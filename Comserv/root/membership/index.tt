@@ -31,6 +31,7 @@
                 <div class="member-actions">
                     <a href="/member/profile" class="btn btn-primary">Update Profile</a>
                     <a href="/member/benefits" class="btn btn-secondary">View Benefits</a>
+                    <a href="[% c.uri_for('/mail/my_subscriptions') %]" class="btn btn-secondary">Email Subscriptions</a>
                 </div>
             </div>
         </div>

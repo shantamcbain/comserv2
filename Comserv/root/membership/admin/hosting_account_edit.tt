@@ -97,15 +97,18 @@
                 [% SET current_addons = acct.requested_addons || '' %]
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.5rem;">
                 [% FOREACH addon IN [
-                    { key = 'beekeeping', label = '🐝 Beekeeping / Apiary' },
-                    { key = 'planning',   label = '📋 Planning Tools' },
-                    { key = 'ai',         label = '🤖 AI Models' },
-                    { key = 'workshops',  label = '🎓 Workshop Calendar' },
-                    { key = 'helpdesk',   label = '🎫 HelpDesk' },
-                    { key = 'foraging',   label = '🌿 Foraging' },
-                    { key = 'ency',       label = '📖 ENCY' },
-                    { key = 'ecommerce',  label = '🛒 Shop / Price List' },
-                    { key = 'membership', label = '👥 Membership Plans' },
+                    { key = 'beekeeping',  label = '🐝 Beekeeping / Apiary' },
+                    { key = 'planning',    label = '📋 Planning Tools' },
+                    { key = 'ai',          label = '🤖 AI Models' },
+                    { key = 'workshops',   label = '🎓 Workshop Calendar' },
+                    { key = 'helpdesk',    label = '🎫 HelpDesk' },
+                    { key = 'foraging',    label = '🌿 Foraging' },
+                    { key = 'ency',        label = '📖 ENCY' },
+                    { key = 'ecommerce',   label = '🛒 Shop / Price List' },
+                    { key = 'membership',  label = '👥 Membership Plans' },
+                    { key = 'accounting',  label = '💰 Accounting / Bookkeeping' },
+                    { key = 'printing_3d', label = '🖨️ 3D Printing' },
+                    { key = 'brew',        label = '🍺 Brew / Brewhouse' },
                 ] %]
                 <label style="display:flex;gap:0.4rem;align-items:center;cursor:pointer;">
                   <input type="checkbox" name="addon_[% addon.key %]" value="1"

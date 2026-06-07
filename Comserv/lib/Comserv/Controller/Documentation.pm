@@ -672,7 +672,7 @@ sub view :Path('/Documentation') :Args(1) {
 
         # Check site access
         if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name && !$is_admin) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
                 "Access denied to page $page: site mismatch ($metadata->{site} vs $site_name)");
             $c->response->status(403);
             $c->stash(
@@ -702,7 +702,7 @@ sub view :Path('/Documentation') :Args(1) {
         }
 
         unless ($has_role) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
                 "Access denied to page $page: insufficient role ($user_role)");
             $c->response->status(403);
             $c->stash(
@@ -932,7 +932,7 @@ sub view :Path('/Documentation') :Args(1) {
         }
 
         unless ($unreg_ok) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
                 "Access denied to unregistered page $page: insufficient role ($user_role)");
             $c->response->status(403);
             $c->stash(
@@ -2090,13 +2090,15 @@ sub _apply_json_roles_to_memory {
     my $memory_pages = $self->documentation_pages;
     my $synced = 0;
     foreach my $page_name (keys %$json_pages) {
-        if (exists $memory_pages->{$page_name} && ref $json_pages->{$page_name}->{roles} eq 'ARRAY') {
-            $memory_pages->{$page_name}->{roles} = $json_pages->{$page_name}->{roles};
+        if (exists $memory_pages->{$page_name}) {
+            my $jp = $json_pages->{$page_name};
+            $memory_pages->{$page_name}->{roles} = $jp->{roles} if ref $jp->{roles} eq 'ARRAY';
+            $memory_pages->{$page_name}->{site}  = $jp->{site}  if defined $jp->{site};
             $synced++;
         }
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_json_roles_to_memory',
-        "Synced roles from JSON config into memory for $synced pages");
+        "Synced roles+site from JSON config into memory for $synced pages");
 }
 
 # Helper method to clean data structure for JSON encoding

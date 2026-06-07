@@ -28,12 +28,27 @@
     <!-- Always show the form regardless of auth status -->
     <form method="POST" action="[% c.uri_for('/proxmox/create_vm_action') %]" class="vm-creation-form">
         <div class="form-section">
+            <h2>VM Type Preset</h2>
+            <div class="form-group">
+                <label for="vm_type">VM Type:</label>
+                <select id="vm_type" name="vm_type" onchange="applyVmPreset()">
+                    <option value="generic">Generic / Custom</option>
+                    <option value="database" [% IF form_data.vm_type == 'database' %]selected[% END %]>Database Server (MySQL + PostgreSQL)</option>
+                    <option value="web" [% IF form_data.vm_type == 'web' %]selected[% END %]>Web Server</option>
+                    <option value="mail" [% IF form_data.vm_type == 'mail' %]selected[% END %]>Mail Server</option>
+                    <option value="proxy" [% IF form_data.vm_type == 'proxy' %]selected[% END %]>Reverse Proxy / Gateway</option>
+                </select>
+                <span class="help-text">Choose a preset to auto-fill recommended resources</span>
+            </div>
+        </div>
+
+        <div class="form-section">
             <h2>Basic Information</h2>
             
             <div class="form-group">
                 <label for="hostname">Hostname:</label>
                 <input type="text" id="hostname" name="hostname" required 
-                       placeholder="e.g., mailserver-vm" value="[% form_data.hostname %]">
+                       placeholder="e.g., db-server-01" value="[% form_data.hostname %]">
                 <span class="help-text">Name for your virtual machine</span>
             </div>
             
@@ -89,16 +104,16 @@
             <h2>Operating System</h2>
             
             <div class="form-group">
-                <label for="template">OS Template:</label>
-                <select id="template" name="template" required>
-                    <option value="">-- Select a template --</option>
-                    [% FOREACH template IN templates %]
-                    <option value="[% template.id %]" [% IF form_data.template == template.id %]selected[% END %]>
-                        [% template.name %]
+                <label for="template">Boot ISO (optional):</label>
+                <select id="template" name="template">
+                    <option value="">-- No ISO / blank disk --</option>
+                    [% FOREACH tmpl IN templates %]
+                    <option value="[% tmpl.id %]" [% IF form_data.template == tmpl.id %]selected[% END %]>
+                        [% tmpl.name %] ([% tmpl.storage %])
                     </option>
                     [% END %]
                 </select>
-                <span class="help-text">Operating system template to use</span>
+                <span class="help-text">ISO image to boot from for OS installation. Leave blank to create an empty disk.</span>
             </div>
         </div>
         
@@ -117,9 +132,19 @@
             <div id="static_ip_fields" style="display: none;">
                 <div class="form-group">
                     <label for="ip_address">IP Address:</label>
-                    <input type="text" id="ip_address" name="ip_address" 
-                           placeholder="e.g., 192.168.1.100" value="[% form_data.ip_address %]">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="text" id="ip_address" name="ip_address"
+                               placeholder="e.g., 192.168.1.100" value="[% form_data.ip_address %]"
+                               style="flex:1;">
+                        <button type="button" id="suggest_ip_btn" onclick="suggestAvailableIP()"
+                                style="white-space:nowrap;padding:6px 12px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                            🔍 Available IPs
+                        </button>
+                    </div>
                     <span class="help-text">Static IP address for the VM</span>
+                    <div id="ip_suggestions" style="display:none;margin-top:8px;border:1px solid #17a2b8;border-radius:4px;background:#f0fafc;padding:10px;">
+                        <div id="ip_suggestions_content"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -160,6 +185,34 @@
             </div>
         </div>
         
+        <div id="db_services_section" class="form-section" style="display:none;">
+            <h2>Database Services</h2>
+            <p class="help-text" style="margin-bottom:12px;">Select the database engines to document for installation on this VM.</p>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="db_mysql" name="db_services" value="mysql"
+                       [% IF form_data.db_services.grep('mysql').size %]checked[% END %]>
+                <label for="db_mysql">MySQL</label>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="db_postgresql" name="db_services" value="postgresql"
+                       [% IF form_data.db_services.grep('postgresql').size %]checked[% END %]>
+                <label for="db_postgresql">PostgreSQL</label>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="db_redis" name="db_services" value="redis"
+                       [% IF form_data.db_services.grep('redis').size %]checked[% END %]>
+                <label for="db_redis">Redis (cache)</label>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+                <label for="db_port_mysql">MySQL Port:</label>
+                <input type="number" id="db_port_mysql" name="db_port_mysql" value="[% form_data.db_port_mysql || 3306 %]" style="width:120px;">
+            </div>
+            <div class="form-group">
+                <label for="db_port_postgresql">PostgreSQL Port:</label>
+                <input type="number" id="db_port_postgresql" name="db_port_postgresql" value="[% form_data.db_port_postgresql || 5432 %]" style="width:120px;">
+            </div>
+        </div>
+
         <div class="form-actions">
             <button type="submit" class="btn-primary">Create Virtual Machine</button>
             <button type="button" class="btn-secondary" onclick="window.location.href='[% c.uri_for('/proxmox') %]'">Cancel</button>
@@ -307,208 +360,131 @@ button {
 </style>
 
 <script>
-function toggleNetworkFields() {
-    var networkType = document.getElementById('network_type').value;
-    var staticFields = document.getElementById('static_ip_fields');
-    
-    if (networkType === 'static') {
-        staticFields.style.display = 'block';
-    } else {
-        staticFields.style.display = 'none';
+var VM_PRESETS = {
+    database: { cpu: 4, memory: 8192, disk_size: 100, hostnamePrefix: 'db-',
+                description: 'Database server running MySQL and PostgreSQL' },
+    web:      { cpu: 2, memory: 4096, disk_size: 40,  hostnamePrefix: 'web-',
+                description: 'Web application server' },
+    mail:     { cpu: 2, memory: 4096, disk_size: 80,  hostnamePrefix: 'mail-',
+                description: 'Mail server (SMTP/IMAP)' },
+    proxy:    { cpu: 2, memory: 2048, disk_size: 20,  hostnamePrefix: 'proxy-',
+                description: 'Reverse proxy / gateway' },
+    generic:  {}
+};
+
+function applyVmPreset() {
+    var type = document.getElementById('vm_type').value;
+    var preset = VM_PRESETS[type] || {};
+    var dbSection = document.getElementById('db_services_section');
+
+    if (preset.cpu) {
+        var cpuSel = document.getElementById('cpu');
+        for (var i = 0; i < cpuSel.options.length; i++) {
+            if (parseInt(cpuSel.options[i].value) === preset.cpu) {
+                cpuSel.selectedIndex = i; break;
+            }
+        }
+    }
+    if (preset.memory) {
+        var memSel = document.getElementById('memory');
+        for (var i = 0; i < memSel.options.length; i++) {
+            if (parseInt(memSel.options[i].value) === preset.memory) {
+                memSel.selectedIndex = i; break;
+            }
+        }
+    }
+    if (preset.disk_size) {
+        var diskSel = document.getElementById('disk_size');
+        for (var i = 0; i < diskSel.options.length; i++) {
+            if (parseInt(diskSel.options[i].value) === preset.disk_size) {
+                diskSel.selectedIndex = i; break;
+            }
+        }
+    }
+    if (preset.hostnamePrefix) {
+        var hn = document.getElementById('hostname');
+        if (!hn.value || Object.values(VM_PRESETS).some(function(p) {
+                return p.hostnamePrefix && hn.value === p.hostnamePrefix; })) {
+            hn.value = preset.hostnamePrefix;
+        }
+    }
+    if (preset.description) {
+        var desc = document.getElementById('description');
+        if (!desc.value) desc.value = preset.description;
+    }
+
+    dbSection.style.display = (type === 'database') ? 'block' : 'none';
+    if (type === 'database') {
+        document.getElementById('db_mysql').checked = true;
+        document.getElementById('db_postgresql').checked = true;
     }
 }
 
-// Initialize on page load
+function toggleNetworkFields() {
+    var networkType = document.getElementById('network_type').value;
+    var staticFields = document.getElementById('static_ip_fields');
+    staticFields.style.display = (networkType === 'static') ? 'block' : 'none';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     toggleNetworkFields();
+    applyVmPreset();
 });
+
+function suggestAvailableIP() {
+    var btn = document.getElementById('suggest_ip_btn');
+    var box = document.getElementById('ip_suggestions');
+    var content = document.getElementById('ip_suggestions_content');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Checking…';
+    box.style.display = 'block';
+    content.innerHTML = '<em style="color:#666;">Querying network map and DHCP leases…</em>';
+
+    var subnet = '192.168.1';
+    var ipVal = document.getElementById('ip_address').value.trim();
+    if (ipVal && ipVal.match(/^(\d+\.\d+\.\d+)\.\d+$/)) {
+        subnet = ipVal.match(/^(\d+\.\d+\.\d+)\.\d+$/)[1];
+    }
+
+    fetch('[% c.uri_for("/proxmox/available_ips") %]?subnet=' + encodeURIComponent(subnet))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = '🔍 Available IPs';
+
+            if (!data.available || data.available.length === 0) {
+                content.innerHTML = '<span style="color:#c0392b;">No available IPs found in ' + data.subnet + '</span>';
+                return;
+            }
+
+            var html = '<strong style="color:#17a2b8;">Available in ' + data.subnet + ':</strong><br>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">';
+            data.available.forEach(function(ip) {
+                html += '<button type="button" onclick="selectIP(\'' + ip + '\')" ' +
+                    'style="padding:4px 10px;background:#28a745;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:0.88em;">' +
+                    ip + '</button>';
+            });
+            html += '</div>';
+
+            if (data.used && data.used.length > 0) {
+                html += '<details style="margin-top:8px;"><summary style="cursor:pointer;color:#666;font-size:0.88em;">In use (' + data.used.length + ')</summary><ul style="margin:4px 0 0 16px;font-size:0.85em;color:#555;">';
+                data.used.forEach(function(u) {
+                    html += '<li>' + u.ip + ' — ' + u.reason + '</li>';
+                });
+                html += '</ul></details>';
+            }
+            content.innerHTML = html;
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = '🔍 Available IPs';
+            content.innerHTML = '<span style="color:#c0392b;">Error: ' + err.message + '</span>';
+        });
+}
+
+function selectIP(ip) {
+    document.getElementById('ip_address').value = ip;
+    document.getElementById('ip_suggestions').style.display = 'none';
+}
 </script>[% META title = 'Create New Virtual Machine' %]
-
-<div class="container">
-    <h1>Create New Virtual Machine</h1>
-    
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h2>VM Configuration</h2>
-                </div>
-                <div class="card-body">
-                    [% IF error_msg %]
-                    <div class="alert alert-danger">
-                        [% error_msg %]
-                    </div>
-                    [% END %]
-                    
-                    <form method="post" action="[% c.uri_for('/proxmox/create_vm') %]" class="needs-validation" novalidate>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h3>VM Template</h3>
-                                <div class="form-group mb-3">
-                                    <label for="template_id">Select Template:</label>
-                                    <select id="template_id" name="template_id" class="form-control" required>
-                                        <option value="">-- Select a Template --</option>
-                                        [% FOREACH template IN templates %]
-                                        <option value="[% template.id %]" data-file="[% template.file %]">[% template.name %]</option>
-                                        [% END %]
-                                    </select>
-                                    <input type="hidden" id="template_file" name="template_file" value="">
-                                    <div class="invalid-feedback">
-                                        Please select a template.
-                                    </div>
-                                </div>
-                                
-                                <h3>Hardware Configuration</h3>
-                                <div class="form-group mb-3">
-                                    <label for="cpu">CPU Cores:</label>
-                                    <select id="cpu" name="cpu" class="form-control" required>
-                                        [% FOREACH cpu IN cpu_options %]
-                                        <option value="[% cpu %]">[% cpu %] CPU Core[% IF cpu > 1 %]s[% END %]</option>
-                                        [% END %]
-                                    </select>
-                                    <div class="invalid-feedback">
-                                        Please select CPU cores.
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group mb-3">
-                                    <label for="memory">Memory:</label>
-                                    <select id="memory" name="memory" class="form-control" required>
-                                        [% FOREACH mem IN memory_options %]
-                                        <option value="[% mem.value %]">[% mem.label %]</option>
-                                        [% END %]
-                                    </select>
-                                    <div class="invalid-feedback">
-                                        Please select memory size.
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group mb-3">
-                                    <label for="disk_size">Disk Size:</label>
-                                    <select id="disk_size" name="disk_size" class="form-control" required>
-                                        [% FOREACH disk IN disk_options %]
-                                        <option value="[% disk.value %]">[% disk.label %]</option>
-                                        [% END %]
-                                    </select>
-                                    <div class="invalid-feedback">
-                                        Please select disk size.
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <h3>VM Identity</h3>
-                                <div class="form-group mb-3">
-                                    <label for="hostname">Hostname:</label>
-                                    <input type="text" id="hostname" name="hostname" class="form-control" required 
-                                           value="[% form_data.hostname | html %]" placeholder="e.g., webserver">
-                                    <div class="invalid-feedback">
-                                        Please enter a hostname.
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group mb-3">
-                                    <label for="domain">Domain:</label>
-                                    <input type="text" id="domain" name="domain" class="form-control" required 
-                                           value="[% form_data.domain | html %]" placeholder="e.g., example.com">
-                                    <div class="invalid-feedback">
-                                        Please enter a domain.
-                                    </div>
-                                </div>
-                                
-                                <h3>User Credentials</h3>
-                                <div class="form-group mb-3">
-                                    <label for="username">Username:</label>
-                                    <input type="text" id="username" name="username" class="form-control" required 
-                                           value="[% form_data.username | html %]" placeholder="e.g., admin">
-                                    <div class="invalid-feedback">
-                                        Please enter a username.
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group mb-3">
-                                    <label for="password">Password:</label>
-                                    <input type="password" id="password" name="password" class="form-control" required>
-                                    <div class="invalid-feedback">
-                                        Please enter a password.
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group mb-3">
-                                    <label for="confirm_password">Confirm Password:</label>
-                                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
-                                    <div class="invalid-feedback">
-                                        Please confirm your password.
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group mt-4">
-                            <button type="submit" class="btn btn-primary">Create VM</button>
-                            <a href="[% c.uri_for('/proxmox') %]" class="btn btn-secondary">Cancel</a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-// Form validation
-(function() {
-    'use strict';
-    window.addEventListener('load', function() {
-        // Fetch all the forms we want to apply custom Bootstrap validation styles to
-        var forms = document.getElementsByClassName('needs-validation');
-        // Loop over them and prevent submission
-        var validation = Array.prototype.filter.call(forms, function(form) {
-            form.addEventListener('submit', function(event) {
-                if (form.checkValidity() === false) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                } else {
-                    // Check if passwords match
-                    var password = document.getElementById('password');
-                    var confirm = document.getElementById('confirm_password');
-                    
-                    if (password.value !== confirm.value) {
-                        confirm.setCustomValidity('Passwords do not match');
-                        event.preventDefault();
-                        event.stopPropagation();
-                    } else {
-                        confirm.setCustomValidity('');
-                    }
-                }
-                form.classList.add('was-validated');
-            }, false);
-        });
-        
-        // Set template file when template is selected
-        document.getElementById('template_id').addEventListener('change', function() {
-            var select = this;
-            var option = select.options[select.selectedIndex];
-            var fileInput = document.getElementById('template_file');
-            
-            if (option && option.dataset.file) {
-                fileInput.value = option.dataset.file;
-            } else {
-                fileInput.value = '';
-            }
-        });
-        
-        // Password confirmation validation
-        document.getElementById('confirm_password').addEventListener('input', function() {
-            var password = document.getElementById('password');
-            var confirm = document.getElementById('confirm_password');
-            
-            if (password.value !== confirm.value) {
-                confirm.setCustomValidity('Passwords do not match');
-            } else {
-                confirm.setCustomValidity('');
-            }
-        });
-    }, false);
-})();
-</script>

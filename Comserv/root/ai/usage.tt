@@ -1,0 +1,294 @@
+[%# AI Usage Monitor - for customer billing and system usage anticipation
+   # Shows provider breakdown (grok vs ollama etc), tokens, estimated costs, per-site
+   # so operators can bill AI-enabled customers and plan capacity (local GPU load vs paid API spend).
+%]
+[%- 
+  # simple number format helper
+  MACRO fmt_num(n) BLOCK; n | format('%d'); END;
+  MACRO fmt_cost(c) BLOCK; c | format('%.4f'); END;
+-%]
+
+<div class="ai-usage-page" style="max-width:1200px;margin:0 auto;padding:1rem;">
+  <h1>🤖 AI Usage Monitor</h1>
+  <p class="muted">Track usage for billing customers with AI enabled + anticipate load on providers (local Ollama hosts vs xAI/Grok/OpenAI).</p>
+
+  [% IF error %]<div class="alert alert-error">[% error %]</div>[% END %]
+  [% IF success_msg %]<div class="alert alert-success">[% success_msg %]</div>[% END %]
+
+  <!-- Live xAI / Grok balance check -->
+  <div style="margin:16px 0; padding:12px; border:1px solid #ccc; border-radius:6px; background:#fafafa;">
+    <h3 style="margin-top:0;">Live xAI / Grok Balance &amp; Usage</h3>
+    <p style="font-size:0.9em; color:#555;">Check the real status from xAI (via the active system Grok key) + our internal tracked spend from ai_usage_logs. Use this to know exactly where you are and trigger refill alerts / be more careful. <strong>Balance check calls are logged separately</strong> (as request_type=grok_balance_check, 0 tokens) so the "real chat" Grok usage numbers are not inflated. They still count for overall Grok provider usage if you want them to.</p>
+    <button type="button" onclick="checkLiveGrokBalance()" style="padding:6px 14px;">Check Live xAI Balance / Usage</button>
+    <div style="margin-top:8px;">
+      <input type="number" id="declare-xai-balance" step="0.01" placeholder="e.g. 42.50" style="width:120px; padding:4px;" />
+      <button type="button" onclick="declareAndCheckBalance()" style="padding:6px 14px;">Declare current balance from console.x.ai &amp; refresh</button>
+      <small style="color:#666;">(This stores it with your Grok key so we can show estimated remaining = declared - tracked spend)</small>
+    </div>
+    <div id="grok-live-result" style="margin-top:10px; font-family: monospace; white-space: pre-wrap; font-size:0.85em;"></div>
+  </div>
+
+  <script>
+    async function checkLiveGrokBalance(declareVal) {
+      const el = document.getElementById('grok-live-result');
+      el.textContent = 'Querying xAI and internal logs...';
+      let url = '/ai/grok_balance';
+      
+      // If no explicit declareVal passed, check the input field (so user can type and click the main Check button)
+      if (declareVal == null || declareVal === '') {
+        const input = document.getElementById('declare-xai-balance');
+        if (input) {
+          declareVal = input.value.trim();
+        }
+      }
+      
+      if (declareVal != null && declareVal !== '') {
+        url += '?declare_balance=' + encodeURIComponent(declareVal);
+      }
+      
+      try {
+        const r = await fetch(url, { credentials: 'include' });
+        const data = await r.json();
+        let html = '';
+        if (data.success) {
+          html += 'Key source: ' + (data.key_source || 'unknown') + '\n';
+          if (data.live && !data.live.error) {
+            html += 'Live from xAI:\n' + JSON.stringify(data.live, null, 2) + '\n\n';
+          } else if (data.live && data.live.error) {
+            html += 'Live xAI error: ' + data.live.error + '\nNote: ' + (data.live.note || '') + '\n\n';
+          }
+          
+          // Show declared balance + estimated remaining if present
+          if (data.internal && data.internal.declared_balance != null) {
+            const decl = data.internal.declared_balance;
+            const spent = data.internal.estimated_spend_since_declared || 0;
+            const remaining = (decl - spent).toFixed(4);
+            html += 'Declared xAI balance: $' + decl + ' (on ' + (data.internal.declared_at || 'unknown') + ')\n';
+            html += 'Tracked spend since declaration: $' + spent + '\n';
+            html += 'Estimated remaining: $' + remaining + '\n\n';
+          }
+          
+          // Show separated real usage vs diagnostic balance checks
+          var totalCalls = (data.internal && data.internal.calls || 0);
+          var realCalls = (data.internal && data.internal.real_grok_calls || 0);
+          var checkCalls = (data.internal && data.internal.balance_check_calls || 0);
+          
+          html += 'Our internal tracking (last ~30d Grok calls):\n';
+          html += '  Total calls: ' + totalCalls + ' (real chat: ' + realCalls + ', balance checks: ' + checkCalls + ')\n';
+          html += '  Real chat tokens: ' + (data.internal && data.internal.real_grok_tokens || 0) + '\n';
+          html += '  Real chat est. cost: $' + (data.internal && data.internal.real_grok_cost || '0') + '\n';
+          if (data.internal && data.internal.by_site) {
+            html += '  By site (all): ' + JSON.stringify(data.internal.by_site) + '\n';
+          }
+          
+          // All-time for the user (more relevant for balance awareness)
+          if (data.internal && data.internal.user_all_time_calls) {
+            html += '\nAll-time tracked for your user (real + checks):\n';
+            html += '  Calls: ' + data.internal.user_all_time_calls + '\n';
+            html += '  Tokens: ' + data.internal.user_all_time_tokens + '\n';
+            html += '  Est. cost: $' + data.internal.user_all_time_cost + '\n';
+          }
+          
+          if (data.alert) {
+            html += '\n⚠️ ALERT: ' + (data.alert_msg || 'High spend or low balance detected. Refill recommended at console.x.ai');
+            setTimeout(() => alert('Grok/xAI Alert: ' + (data.alert_msg || 'Check usage and consider refilling.')), 300);
+          }
+          if (data.note) {
+            html += '\n' + data.note;
+          }
+        } else {
+          html = 'Error: ' + (data.error || 'Unknown');
+        }
+        el.textContent = html;
+      } catch (e) {
+        // Improved error reporting so you see the real problem instead of a generic message
+        el.textContent = 'Error fetching /ai/grok_balance:\n' + e.message +
+          '\n\nPossible causes:\n' +
+          '- You are not logged in (or the session expired)\n' +
+          '- The Grok key for this user is missing or not marked active\n' +
+          '- Server error (check application.log for the real Perl error)\n\n' +
+          'Try a hard refresh (Ctrl+Shift+R) of this page and make sure you are logged in as the user who owns the Grok key.';
+      }
+    }
+    
+    function declareAndCheckBalance() {
+      const input = document.getElementById('declare-xai-balance');
+      const val = input ? input.value.trim() : '';
+      if (!val) {
+        alert('Enter your current balance from console.x.ai first.');
+        return;
+      }
+      checkLiveGrokBalance(val);
+    }
+  </script>
+
+  <!-- Filters -->
+  <form method="GET" class="ai-usage-filters" style="background:#f8f9fa;padding:12px;border-radius:6px;margin:12px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+    <div>
+      <label>Days</label><br>
+      <select name="days">
+        [% FOREACH d IN [7,14,30,60,90] %]
+          <option value="[% d %]" [% IF filters.days == d %]selected[% END %]>[% d %] days</option>
+        [% END %]
+      </select>
+    </div>
+    <div>
+      <label>Provider</label><br>
+      <select name="provider">
+        <option value="">All</option>
+        [% FOREACH p IN providers %]
+          <option value="[% p %]" [% IF filters.provider == p %]selected[% END %]>[% p %]</option>
+        [% END %]
+      </select>
+    </div>
+    [% IF is_admin %]
+    <div>
+      <label>Site / Customer</label><br>
+      <select name="site_id">
+        <option value="">All sites</option>
+        [% FOREACH s IN sites %]
+          <option value="[% s.id %]" [% IF filters.site_id == s.id %]selected[% END %]>[% s.name %] (#[% s.id %])</option>
+        [% END %]
+      </select>
+    </div>
+    [% END %]
+    <div>
+      <label>Model contains</label><br>
+      <input type="text" name="model" value="[% filters.model | html %]" placeholder="grok-3, llama...">
+    </div>
+    <div>
+      <button type="submit" class="btn">Filter</button>
+      <a href="?" class="btn btn-secondary" style="margin-left:4px;">Reset</a>
+    </div>
+    <div style="margin-left:auto;font-size:0.9em;color:#555;">
+      Showing up to 200 recent records for the period.
+    </div>
+  </form>
+
+  <!-- Summary cards -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
+      <div style="font-size:0.85em;color:#666;">Total Calls</div>
+      <div style="font-size:1.8em;font-weight:600;">[% summary.total_calls %]</div>
+    </div>
+    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
+      <div style="font-size:0.85em;color:#666;">Total Tokens</div>
+      <div style="font-size:1.8em;font-weight:600;">[% summary.total_tokens %]</div>
+    </div>
+    <div style="flex:1;min-width:180px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:12px;">
+      <div style="font-size:0.85em;color:#666;">Est. External Cost (USD)</div>
+      <div style="font-size:1.8em;font-weight:600;color:#0a0;">$[% summary.total_cost %]</div>
+      <div style="font-size:0.75em;color:#888;">(local/ollama = $0; paid providers only)</div>
+    </div>
+  </div>
+
+  <!-- By Provider breakdown -->
+  <h3 style="margin-top:0;">By Provider (for anticipating paid vs local spend/load)</h3>
+  <table class="table" style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+    <thead><tr style="background:#f0f0f0;"><th>Provider</th><th>Calls</th><th>Tokens</th><th>Est. Cost USD</th></tr></thead>
+    <tbody>
+    [% FOREACH p IN summary.by_provider.keys.sort %]
+      <tr>
+        <td><strong>[% p %]</strong></td>
+        <td>[% summary.by_provider.$p.calls %]</td>
+        <td>[% summary.by_provider.$p.tokens %]</td>
+        <td>$[% fmt_cost(summary.by_provider.$p.cost) %]</td>
+      </tr>
+    [% END %]
+    [% IF ! summary.by_provider.size %]<tr><td colspan="4" class="muted">No data for filters.</td></tr>[% END %]
+    </tbody>
+  </table>
+
+  [% IF is_admin %]
+  <!-- By Site / Customer (billing view) -->
+  <h3>By Site / Customer (for billing AI-enabled accounts + free quota harmony)</h3>
+  <p style="font-size:0.9em;color:#555;">Free daily calls come from the site's active MembershipPlan.ai_requests_per_day (the "included with AI addon" allowance). Local Ollama calls primarily consume the free quota. Paid providers (grok etc.) are tracked for cost even when under quota.</p>
+  <table class="table" style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+    <thead><tr style="background:#f0f0f0;"><th>Site ID</th><th>Plan Free/Day</th><th>Calls (free / over)</th><th>Tokens</th><th>Est. Cost</th></tr></thead>
+    <tbody>
+    [% FOREACH sid IN summary.by_site.keys.sort %]
+      <tr>
+        <td><a href="/ai/usage?site_id=[% sid %]">[% sid %]</a></td>
+        <td>[% summary.by_site.$sid.plan_quota || '—' %]</td>
+        <td>
+          [% summary.by_site.$sid.calls %]
+          [% IF summary.by_site.$sid.free_calls OR summary.by_site.$sid.overage_calls %]
+            <br><small>(free: [% summary.by_site.$sid.free_calls || 0 %] / over: [% summary.by_site.$sid.overage_calls || 0 %])</small>
+          [% END %]
+        </td>
+        <td>[% summary.by_site.$sid.tokens %]</td>
+        <td>$[% fmt_cost(summary.by_site.$sid.cost) %]</td>
+      </tr>
+    [% END %]
+    [% IF ! summary.by_site.size %]<tr><td colspan="5" class="muted">No per-site data.</td></tr>[% END %]
+    </tbody>
+  </table>
+  [% END %]
+
+  <!-- Recent logs table -->
+  <h3>Recent AI Calls (latest 200)</h3>
+  <table class="table ai-usage-table" style="width:100%;font-size:0.9em;border-collapse:collapse;">
+    <thead>
+      <tr style="background:#f0f0f0;">
+        <th>When</th>
+        <th>Provider / Model</th>
+        <th>User/Site</th>
+        <th style="text-align:right;">Tokens (in/out/total)</th>
+        <th style="text-align:right;">Cost</th>
+        <th>Dur</th>
+        <th>Status</th>
+        <th>Type</th>
+      </tr>
+    </thead>
+    <tbody>
+    [% FOREACH log IN logs %]
+      <tr style="border-bottom:1px solid #eee;[% IF log.status != 'success' %]background:#fff3f3;[% END %]">
+        <td>[% log.created_at.strftime('%Y-%m-%d %H:%M') IF log.created_at %]</td>
+        <td>
+          <strong>[% log.provider %]</strong><br>
+          <small>[% log.model %]</small>
+          [% IF log.ollama_host %]<br><small style="color:#666;">@ [% log.ollama_host %]</small>[% END %]
+        </td>
+        <td>
+          u:[% log.user_id || 'guest' %]<br>
+          <small>s:[% log.site_id || '-' %] [% IF log.guest_session_id %]<span title="guest">g</span>[% END %]</small>
+        </td>
+        <td style="text-align:right;white-space:nowrap;">
+          [% log.prompt_tokens || 0 %] / [% log.completion_tokens || 0 %]<br>
+          <strong>[% log.total_tokens || 0 %]</strong>
+        </td>
+        <td style="text-align:right;">$[% fmt_cost(log.estimated_cost_usd) %]</td>
+        <td>[% log.duration_ms ? (log.duration_ms / 1000) _ 's' : '-' %]</td>
+        <td>
+          [% IF log.status == 'success' %]
+            <span style="color:#0a0;">✓</span>
+          [% ELSE %]
+            <span style="color:#c00;" title="[% log.error_message | html %]">✗ [% log.status %]</span>
+          [% END %]
+        </td>
+        <td><small>[% log.request_type %]</small></td>
+      </tr>
+    [% END %]
+    [% IF ! logs.size %]
+      <tr><td colspan="8" class="muted" style="padding:20px;text-align:center;">No AI usage records match the current filters.</td></tr>
+    [% END %]
+    </tbody>
+  </table>
+
+  <div style="margin-top:20px;font-size:0.85em;color:#666;">
+    Notes: 
+    <ul>
+      <li>Local Ollama usage is tracked for capacity planning (your GPU/CPU hosts). Cost is always $0.</li>
+      <li>External providers (grok/xAI etc.) show rough estimated cost based on current token pricing — use for customer billing quotes and actual invoices.</li>
+      <li>Customers with AI enabled are those whose MembershipPlan includes ai_* services or ai_models_allowed.</li>
+      <li>For full exports / heavy reporting, query the <code>ai_usage_logs</code> table directly or extend this page.</li>
+    </ul>
+    <p><a href="/ai">← Back to AI Chat</a> &nbsp; | &nbsp; <a href="/ai/conversations">Chat History</a> &nbsp; | &nbsp; <a href="/membership/admin">Membership / Plans (AI enablement)</a></p>
+  </div>
+</div>
+
+<style>
+.ai-usage-page .table td, .ai-usage-page .table th { padding: 6px 8px; vertical-align: top; }
+.ai-usage-page .muted { color:#888; }
+.ai-usage-page select, .ai-usage-page input { padding:4px 6px; }
+</style>

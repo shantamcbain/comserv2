@@ -495,6 +495,121 @@ This is an automated notification.
     return $self->send_email($c, $email, $smtp_config);
 }
 
+sub send_admin_profile_completion_notification {
+    my ($self, $c, $user) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_admin_profile_completion_notification',
+        "Sending Step 3 completion notification for user: " . $user->username);
+
+    my $sitename    = $c->stash->{SiteName} || 'CSC';
+    my $smtp_config = $self->get_smtp_config($c, $sitename);
+
+    unless ($smtp_config->{smtp_host}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_admin_profile_completion_notification',
+            "No SMTP configuration — notification not sent");
+        return 0;
+    }
+
+    my $site        = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    my $admin_email = ($site && $site->mail_to_admin)
+        ? $site->mail_to_admin
+        : 'helpdesk@computersystemconsulting.ca';
+
+    my $timestamp   = scalar localtime;
+    my $admin_link  = $c->uri_for('/user/admin_user_list')->as_string;
+
+    my $full_name   = join(' ', grep { $_ } ($user->first_name, $user->last_name)) || $user->username;
+
+    my $body = qq{
+Registration Complete (Step 3 of 3) — $sitename
+Time: $timestamp
+
+A user has completed full account setup and is now active:
+
+  Username  : } . $user->username . qq{
+  Full Name : $full_name
+  Email     : } . $user->email . qq{
+  User ID   : } . $user->id . qq{
+  Status    : } . ($user->status || 'active') . qq{
+  Roles     : } . ($user->roles || 'normal') . qq{
+
+The account is fully activated and the user can now log in.
+
+View user list: $admin_link
+
+This is an automated notification.
+};
+
+    my $email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@' . $smtp_config->{smtp_host},
+            To      => $admin_email,
+            Subject => "[$sitename] Registration complete: " . $user->username,
+        ],
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+
+    return $self->send_email($c, $email, $smtp_config);
+}
+
+sub send_admin_email_verified_notification {
+    my ($self, $c, $user) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_admin_email_verified_notification',
+        "Sending Step 2 completion notification for user: " . $user->username);
+
+    my $sitename    = $c->stash->{SiteName} || 'CSC';
+    my $smtp_config = $self->get_smtp_config($c, $sitename);
+
+    unless ($smtp_config->{smtp_host}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_admin_email_verified_notification',
+            "No SMTP configuration — notification not sent");
+        return 0;
+    }
+
+    my $site        = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    my $admin_email = ($site && $site->mail_to_admin)
+        ? $site->mail_to_admin
+        : 'helpdesk@computersystemconsulting.ca';
+
+    my $timestamp   = scalar localtime;
+
+    my $body = qq{
+Email Verified (Step 2 of 3) — $sitename
+Time: $timestamp
+
+The user has successfully verified their email address and proceeded to profile completion:
+
+  Username  : } . $user->username . qq{
+  Email     : } . $user->email . qq{
+  User ID   : } . $user->id . qq{
+  Status    : } . ($user->status || 'pending_verification') . qq{
+
+The user is now filling out their profile to complete the setup.
+
+This is an automated notification.
+};
+
+    my $email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@' . $smtp_config->{smtp_host},
+            To      => $admin_email,
+            Subject => "[$sitename] Email verified: " . $user->username,
+        ],
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+
+    return $self->send_email($c, $email, $smtp_config);
+}
+
 sub send_hosting_signup_notification {
     my ($self, $c, $account) = @_;
 
@@ -506,7 +621,6 @@ sub send_hosting_signup_notification {
         ? $csc_site->mail_to_admin
         : 'helpdesk@computersystemconsulting.ca';
 
-    # Always use the canonical CSC URL — not the submitting server's URL
     my $approve_url = 'https://computersystemconsulting.ca/membership/admin/hosting_accounts';
 
     my $timestamp = scalar localtime;
@@ -537,38 +651,46 @@ is confirmed.
 This is an automated notification from the Comserv platform.
 };
 
-    # Collect recipients: CSC admin email + all users whose global roles include admin or accounting
-    # (global roles = users.roles column; site-specific roles are in user_site_roles and not checked here)
     my %seen_emails = ($csc_email => 1);
     my @recipients  = ($csc_email);
     eval {
-        my @admin_users = $c->model('DBEncy')->resultset('User')->search(
-            [
-                { roles => { -like => '%admin%'      }, status => 'active', email_notifications => 1 },
-                { roles => { -like => '%accounting%' }, status => 'active', email_notifications => 1 },
-            ],
-            { columns => ['email'] }
-        )->all;
-        for my $u (@admin_users) {
-            next unless $u->email;
-            next if $seen_emails{ $u->email }++;
-            push @recipients, $u->email;
+        my $schema = $c->model('DBEncy');
+        my $csc_site = $schema->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @site_roles = $schema->resultset('UserSiteRole')->search(
+                {
+                    site_id  => $csc_site->id,
+                    role     => { -in => ['admin', 'accounting'] },
+                    is_active => 1,
+                },
+                { prefetch => 'user' }
+            )->all;
+            for my $sr (@site_roles) {
+                my $u = eval { $sr->user } or next;
+                next unless $u && $u->email && ($u->status // '') eq 'active'
+                         && ($u->email_notifications // 0);
+                next if $seen_emails{ $u->email }++;
+                push @recipients, $u->email;
+            }
         }
     };
 
-    my $to_header = join(', ', @recipients);
-
-    my $email = Email::MIME->create(
-        header_str => [
-            From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
-            To      => $to_header,
-            Subject => "[CSC] Hosting registration request: " . $account->sitename,
-        ],
-        attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
-        body_str   => $body,
-    );
-
-    return $self->send_email($c, $email, $smtp_config);
+    my $from    = $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca';
+    my $subject = "[CSC] Hosting registration request: " . $account->sitename;
+    my $sent_ok = 0;
+    for my $recipient (@recipients) {
+        my $email = Email::MIME->create(
+            header_str => [
+                From    => $from,
+                To      => $recipient,
+                Subject => $subject,
+            ],
+            attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+            body_str   => $body,
+        );
+        $sent_ok = $self->send_email($c, $email, $smtp_config) || $sent_ok;
+    }
+    return $sent_ok;
 }
 
 sub send_hosting_signup_confirmation {

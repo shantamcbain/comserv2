@@ -239,7 +239,7 @@ sub inspections :Path('/Apiary/inspections') :Args(0) {
 
     my (@recent, %stats);
     eval {
-        my $rs = $schema->resultset('Inspection')->search(
+        my $rs = $schema->resultset('Beekeeping::Inspection')->search(
             \%filter,
             {
                 join     => { hive => 'yard' },
@@ -253,14 +253,14 @@ sub inspections :Path('/Apiary/inspections') :Args(0) {
         my $today       = strftime('%Y-%m-%d', localtime);
         my $month_start = strftime('%Y-%m-01', localtime);
 
-        $stats{total_inspections} = $schema->resultset('Inspection')->count(\%filter);
-        $stats{this_month}        = $schema->resultset('Inspection')->count({
+        $stats{total_inspections} = $schema->resultset('Beekeeping::Inspection')->count(\%filter);
+        $stats{this_month}        = $schema->resultset('Beekeeping::Inspection')->count({
             %filter, inspection_date => { '>=' => $month_start }
         });
-        $stats{pending_actions}   = $schema->resultset('Inspection')->count({
+        $stats{pending_actions}   = $schema->resultset('Beekeeping::Inspection')->count({
             %filter, action_required => { '!=' => undef }
         });
-        $stats{overdue}           = $schema->resultset('Inspection')->count({
+        $stats{overdue}           = $schema->resultset('Beekeeping::Inspection')->count({
             %filter,
             next_inspection_date => { '<' => $today },
         });
@@ -290,7 +290,7 @@ sub inspections_new :Path('/Apiary/inspections/new') :Args(0) {
 
     my @hives;
     eval {
-        @hives = $schema->resultset('Hive')->search(
+        @hives = $schema->resultset('Beekeeping::Hive')->search(
             { 'yard.sitename' => $sitename, 'me.status' => 'active' },
             { join => 'yard', order_by => 'me.hive_number', prefetch => 'yard' }
         );
@@ -326,7 +326,7 @@ sub inspections_create :Path('/Apiary/inspections/create') :Args(0) {
     my $inspection;
     eval {
         $schema->txn_do(sub {
-            $inspection = $schema->resultset('Inspection')->create({
+            $inspection = $schema->resultset('Beekeeping::Inspection')->create({
                 hive_id             => $p->{hive_id},
                 inspection_date     => $p->{inspection_date},
                 start_time          => $p->{start_time}          || undef,
@@ -360,7 +360,7 @@ sub inspections_create :Path('/Apiary/inspections/create') :Args(0) {
             my @box_ids = ref $p->{box_id} ? @{$p->{box_id}} : ($p->{box_id} // ());
             for my $box_id (@box_ids) {
                 next unless $box_id;
-                $schema->resultset('InspectionDetail')->create({
+                $schema->resultset('Beekeeping::InspectionDetail')->create({
                     inspection_id       => $inspection->id,
                     box_id              => $box_id,
                     detail_type         => 'box_summary',
@@ -378,7 +378,7 @@ sub inspections_create :Path('/Apiary/inspections/create') :Args(0) {
 
             # Save feeding records if feeding was done
             if ($p->{feeding_done} && $p->{feed_inventory_item_id}) {
-                $schema->resultset('InspectionFeeding')->create({
+                $schema->resultset('Beekeeping::InspectionFeeding')->create({
                     inspection_id            => $inspection->id,
                     inventory_item_id        => $p->{feed_inventory_item_id},
                     feed_amount              => $p->{feed_amount}              || undef,
@@ -411,7 +411,7 @@ sub inspections_view :Path('/Apiary/inspections/view') :Args(1) {
     my $inspection;
 
     eval {
-        $inspection = $schema->resultset('Inspection')->find(
+        $inspection = $schema->resultset('Beekeeping::Inspection')->find(
             $id,
             {
                 prefetch => [
@@ -458,7 +458,7 @@ sub inspections_edit :Path('/Apiary/inspections/edit') :Args(1) {
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 
     my $schema     = $c->model('DBEncy');
-    my $inspection = $schema->resultset('Inspection')->find(
+    my $inspection = $schema->resultset('Beekeeping::Inspection')->find(
         $id, { prefetch => ['inspection_details', 'inspection_feedings'] }
     );
 
@@ -472,7 +472,7 @@ sub inspections_edit :Path('/Apiary/inspections/edit') :Args(1) {
     my $sitename = $c->session->{SiteName} || $c->session->{sitename};
     my @hives;
     eval {
-        @hives = $schema->resultset('Hive')->search(
+        @hives = $schema->resultset('Beekeeping::Hive')->search(
             { 'yard.sitename' => $sitename, 'me.status' => 'active' },
             { join => 'yard', order_by => 'me.hive_number' }
         );
@@ -497,7 +497,7 @@ sub inspections_update :Path('/Apiary/inspections/update') :Args(1) {
 
     my $schema     = $c->model('DBEncy');
     my $p          = $c->req->params;
-    my $inspection = $schema->resultset('Inspection')->find($id);
+    my $inspection = $schema->resultset('Beekeeping::Inspection')->find($id);
 
     unless ($inspection) {
         $c->flash->{error_msg} = "Inspection #$id not found.";
@@ -561,7 +561,7 @@ sub inspections_reports :Path('/Apiary/inspections/reports') :Args(0) {
 
     my (%by_type, %by_status, %by_month, @action_items);
     eval {
-        my $rs = $schema->resultset('Inspection')->search(
+        my $rs = $schema->resultset('Beekeeping::Inspection')->search(
             {
                 'hive.yard.sitename' => $sitename,
                 inspection_date => {
@@ -603,7 +603,7 @@ sub inspections_calendar :Path('/Apiary/inspections/calendar') :Args(0) {
     eval {
         my $base = { 'hive.yard.sitename' => $sitename };
 
-        @upcoming = $schema->resultset('Inspection')->search(
+        @upcoming = $schema->resultset('Beekeeping::Inspection')->search(
             { %$base, next_inspection_date => { '>=' => $today } },
             {
                 join     => { hive => 'yard' },
@@ -613,7 +613,7 @@ sub inspections_calendar :Path('/Apiary/inspections/calendar') :Args(0) {
             }
         )->all;
 
-        @past_30 = $schema->resultset('Inspection')->search(
+        @past_30 = $schema->resultset('Beekeeping::Inspection')->search(
             {
                 %$base,
                 inspection_date => {
@@ -652,7 +652,7 @@ sub api_queen_search :Path('/Apiary/api/queen_search') :Args(0) {
     if (length($q) >= 2) {
         eval {
             my $schema = $c->model('DBEncy');
-            my @queens = $schema->resultset('Queen')->search(
+            my @queens = $schema->resultset('Beekeeping::Queen')->search(
                 {
                     sitename => $sitename,
                     -or => [
@@ -701,7 +701,7 @@ sub api_hive_frame_layout :Path('/Apiary/api/hive_frame_layout') :Args(1) {
     my @boxes;
     eval {
         my $schema = $c->model('DBEncy');
-        my @box_rs = $schema->resultset('Box')->search(
+        my @box_rs = $schema->resultset('Beekeeping::Box')->search(
             { hive_id => $hive_id, status => 'active' },
             { order_by => 'box_position', prefetch => 'hive_frames' }
         );
@@ -835,6 +835,135 @@ sub api_image_extract :Path('/Apiary/api/image_extract') :Args(0) {
 
     $c->res->body(encode_json({ fields => $fields }));
     $c->detach;
+}
+
+# ============================================================================
+# ============================================================================
+# VOICE RECORDINGS
+# ============================================================================
+
+sub voice_recordings :Path('/Apiary/voice_recordings') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} || '';
+    unless ($username) {
+        $c->response->redirect($c->uri_for('/login'));
+        $c->detach;
+        return;
+    }
+
+    my $sitename = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my @recordings;
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my @audio_rows = $schema->resultset('File')->search(
+            {
+                file_type => 'audio',
+                sitename  => $sitename,
+            },
+            { order_by => { -desc => 'id' }, rows => 50 }
+        )->all;
+
+        my @transcript_rows = $schema->resultset('File')->search(
+            {
+                file_format => 'application/json',
+                sitename    => $sitename,
+                description => { like => 'Whisper transcript%' },
+            },
+            { order_by => { -desc => 'id' } }
+        )->all;
+
+        my %transcripts_by_audio;
+        for my $t (@transcript_rows) {
+            my $desc = $t->description || '';
+            my ($orig) = $desc =~ /Whisper transcript for (.+)$/;
+            $transcripts_by_audio{$orig} = $t if $orig;
+        }
+
+        for my $row (@audio_rows) {
+            my $orig_name = $row->file_name || '';
+            my $trans_row = $transcripts_by_audio{$orig_name};
+            my $transcript_text = '';
+            if ($trans_row && $trans_row->nfs_path && -f $trans_row->nfs_path) {
+                eval {
+                    open(my $fh, '<:utf8', $trans_row->nfs_path) or die;
+                    my $json = do { local $/; <$fh> };
+                    close $fh;
+                    my $data = decode_json($json);
+                    $transcript_text = $data->{transcript} || '';
+                };
+            }
+            my $bytes = $row->file_size || 0;
+            my $size_str = $bytes > 1048576 ? sprintf('%.1f MB', $bytes / 1048576)
+                         : $bytes > 1024    ? sprintf('%d KB',   int($bytes / 1024))
+                         : ($bytes . ' B');
+            push @recordings, {
+                id            => $row->id,
+                file_name     => $orig_name,
+                nfs_path      => $row->nfs_path || '',
+                file_size     => $bytes,
+                size_str      => $size_str,
+                description   => $row->description || '',
+                transcript    => $transcript_text,
+                transcript_id => $trans_row ? $trans_row->id : undef,
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'voice_recordings', "Error loading recordings: $@");
+    }
+
+    $c->stash(
+        recordings => \@recordings,
+        template   => 'BMaster/voice_recordings.tt',
+    );
+}
+
+sub audio_serve :Path('/Apiary/audio_serve') :Args(1) {
+    my ($self, $c, $file_id) = @_;
+
+    my $username = $c->session->{username} || '';
+    unless ($username && $file_id =~ /^\d+$/) {
+        $c->response->status(403);
+        $c->response->body('Forbidden');
+        return;
+    }
+
+    my $sitename = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $row;
+    eval {
+        $row = $c->model('DBEncy')->resultset('File')->find({
+            id       => $file_id,
+            sitename => $sitename,
+            file_type => 'audio',
+        });
+    };
+
+    unless ($row && $row->nfs_path && -f $row->nfs_path) {
+        $c->response->status(404);
+        $c->response->body('Not found');
+        return;
+    }
+
+    my $nfs_path = $row->nfs_path;
+    my $fmt      = $row->file_format || 'audio/mpeg';
+    my $size     = -s $nfs_path;
+
+    $c->response->content_type($fmt);
+    $c->response->headers->header('Content-Length' => $size);
+    $c->response->headers->header('Accept-Ranges'  => 'bytes');
+    $c->response->headers->header('Content-Disposition' => 'inline; filename="' . ($row->file_name || 'recording.mp3') . '"');
+
+    open(my $fh, '<:raw', $nfs_path) or do {
+        $c->response->status(500);
+        $c->response->body('Read error');
+        return;
+    };
+    local $/;
+    $c->response->body(<$fh>);
+    close $fh;
 }
 
 # ============================================================================

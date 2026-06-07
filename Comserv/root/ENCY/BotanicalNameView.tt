@@ -30,12 +30,12 @@
 
 	[% IF c.session.username %]
 
-<h3 > Hello  [% first_name%]  [% last_name%]! Welcome to The Encyclopaedia of Biological life!</h3>
+<h3>Hello [% first_name %] [% last_name %]! Welcome to The Encyclopedia of Biological Life!</h3>
 	  
 
 	[% ELSE %]
 
-	<h3>  Hello! Welcome to The Encyclopaedia of Biological life!</h3>
+	<h3>Hello! Welcome to The Encyclopedia of Biological Life!</h3>
 
 	[% END %]
 
@@ -44,23 +44,328 @@
 <A NAME="PageTop"></A>
 </div>
      
-        <h2>Herbs by Botanical name.</h2>
+        <h2>Herbs by Botanical Name</h2>
  <!-- Display the Add Herb button only for admin users -->
 [% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
 [% END %]
 
 <form action="search" method="POST">
-    <label for="search">Search our herbal Database:</label>
+    <label for="search">Search our herbal database:</label>
     <input type="text" id="search" name="search_string" value="">
     <input type="submit" value="Go">
 </form>
 
-<p>     <a href="ForumulaView"> Formulas.</a>
+<p>     <a href="[% c.uri_for('/ENCY/Formula') %]">Formulas</a></p>
 
- <p> These Herbs are in the data base.
+<p>These herbs are in the database.
 [% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add new Herb</a>
+    &nbsp;
+    <button type="button" id="ncbi-bulk-btn" onclick="ncbiBulkLink()"
+            style="background:#2a7ae2;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Link all herbs to NCBI taxonomy
+    </button>
+    &nbsp;
+    <button type="button" id="ncbi-resync-btn" onclick="ncbiResync()"
+            style="background:#8a6ae2;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Fix organism types &amp; taxonomy
+    </button>
+    &nbsp;
+    <button type="button" id="enrich-bulk-btn" onclick="bulkEnrich()"
+            style="background:#2a9e5a;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Fetch images &amp; descriptions (GBIF / Wikipedia)
+    </button>
+    &nbsp;
+    <button type="button" id="clean-images-btn" onclick="cleanBadImages()"
+            style="background:#c0392b;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Clean bad images (graphs/papers)
+    </button>
+    &nbsp;
+    <button type="button" id="import-cn-btn" onclick="importCommonNames()"
+            style="background:#7a5c2a;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Import common names from herbs
+    </button>
+    <div id="import-cn-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#fffbf0;border:1px solid #d8c890;border-radius:4px;max-width:700px;">
+        <strong>Import Common Names</strong>
+        <div id="import-cn-status" style="margin:0.4em 0;color:#555;">Starting…</div>
+        <div style="background:#e8e8e8;border-radius:3px;height:14px;width:100%;margin-bottom:0.5em;">
+            <div id="import-cn-bar" style="background:#7a5c2a;height:14px;border-radius:3px;width:0%;transition:width 0.4s;"></div>
+        </div>
+        <div id="import-cn-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
+    </div>
+    <div id="enrich-bulk-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f5fff9;border:1px solid #b0d8c0;border-radius:4px;max-width:700px;">
+        <strong>Bulk Enrich from GBIF &amp; Wikipedia</strong>
+        <div id="enrich-bulk-status" style="margin:0.4em 0;color:#555;">Starting…</div>
+        <div style="background:#e8e8e8;border-radius:3px;height:14px;width:100%;margin-bottom:0.5em;">
+            <div id="enrich-bulk-bar" style="background:#2a9e5a;height:14px;border-radius:3px;width:0%;transition:width 0.4s;"></div>
+        </div>
+        <div id="enrich-bulk-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
+    </div>
+    <div id="ncbi-bulk-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f5f9ff;border:1px solid #c0d8f0;border-radius:4px;max-width:700px;">
+        <strong>NCBI Bulk Link</strong>
+        <div id="ncbi-bulk-status" style="margin:0.4em 0;color:#555;">Starting…</div>
+        <div style="background:#e8e8e8;border-radius:3px;height:14px;width:100%;margin-bottom:0.5em;">
+            <div id="ncbi-bulk-bar" style="background:#2a7ae2;height:14px;border-radius:3px;width:0%;transition:width 0.4s;"></div>
+        </div>
+        <div id="ncbi-bulk-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
+    </div>
+    <div id="ncbi-resync-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f9f5ff;border:1px solid #d0c0f0;border-radius:4px;max-width:700px;">
+        <strong>Fix Organism Types &amp; Taxonomy</strong>
+        <div id="ncbi-resync-status" style="margin:0.4em 0;color:#555;">Starting…</div>
+        <div style="background:#e8e8e8;border-radius:3px;height:14px;width:100%;margin-bottom:0.5em;">
+            <div id="ncbi-resync-bar" style="background:#8a6ae2;height:14px;border-radius:3px;width:0%;transition:width 0.4s;"></div>
+        </div>
+        <div id="ncbi-resync-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
+    </div>
+    <script>
+    function bulkEnrich() {
+        var btn    = document.getElementById('enrich-bulk-btn');
+        var panel  = document.getElementById('enrich-bulk-panel');
+        var bar    = document.getElementById('enrich-bulk-bar');
+        var status = document.getElementById('enrich-bulk-status');
+        var log    = document.getElementById('enrich-bulk-log');
+        btn.disabled = true;
+        panel.style.display = 'block';
+        log.innerHTML = '';
+        var totalUpdated = 0, totalErrors = 0, totalDone = 0, grandTotal = null, lastId = 0;
+
+        function runBatch() {
+            status.textContent = 'Fetching GBIF / Wikipedia… (' + totalDone + ' done)';
+            fetch('/ENCY/organism_bulk_enrich', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'batch_size=3&last_id=' + lastId
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
+                if (grandTotal === null) grandTotal = d.total || 0;
+                if (d.last_id) lastId = d.last_id;
+                totalUpdated += d.updated || 0;
+                totalErrors  += d.errors  || 0;
+                totalDone    += d.processed || 0;
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+                (d.details || []).forEach(function(r) {
+                    var line = document.createElement('div');
+                    line.style.color = r.status === 'enriched' ? '#267326' : '#c00';
+                    line.textContent = (r.status === 'enriched' ? '✓ ' : '✗ ')
+                        + (r.scientific_name || 'organism #' + r.organism_id) + ': ' + r.message;
+                    log.appendChild(line);
+                    log.scrollTop = log.scrollHeight;
+                });
+                if (d.processed === 0 || d.remaining <= 0) {
+                    bar.style.width = '100%';
+                    status.textContent = 'Complete. ' + totalUpdated + ' enriched, ' + totalErrors + ' errors.';
+                    btn.disabled = false;
+                    btn.textContent = 'Re-run enrich';
+                } else {
+                    status.textContent = totalDone + ' of ' + grandTotal + ' processed — ' + totalUpdated + ' enriched, ' + totalErrors + ' errors. Continuing…';
+                    setTimeout(runBatch, 800);
+                }
+            })
+            .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
+        }
+        runBatch();
+    }
+
+    function ncbiBulkLink() {
+        var btn   = document.getElementById('ncbi-bulk-btn');
+        var panel = document.getElementById('ncbi-bulk-panel');
+        var bar   = document.getElementById('ncbi-bulk-bar');
+        var status= document.getElementById('ncbi-bulk-status');
+        var log   = document.getElementById('ncbi-bulk-log');
+        btn.disabled = true;
+        panel.style.display = 'block';
+        var totalLinked = 0, totalNotFound = 0, totalErrors = 0, totalDone = 0, grandTotal = null;
+
+        function runBatch() {
+            status.textContent = 'Processing batch… (' + totalDone + ' done)';
+            fetch('/ENCY/herb_ncbi_bulk_link', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'batch_size=10'
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
+                if (grandTotal === null) grandTotal = d.total_pending;
+                totalLinked    += d.linked;
+                totalNotFound  += d.not_found;
+                totalErrors    += d.errors;
+                totalDone      += d.processed;
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+                (d.details || []).forEach(function(r) {
+                    var line = document.createElement('div');
+                    var icon = r.status === 'linked' ? '✓' : r.status === 'not_found' ? '?' : '✗';
+                    line.style.color = r.status === 'linked' ? '#267326' : r.status === 'not_found' ? '#888' : '#c00';
+                    line.textContent = icon + ' ' + r.botanical_name + ': ' + r.message;
+                    log.appendChild(line);
+                    log.scrollTop = log.scrollHeight;
+                });
+                if (d.remaining > 0) {
+                    status.textContent = totalDone + ' of ' + grandTotal + ' processed — ' + totalLinked + ' linked, ' + totalNotFound + ' not found, ' + totalErrors + ' errors. Continuing…';
+                    setTimeout(runBatch, 500);
+                } else {
+                    bar.style.width = '100%';
+                    status.textContent = 'Complete. ' + totalLinked + ' linked, ' + totalNotFound + ' not in NCBI, ' + totalErrors + ' errors. Reload the page to see updated taxonomy.';
+                    btn.disabled = false;
+                    btn.textContent = 'Re-run NCBI link';
+                }
+            })
+            .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
+        }
+        runBatch();
+    }
+
+    function ncbiResync() {
+        var btn    = document.getElementById('ncbi-resync-btn');
+        var panel  = document.getElementById('ncbi-resync-panel');
+        var bar    = document.getElementById('ncbi-resync-bar');
+        var status = document.getElementById('ncbi-resync-status');
+        var log    = document.getElementById('ncbi-resync-log');
+        btn.disabled = true;
+        panel.style.display = 'block';
+        log.innerHTML = '';
+        var totalUpdated = 0, totalErrors = 0, totalDone = 0, grandTotal = null, lastId = 0;
+        var seenIds = {};
+
+        function done(msg) {
+            bar.style.width = '100%';
+            status.textContent = msg;
+            btn.disabled = false;
+            btn.textContent = 'Re-run fix';
+        }
+
+        function runBatch() {
+            status.textContent = 'Fetching NCBI data… (' + totalDone + ' done)';
+            fetch('/ENCY/organism_ncbi_resync', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'batch_size=10&last_id=' + lastId
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
+                if (grandTotal === null) grandTotal = d.total || (d.remaining + d.processed) || 0;
+                if (d.last_id) lastId = d.last_id;
+                totalUpdated += d.updated || 0;
+                totalErrors  += d.errors  || 0;
+                totalDone    += d.processed || 0;
+
+                var newSeen = 0;
+                (d.details || []).forEach(function(r) {
+                    var oid = r.organism_id;
+                    if (!seenIds[oid]) { seenIds[oid] = true; newSeen++; }
+                    var line = document.createElement('div');
+                    line.style.color = r.status === 'updated' ? '#267326' : '#c00';
+                    line.textContent = (r.status === 'updated' ? '✓ ' : '✗ ')
+                        + (r.scientific_name || 'organism #' + oid) + ': ' + r.message;
+                    log.appendChild(line);
+                    log.scrollTop = log.scrollHeight;
+                });
+
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+
+                if (d.processed === 0) {
+                    done('Complete. ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.');
+                } else if (newSeen === 0) {
+                    done('Complete (all organisms processed). ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.');
+                } else if (d.remaining > 0 || (!d.last_id && d.processed > 0)) {
+                    status.textContent = totalDone + ' processed — ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Continuing…';
+                    setTimeout(runBatch, 500);
+                } else {
+                    done('Complete. ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.');
+                }
+            })
+            .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
+        }
+        runBatch();
+    }
+
+    function importCommonNames() {
+        var btn    = document.getElementById('import-cn-btn');
+        var panel  = document.getElementById('import-cn-panel');
+        var bar    = document.getElementById('import-cn-bar');
+        var status = document.getElementById('import-cn-status');
+        var log    = document.getElementById('import-cn-log');
+        btn.disabled = true;
+        panel.style.display = 'block';
+        log.innerHTML = '';
+        var totalAdded = 0, totalSkipped = 0, totalErrors = 0, totalDone = 0, grandTotal = null, lastId = 0;
+
+        function runBatch() {
+            status.textContent = 'Importing common names… (' + totalDone + ' herbs done)';
+            fetch('/ENCY/herb_import_common_names', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'batch_size=20&last_herb_id=' + lastId
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
+                if (grandTotal === null) grandTotal = d.total || 0;
+                if (d.last_id) lastId = d.last_id;
+                totalAdded   += d.added   || 0;
+                totalSkipped += d.skipped || 0;
+                totalErrors  += d.errors  || 0;
+                totalDone    += d.processed || 0;
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+                (d.details || []).forEach(function(r) {
+                    var line = document.createElement('div');
+                    line.style.color = r.added > 0 ? '#267326' : '#888';
+                    line.textContent = (r.added > 0 ? '✓' : '—') + ' '
+                        + (r.botanical_name || 'herb #' + r.herb_id)
+                        + ': parsed=' + r.parsed + ' added=' + r.added + ' skipped=' + r.skipped
+                        + (r.error ? ' ERROR: ' + r.error : '');
+                    log.appendChild(line);
+                    log.scrollTop = log.scrollHeight;
+                });
+                if (d.processed === 0 || d.remaining <= 0) {
+                    bar.style.width = '100%';
+                    status.textContent = 'Complete. ' + totalAdded + ' names added, ' + totalSkipped + ' already existed, ' + totalErrors + ' errors.';
+                    btn.disabled = false;
+                    btn.textContent = 'Re-run import';
+                } else {
+                    setTimeout(runBatch, 300);
+                }
+            })
+            .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
+        }
+        runBatch();
+    }
+
+    function cleanBadImages() {
+        var btn = document.getElementById('clean-images-btn');
+        btn.disabled = true;
+        btn.textContent = 'Cleaning…';
+        fetch('/ENCY/clean_bad_organism_images', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: ''
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d) {
+            btn.disabled = false;
+            if (d.ok) {
+                btn.textContent = 'Done — ' + d.message;
+                btn.style.background = '#267326';
+            } else {
+                btn.textContent = 'Error: ' + (d.error || 'unknown');
+                btn.style.background = '#c0392b';
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Network error';
+            btn.style.background = '#c0392b';
+        });
+    }
+    </script>
 [% END %]
 
 <table>
@@ -72,16 +377,15 @@
  [% FOREACH link IN herbal_data %]
     <tr>
         <td>
-            <span style="font-size: 30px;"> Botanical Name:</span> [% link.botanical_name %]<br>
-             <span style="font-size: 30px;">Common Name:</span> [% link.common_names %]<br>
-             <span style="font-size: 30px;">Idententifing Character:</span> [% link.ident_character %]<br>
-            <span style="font-size: 30px;"> Distribution:</span> [% link.distribution %]<br>
-            <span style="font-size: 30px;" >Medical Uses:</span> [% link.medical_uses %]<br>
-           <a href="/ENCY/herb_detail/[% link.record_id %]" title="details">Details</a>
-
+            <span style="font-size: 30px;">Botanical Name:</span> [% link.display_name | html %]<br>
+            <span style="font-size: 30px;">Common Name:</span> [% link.common_names | html %]<br>
+            <span style="font-size: 30px;">Identifying Character:</span> [% link.ident_character | html %]<br>
+            <span style="font-size: 30px;">Distribution:</span> [% link.distribution | html %]<br>
+            <span style="font-size: 30px;">Medical Uses:</span> [% link.medical_uses | html %]<br>
+            <a href="/ENCY/herb_detail/[% link.record_id %]" title="details">Details</a>
         </td>
         <td>
-            [% ency_img_tag(link.image, 300, 325) %]
+            [% ency_img_tag(link.display_image, 300, 325) %]
         </td>
     </tr>
 [% END %]

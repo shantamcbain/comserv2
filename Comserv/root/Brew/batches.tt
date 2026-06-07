@@ -1,0 +1,11 @@
+[% META
+  title = 'Brew — Batches'
+  description = 'Brewhouse batch tracking — guest overview and admin migration map'
+  roles = 'guest,user,admin'
+  TemplateType = 'Application'
+  category = 'brew,addon'
+  page_version = '0.01'
+  last_updated = '2026/06/05'
+%]
+[% PageVersion = 'Brew/batches.tt,v 0.01 2026/06/05 Brew batches feature' %]
+[% INCLUDE 'Brew/_feature_shell.tt' %]

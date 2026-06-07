@@ -49,39 +49,57 @@
             </div>
         </div>
 
-        <!-- Mailing Lists - Admin Only -->
-        [% IF c.check_user_roles('admin') || c.check_user_roles('developer') %]
-            <div class="feature-card">
-                <div class="feature-header">
-                    <h3><i class="feature-icon fas fa-list"></i> Mailing Lists</h3>
-                </div>
-                <div class="feature-content">
-                    <p>Manage newsletter subscriptions and mailing list preferences</p>
-                </div>
-                <div class="feature-actions">
-                    <a href="/mail/lists" class="btn btn-secondary">
-                        <i class="fas fa-list"></i> View Mailing Lists
-                    </a>
-                </div>
+        <!-- Mailing Lists - visible to all -->
+        <div class="feature-card" style="border-top:3px solid var(--primary-color,#007bff);">
+            <div class="feature-header">
+                <h3><i class="feature-icon fas fa-envelope-open-text"></i> Mailing Lists</h3>
             </div>
+            <div class="feature-content">
+                [% IF c.session.user_id %]
+                    <p>Manage your newsletter and update subscriptions for <strong>[% c.session.SiteName || 'this site' %]</strong>.</p>
+                [% ELSE %]
+                    <p>Subscribe to newsletters and updates from <strong>[% c.session.SiteName || 'this site' %]</strong>. Stay in the loop — unsubscribe any time.</p>
+                [% END %]
+            </div>
+            <div class="feature-actions">
+                [% IF c.session.user_id %]
+                    <a href="/mail/my_subscriptions" class="btn btn-primary" style="font-size:1.05em;padding:10px 22px;">
+                        &#9993; My Email Subscriptions
+                    </a>
+                    <a href="/mail/subscribe" class="btn btn-secondary">
+                        Browse All Lists
+                    </a>
+                [% ELSE %]
+                    <a href="/mail/subscribe" class="btn btn-primary" style="font-size:1.05em;padding:10px 22px;">
+                        &#9993; Join Our Mailing List
+                    </a>
+                [% END %]
+                [% IF c.session.roles.match('admin') || c.check_user_roles('admin') %]
+                    <a href="/mail/lists" class="btn btn-secondary">
+                        <i class="fas fa-list"></i> Manage Lists
+                    </a>
+                [% END %]
+            </div>
+        </div>
 
-            <!-- Mail Administration -->
+        <!-- Mail Administration - Admin Only -->
+        [% IF c.check_user_roles('admin') || c.check_user_roles('developer') %]
             <div class="feature-card">
                 <div class="feature-header">
                     <h3><i class="feature-icon fas fa-cog"></i> Mail Administration</h3>
                 </div>
                 <div class="feature-content">
-                    <p>Administrative tools for managing the mail system</p>
+                    <p>Administrative tools for managing the mail system and mailing lists</p>
                 </div>
                 <div class="feature-actions">
+                    <a href="/mail/mail_admin_dashboard" class="btn btn-primary">
+                        <i class="fas fa-tachometer-alt"></i> Admin Dashboard
+                    </a>
                     <a href="/mail/mass_email" class="btn btn-warning">
                         <i class="fas fa-envelope-bulk"></i> Site Mailout
                     </a>
                     <a href="/mail/add_mail_config_form" class="btn btn-secondary">
                         <i class="fas fa-server"></i> SMTP Config
-                    </a>
-                    <a href="/mail/create_mail_account" class="btn btn-secondary">
-                        <i class="fas fa-user-plus"></i> Create Account
                     </a>
                 </div>
             </div>

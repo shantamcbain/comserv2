@@ -12,6 +12,7 @@ use Comserv::Util::EmailNotification;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::PointSystem;
 use DateTime;
+use DateTime::Format::MySQL;
 
 BEGIN { extends 'Catalyst::Controller'; }
 # Apply restrictions to the entire controller
@@ -1065,6 +1066,56 @@ sub create_account :Local {
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
+
+    my $submitted_token = $c->request->params->{csrf_token} // '';
+    my $session_token   = $c->session->{csrf_token}         // '';
+    my $honeypot        = $c->request->params->{website}    // '';
+    my $reg_ip          = $c->req->address || 'unknown';
+
+    if ($honeypot ne '') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Bot detected (honeypot filled) from ip=$reg_ip");
+        $c->stash(error_msg => 'Registration failed. Please try again.', template => 'user/register.tt');
+        return;
+    }
+
+    my $math_challenge_ans = $c->request->params->{math_challenge_ans} // '';
+    my $expected_sum       = $c->session->{math_challenge_sum} // '';
+
+    if ($expected_sum ne '' && $math_challenge_ans ne $expected_sum) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Bot detected (math challenge failed: submitted '$math_challenge_ans', expected '$expected_sum') from ip=$reg_ip");
+            
+        my $num1 = int(rand(8)) + 2;
+        my $num2 = int(rand(8)) + 2;
+        $c->session->{math_challenge_sum} = $num1 + $num2;
+        
+        my $csrf_token = sha256_hex(time() . rand() . ($c->sessionid || ''));
+        $c->session->{csrf_token} = $csrf_token;
+        
+        $c->stash(
+            csrf_token => $csrf_token,
+            num1       => $num1,
+            num2       => $num2,
+            username   => $c->request->params->{username} // '',
+            email      => $c->request->params->{email} // '',
+            error_msg  => 'Security check failed. Please solve the arithmetic question correctly.',
+            template   => 'user/register.tt'
+        );
+        return;
+    }
+
+    delete $c->session->{math_challenge_sum};
+
+    if (!$submitted_token || !$session_token || $submitted_token ne $session_token) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "CSRF token mismatch from ip=$reg_ip");
+        $c->stash(error_msg => 'Your session has expired. Please try again.', template => 'user/register.tt');
+        return;
+    }
+
+    delete $c->session->{csrf_token};
+
     my $username = $c->request->params->{username} // '';
     my $email    = $c->request->params->{email}    // '';
 
@@ -1117,7 +1168,7 @@ sub do_create_account :Local {
             email => $email,
             status => 'pending_verification',
             creation_context => 'self_registration',
-            roles => 'normal',
+            roles => 'guest',
         });
         
         $verification_code = $self->user_verification->generate_verification_code();
@@ -1129,13 +1180,29 @@ sub do_create_account :Local {
             my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $reg_sitename })->single;
             
             if ($site) {
+                my $role_to_grant = 'guest';
+                if (lc($reg_sitename) ne 'csc') {
+                    my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                        sitename => $reg_sitename,
+                    }, { rows => 1 })->single;
+                    if ($hosting && $hosting->contact_email && lc($hosting->contact_email) eq lc($email)) {
+                        $role_to_grant = 'admin';
+                    } else {
+                        my $user_count = $c->model('DBEncy::UserSiteRole')->search({
+                            site_id => $site->id,
+                        })->count;
+                        if ($user_count == 0) {
+                            $role_to_grant = 'admin';
+                        }
+                    }
+                }
                 $c->model('DBEncy::UserSiteRole')->create({
                     user_id => $new_user->id,
                     site_id => $site->id,
-                    role    => 'normal',
+                    role    => $role_to_grant,
                 });
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                    "Created UserSiteRole for user " . $new_user->id . " on site $reg_sitename (site_id=" . $site->id . ") with role 'normal'");
+                    "Created UserSiteRole for user " . $new_user->id . " on site $reg_sitename (site_id=" . $site->id . ") with role '$role_to_grant'");
             }
         };
         if ($@) {
@@ -1250,6 +1317,17 @@ sub verify_email :Local {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
                 "AUDIT: Email verified user_id=$user_id ip=$verify_ip");
             
+            # Send Step 2 completion notification to admin
+            eval {
+                $self->email_notification->send_admin_email_verified_notification($c, $user);
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
+                    "Admin Step 2 notification sent for user: " . $user->username);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'verify_email',
+                    "Failed to send admin Step 2 notification: $@");
+            }
+
             delete $c->session->{verification_code_display};
             delete $c->session->{verify_fail_count};
             $c->response->redirect($c->uri_for('/user/complete_profile'));
@@ -1571,15 +1649,21 @@ sub complete_profile :Local {
                     "Auto-assigning workshop_leader role due to return_to: $session_return_to");
             }
 
+            my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
             $user->update({
                 first_name        => $first_name,
                 last_name         => $last_name,
                 password          => $hashed_password,
                 status            => 'active',
                 roles             => $roles_to_assign,
-                email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
+                email_verified_at => $now_str,
             });
-            
+
+            eval {
+                $user->user_site_roles->search({ role => 'guest' })
+                    ->update({ role => $roles_to_assign });
+            };
+
             my $profile_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
                 "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active roles=$roles_to_assign");
@@ -1607,6 +1691,16 @@ sub complete_profile :Local {
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'complete_profile',
                 "Failed to send welcome email: $@");
+        }
+
+        eval {
+            $self->email_notification->send_admin_profile_completion_notification($c, $user);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                "Admin Step 3 notification sent for user: " . $user->username);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'complete_profile',
+                "Failed to send admin Step 3 notification: $@");
         }
 
         my $final_redirect = $c->session->{return_to} || $c->uri_for('/user/login');
@@ -2044,13 +2138,398 @@ sub complete_password_setup :Local {
 sub list_users :Local :Args(0) {
     my ($self, $c) = @_;
 
-    # Fetch the list of users and pass it to the view
-    my @users = $c->model('DBEncy::User')->all;
-    $c->stash(users => \@users);
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'list_users')) {
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
-    # Display the list of users
-    $c->stash(template => 'user/list_users.tt');
+    my $q      = $c->req->param('q')      || '';
+    my $field  = $c->req->param('by')     || 'email';
+    my $sort   = $c->req->param('sort')   || '';
+    my $schema = $c->model('DBEncy');
+    my $now    = DateTime->now;
+    my $month_ago = $now->clone->subtract(months => 1)->strftime('%Y-%m-%d %H:%M:%S');
+    my $two_months_ago = $now->clone->subtract(months => 2)->strftime('%Y-%m-%d %H:%M:%S');
+
+    my %where;
+    if ($q) {
+        my $like = { -like => '%' . $q . '%' };
+        %where = $field eq 'username' ? (username => $like)
+               : $field eq 'roles'    ? (roles    => $like)
+               :                        (email    => $like);
+    }
+
+    my @all_users = $schema->resultset('User')->search(\%where,
+        { order_by => { -asc => 'username' } })->all;
+
+    my (@members, @verified, @pending);
+    my $member_roles = qr/\b(admin|helpdesk|editor|member|moderator|workshop_leader)\b/i;
+
+    for my $u (@all_users) {
+        my $roles_str = $u->roles || '';
+        my $status    = $u->status || '';
+        my $ev_at     = $u->email_verified_at || '';
+        my $ca_str    = $u->created_at || '';
+
+        my $age_days = 0;
+        eval {
+            my $created = DateTime::Format::MySQL->parse_datetime($ca_str);
+            $age_days = int($now->clone->subtract_datetime($created)->in_units('days'));
+        };
+
+        my $email_failed = 0;
+        eval {
+            my $code_count = $u->verification_codes->count;
+            if ($code_count > 0 && !$ev_at && $status eq 'pending_verification') {
+                my $active = $u->verification_codes->search({
+                    expires_at  => { '>=' => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') },
+                    verified_at => undef,
+                })->count;
+                $email_failed = 1 if $active == 0;
+            }
+        };
+
+        my $stale = ($age_days >= 30 && $status eq 'pending_verification') ? 1 : 0;
+
+        my $created_date = '';
+        $created_date = substr($ca_str, 0, 10) if $ca_str;
+
+        my %row = (
+            obj          => $u,
+            id           => $u->id,
+            username     => $u->username     || '',
+            email        => $u->email        || '',
+            first_name   => $u->first_name   || '',
+            last_name    => $u->last_name    || '',
+            roles        => $roles_str,
+            status       => $status,
+            created_at   => $ca_str,
+            created_date => $created_date,
+            email_verified_at => $ev_at,
+            age_days     => $age_days,
+            email_failed => $email_failed,
+            stale        => $stale,
+        );
+
+        if ($roles_str =~ $member_roles) {
+            push @members, \%row;
+        } elsif ($ev_at || $status eq 'active') {
+            push @verified, \%row;
+        } else {
+            push @pending, \%row;
+        }
+    }
+
+    my $sort_by = $sort || '';
+    for my $group (\@members, \@verified) {
+        if ($sort_by eq 'date') {
+            @$group = sort { $a->{created_at} cmp $b->{created_at} } @$group;
+        } elsif ($sort_by eq 'email') {
+            @$group = sort { $a->{email} cmp $b->{email} } @$group;
+        } elsif ($sort_by eq 'role') {
+            @$group = sort { $a->{roles} cmp $b->{roles} } @$group;
+        } else {
+            @$group = sort { $a->{username} cmp $b->{username} } @$group;
+        }
+    }
+    if ($sort_by eq 'username') {
+        @pending = sort { $a->{username} cmp $b->{username} } @pending;
+    } elsif ($sort_by eq 'email') {
+        @pending = sort { $a->{email} cmp $b->{email} } @pending;
+    } else {
+        @pending = sort { $b->{created_at} cmp $a->{created_at} } @pending;
+    }
+
+    $c->stash(
+        members         => \@members,
+        verified        => \@verified,
+        pending         => \@pending,
+        q               => $q,
+        by              => $field,
+        sort            => $sort_by,
+        two_months_ago  => $two_months_ago,
+        template        => 'user/list_users.tt',
+    );
 }
+
+sub bulk_delete_users :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'bulk_delete_users')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->res->redirect($c->uri_for('/user/list_users'));
+        return;
+    }
+
+    return $c->res->redirect($c->uri_for('/user/list_users'))
+        unless $c->req->method eq 'POST';
+
+    my @ids = $c->req->param('delete_ids');
+    unless (@ids) {
+        $c->flash->{error_msg} = 'No users selected.';
+        return $c->res->redirect($c->uri_for('/user/list_users'));
+    }
+
+    my $admin_uid = $c->session->{user_id};
+    my $schema    = $c->model('DBEncy');
+    my ($deleted, @errors) = (0);
+
+    for my $uid (@ids) {
+        next unless $uid =~ /^\d+$/;
+        next if $uid == ($admin_uid // 0);
+
+        my $user = eval { $schema->resultset('User')->find($uid) };
+        next unless $user;
+
+        eval {
+            $schema->storage->dbh_do(sub {
+                my ($storage, $dbh) = @_;
+                for my $tbl (qw(
+                    admin_presence
+                    ai_support_sessions
+                    api_tokens
+                    benefactor_contributions
+                    crypto_transactions
+                    email_verification_codes
+                    env_variable_audit_logs
+                    event
+                    internal_currency_accounts
+                    job_applications
+                    membership_service_access
+                    password_reset_tokens
+                    payment_transactions
+                    plan_audit
+                    point_accounts
+                    user_api_keys
+                    user_groups
+                    user_memberships
+                    user_site_roles
+                    user_sites
+                    workshop_roles
+                )) {
+                    eval { $dbh->do("DELETE FROM $tbl WHERE user_id = ?", undef, $uid) };
+                }
+                $dbh->do("DELETE FROM ai_support_sessions WHERE admin_user_id = ?", undef, $uid);
+                $dbh->do("DELETE FROM ai_support_messages WHERE sender_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE internal_currency_transactions SET from_user_id = NULL WHERE from_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE internal_currency_transactions SET to_user_id = NULL WHERE to_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE jobs SET posted_by_user_id = NULL WHERE posted_by_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE point_ledger SET from_user_id = NULL WHERE from_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE point_ledger SET to_user_id = NULL WHERE to_user_id = ?", undef, $uid);
+                my @conv_ids = map { $_->[0] }
+                    @{ $dbh->selectall_arrayref("SELECT id FROM ai_conversations WHERE user_id = ?", undef, $uid) };
+                if (@conv_ids) {
+                    my $ph = join(',', ('?') x @conv_ids);
+                    $dbh->do("DELETE FROM ai_messages WHERE conversation_id IN ($ph)", undef, @conv_ids);
+                }
+                $dbh->do("DELETE FROM ai_conversations WHERE user_id = ?", undef, $uid);
+                for my $col_tbl (
+                    ['content',                'created_by'],
+                    ['content',                'updated_by'],
+                    ['documentation',          'created_by'],
+                    ['documentation',          'updated_by'],
+                    ['env_variables',          'created_by'],
+                    ['env_variables',          'updated_by'],
+                    ['nfs_directory',          'created_by'],
+                    ['system_cost_tracking',   'created_by'],
+                    ['todo',                   'user_id'],
+                    ['workshop_mail_templates','created_by'],
+                    ['workshop_resource',      'uploaded_by'],
+                ) {
+                    my ($tbl, $col) = @$col_tbl;
+                    eval { $dbh->do("UPDATE $tbl SET $col = NULL WHERE $col = ?", undef, $uid) };
+                }
+            });
+        };
+
+        my $del_err;
+        eval {
+            $schema->storage->dbh_do(sub {
+                my ($storage, $dbh) = @_;
+                $dbh->do("DELETE FROM users WHERE id = ?", undef, $uid);
+            });
+        };
+        $del_err = "$@" if $@;
+        if ($del_err) {
+            push @errors, "id=$uid: $del_err";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'bulk_delete_users',
+                "Failed to delete user_id=$uid: $del_err");
+        } else {
+            $deleted++;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bulk_delete_users',
+                "AUDIT: Bulk-deleted user_id=$uid by admin_id=" . ($admin_uid || '?'));
+        }
+    }
+
+    my $msg = "Deleted $deleted user(s).";
+    $msg .= " " . scalar(@errors) . " error(s) — check log." if @errors;
+    $c->flash->{success_msg} = $msg;
+    $c->res->redirect($c->uri_for('/user/list_users'));
+}
+sub admin_purge_unverified :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_purge_unverified')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema    = $c->model('DBEncy');
+    my $days_old  = int($c->req->param('days_old') // 7);
+    $days_old     = 1 unless $days_old >= 1;
+
+    my $cutoff_ts = DateTime->now->subtract(days => $days_old)->strftime('%Y-%m-%d %H:%M:%S');
+
+    my @stale = $schema->resultset('User')->search(
+        {
+            status     => 'pending_verification',
+            created_at => { '<' => $cutoff_ts },
+        },
+        { order_by => { -asc => 'created_at' } }
+    )->all;
+
+    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        my $admin_uid = $c->session->{user_id};
+        my $purged    = 0;
+        my @errors;
+
+        for my $user (@stale) {
+            my $uid  = $user->id;
+            my $uname = $user->username // $user->email // "id=$uid";
+            next if $uid == ($admin_uid // 0);
+
+            eval {
+                $schema->storage->dbh_do(sub {
+                    my ($storage, $dbh) = @_;
+                    $dbh->do("DELETE FROM user_sites WHERE user_id = ?", undef, $uid);
+                });
+            };
+
+            for my $rs_name (qw(
+                WorkshopRole UserSiteRole UserGroup UserApiKeys ApiToken
+                EmailVerificationCode PasswordResetToken
+            )) {
+                eval { $schema->resultset($rs_name)->search({ user_id => $uid })->delete };
+            }
+
+            eval { $schema->resultset('User')->search({ created_by => $uid })->update({ created_by => undef }) };
+
+            my $del_err;
+            eval { $user->delete };
+            $del_err = "$@" if $@;
+
+            if ($del_err) {
+                push @errors, "user_id=$uid ($uname): $del_err";
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_purge_unverified',
+                    "FAILED to purge user_id=$uid: $del_err");
+            } else {
+                $purged++;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_purge_unverified',
+                    "AUDIT: Purged pending user_id=$uid username=$uname by admin_id=$admin_uid");
+            }
+        }
+
+        my $msg = "Purged $purged unverified account(s) older than $days_old day(s).";
+        $msg   .= " Errors: " . scalar(@errors) . " — check server log." if @errors;
+        $c->flash->{success_msg} = $msg;
+        $c->response->redirect($c->uri_for('/user/admin_purge_unverified', { days_old => $days_old }));
+        return;
+    }
+
+    my %buckets;
+    for my $u (@stale) {
+        my $age_days = 0;
+        eval {
+            my $created = DateTime::Format::MySQL->parse_datetime($u->created_at);
+            $age_days = int(DateTime->now->subtract_datetime($created)->in_units('days'));
+        };
+        if    ($age_days < 7)  { $buckets{'1-6 days'}++ }
+        elsif ($age_days < 30) { $buckets{'7-29 days'}++ }
+        elsif ($age_days < 90) { $buckets{'30-89 days'}++ }
+        else                   { $buckets{'90+ days'}++ }
+    }
+
+    $c->stash(
+        stale_users => \@stale,
+        days_old    => $days_old,
+        total       => scalar(@stale),
+        buckets     => \%buckets,
+        template    => 'user/AdminPurgeUnverified.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub do_admin_purge_single :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'do_admin_purge_single')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema    = $c->model('DBEncy');
+    my $user      = $schema->resultset('User')->find($user_id);
+    my $admin_uid = $c->session->{user_id};
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/user/admin_purge_unverified'));
+        return;
+    }
+
+    unless ($user->status eq 'pending_verification') {
+        $c->flash->{error_msg} = 'This action only applies to pending_verification accounts.';
+        $c->response->redirect($c->uri_for('/user/admin_purge_unverified'));
+        return;
+    }
+
+    if ($user_id == ($admin_uid // 0)) {
+        $c->flash->{error_msg} = 'Cannot delete your own account.';
+        $c->response->redirect($c->uri_for('/user/admin_purge_unverified'));
+        return;
+    }
+
+    my $uname = $user->username // $user->email // "id=$user_id";
+
+    eval {
+        $schema->storage->dbh_do(sub {
+            my ($storage, $dbh) = @_;
+            $dbh->do("DELETE FROM user_sites WHERE user_id = ?", undef, $user_id);
+        });
+    };
+
+    for my $rs_name (qw(
+        WorkshopRole UserSiteRole UserGroup UserApiKeys ApiToken
+        EmailVerificationCode PasswordResetToken
+    )) {
+        eval { $schema->resultset($rs_name)->search({ user_id => $user_id })->delete };
+    }
+
+    eval { $schema->resultset('User')->search({ created_by => $user_id })->update({ created_by => undef }) };
+
+    my $del_err;
+    eval { $user->delete };
+    $del_err = "$@" if $@;
+
+    if ($del_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_admin_purge_single',
+            "FAILED to purge user_id=$user_id: $del_err");
+        $c->flash->{error_msg} = "Failed to delete $uname: $del_err";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_admin_purge_single',
+            "AUDIT: Purged pending user_id=$user_id username=$uname by admin_id=$admin_uid");
+        $c->flash->{success_msg} = "Deleted unverified account: $uname";
+    }
+
+    $c->response->redirect($c->uri_for('/user/admin_purge_unverified'));
+}
+
 sub edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 
@@ -2462,7 +2941,7 @@ sub admin_delete_user :Local :Args(1) {
 
     unless ($user) {
         $c->flash->{error_msg} = 'User not found.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -2473,7 +2952,7 @@ sub admin_delete_user :Local :Args(1) {
 
     if ($user_id == $admin_uid) {
         $c->flash->{error_msg} = 'You cannot delete your own account.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -2486,7 +2965,7 @@ sub admin_delete_user :Local :Args(1) {
             })->count;
             unless ($access) {
                 $c->flash->{error_msg} = 'Access denied. You can only delete users in your site.';
-                $c->response->redirect($c->uri_for('/admin/users'));
+                $c->response->redirect($c->uri_for('/user/list_users'));
                 return;
             }
         }
@@ -2545,13 +3024,13 @@ sub do_admin_delete_user :Local :Args(1) {
 
     unless ($user) {
         $c->flash->{error_msg} = 'User not found.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
     if ($user_id == $admin_uid) {
         $c->flash->{error_msg} = 'You cannot delete your own account.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -2649,19 +3128,54 @@ sub do_admin_delete_user :Local :Args(1) {
         }
     }
 
-    # Step 3: Clear created_by references
+    # Step 3: NULL out FK columns that cannot be deleted (financial/audit trails)
+    eval {
+        $schema->storage->dbh_do(sub {
+            my ($storage, $dbh) = @_;
+            for my $stmt (
+                "UPDATE point_ledger SET from_user_id = NULL WHERE from_user_id = $user_id",
+                "UPDATE point_ledger SET to_user_id   = NULL WHERE to_user_id   = $user_id",
+                "UPDATE internal_currency_transactions SET from_user_id = NULL WHERE from_user_id = $user_id",
+                "UPDATE internal_currency_transactions SET to_user_id   = NULL WHERE to_user_id   = $user_id",
+                "UPDATE jobs SET posted_by_user_id = NULL WHERE posted_by_user_id = $user_id",
+                "UPDATE content SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE content SET updated_by = NULL WHERE updated_by = $user_id",
+                "UPDATE documentation SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE documentation SET updated_by = NULL WHERE updated_by = $user_id",
+                "UPDATE env_variables SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE env_variables SET updated_by = NULL WHERE updated_by = $user_id",
+                "UPDATE nfs_directory SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE system_cost_tracking SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE workshop_mail_templates SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE workshop_resource SET uploaded_by = NULL WHERE uploaded_by = $user_id",
+                "DELETE FROM benefactor_contributions WHERE user_id = $user_id",
+                "DELETE FROM crypto_transactions WHERE user_id = $user_id",
+                "DELETE FROM payment_transactions WHERE user_id = $user_id",
+                "DELETE FROM job_applications WHERE user_id = $user_id",
+                "DELETE FROM membership_service_access WHERE user_id = $user_id",
+                "DELETE FROM admin_presence WHERE user_id = $user_id",
+                "DELETE FROM ai_support_messages WHERE sender_user_id = $user_id",
+                "DELETE FROM ai_support_sessions WHERE admin_user_id = $user_id",
+            ) {
+                eval { $dbh->do($stmt) };
+            }
+        });
+    };
     eval {
         $schema->resultset('User')->search({ created_by => $user_id })
             ->update({ created_by => undef });
     };
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
-        "created_by nullify error: $@") if $@;
 
-    # Step 4: Delete the user record — this is the critical step
-    # Capture $@ immediately — logging/notification calls will reset it
+    # Step 4: Delete the user record via raw SQL to bypass DBIC cascade logic
+    # (DBIC cascade would SELECT related tables whose schema may not match the live DB)
     my $delete_err;
-    eval { $user->delete };
-    $delete_err = "$@" if $@;   # stringify immediately before any other eval runs
+    eval {
+        $schema->storage->dbh_do(sub {
+            my ($storage, $dbh) = @_;
+            $dbh->do("DELETE FROM users WHERE id = ?", undef, $user_id);
+        });
+    };
+    $delete_err = "$@" if $@;
 
     if ($delete_err) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_admin_delete_user',
@@ -2670,7 +3184,7 @@ sub do_admin_delete_user :Local :Args(1) {
             "User deletion failed: $deleted_username",
             "user_id=$user_id\nerror=$delete_err");
         $c->flash->{error_msg} = "Failed to delete user '$deleted_username': $delete_err";
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -2679,7 +3193,7 @@ sub do_admin_delete_user :Local :Args(1) {
         "AUDIT: User deleted username='$deleted_username' user_id=$user_id admin_id=$admin_uid ip=$del_ip");
 
     $c->flash->{success_msg} = "User '$deleted_username' deleted successfully.";
-    $c->response->redirect($c->uri_for('/admin/users'));
+    $c->response->redirect($c->uri_for('/user/list_users'));
 }
 
 sub register :Local {
@@ -2694,8 +3208,20 @@ sub register :Local {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
             "Stored return_to in session: $return_to");
     }
-    
-    $c->stash(template => 'user/register.tt');
+
+    my $csrf_token = sha256_hex(time() . rand() . ($c->sessionid || ''));
+    $c->session->{csrf_token} = $csrf_token;
+
+    my $num1 = int(rand(8)) + 2; # 2 to 9
+    my $num2 = int(rand(8)) + 2; # 2 to 9
+    $c->session->{math_challenge_sum} = $num1 + $num2;
+
+    $c->stash(
+        csrf_token => $csrf_token,
+        num1       => $num1,
+        num2       => $num2,
+        template   => 'user/register.tt'
+    );
 }
 sub welcome :Local {
     my ($self, $c) = @_;

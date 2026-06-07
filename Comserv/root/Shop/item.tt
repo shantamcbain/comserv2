@@ -42,6 +42,25 @@
     </p>
     [% END %]
 
+    <!-- Points Accepted badge -->
+    [% IF item.accepts_points %]
+    <div style="margin-bottom:0.6em">
+      <span style="display:inline-block;background:#7b1fa2;color:#fff;font-size:0.8rem;font-weight:bold;border-radius:12px;padding:3px 12px;font-family:var(--body-font)">
+        ★ Points Accepted
+      </span>
+      [% IF buyer_is_member && buyer_points %]
+      <span style="margin-left:0.8em;font-size:0.82rem;color:var(--text-muted-color);font-family:var(--body-font)">
+        Your balance: <strong style="color:#7b1fa2">[% buyer_points | format('%.2f') %] pts</strong>
+        <span style="font-size:0.75rem">(contact seller to pay with points)</span>
+      </span>
+      [% ELSIF buyer_is_member %]
+      <span style="margin-left:0.8em;font-size:0.82rem;color:var(--text-muted-color);font-family:var(--body-font)">
+        (contact seller to arrange points payment)
+      </span>
+      [% END %]
+    </div>
+    [% END %]
+
     <!-- Price -->
     <div style="margin:0.8em 0">
       [% IF display_price > 0 %]

@@ -1,0 +1,350 @@
+[% META
+   title = "Site Add-ons & Modules"
+   description = "Manage and view available modules and add-ons for this site"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-06-04"
+%]
+
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+[% IF !is_embedded %]
+<div class="app-container">
+  <div class="page-header">
+    <h1>Site Add-ons &amp; Modules</h1>
+    <p>Manage integrations and feature sets available on <strong>[% site_name | html %]</strong>.</p>
+    <div class="admin-actions">
+      <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">&larr; Back to Memberships</a>
+      [% IF is_admin %]
+      <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Admin Dashboard</a>
+      [% END %]
+    </div>
+  </div>
+
+  <nav class="membership-page-nav" aria-label="Add-ons page">
+    <span class="membership-page-nav-label">On this page</span>
+    <a href="#addons-list">Add-on list</a>
+    [% IF is_admin %]
+    <a href="#addons-save">Save settings</a>
+    [% END %]
+    <a href="[% c.uri_for('/membership') %]#membership-addons">&uarr; Membership home</a>
+  </nav>
+  <style>
+  .membership-page-nav { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:10px 14px; margin:0 0 1.25rem; background:var(--bg-secondary,#f0f4f8); border:1px solid var(--border-color,#ddd); border-radius:6px; font-size:0.9em; }
+  .membership-page-nav-label { font-weight:bold; color:var(--text-muted-color,#666); margin-right:4px; }
+  .membership-page-nav a { color:var(--primary-color,#1565c0); text-decoration:none; padding:4px 10px; border-radius:4px; }
+  .membership-page-nav a:hover { background:var(--bg-color,#fff); text-decoration:underline; }
+  </style>
+
+  <div class="content-container" style="display: block;">
+[% END %]
+    
+    <div class="content-section" id="addons-list">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 0.5rem;">
+        <h2 style="margin: 0;">Available System Add-ons</h2>
+        <div style="display: flex; gap: 8px;">
+          [% SET _is_global_admin = 0 %]
+          [% FOREACH r IN c.session.roles %]
+            [% IF r == 'admin' OR r == 'site_admin' OR r.lower == 'admin' OR r.lower == 'site_admin' %][% _is_global_admin = 1 %][% END %]
+          [% END %]
+          [% IF c.session.username == 'Shanta' %][% _is_global_admin = 1 %][% END %]
+          [% IF is_admin OR _is_global_admin %]
+            [% IF site_is_csc %]
+              <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="btn btn-sm" style="background: #e65c00; color: white; font-weight: bold; padding: 6px 14px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                &#127760; Manage Hosting Accounts
+              </a>
+            [% ELSE %]
+              <a href="[% c.uri_for('/membership/hosting_signup', { site_name => site_name }) %]" class="btn btn-sm" style="background: #e65c00; color: white; font-weight: bold; padding: 6px 14px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                &#9998; Edit Subscribed Add-ons
+              </a>
+            [% END %]
+          [% END %]
+          [% IF _is_global_admin %]
+            <a href="[% c.uri_for('/admin/site_modules') %]" class="btn btn-sm" style="background: #007bff; color: white; font-weight: bold; padding: 6px 14px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+              &#9881; Module Access Control
+            </a>
+          [% END %]
+        </div>
+      </div>
+      <p class="text-muted">These modules are offered by the parent network and individual partner sites (e.g. beekeeping is owned by BMaster, ENCY by ENCY, 3D printing by 3D). <strong>Click any row</strong> for full details.</p>
+
+      <style>
+      .addon-row { cursor: pointer; }
+      .addon-row:hover td { background: var(--bg-secondary, #f5f8fa) !important; }
+      .addon-no-popup { cursor: default; }
+      #addon-detail-overlay {
+        display: none; position: fixed; inset: 0; z-index: 10000;
+        background: rgba(0,0,0,0.45); align-items: center; justify-content: center;
+        padding: 16px;
+      }
+      #addon-detail-overlay.open { display: flex; }
+      #addon-detail-dialog {
+        background: var(--bg-color, #fff); color: var(--text-color, #222);
+        border-radius: 8px; max-width: 520px; width: 100%;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        border: 1px solid var(--border-color, #ccc);
+        max-height: 90vh; overflow-y: auto;
+      }
+      #addon-detail-dialog .addon-dialog-header {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        padding: 16px 18px 8px; border-bottom: 1px solid var(--border-color, #ddd);
+      }
+      #addon-detail-dialog .addon-dialog-body { padding: 14px 18px 18px; font-size: 0.95em; line-height: 1.5; }
+      #addon-detail-dialog dl { margin: 0; }
+      #addon-detail-dialog dt { font-weight: bold; margin-top: 10px; color: var(--text-muted-color, #666); font-size: 0.82em; text-transform: uppercase; }
+      #addon-detail-dialog dd { margin: 4px 0 0; }
+      #addon-detail-close {
+        background: none; border: none; font-size: 1.4em; cursor: pointer;
+        color: var(--text-muted-color, #888); line-height: 1;
+      }
+      .addon-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color, #eee); }
+      </style>
+      
+      [% IF is_admin %]
+      <form action="[% c.uri_for('/membership/addons') %]" method="POST" id="addons-form">
+      [% END %]
+
+      <div class="table-container">
+        <table class="data-table" id="addons-table" data-site="[% site_name | html %]" data-is-admin="[% IF is_admin %]1[% ELSE %]0[% END %]">
+          <thead>
+            <tr>
+              <th>Add-on / Module</th>
+              <th>Owner</th>
+              <th>Description</th>
+              <th>Site-Level Status</th>
+              <th>My Access Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            [% FOREACH module IN modules %]
+            <tr class="addon-row"
+                tabindex="0"
+                role="button"
+                aria-label="View details for [% module.name | html %]"
+                data-key="[% module.key | html %]"
+                data-route="[% module.route | html %]"
+                data-site-enabled="[% IF module.site_enabled %]1[% ELSE %]0[% END %]"
+                data-user-access="[% IF module.user_access %]1[% ELSE %]0[% END %]"
+                data-subscribed="[% IF module.subscribed %]1[% ELSE %]0[% END %]"
+                data-open-url="[% IF module.user_access %][% c.uri_for(module.route) %][% END %]">
+              <td>
+                <strong>[% module.name | html %]</strong>
+                [% IF module.subscribed %]
+                  <span class="badge" style="background-color:#e65c00;color:white;font-size:0.8em;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:bold;white-space:nowrap;display:inline-block;vertical-align:middle;">Subscribed</span>
+                [% END %]<br>
+                <code style="font-size:0.85em;color:#666;">[% module.key | html %]</code>
+              </td>
+              <td class="addon-owner-cell">
+                <span class="badge" style="background-color:#5c6bc0;color:white;font-weight:bold;padding:2px 8px;border-radius:12px;">[% module.owner | html %]</span>
+              </td>
+              <td class="addon-desc-cell">[% module.description | html %]</td>
+              <td class="addon-no-popup">
+                [% IF is_admin %]
+                  [% IF module.key == 'membership' %]
+                    <span class="text-success" style="font-weight:bold;">Required Core</span>
+                    <input type="hidden" name="enabled_[% module.key %]" value="1" />
+                  [% ELSE %]
+                    <label class="switch addon-no-popup" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                      <input type="checkbox" class="addon-no-popup" name="enabled_[% module.key %]" value="1" [% IF module.site_enabled %]checked[% END %] style="cursor:pointer;" />
+                      [% IF module.site_enabled %]Enabled[% ELSE %]<span style="color:#aaa;">Disabled</span>[% END %]
+                    </label>
+                  [% END %]
+                [% ELSE %]
+                  [% IF module.site_enabled OR module.key == 'membership' %]
+                    <span class="text-success" style="font-weight:bold;">&#10004; Enabled</span>
+                  [% ELSE %]
+                    <span class="text-muted">Disabled</span>
+                  [% END %]
+                [% END %]
+              </td>
+              <td>
+                [% IF module.user_access %]
+                  <span class="badge badge-success" style="background-color:#28a745;color:white;padding:2px 8px;border-radius:12px;font-weight:bold;">Active Access</span>
+                [% ELSE %]
+                  <span class="badge badge-secondary" style="background-color:#6c757d;color:white;padding:2px 8px;border-radius:12px;">Locked</span>
+                [% END %]
+              </td>
+              <td class="addon-no-popup">
+                <div class="addon-no-popup" style="display: flex; gap: 4px; align-items: center;">
+                  [% IF module.user_access %]
+                    <a href="[% c.uri_for(module.route) %]" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">Open &rarr;</a>
+                  [% END %]
+                  [% IF is_admin OR _is_global_admin %]
+                    [% IF site_is_csc %]
+                      [% IF !module.user_access %]
+                        <a href="[% c.uri_for('/admin/site_modules') %]" class="btn btn-sm btn-secondary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">Enable in Core</a>
+                      [% END %]
+                    [% ELSE %]
+                      [% IF hosting_account %]
+                        [% IF module.user_access %]
+                          <a href="[% c.uri_for('/membership/hosting_signup', { site_name => site_name }) %]" class="btn btn-sm" style="background:#e65c00;color:white;text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">&#9998; Edit</a>
+                        [% ELSE %]
+                          <a href="[% c.uri_for('/membership/hosting_signup', { site_name => site_name }) %]" class="btn btn-sm" style="background:#e65c00;color:white;text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">Request Addon</a>
+                        [% END %]
+                      [% ELSE %]
+                        <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', site_name => site_name }) %]" class="btn btn-sm btn-secondary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">Register with CSC</a>
+                      [% END %]
+                    [% END %]
+                    <a href="[% c.uri_for('/admin/site_modules/edit_addon', { key => module.key, sitename => site_name }) %]" class="btn btn-sm" style="background:#ffc107;color:#212529;text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;font-weight:bold;" title="Catalog, pricing, route, and site enable/min role">&#9998; Edit Addon</a>
+                  [% ELSIF !module.user_access %]
+                    <a href="[% c.uri_for('/membership') %]" class="btn btn-sm btn-secondary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">View Plans</a>
+                  [% END %]
+                </div>
+              </td>
+            </tr>
+            [% END %]
+          </tbody>
+        </table>
+      </div>
+
+      [% IF is_admin %]
+      <div class="form-actions" id="addons-save" style="margin-top:1.5rem; text-align:right;">
+        <button type="submit" class="btn btn-primary" style="padding:10px 24px;font-size:1rem;font-weight:bold;">Save Add-on Configurations</button>
+      </div>
+      </form>
+      [% END %]
+
+    </div>
+
+<div id="addon-detail-overlay" role="dialog" aria-modal="true" aria-labelledby="addon-detail-title">
+  <div id="addon-detail-dialog">
+    <div class="addon-dialog-header">
+      <div>
+        <h3 id="addon-detail-title" style="margin:0;font-size:1.15em;"></h3>
+        <code id="addon-detail-key" style="font-size:0.85em;color:#666;"></code>
+      </div>
+      <button type="button" id="addon-detail-close" title="Close">&times;</button>
+    </div>
+    <div class="addon-dialog-body">
+      <dl>
+        <dt>Owner</dt><dd id="addon-detail-owner"></dd>
+        <dt>Description</dt><dd id="addon-detail-description"></dd>
+        <dt>Entry route</dt><dd id="addon-detail-route"></dd>
+        <dt>Monthly cost (catalog)</dt><dd id="addon-detail-cost"></dd>
+        <dt>Site-level status</dt><dd id="addon-detail-site-status"></dd>
+        <dt>Your access</dt><dd id="addon-detail-user-access"></dd>
+        <dt>CSC subscription</dt><dd id="addon-detail-subscribed"></dd>
+      </dl>
+      <div class="addon-dialog-actions" id="addon-detail-actions"></div>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  var overlay = document.getElementById('addon-detail-overlay');
+  if (!overlay) return;
+  var table = document.getElementById('addons-table');
+  var siteName = table ? table.getAttribute('data-site') : '';
+  var isAdmin = table && table.getAttribute('data-is-admin') === '1';
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  function addonEditUrl(key) {
+    return '/admin/site_modules/edit_addon?key=' + encodeURIComponent(key)
+      + '&sitename=' + encodeURIComponent(siteName || '');
+  }
+
+  function openAddonDetail(row) {
+    var d = row.dataset;
+    var nameEl = row.querySelector('strong');
+    var descEl = row.querySelector('.addon-desc-cell');
+    var ownerEl = row.querySelector('.addon-owner-cell');
+    document.getElementById('addon-detail-title').textContent = nameEl ? nameEl.textContent.trim() : (d.key || '');
+    document.getElementById('addon-detail-key').textContent = d.key || '';
+    document.getElementById('addon-detail-owner').textContent = ownerEl ? ownerEl.textContent.trim() : '—';
+    document.getElementById('addon-detail-description').textContent = descEl ? descEl.textContent.trim() : '—';
+    document.getElementById('addon-detail-route').textContent = d.route || '—';
+    document.getElementById('addon-detail-cost').textContent = 'See Edit addon (catalog pricing)';
+    document.getElementById('addon-detail-site-status').textContent =
+      d.siteEnabled === '1' ? 'Enabled on ' + siteName : 'Disabled on ' + siteName;
+    document.getElementById('addon-detail-user-access').textContent =
+      d.userAccess === '1' ? 'Active access' : 'Locked (enable site module or upgrade plan)';
+    document.getElementById('addon-detail-subscribed').textContent =
+      d.subscribed === '1' ? 'Listed on CSC hosting subscription' : 'Not on hosting subscription';
+
+    var actions = document.getElementById('addon-detail-actions');
+    actions.innerHTML = '';
+    if (d.userAccess === '1' && d.openUrl) {
+      var openA = document.createElement('a');
+      openA.href = d.openUrl;
+      openA.className = 'btn btn-sm btn-primary';
+      openA.textContent = 'Open module \u2192';
+      actions.appendChild(openA);
+    }
+    if (isAdmin && d.key) {
+      var editUrl = addonEditUrl(d.key);
+      var editA = document.createElement('a');
+      editA.href = editUrl;
+      editA.className = 'btn btn-sm addon-modal-link';
+      editA.style.cssText = 'background:#ffc107;color:#212529;font-weight:bold;';
+      editA.textContent = '\u270E Edit addon for ' + siteName;
+      actions.appendChild(editA);
+      var popA = document.createElement('a');
+      popA.href = editUrl;
+      popA.target = '_blank';
+      popA.rel = 'noopener';
+      popA.className = 'btn btn-sm btn-secondary addon-modal-link';
+      popA.textContent = 'Edit in new tab';
+      actions.appendChild(popA);
+    }
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeAddonDetail() {
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  document.getElementById('addon-detail-close').addEventListener('click', closeAddonDetail);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeAddonDetail();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeAddonDetail();
+  });
+
+  document.getElementById('addon-detail-actions').addEventListener('click', function(e) {
+    if (e.target.closest('a.addon-modal-link')) {
+      closeAddonDetail();
+    }
+  });
+
+  document.querySelectorAll('.addon-row').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+      if (e.target.closest('.addon-no-popup')) return;
+      openAddonDetail(row);
+    });
+    row.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!e.target.closest('.addon-no-popup')) openAddonDetail(row);
+      }
+    });
+  });
+})();
+</script>
+
+    [% IF !hosting_account AND !site_is_csc AND is_admin AND !is_embedded %]
+    <div class="alert alert-warning" style="margin-top:2rem;background:#fff3cd;border:1px solid #ffeeba;padding:1.5rem;border-radius:8px;">
+      <h3 style="margin-top:0;">&#9888; [% site_name | html %] is not registered with CSC Hosting</h3>
+      <p>To enable full managed add-ons, cPanel databases, and secure subdomains, register this site's hosting relationship with CSC today.</p>
+      <div style="margin-top:1rem;">
+        <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain' }) %]" class="btn btn-primary">Register Site with CSC &rarr;</a>
+      </div>
+    </div>
+    [% END %]
+
+[% IF !is_embedded %]
+  </div>
+</div>
+[% END %]

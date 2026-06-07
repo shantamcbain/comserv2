@@ -122,41 +122,51 @@ sub get_pages {
     
     # Use eval to catch any database errors
     eval {
-        # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('PageTb')->search({
-            menu => $menu,
-            status => $status,
-            sitename => [ $site_name, 'All' ]
-        }, {
-            order_by => { -asc => 'link_order' }
+        # Fetch active and inactive to let local overrides fully eclipse shared pages
+        my $rs = $c->model('DBEncy')->resultset('Page')->search({
+            '-or' => [
+                { sitename => [ $site_name, 'CSC', 'All' ] },
+                { share_with => 'all' },
+                { share_with => { 'like' => "%$site_name%" } }
+            ]
         });
-        
+
+        my %pages_by_code;
         while (my $row = $rs->next) {
-            push @results, { $row->get_columns };
-        }
-        
-        # If no results and we might need to fall back to direct SQL
-        if (!@results) {
-            # Get the database handle from the DBEncy model
-            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            my $code = $row->page_code;
+            my $site = $row->sitename;
             
-            # Prepare and execute the query
-            my $query = "SELECT * FROM page_tb WHERE menu = ? AND status = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
-            my $sth = $dbh->prepare($query);
-            $sth->execute($menu, $status, $site_name);
+            # Priority: 3 = Local Site override, 2 = CSC/All fallback, 1 = Shared
+            my $priority = 1;
+            if ($site eq $site_name) {
+                $priority = 3;
+            } elsif ($site eq 'CSC' || $site eq 'All') {
+                $priority = 2;
+            }
             
-            # Fetch all results
-            while (my $row = $sth->fetchrow_hashref) {
-                push @results, $row;
+            if (!exists $pages_by_code{$code} || $pages_by_code{$code}->{_priority} < $priority) {
+                my $page_data = { $row->get_columns };
+                $page_data->{_priority} = $priority;
+                $pages_by_code{$code} = $page_data;
             }
         }
-        
+
+        # Filter by active status and requested menu
+        my @filtered;
+        for my $code (keys %pages_by_code) {
+            my $p = $pages_by_code{$code};
+            if ($p->{status} eq 'active' && lc($p->{menu}) eq lc($menu)) {
+                push @filtered, $p;
+            }
+        }
+
+        @results = sort { ($a->{link_order} || 0) <=> ($b->{link_order} || 0) } @filtered;
         $c->log->debug("Found " . scalar(@results) . " pages");
     };
     if ($@) {
         $c->log->error("Error getting pages: $@");
     }
-    
+
     return \@results;
 }
 
@@ -171,28 +181,52 @@ sub get_admin_pages {
     
     # Use eval to catch any database errors
     eval {
-        # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('PageTb')->search({
-            menu => 'Admin',
-            status => 2,
-            sitename => [ $site_name, 'All' ]
-        }, {
-            order_by => { -asc => 'link_order' }
+        my $rs = $c->model('DBEncy')->resultset('Page')->search({
+            '-or' => [
+                { sitename => [ $site_name, 'CSC', 'All' ] },
+                { share_with => 'all' },
+                { share_with => { 'like' => "%$site_name%" } }
+            ]
         });
-        
+
+        my %pages_by_code;
         while (my $row = $rs->next) {
-            push @results, { $row->get_columns };
+            my $code = $row->page_code;
+            my $site = $row->sitename;
+            
+            # Priority: 3 = Local Site override, 2 = CSC/All fallback, 1 = Shared
+            my $priority = 1;
+            if ($site eq $site_name) {
+                $priority = 3;
+            } elsif ($site eq 'CSC' || $site eq 'All') {
+                $priority = 2;
+            }
+            
+            if (!exists $pages_by_code{$code} || $pages_by_code{$code}->{_priority} < $priority) {
+                my $page_data = { $row->get_columns };
+                $page_data->{_priority} = $priority;
+                $pages_by_code{$code} = $page_data;
+            }
         }
-        
-        # If no results and we might need to fall back to direct SQL
+
+        # Filter by active status and requested menu
+        my @filtered;
+        for my $code (keys %pages_by_code) {
+            my $p = $pages_by_code{$code};
+            if ($p->{status} eq 'active' && lc($p->{menu}) eq 'admin') {
+                push @filtered, $p;
+            }
+        }
+
+        @results = sort { ($a->{link_order} || 0) <=> ($b->{link_order} || 0) } @filtered;
+
         if (!@results) {
             # Get the database handle from the DBEncy model
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-            
-            # Prepare and execute the query
-            my $query = "SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+
+            my $query = "SELECT * FROM page WHERE menu = 'Admin' AND status = 'active' AND (sitename = ? OR sitename = 'CSC' OR share_with = 'all' OR share_with LIKE ?) ORDER BY link_order";
             my $sth = $dbh->prepare($query);
-            $sth->execute($site_name);
+            $sth->execute($site_name, "%$site_name%");
             
             # Fetch all results
             while (my $row = $sth->fetchrow_hashref) {
@@ -809,6 +843,10 @@ sub populate_navigation_data {
             $nav_data->{private_links} = $self->get_private_links($c, $username, $site_name);
         }
         
+        # Cap cache size to prevent unbounded memory growth (max 50 entries)
+        if (scalar(keys %{$self->_navigation_cache}) >= 50) {
+            $self->_navigation_cache({});
+        }
         # Cache the data
         $self->_navigation_cache->{$cache_key} = $nav_data;
         $self->_cache_timestamp($current_time);
@@ -836,61 +874,27 @@ sub _ensure_navigation_tables_exist {
         my $dbh = $schema->storage->dbh;
         my $tables = $db_model->list_tables();
         my $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
-        my $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
         my $navigation_exists = grep { $_ eq 'navigation' } @$tables;
-        
-        # If tables don't exist, try to create them
-        if (!$internal_links_exists || !$page_tb_exists) {
-            $c->log->debug("Navigation tables don't exist. Attempting to create them.");
-            
-            # Create tables if they don't exist
+
+        if (!$internal_links_exists) {
+            $c->log->debug("internal_links_tb table doesn't exist. Attempting to create it.");
             $db_model->create_table_from_result('InternalLinksTb', $schema, $c);
-            $db_model->create_table_from_result('PageTb', $schema, $c);
-            
-            # Check if tables were created successfully
+
             $tables = $db_model->list_tables();
             $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
-            $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
-            
-            # If tables still don't exist, try to create them using SQL files
-            if (!$internal_links_exists || !$page_tb_exists) {
-                $c->log->debug("Creating tables from SQL files.");
-                
-                # Try to execute SQL files
-                if (!$internal_links_exists) {
-                    my $sql_file = $c->path_to('sql', 'internal_links_tb.sql')->stringify;
-                    if (-e $sql_file) {
-                        my $sql = do { local (@ARGV, $/) = $sql_file; <> };
-                        my @statements = split /;/, $sql;
-                        foreach my $statement (@statements) {
-                            $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
-                            next unless $statement;  # Skip empty statements
-                            eval { $dbh->do($statement); };
-                            if ($@) {
-                                $c->log->error("Error executing SQL: $@");
-                            }
-                        }
-                    } else {
-                        $c->log->error("SQL file not found: $sql_file");
+
+            if (!$internal_links_exists) {
+                my $sql_file = $c->path_to('sql', 'internal_links_tb.sql')->stringify;
+                if (-e $sql_file) {
+                    my $sql = do { local (@ARGV, $/) = $sql_file; <> };
+                    foreach my $statement (split /;/, $sql) {
+                        $statement =~ s/^\s+|\s+$//g;
+                        next unless $statement;
+                        eval { $dbh->do($statement); };
+                        $c->log->error("Error executing SQL: $@") if $@;
                     }
-                }
-                
-                if (!$page_tb_exists) {
-                    my $sql_file = $c->path_to('sql', 'page_tb.sql')->stringify;
-                    if (-e $sql_file) {
-                        my $sql = do { local (@ARGV, $/) = $sql_file; <> };
-                        my @statements = split /;/, $sql;
-                        foreach my $statement (@statements) {
-                            $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
-                            next unless $statement;  # Skip empty statements
-                            eval { $dbh->do($statement); };
-                            if ($@) {
-                                $c->log->error("Error executing SQL: $@");
-                            }
-                        }
-                    } else {
-                        $c->log->error("SQL file not found: $sql_file");
-                    }
+                } else {
+                    $c->log->error("SQL file not found: $sql_file");
                 }
             }
         }
@@ -1083,8 +1087,9 @@ sub add_navigation_item :Path('/navigation/add') :Args(0) {
     }
     
     # Load pages for dropdown
-    $c->stash->{pages} = [$c->model('DBEncy')->resultset('PageTb')->search({}, 
-                         { order_by => 'name' })->all];
+    $c->stash->{pages} = [$c->model('DBEncy')->resultset('Page')->search({
+        status => 'active',
+    }, { order_by => 'title' })->all];
     $c->stash->{template} = 'Navigation/add.tt';
 }
 

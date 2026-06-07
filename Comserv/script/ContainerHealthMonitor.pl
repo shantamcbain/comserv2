@@ -12,7 +12,7 @@ use DBI;
 my $logger = Comserv::Util::Logging->instance();
 
 my $check_interval = $ENV{HEALTH_CHECK_INTERVAL} || 60;
-my $disk_threshold = $ENV{HEALTH_DISK_THRESHOLD} || 90;
+my $disk_threshold = $ENV{HEALTH_DISK_THRESHOLD} || 85;
 my $mem_threshold  = $ENV{HEALTH_MEM_THRESHOLD}  || 95;
 
 my $sys_id   = $ENV{SYSTEM_IDENTIFIER} || $logger->get_system_identifier();
@@ -32,6 +32,11 @@ my $db_down_since   = 0;   # epoch when DB was first found down
 my $db_backoff_next = 0;   # next epoch to retry DB check
 my $db_backoff_s    = 60;  # current backoff in seconds (grows up to 10 min)
 my $db_was_down     = 0;   # flag so we log "back up" when it recovers
+
+# Disk alert state — alert once when threshold crossed, then hourly reminder,
+# then log recovery when usage drops back below threshold.
+# Key: filesystem path, Value: hashref { alerted=>epoch, remind_next=>epoch }
+my %disk_alert_state;
 
 # Main Loop
 while (1) {
@@ -76,17 +81,48 @@ sub _db_credentials {
 }
 
 sub _db_ping {
-    # Returns: 1=up, 0=down
-    # Uses TCP connect check — avoids credential/grant issues when the app
-    # itself connects successfully via its own K8s secret credentials.
+    my ($user, $pass) = _db_credentials();
     my $port = $ENV{DB_PORT} || 3306;
+    
+    if ($user) {
+        my $driver = 'MariaDB';
+        my $driver_available = 0;
+        eval { require DBD::MariaDB; $driver_available = 1; };
+        if (!$driver_available) {
+            eval { require DBD::mysql; $driver = 'mysql'; $driver_available = 1; };
+        }
+        
+        if ($driver_available) {
+            my $dsn = "dbi:$driver:database=$db_name;host=$db_host;port=$port";
+            my $dbh = eval {
+                local $SIG{ALRM} = sub { die "timeout\n" };
+                alarm(4);
+                my $h = DBI->connect($dsn, $user, $pass, {
+                    RaiseError => 1,
+                    PrintError => 0,
+                    AutoCommit => 1,
+                    ($driver eq 'MariaDB' ? (mariadb_connect_timeout => 2) : (mysql_connect_timeout => 2)),
+                });
+                alarm(0);
+                return $h;
+            };
+            alarm(0);
+            
+            if ($dbh) {
+                my $ping_ok = eval { $dbh->ping };
+                $dbh->disconnect();
+                return 1 if $ping_ok;
+            }
+        }
+    }
+    
     use IO::Socket::INET;
     my $sock = eval {
         IO::Socket::INET->new(
             PeerAddr => $db_host,
             PeerPort => $port,
             Proto    => 'tcp',
-            Timeout  => 5,
+            Timeout  => 3,
         );
     };
     if ($sock) {
@@ -137,43 +173,37 @@ sub check_health {
 
     # --- 2. Disk space ---
     check_disk_space('/');
-    for my $mount (qw(/data/nfs /opt/comserv/logs)) {
-        next unless -d $mount;
-        # Only check separately if it is a real NFS mount.
-        # Bind mounts (ext4/overlay) reflect the host filesystem already
-        # checked above via '/' and would produce duplicate/misleading alerts.
-        next unless is_nfs_mount($mount);
-        check_disk_space($mount);
-    }
 
     # --- 3. Memory ---
     check_memory();
 }
 
-sub is_nfs_mount {
-    my ($path) = @_;
-    return 0 unless -f '/proc/mounts';
-    open my $fh, '<', '/proc/mounts' or return 0;
-    while (my $line = <$fh>) {
-        my (undef, $mnt, $fstype) = split /\s+/, $line;
-        if ($mnt eq $path && $fstype =~ /^nfs/) {
-            close $fh;
-            return 1;
-        }
-    }
-    close $fh;
-    return 0;
-}
-
 sub check_disk_space {
     my ($path) = @_;
     my $df_output = `df -P "$path" 2>/dev/null | tail -1`;
-    if ($df_output && $df_output =~ /(\d+)%/) {
-        my $usage = $1;
-        if ($usage >= $disk_threshold) {
+    return unless $df_output && $df_output =~ /(\d+)%/;
+    my $usage = $1;
+    my $now   = time();
+    my $state = $disk_alert_state{$path} //= { alerted => 0, remind_next => 0 };
+
+    if ($usage >= $disk_threshold) {
+        if (!$state->{alerted}) {
+            $state->{alerted}      = $now;
+            $state->{remind_next}  = $now + 3600;
             $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'check_disk_space',
                 "$id_str Disk usage alert on $path: ${usage}% (threshold: ${disk_threshold}%)");
+        } elsif ($now >= $state->{remind_next}) {
+            $state->{remind_next} = $now + 3600;
+            my $alert_min = int(($now - $state->{alerted}) / 60);
+            $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'check_disk_space',
+                "$id_str Disk still high on $path: ${usage}% — ${alert_min} min above threshold (${disk_threshold}%)");
         }
+    } elsif ($state->{alerted}) {
+        my $alert_min = int(($now - $state->{alerted}) / 60);
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'check_disk_space',
+            "$id_str Disk recovered on $path: ${usage}% — was above threshold for ${alert_min} min");
+        $state->{alerted}     = 0;
+        $state->{remind_next} = 0;
     }
 }
 

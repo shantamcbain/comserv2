@@ -148,10 +148,17 @@ sub COMPONENT {
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
             "DBEncy: Using database driver: $driver (available: $driver_available)");
         
+        my %driver_attrs = $driver eq 'MariaDB'
+            ? (mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
+            : (); # mysql fallback: timeouts go in DSN to avoid attribute-rejection by older DBIx::Class
+        my $dsn = "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port};
+        $dsn .= ";mysql_connect_timeout=10;mysql_read_timeout=30;mysql_write_timeout=30" if $driver eq 'mysql';
+
         $connect_info = {
-            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => $dsn,
             user => $conn->{username},
             password => $conn->{password},
+            %driver_attrs,
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,
@@ -169,7 +176,21 @@ sub COMPONENT {
     }
 
     $args->{connect_info} = $connect_info;
-    return $self->next::method($app, $args);
+    my $instance = $self->next::method($app, $args);
+
+    if ($db_type eq 'sqlite') {
+        eval {
+            $instance->schema->deploy({ add_drop_tables => 0 });
+            $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+                "DBEncy SQLite fallback: schema deployed successfully.");
+        };
+        if ($@) {
+            $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+                "DBEncy SQLite fallback: schema deploy encountered errors (tables may already exist): $@");
+        }
+    }
+
+    return $instance;
 }
 
 # Method to get current connection info for debugging
@@ -293,7 +314,9 @@ sub create_table_from_result {
     # Check if the table exists
     if (!$result) {
         # The table does not exist, create it
-        my $result_class = "Comserv::Model::Schema::Ency::Result::$table_name";
+        # table_name may carry '/' subdir separators; convert to '::' for a valid Perl class path
+        (my $result_path = $table_name) =~ s{/}{::}g;
+        my $result_class = "Comserv::Model::Schema::Ency::Result::$result_path";
         eval "require $result_class";
         if ($@) {
             $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not load $result_class: $@. Table name: $table_name");

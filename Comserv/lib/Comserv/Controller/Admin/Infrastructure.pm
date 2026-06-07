@@ -9,7 +9,11 @@ use File::Spec;
 use File::Path qw(make_path);
 use IPC::Run3;
 use DateTime;
+use LWP::UserAgent;
+use HTTP::Request;
+use MIME::Base64 qw(encode_base64);
 use Comserv::Util::Logging;
+use Comserv::Util::Opnsense;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -474,6 +478,195 @@ sub _deploy_monitoring_stack {
         success => $all_success,
         message => $all_success ? 'Monitoring stack deployed successfully' : 'Deployment encountered errors',
         steps => \@results
+    };
+}
+
+sub opnsense_index :Path('/admin/infrastructure/opnsense') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'opnsense_index',
+        'Loading OPNsense gateway management page');
+
+    my $config = $self->_load_opnsense_config($c);
+    my ($status, $error);
+
+    my $api;
+    if ($config->{host} && $config->{key} && $config->{secret}) {
+        $api = Comserv::Util::Opnsense->new($config);
+        if ($api) {
+            $status = $api->fetch_status;
+        } else {
+            $error = 'Could not initialize OPNsense API client.';
+        }
+    } else {
+        $error = 'OPNsense not configured. Please set host, key, and secret below.';
+    }
+
+    $c->stash(
+        opnsense_config => $config,
+        opnsense_status => $status,
+        opnsense_error  => $error,
+        dev_access      => $self->_dev_zerotier_access_hints($c),
+        template        => 'admin/infrastructure/opnsense.tt',
+    );
+}
+
+sub opnsense_save_config :Path('/admin/infrastructure/opnsense/save') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+        return;
+    }
+
+    my $params  = $c->req->body_parameters;
+    my $config  = {
+        host    => $params->{host}   || '',
+        port    => int($params->{port}) || 8443,
+        key     => $params->{key}    || '',
+        secret  => $params->{secret} || '',
+        verify_ssl => ($params->{verify_ssl} ? 1 : 0),
+    };
+
+    $self->_save_opnsense_config($c, $config);
+
+    $c->flash->{success_msg} = 'OPNsense configuration saved.';
+    $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+}
+
+sub opnsense_status :Path('/admin/infrastructure/opnsense/status') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $config = $self->_load_opnsense_config($c);
+    my $api = Comserv::Util::Opnsense->new($config);
+    unless ($api && $api->configured) {
+        $c->stash->{json} = { success => 0, error => 'OPNsense not configured' };
+        $c->forward('View::JSON');
+        return;
+    }
+    $c->stash->{json} = { success => 1, %{ $api->fetch_status } };
+    $c->forward('View::JSON');
+}
+
+sub opnsense_action :Path('/admin/infrastructure/opnsense/action') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+        return;
+    }
+
+    my $config = $self->_load_opnsense_config($c);
+    my $api = Comserv::Util::Opnsense->new($config);
+    unless ($api && $api->configured) {
+        $c->flash->{error_msg} = 'OPNsense API not configured.';
+        $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+        return;
+    }
+
+    my $action = $c->req->parameters->{action} || '';
+    my $p = $c->req->parameters;
+    my $result;
+
+    if ($action eq 'apply_nat') {
+        $result = $api->apply_nat;
+    } elsif ($action eq 'apply_filter') {
+        $result = $api->apply_filter;
+    } elsif ($action eq 'reconfigure_unbound') {
+        $result = $api->reconfigure_unbound;
+    } elsif ($action eq 'add_nat') {
+        $result = $api->add_port_forward({
+            interface      => $p->{interface},
+            protocol       => $p->{protocol},
+            external_port  => $p->{external_port},
+            local_port     => $p->{local_port},
+            target_ip      => $p->{target_ip},
+            destination    => $p->{destination},
+            description    => $p->{description},
+        });
+        if ($result->{success}) {
+            $api->apply_nat;
+            $c->flash->{success_msg} = 'NAT port forward added and applied.';
+        }
+    } elsif ($action eq 'add_dns') {
+        $result = $api->add_host_override({
+            hostname    => $p->{hostname},
+            domain      => $p->{domain},
+            ip          => $p->{ip},
+            description => $p->{description},
+        });
+        if ($result->{success}) {
+            $api->reconfigure_unbound;
+            $c->flash->{success_msg} = 'DNS host override added and Unbound reconfigured.';
+        }
+    } elsif ($action eq 'toggle_nat') {
+        $result = $api->set_nat_rule_enabled($p->{uuid}, $p->{enabled});
+        if ($result->{success}) {
+            $api->apply_nat;
+            $c->flash->{success_msg} = 'NAT rule updated.';
+        }
+    } else {
+        $c->flash->{error_msg} = "Unknown action: $action";
+        $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+        return;
+    }
+
+    if ($result && $result->{success}) {
+        $c->flash->{success_msg} //= "OPNsense action '$action' completed.";
+    } else {
+        $c->flash->{error_msg} = $result->{error} || "OPNsense action '$action' failed.";
+    }
+    $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+}
+
+sub _dev_zerotier_access_hints {
+    my ($self, $c) = @_;
+    my $zero_host = 'zero.computersystemconsulting.ca';
+    my $cf_zone   = 'computersystemconsulting.ca';
+    my $dns_zone_url = $c->uri_for('/admin/dns/zone/' . $cf_zone);
+    my $dns_zero_url = $dns_zone_url . '?host=' . $zero_host;
+    return {
+        prod_zero_host    => $zero_host,
+        prod_zero_ip      => '172.30.50.206',
+        prod_port         => 5000,
+        dev_zt_ip         => '172.30.131.126',
+        dev_hostname      => 'workstation.zero',
+        dev_port          => 3001,
+        dev_url           => 'http://workstation.zero:3001/ai/editing_widget_popup',
+        cf_zone           => $cf_zone,
+        dns_dashboard_url => $c->uri_for('/admin/dns'),
+        dns_zone_url      => $dns_zone_url,
+        dns_zero_edit_url => $dns_zero_url,
+        note              => 'Public DNS for zero.computersystemconsulting.ca is managed in Comserv Application DNS (Cloudflare). '
+                           . 'It currently points at production1 (:5000). For dev Starman :3001 use workstation.zero or 172.30.131.126, '
+                           . 'or change the Cloudflare A record to the workstation ZeroTier IP.',
+    };
+}
+
+sub _load_opnsense_config {
+    my ($self, $c) = @_;
+    my $config_file = Catalyst::Utils::home('Comserv') . '/config/infrastructure/opnsense.json';
+    return {} unless -f $config_file;
+    try {
+        my $json = read_file($config_file);
+        return decode_json($json);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_load_opnsense_config',
+            "Failed to load OPNsense config: $_");
+        return {};
+    };
+}
+
+sub _save_opnsense_config {
+    my ($self, $c, $config) = @_;
+    my $config_dir  = Catalyst::Utils::home('Comserv') . '/config/infrastructure';
+    my $config_file = "$config_dir/opnsense.json";
+    make_path($config_dir) unless -d $config_dir;
+    try {
+        write_file($config_file, encode_json($config));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_save_opnsense_config',
+            "Failed to save OPNsense config: $_");
     };
 }
 

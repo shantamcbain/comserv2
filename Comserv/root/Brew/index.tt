@@ -1,0 +1,138 @@
+[% META
+  title = 'Brew — Brewhouse Management'
+  description = 'Brewhouse addon home — recipes, batches, ingredients, Planning calendar, brew log'
+  roles = 'guest,user,admin'
+  TemplateType = 'Application'
+  category = 'brew,addon'
+  page_version = '0.02'
+  last_updated = '2026/06/05'
+%]
+[% PageVersion = 'Brew/index.tt,v 0.02 2026/06/05 Brew home feature links' %]
+
+<style>
+.brew-hero {
+    background: linear-gradient(135deg, #4e342e 0%, #8d6e63 45%, #ff8f00 100%);
+    color: #fff;
+    padding: 2rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+.brew-hero h1 { margin: 0 0 0.5rem; font-size: 1.8em; }
+.brew-hero p { margin: 0; opacity: 0.95; max-width: 52em; line-height: 1.5; }
+.brew-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+}
+.brew-card {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    background: rgba(255,255,255,0.88);
+}
+.brew-card h3 { margin: 0 0 0.5rem; color: #5d4037; font-size: 1.05em; }
+.brew-card p { margin: 0 0 0.75rem; font-size: 0.9em; color: var(--text-color, #555); line-height: 1.45; }
+.brew-card a.btn {
+    display: inline-block;
+    padding: 6px 14px;
+    background: #6d4c41;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.brew-card a.btn:hover { background: #4e342e; }
+.brew-note, .brew-accounting-note {
+    background: rgba(255,248,225,0.88);
+    border: 1px solid var(--border-color, #ffcc80);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 1.2rem;
+    font-size: 0.92em;
+}
+</style>
+
+<div class="app-container">
+<div class="brew-hero">
+    <h1><i class="fas fa-beer"></i> Brew</h1>
+    <p>
+        Brewhouse operations for <strong>[% c.stash.SiteName || c.session.SiteName | html %]</strong> —
+        beer, mead, wine, cider, and other ferments.
+        This addon is served on any <code>brew.<em>your-domain</em></code> hostname
+        (for example <code>brew.computersystemconsulting.ca</code>).
+    </p>
+</div>
+
+<div class="brew-note">
+    <strong>Brew addon:</strong> Recipes, batches, ingredients, and brew-day logging are rolling out here.
+    <strong>Calendar</strong> uses the shared Planning system — there is no separate brew-only calendar.
+    Brew works fully <em>without</em> the Accounting addon; enable Accounting only if you want GL, invoicing, or stocked ingredient costing.
+</div>
+
+<div class="brew-accounting-note">
+    <strong>Accounting (optional):</strong>
+    [% IF c.stash.enabled_modules.accounting %]
+    Accounting is enabled on this site. You can use it to manage brewhouse inventory costs, invoices, and ledger entries when you are ready — but recipes, batches, and the brew log do not require it.
+    [% ELSE %]
+    No Accounting addon on this site. Your brewhouse still runs on recipes, batches, Planning calendar, and brew logs. Ask your site admin about enabling Accounting if you later want chart-of-accounts or inventory costing.
+    [% END %]
+</div>
+
+<div class="brew-note" style="background:#fefce8;border-color:#a16207;">
+    <strong>Brew starter template:</strong> When the Brew addon (with Accounting) is enabled for a new user, the system provisions a full accounting DB + a reusable catalog of brewing ingredients with sample prices/costs and example BOMs. This is the "accounting part which includes BOMs" template.
+    Real legacy recipes (Gambrinus and many others) are available to browse on the Recipes and Ingredients pages and can be selectively imported — they are <em>not</em> forced into every new brewer's active set.
+</div>
+
+<div class="brew-cards">
+    <div class="brew-card">
+        <h3>Dashboard</h3>
+        <p>Overview of brewhouse status, upcoming batches, and quick links.</p>
+        <a href="[% c.uri_for('/brew') %]" class="btn">You are here</a>
+    </div>
+    <div class="brew-card">
+        <h3>Recipes</h3>
+        <p>Beer, mead, wine, cider — formulas, mash targets, and ingredient lines.</p>
+        <a href="[% c.uri_for('/brew/recipes') %]" class="btn">Learn more</a>
+    </div>
+    <div class="brew-card">
+        <h3>Batches</h3>
+        <p>Track each brew run from mash through packaging.</p>
+        <a href="[% c.uri_for('/brew/batches') %]" class="btn">Learn more</a>
+    </div>
+    <div class="brew-card">
+        <h3>Ingredients</h3>
+        <p>Grains, hops, yeast, and adjuncts for your brewhouse.</p>
+        <a href="[% c.uri_for('/brew/ingredients') %]" class="btn">Learn more</a>
+    </div>
+    <div class="brew-card">
+        <h3>Calendar</h3>
+        <p>Bottle, rack, and brew-day reminders via Planning for <strong>[% c.stash.SiteName || c.session.SiteName | html %]</strong>.</p>
+        <a href="[% c.uri_for('/brew/calendar') %]" class="btn">About calendar</a>
+        [% IF c.stash.can_plan %]
+        <a href="[% c.uri_for('/planning/daily') %]#month-view" class="btn" style="margin-left:6px;background:#5d4037;">Open calendar</a>
+        [% END %]
+    </div>
+    <div class="brew-card">
+        <h3>Brew log</h3>
+        <p>Mash and sparge temperatures, fermentation milestones.</p>
+        <a href="[% c.uri_for('/brew/brewlog') %]" class="btn">Learn more</a>
+    </div>
+    <div class="brew-card">
+        <h3>HelpDesk</h3>
+        <p>Support tickets and documentation for your brewery team.</p>
+        <a href="[% c.uri_for('/helpdesk') %]" class="btn">HelpDesk</a>
+    </div>
+    [% IF c.stash.is_admin %]
+    <div class="brew-card">
+        <h3>Import legacy data</h3>
+        <p>Migration map: forager brew tables → ENCY and Planning.</p>
+        <a href="[% c.uri_for('/brew/import') %]" class="btn">Migration hub</a>
+    </div>
+    <div class="brew-card">
+        <h3>Site setup</h3>
+        <p>Domains, modules, and hosting for Brew sites.</p>
+        <a href="[% c.uri_for('/admin/site_modules') %]" class="btn">Site modules</a>
+    </div>
+    [% END %]
+</div>
+</div>

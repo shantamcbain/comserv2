@@ -40,14 +40,14 @@ BEGIN {
     } @INC;
     
     # STEP 2: Add main lib path to VERY BEGINNING of @INC via unshift (takes absolute priority)
-    unshift @INC, "$FindBin::Bin/../lib";
+    unshift @INC, $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib";
     
     # STEP 3: Also add project root for relative module loading
-    unshift @INC, "$FindBin::Bin/..";
+    unshift @INC, $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
     
     # Traditional use lib statements (for compatibility) - now comes AFTER unshift
-    use lib "$FindBin::Bin/../lib";
-    use lib "$FindBin::Bin/..";
+    use lib $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib";
+    use lib $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
 
     # Install local::lib if not already installed
     eval { require local::lib; }; # Check if local::lib is loaded
@@ -72,9 +72,9 @@ BEGIN {
     my $version = $Config{version};
 
     # Add all possible architecture paths to @INC
-    use lib "$FindBin::Bin/../local/lib/perl5/$archname";
-    use lib "$FindBin::Bin/../local/lib/perl5/$version/$archname";
-    use lib "$FindBin::Bin/../local/lib/perl5/$version";
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname"        if $archname;
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$version/$archname" if $version && $archname;
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$version"          if $version;
 
     # Also add the actual installed architecture path (for systems where archname differs)
     # This handles cases where the actual installed path uses a different architecture name
@@ -298,20 +298,11 @@ sub _start_health_evaluator {
                             $status, $score, scalar(@$summary))
                     );
 
-                    # Log Docker container health to system_log so all servers are visible
+                    # Log Docker container health to system_log (shared DB, all servers)
                     eval {
-                        my $containers = Comserv::Util::HealthLogger->get_docker_health();
-                        for my $ct (@$containers) {
-                            my $lvl = ($ct->{health} eq 'healthy') ? 'info'
-                                    : ($ct->{health} eq 'unhealthy') ? 'warn'
-                                    : 'debug';
-                            $logger->log_with_details(undef, $lvl, __FILE__, __LINE__,
-                                'docker_health',
-                                sprintf('[HEALTH][DOCKER_STATUS] container=%s health=%s status=%s last_check=%s',
-                                    $ct->{name}, $ct->{health}, $ct->{status_str},
-                                    $ct->{last_output} || 'ok')
-                            );
-                        }
+                        Comserv::Util::HealthLogger->record_docker_health_snapshot(
+                            $schema, all_containers => 1
+                        );
                     };
 
                     # Alert CSC admin if health has deteriorated
@@ -426,7 +417,7 @@ EMAIL
     }
 }
 
-_start_health_evaluator();
+_start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1';
 
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 

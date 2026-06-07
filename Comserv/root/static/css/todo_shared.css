@@ -29,28 +29,34 @@
 /* Common Navigation Styles */
 .view-navigation {
     display: flex;
-    justify-content: space-between;
-    margin: 20px 0;
-    gap: 8px;
-    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin: 6px 0;
+    gap: 5px;
+    flex-wrap: nowrap;
     align-items: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     position: sticky;
     top: 0;
     z-index: 1000;
     background-color: var(--background-color, white);
-    padding: 10px;
-    border-bottom: 2px solid var(--border-color, #ddd);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border-color, #ddd);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    scrollbar-width: none;
 }
+.view-navigation::-webkit-scrollbar { display: none; }
 
 .view-navigation a {
-    padding: 4px 10px;
+    padding: 3px 8px;
     background-color: var(--button-bg, #f2f2f2);
     color: var(--button-text, #000000);
     text-decoration: none;
     border-radius: 4px;
     border: 1px solid var(--button-border, #cccccc);
-    font-size: 1em;
+    font-size: 0.85em;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .view-navigation a:hover {
@@ -114,9 +120,11 @@
 /* Action Buttons */
 .todo-actions-shared {
     display: flex;
-    gap: 5px;
-    margin-top: 5px;
-    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
 .action-button-shared {
@@ -165,42 +173,21 @@
 /* Responsive Base Styles */
 @media (max-width: 768px) {
     .view-buttons {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        overflow-x: auto;
         gap: 5px;
     }
-    
-    .view-buttons a {
-        padding: 6px 12px;
-        font-size: 0.9em;
-    }
-    
-    .view-navigation {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    
-    .view-navigation a {
-        padding: 6px 12px;
-        font-size: 0.9em;
-    }
-    
-    .todo-actions-shared {
-        gap: 3px;
-    }
-    
-    .action-button-shared {
-        font-size: 0.6em;
-        padding: 3px 6px;
-    }
-}
 
-@media (max-width: 480px) {
-    .view-navigation {
-        flex-direction: column;
+    .view-buttons a {
+        padding: 4px 8px;
+        font-size: 0.82em;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
-    
-    .view-navigation a {
-        text-align: center;
+
+    .action-button-shared {
+        font-size: 0.65em;
+        padding: 3px 6px;
     }
 }
 

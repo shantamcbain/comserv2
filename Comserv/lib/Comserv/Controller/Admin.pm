@@ -7,6 +7,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
+use Comserv::Util::BackupManager;
 use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
@@ -21,6 +22,7 @@ use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
 use POSIX qw(_exit);
+use DBI;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -185,6 +187,9 @@ sub index :Path :Args(0) {
     
     # Get system stats
     my $stats = $self->get_system_stats($c);
+
+    # Get remote server stats (db + prod catalyst servers)
+    my $remote_servers = $self->get_remote_server_stats($c);
     
     # Get recent user activity
     my $recent_activity = $self->get_recent_activity($c);
@@ -204,14 +209,14 @@ sub index :Path :Args(0) {
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
         if (lc($site_name) eq 'csc') {
-            my @pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            my @pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { status => 'pending' },
                 { order_by => { -asc => 'sitename' } }
             )->all;
             $pending_hosting = scalar @pending;
             $pending_hosting_sites = \@pending;
         } else {
-            my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+            my @inv = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
                 { sitename => $site_name, status => 'outstanding' },
                 { join => 'supplier', prefetch => 'supplier', order_by => { -asc => 'me.due_date' } }
             )->all;
@@ -223,18 +228,106 @@ sub index :Path :Args(0) {
             "Outstanding invoices query error: $@");
     }
 
+    my $helpdesk_open_tickets = [];
+    my $helpdesk_open_count   = 0;
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        my $is_csc    = lc($site_name) eq 'csc';
+        my %hd_where  = (status => [qw(open in_progress)]);
+        $hd_where{site_name} = $site_name unless $is_csc;
+        my @hd_tickets = $c->model('DBEncy')->resultset('SupportTicket')->search(
+            \%hd_where,
+            { order_by => [{ -desc => 'me.created_at' }], rows => 10 }
+        )->all;
+        $helpdesk_open_count   = $is_csc
+            ? $c->model('DBEncy')->resultset('SupportTicket')->search({ status => [qw(open in_progress)] })->count
+            : scalar @hd_tickets;
+        $helpdesk_open_tickets = \@hd_tickets;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "HelpDesk ticket query error: $@");
+    }
+
+    my $software_status = $self->_get_software_status($c);
+
+    my $site_name_idx = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $is_csc        = (lc($site_name_idx) eq 'csc') ? 1 : 0;
+    my $has_accounting = $is_csc ? 1 : 0;
+    unless ($is_csc) {
+        eval {
+            $has_accounting = $c->model('DBEncy')->resultset('SiteModule')->search({
+                sitename    => $site_name_idx,
+                module_name => 'accounting',
+            })->count ? 1 : 0;
+        };
+    }
+
     $c->stash(
-        template             => 'admin/index.tt',
-        stats                => $stats,
-        recent_activity      => $recent_activity,
-        notifications        => $notifications,
-        pending_hosting       => $pending_hosting,
-        pending_hosting_sites => $pending_hosting_sites,
-        outstanding_invoices  => $outstanding_invoices,
+        template              => 'admin/index.tt',
+        stats                 => $stats,
+        remote_servers        => $remote_servers,
+        recent_activity       => $recent_activity,
+        notifications         => $notifications,
+        pending_hosting        => $pending_hosting,
+        pending_hosting_sites  => $pending_hosting_sites,
+        outstanding_invoices   => $outstanding_invoices,
+        helpdesk_open_tickets  => $helpdesk_open_tickets,
+        helpdesk_open_count    => $helpdesk_open_count,
+        software_status        => $software_status,
+        is_csc                 => $is_csc,
+        has_accounting         => $has_accounting,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Completed Admin index action");
+}
+
+sub _get_software_status {
+    my ($self, $c) = @_;
+
+    my $repo_dir = $c->path_to('..')->stringify;
+
+    my $current_branch  = '';
+    my $last_commit     = '';
+    my $commits_behind  = 0;
+    my $has_uncommitted = 0;
+    my $has_untracked   = 0;
+    my @recommendations;
+
+    eval {
+        chomp($current_branch = `git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null`);
+        chomp($last_commit    = `git -C "$repo_dir" log -1 --format="%h %s" 2>/dev/null`);
+
+        my $fetch_out = `git -C "$repo_dir" fetch origin 2>&1`;
+        chomp(my $behind_raw = `git -C "$repo_dir" rev-list --count HEAD..origin/main 2>/dev/null`);
+        $commits_behind = ($behind_raw =~ /^\d+$/) ? $behind_raw + 0 : 0;
+
+        my $status_out = `git -C "$repo_dir" status --porcelain 2>/dev/null`;
+        $has_uncommitted = ($status_out =~ /^[MADRCU]/m) ? 1 : 0;
+        $has_untracked   = ($status_out =~ /^\?\?/m)     ? 1 : 0;
+
+        if ($commits_behind > 0) {
+            push @recommendations, {
+                type    => 'warning',
+                icon    => 'fas fa-exclamation-triangle',
+                message => "Your branch is $commits_behind commit(s) behind origin/main.",
+                action  => 'Run Git Pull to update.',
+                link    => '/admin/git_pull',
+            };
+        }
+    };
+
+    return {
+        git_status => {
+            current_branch          => $current_branch  || 'Unknown',
+            last_commit             => $last_commit      || 'No commits',
+            commits_behind          => $commits_behind,
+            has_uncommitted_changes => $has_uncommitted,
+            has_untracked_files     => $has_untracked,
+        },
+        recommendations => \@recommendations,
+    };
 }
 
 # Get system statistics for the admin dashboard
@@ -280,15 +373,21 @@ sub get_system_stats {
     };
 
     eval {
-        my $nfs_root = $ENV{NFS_ROOT} // '/data/nfs';
+        my $nfs_root = $ENV{NFS_DATA_PATH} // $ENV{NFS_ROOT} // '/data/nfs';
         if (-d $nfs_root) {
-            my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
-            if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
-                my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
-                $stats->{nfs_pct}   = $pct;
-                $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
-                $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
-                $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+            my @app_dev = stat('.');
+            my @nfs_dev = stat($nfs_root);
+            if (@app_dev && @nfs_dev && $app_dev[0] != $nfs_dev[0]) {
+                my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
+                if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+                    my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+                    $stats->{nfs_pct}   = $pct;
+                    $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
+                    $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+                    $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+                }
+            } elsif (@app_dev && @nfs_dev && $app_dev[0] == $nfs_dev[0]) {
+                $stats->{nfs_same_device} = 1;
             }
         }
     };
@@ -303,6 +402,52 @@ sub get_system_stats {
     };
 
     return $stats;
+}
+
+my @MONITORED_SERVERS = (
+    { names => ['db-production', 'db-01', '192.168.1.20'], ip => '192.168.1.20', label => 'DB Server 1 (192.168.1.20)'   },
+    { names => ['db-02', '192.168.1.21'],                  ip => '192.168.1.21', label => 'DB Server 2 (192.168.1.21)'   },
+    { names => ['prod-01', 'prod1', '192.168.1.126'],      ip => '192.168.1.126', label => 'Prod Catalyst 1 (192.168.1.126)' },
+    { names => ['prod-02', 'prod2', '192.168.1.127'],      ip => '192.168.1.127', label => 'Prod Catalyst 2 (192.168.1.127)' },
+);
+
+sub get_remote_server_stats {
+    my ($self, $c) = @_;
+    my @servers;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+        for my $srv (@MONITORED_SERVERS) {
+            my %latest;
+            my @rows = $rs->search(
+                { hostname  => { -in => $srv->{names} },
+                  timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL 2 HOUR)" } },
+                { order_by => { -desc => 'timestamp' } }
+            )->all;
+            for my $row (@rows) {
+                my $mn = $row->metric_name;
+                next if exists $latest{$mn};
+                $latest{$mn} = {
+                    value => $row->metric_value,
+                    text  => $row->metric_text,
+                    unit  => $row->unit,
+                    level => $row->level,
+                    ts    => $row->timestamp,
+                };
+            }
+            my $reported_hostname = @rows ? $rows[0]->hostname : undef;
+            my $last_seen         = @rows ? $rows[0]->timestamp : undef;
+            push @servers, {
+                name      => $srv->{ip},
+                ip        => $srv->{ip},
+                label     => $srv->{label},
+                hostname  => $reported_hostname,
+                metrics   => \%latest,
+                last_seen => $last_seen,
+                online    => scalar(@rows) ? 1 : 0,
+            };
+        }
+    };
+    return \@servers;
 }
 
 # Get recent user activity for the admin dashboard
@@ -425,7 +570,7 @@ sub get_system_notifications {
         }
 
         if ($is_csc_admin) {
-            my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            my $pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { status => 'pending' }
             )->count;
             if ($pending > 0) {
@@ -441,7 +586,7 @@ sub get_system_notifications {
 
             # Recently paid hosting invoices (last 48h)
             my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
-            my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+            my @paid = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
                 { sitename => { '!=' => 'CSC' }, status => 'paid',
                   updated_at => { '>=' => $cutoff } },
                 { order_by => { -desc => 'updated_at' } }
@@ -460,7 +605,7 @@ sub get_system_notifications {
         eval {
             my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
             my $today_str = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-            my $auto_due  = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search({
+            my $auto_due  = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search({
                 sitename => $site_name,
                 auto_pay => 1,
                 status   => { '!=' => 'paid' },
@@ -647,6 +792,88 @@ sub users :Path('/admin/users') :Args(0) {
     );
 }
 
+# Admin purge unverified/bogus users
+sub purge_users :Path('/admin/purge_users') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+
+    unless ($admin_auth->check_admin_access($c, 'admin_users')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'purge_users',
+            "Access denied for admin_users - username: " . ($c->session->{username} || 'none'));
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    unless ($is_csc_admin) {
+        $c->flash->{error_msg} = "Only global CSC administrators can purge users.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $hours = $c->req->param('purge_hours') // 24;
+    if ($hours !~ /^\d+$/ || $hours <= 0) {
+        $hours = 24;
+    }
+
+    my $email_pattern = $c->req->param('email_pattern') // '';
+    $email_pattern =~ s/^\s+|\s+$//g;
+
+    my $schema = $c->model('DBEncy');
+    my $purged_count = 0;
+
+    eval {
+        my $cutoff = DateTime->now->subtract(hours => $hours)->strftime('%Y-%m-%d %H:%M:%S');
+
+        my %search_cond = (
+            status => 'pending_verification',
+            created_at => { '<' => $cutoff },
+        );
+
+        if ($email_pattern ne '') {
+            $search_cond{email} = { like => "%$email_pattern%" };
+        }
+
+        my @users_to_purge = $schema->resultset('User')->search(\%search_cond)->all;
+
+        for my $user (@users_to_purge) {
+            my $user_id = $user->id;
+
+            $schema->txn_do(sub {
+                $schema->resultset('EmailVerificationCode')->search({ user_id => $user_id })->delete;
+                $schema->resultset('PasswordResetToken')->search({ user_id => $user_id })->delete;
+                $schema->resultset('UserSiteRole')->search({ user_id => $user_id })->delete;
+                $schema->resultset('Accounting::PointAccount')->search({ user_id => $user_id })->delete;
+
+                eval {
+                    $schema->resultset('System::SiteUser')->search({ user_id => $user_id })->delete;
+                };
+
+                $schema->resultset('User')->search({ id => $user_id })->delete;
+                $purged_count++;
+            });
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'purge_users',
+            "Admin purged $purged_count unverified users older than $hours hours (email pattern: '$email_pattern')");
+
+        $c->flash->{success_msg} = "Successfully purged $purged_count unverified accounts.";
+    };
+
+    if ($@) {
+        my $err = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'purge_users',
+            "Error purging unverified users: $err");
+        $c->flash->{error_msg} = "Error purging unverified users: $err";
+    }
+
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
 # Admin create user
 sub create_user :Path('/admin/create_user') :Args(0) {
     my ($self, $c) = @_;
@@ -765,7 +992,7 @@ sub create_user :Path('/admin/create_user') :Args(0) {
         @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
     }
 
-    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'helpdesk', 'admin');
 
     $c->stash(
         available_sites => \@available_sites,
@@ -1982,6 +2209,11 @@ sub backup :Path('/admin/backup') :Args(0) {
 }
 
 # Keeping it here for backward compatibility
+sub mail :Path('/admin/mail') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+}
+
 sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
     my ($self, $c) = @_;
 
@@ -2345,8 +2577,22 @@ sub get_database_comparison {
             error => undef,
             table_comparisons => []
         },
+        migration_mysql => {
+            name => 'migration_mysql',
+            display_name => 'New Server — MySQL Docker (192.168.1.20:3307)',
+            connection_status => 'unknown',
+            error => undef,
+            databases => []
+        },
+        migration_postgres => {
+            name => 'migration_postgres',
+            display_name => 'New Server — PostgreSQL Docker (192.168.1.20:5433)',
+            connection_status => 'unknown',
+            error => undef,
+            databases => []
+        },
         summary => {
-            total_databases => 2,
+            total_databases => 4,
             connected_databases => 0,
             total_tables => 0,
             tables_with_results => 0,
@@ -2452,7 +2698,27 @@ sub get_database_comparison {
         $comparison->{forager}->{connection_status} = 'error';
         $comparison->{forager}->{error} = $error;
     };
-    
+
+    # Get migration target MySQL server info
+    my $mysql_info = $self->get_migration_mysql_info($c);
+    $comparison->{migration_mysql}->{connection_status} = $mysql_info->{connection_status};
+    $comparison->{migration_mysql}->{error}             = $mysql_info->{error};
+    $comparison->{migration_mysql}->{databases}         = $mysql_info->{databases} // [];
+    $comparison->{migration_mysql}->{host}              = $mysql_info->{host};
+    if ($mysql_info->{connection_status} eq 'connected') {
+        $comparison->{summary}->{connected_databases}++;
+    }
+
+    # Get migration target PostgreSQL server info
+    my $pg_info = $self->get_migration_postgres_info($c);
+    $comparison->{migration_postgres}->{connection_status} = $pg_info->{connection_status};
+    $comparison->{migration_postgres}->{error}             = $pg_info->{error};
+    $comparison->{migration_postgres}->{databases}         = $pg_info->{databases} // [];
+    $comparison->{migration_postgres}->{host}              = $pg_info->{host};
+    if ($pg_info->{connection_status} eq 'connected') {
+        $comparison->{summary}->{connected_databases}++;
+    }
+
     return $comparison;
 }
 
@@ -2534,8 +2800,15 @@ sub find_result_file {
     my $app_root = $c->config->{home} || '/home/shanta/PycharmProjects/comserv2';
     
     if (lc($database) eq 'ency') {
+        # If the input looks like a subdirectory path (e.g., "Ency/ExternalID"),
+        # also try a direct path match before falling back to computed result_name
+        if ($table_name =~ m{/}) {
+            my $direct = "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/${table_name}.pm";
+            return $direct if -f $direct;
+        }
         @search_paths = (
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/Ency/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/System/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/User/$result_name.pm"
         );
@@ -2569,7 +2842,13 @@ sub table_name_to_result_name {
     
     # Handle database-specific table name patterns
     my $clean_name = $table_name;
-    
+
+    # Strip subdirectory prefix (e.g., "Ency/ExternalID" -> "ExternalID")
+    # scan_result_directory_recursive uses "/" to denote subdirectory nesting
+    if ($clean_name =~ m{^[A-Za-z][A-Za-z0-9]*/(.+)$}) {
+        $clean_name = $1;
+    }
+
     # Remove common prefixes
     $clean_name =~ s/^ency_//i;
     $clean_name =~ s/^forager_//i;
@@ -2589,7 +2868,7 @@ sub table_name_to_result_name {
         'log' => 'Log',
         'mail_domains' => 'MailDomain',
         'network_devices' => 'NetworkDevice',
-        'pages_content' => 'Pages_content',
+        'page' => 'Page',
         'page_tb' => 'PageTb',
         'pallets' => 'Pallet',
         'participant' => 'Participant',
@@ -2882,13 +3161,11 @@ sub result_name_to_table_name {
         'Participant' => 'participants',
         'Herb' => 'ency_herb_tb',
         'Page' => 'page',
-        'Pages_content' => 'pages_content',
         'InternalLinksTb' => 'internal_links_tb',
         'Learned_data' => 'learned_data',
         'Log' => 'log',
         'MailDomain' => 'mail_domains',
         'NetworkDevice' => 'network_devices',
-        'PageTb' => 'page_tb',
         'Pallet' => 'pallets',
         'ProjectSite' => 'project_sites',
         'Queen' => 'queens',
@@ -5416,25 +5693,145 @@ sub _docker_bin {
     return 'docker';
 }
 
+sub _run_host_cmd_on_target {
+    my ($self, $c, $host_cmd, $target) = @_;
+    
+    $target //= $c->req->params->{target} || 'workstation';
+    $target = lc($target);
+    
+    if ($target eq 'workstation') {
+        my $output = `$host_cmd 2>&1`;
+        my $exit_code = $? >> 8;
+        return ($output, $exit_code);
+    }
+    
+    # Remote target via SSH
+    my $ssh_host = '';
+    my $ssh_user = 'ubuntu';
+    my $ssh_port = 22;
+    if ($target eq 'production2') {
+        $ssh_host = '192.168.1.127';
+    } else {
+        # Default to production1
+        $ssh_host = '192.168.1.126';
+    }
+    
+    # Load SSH password from file
+    my $ssh_password = '';
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        if ($creds) {
+            $ssh_password = $creds->{ssh_password} || '';
+            $ssh_port = $creds->{ssh_port} || 22;
+        }
+    }
+    
+    if (!$ssh_password) {
+        return ("ERROR: SSH password required. Use Test Connection to save credentials first.", 1);
+    }
+    
+    # Validate SSH parameters
+    unless ($ssh_host =~ /^[a-zA-Z0-9_\-\.]+$/) {
+        return ("ERROR: Invalid host format", 1);
+    }
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+    
+    # Escape single quotes in host_cmd
+    my $escaped_cmd = $host_cmd;
+    $escaped_cmd =~ s/'/'\\''/g;
+    
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host '$escaped_cmd' 2>&1);
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    return ($output, $exit_code);
+}
+
+sub _run_docker_on_target {
+    my ($self, $c, $docker_cmd, $target) = @_;
+    
+    $target //= $c->req->params->{target} || 'workstation';
+    $target = lc($target);
+    
+    if ($target eq 'workstation') {
+        my $denv  = _docker_env();
+        my $docker = _docker_bin();
+        return $self->_run_host_cmd_on_target($c, "$denv $docker $docker_cmd", $target);
+    } else {
+        return $self->_run_host_cmd_on_target($c, "docker $docker_cmd", $target);
+    }
+}
+
+sub _query_system_diagnostics {
+    my ($self, $c, $target) = @_;
+    
+    # 1. Docker Compose status
+    my ($compose_out, $compose_code) = $self->_run_host_cmd_on_target($c, "docker compose version 2>&1 || docker-compose version 2>&1 || echo 'Not installed'", $target);
+    chomp($compose_out);
+    
+    # 2. Starman process status
+    my ($starman_out, $starman_code) = $self->_run_host_cmd_on_target($c, "ps aux | grep -i starman | grep -v grep || echo 'No starman processes found'", $target);
+    
+    # 3. Port bindings
+    my ($ports_out, $ports_code) = $self->_run_host_cmd_on_target($c, "ss -tln || netstat -tln || echo 'Network utilities not available'", $target);
+    my @active_ports;
+    for my $line (split(/\n/, $ports_out)) {
+        if ($line =~ /(?:^|[\s:])(5000|3000|3001)(?:\s|$|:)/) {
+            push @active_ports, $1 unless grep { $_ eq $1 } @active_ports;
+        }
+    }
+    
+    # 4. Git status & log
+    my $git_cmd = '';
+    if ($target eq 'workstation') {
+        $git_cmd = "git status -sb && echo '---' && git log -1 --format='%h - %an, %ar : %s'";
+    } else {
+        $git_cmd = "cd /opt/comserv/Comserv 2>/dev/null && git status -sb && echo '---' && git log -1 --format='%h - %an, %ar : %s' || echo 'Directory /opt/comserv/Comserv not found or not a git repo'";
+    }
+    my ($git_out, $git_code) = $self->_run_host_cmd_on_target($c, $git_cmd, $target);
+    
+    # 5. Backup images list
+    my ($backups_out, $backups_code) = $self->_run_host_cmd_on_target($c, "docker images --format '{{.Repository}}:{{.Tag}} ({{.ID}})' | grep shantamcsbain/comserv-web-prod || echo 'No images found'", $target);
+    my @backups;
+    for my $line (split(/\n/, $backups_out)) {
+        chomp($line);
+        if ($line =~ /comserv-web-prod/i && $line !~ /latest/i) {
+            push @backups, $line;
+        }
+    }
+    
+    # 6. Host stats
+    my ($disk_out) = $self->_run_host_cmd_on_target($c, "df -h / | tail -n 1", $target);
+    chomp($disk_out);
+    my ($mem_out) = $self->_run_host_cmd_on_target($c, "free -m | grep Mem", $target);
+    chomp($mem_out);
+    my ($uptime_out) = $self->_run_host_cmd_on_target($c, "uptime", $target);
+    chomp($uptime_out);
+    
+    return {
+        compose_status  => $compose_out,
+        starman_status  => $starman_out,
+        active_ports    => \@active_ports,
+        git_status      => $git_out,
+        backups         => \@backups,
+        disk            => $disk_out,
+        memory          => $mem_out,
+        uptime          => $uptime_out,
+    };
+}
+
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
-
-    # Port restriction: only accessible from port 3001 (host dev server)
-    my $port = $c->req->uri->port || 0;
-    if ($port == 5000) {
-        $c->response->body('');
-        $c->response->status(403);
-        return;
-    }
-    if ($port && $port != 3001) {
-        my $redirect_uri = $c->req->uri->clone;
-        $redirect_uri->port(3001);
-        $c->response->redirect($redirect_uri);
-        return;
-    }
 
     # CSC admin only - use AdminAuth (same pattern as all other admin actions)
     my $admin_auth = Comserv::Util::AdminAuth->new();
@@ -5454,6 +5851,28 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
 
     $c->stash(
         template => 'admin/docker_containers.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
+sub docker_containers_old :Path('/admin/docker-containers-old') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers_old',
+        "Docker old containers management page accessed");
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_containers')) {
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker_containers_old.tt',
         docker_available => $docker_available,
         authenticated => 1,
     );
@@ -5480,18 +5899,30 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    my $denv  = _docker_env();
-    my $docker = _docker_bin();
-
-    my $output = `$denv $docker ps --all --format json 2>&1`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, "ps --all --format json", $target);
     
     if ($exit_code != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps: $output" }));
+        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps on $target: $output" }));
         $c->response->content_type('application/json');
         return;
     }
     
+    # Get image IDs to tags mapping on the server
+    my %image_id_to_tags;
+    my ($tags_out, $tags_exit) = $self->_run_docker_on_target($c, 'images --format "{{.ID}} {{.Tag}}"', $target);
+    if ($tags_exit == 0) {
+        foreach my $line (split /\n/, $tags_out) {
+            if ($line =~ /^(\S+)\s+(.+)$/) {
+                my ($id, $tag) = ($1, $2);
+                $id =~ s/^sha256://g;
+                my $short_id = substr($id, 0, 12);
+                push @{$image_id_to_tags{$id}}, $tag;
+                push @{$image_id_to_tags{$short_id}}, $tag unless $short_id eq $id;
+            }
+        }
+    }
+
     # Parse JSON output (one JSON object per line from docker ps --format json)
     my @containers;
     foreach my $line (split /\n/, $output) {
@@ -5511,18 +5942,56 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
             if (my $ports_str = $container->{Ports}) {
                 @ports = grep { /\d+:\d+/ } split(/,\s*/, $ports_str);
             }
-            push @containers, {
+            my $state = $container->{State} || 'unknown';
+            my $container_info = {
                 name    => $name,
                 service => $service,
-                state   => $container->{State} || 'unknown',
+                state   => $state,
                 status  => $container->{Status} || '',
                 ports   => \@ports,
-                image   => $container->{Image} || ''
+                image   => $container->{Image} || '',
+                image_tags => [],
             };
+            if (lc($state) eq 'running' || lc($state) eq 'up' || ($container->{Status} && $container->{Status} =~ /Up/i)) {
+                # Get the running container's image ID
+                my ($inspect_out, $inspect_exit) = $self->_run_docker_on_target($c, "inspect --format '{{.Image}}' $name", $target);
+                if ($inspect_exit == 0) {
+                    chomp $inspect_out;
+                    $inspect_out =~ s/^'|'$//g; # Clean quotes
+                    $inspect_out =~ s/^sha256://g;
+                    my $short_id = substr($inspect_out, 0, 12);
+                    if ($image_id_to_tags{$inspect_out}) {
+                        $container_info->{image_tags} = $image_id_to_tags{$inspect_out};
+                    } elsif ($image_id_to_tags{$short_id}) {
+                        $container_info->{image_tags} = $image_id_to_tags{$short_id};
+                    }
+                }
+
+                my ($version_out, $version_exit) = $self->_run_docker_on_target($c, "exec $name cat /opt/comserv/version.json", $target);
+                if ($version_exit == 0 && $version_out =~ /^\{/) {
+                    my $ver_data = eval { decode_json($version_out) };
+                    if ($ver_data) {
+                        $container_info->{build_info} = $ver_data;
+                    }
+                }
+            }
+            push @containers, $container_info;
         };
     }
     
-    $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    # Query available backup images on target
+    my @backups;
+    my ($images_output, $images_exit) = $self->_run_docker_on_target($c, 'images --format "{{.Repository}}:{{.Tag}} ({{.Size}})"', $target);
+    if ($images_exit == 0) {
+        foreach my $line (split /\n/, $images_output) {
+            if ($line =~ /:backup-/) {
+                $line =~ s/^(?:shantamcsbain\/)?comserv-web-prod://;
+                push @backups, $line;
+            }
+        }
+    }
+
+    $c->response->body(encode_json({ success => 1, containers => \@containers, backups => \@backups, target => $target }));
     $c->response->content_type('application/json');
 }
 
@@ -5546,14 +6015,11 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         return;
     }
 
-    my $denv_v  = _docker_env();
-    my $docker_v = _docker_bin();
-
-    my $names_out = `$denv_v $docker_v volume ls -q 2>&1`;
-    my $names_exit = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($names_out, $names_exit) = $self->_run_docker_on_target($c, "volume ls -q", $target);
 
     if ($names_exit != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $names_out" }));
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes on $target: $names_out" }));
         $c->response->content_type('application/json');
         return;
     }
@@ -5561,14 +6027,13 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     my @names = grep { $_ ne '' } split /\n/, $names_out;
 
     if (!@names) {
-        $c->response->body(encode_json({ success => 1, volumes => [] }));
+        $c->response->body(encode_json({ success => 1, volumes => [], target => $target }));
         $c->response->content_type('application/json');
         return;
     }
 
     my $names_str = join(' ', map { quotemeta($_) } @names);
-    my $inspect_out = `$denv_v $docker_v volume inspect $names_str 2>&1`;
-    my $inspect_exit = $? >> 8;
+    my ($inspect_out, $inspect_exit) = $self->_run_docker_on_target($c, "volume inspect $names_str", $target);
 
     my @volumes;
     eval {
@@ -5620,25 +6085,20 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $denv_r   = _docker_env();
-    my $docker_r = _docker_bin();
-    my $home_r   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_r = "$home_r/PycharmProjects/comserv2";
-
-    my ($output, $exit_code);
+    my $docker_cmd;
     if ($service eq 'all') {
-        $output = `$denv_r $docker_r compose -f '$compose_dir_r/docker-compose.yml' restart 2>&1`;
-        $exit_code = $? >> 8;
-    } else {
-        $output = `$denv_r $docker_r restart '$service' 2>&1`;
-        $exit_code = $? >> 8;
-        if ($exit_code != 0) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
-                "docker restart $service failed (exit $exit_code): $output");
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml restart";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml restart";
         }
+    } else {
+        $docker_cmd = "restart '$service'";
     }
-    $output //= "(no output captured — docker socket not found)";
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5670,17 +6130,20 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $denv_s   = _docker_env();
-    my $docker_s = _docker_bin();
-    my $home_s   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_s = "$home_s/PycharmProjects/comserv2";
-    my $cmd = $service eq 'all'
-        ? "$denv_s $docker_s compose -f '$compose_dir_s/docker-compose.yml' start 2>&1"
-        : "$denv_s $docker_s start '$service' 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $output    = `$cmd`;
-    $output //= "(no output captured — docker socket not found)";
-    my $exit_code = $? >> 8;
+    my $docker_cmd;
+    if ($service eq 'all') {
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml start";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml start";
+        }
+    } else {
+        $docker_cmd = "start '$service'";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5712,17 +6175,20 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $denv_st   = _docker_env();
-    my $docker_st = _docker_bin();
-    my $home_st   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_st = "$home_st/PycharmProjects/comserv2";
-    my $cmd = $service eq 'all'
-        ? "$denv_st $docker_st compose -f '$compose_dir_st/docker-compose.yml' stop 2>&1"
-        : "$denv_st $docker_st stop '$service' 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $output    = `$cmd`;
-    $output //= "(no output captured — docker socket not found)";
-    my $exit_code = $? >> 8;
+    my $docker_cmd;
+    if ($service eq 'all') {
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml stop";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml stop";
+        }
+    } else {
+        $docker_cmd = "stop '$service'";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5754,20 +6220,24 @@ sub docker_up :Path('/admin/docker-up') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
+
+    my $docker_cmd;
+    my $compose_target = $service eq 'all' ? '' : $service;
+    if ($target eq 'workstation') {
+        $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml up -d $compose_target";
+    } else {
+        $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml up -d $compose_target";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
     
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+    $c->response->body(encode_json({
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
+        exit_code => $exit_code,
+        ($exit_code != 0 ? (error => $output) : ()),
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -5795,17 +6265,22 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
     my $lines = int($c->req->params->{lines} || 100);
     $lines = 100 unless $lines > 0 && $lines <= 10000;
     
-    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+
+    my $docker_cmd;
+    if ($target eq 'workstation') {
+        $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml logs --tail=$lines $service";
+    } else {
+        $docker_cmd = "logs --tail=$lines $service";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
     
-    my $result = {
+    $c->response->body(encode_json({
         success => $exit_code == 0 ? \1 : \0,
-        output => $output,  # Changed from 'logs' to 'output' to match template expectation
+        output => $output,
         exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -5830,21 +6305,133 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
-    
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
+
+    my $log_file  = "/tmp/docker-build-${service}.log";
+    my $done_file = "/tmp/docker-build-${service}.done";
+    my $pid_file  = "/tmp/docker-build-${service}.pid";
+
+    unlink $done_file if -f $done_file;
+    open(my $lf, '>', $log_file) or do {
+        $c->response->body(encode_json({ success => \0, error => "Cannot write build log: $!" }));
+        $c->response->content_type('application/json');
+        return;
     };
-    
-    $c->response->body(encode_json($result));
+    print $lf "=== Build started at " . scalar(localtime) . " ===\n";
+    close $lf;
+
+    my $disk_pct = `df / | awk 'NR==2 {gsub(/%/,"",$5); print $5}'`;
+    chomp $disk_pct;
+    if ($disk_pct =~ /^\d+$/ && $disk_pct >= 90) {
+        $c->response->body(encode_json({
+            success => \0,
+            error   => "Disk at ${disk_pct}% — not safe to build. Run Docker Cleanup first.",
+        }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $build_target = $service eq 'all' ? '' : $service;
+    my $script = <<"SHELL";
+#!/bin/bash
+LOG="$log_file"
+DONE="$done_file"
+cd /home/shanta/PycharmProjects/comserv2
+
+echo "--- Pre-build cleanup ---" >> "\$LOG"
+docker image prune -f >> "\$LOG" 2>&1
+docker builder prune -f --keep-storage 5GB >> "\$LOG" 2>&1
+
+DISK=\$(df / | awk 'NR==2 {gsub(/%/,"",\$5); print \$5}')
+echo "Disk before build: \${DISK}%" >> "\$LOG"
+
+echo "--- Building $service ---" >> "\$LOG"
+docker compose build --progress=plain $build_target >> "\$LOG" 2>&1
+EXIT=\$?
+
+echo "--- Post-build cleanup ---" >> "\$LOG"
+docker image prune -f >> "\$LOG" 2>&1
+
+DISK_AFTER=\$(df / | awk 'NR==2 {gsub(/%/,"",\$5); print \$5}')
+echo "Disk after build: \${DISK_AFTER}%" >> "\$LOG"
+echo "=== Build finished exit=\$EXIT at \$(date) ===" >> "\$LOG"
+echo \$EXIT > "\$DONE"
+SHELL
+
+    my $script_file = "/tmp/docker-build-${service}.sh";
+    open(my $sf, '>', $script_file) or do {
+        $c->response->body(encode_json({ success => \0, error => "Cannot write build script: $!" }));
+        $c->response->content_type('application/json');
+        return;
+    };
+    print $sf $script;
+    close $sf;
+    chmod 0755, $script_file;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ success => \0, error => "Fork failed: $!" }));
+        $c->response->content_type('application/json');
+        return;
+    }
+    if ($pid == 0) {
+        open(STDIN,  '<', '/dev/null');
+        open(STDOUT, '>>', $log_file);
+        open(STDERR, '>>', $log_file);
+        exec($script_file);
+        exit 1;
+    }
+    if (open(my $pf, '>', $pid_file)) { print $pf $pid; close $pf; }
+
+    $c->response->body(encode_json({
+        success  => \1,
+        async    => \1,
+        job_id   => $service,
+        message  => "Build started for $service (PID $pid). Poll /admin/docker-rebuild-status/$service for progress.",
+    }));
     $c->response->content_type('application/json');
+}
+
+sub docker_rebuild_status :Path('/admin/docker-rebuild-status') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_rebuild_status')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => \0, error => 'Access denied' }));
+        return;
+    }
+
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+
+    my $log_file  = "/tmp/docker-build-${service}.log";
+    my $done_file = "/tmp/docker-build-${service}.done";
+
+    unless (-f $log_file) {
+        $c->response->body(encode_json({ success => \0, error => "No build in progress for $service" }));
+        return;
+    }
+
+    my $done     = -f $done_file;
+    my $exit_val = 0;
+    if ($done) {
+        if (open my $df, '<', $done_file) { chomp($exit_val = <$df> // 0); close $df; }
+    }
+
+    my $output = '';
+    if (open my $lf, '<', $log_file) {
+        local $/;
+        $output = <$lf>;
+        close $lf;
+    }
+
+    $c->response->body(encode_json({
+        success   => $done ? ($exit_val == 0 ? \1 : \0) : \1,
+        done      => $done ? \1 : \0,
+        exit_code => $exit_val + 0,
+        output    => $output,
+    }));
 }
 
 sub docker_prune :Path('/admin/docker-prune') :Args(0) {
@@ -5867,27 +6454,63 @@ sub docker_prune :Path('/admin/docker-prune') :Args(0) {
         return;
     }
     
-    # Prune stopped containers, dangling images, and unused networks
+    my $target = $c->req->params->{target} || 'workstation';
     my $output = '';
     
     # Remove stopped containers
     $output .= "=== Removing stopped containers ===\n";
-    $output .= `docker container prune -f 2>&1`;
+    my ($o1, $e1) = $self->_run_docker_on_target($c, "container prune -f", $target);
+    $output .= $o1;
     
     # Remove dangling images
     $output .= "\n=== Removing dangling images ===\n";
-    $output .= `docker image prune -f 2>&1`;
+    my ($o2, $e2) = $self->_run_docker_on_target($c, "image prune -f", $target);
+    $output .= $o2;
     
     # Remove unused networks
     $output .= "\n=== Removing unused networks ===\n";
-    $output .= `docker network prune -f 2>&1`;
+    my ($o3, $e3) = $self->_run_docker_on_target($c, "network prune -f", $target);
+    $output .= $o3;
     
-    my $exit_code = $? >> 8;
+    my $exit_code = ($e1 || $e2 || $e3) ? 1 : 0;
     
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
         output => $output,
         exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_diagnostics :Path('/admin/docker-diagnostics') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_diagnostics',
+        "Docker system diagnostics requested");
+        
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_diagnostics')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $target = $c->req->params->{target} || 'workstation';
+    my $diagnostics = $self->_query_system_diagnostics($c, $target);
+    
+    my $result = {
+        success     => \1,
+        diagnostics => $diagnostics,
+        target      => $target
     };
     
     $c->response->body(encode_json($result));
@@ -5914,8 +6537,8 @@ sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
         return;
     }
     
-    my $output = `docker system df 2>&1`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, "system df", $target);
     
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
@@ -5994,6 +6617,8 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     my $ssh_port = $c->req->params->{ssh_port} || 22;
     my $ssh_password = $c->req->params->{ssh_password} || '';
     my $save_credentials = $c->req->params->{save_credentials} || '';
+    my $docker_hub_username = $c->req->params->{docker_hub_username} || '';
+    my $docker_hub_password = $c->req->params->{docker_hub_password} || '';
 
     # Validate ssh_target: must be user@hostname format with safe characters only
     unless ($ssh_target =~ /^[a-zA-Z0-9_\-]+\@[a-zA-Z0-9_\-\.]+$/) {
@@ -6047,13 +6672,26 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
             system("chmod 700 $secrets_dir");
         }
         
-        my $credentials = {
-            ssh_target => $ssh_target,
-            ssh_port => $ssh_port,
-            ssh_password => $ssh_password,
-            last_updated => time(),
-            last_test_success => time()
-        };
+        my $credentials = {};
+        if (-f $credentials_file && open my $rf, '<', $credentials_file) {
+            local $/;
+            my $json = <$rf>;
+            close $rf;
+            $credentials = eval { decode_json($json) } || {};
+        }
+        
+        $credentials->{ssh_target} = $ssh_target;
+        $credentials->{ssh_port} = $ssh_port;
+        $credentials->{ssh_password} = $ssh_password;
+        $credentials->{last_updated} = time();
+        $credentials->{last_test_success} = time();
+        
+        if ($docker_hub_username) {
+            $credentials->{docker_hub_username} = $docker_hub_username;
+        }
+        if ($docker_hub_password) {
+            $credentials->{docker_hub_password} = $docker_hub_password;
+        }
         
         if (open my $fh, '>', $credentials_file) {
             print $fh encode_json($credentials);
@@ -6066,6 +6704,212 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     }
     
     $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub emergency_restore :Path('/admin/emergency-restore') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore',
+        "Emergency restore page requested by " . ($c->user ? $c->user->username : 'unknown'));
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'emergency_restore')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $backup_manager = Comserv::Util::BackupManager->new(app_dir => $c->config->{home});
+    
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action') || '';
+        
+        if ($action eq 'restore_psgi') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore',
+                "Emergency restore of comserv.psgi file triggered");
+                
+            my $res = $backup_manager->restore_psgi_file();
+            if ($res->{success}) {
+                $c->stash->{success_msg} = "comserv.psgi restored successfully.";
+            } else {
+                $c->stash->{error_msg} = "Failed to restore comserv.psgi: " . $res->{message};
+            }
+            $c->stash->{output} = $res->{output};
+        }
+        elsif ($action eq 'restore_file') {
+            my $backup_path = $c->req->param('backup_path');
+            my $target_file = $c->req->param('target_file');
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore',
+                "Emergency restore of file '$target_file' from '$backup_path'");
+                
+            if ($backup_path && $target_file) {
+                my $res = $backup_manager->restore_file_from_backup($backup_path, $target_file);
+                if ($res->{success}) {
+                    $c->stash->{success_msg} = "File '$target_file' restored successfully.";
+                } else {
+                    $c->stash->{error_msg} = "Failed to restore file: " . $res->{message};
+                }
+                $c->stash->{output} = $res->{output};
+            } else {
+                $c->stash->{error_msg} = "Backup path and target file are required.";
+            }
+        }
+    }
+
+    my $backup_contents = $backup_manager->get_backup_directory_contents();
+    my $app_dir = $backup_manager->app_dir;
+    my $psgi_path = $app_dir =~ m{/Comserv$} ? "$app_dir/comserv.psgi" : "$app_dir/Comserv/comserv.psgi";
+    my $psgi_exists = -f $psgi_path;
+
+    $c->stash(
+        template => 'admin/emergency_restore.tt',
+        backup_contents => $backup_contents,
+        psgi_exists => $psgi_exists,
+    );
+}
+
+sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start_starman',
+        "Manual host Starman startup requested from application");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_start_starman')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $target = $c->req->params->{target} || 'production1';
+    
+    # Load SSH password to support remote sudo authentication
+    my $ssh_password = '';
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        if ($creds) {
+            $ssh_password = $creds->{ssh_password} || '';
+        }
+    }
+    
+    my $escaped_password = $ssh_password;
+    $escaped_password =~ s/'/'\\''/g;
+    
+    # Construct shell command to locate host code, stop failing container, and run daemonized Starman
+    my $start_cmd = q(
+        sudo() {
+            echo '__SSH_PASSWORD__' | /usr/bin/sudo -S "$@"
+        }
+
+        HOST_APP_DIR=""
+        for DIR in /opt/comserv/Comserv /home/ubuntu/comserv /home/shanta/PycharmProjects/comserv2; do
+            if [ -d "$DIR" ]; then
+                HOST_APP_DIR="$DIR"
+                break
+            fi
+        done
+
+        if [ -n "$HOST_APP_DIR" ]; then
+            cd "$HOST_APP_DIR"
+            PSGI_FILE=""
+            for FILE in script/comserv_server.psgi script/comserv.psgi comserv_server.psgi comserv.psgi; do
+                if [ -f "$FILE" ]; then
+                    PSGI_FILE="$FILE"
+                    break
+                fi
+            done
+            
+            if [ -n "$PSGI_FILE" ]; then
+                # Stop any container running on 5000 to free port
+                sudo docker stop comserv2-web-prod 2>/dev/null || docker stop comserv2-web-prod 2>/dev/null || true
+                sudo docker rm -f comserv2-web-prod 2>/dev/null || docker rm -f comserv2-web-prod 2>/dev/null || true
+                
+                # Kill processes holding port 5000 to guarantee clean bind
+                if command -v fuser &>/dev/null; then
+                    sudo fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                fi
+                
+                export CATALYST_HOME="$HOST_APP_DIR"
+                export CATALYST_ENV=production
+                export COMSERV_LOG_DIR="$HOST_APP_DIR"
+                export PERL_LOCAL_LIB_ROOT="$HOST_APP_DIR/local"
+                export PERL5LIB="$HOST_APP_DIR/lib:$HOST_APP_DIR/local/lib/perl5:$PERL5LIB"
+
+                if [ -f "script/comserv_server.psgi" ]; then
+                    rm -f comserv.psgi 2>/dev/null || true
+                    ln -sf script/comserv_server.psgi comserv.psgi || cp -f script/comserv_server.psgi comserv.psgi || true
+                fi
+
+                echo "Attempting to reset and start systemd starman.service..."
+                sudo systemctl reset-failed starman.service 2>/dev/null || true
+                sudo systemctl enable starman.service 2>/dev/null || true
+                
+                if sudo systemctl start starman.service 2>/dev/null && sleep 2 && sudo systemctl is-active starman.service &>/dev/null; then
+                    echo "SUCCESS: Host Starman systemd service started and verified active!"
+                else
+                    echo "systemd service failed to start or verify. Falling back to manual process execution..."
+                    
+                    # Stop and disable systemd starman service if active to avoid restart conflicts
+                    sudo systemctl stop starman.service 2>/dev/null || true
+                    sudo systemctl disable starman.service 2>/dev/null || true
+
+                    # Kill existing starman/plackup on host
+                    sudo pkill -f starman 2>/dev/null || pkill -f starman 2>/dev/null || true
+                    sudo pkill -f plackup 2>/dev/null || pkill -f plackup 2>/dev/null || true
+                    sudo pkill -f comserv.*psgi 2>/dev/null || pkill -f comserv.*psgi 2>/dev/null || true
+                    
+                    # Try launching via various known starman locations/methods
+                    STARTED=0
+                    if [ -x "/usr/local/bin/starman" ]; then
+                        if /usr/local/bin/starman -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 0 ]; then
+                        if perl -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 0 ]; then
+                        if starman -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 1 ]; then
+                        echo "SUCCESS: Host Starman manual process started on port 5000!"
+                    else
+                        echo "ERROR: Failed to start host Starman using any method. Log:"
+                        cat /tmp/host_starman_manual.log 2>/dev/null || echo "No manual log file found."
+                    fi
+                fi
+            else
+                echo "ERROR: PSGI file not found under $HOST_APP_DIR"
+            fi
+        else
+            echo "ERROR: Host application directory not found."
+        fi
+    );
+    
+    $start_cmd =~ s/__SSH_PASSWORD__/$escaped_password/g;
+    
+    my ($output, $exit_code) = $self->_run_host_cmd_on_target($c, $start_cmd, $target);
+    
+    if ($exit_code != 0 || $output =~ /ERROR:/) {
+        $c->response->body(encode_json({ success => \0, error => $output || "SSH command failed" }));
+    } else {
+        $c->response->body(encode_json({ success => \1, message => $output }));
+    }
     $c->response->content_type('application/json');
 }
 
@@ -6112,16 +6956,66 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
+    my $current_deploy_log_id = $c->req->params->{deploy_log_id} || 0;
+
+    my $active_deploy_log = eval {
+        my $now = DateTime->now(time_zone => 'local');
+        my $today = $now->ymd;
+        my $threshold_time = $now->clone->subtract(minutes => 20)->hms;
+        my %search_params = (
+            status     => 2,
+            abstract   => { -like => '%Docker%Deploy%' },
+            start_date => $today,
+            start_time => { '>=', $threshold_time },
+        );
+        if ($current_deploy_log_id) {
+            $search_params{record_id} = { '!=' => $current_deploy_log_id };
+        }
+        $c->model('DBEncy')->resultset('Log')->search(\%search_params, {
+            rows => 1,
+            order_by => { -desc => 'record_id' }
+        })->first;
+    };
+
+    if ($active_deploy_log) {
+        my $act_user = $active_deploy_log->username || 'unknown';
+        my $act_time = $active_deploy_log->start_time || 'unknown';
+        $c->response->body(encode_json({
+            success => 0,
+            error   => "A deployment is already in progress by $act_user (started at $act_time today)!"
+        }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
 
+    my $pid_file_check = '/tmp/comserv-hub-deploy.pid';
+    if (-f $pid_file_check && open my $pf_fh, '<', $pid_file_check) {
+        my $chk_pid = <$pf_fh>;
+        close $pf_fh;
+        if ($chk_pid && $chk_pid =~ /^\d+$/ && kill(0, $chk_pid)) {
+            $c->response->body(encode_json({ success => 0, error => "A deployment is already in progress (PID $chk_pid)!" }));
+            $c->response->content_type('application/json');
+            return;
+        }
+    }
+
     my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
     my $form_password = $c->req->params->{ssh_password} || '';
+    my $deploy_mode   = $c->req->params->{deploy_mode}   || 'full';
+    if ($c->req->params->{quick_deploy}) {
+        $deploy_mode = 'quick';
+    }
+    my $quick_deploy  = ($deploy_mode ne 'full') ? 1 : 0;
 
     my $ssh_password = '';
+    my $docker_hub_username = '';
+    my $docker_hub_password = '';
     my $home     = $ENV{HOME} || '/home/shanta';
     my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
     if (-f $creds_file && open my $cf, '<', $creds_file) {
@@ -6129,9 +7023,11 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         my $json = <$cf>;
         close $cf;
         my $creds = eval { decode_json($json) };
-        if ($creds && $creds->{ssh_password}) {
-            $ssh_password = $creds->{ssh_password};
-            $ssh_target   = $creds->{ssh_target} if $creds->{ssh_target};
+        if ($creds) {
+            $ssh_password        = $creds->{ssh_password} if $creds->{ssh_password};
+            $ssh_target          = $creds->{ssh_target} if $creds->{ssh_target};
+            $docker_hub_username = $creds->{docker_hub_username} if $creds->{docker_hub_username};
+            $docker_hub_password = $creds->{docker_hub_password} if $creds->{docker_hub_password};
         }
     }
     $ssh_password ||= $form_password;
@@ -6149,8 +7045,9 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
-    my $repo_dir     = "$home/PycharmProjects/comserv2";
-    my $comserv_dir  = "$repo_dir/Comserv";
+    my $comserv_dir  = $c->config->{home};
+    my $repo_dir     = $comserv_dir;
+    $repo_dir =~ s/\/Comserv$//;
     my $prod_compose = 'docker-compose.prod.yml';
     my $hub_image    = 'shantamcsbain/comserv-web-prod:latest';
 
@@ -6204,6 +7101,12 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         open(STDERR, '>&STDOUT')     or _exit(1);
         $| = 1;
 
+        my $child_exit = sub {
+            my $code = shift;
+            unlink $pid_file if -f $pid_file;
+            _exit($code);
+        };
+
         print "=== Comserv Production Deploy via Docker Hub ===\n";
         print "Started   : " . scalar(localtime) . "\n";
         print "Commit    : $git_commit ($git_branch)\n";
@@ -6211,81 +7114,177 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print "Image     : $hub_image\n";
         print "SSH target: $ssh_target\n";
         print "Log file  : $log_file\n";
+        print "Mode      : " . ($quick_deploy ? "QUICK DEPLOY (Skip build/push)" : "FULL DEPLOY (Build + Push + Deploy)") . "\n";
         print "=" x 60 . "\n\n";
 
-        print "--- Pre-flight: Checking Docker Hub credentials ---\n";
+        unless ($quick_deploy) {
+            print "--- Pre-flight: Checking Docker Hub credentials ---\n";
 
-        my $logged_in     = 0;
-        my $creds_method  = 'unknown';
-        my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
-        if (open my $dcf, '<', $docker_cfg) {
-            local $/; my $raw = <$dcf>; close $dcf;
-            my $dcfg = eval { decode_json($raw) } || {};
-            my $creds_store = $dcfg->{credsStore} || '';
-            my $auths       = $dcfg->{auths}       || {};
+            my $logged_in     = 0;
+            my $creds_method  = 'unknown';
+            my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
+            if (open my $dcf, '<', $docker_cfg) {
+                local $/; my $raw = <$dcf>; close $dcf;
+                my $dcfg = eval { decode_json($raw) } || {};
+                my $creds_store = $dcfg->{credsStore} || '';
+                my $auths       = $dcfg->{auths}       || {};
 
-            if ($creds_store) {
-                $creds_method = "credential helper (credsStore: $creds_store)";
-                my $helper = "docker-credential-$creds_store";
-                my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
-                if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
-                    print "✅ Logged in via $creds_method as: $1\n\n";
+                if ($creds_store) {
+                    $creds_method = "credential helper (credsStore: $creds_store)";
+                    my $helper = "docker-credential-$creds_store";
+                    my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
+                    if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
+                        print "✅ Logged in via $creds_method as: $1\n\n";
+                        $logged_in = 1;
+                    } else {
+                        print "⚠️  Credential helper ($helper) did not return credentials\n";
+                    }
+                } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
+                    $creds_method = 'config.json auth entry';
+                    print "✅ Docker Hub auth entry found in config.json\n\n";
                     $logged_in = 1;
                 } else {
-                    print "⚠️  Credential helper ($helper) did not return credentials\n";
+                    print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
                 }
-            } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
-                $creds_method = 'config.json auth entry';
-                print "✅ Docker Hub auth entry found in config.json\n\n";
-                $logged_in = 1;
             } else {
-                print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
+                print "⚠️  Cannot read $docker_cfg\n";
             }
-        } else {
-            print "⚠️  Cannot read $docker_cfg\n";
+
+            unless ($logged_in) {
+                print "   Push may fail — run: docker login -u shantamcsbain\n";
+                print "   (continuing anyway)\n";
+            }
+            print "\n";
+
+            print "--- Step 0: Routine cleanup of local containers on Workstation ---\n";
+            if (-f "$comserv_dir/script/docker-cleanup.sh") {
+                print "    Running: $comserv_dir/script/docker-cleanup.sh\n\n";
+                my $cleanup_exit = system('bash', "$comserv_dir/script/docker-cleanup.sh");
+                $cleanup_exit >>= 8;
+                if ($cleanup_exit != 0) {
+                    print "⚠️  Local cleanup script exited with code $cleanup_exit\n\n";
+                } else {
+                    print "✅ Local cleanup completed successfully\n\n";
+                }
+            } else {
+                print "⚠️  Local cleanup script not found at $comserv_dir/script/docker-cleanup.sh\n\n";
+            }
+
+            print "--- Step 1: Building production image ($hub_image) ---\n";
+            print "    compose: $comserv_dir/$prod_compose\n\n";
+            my $build_exit = system('docker', 'compose',
+                '-f', "$comserv_dir/$prod_compose",
+                '--project-directory', $comserv_dir,
+                'build', '--progress=plain');
+            $build_exit >>= 8;
+            if ($build_exit != 0) {
+                print "\n❌ BUILD FAILED (exit $build_exit)\n";
+                $child_exit->(1);
+            }
+            print "\n✅ Build complete\n\n";
+
+            print "--- Step 1b: Stale-build check ---\n";
+            my $fetch_out = `git -C "$repo_dir" fetch origin main 2>&1`;
+            chomp(my $post_build_commit = `git -C "$repo_dir" rev-parse origin/main 2>/dev/null`);
+            chomp(my $new_commits_raw   = `git -C "$repo_dir" rev-list --count "$git_commit"..origin/main 2>/dev/null`);
+            my $new_commits = ($new_commits_raw =~ /^\d+$/) ? $new_commits_raw + 0 : 0;
+            if ($new_commits > 0) {
+                print "⚠️  WARNING: $new_commits new commit(s) merged into main WHILE this build was running.\n";
+                print "   Build captured: $git_commit\n";
+                print "   main is now at: $post_build_commit\n";
+                print "   The pushed image will NOT contain these commits:\n";
+                my $new_log = `git -C "$repo_dir" log --oneline "$git_commit"..origin/main 2>/dev/null`;
+                print "$new_log\n";
+                print "   Recommendation: cancel, merge main, and re-run Auto Deploy.\n";
+                print "   Continuing push anyway (image is still valid, just not latest).\n\n";
+            } else {
+                print "✅ main has not advanced — build is current ($git_commit)\n\n";
+            }
+
+            print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
+            if ($docker_hub_username && $docker_hub_password) {
+                print "🔐 Attempting automatic Docker Hub login for $docker_hub_username...\n";
+                my $login_cmd = sprintf("echo %s | docker login -u %s --password-stdin 2>&1",
+                    quotemeta($docker_hub_password), quotemeta($docker_hub_username));
+                my $login_out = `$login_cmd`;
+                my $login_exit = $? >> 8;
+                if ($login_exit == 0) {
+                    print "✅ Automatic Docker Hub login successful!\n\n";
+                } else {
+                    print "⚠️  Automatic Docker Hub login failed (exit $login_exit):\n$login_out\n\n";
+                }
+            }
+
+            my $push_exit = system('docker', 'compose',
+                '-f', "$comserv_dir/$prod_compose",
+                '--project-directory', $comserv_dir,
+                'push');
+            $push_exit >>= 8;
+            if ($push_exit != 0) {
+                print "\n❌ PUSH FAILED (exit $push_exit)\n";
+                print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
+                print "     then click Auto Deploy again\n";
+                $child_exit->(1);
+            }
+            print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
         }
 
-        unless ($logged_in) {
-            print "   Push may fail — run: docker login -u shantamcsbain\n";
-            print "   (continuing anyway)\n";
-        }
-        print "\n";
+        print "--- Step 3: Publishing production deploy files to $ssh_target ---\n";
+        my $escaped_password = $ssh_password;
+        $escaped_password =~ s/'/'\\''/g;
 
-        print "--- Step 1: Building production image ($hub_image) ---\n";
-        print "    compose: $comserv_dir/$prod_compose\n\n";
-        my $build_exit = system('docker', 'compose',
-            '-f', "$comserv_dir/$prod_compose",
-            '--project-directory', $comserv_dir,
-            'build', '--progress=plain');
-        $build_exit >>= 8;
-        if ($build_exit != 0) {
-            print "\n❌ BUILD FAILED (exit $build_exit)\n";
-            _exit(1);
-        }
-        print "\n✅ Build complete\n\n";
-
-        print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
-        my $push_exit = system('docker', 'compose',
-            '-f', "$comserv_dir/$prod_compose",
-            '--project-directory', $comserv_dir,
-            'push');
-        $push_exit >>= 8;
-        if ($push_exit != 0) {
-            print "\n❌ PUSH FAILED (exit $push_exit)\n";
-            print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
-            print "     then click Auto Deploy again\n";
-            _exit(1);
-        }
-        print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
-
-        print "--- Step 3: Triggering deploy on $ssh_target ---\n";
-        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
         local $ENV{SSHPASS} = $ssh_password;
+
+        # Copy to /tmp first to bypass write permission restrictions on /opt/comserv/Comserv/
+        print "    Copying deploy.sh to remote /tmp...\n";
+        my $scp1 = system('sshpass', '-e', 'scp',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            "$comserv_dir/script/deploy.sh",
+            "$ssh_target:/tmp/deploy.sh");
+        $scp1 >>= 8;
+        if ($scp1 != 0) {
+            print "\n❌ FAILED TO COPY DEPLOY SCRIPT (exit $scp1)\n";
+            $child_exit->(1);
+        }
+
+        print "    Copying docker-compose.server.yml to remote /tmp...\n";
+        my $scp2 = system('sshpass', '-e', 'scp',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            "$comserv_dir/script/docker-compose.server.yml",
+            "$ssh_target:/tmp/docker-compose.prod.yml");
+        $scp2 >>= 8;
+        if ($scp2 != 0) {
+            print "\n❌ FAILED TO COPY DOCKER COMPOSE CONFIG (exit $scp2)\n";
+            $child_exit->(1);
+        }
+
+        # Move to /opt/comserv/Comserv/ with sudo
+        print "    Moving files to final remote destinations with sudo...\n";
+        my $move_cmd = "echo '$escaped_password' | sudo -S cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && " .
+                       "echo '$escaped_password' | sudo -S chmod +x /opt/comserv/Comserv/deploy.sh && " .
+                       "echo '$escaped_password' | sudo -S cp /tmp/docker-compose.prod.yml /opt/comserv/Comserv/docker-compose.prod.yml";
+        my $move_exit = system('sshpass', '-e', 'ssh',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            $ssh_target,
+            $move_cmd);
+        $move_exit >>= 8;
+        if ($move_exit != 0) {
+            print "\n❌ MOVING REMOTE FILES FAILED (exit $move_exit)\n";
+            $child_exit->(1);
+        }
+        print "✅ Production deploy files published\n\n";
+
+        print "--- Step 4: Triggering deploy on $ssh_target ---\n";
+        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
+        my $ssh_cmd = "echo '$escaped_password' | sudo -S DEPLOY_MODE='$deploy_mode' /opt/comserv/Comserv/deploy.sh";
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             $ssh_target,
-            '/opt/comserv/Comserv/deploy.sh');
+            $ssh_cmd);
         $ssh_exit >>= 8;
         if ($ssh_exit != 0) {
             print "\n⚠️  SSH TRIGGER FAILED (exit $ssh_exit)\n";
@@ -6302,7 +7301,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         unlink $latest_link if -l $latest_link;
         symlink $log_file, $latest_link;
 
-        _exit($ssh_exit != 0 ? 2 : 0);
+        $child_exit->($ssh_exit != 0 ? 2 : 0);
     }
 
     if (open my $fh, '>', $pid_file) { print $fh $pid; close $fh; }
@@ -6655,6 +7654,183 @@ sub table_name_to_class_name {
     return $class_name;
 }
 
+# Connect to the new MySQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
+sub get_migration_mysql_info {
+    my ($self, $c) = @_;
+
+    my $host     = $ENV{MIGRATION_MYSQL_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_MYSQL_PORT}     || 3307;
+    my $user     = $ENV{MIGRATION_MYSQL_USER}     || 'root';
+    my $password = $ENV{MIGRATION_MYSQL_PASSWORD} // '';
+
+    unless ($password) {
+        my $home = $ENV{HOME} || '';
+        my $dbi_file = "$home/.comserv/secrets/dbi/db_production_mysql.json";
+        if (-f $dbi_file) {
+            eval {
+                local $/;
+                open my $fh, '<', $dbi_file or die $!;
+                my $data = JSON::decode_json(<$fh>);
+                close $fh;
+                my ($cfg) = values %$data;
+                $password = $cfg->{password} // '' if ref $cfg eq 'HASH';
+                $host     = $cfg->{host}     if ref $cfg eq 'HASH' && $cfg->{host};
+                $port     = $cfg->{port}     if ref $cfg eq 'HASH' && $cfg->{port};
+                $user     = $cfg->{username} if ref $cfg eq 'HASH' && $cfg->{username};
+            };
+        }
+    }
+
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_MYSQL_PASSWORD not set — add it to Comserv/.env or set credentials in the db_production_mysql server entry',
+            databases => [],
+        };
+    }
+
+    my $result = { connection_status => 'unknown', databases => [] };
+
+    try {
+        my $dsn = "DBI:mysql:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1, mysql_connect_timeout => 5,
+        });
+
+        my $sth = $dbh->prepare("SHOW DATABASES");
+        $sth->execute();
+        my @databases;
+        while (my ($db_name) = $sth->fetchrow_array()) {
+            next if $db_name =~ /^(information_schema|performance_schema|sys|mysql)$/i;
+            my $tbl_sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?");
+            $tbl_sth->execute($db_name);
+            my ($table_count) = $tbl_sth->fetchrow_array();
+            push @databases, { name => $db_name, table_count => $table_count };
+        }
+        $dbh->disconnect();
+
+        $result->{connection_status} = 'connected';
+        $result->{databases} = \@databases;
+        $result->{host} = "$host:$port";
+
+    } catch {
+        $result->{connection_status} = 'error';
+        $result->{error} = "MySQL connection failed: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_migration_mysql_info', $result->{error});
+    };
+
+    return $result;
+}
+
+# Connect to the new PostgreSQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
+sub get_migration_postgres_info {
+    my ($self, $c) = @_;
+
+    my $host     = $ENV{MIGRATION_POSTGRES_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_POSTGRES_PORT}     || 5433;
+    my $user     = $ENV{MIGRATION_POSTGRES_USER}     || 'postgres';
+    my $password = $ENV{MIGRATION_POSTGRES_PASSWORD} // '';
+
+    unless ($password) {
+        my $home = $ENV{HOME} || '';
+        my $dbi_file = "$home/.comserv/secrets/dbi/db_production_postgres.json";
+        if (-f $dbi_file) {
+            eval {
+                local $/;
+                open my $fh, '<', $dbi_file or die $!;
+                my $data = JSON::decode_json(<$fh>);
+                close $fh;
+                my ($cfg) = values %$data;
+                $password = $cfg->{password} // '' if ref $cfg eq 'HASH';
+                $host     = $cfg->{host}     if ref $cfg eq 'HASH' && $cfg->{host};
+                $port     = $cfg->{port}     if ref $cfg eq 'HASH' && $cfg->{port};
+                $user     = $cfg->{username} if ref $cfg eq 'HASH' && $cfg->{username};
+            };
+        }
+    }
+
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_POSTGRES_PASSWORD not set — add it to Comserv/.env or set credentials in the db_production_postgres server entry',
+            databases => [],
+        };
+    }
+
+    my $result = { connection_status => 'unknown', databases => [] };
+
+    try {
+        my $dsn = "DBI:Pg:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1,
+        });
+
+        my $sth = $dbh->prepare("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname");
+        $sth->execute();
+        my @db_names;
+        while (my ($db_name) = $sth->fetchrow_array()) {
+            next if $db_name eq 'postgres';
+            push @db_names, $db_name;
+        }
+        $dbh->disconnect();
+
+        # Now connect to each database and fetch its schema
+        my @databases;
+        for my $db_name (@db_names) {
+            my $db_entry = { name => $db_name, tables => [], table_count => 0, error => undef };
+            eval {
+                my $db_dbh = DBI->connect("DBI:Pg:dbname=$db_name;host=$host;port=$port",
+                    $user, $password, { RaiseError => 1, PrintError => 0, AutoCommit => 1 });
+                my $tsth = $db_dbh->prepare(
+                    "SELECT t.tablename, COUNT(c.column_name)::int AS col_count
+                     FROM pg_tables t
+                     LEFT JOIN information_schema.columns c
+                       ON c.table_schema = 'public' AND c.table_name = t.tablename
+                     WHERE t.schemaname = 'public'
+                     GROUP BY t.tablename
+                     ORDER BY t.tablename");
+                $tsth->execute();
+                my @tables;
+                while (my ($tname, $col_count) = $tsth->fetchrow_array()) {
+                    # Fetch column details
+                    my $csth = $db_dbh->prepare(
+                        "SELECT column_name, data_type, character_maximum_length,
+                                is_nullable, column_default
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public' AND table_name = ?
+                         ORDER BY ordinal_position");
+                    $csth->execute($tname);
+                    my @cols;
+                    while (my $col = $csth->fetchrow_hashref()) {
+                        push @cols, $col;
+                    }
+                    push @tables, { name => $tname, col_count => $col_count, columns => \@cols };
+                }
+                $db_dbh->disconnect();
+                $db_entry->{tables}      = \@tables;
+                $db_entry->{table_count} = scalar @tables;
+            };
+            $db_entry->{error} = $@ if $@;
+            push @databases, $db_entry;
+        }
+
+        $result->{connection_status} = 'connected';
+        $result->{databases} = \@databases;
+        $result->{host} = "$host:$port";
+
+    } catch {
+        $result->{connection_status} = 'error';
+        my $err = "$_";
+        $result->{error} = "PostgreSQL connection failed: $err";
+        my $level = ($err =~ /No route to host|Connection refused|timeout/i) ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'get_migration_postgres_info', $result->{error});
+    };
+
+    return $result;
+}
+
 # Helper method to determine Result file path
 sub get_result_file_path {
     my ($self, $c, $table_name, $database) = @_;
@@ -6667,6 +7843,389 @@ sub get_result_file_path {
     my $result_file_path = File::Spec->catfile($base_path, "$class_name.pm");
     
     return $result_file_path;
+}
+
+# Page Migration action: Forager -> Ency
+sub migrate_pages :Path('/admin/migrate_pages') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_pages', 
+        "Starting migrate_pages action");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'migrate_pages')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    
+    my $action = $c->req->param('action') || '';
+    
+    if ($action eq 'preview') {
+        my $preview_data = $self->_preview_page_migration($c);
+        $c->stash(
+            show_preview => 1,
+            preview_data => $preview_data,
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+    elsif ($action eq 'migrate') {
+        my @selected_ids = $c->req->param('selected_pages');
+        my $result = $self->_perform_page_migration($c, \@selected_ids);
+        $c->stash(
+            show_result => 1,
+            migration_result => $result,
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+    else {
+        $c->stash(
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+}
+
+# Helper method to preview page migration
+sub _preview_page_migration {
+    my ($self, $c) = @_;
+    
+    my @forager_pages;
+    eval {
+        @forager_pages = $c->model('DBForager')->resultset('Page')->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_preview_page_migration', 
+            "Error fetching Forager pages: $@");
+        return {
+            total_count => 0,
+            issues_count => 0,
+            mapping_issues => [{ error => "Failed to load Forager pages: $@" }],
+            forager_pages => []
+        };
+    }
+    
+    my $total_count = scalar @forager_pages;
+    my $issues_count = 0;
+    my @mapping_issues;
+    
+    foreach my $f_page (@forager_pages) {
+        my @issues;
+        
+        # Check required fields
+        push @issues, "Missing sitename" unless $f_page->sitename;
+        push @issues, "Missing menu" unless $f_page->menu;
+        push @issues, "Missing page_code" unless $f_page->page_code;
+        
+        # Check duplicate page_code in Ency.page for the same site.
+        if ($f_page->page_code) {
+            my $exists = $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
+            if ($exists) {
+                push @issues, "Page code already exists in destination for site " . ($f_page->sitename || 'CSC');
+            }
+        }
+        
+        if (@issues) {
+            $issues_count++;
+            push @mapping_issues, {
+                page => $f_page,
+                issues => \@issues
+            };
+        }
+    }
+    
+    return {
+        total_count => $total_count,
+        issues_count => $issues_count,
+        mapping_issues => \@mapping_issues,
+        forager_pages => \@forager_pages
+    };
+}
+
+# Helper method to perform page migration
+sub _perform_page_migration {
+    my ($self, $c, $selected_ids) = @_;
+    
+    my $migrated_count = 0;
+    my $skipped_count = 0;
+    my $error_count = 0;
+    my @migration_log;
+    my @errors;
+    
+    foreach my $id (@$selected_ids) {
+        my $f_page = eval { $c->model('DBForager')->resultset('Page')->find({ record_id => $id }) };
+        unless ($f_page) {
+            $error_count++;
+            push @errors, "Could not find Forager page with record_id: $id";
+            next;
+        }
+        
+        # Safety checks
+        my $exists = eval {
+            $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
+        };
+        if ($exists) {
+            $skipped_count++;
+            push @migration_log, "Skipped duplicate: " . ($f_page->sitename || 'CSC') . "/" . $f_page->page_code;
+            next;
+        }
+        
+        # Build page data
+        my $page_data = {
+            sitename => $f_page->sitename || 'CSC',
+            menu => $f_page->menu || 'Main',
+            page_code => $f_page->page_code,
+            title => $f_page->app_title || $f_page->page_code,
+            body => $f_page->body || '',
+            description => $f_page->description,
+            keywords => $f_page->keywords,
+            link_order => $f_page->link_order || 0,
+            status => $f_page->status || 'active',
+            roles => 'public', # default
+            created_by => $f_page->username_of_poster || 'migrated',
+        };
+        
+        eval {
+            $c->model('DBEncy')->resultset('Page')->create($page_data);
+            $migrated_count++;
+            push @migration_log, "Successfully migrated: " . $f_page->page_code;
+        };
+        if ($@) {
+            $error_count++;
+            push @errors, "Failed to migrate " . $f_page->page_code . ": $@";
+        }
+    }
+    
+    return {
+        migrated_count => $migrated_count,
+        skipped_count => $skipped_count,
+        error_count => $error_count,
+        migration_log => \@migration_log,
+        errors => \@errors
+    };
+}
+
+# Admin: Page Management UI
+sub pages :Path('/admin/pages') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'pages', 
+        "Starting admin pages action");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'pages')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    
+    my $action = $c->req->param('action') || '';
+    my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    
+    # Handle deletion
+    if ($action eq 'delete') {
+        my $id = $c->req->param('id');
+        my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+        if ($page) {
+            # Site isolation check: non-CSC admins can only delete pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only delete pages belonging to your own site.";
+            } else {
+                my $code = $page->page_code;
+                eval {
+                    $page->delete;
+                    $c->flash->{success_msg} = "Page '$code' deleted successfully.";
+                };
+                if ($@) {
+                    $c->flash->{error_msg} = "Failed to delete page: $@";
+                }
+            }
+        } else {
+            $c->flash->{error_msg} = "Page not found for deletion.";
+        }
+        $c->response->redirect($c->uri_for('/admin/pages'));
+        return;
+    }
+    
+    my $show_form = undef;
+    my $page_item = {};
+    
+    if ($action eq 'create') {
+        $show_form = 'create';
+        my $clone_id = $c->req->param('clone_id');
+        if ($clone_id) {
+            my $cloned = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $clone_id }) };
+            if ($cloned) {
+                $page_item = {
+                    sitename    => $current_sitename,
+                    menu        => $cloned->menu || 'Main',
+                    page_code   => $cloned->page_code,
+                    title       => $cloned->title . ' (Copy)',
+                    body        => $cloned->body,
+                    description => $cloned->description,
+                    keywords    => $cloned->keywords,
+                    link_order  => $cloned->link_order || 0,
+                    status      => 'active',
+                    roles       => $cloned->roles || 'public',
+                };
+            }
+        }
+        unless (keys %$page_item) {
+            $page_item = {
+                sitename => $current_sitename,
+                menu => 'Main',
+                status => 'active',
+                roles => 'public',
+            };
+        }
+    }
+    elsif ($action eq 'edit') {
+        my $id = $c->req->param('id');
+        my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+        if ($page) {
+            # Site isolation check: non-CSC admins can only edit pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only edit pages belonging to your own site.";
+            } else {
+                $show_form = 'edit';
+                $page_item = $page;
+            }
+        } else {
+            $c->flash->{error_msg} = "Page not found for editing.";
+        }
+    }
+    elsif ($action eq 'save') {
+        my $params = $c->req->params;
+        my $id = $params->{id};
+        
+        # Site isolation check: non-CSC admins can only assign to their own site
+        my $target_sitename = $params->{sitename} || $current_sitename;
+        if ($current_sitename ne 'CSC' && $target_sitename ne $current_sitename) {
+            $c->stash(error_msg => "Access denied: You can only save pages belonging to your own site.");
+            $show_form = $id ? 'edit' : 'create';
+            $page_item = $params;
+        } else {
+            my $page_data = {
+                sitename => $target_sitename,
+                menu => $params->{menu} || 'Main',
+                page_code => $params->{page_code},
+                title => $params->{title},
+                body => $params->{body} || '',
+                description => $params->{description},
+                keywords => $params->{keywords},
+                link_order => $params->{link_order} || 0,
+                status => $params->{status} || 'active',
+                roles => $params->{roles} || 'public',
+                share_with => $params->{share_with} || '',
+            };
+            
+            my $success = 0;
+            if ($id) {
+                # Editing existing page
+                my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+                if ($page) {
+                    if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                        $c->stash(error_msg => "Access denied: You can only modify pages belonging to your own site.");
+                        $show_form = 'edit';
+                        $page_item = $params;
+                    } else {
+                        eval {
+                            $page->update($page_data);
+                            $c->flash->{success_msg} = "Page updated successfully.";
+                            $success = 1;
+                        };
+                        if ($@) {
+                            $c->stash(error_msg => "Error updating page: $@");
+                            $show_form = 'edit';
+                            $page_item = $params;
+                        }
+                    }
+                } else {
+                    $c->stash(error_msg => "Page not found to update.");
+                }
+            } else {
+                # Creating new page
+                $page_data->{created_by} = $c->session->{username} || 'admin';
+                eval {
+                    $c->model('DBEncy')->resultset('Page')->create($page_data);
+                    $c->flash->{success_msg} = "Page created successfully.";
+                    $success = 1;
+                };
+                if ($@) {
+                    $c->stash(error_msg => "Error creating page: $@");
+                    $show_form = 'create';
+                    $page_item = $params;
+                }
+            }
+            
+            if ($success) {
+                $c->response->redirect($c->uri_for('/admin/pages'));
+                return;
+            }
+        }
+    }
+    
+    # Fetch pages according to site context for list display
+    my @pages;
+    eval {
+        if ($current_sitename eq 'CSC') {
+            @pages = $c->model('DBEncy')->resultset('Page')->all;
+        } else {
+            # Regular site admins see their own pages + shared pages
+            @pages = $c->model('DBEncy')->resultset('Page')->search({
+                '-or' => [
+                    { sitename => $current_sitename },
+                    { share_with => 'all' },
+                    { share_with => { 'like' => "%$current_sitename%" } }
+                ]
+            })->all;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'pages', 
+            "Error fetching Ency pages: $@");
+        $c->stash(error_msg => "Error fetching pages: $@") unless $c->stash->{error_msg};
+    }
+    
+    # Standard roles drop down
+    my @available_roles = ('public', 'member', 'coop', 'it', 'helpdesk', 'admin');
+    # Fetch site-specific custom roles
+    eval {
+        my $roles_rs = $c->model('DBEncy')->resultset('SiteRole')->search({
+            sitename => [ $current_sitename, 'All' ]
+        });
+        while (my $r = $roles_rs->next) {
+            push @available_roles, $r->role_name;
+        }
+    };
+    
+    # Unique roles list
+    my %seen;
+    @available_roles = grep { !$seen{$_}++ } @available_roles;
+    
+    # Fetch all sites for the dropdown check list (Cross-Site Page Sharing)
+    my @sites_list;
+    eval {
+        my $sites_rs = $c->model('DBEncy')->resultset('Site')->all;
+        while (my $s = $sites_rs->next) {
+            push @sites_list, $s->name;
+        }
+    };
+    
+    $c->stash(
+        pages => \@pages,
+        show_form => $show_form,
+        page_item => $page_item,
+        current_site => $current_sitename,
+        available_roles => \@available_roles,
+        sites_list => \@sites_list,
+        template => 'admin/pages.tt'
+    );
 }
 
 =head1 AUTHOR

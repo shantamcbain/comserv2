@@ -26,6 +26,30 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
+# When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
+# Defaults to disabled when CATALYST_ENV=production (safe default for disk).
+# Admin can toggle at runtime via set_file_logging(). A restart is only needed
+# to affect the log file initialisation itself.
+my $FILE_LOGGING_DISABLED = do {
+    my $env_val = $ENV{DISABLE_FILE_LOGGING} // '';
+    if    ($env_val eq '1') { 1 }
+    elsif ($env_val eq '0') { 0 }
+    elsif (($ENV{CATALYST_ENV} // '') eq 'production') { 1 }
+    else  { 0 }
+};
+
+# Allow runtime toggle — called by admin UI actions.
+sub set_file_logging {
+    my ($class, $enabled) = @_;
+    $FILE_LOGGING_DISABLED = $enabled ? 0 : 1;
+    _print_log("File logging " . ($FILE_LOGGING_DISABLED ? "DISABLED" : "ENABLED") . " at runtime by admin");
+    return !$FILE_LOGGING_DISABLED;
+}
+
+sub file_logging_enabled {
+    return !$FILE_LOGGING_DISABLED;
+}
+
 # Known bot/spider user-agent patterns for request classification
 my @BOT_PATTERNS = (
     qr/googlebot/i,
@@ -68,10 +92,12 @@ my @BOT_PATTERNS = (
 # Circuit breaker: if DB write fails, stop trying for 30s to prevent blocking Starman workers.
 my $_db_log_failed_at  = 0;  # epoch time of last DB write failure
 my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
+my $_in_todo_create    = 0;  # recursion guard for auto-error-todo creation
 
 # Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
 my $_email_failed_at = 0;  # epoch time of last email send failure
 my $_email_backoff_s = 300; # seconds to pause email sending after a failure
+my $_last_rotation_attempt_at = 0; # epoch time of last preemptive log rotation attempt
 
 my $MAX_LOG_SIZE = 50 * 1024 * 1024; # 50 MB max log size
 my $ROTATION_THRESHOLD = 40 * 1024 * 1024; # Rotate at 40 MB
@@ -115,14 +141,15 @@ sub _print_log {
 # Log rotation method
 sub rotate_log {
     my ($class) = @_;
+    return if $FILE_LOGGING_DISABLED;
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
-    _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
-    return if $file_size < $MAX_LOG_SIZE;
+    _print_log("Current log file size: $file_size bytes, rotation threshold: $ROTATION_THRESHOLD bytes");
+    return if $file_size < $ROTATION_THRESHOLD;
 
     # Log that we're rotating the file
-    _print_log("Log file size ($file_size bytes) exceeds maximum size ($MAX_LOG_SIZE bytes). Rotating log file.");
+    _print_log("Log file size ($file_size bytes) exceeds rotation threshold ($ROTATION_THRESHOLD bytes). Rotating log file.");
 
     # Generate timestamped filename
     my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
@@ -162,6 +189,37 @@ sub rotate_log {
     _cleanup_old_logs($archive_dir, $filename);
 
     _print_log("Log rotated: $archived_log");
+
+    # Async copy of the archived log to NFS — runs in a child process so the
+    # server never blocks waiting for NFS I/O.
+    _copy_archive_to_nfs_async($archived_log) if defined $archived_log && -e $archived_log;
+}
+
+sub _copy_archive_to_nfs_async {
+    my ($archived_log) = @_;
+    return unless defined $archived_log && length $archived_log;
+
+    my $nfs_archive_dir;
+    eval {
+        my $nfs_util = Comserv::Util::NfsPath->new();
+        my $nfs_root = $nfs_util->get_nfs_root();
+        $nfs_archive_dir = File::Spec->catdir($nfs_root, 'logs', 'archive');
+    };
+    return if $@ || !defined $nfs_archive_dir;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        _print_log("NFS archive copy: fork failed (non-fatal): $!");
+        return;
+    }
+    if ($pid == 0) {
+        eval {
+            make_path($nfs_archive_dir) unless -d $nfs_archive_dir;
+            my (undef, undef, $fname) = File::Spec->splitpath($archived_log);
+            File::Copy::copy($archived_log, File::Spec->catfile($nfs_archive_dir, $fname));
+        };
+        exit 0;
+    }
 }
 
 # Helper function to clean up old log files
@@ -230,40 +288,66 @@ sub get_system_identifier {
         $p;
     };
 
+    my $identifier = '';
+
     # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
-    my $identifier = $ENV{SYSTEM_IDENTIFIER};
-    if ($identifier && $identifier ne '') {
-        # Append port when it adds useful info (i.e. not already encoded in the name)
-        $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
-        return $identifier;
+    if ($ENV{SYSTEM_IDENTIFIER} && $ENV{SYSTEM_IDENTIFIER} ne '') {
+        $identifier = $ENV{SYSTEM_IDENTIFIER};
+    } else {
+        # Check if we are inside a Docker container
+        my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+        
+        if ($is_docker) {
+            my $env = $ENV{CATALYST_ENV} || 'production';
+            if ($env eq 'development') {
+                $identifier = 'workstation-container';
+            } else {
+                $identifier = 'production-container';
+            }
+        } else {
+            # Outside container: resolve by LAN IP
+            my %IP_NAMES = (
+                '192.168.1.126' => 'production-host',
+                '192.168.1.199' => 'workstation-host',
+            );
+            eval {
+                require Socket;
+                socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0) or die;
+                connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8'))) or die;
+                my $local = getsockname($sock);
+                my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
+                my $ip = Socket::inet_ntoa($local_ip_packed);
+                if (exists $IP_NAMES{$ip}) {
+                    $identifier = $IP_NAMES{$ip};
+                }
+            };
+            
+            # Fallback to hostname if IP-based lookup failed or wasn't mapped
+            unless ($identifier) {
+                eval {
+                    require Sys::Hostname;
+                    $identifier = Sys::Hostname::hostname();
+                };
+                $identifier //= 'unknown-host';
+            }
+        }
     }
 
-    # 2. Map known IP addresses to friendly names.
-    # Use a UDP connect (no packets sent) to find which local IP the OS would
-    # use when routing outbound — the most reliable way to get the primary LAN IP.
-    my %IP_NAMES = (
-        '192.168.1.126' => 'production',
-        '192.168.1.199' => 'workstation',
-    );
-    eval {
-        require Socket;
-        socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0)
-            or die "socket: $!";
-        connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8')))
-            or die "connect: $!";
-        my $local = getsockname($sock);
-        my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
-        my $ip = Socket::inet_ntoa($local_ip_packed);
-        $identifier = $IP_NAMES{$ip} if exists $IP_NAMES{$ip};
-    };
+    # Detect runtime environments (Docker, Starman, Standalone)
+    my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+    my $is_starman = exists $INC{'Starman.pm'} || exists $INC{'Starman/Server.pm'} || ($ENV{SERVER_SOFTWARE} && $ENV{SERVER_SOFTWARE} =~ /Starman/i) || ($0 =~ /starman/i);
 
-    # 3. Fall back to plain hostname
-    unless ($identifier && $identifier ne '') {
-        eval { require Sys::Hostname; $identifier = Sys::Hostname::hostname() };
-        $identifier //= 'unknown';
+    my $tag_str;
+    if ($is_docker) {
+        $tag_str = 'Docker';
+    } else {
+        $tag_str = $is_starman ? 'Starman' : 'Standalone';
     }
+
+    $identifier .= " ($tag_str)" if $tag_str;
 
     # Append port to disambiguate multiple dev servers on the same host
+    $port //= '3000';
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
     return $identifier;
@@ -273,77 +357,60 @@ sub get_system_identifier {
 sub init {
     my ($class) = @_;
 
-    # Determine the base directory for logs
-    # Priority 1: Configured path in Database (logging_nfs_dir)
-    # Priority 2: Standardized NFS shared directory (via Comserv::Util::NfsPath)
-    # Priority 3: NFS shared directory from ENV (COMSERV_NFS_LOG_DIR)
-    # Priority 4: Specific log directory from ENV (COMSERV_LOG_DIR)
-    # Priority 5: Default relative to binary
+    # Also honour the legacy env var COMSERV_DISABLE_FILE_LOG
+    $FILE_LOGGING_DISABLED = 1 if $ENV{COMSERV_DISABLE_FILE_LOG};
+
+    if ($FILE_LOGGING_DISABLED) {
+        print STDERR "=== FILE LOGGING DISABLED — STDERR + DB only ===\n";
+        __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+            "Logging system initialized (STDERR + DB only; file logging disabled)");
+        return;
+    }
+
+    # Always write to the local log directory first — never NFS during startup.
     my $log_file;
     my $log_dir;
 
-    # Note: DB access in init() might be restricted depending on startup sequence.
-    # We use ENV as primary for bootstrap, and refresh_settings() for DB overrides later.
-    
-    my $nfs_path_util = Comserv::Util::NfsPath->new();
-    my $standard_nfs = $nfs_path_util->get_nfs_root();
-    my $standard_log_dir = File::Spec->catdir($standard_nfs, 'logs');
-    
-    my $nfs_log_dir = $ENV{'COMSERV_NFS_LOG_DIR'};
-    
-    if (-d $standard_log_dir && -w $standard_log_dir) {
-        $log_dir  = $standard_log_dir;
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using standardized NFS log directory: $log_dir");
-    } elsif ($nfs_log_dir && -d $nfs_log_dir && -w $nfs_log_dir) {
-        $log_dir  = $nfs_log_dir;
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using centralized log directory: $log_dir");
+    if ($ENV{'COMSERV_LOG_DIR'}) {
+        $log_dir = $ENV{'COMSERV_LOG_DIR'};
     } else {
-        my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-        $log_dir  = File::Spec->catdir($base_dir, "logs");
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using local log directory: $log_dir");
+        my $base_dir = File::Spec->catdir($FindBin::Bin, '..');
+        $log_dir = File::Spec->catdir($base_dir, "logs");
     }
 
-    _print_log("Log file: $log_file");
+    $log_file = File::Spec->catfile($log_dir, "application.log");
+
+    print STDERR "Using local log directory: $log_dir\n";   # Safe fallback
+    print STDERR "Log file: $log_file\n";
 
     # Create the log directory if it doesn't exist
     unless (-d $log_dir) {
         eval { make_path($log_dir) };
         if ($@) {
-            _print_log("[ERROR] Failed to create log directory $log_dir: $@");
+            print STDERR "[ERROR] Failed to create log directory $log_dir: $@\n";
             die "Failed to create log directory $log_dir: $@\n";
         }
-        _print_log("Log directory created: $log_dir");
-    } else {
-        _print_log("Log directory exists: $log_dir");
     }
 
     # Open the log file for appending
     unless (sysopen($LOG_FH, $log_file, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
         my $error_message = "Can't open log file $log_file: $!";
-        _print_log("[ERROR] $error_message");
+        print STDERR "[ERROR] $error_message\n";
         die $error_message;
     }
 
     # Ensure the file handle is auto-flushed
     select((select($LOG_FH), $| = 1)[0]);
-    _print_log("Log file opened: $log_file");
 
-    # Write a test entry to ensure the log file is created
     print $LOG_FH "Test log entry\n";
-    _print_log("Wrote test log entry to file");
-    
+
     # Set global log file path for rotation
     $LOG_FILE = $log_file;
-    _print_log("Global log file path set to: $LOG_FILE");
 
-    # Log initialization message
-    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    # Now safe to use full logging
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+        "Logging system initialized with log file: $LOG_FILE");
 }
-
-# Constructor for creating a new instance
 sub new {
     my ($class) = @_;
     return bless {}, $class;
@@ -387,7 +454,11 @@ sub log_with_details {
     }
 
     # Write to application log file and STDERR (filtered by COMSERV_LOG_MIN_LEVEL).
-    log_to_file($log_message, undef, $level);
+    my $min_prio  = $LEVEL_PRIORITY{ uc($STDERR_LOG_MIN_LEVEL) } // 1;
+    my $msg_prio  = $LEVEL_PRIORITY{ uc($level)                } // 1;
+    if ($msg_prio >= $min_prio) {
+        log_to_file($log_message, undef, $level);
+    }
     _print_log($log_message, $level);
 
     # Log to database — only WARN and above to keep the table manageable.
@@ -441,6 +512,121 @@ sub log_with_details {
         # Don't log the error of sending the error notification to avoid infinite loop
     }
 
+    # Auto-create a Todo in the audit panel for every EMAIL-threshold+ error.
+    # This ensures errors show up immediately without waiting for Start Day.
+    if ($current_prio >= $notify_prio
+        && $c && blessed($c) && $c->can('model')
+        && !$_in_todo_create) {
+        $_in_todo_create = 1;
+        eval {
+            my $now_date = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+            my $sub_name = $subroutine // 'unknown';
+            $sub_name =~ s/^Comserv:://;
+            my $sub_short    = substr($sub_name, 0, 80);
+            my $todo_subject = "[Error] $sub_short ($now_date)";
+            my $sitename     = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+            my $username     = ($c->can('session') && $c->session) ? ($c->session->{username} || 'system') : 'system';
+            my $uid          = ($c->can('session') && $c->session) ? ($c->session->{user_id}  || undef)    : undef;
+            my $top_level    = uc($level);
+            my $todo_priority = ($top_level eq 'CRITICAL') ? 1 : ($top_level eq 'ERROR') ? 2 : 3;
+
+            my $existing = $c->model('DBEncy')->resultset('Todo')->search(
+                { subject    => { -like => "[Error] $sub_short%" },
+                  start_date => $now_date,
+                  status     => { -not_in => [3, 'done', 'Done', 'DONE', 'completed', 'Completed'] } },
+                { rows => 1 }
+            )->first;
+
+            unless ($existing) {
+                # Try to match the error's file/subroutine to a project.
+                # The file path (e.g. "Comserv/Controller/Todo.pm") and
+                # subroutine (e.g. "Comserv::Controller::Todo::modify_todo")
+                # both carry the controller/module name which we can match
+                # against project_name or project_code in the Project table.
+                my $fallback_project_id   = 1;
+                my $matched_project_id    = undef;
+                my $matched_project_code  = 'PLANNING';
+                eval {
+                    my $sp = $c->model('DBEncy')->resultset('Project')->search(
+                        { project_code => { -in => ['PLANNING', 'Catalyst2', 'CSCDebugLog'] }, sitename => 'CSC' },
+                        { order_by => { -asc => 'id' }, rows => 1 }
+                    )->first;
+                    $fallback_project_id = $sp->id if $sp;
+                };
+                eval {
+                    my $search_term;
+                    if ($sub_name =~ /Controller::(\w+)/) {
+                        $search_term = $1;
+                    } elsif ($file && $file =~ m{/(\w+)\.pm$}i) {
+                        $search_term = $1;
+                    }
+                    if ($search_term && $search_term !~ /^(unknown|Comserv)$/i) {
+                        my $proj = $c->model('DBEncy')->resultset('Project')->search(
+                            { -or => [
+                                { name         => { -like => "%$search_term%" } },
+                                { project_code => { -like => "%$search_term%" } },
+                            ]},
+                            { rows => 1 }
+                        )->first;
+                        if ($proj) {
+                            $matched_project_id   = $proj->id;
+                            $matched_project_code = $proj->project_code || 'PLANNING';
+                        }
+                    }
+                };
+                $matched_project_id //= $fallback_project_id;
+
+                my $effective_uid = defined($uid) ? $uid : 178;
+
+                my ($src_server, $src_branch, $src_file) = ('', '', '');
+                if ($log_message =~ /\[([^\]]+:\d+)\]/) {
+                    $src_server = $1;
+                }
+                if ($log_message =~ m{/worktrees/([^/]+)/}) {
+                    $src_branch = $1;
+                } elsif ($file && $file =~ m{/worktrees/([^/]+)/}) {
+                    $src_branch = $1;
+                }
+                if ($file) {
+                    ($src_file = $file) =~ s{.*/Comserv/}{Comserv/};
+                    $src_file .= ":$line" if $line;
+                }
+                my $source_comment = '';
+                $source_comment .= "Server: $src_server\n"  if $src_server;
+                $source_comment .= "Branch: $src_branch\n"  if $src_branch;
+                $source_comment .= "File:   $src_file\n"    if $src_file;
+                $source_comment .= "Function: $sub_name\n"  if $sub_name;
+
+                my %create_args = (
+                    subject             => $todo_subject,
+                    description         => "Automatic error todo from system log (level: $top_level).\n\n$log_message",
+                    status              => 1,
+                    priority            => $todo_priority,
+                    is_blocking         => 0,
+                    sitename            => $sitename,
+                    developer           => $username,
+                    username_of_poster  => $username,
+                    user_id             => $effective_uid,
+                    project_id          => $matched_project_id,
+                    last_mod_by         => $username,
+                    last_mod_date       => $now_date,
+                    date_time_posted    => $now_date . ' 00:00:00',
+                    start_date          => $now_date,
+                    due_date            => $now_date,
+                    parent_todo         => '',
+                    estimated_man_hours => 0,
+                    accumulative_time   => '00:00:00',
+                    group_of_poster     => 'admin',
+                    project_code        => $matched_project_code,
+                    share               => 0,
+                    comments            => $source_comment,
+                );
+                $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
+            }
+        };
+        $_in_todo_create = 0;
+    }
+
     return $log_message;
 }
 
@@ -485,9 +671,15 @@ sub log_error {
 # Send an error notification via email
 sub send_error_notification {
     my ($self, $c, $subject, $error_details) = @_;
-    
+
     my $system_id = __PACKAGE__->get_system_identifier();
     $subject = "[$system_id] $subject";
+
+    if ($ENV{EMAIL_NOTIFICATIONS_DISABLED}) {
+        _print_log("[EMAIL-DISABLED] notifications suppressed by EMAIL_NOTIFICATIONS_DISABLED: $subject");
+        return;
+    }
+
     return if $self->{_sending_email};
     local $self->{_sending_email} = 1;
 
@@ -537,7 +729,9 @@ sub send_error_notification {
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
     my ($message, $file_path, $level) = @_;
-    
+
+    return if $FILE_LOGGING_DISABLED;
+
     # CRITICAL FIX: Ensure we always use a proper log file path
     # If no file_path is provided or it's undefined, use the global log file
     # This prevents creating files with the message as the filename
@@ -567,12 +761,19 @@ sub log_to_file {
     $level //= 'INFO';
 
     # Check file size before writing to ensure we don't exceed max size
+    # Only try to rotate once every 5 minutes to prevent infinite warning loops if rotation fails
     if (defined $LOG_FILE && $file_path eq $LOG_FILE && -e $file_path) {
         my $file_size = -s $file_path;
         if ($file_size >= $ROTATION_THRESHOLD) {
-            _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
-            eval { rotate_log() };
-            _print_log("Log rotation failed (non-fatal): $@") if $@;
+            my $now = time();
+            if ($now - $_last_rotation_attempt_at >= 300) {
+                $_last_rotation_attempt_at = $now;
+                _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
+                eval { rotate_log() };
+                if ($@) {
+                    _print_log("Log rotation failed (non-fatal): $@");
+                }
+            }
         }
     }
 

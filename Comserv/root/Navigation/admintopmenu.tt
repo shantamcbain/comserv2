@@ -24,6 +24,8 @@
             <div class="submenu">
                 <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
+                <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
+                <a href="/admin/docker-containers-old"><i class="icon-docker"></i>Docker Containers (Old)</a>
                 <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/admin/git_pull"><i class="icon-git"></i>Git Pull</a>
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
@@ -40,13 +42,19 @@
             <div class="submenu">
                 <a href="/ai"><i class="icon-chat"></i>AI Chat Interface</a>
                 <a href="/ai/conversations"><i class="icon-history"></i>Chat History</a>
+                <a href="/ai/usage"><i class="icon-stats"></i>Usage &amp; Billing Monitor</a>
                 <a href="/ai/manage_api_keys"><i class="icon-key"></i>Manage API Keys</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
+                [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
+                <a href="#" id="nav-aew-open" onclick="if(window.AEW){AEW.openPopup();return false;}window.open('/ai/editing_widget_popup','aew-grok-editor','width=920,height=640,resizable=yes');return false;"><i class="icon-edit"></i>AI Code Editor (Grok CLI)</a>
+                <a href="/ai/template_editor"><i class="icon-ttml"></i>Template Editor</a>
+                [% END %]
                 [% IF c.session.roles.grep('admin').size %]
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin</span>
                         <a href="/admin/ai/configure"><i class="icon-config"></i>AI Configuration</a>
+                        <a href="/chat/admin" id="nav-support-chat-link"><i class="icon-chat"></i>Support Chat <span id="nav-support-badge" style="display:none;background:#e55;color:#fff;border-radius:10px;padding:1px 7px;font-size:.75em;margin-left:4px;vertical-align:middle;"></span></a>
                     </div>
                 [% END %]
             </div>
@@ -289,7 +297,7 @@
                 <div class="submenu-section">
                     <span class="submenu-section-title">System Configuration</span>
                     <a href="/ApiCredentials"><i class="icon-key"></i>API Credentials</a>
-                    <a href="/cloudflareapi"><i class="icon-cloud"></i>Cloudflare DNS</a>
+                    <a href="/admin/dns"><i class="icon-cloud"></i>Cloudflare DNS</a>
                     <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
                     <a href="/admin/compare_schema"><i class="icon-schema"></i>Database Schema Compare</a>
                     <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
@@ -382,8 +390,18 @@
                 <!-- Dynamic Links -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">Admin Links</span>
-                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]">[% link.view_name %]</a>
+                    <!-- Dynamic Page-based links for Admin menu from new page system -->
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'admin' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                        <a href="/page/[% link.page_code %]" name="Contact" target="_self" title="[% link.title | html %]">[% link.title | html %]</a>
+                    [% END %]
+                    
+                    <!-- Legacy Page-based Admin Links -->
+                    [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'admin' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                        [%# Check if page is already in the new page system to avoid duplicates %]
+                        [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
+                        [% IF is_migrated == 0 %]
+                            <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% legacy_link.page_code %]" name="Contact" target="[% legacy_link.target %]" title="[% legacy_link.view_name %]">[% legacy_link.view_name %]</a>
+                        [% END %]
                     [% END %]
                 </div>
                 
@@ -439,4 +457,22 @@
             </div>
         </div>
     </div>
+<script>
+(function() {
+    function _updateSupportBadge() {
+        var badge = document.getElementById('nav-support-badge');
+        if (!badge) return;
+        fetch('/chat/pending_count', { credentials: 'include' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var n = d && d.count ? parseInt(d.count, 10) : 0;
+            if (n > 0) { badge.textContent = n; badge.style.display = ''; }
+            else { badge.style.display = 'none'; }
+        })
+        .catch(function() {});
+    }
+    _updateSupportBadge();
+    setInterval(_updateSupportBadge, 30000);
+})();
+</script>
 </li>

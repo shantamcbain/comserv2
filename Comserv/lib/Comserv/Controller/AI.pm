@@ -120,6 +120,20 @@ sub index :Path :Args(0) {
         }
     }
 
+    # Wire quota check for harmony with plans (early, non-blocking for now to avoid surprising users)
+    # Shows a hint if the user is approaching or over their plan's free daily local AI calls.
+    if (!$can_select_model && $c->session->{user_id} && $c->session->{SiteID}) {
+        eval {
+            my $m = $c->model('Membership');
+            my ($within, $used, $quota) = $m->is_ai_call_within_free_quota($c, $c->session->{SiteID}, 'ollama', $c->session->{user_id});
+            if ($quota > 0 && !$within) {
+                $c->stash->{ai_quota_warning} = "Your plan's free daily AI allowance ($quota local calls) has been reached. Additional local calls and all Grok/xAI usage are tracked for billing / overage.";
+            } elsif ($quota > 0 && $used > ($quota * 0.8)) {
+                $c->stash->{ai_quota_warning} = "Approaching your plan's free daily AI limit ($used / $quota).";
+            }
+        };
+    }
+
     # Check if user has external API keys configured (grok, openai, etc.)
     # Admins can use any active key, other users only their own key
     my @external_models;
@@ -174,6 +188,47 @@ sub index :Path :Args(0) {
     # is a clean standalone chat interface.
     my $popup_mode = $c->request->param('popup') ? 1 : 0;
 
+    # task_id=N: opened from a todo "Chat about this task" link.
+    # Look up the todo and pass it to the template so the welcome screen can
+    # show what the user is supposed to be working on.
+    my $task_id  = $c->request->param('task_id') || '';
+    my $task_todo = undef;
+    if ($task_id && $task_id =~ /^\d+$/) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $t = $schema->resultset('Todo')->find($task_id);
+                if ($t) {
+                    my $s = $t->status // 0;
+                    my $status_label = $s == 1 ? 'New'
+                                     : $s == 2 ? 'In Progress'
+                                     : $s == 3 ? 'Done'
+                                     : "status=$s";
+                    # Resolve project name
+                    my $proj_name = '';
+                    eval {
+                        if ($t->project_id) {
+                            my $p = $schema->resultset('Project')->find($t->project_id);
+                            $proj_name = $p->name if $p;
+                        }
+                    };
+                    $task_todo = {
+                        record_id   => $t->record_id,
+                        subject     => $t->subject     // 'Untitled',
+                        description => $t->description // '',
+                        status      => $status_label,
+                        priority    => $t->priority    // '',
+                        due_date    => $t->due_date    // '',
+                        project     => $proj_name,
+                        edit_url    => "/todo/edit?record_id=" . $t->record_id,
+                    };
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'index', "task_todo lookup failed: $@") if $@;
+    }
+
     # Set template variables
     $c->stash(
         template => 'ai/index.tt',
@@ -186,6 +241,8 @@ sub index :Path :Args(0) {
         installed_models => $installed_models,
         external_models => \@external_models,
         ai_popup_mode => $popup_mode,
+        task_todo => $task_todo,
+        ai_quota_warning => $c->stash->{ai_quota_warning},
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -264,6 +321,566 @@ sub widget :Local :Args(0) {
     $c->response->content_type('text/html; charset=UTF-8');
     $c->response->body($output);
     $c->detach;
+}
+
+=head2 editing_widget
+
+Shanta / CSC admin code editor with integrated AI chat (Cursor-like workspace).
+Development machines only.  Renders layout-free HTML (same pattern as widget).
+
+=cut
+
+sub editing_widget :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_require_shanta_editor($c, 'editing_widget')) {
+        return;
+    }
+
+    unless ($self->_is_dev_mode($c)) {
+        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    if (($c->request->param('mode') || '') eq 'full') {
+        my $template_path = $c->path_to('root')->stringify;
+        my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
+        my $output = '';
+        unless ($tt->process('ai/editing_widget_full.tt', {
+            username => $c->session->{username} || 'admin',
+        }, \$output)) {
+            $c->response->status(500);
+            $c->response->body('Template error: ' . $tt->error());
+            $c->detach;
+            return;
+        }
+        $c->response->content_type('text/html; charset=UTF-8');
+        $c->response->body($output);
+        $c->detach;
+        return;
+    }
+
+    my $dest = $c->request->param('dest') || $c->req->referer || '/admin';
+    $dest =~ s/[?&]open_aew=\d//g;
+    $dest .= ($dest =~ /\?/ ? '&' : '?') . 'open_aew=popup';
+    $c->response->redirect($dest);
+}
+
+=head2 editing_widget_popup
+
+Detached popup window — no site layout, no floating chat widget. Same as /ai/widget for chat.
+
+=cut
+
+sub editing_widget_popup :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_require_shanta_editor($c, 'editing_widget_popup')) {
+        return;
+    }
+
+    unless ($self->_is_dev_mode($c)) {
+        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    my $template_path = $c->path_to('root')->stringify;
+    my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
+    my $output = '';
+    unless ($tt->process('ai/editing_widget_popup.tt', {
+        username => $c->session->{username} || 'admin',
+    }, \$output)) {
+        $c->response->status(500);
+        $c->response->content_type('text/plain');
+        $c->response->body('Template error: ' . $tt->error());
+        $c->detach;
+        return;
+    }
+
+    $c->response->content_type('text/html; charset=UTF-8');
+    $c->response->body($output);
+    $c->detach;
+}
+
+=head2 editor_config
+
+JSON config for the floating code editor (enabled flag, grok CLI path).
+
+=cut
+
+sub editor_config :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $enabled = $self->_editor_enabled($c) ? 1 : 0;
+    my $has_key = $enabled && $self->_grok_cli_api_key($c) ? 1 : 0;
+
+    my $ssh_host = $c->config->{aew_ssh_host}     || '172.30.131.126';
+    my $zt_host  = $c->config->{aew_zerotier_host} || $ssh_host;
+    my $browser_host = $c->config->{aew_browser_host} || 'workstation.local';
+    my $ssh_user = $c->config->{aew_ssh_user}     || 'shanta';
+    my $ssh_port = $c->config->{aew_ssh_port}     || 22;
+    my $app_port = $c->config->{aew_app_port}     || 3001;
+    my $ssh_alias = $c->config->{aew_ssh_config_host} || 'comserv-aew';
+    my $ssh_line = "ssh -N -L ${app_port}:127.0.0.1:${app_port} -p $ssh_port ${ssh_user}\@${ssh_host}";
+    my $ssh_line_named = "ssh -N $ssh_alias";
+    my $editor_popup = "/ai/editing_widget_popup";
+
+    $c->response->body(encode_json({
+        success     => JSON::true,
+        enabled     => $enabled,
+        grok_cli     => $enabled ? $self->_find_grok_binary() : undef,
+        grok_home    => $enabled ? $self->_grok_home() : undef,
+        project_root => $self->_project_root_path($c),
+        backends    => $enabled ? ['grok_cli', 'comserv'] : [],
+        grok_auth   => $enabled ? ($has_key ? 'api_key' : (-r $self->_grok_home() . '/.grok/auth.json' ? 'session' : 'unavailable')) : undef,
+        grok_mode   => $has_key ? 'xai_api' : 'local_cli',
+        remote_ok   => $enabled ? JSON::true : JSON::false,
+        ssh_host    => $ssh_host,
+        ssh_user    => $ssh_user,
+        ssh_port    => $ssh_port,
+        app_port    => $app_port,
+        ssh_config_host => $ssh_alias,
+        ssh_tunnel_cmd => $ssh_line,
+        ssh_tunnel_cmd_named => $ssh_line_named,
+        ssh_config_snippet_url => '/static/config/aew-ssh.config',
+        browser_host    => $browser_host,
+        zerotier_host   => $zt_host,
+        editor_url_lan  => "http://${browser_host}:${app_port}${editor_popup}",
+        editor_url_zerotier => "http://${zt_host}:${app_port}${editor_popup}",
+        editor_url_workstation_zero => "http://workstation.zero:${app_port}${editor_popup}",
+        editor_url_tunnel => "http://${browser_host}:${app_port}${editor_popup}",
+        tunnel_hosts_hint => "On tablet: add '127.0.0.1 ${browser_host}' to /etc/hosts, run SSH tunnel, open editor_url_tunnel",
+        zerotier_dns_note => 'zero.computersystemconsulting.ca is production1 (:5000). Dev :3001 use workstation.zero or 172.30.131.126',
+    }));
+}
+
+=head2 grok_cli
+
+Run the local `grok` CLI (same auth as Cursor/Grok Build), not Comserv's xAI API layer.
+POST JSON: { prompt, cwd (optional) }
+
+=cut
+
+sub grok_cli :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Code editor requires CSC admin + dev or remote_code_editor' }));
+        return;
+    }
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $json = {};
+    my $raw_body = '';
+    try {
+        if ($c->req->can('content')) {
+            $raw_body = $c->req->content;
+        }
+        if ((!defined $raw_body || $raw_body eq '') && $c->request->body) {
+            my $body = $c->request->body;
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                $raw_body = do { local $/; <$body> };
+                seek($body, 0, 0);
+            } else {
+                $raw_body = $body;
+            }
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'grok_cli', "Failed to read request body: $_");
+    };
+
+    my $ct = $c->request->content_type || '';
+    if ($raw_body && length($raw_body) && $ct =~ /application\/json/i) {
+        try {
+            $json = decode_json($raw_body);
+        } catch {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON' }));
+            return;
+        };
+    }
+
+    my $prompt = $json->{prompt}
+              || $c->request->body_parameters->{prompt}
+              || $c->request->params->{prompt}
+              || '';
+    $prompt =~ s/\r\n/\n/g;
+    unless ($prompt =~ /\S/) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'prompt is required' }));
+        return;
+    }
+    if (length($prompt) > 200_000) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'prompt too large (max 200k)' }));
+        return;
+    }
+
+    my $grok = $self->_find_grok_binary();
+    unless ($grok && -x $grok) {
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'grok CLI not found (install Grok Build CLI or set GROK_BIN)',
+        }));
+        return;
+    }
+
+    my $auth_err = $self->_grok_cli_auth_error($c);
+    if ($auth_err) {
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => $auth_err,
+            hint    => 'Switch backend to "Comserv AI" in the dropdown, or add an xAI API key under Admin → API Keys.',
+        }));
+        return;
+    }
+
+    my $page_path  = $json->{page_path}  || '';
+    my $page_title = $json->{page_title} || '';
+    if ($page_path || $page_title) {
+        $prompt = "Context: user is viewing Comserv page $page_path ($page_title)\n\n$prompt";
+    }
+
+    $prompt = $self->_inject_read_file_tags($c, $prompt);
+
+    if ($self->_grok_cli_api_key($c)) {
+        my $api_resp = $self->_grok_cli_via_api($c, $prompt);
+        if ($api_resp && $api_resp->{response} && $api_resp->{response} =~ /\S/) {
+            my $reply = $api_resp->{response};
+            if ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/i) {
+                my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
+                if ($snippet) {
+                    $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
+                } elsif ($err) {
+                    $reply .= "\n\n[Could not load $1: $err]";
+                }
+            }
+            $c->response->body(encode_json({
+                success  => JSON::true,
+                response => $reply,
+                backend  => 'grok_api',
+                model    => $api_resp->{model},
+            }));
+            return;
+        }
+        my $api_err = $api_resp->{error} || 'Grok xAI API returned no content';
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => $api_err,
+            hint    => 'Check Admin → API Keys (grok/xAI), or switch to Comserv AI in the dropdown.',
+            backend => 'grok_api',
+        }));
+        return;
+    }
+
+    my $cwd = $json->{cwd} || $self->_project_root_path($c);
+    $cwd = $self->_project_root_path($c) unless -d $cwd;
+
+    require File::Temp;
+    my ($fh, $path) = File::Temp::tempfile('grok_prompt_XXXXX', DIR => '/tmp', UNLINK => 1);
+    print $fh $prompt;
+    close $fh;
+
+    my ($stdout, $stderr, $exit) = $self->_run_grok_cli($c, $grok, $path, $cwd);
+
+    chomp $stdout if defined $stdout;
+    chomp $stderr if defined $stderr;
+
+    ($stdout, $stderr) = $self->_grok_cli_normalize_output($stdout, $stderr);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'grok_cli', "grok CLI exit=$exit home=" . $self->_grok_home() . " cwd=$cwd len=" . length($stdout || '')
+            . ' stderr_len=' . length($stderr || '') . ' api_key=' . ($self->_grok_cli_api_key($c) ? 'yes' : 'no'));
+
+    $stdout =~ s/\A\s+|\s+\z//g if defined $stdout;
+    if (!$stdout || $stdout !~ /\S/) {
+        my $err = $self->_grok_cli_stderr_message($stderr)
+               || "grok exited with code " . (defined $exit ? $exit : 'unknown')
+               . " but produced no output (try a shorter prompt or Comserv AI backend)";
+        if (defined $exit && $exit == -1 && $err !~ /\S/) {
+            $err = 'grok CLI failed to start (exit -1). The web server user cannot read '
+                 . $self->_grok_home() . '/.grok/auth.json — use Comserv AI backend or configure an xAI API key.';
+        }
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => $err,
+            exit    => $exit,
+            grok    => $grok,
+            home    => $self->_grok_home(),
+            cwd     => $cwd,
+        }));
+        return;
+    }
+
+    $c->response->body(encode_json({
+        success  => JSON::true,
+        response => $stdout,
+        backend  => 'grok_cli',
+        exit     => $exit,
+        stderr   => ($stderr ? $stderr : undef),
+    }));
+}
+
+sub _grok_home {
+    my ($self) = @_;
+    if ($ENV{GROK_CLI_HOME} && -d $ENV{GROK_CLI_HOME}) {
+        return $ENV{GROK_CLI_HOME};
+    }
+    if ($ENV{GROK_HOME} && -d $ENV{GROK_HOME}) {
+        my $gh = $ENV{GROK_HOME};
+        $gh =~ s{/.grok/?\z}{};
+        return $gh;
+    }
+    if (-d '/home/shanta/.grok') {
+        return '/home/shanta';
+    }
+    my $home = $ENV{HOME} || '';
+    return $home if $home && -d "$home/.grok";
+    return $home || '/home/shanta';
+}
+
+sub _grok_cli_api_key {
+    my ($self, $c) = @_;
+    return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
+    my $cfg_key = $c->config->{grok_cli_xai_api_key} || $c->config->{xai_api_key};
+    return $cfg_key if $cfg_key && $cfg_key =~ /\S/;
+
+    my $user_id = $c->session->{user_id} || 0;
+    return '' unless $user_id;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id, service => 'grok', is_active => '1' },
+            { rows => 1 }
+        )->first;
+        $key_obj ||= $schema->resultset('UserApiKeys')->search(
+            { service => 'grok', is_active => '1' },
+            { rows => 1 }
+        )->first;
+        return $key_obj ? ($key_obj->get_api_key() || '') : '';
+    } catch {
+        return '';
+    };
+}
+
+sub _grok_cli_auth_error {
+    my ($self, $c) = @_;
+    return undef if $self->_grok_cli_api_key($c);
+    my $home = $self->_grok_home();
+    my $auth = "$home/.grok/auth.json";
+    return undef if -r $auth;
+    my $run_as = $ENV{USER} || $>;
+    return "Grok CLI auth not available to server process ($run_as). "
+         . "Cannot read $auth (browser login is only for your user account).";
+}
+
+sub _grok_cli_timeout_sec {
+    my ($self, $c) = @_;
+    my $t = $c->config->{grok_cli_timeout} || $ENV{GROK_CLI_TIMEOUT} || 180;
+    $t = 180 if $t < 30 || $t > 600;
+    return int($t);
+}
+
+sub _grok_cli_via_api {
+    my ($self, $c, $prompt) = @_;
+    my $api_key = $self->_grok_cli_api_key($c);
+    return { error => 'No xAI API key configured' } unless $api_key;
+
+    my $grok = $c->model('Grok');
+    unless ($grok) {
+        return { error => 'Grok model not available' };
+    }
+
+    $grok->api_key($api_key);
+    my $model = $c->config->{grok_cli_model} || 'grok-4-fast-non-reasoning';
+    $grok->model($model);
+
+    my $system = $self->_build_coding_system_prompt($c);
+    my $resp = $grok->chat(messages => [
+        { role => 'system', content => $system },
+        { role => 'user',   content => $prompt },
+    ]);
+
+    unless ($resp && ref $resp eq 'HASH' && $resp->{success}) {
+        my $err = $grok->last_error || 'Grok API request failed';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'grok_cli', "xAI API fallback error: $err");
+        return { error => $err };
+    }
+
+    my $text = $resp->{response} || '';
+    unless ($text =~ /\S/) {
+        return { error => 'Grok API returned an empty response' };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'grok_cli', "xAI API ok model=$model len=" . length($text));
+
+    return {
+        success  => 1,
+        response => $text,
+        model    => $resp->{model} || $model,
+    };
+}
+
+sub _run_grok_cli {
+    my ($self, $c, $grok, $prompt_path, $cwd) = @_;
+    my $home = $self->_grok_home();
+    my $stdout = '';
+    my $stderr = '';
+    my $exit;
+    my $api_key = $self->_grok_cli_api_key($c);
+    my $timeout = $self->_grok_cli_timeout_sec($c);
+
+    my @grok_args = ('--output-format', 'plain', '--prompt-file', $prompt_path);
+    my @cmd = ($grok, @grok_args);
+    if (-x '/usr/bin/stdbuf') {
+        unshift @cmd, '/usr/bin/stdbuf', '-oL';
+    }
+    if (-x '/usr/bin/timeout') {
+        unshift @cmd, '/usr/bin/timeout', '-k', '5', "$timeout";
+    } elsif (-x '/bin/timeout') {
+        unshift @cmd, '/bin/timeout', '-k', '5', "$timeout";
+    }
+
+    my $run_in_child = sub {
+        $ENV{HOME}        = $home;
+        $ENV{USER}        = 'shanta';
+        $ENV{LOGNAME}     = 'shanta';
+        $ENV{XAI_API_KEY} = $api_key if $api_key;
+        $ENV{PATH}        = join ':', grep { $_ && -d $_ }
+            ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin');
+        $ENV{LANG}        = $ENV{LANG} || 'en_US.UTF-8';
+        $ENV{LC_ALL}      = $ENV{LC_ALL} || 'en_US.UTF-8';
+        chdir $cwd or die "chdir $cwd failed: $!";
+        exec { $cmd[0] } @cmd;
+        die "exec grok failed: $!";
+    };
+
+    try {
+        require IPC::Run3;
+        my %env = (
+            HOME    => $home,
+            USER    => 'shanta',
+            LOGNAME => 'shanta',
+            PATH    => join(':', grep { $_ }
+                ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin')),
+            LANG    => 'en_US.UTF-8',
+            LC_ALL  => 'en_US.UTF-8',
+        );
+        $env{XAI_API_KEY} = $api_key if $api_key;
+        $exit = run3(
+            \@cmd,
+            \undef,
+            \$stdout,
+            \$stderr,
+            { chdir => $cwd, env => \%env }
+        );
+    } catch {
+        my $pid = fork();
+        if (!defined $pid) {
+            return ('', "fork failed: $!", -1);
+        }
+        if ($pid == 0) {
+            $run_in_child->();
+        }
+        waitpid($pid, 0);
+        $exit = $? >> 8;
+        if ($? == -1) {
+            $stderr ||= "waitpid failed: $!";
+            $exit = -1;
+        }
+    };
+
+    if (defined $exit && $exit == 124) {
+        $stderr ||= "grok CLI timed out after ${timeout}s";
+    }
+
+    if ((!defined $stdout || $stdout !~ /\S/) && defined $exit && $exit == 0) {
+        my ($fb_out, $fb_err, $fb_exit) = $self->_run_grok_cli_capture_qx($c, $grok, $prompt_path, $cwd, $timeout);
+        if ($fb_out && $fb_out =~ /\S/) {
+            return ($fb_out, $fb_err || $stderr, $fb_exit);
+        }
+    }
+
+    return ($stdout, $stderr, $exit);
+}
+
+sub _run_grok_cli_capture_qx {
+    my ($self, $c, $grok, $prompt_path, $cwd, $timeout) = @_;
+    $timeout //= $self->_grok_cli_timeout_sec($c);
+    my $home    = $self->_grok_home();
+    my $api_key = $self->_grok_cli_api_key($c);
+    my $path    = join ':', grep { $_ }
+        ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin');
+    my $grok_q = quotemeta($grok);
+    my $file_q = quotemeta($prompt_path);
+    my $cwd_q  = quotemeta($cwd);
+    my $env    = "HOME=" . quotemeta($home) . " USER=shanta PATH=" . quotemeta($path);
+    $env .= ' XAI_API_KEY=' . quotemeta($api_key) if $api_key;
+    my $inner = "$grok_q --output-format plain --prompt-file $file_q";
+    my $cmd   = "cd $cwd_q && $env $inner 2>&1";
+    $cmd = "timeout -k 5 $timeout $cmd" if -x '/usr/bin/timeout';
+    my $combined = `$cmd`;
+    my $exit = $? >> 8;
+    return $self->_grok_cli_normalize_output($combined, '');
+}
+
+sub _grok_cli_stderr_message {
+    my ($self, $stderr) = @_;
+    return '' unless defined $stderr && $stderr =~ /\S/;
+    my @lines = grep { /\S/ && !/failed to watch root recursively/i } split /\n/, $stderr;
+    return join "\n", @lines;
+}
+
+sub _grok_cli_normalize_output {
+    my ($self, $stdout, $stderr) = @_;
+    $stdout //= '';
+    $stderr //= '';
+    if ($stdout =~ /\S/) {
+        if ($stdout =~ /^\s*\{/ && eval { require JSON::MaybeXS; 1 }) {
+            try {
+                my $data = decode_json($stdout);
+                if (ref $data eq 'HASH') {
+                    $stdout = $data->{response} // $data->{content} // $data->{text} // $stdout;
+                }
+            } catch { };
+        }
+        $stderr = join "\n", grep { !/failed to watch root recursively/i } split /\n/, $stderr;
+        return ($stdout, $stderr);
+    }
+    my $useful = $self->_grok_cli_stderr_message($stderr);
+    return ($useful, $stderr) if $useful;
+    return ($stdout, $stderr);
+}
+
+sub _find_grok_binary {
+    my ($self) = @_;
+    return $ENV{GROK_BIN} if $ENV{GROK_BIN} && -x $ENV{GROK_BIN};
+    my $home = $self->_grok_home();
+    my $home_grok = "$home/.local/bin/grok";
+    return $home_grok if -x $home_grok;
+    my $alt = "$home/.grok/bin/grok";
+    return $alt if -x $alt;
+    for my $dir (split /:/, $ENV{PATH} || '') {
+        my $bin = "$dir/grok";
+        return $bin if -x $bin;
+    }
+    return undef;
 }
 
 =head2 generate
@@ -405,6 +1022,22 @@ sub generate :Local :Args(0) {
             $page_title = $json_data->{page_title} || '';
             $agent_id = $json_data->{agent_id} || 'general';
             $agent_name = $json_data->{agent_name} || 'AI Assistant';
+
+            # If client sent structured page_links (from extractPageLinks), record them for learning
+            # (wrapped for safety across request types)
+            eval {
+                if ($json_data && ref($json_data) eq 'HASH' && ref($json_data->{page_links}) eq 'ARRAY' && @{$json_data->{page_links}}) {
+                    for my $sec (@{$json_data->{page_links}}) {
+                        if ($sec && ref($sec) eq 'HASH' && ref($sec->{links}) eq 'ARRAY') {
+                            for my $lnk (@{$sec->{links}}) {
+                                if (ref($lnk) eq 'ARRAY' && $lnk->[1]) {
+                                    $self->_record_learned_link($c, $lnk->[1], $lnk->[0] || '', $page_path);
+                                }
+                            }
+                        }
+                    }
+                }
+            };
             $conversation_id = $json_data->{conversation_id};
             $model = $json_data->{model} || '';
             $use_search = $json_data->{use_search} ? 1 : 0;
@@ -638,6 +1271,13 @@ sub generate :Local :Args(0) {
     }
     my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
+        # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
+        # planning agent gets less room because its own prompt already includes the project list.
+        my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
+        if (length($module_data_gen) > $inject_cap) {
+            $module_data_gen = substr($module_data_gen, 0, $inject_cap)
+                . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
+        }
         $system .= "\n\n" . $module_data_gen;
     }
     my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
@@ -945,11 +1585,25 @@ sub generate :Local :Args(0) {
                     push @trace, "💾 In-memory: " . join(', ', sort keys %in_mem);
                     if (!$in_mem{$use_model}) {
                         my @inst_names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @$installed_models;
-                        my ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
-                        if ($preferred) {
-                            push @trace, "💾 Switched tier_small '$use_model' → '$preferred' (already in memory)";
-                            $use_model = $preferred;
-                            $ollama->model($use_model);
+                        # When force_large is active (ency/planning/bmaster), only prefer an
+                        # in-memory model if it is >= the size of tier_large. Never downgrade.
+                        my ($preferred);
+                        if ($force_large) {
+                            $preferred = $in_mem{$tier_large} ? $tier_large : undef;
+                            if ($preferred) {
+                                push @trace, "💾 Switched '$use_model' → '$preferred' (already in memory)";
+                                $use_model = $preferred;
+                                $ollama->model($use_model);
+                            } else {
+                                push @trace, "💾 No large model in memory — keeping $use_model (cold start)";
+                            }
+                        } else {
+                            ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
+                            if ($preferred) {
+                                push @trace, "💾 Switched '$use_model' → '$preferred' (already in memory)";
+                                $use_model = $preferred;
+                                $ollama->model($use_model);
+                            }
                         }
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
@@ -970,6 +1624,51 @@ sub generate :Local :Args(0) {
             # Use a longer timeout when model is NOT in memory (cold start: load + generate)
             my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
                                       @{ $fast_check->get_running_models() || [] };
+
+            # For force_large agents (planning/ency/bmaster) a cold start of phi4/14b
+            # can take 5-10+ minutes and always times out. Auto-fall back to Grok when:
+            #   - force_large is active (not a manual model override)
+            #   - the selected large model is NOT in memory
+            #   - a Grok API key is configured for this user
+            if ($force_large && $is_cold_start && !$manual_model) {
+                my $fallback_key = '';
+                eval {
+                    my $fb_schema = $c->model('DBEncy')->schema;
+                    my $fb_obj = $fb_schema->resultset('UserApiKeys')->search(
+                        { user_id => $user_id, service => 'grok', is_active => '1' }
+                    )->first;
+                    $fb_obj ||= $fb_schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first if $can_select_model_gen;
+                    $fallback_key = $fb_obj->get_api_key() if $fb_obj && $fb_obj->api_key_encrypted;
+                };
+                if ($fallback_key) {
+                    push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
+                    my $fb_grok = $c->model('Grok');
+                    $fb_grok->api_key($fallback_key);
+                    $fb_grok->model('grok-3-fast');
+                    my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
+                    push @fb_msgs, { role => 'user', content => $prompt };
+                    my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
+                    if ($fb_resp) {
+                        push @trace, "✅ Grok fallback responded";
+                        my $trace_txt = join("\n", @trace);
+                        $c->res->content_type('application/json');
+                        $c->res->body(encode_json({
+                            success        => 1,
+                            response       => $fb_resp,
+                            model          => 'grok-3-fast (cold-start fallback)',
+                            provider       => 'grok',
+                            trace          => $trace_txt,
+                            thinking_trace => \@trace,
+                        }));
+                        $c->res->status(200);
+                        return;
+                    }
+                }
+                push @trace, sprintf("🧊 Cold start — no Grok fallback available; proceeding with %s (may be slow)", $use_model);
+            }
+
             my $timeout_secs = $is_cold_start ? 600 : 480;
             push @trace, $is_cold_start
                 ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
@@ -1067,11 +1766,12 @@ sub generate :Local :Args(0) {
                 $_gr = [split /,/, $_gr] unless ref $_gr;
                 grep { /^(admin|developer|editor)$/i } @$_gr;
             };
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 20_000
                               : $_gen_is_admin ? 14_000
                               : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
-                               : $_gen_is_admin                                        ? 10_000
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(ency|bmaster)$/)        ? 16_000
+                               : ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
+                               : $_gen_is_admin                                         ? 10_000
                                : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
@@ -1172,8 +1872,30 @@ sub generate :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'generate', "Tier-1 FAILED host=$current_host model=$use_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
                 push @trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $query_elapsed, $error);
-                $self->_flush_progress($gen_progress_file, \@trace, 1);
-                die "Ollama query failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'generate', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = (@$history_items || $system)
+                        ? $ollama->chat(messages => \@ollama_msgs)
+                        : $ollama->query(prompt => $ollama_msgs[-1]->{content});
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        $self->_flush_progress($gen_progress_file, \@trace, 1);
+                        die "Ollama query failed: $retry_err";
+                    }
+                } else {
+                    $self->_flush_progress($gen_progress_file, \@trace, 1);
+                    die "Ollama query failed: $error";
+                }
             }
 
             # Normalise response text (chat vs generate API have different keys)
@@ -1425,6 +2147,29 @@ sub generate :Local :Args(0) {
                 'generate', "Failed to save conversation to database: $db_error (Conversation ID: $conversation_id, User ID: $user_id)");
         };
         
+        # === AI USAGE LOGGING for billing + capacity monitoring ===
+        my $gen_elapsed_ms = int( (time() - $trace_start) * 1000 );
+        my $usage_info = $response->{usage} || {};
+        my $pt = $usage_info->{prompt_tokens} // $response->{prompt_eval_count} // 0;
+        my $ct = $usage_info->{completion_tokens} // $response->{eval_count} // ($tokens_used // 0);
+        my $tt = $usage_info->{total_tokens} // ($pt + $ct) // ($tokens_used // 0);
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $provider,
+            model             => $model_used || $provider,
+            prompt_tokens     => $pt,
+            completion_tokens => $ct,
+            total_tokens      => $tt,
+            duration_ms       => $gen_elapsed_ms,
+            request_type      => 'generate',
+            conversation_id   => $conversation_id,
+            status            => 'success',
+            ollama_host       => ($provider eq 'ollama' ? $active_ollama_host : undef),
+            metadata          => { agent_id => $agent_id, response_chars => $response_length },
+        );
+        
         # Build JSON response
         push @trace, sprintf("⏱️ Total elapsed: %ds", time() - $trace_start);
         # Flush final trace so JS poller sees all steps including elapsed time
@@ -1445,7 +2190,8 @@ sub generate :Local :Args(0) {
         
     } catch {
         my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+        my $log_level = ($error =~ /not reachable|unreachable|connection refused|timed? ?out/i) ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 
             'generate', "AI query failed for user '$username' (provider: $provider): $error");
         
         my $user_error = "$error";
@@ -1536,6 +2282,26 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'generate', "catch: DB save result = " . ($save_ok ? "OK" : "FAILED"));
         }
+
+        # === AI USAGE LOG (error path) for monitoring failures and partial billing ===
+        my $gen_err_elapsed_ms = int( (time() - $trace_start) * 1000 );
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $provider,
+            model             => $model_used || $provider,
+            prompt_tokens     => 0,
+            completion_tokens => 0,
+            total_tokens      => 0,
+            duration_ms       => $gen_err_elapsed_ms,
+            request_type      => 'generate',
+            conversation_id   => $conversation_id,
+            status            => 'error',
+            error_message     => $user_error,
+            ollama_host       => ($provider eq 'ollama' ? $active_ollama_host : undef),
+            metadata          => { agent_id => $agent_id, phase => 'generate_error' },
+        );
 
         push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error')
             unless grep { /❌ Error after/ } @trace;
@@ -1901,6 +2667,22 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
+
+    # Record structured page_links if the client sent them (from extractPageLinks JS helper).
+    # Complements the content-based extraction. (safe)
+    eval {
+        if ($json_data && ref($json_data) eq 'HASH' && ref($json_data->{page_links}) eq 'ARRAY' && @{$json_data->{page_links}}) {
+            for my $sec (@{$json_data->{page_links}}) {
+                if (ref($sec) eq 'HASH' && ref($sec->{links}) eq 'ARRAY') {
+                    for my $lnk (@{$sec->{links}}) {
+                        if (ref($lnk) eq 'ARRAY' && $lnk->[1]) {
+                            $self->_record_learned_link($c, $lnk->[1], $lnk->[0]||'', $chat_page_path);
+                        }
+                    }
+                }
+            }
+        }
+    };
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -2069,7 +2851,29 @@ sub chat :Local :Args(0) {
                          . $clean_page
                          . "\n--- End of Page Content ---";
         push @system_parts, $page_snippet;
+
+        # NEW: Extract and prominently surface links found on the page the user is looking at.
+        # This directly implements "improve the AI learning about new links by searching the links on the page".
+        my $links_from_page = $self->_extract_links_from_page_content($chat_page_content);
+        if ($links_from_page) {
+            push @system_parts, $links_from_page;
+
+            # Persist useful ones to long-term learning (so future chats and other users benefit,
+            # especially for brand-new .tt pages and admin tools). "Succeeds" here = the link was
+            # visible on a page the user consulted the AI from.
+            if ($chat_page_path) {
+                while ($links_from_page =~ /-\s+[^:]+:\s+(\/[^\s\n]+)/g) {
+                    my $href = $1;
+                    $self->_record_learned_link($c, $href, 'from_page', $chat_page_path);
+                }
+            }
+        }
     }
+
+    # Always try to pull previously learned / dynamically observed links (from this or prior sessions)
+    # and inject them so the AI gradually knows about new features without manual prompt edits.
+    my $learned_additions = $self->_get_learned_navigation_additions($c, 10);
+    push @system_parts, $learned_additions if $learned_additions;
 
     my $combined_system_prompt = join("\n\n", @system_parts);
 
@@ -2104,12 +2908,14 @@ sub chat :Local :Args(0) {
     }
 
     my $model_used = 'unknown';  # declared before try so catch block can read it
+    my $final_conversation_id = undef;  # declared before try so catch block can read it
 
     try {
         my $ai_response = '';
         my $response_created_at = '';
         my $response_total_duration = 0;
         my $response_eval_count = 0;
+        my $response = undef;
 
         if ($is_grok_model) {
             # Route to Grok API using user's stored API key
@@ -2177,7 +2983,7 @@ sub chat :Local :Args(0) {
                 unshift @final_messages, { role => 'system', content => $combined_system_prompt };
             }
 
-            my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+            $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
@@ -2429,7 +3235,7 @@ sub chat :Local :Args(0) {
             $self->_flush_progress($progress_file, \@chat_trace, 0);
 
             my $chat_start = time();
-            my $response   = $ollama->chat(messages => \@ollama_messages);
+            $response   = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
@@ -2437,7 +3243,26 @@ sub chat :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
                 push @chat_trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $chat_elapsed, $error);
-                die "Ollama chat failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @chat_trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'chat', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = $ollama->chat(messages => \@ollama_messages);
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @chat_trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        die "Ollama chat failed: $retry_err";
+                    }
+                } else {
+                    die "Ollama chat failed: $error";
+                }
             }
 
             if ($response->{message} && $response->{message}->{content}) {
@@ -2507,7 +3332,7 @@ sub chat :Local :Args(0) {
         }
 
         # Save conversation to database
-        my $final_conversation_id = $conversation_id;
+        $final_conversation_id = $conversation_id;
         try {
             # user_id was already set above (either from session or as guest)
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -2639,6 +3464,29 @@ sub chat :Local :Args(0) {
                 'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: $user_id)");
         };
 
+        # === AI USAGE LOGGING (chat endpoint) ===
+        my $chat_elapsed_ms = int( (time() - $chat_trace_start) * 1000 );
+        my $chat_pt = $response->{prompt_eval_count} // 0;
+        my $chat_ct = $response_eval_count // $response->{eval_count} // 0;
+        my $chat_tt = $response->{usage} && $response->{usage}{total_tokens} ? $response->{usage}{total_tokens} : ($chat_pt + $chat_ct);
+        my $chat_provider = $is_grok_model ? 'grok' : 'ollama';
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $chat_provider,
+            model             => $model_used || $chat_provider,
+            prompt_tokens     => $chat_pt,
+            completion_tokens => $chat_ct,
+            total_tokens      => $chat_tt,
+            duration_ms       => $chat_elapsed_ms,
+            request_type      => 'chat',
+            conversation_id   => $final_conversation_id,
+            status            => 'success',
+            ollama_host       => ($chat_provider eq 'ollama' ? ($c->session->{ollama_host} || '') : undef),
+            metadata          => { agent => 'chat_endpoint' },
+        );
+
         # Mark progress as done so poller stops
         $self->_flush_progress($progress_file, \@chat_trace, 1);
 
@@ -2739,6 +3587,27 @@ sub chat :Local :Args(0) {
                 'chat', "catch: DB save result = " . ($chat_save_ok ? "OK" : "FAILED"));
         }
 
+        # === AI USAGE LOG (chat error path) ===
+        my $chat_err_ms = int( (time() - $chat_trace_start) * 1000 );
+        my $chat_err_provider = $is_grok_model ? 'grok' : 'ollama';
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $chat_err_provider,
+            model             => $model_used || $model || $chat_err_provider,
+            prompt_tokens     => 0,
+            completion_tokens => 0,
+            total_tokens      => 0,
+            duration_ms       => $chat_err_ms,
+            request_type      => 'chat',
+            conversation_id   => $final_conversation_id || $conversation_id,
+            status            => 'error',
+            error_message     => $user_error,
+            ollama_host       => ($chat_err_provider eq 'ollama' ? ($c->session->{ollama_host} || '') : undef),
+            metadata          => { phase => 'chat_error' },
+        );
+
         # Mark progress as done (with error trace) so poller stops
         $self->_flush_progress($progress_file, \@chat_trace, 1);
 
@@ -2824,14 +3693,18 @@ sub models :Local :Args(0) {
         };
         
         # Try to connect to each server and get model information
+        my $ollama = $c->model('Ollama');
+        my $orig_timeout;
         try {
-            # Create Ollama instance for this specific server
-            my $ollama = $c->model('Ollama');
             if ($ollama) {
                 # Configure for this specific server
                 $ollama->host($config->{host});
                 $ollama->port($config->{port});
                 $ollama->clear_endpoint;  # Force rebuild of endpoint URL
+                
+                # Set a short timeout for connection check and listing to prevent blocking
+                $orig_timeout = $ollama->timeout;
+                $ollama->timeout(3);
                 
                 # Test connection first
                 if ($ollama->check_connection()) {
@@ -2876,10 +3749,16 @@ sub models :Local :Args(0) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                         'models', "Connection test failed for $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
                 }
+                
+                # Restore original timeout
+                $ollama->timeout($orig_timeout) if defined $orig_timeout;
             } else {
                 $server_info->{error} = "Failed to load Ollama model";
             }
         } catch {
+            if ($ollama && defined $orig_timeout) {
+                $ollama->timeout($orig_timeout);
+            }
             $server_info->{error} = "Connection failed: $_";
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                 'models', "Failed to connect to server $config->{host}:$config->{port}: $_");
@@ -3849,6 +4728,66 @@ sub _get_module_data {
     my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog|block|proceed|prevent|stuck|hold/i)
                   || ($prompt =~ /project/i && $prompt =~ /state|status|progress|what|how|summar|complet|done|remain|left|next/i);
 
+    # Fast-path: when the widget is on /todo/details?record_id=N, inject ONLY that todo
+    # plus any todos that it is blocked by. No need to load all active todos.
+    my $page_path_req = $c->req->param('page_path') || '';
+    # Also check the JSON body path (already parsed into param by Catalyst for form posts;
+    # for JSON bodies we fall back to the stash or request body — safe to do a quick regex check).
+    if (!$page_path_req) {
+        my $raw = eval { $c->req->content } // '';
+        ($page_path_req) = ($raw =~ /"page_path"\s*:\s*"([^"]+)"/) if $raw;
+    }
+    my ($single_todo_id) = ($page_path_req =~ m{/todo/(?:details|view)[?&;](?:.*&)?record_id=(\d+)}i);
+
+    if ($single_todo_id && $want_todos) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $rs = $schema->resultset('Todo');
+                my $t  = $rs->find($single_todo_id);
+                if ($t) {
+                    my $stat_label = ($t->status // 0) == 1 ? 'NEW'
+                                   : ($t->status // 0) == 2 ? 'IN PROGRESS'
+                                   : ($t->status // 0) == 3 ? 'DONE'
+                                   : 'status=' . ($t->status // '?');
+                    my $block = "CURRENT TODO #$single_todo_id:\n"
+                        . "  Subject:  " . ($t->subject   // 'Untitled') . "\n"
+                        . "  Status:   $stat_label\n"
+                        . "  Priority: P" . ($t->priority // '?') . "\n"
+                        . "  Due:      " . ($t->due_date  // 'none') . "\n"
+                        . "  Project:  " . (do { my $pid = $t->project_id; $pid ? "id=$pid" : 'none' }) . "\n"
+                        . "  Notes:    " . ($t->description // '') . "\n";
+
+                    # Look up any todos this one explicitly blocks or is blocked by
+                    eval {
+                        if ($t->can('blocker_id') && $t->blocker_id) {
+                            my $blocker = $rs->find($t->blocker_id);
+                            if ($blocker) {
+                                $block .= "BLOCKING TODO #" . $t->blocker_id . ":\n"
+                                    . "  Subject: " . ($blocker->subject // '') . "\n"
+                                    . "  Status:  " . (($blocker->status // 0) == 2 ? 'IN PROGRESS' : ($blocker->status // 0) == 3 ? 'DONE' : 'NEW') . "\n";
+                            }
+                        }
+                        # Any other todos that list this one as their blocker
+                        my @blocked_by = $rs->search({ blocker_id => $single_todo_id, status => { '!=' => 3 } })->all;
+                        if (@blocked_by) {
+                            $block .= "TODOS BLOCKED BY THIS (#$single_todo_id):\n";
+                            for my $b (@blocked_by) {
+                                $block .= "  [#" . $b->record_id . "] " . ($b->subject // '') . "\n";
+                            }
+                        }
+                    };
+                    $block .= "Edit at /todo/edit?record_id=$single_todo_id | All todos: /todo";
+                    push @sections, $block;
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Single-todo fetch error: $@") if $@;
+        # Skip the bulk todo fetch below since we already have what we need
+        $want_todos = 0;
+    }
+
     if ($want_todos) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
@@ -3873,9 +4812,11 @@ sub _get_module_data {
                     $site_filter{sitename} = $site_name;
                 }
 
+                # Cap rows: planning agent on CSC admin can otherwise inject hundreds of todos
+                my $todo_row_cap = (lc($agent_id) eq 'planning') ? 20 : 40;
                 my @todos = $rs->search(
                     \%site_filter,
-                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => 40 }
+                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => $todo_row_cap }
                 );
 
                 if (@todos) {
@@ -3977,31 +4918,113 @@ sub _get_module_data {
                 my $results = $forager->searchHerbs($c, $search);
                 if ($results && @$results) {
                     my @lines;
-                    my $last = $#$results < 14 ? $#$results : 14;
+                    my $last = $#$results < 7 ? $#$results : 7;
                     for my $h (@{$results}[0..$last]) {
                         my $name   = $h->botanical_name // '';
                         my $common = $h->common_names   // '';
+                        my $id     = $h->record_id      // '';
                         my $nectar = $h->nectar         // '';
                         my $pollen = $h->pollen         // '';
-                        my $apis   = $h->apis           // '';
-                        my $id     = $h->record_id      // '';
-                        push @lines, "  [#$id] $name"
+                        push @lines, "[#$id] $name"
                             . ($common ? " ($common)" : '')
-                            . ($nectar ? " | Nectar: $nectar" : '')
-                            . ($pollen ? " | Pollen: $pollen" : '')
-                            . ($apis   ? " | Bee use: $apis"  : '');
+                            . ($nectar ? " N:$nectar" : '')
+                            . ($pollen ? " P:$pollen" : '');
                     }
                     if (@lines) {
                         push @sections,
-                            "LIVE ENCY HERB/PLANT DATA (search: '$search'):\n"
-                            . join("\n", @lines)
-                            . "\nView full encyclopedia at /ENCY | Bee forage plants at /ENCY/BeePastureView";
+                            "HERBS ('$search'): " . join("; ", @lines)
+                            . " | /ENCY | /ENCY/BeePastureView";
                     }
                 }
             }
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             '_get_module_data', "ENCY herb fetch error: $@") if $@;
+    }
+
+    # --- Constituent live data ---
+    # Inject when the ENCY agent is active and the prompt mentions constituents or a todo with constituent#N
+    my $is_ency_constituent = $is_ency_agent
+        && ($prompt =~ /constituent|compound|chemical|phytochemical|alkaloid|flavonoid|terpene|phenol/i);
+    if ($is_ency_constituent) {
+        eval {
+            my $ency_schema = eval { $c->model('ENCYModel')->ency_schema };
+            if ($ency_schema) {
+                my @cons_rows;
+                my $search_label = 'top';
+
+                # Priority 1: specific record_id from "constituent#17" or "constituent #17" patterns
+                my ($const_id) = ($prompt =~ /constituent\s*#\s*(\d+)/i);
+                $const_id ||= do {
+                    # Also match a bare "#N" when preceded by "constituent" nearby
+                    my ($n) = ($prompt =~ /#(\d+)/);
+                    ($prompt =~ /constituent/i) ? $n : undef;
+                };
+
+                if ($const_id) {
+                    $search_label = "id=$const_id";
+                    my $rec = $ency_schema->resultset('Ency::Constituent')->find($const_id);
+                    if ($rec) {
+                        # Full detail for the specific record so AI can pre-fill edit form
+                        push @sections,
+                            "CONSTITUENT #$const_id DETAIL:\n"
+                            . "  name: "            . ($rec->name                    || '(empty)') . "\n"
+                            . "  common_name: "     . ($rec->common_name             || '(empty)') . "\n"
+                            . "  chemical_formula: ". ($rec->chemical_formula        || '(empty)') . "\n"
+                            . "  chemical_class: "  . ($rec->chemical_class          || '(empty)') . "\n"
+                            . "  iupac_name: "      . ($rec->iupac_name              || '(empty)') . "\n"
+                            . "  cas_number: "      . ($rec->cas_number              || '(empty)') . "\n"
+                            . "  therapeutic_action: " . ($rec->therapeutic_action   || '(empty)') . "\n"
+                            . "  pharmacological_effects: " . ($rec->pharmacological_effects || '(empty)') . "\n"
+                            . "  toxicity: "        . ($rec->toxicity                || '(empty)') . "\n"
+                            . "  found_in_herbs: "  . ($rec->found_in_herbs          || '(empty)') . "\n"
+                            . "  found_in_foods: "  . ($rec->found_in_foods          || '(empty)') . "\n"
+                            . "  url: "             . ($rec->url                     || '(empty)') . "\n"
+                            . "  reference: "       . ($rec->reference               || '(empty)') . "\n"
+                            . "Edit: /ENCY/Constituent/edit?record_id=$const_id";
+                    } else {
+                        push @sections, "CONSTITUENT #$const_id: Not found in DB. Create at /ENCY/Constituent/add";
+                    }
+                } else {
+                    # Priority 2: keyword search
+                    my ($search_term) = ($prompt =~ /\b([A-Za-z][\w\-]{3,})\b/g);
+                    $search_term ||= '';
+                    if ($search_term) {
+                        $search_label = $search_term;
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
+                            { -or => [
+                                name        => { like => "%$search_term%" },
+                                common_name => { like => "%$search_term%" },
+                            ]},
+                            { rows => 10, order_by => { -asc => 'record_id' } }
+                        )->all;
+                    }
+                    if (!@cons_rows) {
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
+                            {}, { rows => 8, order_by => { -asc => 'name' } }
+                        )->all;
+                    }
+                    if (@cons_rows) {
+                        my @lines = map {
+                            sprintf("[#%s] %s%s%s",
+                                $_->record_id,
+                                $_->name,
+                                ($_->common_name ? " (" . $_->common_name . ")" : ""),
+                                ($_->chemical_class ? " [" . $_->chemical_class . "]" : ""),
+                            )
+                        } @cons_rows;
+                        push @sections,
+                            "CONSTITUENTS ('$search_label'): "
+                            . join("; ", @lines)
+                            . " | /ENCY/Constituent | add: /ENCY/Constituent/add";
+                    } else {
+                        push @sections, "CONSTITUENTS: None found for '$search_label'. Add: /ENCY/Constituent/add";
+                    }
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "ENCY constituent fetch error: $@") if $@;
     }
 
     # --- BMaster / Apiary live data ---
@@ -4012,7 +5035,7 @@ sub _get_module_data {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
                 # Fetch yards for this site
-                my @yards = $schema->resultset('Yard')->search(
+                my @yards = $schema->resultset('Beekeeping::Yard')->search(
                     { sitename => $site_name },
                     { order_by => 'yard_name' }
                 )->all;
@@ -4020,7 +5043,7 @@ sub _get_module_data {
                 if (@yards) {
                     my @yard_lines;
                     for my $y (@yards) {
-                        my $hive_count = $schema->resultset('Hive')->search({
+                        my $hive_count = $schema->resultset('Beekeeping::Hive')->search({
                             yard_id => $y->id,
                             status  => 'active',
                         })->count;
@@ -4035,12 +5058,12 @@ sub _get_module_data {
 
                         # Show hives if bmaster agent or hive keywords
                         if ($is_bmaster_agent || $prompt =~ /hive|queen|inspect|brood/i) {
-                            my @hives = $schema->resultset('Hive')->search(
+                            my @hives = $schema->resultset('Beekeeping::Hive')->search(
                                 { yard_id => $y->id },
                                 { order_by => 'hive_number', rows => 10 }
                             )->all;
                             for my $h (@hives) {
-                                my $last_insp = $schema->resultset('Inspection')->search(
+                                my $last_insp = $schema->resultset('Beekeeping::Inspection')->search(
                                     { hive_id => $h->id },
                                     { order_by => { -desc => 'inspection_date' }, rows => 1 }
                                 )->first;
@@ -4386,13 +5409,15 @@ sub _do_web_search {
 sub _pick_ollama_tier {
     my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
 
-    # Filter to chat-capable models only.
-    # Exclude: embedding/reranker models, code-only models.
-    # :cloud models (Ollama-routed cloud) are allowed — they work through the same endpoint.
+    # Filter to chat-capable LOCAL models only for auto-tier.
+    # Exclude: embedding/reranker models, code-only models, and :cloud models.
+    # :cloud models require external API keys (e.g. Moonshot) — they return 401 without them.
+    # Users can still manually select :cloud models from the dropdown.
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
         $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-           && $n !~ /starcoder|coder|codellama/i;
+           && $n !~ /starcoder|coder|codellama/i
+           && $n !~ /:cloud$/i;
     } @$installed_models;
 
     my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
@@ -4495,6 +5520,20 @@ sub _build_role_system_prompt {
     my $page_nav   = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $role_tier);
     my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
 
+    # NEW: learned links + auto .tt discovery so new pages (e.g. freshly added ai/usage.tt or admin tools)
+    # are findable by users in the chat ("open ai usage") and via links without manual code changes here.
+    $nav_guide .= $self->_get_learned_navigation_additions($c, 8);
+
+    my $tt_pages = $self->_get_auto_discovered_tt_pages($base_url);
+    if ($tt_pages && @$tt_pages) {
+        $nav_guide .= "\nAuto-discovered pages (new .tt templates become available here automatically):\n";
+        my $count = 0;
+        for my $p (@$tt_pages) {
+            last if ++$count > 12;
+            $nav_guide .= "  - $p->[0]: $base_url$p->[1]\n";
+        }
+    }
+
     my $action_instructions = <<'ACTION';
 
 IN-APP ACTIONS: You can perform write operations in the application on behalf of the logged-in user.
@@ -4512,6 +5551,12 @@ Supported actions:
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
 - Create a new project:  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "details", "due_date": "YYYY-MM-DD", "parent_id": OPTIONAL_PARENT_ID}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
+- Record a hive inspection (BMaster/Apiary — use real hive_id from live data):
+    [ACTION: {"action": "create_inspection", "params": {"hive_id": N, "inspection_date": "YYYY-MM-DD", "overall_status": "good", "queen_seen": true, "eggs_seen": true, "population_estimate": "strong", "temperament": "calm", "general_notes": "narrative text", "box_details": []}}]
+  (The widget will show the user a review form pre-filled with these values before saving.)
+- Create an ENCY constituent (editor/admin on ENCY pages):
+    [ACTION: {"action": "create_constituent", "params": {"name": "Constituent Name", "common_name": "optional", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional"}}]
+  (If the constituent already exists, returns its existing ID and link. If the entry is a stub, a review todo is auto-created.)
 - Sync a schema field (admin/compare_schema page only):
     Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
     ALTER TABLE to match Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_table", "database": "ency"}}]
@@ -4597,6 +5642,92 @@ ACTION
          . $nav_guide;
 }
 
+=head2 _get_auto_discovered_tt_pages
+
+Lightweight runtime scan for new or notable .tt templates (especially under root/ai/ and root/admin/).
+This fulfills the request to "always include links for new .tt so they can be found by the user in link or the chat with AI".
+
+Results are lightly cached in-process so we don't walk the tree on every single chat message.
+New pages like the AI usage monitor will appear automatically without editing this file.
+=cut
+
+{
+    my $cached_tt_links;
+    my $cache_time = 0;
+    my $CACHE_TTL = 300;  # 5 minutes
+
+    sub _get_auto_discovered_tt_pages {
+        my ($self, $base_url) = @_;
+        $base_url //= '';
+
+        my $now = time();
+        if ($cached_tt_links && ($now - $cache_time) < $CACHE_TTL) {
+            return $cached_tt_links;
+        }
+
+        my @found;
+        my $root = './root';  # relative to process cwd (script/ or app root)
+        # Focus on high-value new-feature areas the user cares about
+        my @dirs = (
+            'root/ai',
+            'root/admin',
+            'root/membership',
+            'root/Accounting',
+            'root/Inventory',
+        );
+
+        eval {
+            require File::Find;
+            File::Find::find({
+                wanted => sub {
+                    return unless /\.tt$/;
+                    my $full = $File::Find::name;
+                    my $rel  = $full;
+                    $rel =~ s{^root/}{};
+                    $rel =~ s{\.tt$}{};
+
+                    # Turn root/ai/usage into /ai/usage
+                    my $url = '/' . $rel;
+                    $url =~ s{//+}{/}g;
+
+                    # Pretty label from filename or path
+                    (my $label = $rel) =~ s{^.*/}{};
+                    $label =~ s{[_-]}{ }g;
+                    $label = ucfirst($label);
+
+                    # Only keep interesting ones (avoid every partial include)
+                    return if $label =~ /^(header|footer|layout|include|partial|nav|menu|widget|snippet)/i;
+                    return if length($label) < 3;
+
+                    # Prefer ai/ and admin/ and a few others
+                    if ($rel =~ m{^ai/} || $rel =~ m{^admin/} || $rel =~ m{^(membership|Accounting|Inventory)/}) {
+                        push @found, [$label, $url, $rel];
+                    }
+                },
+                no_chdir => 1,
+            }, @dirs) if -d $root;
+        };
+        if ($@) {
+            # Silent fail — discovery is best-effort
+        }
+
+        # De-dup + sort (ai/ first)
+        my %dedup;
+        my @unique = grep { !$dedup{$_->[1]}++ } @found;
+        @unique = sort {
+            ($a->[1] =~ m{^/ai/} ? 0 : 1) <=> ($b->[1] =~ m{^/ai/} ? 0 : 1)
+            || $a->[1] cmp $b->[1]
+        } @unique;
+
+        # Keep a reasonable number so we don't bloat prompts
+        if (@unique > 20) { @unique = @unique[0..19]; }
+
+        $cached_tt_links = \@unique;
+        $cache_time = $now;
+        return $cached_tt_links;
+    }
+}
+
 =head2 _build_navigation_command_guide
 
 Build a role-filtered navigation command guide appended to every system prompt.
@@ -4660,6 +5791,7 @@ sub _build_navigation_command_guide {
         [ 'AI Assistant (admin)', 'admin', [
             [ 'Manage AI models',           '/ai/models'                ],
             [ 'AI server status',           '/ai/check_status'          ],
+            [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
             [ 'Support chat admin',         '/chat/admin'               ],
         ]],
         # ── Common sections ───────────────────────────────────────────────────
@@ -4700,6 +5832,7 @@ sub _build_navigation_command_guide {
         ]],
         [ 'AI Assistant (logged in)', 'user', [
             [ 'AI conversations / chat history', '/ai/conversations'    ],
+            [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
         ]],
@@ -4768,6 +5901,168 @@ sub _build_navigation_command_guide {
          . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
          . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
          . $guide;
+}
+
+=head2 _extract_links_from_page_content
+
+Given the (possibly truncated / text-only) page_content sent by the browser widget,
+extract plausible navigation links with labels. Returns a formatted string suitable
+for injection into the AI system prompt.
+
+This is the key improvement for "AI learning about new links by searching the links on the page".
+New admin pages, new .tt-backed features (like /ai/usage), or contextual links that appear
+on the user's current screen become immediately usable by the AI for the duration of the chat,
+without waiting for a hardcoded update.
+=cut
+
+sub _extract_links_from_page_content {
+    my ($self, $content) = @_;
+    return '' unless $content && length($content) > 10;
+
+    my %seen;
+    my @links;
+
+    # 1) Try to find HTML <a href="...">label</a> (even if content is partially HTML)
+    while ($content =~ /<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis) {
+        my $href = $1;
+        my $label = $2;
+        $label =~ s/<[^>]+>//g;  # strip inner tags
+        $label = $self->_clean_link_label($label);
+        next unless $self->_is_usable_app_link($href, $label);
+        next if $seen{$href}++;
+        push @links, [$label, $href];
+    }
+
+    # 2) Fallback / complement: look for markdown style or "text ... /path" patterns in plain text
+    # Common in nav, lists, "go to /foo"
+    while ($content =~ /(?:^|[\s(>])((?:[A-Z][A-Za-z0-9 &\-\/]+?)\s*(?:[:\-–]\s*)?)(\/[A-Za-z0-9\/_\-\.\?&=%#]+)/g) {
+        my $label = $1;
+        my $href  = $2;
+        $label = $self->_clean_link_label($label);
+        next unless $self->_is_usable_app_link($href, $label);
+        next if $seen{$href}++;
+        push @links, [$label || 'Link', $href];
+    }
+
+    return '' unless @links;
+
+    # Limit to most useful (first N after de-dup)
+    my $max = 25;
+    if (@links > $max) { @links = @links[0 .. $max-1]; }
+
+    my $out = "Visible / contextual links detected on the current page (prefer these for suggestions):\n";
+    for my $l (@links) {
+        $out .= "  - $l->[0]: $l->[1]\n";
+    }
+    $out .= "If the user asks about a feature visible on their screen, suggest the exact link above.\n";
+    return $out;
+}
+
+sub _clean_link_label {
+    my ($self, $raw) = @_;
+    $raw =~ s/\s+/ /g;
+    $raw =~ s/^\s+|\s+$//g;
+    $raw = substr($raw, 0, 80) if length($raw) > 80;
+    return $raw if length($raw) >= 2;
+    return '';
+}
+
+sub _is_usable_app_link {
+    my ($self, $href, $label) = @_;
+    return 0 unless $href;
+    return 0 if $href =~ /^(javascript:|mailto:|tel:|#|data:)/i;
+    return 0 if $href =~ /^https?:\/\//i && $href !~ m{^https?://[^/]+/(ai|admin|todo|project|inventory|accounting|helpdesk|ency|workshop|planning)}i;  # prefer internal app paths
+    return 0 if length($label) < 2;
+    # Skip pure images, icons, etc.
+    return 0 if $label =~ /^(img|icon|logo|menu|close|×|›|»)$/i;
+    return 1;
+}
+
+=head2 _record_learned_link
+
+Persist a discovered link into the learning system (repurposes learned_data with convention).
+This allows "if it succeeds" persistence: useful new links the user visits while chatting
+(or that appear on pages during AI use) get remembered across sessions and can be promoted
+into future navigation guides.
+
+Call this when we extract links from page content the user is actively using with the AI.
+=cut
+
+sub _record_learned_link {
+    my ($self, $c, $href, $label, $source_page) = @_;
+    return unless $href && $c;
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return unless $schema;
+
+        my $norm_href = $href;
+        $norm_href =~ s/#.*$//;  # drop fragments
+        $norm_href =~ s/\?.*$// if length($norm_href) > 60; # keep query only for short ones
+
+        my $key = 'ai_link:' . $norm_href;
+        # Use update_or_create on (word) or fall back to create + frequency bump via raw if needed.
+        my $row = $schema->resultset('LearnedData')->search({ word => $key })->first;
+
+        if ($row) {
+            my $freq = ($row->frequency || 0) + 1;
+            $row->update({ frequency => $freq, file => 'ai_discovered_link' });
+        } else {
+            # id is PK — try to get a safe id or let DB default if possible.
+            # Many installs have the table with auto_increment on id.
+            $schema->resultset('LearnedData')->create({
+                id       => time() % 1_000_000_000 + int(rand(10000)),  # best-effort unique
+                word     => $key,
+                file     => 'ai_discovered_link',
+                frequency => 1,
+            });
+        }
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_record_learned_link',
+            "Learned link: $norm_href (label=$label, source=$source_page)");
+    };
+    if ($@) {
+        # Non-fatal
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_record_learned_link', "Could not persist learned link: $@");
+    }
+}
+
+=head2 _get_learned_navigation_additions
+
+Pull recently / frequently observed links from the learning store and format them
+as a small "Dynamically learned / observed while using AI" section.
+These survive prompt budget stripping better if we keep the list small.
+=cut
+
+sub _get_learned_navigation_additions {
+    my ($self, $c, $max) = @_;
+    $max //= 8;
+    return '' unless $c;
+
+    my $out = '';
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return '' unless $schema;
+
+        my @rows = $schema->resultset('LearnedData')->search(
+            { file => 'ai_discovered_link', word => { like => 'ai_link:%' } },
+            { order_by => { -desc => 'frequency' }, rows => $max }
+        )->all;
+
+        my @items;
+        for my $r (@rows) {
+            my $w = $r->word || '';
+            $w =~ s/^ai_link://;
+            next unless $w =~ /^\//;
+            my $f = $r->frequency || 1;
+            push @items, "  - (observed $f×) $w";
+        }
+        if (@items) {
+            $out = "\nDynamically learned links (observed on pages during recent AI chats — use when relevant):\n"
+                 . join("\n", @items) . "\n";
+        }
+    };
+    return $out;
 }
 
 =head2 _build_page_navigation_hint
@@ -5053,11 +6348,12 @@ sub _get_current_ollama_config {
     # Configure the ollama model with the determined host
     try {
         $ollama->set_host($current_host);
-        $current_port = $ollama->port;
+        $ollama->port($config_port);
+        $current_port = $config_port;
         $current_model = $ollama->model;
         
         # Quick connection check (uses 3s timeout via temporary UA)
-        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => 11434, timeout => 3);
+        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => $config_port, timeout => 3);
         if ($check_ollama && $check_ollama->check_connection()) {
             my $models = $ollama->list_models();
             $installed_models = $models if $models && ref($models) eq 'ARRAY';
@@ -6109,7 +7405,10 @@ sub get_user_providers :Local :Args(0) {
         if ($ollama) {
             $ollama->host($active_host);
             $ollama->port($cfg_port);
+            my $orig_timeout = $ollama->timeout;
+            $ollama->timeout(3);
             my $installed = $ollama->list_models() || [];
+            $ollama->timeout($orig_timeout);
             my @chat_models = grep {
                 my $n = $_->{name} || '';
                 $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
@@ -7122,23 +8421,25 @@ sub action :Local :Args(0) {
         my $log_row;
         eval {
             $log_row = $schema->resultset('Log')->create({
-                todo_record_id => $todo_id || undef,
-                owner          => $current_user,
-                sitename       => $sitename,
-                start_date     => $today,
-                abstract       => $abstract,
-                details        => $details,
-                start_time     => '00:00',
-                end_time       => '00:00',
-                time           => 0,
+                todo_record_id  => $todo_id || undef,
+                username        => $current_user,
+                sitename        => $sitename,
+                start_date      => $today,
+                due_date        => $today,
+                project_code    => 'PLANNING',
+                abstract        => $abstract,
+                details         => $details,
+                start_time      => '00:00:00',
+                end_time        => '00:00:00',
+                time            => '00:00:00',
                 group_of_poster => do {
                     my $roles = $c->session->{roles} || [];
                     ref $roles eq 'ARRAY' ? join(',', @$roles) : ($roles || 'default');
                 },
-                status        => 1,
-                priority      => 2,
-                last_mod_by   => $current_user,
-                last_mod_date => $today,
+                status          => 1,
+                priority        => 2,
+                last_mod_by     => $current_user,
+                last_mod_date   => $today,
             });
         };
         if ($@ || !$log_row) {
@@ -7463,6 +8764,505 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_constituent ────────────────────────────────────────────────────
+    # Create a new ENCY constituent record and optionally a todo stub.
+    if ($action_name eq 'create_constituent') {
+        my $name = $params->{name} || '';
+        unless ($name) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'name required' }));
+            return;
+        }
+
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        my $can_edit = grep { /^(admin|editor|developer)$/i } @$roles;
+        unless ($can_edit) {
+            $c->response->status(403);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => 'Editor or admin role required to create constituents' }));
+            return;
+        }
+
+        my $ency_model = $c->model('ENCYModel');
+        unless ($ency_model) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'ENCY model not available' }));
+            return;
+        }
+
+        my $sitename  = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
+        my $username  = $c->session->{username} || 'system';
+        my $group     = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : '';
+
+        my $existing;
+        eval {
+            $existing = $ency_model->ency_schema->resultset('Ency::Constituent')->search(
+                { -or => [
+                    name        => { like => $name },
+                    common_name => { like => $name },
+                ]},
+                { rows => 1 }
+            )->first;
+        };
+
+        if ($existing) {
+            $c->response->body(encode_json({
+                success  => JSON::true,
+                message  => "Constituent '$name' already exists: " . $existing->name,
+                existing => JSON::true,
+                id       => $existing->record_id,
+                url      => '/ENCY/Constituent/' . $existing->record_id,
+            }));
+            return;
+        }
+
+        my $data = {
+            name                    => $name,
+            common_name             => $params->{common_name}            || '',
+            chemical_formula        => $params->{chemical_formula}       || '',
+            chemical_class          => $params->{chemical_class}         || '',
+            iupac_name              => $params->{iupac_name}             || '',
+            cas_number              => $params->{cas_number}             || '',
+            therapeutic_action      => $params->{therapeutic_action}     || '',
+            pharmacological_effects => $params->{pharmacological_effects}|| '',
+            toxicity                => $params->{toxicity}               || '',
+            solubility              => $params->{solubility}             || '',
+            found_in_herbs          => $params->{found_in_herbs}         || '',
+            found_in_foods          => $params->{found_in_foods}         || '',
+            found_in_drugs          => $params->{found_in_drugs}         || '',
+            research_notes          => $params->{research_notes}         || '',
+            url                     => $params->{url}                    || '',
+            reference               => $params->{reference}              || '',
+            sitename                => $sitename,
+            username_of_poster      => $username,
+            group_of_poster         => $group,
+            date_time_posted        => \'NOW()',
+            share                   => 0,
+        };
+
+        my ($ok, $new_id) = eval { $ency_model->add_constituent($c, $data) };
+        if ($@ || !$ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action',
+                "create_constituent failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => 'Constituent creation failed: ' . ($@ || 'unknown error') }));
+            return;
+        }
+
+        my $stub_note = '';
+        unless ($data->{chemical_formula} || $data->{therapeutic_action}) {
+            eval {
+                require Comserv::Model::ENCYModel;
+                $ency_model->_create_ency_todo($c,
+                    "ENCY: New constituent stub '$name' needs review",
+                    "A stub constituent record was created for '$name' via AI. "
+                  . "Please complete the entry with: chemical formula, class, therapeutic action, "
+                  . "pharmacological effects, found_in_herbs, and references.\n"
+                  . "Edit at: /ENCY/Constituent/edit?record_id=$new_id"
+                );
+            };
+            $stub_note = ' A review todo was created.';
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_constituent: id=$new_id name='$name' by=$username");
+        $c->response->body(encode_json({
+            success => JSON::true,
+            message => "Constituent '$name' created (ID $new_id).$stub_note "
+                     . "Edit at /ENCY/Constituent/edit?record_id=$new_id",
+            id      => $new_id,
+            url     => "/ENCY/Constituent/$new_id",
+        }));
+        return;
+    }
+
+    # ── create_yard ───────────────────────────────────────────────────────────
+    if ($action_name eq 'create_yard') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my %prefill = (
+            yard_code      => $params->{yard_code}      || '',
+            yard_name      => $params->{yard_name}      || '',
+            yard_size      => $params->{yard_size}      || 10,
+            total_yard_size=> $params->{total_yard_size}|| 10,
+            notes          => $params->{notes}          || '',
+            sitename       => $c->session->{SiteName}   || 'BMaster',
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_yard_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the yard details before saving.',
+            }));
+            return;
+        }
+
+        unless ($prefill{yard_code} && $prefill{yard_name}) {
+            $c->response->body(encode_json({ success => JSON::false, error => 'yard_code and yard_name are required' }));
+            return;
+        }
+
+        my $yard_row;
+        eval {
+            $yard_row = $schema->resultset('Beekeeping::Yard')->create({
+                %prefill,
+                current          => 0,
+                status           => 'active',
+                date_time_posted => DateTime->now->stringify,
+                comments         => $params->{comments} || '',
+                image            => '',
+            });
+        };
+        if ($@ || !$yard_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create yard: $@" }));
+            return;
+        }
+        my $yard_id = $yard_row->id;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_yard: id=$yard_id by=$current_user");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            yard_id  => $yard_id + 0,
+            url      => "/Apiary/yards/view/$yard_id",
+            message  => "Yard '$prefill{yard_name}' created (id=$yard_id). Now you can add hives to it.",
+        }));
+        return;
+    }
+
+    # ── create_hive ───────────────────────────────────────────────────────────
+    if ($action_name eq 'create_hive') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+
+        my $yard_id = $params->{yard_id};
+        unless ($yard_id) {
+            my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
+            unless (@yards) {
+                $c->response->body(encode_json({
+                    success => JSON::true,
+                    action  => 'open_yard_wizard',
+                    wizard_prefill => { yard_name => $params->{yard_name} || '', yard_code => '', yard_size => 10, total_yard_size => 10 },
+                    message => 'No yards exist yet. Please create a yard first.',
+                }));
+                return;
+            }
+            if (@yards == 1) {
+                $yard_id = $yards[0]->id;
+            } else {
+                $c->response->body(encode_json({
+                    success       => JSON::true,
+                    action        => 'open_hive_wizard',
+                    wizard_prefill => {
+                        hive_number => $params->{hive_number} || '',
+                        yards       => [map { { id => $_->id, name => $_->yard_name, code => $_->yard_code } } @yards],
+                    },
+                    message => 'Multiple yards found — please select which yard this hive belongs to.',
+                }));
+                return;
+            }
+        }
+
+        my %prefill = (
+            hive_number => $params->{hive_number} || '',
+            yard_id     => $yard_id + 0,
+            queen_code  => $params->{queen_code}  || '',
+            pallet_code => $params->{pallet_code} || '',
+            status      => 'active',
+            sitename    => $sitename,
+            notes       => $params->{notes}       || '',
+            created_by  => $current_user,
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_hive_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the hive details before saving.',
+            }));
+            return;
+        }
+
+        unless ($prefill{hive_number}) {
+            $c->response->body(encode_json({ success => JSON::false, error => 'hive_number is required' }));
+            return;
+        }
+
+        my $hive_row;
+        eval { $hive_row = $schema->resultset('Beekeeping::Hive')->create(\%prefill) };
+        if ($@ || !$hive_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create hive: $@" }));
+            return;
+        }
+        my $hive_id = $hive_row->id;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_hive: id=$hive_id hive_number=$prefill{hive_number} yard=$yard_id by=$current_user");
+        $c->response->body(encode_json({
+            success    => JSON::true,
+            hive_id    => $hive_id + 0,
+            hive_number=> $prefill{hive_number},
+            url        => "/Apiary/hives/view/$hive_id",
+            message    => "Hive $prefill{hive_number} created (id=$hive_id). You can now record an inspection.",
+        }));
+        return;
+    }
+
+    # ── create_queen ──────────────────────────────────────────────────────────
+    if ($action_name eq 'create_queen') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+        my $today = DateTime->now->ymd;
+
+        my %prefill = (
+            tag_number       => $params->{tag_number}       || '',
+            color_marking    => $params->{color_marking}    || '',
+            birth_date       => $params->{birth_date}       || $today,
+            breed            => $params->{breed}            || 'unknown',
+            origin           => $params->{origin}           || 'local',
+            mating_status    => $params->{mating_status}    || 'mated',
+            introduction_date=> $params->{introduction_date}|| $today,
+            removal_date     => $params->{removal_date}     || '9999-12-31',
+            performance_rating => ($params->{performance_rating} || 0) + 0,
+            health_status    => $params->{health_status}    || 'healthy',
+            laying_status    => $params->{laying_status}    || 'laying_well',
+            temperament_rating => $params->{temperament_rating} || 'calm',
+            status           => 'active',
+            purpose          => $params->{purpose}          || 'production',
+            sitename         => $sitename,
+            notes            => $params->{notes}            || '',
+            created_by       => $current_user,
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_queen_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the queen details before saving.',
+            }));
+            return;
+        }
+
+        my $queen_row;
+        eval { $queen_row = $schema->resultset('Beekeeping::Queen')->create(\%prefill) };
+        if ($@ || !$queen_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create queen: $@" }));
+            return;
+        }
+        my $queen_id = $queen_row->id;
+
+        if ($params->{hive_id}) {
+            eval {
+                $schema->resultset('Beekeeping::QueenHiveAssignment')->create({
+                    queen_id   => $queen_id,
+                    hive_id    => $params->{hive_id} + 0,
+                    start_date => $today,
+                    status     => 'active',
+                    notes      => "Assigned by AI from voice inspection",
+                });
+            };
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_queen: id=$queen_id tag=$prefill{tag_number} by=$current_user");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            queen_id => $queen_id + 0,
+            url      => "/Apiary/queens/view/$queen_id",
+            message  => "Queen recorded (id=$queen_id, tag=$prefill{tag_number}).",
+        }));
+        return;
+    }
+
+    # ── create_inspection ─────────────────────────────────────────────────────
+    if ($action_name eq 'create_inspection') {
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+
+        my $hive_id = $params->{hive_id};
+        unless ($hive_id) {
+            my $hive_number = $params->{hive_number} || '';
+            if ($hive_number) {
+                my $hive_row = $schema->resultset('Beekeeping::Hive')->search(
+                    { hive_number => $hive_number, sitename => $sitename },
+                    { rows => 1 }
+                )->first;
+                if ($hive_row) {
+                    $hive_id = $hive_row->id;
+                } else {
+                    my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
+                    unless (@yards) {
+                        $c->response->body(encode_json({
+                            success => JSON::true,
+                            action  => 'open_yard_wizard',
+                            wizard_prefill => { yard_name => '', yard_code => '', yard_size => 10, total_yard_size => 10 },
+                            message => "Hive $hive_number not found and no yards exist. Please create a yard first, then the hive.",
+                            next_action => 'create_hive',
+                            next_params => { hive_number => $hive_number },
+                        }));
+                        return;
+                    }
+                    $c->response->body(encode_json({
+                        success        => JSON::true,
+                        action         => 'open_hive_wizard',
+                        wizard_prefill => {
+                            hive_number => $hive_number,
+                            yard_id     => @yards == 1 ? $yards[0]->id + 0 : undef,
+                            yards       => [map { { id => $_->id + 0, name => $_->yard_name, code => $_->yard_code } } @yards],
+                        },
+                        message => "Hive $hive_number not found in the system. Please fill in the details to register it first.",
+                        next_action => 'create_inspection',
+                        next_params => $params,
+                    }));
+                    return;
+                }
+            } else {
+                $c->response->status(400);
+                $c->response->body(encode_json({ success => JSON::false, error => 'hive_id or hive_number required' }));
+                return;
+            }
+        };
+
+        my %POPULATION_MAP = (
+            'very strong' => 'very_strong', 'very_strong' => 'very_strong',
+            'strong'      => 'strong',      'good'        => 'strong',
+            'moderate'    => 'moderate',    'medium'      => 'moderate', 'average' => 'moderate',
+            'weak'        => 'weak',        'low'         => 'weak',
+            'very weak'   => 'very_weak',   'very_weak'   => 'very_weak', 'poor'   => 'very_weak',
+        );
+        my %TEMPERAMENT_MAP = (
+            'calm'           => 'calm',           'gentle'    => 'calm',     'docile'  => 'calm',
+            'moderate'       => 'moderate',       'normal'    => 'moderate',
+            'aggressive'     => 'aggressive',     'defensive' => 'aggressive',
+            'very aggressive'=> 'very_aggressive','very_aggressive' => 'very_aggressive', 'hot' => 'very_aggressive',
+        );
+        my %STATUS_MAP = (
+            'excellent' => 'excellent', 'great' => 'excellent',
+            'good'      => 'good',
+            'fair'      => 'fair',      'ok'    => 'fair',  'okay' => 'fair',
+            'poor'      => 'poor',
+            'critical'  => 'critical',  'bad'   => 'critical',
+        );
+        my %WEATHER_MAP = (
+            'sunny'    => 'sunny',   'clear'    => 'sunny',
+            'cloudy'   => 'cloudy',  'overcast' => 'cloudy',
+            'rainy'    => 'rainy',   'rain'     => 'rainy',   'wet' => 'rainy',
+            'windy'    => 'windy',   'breezy'   => 'windy',
+            'warm'     => 'warm',    'hot'      => 'warm',
+            'cold'     => 'cold',    'cool'     => 'cold',
+            'foggy'    => 'foggy',
+        );
+
+        my $normalise = sub {
+            my ($val, $map_ref) = @_;
+            return undef unless defined $val && $val ne '';
+            my $lc = lc($val);
+            return $map_ref->{$lc} || $map_ref->{$val} || $val;
+        };
+
+        my $inspection_date = $params->{inspection_date} || $today;
+        $inspection_date = $today unless $inspection_date =~ /^\d{4}-\d{2}-\d{2}$/;
+
+        my %insp = (
+            hive_id             => $hive_id + 0,
+            inspection_date     => $inspection_date,
+            inspector           => $params->{inspector} || $current_user,
+            inspection_type     => $params->{inspection_type} || 'routine',
+            overall_status      => $normalise->($params->{overall_status}, \%STATUS_MAP) || 'good',
+            queen_seen          => ($params->{queen_seen}  ? 1 : 0),
+            queen_marked        => ($params->{queen_marked}? 1 : 0),
+            eggs_seen           => ($params->{eggs_seen}   ? 1 : 0),
+            larvae_seen         => ($params->{larvae_seen} ? 1 : 0),
+            capped_brood_seen   => ($params->{capped_brood_seen} ? 1 : 0),
+            supersedure_cells   => ($params->{supersedure_cells}  || 0) + 0,
+            swarm_cells         => ($params->{swarm_cells}         || 0) + 0,
+            queen_cells         => ($params->{queen_cells}         || 0) + 0,
+            temperament         => $normalise->($params->{temperament}, \%TEMPERAMENT_MAP) || 'calm',
+            general_notes       => $params->{general_notes}   || '',
+            action_required     => $params->{action_required} || '',
+            feeding_done        => ($params->{feeding_done}   ? 1 : 0),
+            feed_type           => $params->{feed_type}    || undef,
+            feed_amount         => $params->{feed_amount}  || undef,
+        );
+
+        if (defined $params->{population_estimate} && $params->{population_estimate} ne '') {
+            $insp{population_estimate} = $normalise->($params->{population_estimate}, \%POPULATION_MAP);
+        }
+        if (defined $params->{weather_conditions} && $params->{weather_conditions} ne '') {
+            $insp{weather_conditions} = $normalise->($params->{weather_conditions}, \%WEATHER_MAP) // $params->{weather_conditions};
+        }
+        if (defined $params->{temperature} && $params->{temperature} =~ /^-?\d/) {
+            ($insp{temperature} = $params->{temperature}) =~ s/[^\d.\-]//g;
+        }
+        if (defined $params->{next_inspection_date} && $params->{next_inspection_date} =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $insp{next_inspection_date} = $params->{next_inspection_date};
+        }
+        if (defined $params->{start_time}) { $insp{start_time} = $params->{start_time}; }
+        if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
+
+        my $inspection_row;
+        eval { $inspection_row = $schema->resultset('Beekeeping::Inspection')->create(\%insp) };
+        if ($@ || !$inspection_row) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'action', "create_inspection failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Inspection creation failed: $@" }));
+            return;
+        }
+
+        my $inspection_id = $inspection_row->id;
+
+        my @detail_rows_created;
+        my $box_details = $params->{box_details} || [];
+        if (ref($box_details) eq 'ARRAY') {
+            for my $bd (@$box_details) {
+                next unless ref($bd) eq 'HASH';
+                my %detail = (
+                    inspection_id   => $inspection_id,
+                    detail_type     => $bd->{detail_type}   || 'box_summary',
+                    bees_coverage   => $bd->{bees_coverage} || 'none',
+                    brood_pattern   => $bd->{brood_pattern} || 'good',
+                    brood_percentage=> ($bd->{brood_percentage} || 0) + 0,
+                    honey_percentage=> ($bd->{honey_percentage} || 0) + 0,
+                    pollen_percentage=>($bd->{pollen_percentage}|| 0) + 0,
+                    empty_percentage=> ($bd->{empty_percentage} || 0) + 0,
+                    disease_signs   => $bd->{disease_signs}   || undef,
+                    pest_signs      => $bd->{pest_signs}      || undef,
+                    treatment_applied=> $bd->{treatment_applied} || undef,
+                    notes           => $bd->{notes}           || undef,
+                    queen_cells_count=> ($bd->{queen_cells_count} || 0) + 0,
+                );
+                $detail{box_id}    = $bd->{box_id}   + 0 if defined $bd->{box_id}   && $bd->{box_id}   =~ /^\d+$/;
+                $detail{frame_id}  = $bd->{frame_id} + 0 if defined $bd->{frame_id} && $bd->{frame_id} =~ /^\d+$/;
+                $detail{comb_condition} = $bd->{comb_condition} if $bd->{comb_condition};
+                $detail{brood_type}     = $bd->{brood_type}     if $bd->{brood_type};
+
+                my $dr;
+                eval { $dr = $schema->resultset('Beekeeping::InspectionDetail')->create(\%detail) };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'action', "create_inspection_detail failed: $@");
+                } else {
+                    push @detail_rows_created, $dr->id;
+                }
+            }
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_inspection: id=$inspection_id hive=$hive_id by=$current_user details=" . scalar(@detail_rows_created));
+
+        $c->response->body(encode_json({
+            success       => JSON::true,
+            inspection_id => $inspection_id + 0,
+            url           => "/Apiary/inspections/view/$inspection_id",
+            detail_count  => scalar(@detail_rows_created) + 0,
+            message       => "Inspection #$inspection_id recorded for hive $hive_id.",
+        }));
+        return;
+    }
+
     # Unknown action
     $c->response->status(400);
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
@@ -7708,7 +9508,7 @@ sub _build_bmaster_system_prompt {
 EDITOR / ADMIN WORKFLOW:
 - Add/edit a yard (apiary location): /Apiary/add_yard | /Apiary/edit_yard?id=ID
 - Add/edit a hive: /Apiary/add_hive | /Apiary/edit_hive?id=ID
-- Record a hive inspection: /Apiary/add_inspection?hive_id=ID
+- Record a hive inspection: /Apiary/add_inspection?hive_id=ID  (or use voice — see VOICE INSPECTION WORKFLOW below)
 - Record a treatment: /Apiary/add_treatment?hive_id=ID
 - Record a honey harvest: /Apiary/add_harvest?hive_id=ID
 - Manage queens: /Apiary/QueenRearing
@@ -7781,6 +9581,16 @@ NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - Workshops (local beekeeping events): /workshop
 - Membership: /membership
 $editor_section
+VOICE INSPECTION TIP (share this when the user asks how to record an inspection):
+You can record a hive inspection by voice directly in this chat widget:
+1. Click the 🎤 button next to the Send button to upload a .m4a / .wav / .mp3 file, OR
+   click ⏺ to record live from your microphone (requires HTTPS or localhost).
+2. The audio is transcribed automatically. The transcript appears in the chat input — review it, then press Send.
+3. Tell me which hive and any details; I will ask follow-up questions and extract the inspection data.
+4. A pre-filled review form appears — edit any fields, then click Save Inspection.
+5. The record is saved to the database and you get a link to view it.
+You can also just type or paste a voice-style inspection note — no audio file needed.
+
 DATA ALREADY INJECTED:
 The server automatically injects LIVE APIARY DATA (yards, hive counts) below when available.
 ALWAYS use this live data — do not ask the user to describe their apiary setup.
@@ -7803,6 +9613,196 @@ COMMON ISSUES AND IPM APPROACH:
 - Swarming: Natural — manage with splits, adding space, or supering promptly
 
 The current user is: $username
+
+VOICE INSPECTION WORKFLOW:
+When the user says they want to record a hive inspection, OR when you receive a voice transcript,
+follow this multi-turn conversation workflow.
+
+A hive inspection is a detailed, multi-step process that may take 5–20 minutes of conversation.
+Record each part of the conversation progressively — do NOT rush to emit the [ACTION:] block.
+Build up the inspection data incrementally across multiple turns.
+
+MULTI-SPEAKER / DIARIZED TRANSCRIPTS:
+If the transcript contains speaker labels (SPEAKER_0, SPEAKER_1, UNKNOWN, etc.), treat the
+conversation as a dialogue between a teacher/inspector and a student/observer.
+Rules for extracting inspection data from a diarized transcript:
+- Both speakers may identify a frame type (honey, brood, foundation, etc.)
+- The teacher/instructor's identification ALWAYS takes precedence if they correct the student
+- If the student says "is that honey?" and the teacher says "yes" or "that's capped honey" — record honey
+- If the student says "that's brood" and the teacher says "no, that's capped honey" — record honey
+- If only one speaker names the frame type and the other does not correct it — record what was said
+- Combine information from BOTH speakers: student may ask the question that reveals the data;
+  teacher may give the answer that provides the value (e.g. "How many frames of brood?" "Three full frames")
+- UNKNOWN segments (very short utterances, ambient sound) may be ignored for data extraction
+- Do NOT discard the student's speech — it may contain hive numbers, counts, or corrections
+- Summarise the full dialogue in general_notes including any teaching commentary of value
+
+STEP 1 — CHECK SETUP (yards, hives, queens):
+Before recording an inspection, the system needs a yard and hive to exist.
+If no hive is found by the hive number mentioned in the transcript or conversation:
+  → Emit [ACTION: {"action": "create_hive", "params": {"hive_number": "X"}}]
+    The widget will show a form to register the hive. If no yards exist either, it will first show
+    the yard creation form, then the hive form.
+If the user mentions a queen number/tag/colour that is not yet in the system:
+  → After creating the inspection, suggest emitting [ACTION: {"action": "create_queen", "params": {...}}]
+    with hive_id set so the queen is automatically assigned to the hive.
+Example create_yard action:
+[ACTION: {"action": "create_yard", "params": {"yard_name": "Main Yard", "yard_code": "MAIN", "yard_size": 20, "total_yard_size": 20}}]
+Example create_hive action:
+[ACTION: {"action": "create_hive", "params": {"hive_number": "24", "yard_id": YARD_ID, "notes": ""}}]
+
+STEP 2 — IDENTIFY THE HIVE:
+Ask "Which hive?" if not stated. Hive can be given by number, queen code, or yard+position.
+Look up the hive_id from LIVE APIARY DATA injected above.
+If the hive is not in the live data, use hive_number in the params and the system will look it up
+or guide the user to register it first.
+For multi-hive sessions (beekeeper inspects several hives in sequence), complete each hive's
+[ACTION:] block before moving to the next hive.
+
+STEP 3 — COLLECT HIVE CONFIGURATION:
+Ask: How many boxes? (e.g. "two box hive", "single brood box with a super" → derive box_count)
+Record box order: top box = position 1 (worked first), bottom box = position 2, etc.
+
+STEP 4 — COLLECT INSPECTION DATA via conversation:
+Ask short, natural follow-up questions in this order (only ask what has not been stated):
+1. Date and time (default: today)
+2. Weather and environmental conditions (temperature, wind, humidity, time of day)
+3. Queen: seen? marked? tag number or colour? where in the hive was she found?
+4. Eggs / larvae / capped brood seen?
+5. Population overall: "lots of bees" → strong, "half full" → moderate, "sparse" → weak
+6. Temperament: calm, normal, defensive, hot?
+7. For each box (top box first, then lower boxes):
+   a. Overall bees coverage for this box
+   b. Frame-by-frame details — user may describe frames in the ORDER THEY WERE REMOVED,
+      not necessarily their position in the box. Record both removal_order and frame_position
+      if the user gives them. For each frame note:
+        - frame_number or frame_position in the box
+        - frame_type: brood / honey / pollen / foundation / empty / feeder
+        - what was observed (bees, pattern, stores, queen sighted here, etc.)
+        - any issues (disease signs, pest signs)
+   c. Feeder: present? type? level? (e.g. "feeder half full", "empty division board feeder")
+   d. Any frames moved from this box? (to top box of same hive, or to a different hive — record destination hive)
+8. Swarm cells / queen cells / supersedure cells? How many? Where in the hive?
+9. Feeding done this visit? Feed type (syrup/candy/fondant/pollen substitute) and amount?
+10. Any treatments applied? Product name, dose, method?
+11. General notes or concerns?
+12. Action required?
+13. Next inspection date?
+
+NATURAL LANGUAGE → ENUM MAPPINGS (use these when normalising user speech):
+population_estimate:
+  "lots of bees" / "full" / "packed" / "very strong" → very_strong
+  "strong" / "good population" / "good coverage" → strong
+  "half full" / "moderate" / "average" → moderate
+  "few bees" / "light" / "thin" / "weak" → weak
+  "almost empty" / "very few" / "dying out" / "very weak" → very_weak
+
+temperament:
+  "calm" / "gentle" / "docile" / "easy" → calm
+  "normal" / "ok" / "moderate" → moderate
+  "defensive" / "a bit aggressive" / "stinging" → aggressive
+  "very hot" / "boiling" / "very aggressive" / "dangerous" → very_aggressive
+
+overall_status:
+  "perfect" / "thriving" / "excellent" → excellent
+  "good" / "healthy" / "fine" → good
+  "ok" / "alright" / "fair" / "so-so" → fair
+  "not great" / "struggling" / "poor" → poor
+  "emergency" / "dying" / "failing" / "critical" → critical
+
+bees_coverage (per box):
+  "no bees" / "empty" → none
+  "few bees" / "light coverage" → light
+  "half covered" / "moderate" → moderate
+  "well covered" / "heavy" → heavy
+  "fully covered" / "packed" → full
+
+brood_pattern:
+  "solid" / "great pattern" / "excellent" → excellent
+  "good" / "mostly solid" → good
+  "some gaps" / "fair" → fair
+  "spotty" / "patchy" → spotty
+  "poor" / "scattered" → poor
+
+frame_type:
+  "brood frame" / "brood comb" / "brood" → brood
+  "honey frame" / "honey comb" / "capped honey" / "honey super frame" → honey
+  "pollen frame" / "pollen" → pollen
+  "foundation" / "new foundation" / "starter strip" / "fresh wax" → foundation
+  "empty frame" / "empty" / "drawn comb" (with nothing on it) → empty
+  "feeder frame" / "division board feeder" / "frame feeder" → feeder
+
+weather_conditions:
+  "nice" / "sunny" / "clear" / "bright" → sunny
+  "cloudy" / "overcast" / "grey" → cloudy
+  "raining" / "wet" / "rainy" / "drizzle" → rainy
+  "windy" / "breezy" / "gusty" → windy
+  "warm" / "hot" / "fine" → warm
+  "cold" / "cool" / "chilly" / "crisp" → cold
+
+AUDIO AND PHOTO ATTACHMENTS:
+- When the transcript came from a voice recording, the widget passes audio_file_id and
+  transcript_file_id in the action params. Always include these in the create_inspection params
+  so the audio and transcript are linked to the inspection record in the file management system.
+- If the user says they have photos of the hive, queen, or frames, reply:
+  "To add photos: go to the inspection record after saving, then use the File Manager to upload
+  images. You can also use the 🖼 button in the chat to discuss what a photo shows before adding it."
+- Photos are linked to the inspection via the File Manager using reference_id = inspection_id.
+
+STEP 5 — SHOW PRE-FILLED FORM:
+Once you have collected enough data (at minimum: hive_id or hive_number, inspection_date, and at
+least one box observation), emit ONE [ACTION:] block on its own line. Do NOT emit it mid-conversation —
+wait until the user signals they are done (e.g. "that's it", "save it", "done") or you have
+worked through all the standard questions above.
+
+[ACTION: {"action": "create_inspection", "params": {
+  "hive_id": REAL_HIVE_ID_OR_OMIT_IF_UNKNOWN,
+  "hive_number": "HIVE_NUMBER_AS_STRING_FALLBACK",
+  "audio_file_id": AUDIO_FILE_ID_FROM_TRANSCRIBE_RESPONSE_OR_OMIT,
+  "transcript_file_id": TRANSCRIPT_FILE_ID_FROM_TRANSCRIBE_RESPONSE_OR_OMIT,
+  "inspection_date": "YYYY-MM-DD",
+  "inspector": "USERNAME",
+  "overall_status": "good",
+  "queen_seen": true,
+  "queen_marked": false,
+  "queen_tag_number": "",
+  "eggs_seen": true,
+  "larvae_seen": true,
+  "capped_brood_seen": true,
+  "population_estimate": "strong",
+  "temperament": "calm",
+  "weather_conditions": "sunny",
+  "temperature": 22,
+  "feeding_done": false,
+  "feed_type": "",
+  "feed_amount": "",
+  "swarm_cells": 0,
+  "queen_cells": 0,
+  "supersedure_cells": 0,
+  "action_required": "",
+  "general_notes": "full narrative summary here — include queen tag colour/number, any frame moves, and anything not captured in structured fields",
+  "box_details": [
+    {
+      "box_position": 1,
+      "detail_type": "box_summary",
+      "bees_coverage": "heavy",
+      "brood_pattern": "good",
+      "brood_percentage": 60,
+      "honey_percentage": 20,
+      "frames": [
+        {"frame_number": 1, "frame_type": "brood", "notes": "solid brood pattern"},
+        {"frame_number": 2, "frame_type": "honey", "notes": "capped honey"}
+      ]
+    }
+  ]
+}}]
+
+Rules:
+- ONLY emit the [ACTION:] block when you have collected enough data (at least hive_id or hive_number and inspection_date).
+- The widget shows the user a review form pre-filled with your values — they can edit before saving.
+- If the user says the form is wrong, update any values they mention and emit a corrected [ACTION:] block.
+- box_details array: one entry per box, top box first. Include box_id if known from live data.
+- For the queen tag number, include it in both queen_tag_number field and general_notes.
 END_PROMPT
 }
 
@@ -7833,6 +9833,78 @@ EDITOR WORKFLOW (you have admin/editor access):
 - To link drug-herb interactions: /ENCY/drug_herb_interactions
 - When the user asks to "add", "edit", "update", or "create" an ENCY entry, provide the direct
   admin URL for that action — do not just describe what to do.
+
+TODO-DRIVEN WORKFLOW — when the user pastes a todo subject into the chat:
+When you see text like "P1 NEW BMaster ENCY: Unresolved term in constituent#17 ...", treat it
+as a work task and follow these steps automatically:
+
+STEP 1 — IDENTIFY the action:
+  "Unresolved term in constituent#N"  → fill in the stub constituent record #N
+  "Unresolved term in therapeutic_action" → review glossary entry
+  "Unresolved constituent name [name]"    → create a new constituent named [name]
+  Extract the TODO record_id from the subject text if present (e.g. "#17" after "constituent").
+
+STEP 2 — LOOKUP from injected data:
+  The server injects "CONSTITUENT #N DETAIL" when constituent#N is in the prompt.
+  Check each field — fields showing "(empty)" need to be filled in.
+
+STEP 3 — NAVIGATE AND PRE-FILL: Open the correct form and pre-fill it automatically.
+  Using your botanical/chemical knowledge, populate ALL fields you know for the constituent.
+  Emit ONE navigate_and_fill action (on its own line) — the browser will open the form and
+  fill the fields automatically. Replace N with the actual record_id number:
+
+  For an existing stub constituent:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/edit?record_id=N", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS", "iupac_name": "IUPAC", "cas_number": "CAS", "therapeutic_action": "THERAPEUTIC_USES", "pharmacological_effects": "EFFECTS", "found_in_herbs": "HERB1, HERB2", "url": "https://pubchem.ncbi.nlm.nih.gov/compound/CID"}}]
+
+  For a constituent that does not exist yet:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS"}}]
+
+  After the navigate_and_fill line, briefly list the values you suggested so the user can verify them.
+
+STEP 4 — OPEN A LOG: Create a log entry linked to this work session:
+  [ACTION: {"action": "create_log_entry", "params": {"title": "Resolving constituent #N", "description": "Working on ENCY constituent stub — filling in chemical and therapeutic details.", "status": 2}}]
+
+STEP 5 — CONFIRM: Tell the user the form has been opened and pre-filled, and ask them to review
+  and save. Example: "I've opened the edit form for constituent #N and pre-filled the fields with
+  the information above. Please review and click Save."
+
+STEP 6 — REMIND when the user says they are done:
+  "Remember to mark the todo as done. You can click the todo link to close it, or I can close it:
+  [ACTION: {"action": "update_todo_status", "params": {"todo_id": TODO_RECORD_ID, "status": 3}}]"
+
+CONSTITUENT WORKFLOW (admin/editor only):
+The "constituents" field on herb and plant forms is a free-text comma-separated list of constituent
+names (e.g., "Quercetin, Rutin, Apigenin"). When the user mentions a constituent name in a form
+or asks about one, you should:
+
+1. CHECK if it exists: Look at the LIVE ENCY CONSTITUENT DATA injected into this prompt.
+   - If the constituent IS listed → give the user its link: /ENCY/Constituent/ID
+   - If it is NOT listed → offer to create it using the action below OR direct the user to /ENCY/Constituent/add
+
+2. CREATE a constituent when the user says "create the constituent", "add constituent [name]",
+   or similar. Use this action format on its own line in your response:
+   [ACTION: {"action": "create_constituent", "params": {"name": "CONSTITUENT_NAME", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional herb names comma-separated", "common_name": "optional"}}]
+
+3. After creating, a todo review stub is automatically generated if the entry is incomplete.
+   The user can then go to /ENCY/Constituent/edit?record_id=ID to fill in full details.
+
+4. CONSTITUENT FIELDS (all optional except name):
+   - name (required): scientific/IUPAC name e.g. "Quercetin"
+   - common_name: common alias e.g. "Quercetol"
+   - chemical_formula: e.g. "C15H10O7"
+   - chemical_class: e.g. "Flavonoid", "Alkaloid", "Terpene", "Phenol", "Glycoside"
+   - iupac_name: full IUPAC name
+   - cas_number: CAS registry number
+   - therapeutic_action: therapeutic uses text
+   - pharmacological_effects: known effects text
+   - toxicity: toxicity / safety notes
+   - solubility: solubility information
+   - found_in_herbs: comma-separated herb names
+   - found_in_foods: comma-separated food names
+   - found_in_drugs: comma-separated drug names
+   - research_notes: notes from research
+   - url: authoritative reference URL (PubChem, Wikipedia)
+   - reference: citation (PubChem CID, article title, etc.)
 EDITOR
 
     return <<END_PROMPT;
@@ -7844,10 +9916,13 @@ DATABASE SCHEMA — ENCY tables you can reference:
         key_name, ident_character, stem, leaves, flowers, fruit, taste, odour, root,
         distribution, dosage, administration, formulas, contra_indications, chinese, non_med, harvest
 - HerbCategory: links herbs to categories (e.g., Adaptogen, Nervine, Vulnerary)
-- HerbConstituent: links herbs to specific chemical constituents
+- HerbConstituent: links herbs to specific chemical constituents (junction table)
 - HerbDisease: links herbs to diseases/conditions they address
 - HerbSymptom: links herbs to symptoms they help with
-- Constituent: name, description, therapeutic actions
+- Constituent: record_id, name, common_name, chemical_formula, chemical_class, iupac_name,
+               cas_number, molecular_weight, therapeutic_action, toxicity, solubility,
+               found_in_herbs, found_in_foods, found_in_drugs, pharmacological_effects,
+               research_notes, image, url, reference
 - Disease: name, description, icd_code
 - Symptom: name, description, body_system
 - Formula: name, description, instructions, FormulaHerb (herb_id, amount, unit)
@@ -7863,15 +9938,19 @@ NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - Plants section: /ENCY/plants
 - Pollinators: /ENCY/pollinators
 - Insects: /ENCY/insects
-- Medicinal constituents: /ENCY/constituents
+- Constituent list: /ENCY/Constituent
+- Constituent detail: /ENCY/Constituent/ID
+- Add constituent: /ENCY/Constituent/add
+- Edit constituent: /ENCY/Constituent/edit?record_id=ID
 - Therapeutic actions: /ENCY/therapeutic_actions
 - Drug-herb interactions: /ENCY/drug_herb_interactions
 - Formulas: /ENCY/formula
 - Recipes: /ENCY/recipes
 $editor_section
 DATA ALREADY INJECTED:
-The server automatically injects LIVE ENCY HERB/PLANT DATA below when relevant herb records
-are found. ALWAYS use this live data to answer questions — do not ask the user to paste records.
+The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below
+when relevant records are found. ALWAYS use this live data to answer questions — do not ask the
+user to paste records.
 
 GUIDELINES:
 - For health questions, always note: "This is educational information only — consult a healthcare provider."
@@ -7879,6 +9958,23 @@ GUIDELINES:
 - When suggesting herb searches, always provide the search URL: /ENCY/search?q=TERM
 - The current user is: $username
 - For unknown terms, say so and suggest searching via /ENCY/search?q=TERM
+- When the user mentions a constituent name and asks you to check if it exists, look at the
+  LIVE ENCY CONSTITUENT DATA. If it's there, give the link. If not, offer to create it.
+
+ACTIONS YOU CAN PERFORM:
+When the user asks to add a constituent or fix an unresolved constituent term, read the injected
+todo/DB data to find the term name, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME", "found_in_herbs": "HERB_NAME_IF_KNOWN", "therapeutic_action": "IF_KNOWN"}}]
+
+Rules:
+- Extract the term name from the injected todo description or DB data — do NOT ask the user for it.
+- Only include fields you can actually determine from the available data.
+- After the ACTION line, confirm the term name and which herb it came from.
+- If the todo says "Unresolved term in constituent#N", look in the injected data for the actual term string.
+
+When the user asks to add a glossary term, use:
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Glossary/add", "fields": {"term": "TERM_NAME", "definition": "IF_KNOWN"}}]
 END_PROMPT
 }
 
@@ -7894,6 +9990,36 @@ sub _build_helpdesk_system_prompt {
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'our system';
     my $username  = $c->session->{username} || 'the user';
 
+    my $recent_tickets_section = '';
+    eval {
+        my $schema    = $c->model('DBEncy')->schema;
+        my $is_csc    = (lc($site_name) eq 'csc');
+        my %search    = (status => [qw(open in_progress)]);
+        $search{site_name} = $site_name unless $is_csc;
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%search,
+            { order_by => { -desc => 'created_at' }, rows => 30 }
+        )->all;
+
+        if (@tickets) {
+            $recent_tickets_section = "\nRECENT OPEN TICKETS (use these to identify patterns and avoid duplicate advice):\n";
+            for my $t (@tickets) {
+                my $desc = $t->description || '';
+                $desc = substr($desc, 0, 120) . '…' if length($desc) > 120;
+                $desc =~ s/\n/ /g;
+                $recent_tickets_section .= sprintf(
+                    "- [%s] %s | cat:%s pri:%s | %s\n",
+                    $t->ticket_number, $t->subject,
+                    $t->category || 'other', $t->priority || 'medium',
+                    $desc
+                );
+            }
+        }
+    };
+
+    my $base_url = $c->req->base || "http://workstation.local:3001";
+    $base_url =~ s{/$}{};
+
     return <<END_PROMPT;
 You are a HelpDesk support assistant for $site_name. Your role is to help users resolve issues efficiently and professionally.
 
@@ -7907,18 +10033,26 @@ CAPABILITIES:
    - Troubleshooting (loading issues, database errors, log analysis)
    - System Administration (Linux commands, server maintenance, backup and recovery)
 
-2. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
-   action from our team, offer to create a support ticket. Tell them they can submit a ticket at:
-   /HelpDesk/ticket/new
+2. TICKET SEARCH: You can search existing tickets to find similar issues and their resolutions.
+   Call: GET $base_url/HelpDesk/api/search_tickets?q=KEYWORDS&limit=10
+   The response is JSON: { tickets: [{ ticket_number, subject, category, status, summary }] }
+   Use this to:
+   - Check if a reported issue has already been solved (reference the ticket number)
+   - Identify recurring problem patterns
+   - Find resolutions from previously closed tickets
+
+3. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
+   action from our team, offer to create a support ticket at: /HelpDesk/ticket/new
    Collect: subject, category (technical/billing/account/feature/other), priority (low/medium/high/critical),
    and a description of the issue.
 
-3. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
+4. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
    frustration, suggest connecting with a live agent through the chat system or by visiting
    /HelpDesk/contact
-
+$recent_tickets_section
 GUIDELINES:
 - Be concise, friendly, and professional
+- Before answering, search tickets for similar issues — if found, mention the ticket number(s)
 - If you don't know the answer, say so clearly and suggest the ticket or live agent option
 - Always confirm you understood the user's issue before suggesting solutions
 - For technical issues, ask clarifying questions if needed (OS, error messages, steps to reproduce)
@@ -7965,6 +10099,13 @@ sub _build_planning_system_prompt {
 
     return <<END_PROMPT;
 You are the AI Project Planning Agent for $site_name. The current user is: $username. Today: $today
+
+## AGENT ROUTING — check first before answering:
+If the user's prompt clearly belongs to a specialist agent, say so BEFORE answering:
+- Contains "ENCY", "herb", "constituent", "botanical", "Quercetin", or similar → "💡 Tip: Switch the agent to **Encyclopedia (ENCY)** for a better answer on this topic."
+- Contains "BMaster", "hive", "apiary", "inspection", "varroa", "queen" → "💡 Tip: Switch the agent to **BMaster** for beekeeping-specific help."
+- Contains "inventory", "stock", "SKU", "BOM" → "💡 Tip: Switch to **Inventory** agent."
+Give the hint on its own line, then continue with whatever partial help you can offer.
 
 ## DAILY LOG ENTRIES — handle immediately with NO extra questions:
 When the user says "good morning", "morning log", "start of day log", "create a log entry" or similar:
@@ -8401,11 +10542,31 @@ AP (amounts owed to suppliers) → 2000 Accounts Payable (Liability)
 GST/HST paid → 2310 GST/HST Payable or 1310 Input Tax Credits (Asset)
 PST paid → 2320 PST Payable
 
-## ACTIONS YOU CAN PERFORM
-When the user asks you to create or update data, respond with a JSON action block:
+## YOUR ROLE
+You are an accounting advisor and form-fill assistant. You explain accounting concepts, advise on
+journal entries, and pre-fill data-entry forms. You do NOT post actual GL entries, modify ledger
+records, or execute any accounting transaction directly — all financial records must be created by
+a human through the appropriate form.
 
-To post a manual GL entry:
-{"action":"create_gl_entry","reference":"ADJ-2026-001","description":"Manual adjustment","post_date":"2026-04-15","lines":[{"account_id":1,"amount":100.00,"memo":"Debit inventory"},{"account_id":5,"amount":-100.00,"memo":"Credit equity"}]}
+Do NOT emit create_gl_entry or any action that writes directly to accounting tables. Instead,
+explain the correct journal entry (DR/CR accounts, amounts, reference) and direct the user to
+/Accounting/gl/new to enter it manually.
+
+## PRE-FILL FORM ACTIONS
+You may open and pre-fill data-entry forms so the user can review and submit them:
+
+To open the supplier invoice form and pre-fill it from a bill the user has pasted:
+Parse the bill text, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION e.g. Freedom Mobile autopay Apr 2026", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT", "auto_pay": "1", "auto_pay_method": "PAYMENT_METHOD if autopay"}}]
+
+Rules for navigate_and_fill invoice entry:
+- supplier_id is a dropdown — tell the user the supplier name and ask them to select it after the form opens.
+- If the supplier does not exist, suggest they go to /Inventory/supplier/add first.
+- Put all tax (GST/HST/PST) in tax_amount, NOT as a line item.
+- If the bill shows "$22.40 total, tax included" with no breakdown, set tax_amount to 0 and unit_cost_0 to the full amount.
+- auto_pay_method and auto_pay: fill both only if the bill shows "Auto Pay" or similar (e.g. "Visa Auto Pay"); omit both if not autopay.
+- After the action line, briefly list the values you used so the user can verify before saving.
 
 Only use actions when the user explicitly requests a data change.  Always confirm
 the details before executing.
@@ -8413,6 +10574,138 @@ the details before executing.
 $editor_section
 The current user is: $username
 END_PROMPT
+}
+
+# ── _is_shanta_editor ─────────────────────────────────────────────────────────
+sub _is_shanta_editor {
+    my ($self, $c) = @_;
+    my $auth = Comserv::Util::AdminAuth->new();
+    return 1 if $auth->is_csc_admin($c);
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : '') || '';
+    return 1 if lc($username) eq 'shanta';
+    # On dev workstations, any logged-in admin may use the code editor
+    if ($self->_is_dev_mode($c)) {
+        return 1 if $c->stash->{is_admin};
+        return 1 if $auth->check_admin_access($c, 'shanta_editor');
+    }
+    return 0;
+}
+
+sub _require_shanta_editor {
+    my ($self, $c, $action_name) = @_;
+    if ($self->_is_shanta_editor($c)) {
+        return 1;
+    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+        '_require_shanta_editor', "Access denied for $action_name");
+    $c->flash->{error_msg} = 'The AI Code Editor is restricted to CSC administrators.';
+    $c->response->redirect($c->uri_for('/user/login', {
+        destination => $c->req->uri,
+    }));
+    return 0;
+}
+
+sub _project_root_path {
+    my ($self, $c) = @_;
+    return $c->config->{home}
+        || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+}
+
+my @_EDITOR_ROOTS = qw(lib root sql script t);
+
+sub _list_dir_param {
+    my ($self, $c) = @_;
+    my $raw = $c->request->param('rel');
+    $raw = $c->request->param('dir') if !defined $raw || $raw eq '';
+    return '' if ref $raw;
+    $raw = '' unless defined $raw;
+    $raw = "$raw";
+    return '' if $raw =~ /HASH\s*\(\s*0x/i || $raw =~ /::/;
+    return $self->_sanitize_editor_rel_path($raw);
+}
+
+sub _sanitize_editor_rel_path {
+    my ($rel) = @_;
+    return '' unless defined $rel;
+    return '' if ref $rel;
+    $rel = "$rel";
+    return '' if $rel =~ /HASH\s*\(\s*0x/i;
+    $rel =~ s/^\s+|\s+$//g;
+    $rel =~ s{^/+}{};
+    $rel =~ s{\.\.}{}g;
+    $rel =~ s{//+}{/}g;
+    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+    $rel =~ s{^Comserv/}{}i;
+    return $rel;
+}
+
+sub _editor_path_allowed {
+    my ($self, $rel) = @_;
+    $rel = $self->_sanitize_editor_rel_path($rel);
+    return 0 unless $rel;
+    my ($top) = split m{/}, $rel, 2;
+    return 0 unless grep { $_ eq $top } @_EDITOR_ROOTS;
+    return $rel;
+}
+
+sub _editor_read_file_snippet {
+    my ($self, $c, $rel, $limit) = @_;
+    $limit //= 400;
+    $limit = 800 if $limit > 800;
+
+    unless ($self->_editor_enabled($c)) {
+        return (undef, 'Editor access required');
+    }
+
+    $rel = $self->_sanitize_editor_rel_path($rel);
+    unless ($self->_editor_path_allowed($rel)) {
+        return (undef, "Path not allowed: $rel (use lib/, root/, sql/, script/, or t/ under the project root)");
+    }
+
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$rel";
+    unless (-f $full) {
+        return (undef, "File not found: $rel (project root: $root)");
+    }
+
+    open(my $fh, '<:utf8', $full) or return (undef, "Cannot read $rel: $!");
+    my @lines = <$fh>;
+    close $fh;
+    my $total = scalar @lines;
+    my $end   = $limit - 1;
+    $end = $total - 1 if $end >= $total;
+    my $chunk = join '', @lines[0..$end];
+
+    return ($chunk, undef);
+}
+
+sub _inject_read_file_tags {
+    my ($self, $c, $prompt) = @_;
+    return $prompt unless defined $prompt && $prompt =~ /\[READ_FILE:/i;
+
+    my $out = $prompt;
+    while ($out =~ /\[READ_FILE:\s*([^\]]+)\]/i) {
+        my $path = $1;
+        $path =~ s/^\s+|\s+$//g;
+        my ($content, $err) = $self->_editor_read_file_snippet($c, $path, 500);
+        my $block = $content
+            ? "[FILE: $path]\n```\n$content\n```\n[/FILE]"
+            : "[FILE: $path] (load failed: $err)";
+        $out =~ s/\[READ_FILE:\s*\Q$path\E\s*\]/$block/i;
+    }
+    return $out;
+}
+
+# ── _editor_enabled ───────────────────────────────────────────────────────────
+# Shanta/CSC admin code editor: dev workstation, or remote_code_editor in config.
+# Clients (tablet, laptop) hit the server over HTTPS; code stays on the dev host.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _editor_enabled {
+    my ($self, $c) = @_;
+    return 0 unless $self->_is_shanta_editor($c);
+    return 1 if $self->_is_dev_mode($c);
+    return 1 if $c->config->{remote_code_editor};
+    return 0;
 }
 
 # ── _is_dev_mode ──────────────────────────────────────────────────────────────
@@ -8430,6 +10723,7 @@ sub _is_dev_mode {
     my $hostname = eval { require Comserv::Util::SystemInfo;
                           Comserv::Util::SystemInfo::get_server_hostname() } || '';
     return 1 if $hostname =~ /workstation|localhost/i;
+    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /^(dev|development|workstation)/i;
     return 0;
 }
 
@@ -8583,8 +10877,86 @@ Rules for fixes:
 - Only propose a fix when you are confident it is correct.
 - Do not add code comments unless the user asks.
 
+DEDICATED WORKSPACE:
+- Shanta admin opens /ai/editing_widget for a Cursor-like UI: file tree, editor, and this chat side-by-side.
+- When a file is open in that editor, the user message will include a [FILE: path] block automatically.
+
 RESTRICTION: This agent is DEVELOPMENT ONLY. Never available on production.
 END_PROMPT
+}
+
+sub _build_ai_editor_section {
+    my ($self, $c) = @_;
+    return '' unless $self->_is_shanta_editor($c);
+    return <<'END_SECTION';
+
+## AI CODE EDITOR (Shanta admin)
+Open /ai/editing_widget on a development workstation for a Cursor-like workspace:
+file browser (lib/, root/, sql/, script/, t/), in-browser editor, and integrated coding chat.
+Use [READ_FILE: path] to load files; use ## FIX: blocks so the Apply button appears.
+END_SECTION
+}
+
+# ── list_dir ───────────────────────────────────────────────────────────────────
+sub list_dir :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $dir = $self->_list_dir_param($c);
+    if ($dir ne '' && !$self->_editor_path_allowed($dir)) {
+        $c->response->body(encode_json({
+            success      => JSON::false,
+            error        => "Directory not allowed: $dir",
+            hint         => 'Open folders under lib/, root/, sql/, script/, or t/ only.',
+            project_root => $self->_project_root_path($c),
+        }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    my @entries;
+
+    if ($dir eq '') {
+        for my $top (@_EDITOR_ROOTS) {
+            my $full = "$root/$top";
+            push @entries, { name => $top, path => $top, type => 'dir' } if -d $full;
+        }
+    } else {
+        my $full = "$root/$dir";
+        unless (-d $full) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Not a directory: $dir" }));
+            return;
+        }
+        opendir(my $dh, $full) or do {
+            $c->response->body(encode_json({ success => JSON::false, error => "Cannot read directory: $!" }));
+            return;
+        };
+        my @names = sort grep { $_ !~ /^\./ } readdir($dh);
+        closedir $dh;
+        for my $name (@names) {
+            my $child_rel = "$dir/$name";
+            $child_rel =~ s{//+}{/}g;
+            next unless $self->_editor_path_allowed($child_rel);
+            my $child_full = "$root/$child_rel";
+            push @entries, {
+                name => $name,
+                path => $child_rel,
+                type => (-d $child_full ? 'dir' : 'file'),
+            };
+        }
+    }
+
+    $c->response->body(encode_json({
+        success      => JSON::true,
+        dir          => $dir,
+        entries      => \@entries,
+        project_root => $root,
+    }));
 }
 
 # ── read_file ──────────────────────────────────────────────────────────────────
@@ -8605,10 +10977,32 @@ sub read_file :Local :Args(0) {
         return;
     }
 
-    my $rel = $c->request->params->{path} || '';
-    $rel =~ s{^/+}{};
-    $rel =~ s{\.\.}{}g;
-    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} || '');
+
+    my $shanta_editor = $self->_editor_enabled($c);
+
+    if ($shanta_editor) {
+        unless ($self->_editor_path_allowed($rel)) {
+            $c->response->body(encode_json({
+                success      => JSON::false,
+                error        => "Path not allowed: $rel",
+                hint         => 'Use paths under lib/, root/, sql/, script/, or t/ (e.g. lib/Comserv/Controller/AI.pm).',
+                project_root => $self->_project_root_path($c),
+            }));
+            return;
+        }
+        my ($content, $err) = $self->_editor_read_file_snippet($c, $rel, int($c->request->params->{limit} || 800));
+        if ($err) {
+            $c->response->body(encode_json({ success => JSON::false, error => $err }));
+            return;
+        }
+        $c->response->body(encode_json({
+            success => JSON::true,
+            path    => $rel,
+            content => $content,
+        }));
+        return;
+    }
 
     # Non-dev admins may only read template files
     if (!$is_dev && $rel !~ /\.tt$/) {
@@ -8616,8 +11010,7 @@ sub read_file :Local :Args(0) {
         return;
     }
 
-    my $root = $c->config->{home}
-            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $root = $self->_project_root_path($c);
     my $full = "$root/$rel";
 
     unless (-f $full) {
@@ -8627,7 +11020,7 @@ sub read_file :Local :Args(0) {
 
     my $offset = int($c->request->params->{offset} || 0);
     my $limit  = int($c->request->params->{limit}  || 300);
-    $limit = 500 if $limit > 500;
+    $limit = 500 if $limit > 800;
 
     open(my $fh, '<:utf8', $full) or do {
         $c->response->body(encode_json({ success => JSON::false, error => "Cannot read: $!" }));
@@ -8675,14 +11068,15 @@ sub apply_fix :Local :Args(0) {
     $rel =~ s{\.\.}{}g;
     $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
 
-    # Non-dev admins may only write template files
-    if (!$is_dev_fix && $rel !~ /\.tt$/) {
+    my $shanta_editor_fix = $self->_editor_enabled($c);
+
+    # Non-dev admins may only write template files (Shanta editor on dev may write all)
+    if (!$is_dev_fix && !$shanta_editor_fix && $rel !~ /\.tt$/) {
         $c->response->body(encode_json({ success => JSON::false, error => 'Non-dev admins may only edit .tt files' }));
         return;
     }
 
-    my $root = $c->config->{home}
-            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $root = $self->_project_root_path($c);
     my $full = "$root/$rel";
 
     unless (-f $full) {
@@ -8744,6 +11138,948 @@ sub apply_fix :Local :Args(0) {
         backup  => "$rel.bak",
         message => "File updated. Original backed up as $rel.bak",
     }));
+}
+
+=head2 transcribe
+
+POST /ai/transcribe — Accept a multipart audio file upload, run it through Whisper,
+and return { success, transcript, model_used }.  The audio file is saved to /tmp,
+transcribed, then immediately deleted.
+
+Whisper is called via the Python binary in Comserv/speechfire or Comserv/venv.
+If neither is available, returns an error asking the user to install openai-whisper.
+
+=cut
+
+sub transcribe :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || '';
+    my $is_guest = !$username || lc($username) eq 'guest';
+    if ($is_guest) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required to use voice transcription' }));
+        return;
+    }
+
+    my $upload = $c->request->upload('audio');
+    unless ($upload) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'No audio file uploaded (field name: audio)' }));
+        return;
+    }
+
+    my $orig_name = $upload->filename || 'recording.wav';
+    (my $ext = lc($orig_name)) =~ s/.*\.//;
+    $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
+
+    my $job_id   = time() . '_' . $$;
+    my $tmp_dir  = '/tmp';
+    my $tmp_file = "$tmp_dir/whisper_job_${job_id}.${ext}";
+
+    eval { $upload->copy_to($tmp_file) };
+    if ($@ || !-f $tmp_file) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio file: $@" }));
+        return;
+    }
+
+    my $safe_user_early = $username; $safe_user_early =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base_early       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs_early      = "${nfs_base_early}/bmaster/audio";
+    my $transcript_nfs_early = "${nfs_base_early}/bmaster/transcripts";
+    my $timestamp_early      = time();
+    my $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
+    my $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
+    my $sitename_early  = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size_early = $upload->size;
+
+    my $source_type = 'nfs';
+    eval {
+        require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
+        require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
+            or die "copy to NFS failed: $!";
+    };
+    if ($@) {
+        my $local_base = $c->path_to('root', 'uploads')->stringify;
+        $audio_nfs_early = "${local_base}/bmaster/audio";
+        $transcript_nfs_early = "${local_base}/bmaster/transcripts";
+        $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
+        $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
+        $source_type = 'local';
+        eval {
+            require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
+            require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
+                or die "copy to local fallback failed: $!";
+        };
+        if ($@) {
+            unlink $tmp_file;
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to NFS and local fallback: $@" }));
+            return;
+        }
+    }
+
+    my $audio_file_id = undef;
+    eval {
+        require POSIX;
+        my $user_id     = $c->session->{user_id} // 0;
+        my $site_id     = $c->session->{SiteID} // 0;
+        my $upload_date = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
+        my $schema  = $c->model('DBEncy');
+        my $audio_row = $schema->resultset('File')->create({
+            file_name    => $orig_name,
+            file_type    => 'audio',
+            file_data    => '',
+            site_id      => $site_id,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => "Hive inspection audio recorded by " . ($username || ''),
+            upload_date  => $upload_date,
+            file_size    => $upload_size_early,
+            file_path    => $nfs_audio_file_early,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => 'audio/' . $ext,
+            user_id      => $user_id,
+            nfs_path     => $nfs_audio_file_early,
+            external_url => '',
+            access_level => 'site_only',
+            source_type  => $source_type,
+            sitename     => $sitename_early,
+        });
+        $audio_file_id = $audio_row->id + 0;
+    };
+    if ($@) {
+        warn "Failed to create early File database row for audio: $@\n";
+    }
+    my $worktree  = $c->path_to('..')->stringify;
+    my $app_root  = $c->path_to('.')->stringify;
+    my @python_candidates = (
+        "$app_root/whisper_venv/bin/python3",
+        "$worktree/whisper_venv/bin/python3",
+        "$app_root/speechfire/bin/python3",
+        "$worktree/speechfire/bin/python3",
+        "$app_root/venv/bin/python3",
+        "$worktree/venv/bin/python3",
+        '/usr/bin/python3',
+        'python3',
+    );
+
+    my $python_bin = '';
+    for my $p (@python_candidates) {
+        next unless $p;
+        my $abs = $p;
+        if ($abs !~ m{^/}) {
+            chomp(my $found = `which $abs 2>/dev/null`);
+            $abs = $found || '';
+        }
+        if ($abs && -x $abs) {
+            my $has_whisper = `"$abs" -c "import whisper" 2>&1`;
+            if ($? == 0) {
+                $python_bin = $abs;
+                last;
+            }
+        }
+    }
+
+    unless ($python_bin) {
+        unlink $tmp_file;
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
+        }));
+        return;
+    }
+
+    my $want_diarize = ($c->request->param('diarize') || $c->request->body_parameters->{diarize} || '') ? 1 : 0;
+    my $num_speakers = int($c->request->param('num_speakers') || $c->request->body_parameters->{num_speakers} || 2);
+    $num_speakers = 2 if $num_speakers < 2 || $num_speakers > 8;
+
+    my $has_diarizer = ($want_diarize && `"$python_bin" -c "import simple_diarizer" 2>&1` =~ /^\s*$/) ? 1 : 0;
+
+    my $whisper_model  = 'small';
+    my $torch_hub_dir  = $c->path_to('whisper_venv', '.torch_hub')->stringify;
+
+    my $whisper_script = <<"PYSCRIPT";
+import sys, json, os
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['TORCH_DEVICE'] = 'cpu'
+import whisper, torch
+torch.hub.set_dir('$torch_hub_dir')
+audio_path = sys.argv[1]
+model_name = sys.argv[2] if len(sys.argv) > 2 else 'base'
+want_diarize = sys.argv[3] == '1' if len(sys.argv) > 3 else False
+num_speakers = int(sys.argv[4]) if len(sys.argv) > 4 else 2
+
+model = whisper.load_model(model_name, device='cpu')
+wresult = model.transcribe(audio_path, language='en', fp16=False)
+
+segments_out = []
+if want_diarize:
+    try:
+        _real_stdout = sys.stdout
+        sys.stdout = sys.stderr
+        from simple_diarizer.diarizer import Diarizer
+        diar = Diarizer(embed_model='ecapa', cluster_method='sc')
+        spk_segs = diar.diarize(audio_path, num_speakers=num_speakers)
+        sys.stdout = _real_stdout
+        def get_speaker(start, end):
+            best = 'UNKNOWN'
+            best_overlap = 0
+            for s in spk_segs:
+                overlap = min(end, s['end']) - max(start, s['start'])
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best = f"SPEAKER_{s['label']}"
+            return best
+        for seg in wresult['segments']:
+            segments_out.append({
+                'start': round(seg['start'], 1),
+                'end':   round(seg['end'], 1),
+                'speaker': get_speaker(seg['start'], seg['end']),
+                'text': seg['text'].strip()
+            })
+    except Exception as e:
+        try: sys.stdout = _real_stdout
+        except NameError: pass
+        segments_out = [{'start': s['start'], 'end': s['end'], 'speaker': 'SPEAKER_0', 'text': s['text'].strip()} for s in wresult['segments']]
+else:
+    for seg in wresult['segments']:
+        segments_out.append({'start': round(seg['start'],1), 'end': round(seg['end'],1), 'speaker': None, 'text': seg['text'].strip()})
+
+print(json.dumps({'transcript': wresult['text'].strip(), 'model': model_name, 'segments': segments_out}))
+PYSCRIPT
+
+    my $py_script_file = "$tmp_dir/whisper_job_${job_id}.py";
+    my $result_file    = "$tmp_dir/whisper_job_${job_id}_result.json";
+    my $status_file    = "$tmp_dir/whisper_job_${job_id}.status";
+
+    open(my $sfh, '>', $py_script_file) or do {
+        unlink $tmp_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to write whisper script' }));
+        return;
+    };
+    print $sfh $whisper_script;
+    close $sfh;
+
+    my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs      = "${nfs_base}/bmaster/audio";
+    my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
+    my $timestamp      = time();
+    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
+    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
+    my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size    = $upload->size;
+
+    {
+        open(my $sf, '>', $status_file) or do { };
+        print $sf encode_json({ status => 'processing', started => $timestamp });
+        close $sf;
+    }
+
+    require POSIX;
+    my $child = fork();
+    if (!defined $child) {
+        unlink $tmp_file, $py_script_file, $status_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to start background transcription' }));
+        return;
+    }
+
+    if ($child == 0) {
+        my $grandchild = fork();
+        if (defined $grandchild && $grandchild == 0) {
+            POSIX::setsid();
+            open(STDIN,  '<', '/dev/null');
+            open(STDOUT, '>', '/dev/null');
+            open(STDERR, '>>', '/tmp/whisper_bg.log');
+
+            my $json_out = '';
+            eval {
+                my $py_pid = open(my $py_out, '-|', $python_bin, $py_script_file,
+                    $tmp_file, $whisper_model, ($has_diarizer ? '1' : '0'), "$num_speakers")
+                    or die "Cannot start python: $!";
+                $json_out = do { local $/; <$py_out> } // '';
+                close $py_out;
+                waitpid($py_pid, 0);
+            };
+
+            unlink $py_script_file;
+
+            if ($@ || !$json_out) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@" }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $result = eval { decode_json($json_out) };
+            unless ($result && $result->{transcript}) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript' }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $model_used = $result->{model} || $whisper_model;
+            my $segments   = $result->{segments} || [];
+
+            my $nfs_ok = 1;
+            eval {
+                require File::Path;
+                File::Path::make_path($audio_nfs, $transcript_nfs);
+            };
+            if ($@) {
+                my $err = "$@";
+                $nfs_ok = 0;
+                print STDERR "NFS error: Failed to create directories $audio_nfs, $transcript_nfs: $err\n";
+            }
+
+            if ($nfs_ok) {
+                require File::Copy;
+                unless (File::Copy::copy($tmp_file, $nfs_audio_file)) {
+                    my $err = $!;
+                    $nfs_ok = 0;
+                    print STDERR "NFS error: Failed to copy audio file from $tmp_file to $nfs_audio_file: $err\n";
+                }
+            }
+            unlink $tmp_file;
+            if ($nfs_ok) {
+                my $transcript_json = encode_json({
+                    transcript => $result->{transcript},
+                    segments   => $segments,
+                    model_used => $model_used,
+                    recorded_by => $username,
+                    original_filename => $orig_name,
+                });
+                { open(my $tfh, '>:utf8', $nfs_transcript_file) or ($nfs_ok = 0); print $tfh $transcript_json if $nfs_ok; close $tfh if $nfs_ok; }
+            }
+
+            open(my $rf, '>', $result_file);
+            print $rf encode_json({
+                success            => JSON::true,
+                transcript         => $result->{transcript},
+                model_used         => $model_used,
+                segments           => $segments,
+                diarized           => $has_diarizer ? JSON::true : JSON::false,
+                audio_nfs_path     => $nfs_ok ? $nfs_audio_file    : undef,
+                transcript_nfs_path=> $nfs_ok ? $nfs_transcript_file : undef,
+                orig_name          => $orig_name,
+                file_size          => $upload_size,
+                sitename           => $sitename,
+                username           => $username,
+                ext                => $ext,
+                source_type        => $source_type,
+            });
+            close $rf;
+
+            open(my $sf, '>', $status_file);
+            print $sf encode_json({ status => 'done' });
+            close $sf;
+
+            POSIX::_exit(0);
+        }
+        POSIX::_exit(0);
+    }
+
+    waitpid($child, 0);
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        job_id  => $job_id,
+        status  => 'processing',
+    }));
+}
+
+sub transcribe_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    my $job_id = $c->request->param('job_id') // '';
+    unless ($job_id =~ /^\d+_\d+$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid job_id' }));
+        return;
+    }
+
+    my $status_file = "/tmp/whisper_job_${job_id}.status";
+    unless (-f $status_file) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Job not found or expired' }));
+        return;
+    }
+
+    my $status_json = do { local $/; open(my $f, '<', $status_file) or return; <$f> };
+    my $status = eval { decode_json($status_json) } || { status => 'processing' };
+
+    if ($status->{status} eq 'done') {
+        my $result_file = "/tmp/whisper_job_${job_id}_result.json";
+        my $result_json = do { local $/; open(my $f, '<', $result_file) or do { $c->response->body(encode_json({success=>JSON::false,error=>'Result missing'})); return; }; <$f> };
+        my $result = eval { decode_json($result_json) } || { success => JSON::false, error => 'Invalid result' };
+        unlink $status_file, $result_file;
+
+        if ($result->{success} && $result->{audio_nfs_path}) {
+            eval {
+                my $schema  = $c->model('DBEncy');
+                my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
+                my $audio_row = $schema->resultset('File')->find({ nfs_path => $result->{audio_nfs_path} });
+                unless ($audio_row) {
+                    require POSIX;
+                    my $user_id     = $c->session->{user_id} // 0;
+                    my $site_id     = $c->session->{SiteID} // 0;
+                    my $upload_date = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
+                    $audio_row = $schema->resultset('File')->create({
+                        file_name    => $result->{orig_name},
+                        file_type    => 'audio',
+                        file_data    => '',
+                        site_id      => $site_id,
+                        reference_id => 0,
+                        category_id  => 0,
+                        share_id     => 0,
+                        description  => "Hive inspection audio recorded by " . ($result->{username} || ''),
+                        upload_date  => $upload_date,
+                        file_size    => $result->{file_size} || 0,
+                        file_path    => $result->{audio_nfs_path},
+                        file_url     => '',
+                        file_status  => 'active',
+                        file_format  => 'audio/' . ($result->{ext} || 'wav'),
+                        user_id      => $user_id,
+                        nfs_path     => $result->{audio_nfs_path},
+                        external_url => '',
+                        access_level => 'site_only',
+                        source_type  => $result->{source_type} || 'nfs',
+                        sitename     => $sitename,
+                    });
+                }
+                $result->{audio_file_id} = $audio_row->id + 0;
+
+                if ($result->{transcript_nfs_path}) {
+                    my $trans_row = $schema->resultset('File')->find({ nfs_path => $result->{transcript_nfs_path} });
+                    unless ($trans_row) {
+                        require POSIX;
+                        my $user_id     = $c->session->{user_id} // 0;
+                        my $site_id     = $c->session->{SiteID} // 0;
+                        my $upload_date = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
+                        $trans_row = $schema->resultset('File')->create({
+                            file_name    => ($result->{orig_name} || 'transcript') . '.json',
+                            file_type    => 'transcript',
+                            file_data    => '',
+                            site_id      => $site_id,
+                            reference_id => 0,
+                            category_id  => 0,
+                            share_id     => 0,
+                            description  => "Whisper transcript for " . ($result->{orig_name} || ''),
+                            upload_date  => $upload_date,
+                            file_size    => length($result->{transcript} || ''),
+                            file_path    => $result->{transcript_nfs_path},
+                            file_url     => '',
+                            file_status  => 'active',
+                            file_format  => 'application/json',
+                            user_id      => $user_id,
+                            nfs_path     => $result->{transcript_nfs_path},
+                            external_url => '',
+                            access_level => 'site_only',
+                            source_type  => $result->{source_type} || 'nfs',
+                            sitename     => $sitename,
+                        });
+                    }
+                    $result->{transcript_file_id} = $trans_row->id + 0;
+                }
+            };
+        }
+
+        delete $result->{$_} for qw(audio_nfs_path transcript_nfs_path orig_name file_size sitename username ext);
+        $c->response->body(encode_json($result));
+    } elsif ($status->{status} eq 'error') {
+        unlink $status_file;
+        $c->response->body(encode_json({ success => JSON::false, error => $status->{error} || 'Transcription failed' }));
+    } else {
+        $c->response->body(encode_json({ success => JSON::true, status => 'processing' }));
+    }
+}
+
+=head2 usage
+
+Admin / operator usage monitor for AI chat.
+Shows calls by provider, model, customer (site), tokens, estimated costs.
+Supports basic filtering for billing reports and capacity planning (anticipate ollama load vs paid spend).
+Access: any authenticated user sees their site's usage; admins see more.
+=cut
+
+sub usage :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} || 'Guest';
+    my $user_id  = $c->session->{user_id};
+    my $site_id  = $c->session->{SiteID};
+    my $roles    = $c->session->{roles} || [];
+    $roles = [split /,/, $roles] unless ref $roles eq 'ARRAY';
+
+    my $is_admin = grep { /^admin$/i } @$roles;
+
+    # Filters from query
+    my $days       = $c->req->param('days') || 30;
+    my $prov_f     = $c->req->param('provider') || '';
+    my $site_f     = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
+    my $model_f    = $c->req->param('model') || '';
+
+    my $schema = eval { $c->model('DBEncy')->schema };
+    my @logs;
+    my %summary = ( total_calls => 0, total_tokens => 0, total_cost => 0, by_provider => {}, by_site => {} );
+
+    if ($schema) {
+        my $rs = $schema->resultset('AiUsageLog');
+        my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
+
+        my $cond = { created_at => { '>=' => $since } };
+        $cond->{provider} = $prov_f if $prov_f;
+        $cond->{site_id}  = $site_f if $site_f;
+        $cond->{model}    = { 'like' => "%$model_f%" } if $model_f;
+
+        # Limit rows for UI
+        @logs = $rs->search($cond, { order_by => { -desc => 'created_at' }, rows => 200 })->all;
+
+        # Compute aggregates (simple, in-mem for now; for high volume add SQL GROUP BY)
+        foreach my $log (@logs) {
+            $summary{total_calls}++;
+            $summary{total_tokens} += $log->total_tokens || 0;
+            $summary{total_cost}   += $log->estimated_cost_usd || 0;
+
+            my $p = $log->provider || 'unknown';
+            $summary{by_provider}{$p}{calls}  += 1;
+            $summary{by_provider}{$p}{tokens} += $log->total_tokens || 0;
+            $summary{by_provider}{$p}{cost}   += $log->estimated_cost_usd || 0;
+
+            my $s = $log->site_id || 0;
+            $summary{by_site}{$s}{calls}  += 1;
+            $summary{by_site}{$s}{tokens} += $log->total_tokens || 0;
+            $summary{by_site}{$s}{cost}   += $log->estimated_cost_usd || 0;
+
+            # Track quota info for display
+            if ($log->plan_ai_requests_per_day) {
+                $summary{by_site}{$s}{plan_quota} = $log->plan_ai_requests_per_day;
+            }
+            if (defined $log->within_free_quota) {
+                $summary{by_site}{$s}{free_calls} += ($log->within_free_quota ? 1 : 0);
+                $summary{by_site}{$s}{overage_calls} += ($log->within_free_quota ? 0 : 1);
+            }
+        }
+        $summary{total_cost} = sprintf('%.4f', $summary{total_cost});
+    }
+
+    # For filter dropdowns: recent distinct providers/sites (lightweight)
+    my @providers = qw(ollama grok openai anthropic);
+    my @sites;
+    if ($is_admin && $schema) {
+        eval {
+            @sites = map { { id => $_->id, name => $_->name || $_->site_display_name || 'Site '.$_->id } }
+                     $schema->resultset('Site')->search({}, { rows => 50, order_by => 'name' })->all;
+        };
+    }
+
+    $c->stash(
+        template    => 'ai/usage.tt',
+        page_title  => 'AI Usage & Billing Monitor',
+        logs        => \@logs,
+        summary     => \%summary,
+        filters     => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
+        providers   => \@providers,
+        sites       => \@sites,
+        is_admin    => $is_admin ? 1 : 0,
+        current_site=> $site_id,
+        username    => $username,
+    );
+}
+
+=head2 grok_balance
+
+Returns live (or best-effort) usage/balance info from the xAI API for the
+configured Grok key (prefers the current user's key from UserApiKeys if present).
+
+Also includes a summary of our internal tracking from ai_usage_logs for Grok calls
+(tokens, estimated cost, recent activity).
+
+This lets operators see exactly where they stand with xAI credits and trigger
+refill alerts or usage caution.
+
+Frontend can call this from /ai/usage or a dedicated button.
+=cut
+
+sub grok_balance :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $user_id = $c->session->{user_id};
+    my $site_id = $c->session->{SiteID};
+    
+    # Early auth check - return clean JSON instead of letting Catalyst redirect or crash
+    unless ($user_id) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'You must be logged in to check Grok/xAI balance and usage.',
+            hint    => 'Please log in at /user/login and ensure you have a Grok API key configured at /ai/manage_api_keys'
+        }));
+        return;
+    }
+    
+    my $can_select_model_perm = $c->session->{roles} && grep { /^(admin|developer|editor)$/i } (ref $c->session->{roles} ? @{$c->session->{roles}} : split(/,/, $c->session->{roles} || ''));
+    
+    my $result;
+    eval {
+        # Get the best available grok key — exactly the same logic the chat/generate paths use
+        # so that "we can use Grok" implies "we can check its balance".
+        my $api_key;
+        my $key_source = 'none';
+        my $key_found = 0;
+        my $key_obj;  # keep reference so we can update metadata for declared balance
+        
+        my $schema = $c->model('DBEncy')->schema;
+        if ($schema) {
+            if ($user_id) {
+                $key_obj = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' },
+                )->first;
+            }
+            # Admins fall back to any active global Grok key (same as inference paths)
+            if (!$key_obj && $can_select_model_perm) {
+                $key_obj = $schema->resultset('UserApiKeys')->search(
+                    { service => 'grok', is_active => '1' }
+                )->first;
+            }
+            
+            if ($key_obj && $key_obj->api_key_encrypted) {
+                $key_found = 1;
+                $api_key = $key_obj->get_api_key() || '';
+                $key_source = $user_id && $key_obj->user_id == $user_id ? 'user' : 'global_db';
+            }
+            
+            # Final fallback: whatever the default Grok model has (ENV / K8s secret)
+            unless ($api_key) {
+                my $g = $c->model('Grok');
+                if ($g && $g->api_key) {
+                    $api_key = $g->api_key;
+                    $key_source = 'global/env';
+                }
+            }
+        }
+        
+        # Support declaring known balance from console.x.ai (persisted in the key's metadata)
+        my $declare_balance = $c->req->param('declare_balance');
+        if ($declare_balance && $key_obj) {
+            my $meta = $key_obj->get_metadata() || {};
+            $meta->{declared_xai_balance_usd} = 0 + $declare_balance;
+            $meta->{declared_at} = DateTime->now->iso8601();
+            $key_obj->update({ metadata => encode_json($meta) });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'grok_balance',
+                "User declared xAI balance \$$declare_balance for key " . $key_obj->id);
+        }
+        
+        unless ($api_key) {
+            my $msg = $key_found
+                ? 'Failed to decrypt your Grok API key. Please re-save it at /ai/manage_api_keys'
+                : 'No active Grok/xAI API key found for this user or globally.';
+            $result = {
+                success => JSON::false,
+                error   => $msg,
+                hint    => 'Add or re-save a key at /ai/manage_api_keys (the same key used for chat must be usable here)'
+            };
+            return;
+        }
+        
+        # Get live from xAI using the *same* key the chat system just found (this is the key fix)
+        my $grok = $c->model('Grok');
+        $grok->api_key($api_key);
+        
+        # Time the live check call itself so we can track this diagnostic call in ai_usage_logs
+        my $check_start = time();
+        my $live = $grok->get_live_usage();
+        my $check_ms = int( (time() - $check_start) * 1000 );
+        
+        # Log this diagnostic call (the "your call" to xAI for balance/usage) in the same tracking system.
+        # This way balance checks are counted toward usage, quotas, and cost estimates.
+        # We use request_type 'grok_balance_check' and model 'xai-usage-check' to distinguish it.
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $site_id,
+            provider          => 'grok',
+            model             => 'xai-usage-check',
+            prompt_tokens     => 0,
+            completion_tokens => 0,
+            total_tokens      => 0,
+            duration_ms       => $check_ms,
+            request_type      => 'grok_balance_check',
+            status            => ( $live && defined $live->{http_status} ? 'success' : 'error' ),
+            error_message     => $live && $live->{error} ? $live->{error} : undef,
+            metadata          => { 
+                key_source => $key_source, 
+                live_http_status => $live->{http_status} || undef,
+                purpose => 'balance_usage_check'
+            },
+        );
+        
+        # (cleaned-up rich internal block starts here)
+        my %internal = ( 
+            total_grok_tokens => 0, total_grok_cost_usd => 0, calls => 0, by_site => {},
+            user_all_time_calls => 0, user_all_time_tokens => 0, user_all_time_cost => 0,
+            declared_balance => undef, declared_at => undef, estimated_spend_since_declared => 0,
+            real_grok_calls => 0, real_grok_tokens => 0, real_grok_cost => 0,
+            balance_check_calls => 0
+        );
+        if ($schema) {
+            my $since_30d = DateTime->now->subtract(days => 30)->ymd . ' 00:00:00';
+            my $rs30 = $schema->resultset('AiUsageLog')->search({
+                provider   => 'grok',
+                created_at => { '>=' => $since_30d },
+                status     => 'success',
+            });
+            while (my $row = $rs30->next) {
+                $internal{total_grok_tokens} += $row->total_tokens || 0;
+                $internal{total_grok_cost_usd} += $row->estimated_cost_usd || 0;
+                $internal{calls}++;
+                my $sid = $row->site_id || 0;
+                $internal{by_site}{$sid}{tokens} += $row->total_tokens || 0;
+                $internal{by_site}{$sid}{cost}   += $row->estimated_cost_usd || 0;
+                $internal{by_site}{$sid}{calls}++;
+                
+                if ($row->request_type && $row->request_type eq 'grok_balance_check') {
+                    $internal{balance_check_calls}++;
+                } else {
+                    $internal{real_grok_calls}++;
+                    $internal{real_grok_tokens} += $row->total_tokens || 0;
+                    $internal{real_grok_cost} += $row->estimated_cost_usd || 0;
+                }
+            }
+            $internal{total_grok_cost_usd} = sprintf('%.4f', $internal{total_grok_cost_usd});
+            $internal{real_grok_cost} = sprintf('%.4f', $internal{real_grok_cost});
+            
+            if ($user_id) {
+                my $rs_all = $schema->resultset('AiUsageLog')->search({
+                    user_id  => $user_id,
+                    provider => 'grok',
+                    status   => 'success',
+                });
+                while (my $row = $rs_all->next) {
+                    $internal{user_all_time_calls}++;
+                    $internal{user_all_time_tokens} += $row->total_tokens || 0;
+                    $internal{user_all_time_cost} += $row->estimated_cost_usd || 0;
+                }
+                $internal{user_all_time_cost} = sprintf('%.4f', $internal{user_all_time_cost});
+            }
+            
+            if ($key_obj) {
+                my $meta = $key_obj->get_metadata() || {};
+                if (exists $meta->{declared_xai_balance_usd}) {
+                    $internal{declared_balance} = 0 + $meta->{declared_xai_balance_usd};
+                    $internal{declared_at} = $meta->{declared_at};
+                    $internal{estimated_spend_since_declared} = sprintf('%.4f', $internal{user_all_time_cost});
+                }
+            }
+        }
+        
+        my $alert = 0;
+        my $alert_msg = '';
+        my $spend_for_alert = $internal{real_grok_cost} || $internal{total_grok_cost_usd};
+        if (defined $internal{declared_balance}) {
+            my $est_remaining = sprintf('%.4f', $internal{declared_balance} - $internal{estimated_spend_since_declared});
+            $alert_msg = "You declared \$$internal{declared_balance} balance on $internal{declared_at}. Estimated tracked spend since: \$$internal{estimated_spend_since_declared}. Approx remaining: \$$est_remaining. (Check console.x.ai for exact.)";
+            if ($est_remaining < 5) {
+                $alert = 1;
+                $alert_msg .= " — LOW BALANCE: top up recommended soon.";
+            }
+        } elsif ($live->{error} && $spend_for_alert > 5) {
+            $alert = 1;
+            $alert_msg = "High internal spend on Grok (~\$" . $spend_for_alert . " in last 30d, excluding diagnostic checks) and live xAI data unavailable. Check console.x.ai and consider refilling.";
+        } elsif ($spend_for_alert > 10) {
+            $alert = 1;
+            $alert_msg = "Significant Grok spend tracked (~\$" . $spend_for_alert . " last 30 days, real chat only). Review usage at /ai/usage and refill at console.x.ai if needed.";
+        }
+        
+        $result = {
+            success     => JSON::true,
+            key_source  => $key_source,
+            live        => $live,
+            internal    => \%internal,
+            alert       => $alert ? JSON::true : JSON::false,
+            alert_msg   => $alert_msg,
+            checked_at  => DateTime->now->iso8601,
+            note        => "Live balance not available via this key's API (xAI console is authoritative). Use the declare input on the page to tell us your known balance from console.x.ai so we can estimate remaining."
+        };
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grok_balance',
+            "Unhandled error in grok_balance: $@");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Unexpected error while checking Grok balance.',
+            hint    => 'Please ensure you are logged in and try again. Check application logs for details.'
+        }));
+        return;
+    }
+    
+    $c->response->body(encode_json($result));
+    
+}
+
+=head2 _estimate_ai_cost_usd
+
+Rough cost estimator for paid providers. Returns 0 for local (ollama).
+Prices are approximate and for monitoring/billing estimates only; update as provider pricing changes.
+=cut
+
+sub _estimate_ai_cost_usd {
+    my ($self, $provider, $model, $prompt_tokens, $completion_tokens) = @_;
+    $provider //= 'ollama';
+    $model    //= '';
+    $prompt_tokens //= 0;
+    $completion_tokens //= 0;
+
+    my $p = lc($provider);
+    return 0 if $p eq 'ollama' || $p eq 'local';
+
+    # xAI / Grok (approximate as of 2026; check current https://x.ai/api )
+    if ($p eq 'grok' || $p eq 'xai') {
+        # Rough tiers: grok-3 / grok-4 variants cheaper for fast, more for reasoning.
+        # Using ballpark $0.20 / M input, $0.80 / M output for common; adjust for real billing.
+        my $rate_in  = 0.00000020;  # per token
+        my $rate_out = 0.00000080;
+        if ($model =~ /mini|fast|non-reason/i) {
+            $rate_in  = 0.00000010;
+            $rate_out = 0.00000040;
+        } elsif ($model =~ /reason|large|4/i) {
+            $rate_in  = 0.00000050;
+            $rate_out = 0.00000150;
+        }
+        return sprintf('%.6f', ($prompt_tokens * $rate_in) + ($completion_tokens * $rate_out));
+    }
+
+    # OpenAI example (if used via api keys)
+    if ($p eq 'openai') {
+        my $rate_in = 0.00000050; # placeholder
+        my $rate_out = 0.00000150;
+        return sprintf('%.6f', ($prompt_tokens * $rate_in) + ($completion_tokens * $rate_out));
+    }
+
+    # Anthropic etc. placeholder 0 for now
+    return 0;
+}
+
+=head2 _log_ai_usage
+
+Centralized logger for every AI inference call (success or error).
+Records provider, model, tokens, cost estimate, site/user for customer billing,
+and timing/host for capacity planning / system usage anticipation.
+Safe: never throws; logs errors to system log only.
+=cut
+
+sub _log_ai_usage {
+    my ($self, $c, %args) = @_;
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return unless $schema;
+
+        my $user_id     = $args{user_id}     // $c->session->{user_id};
+        my $site_id     = $args{site_id}     // $c->session->{SiteID};
+        my $guest_id    = $args{guest_session_id} // $c->session->{guest_session_id};
+        my $provider    = $args{provider}    // 'ollama';
+        my $model       = $args{model}       // 'unknown';
+        my $pt          = $args{prompt_tokens}     // 0;
+        my $ct          = $args{completion_tokens} // 0;
+        my $tot         = $args{total_tokens}      // ($pt + $ct);
+        my $dur_ms      = $args{duration_ms};
+        my $req_type    = $args{request_type} // 'chat';
+        my $conv_id     = $args{conversation_id};
+        my $status      = $args{status} // 'success';
+        my $err_msg     = $args{error_message};
+        my $ollama_host = $args{ollama_host};
+        my $ip          = $c->request ? $c->request->address : undef;
+        my $meta        = $args{metadata} || {};
+
+        # Ensure numeric
+        $pt  += 0; $ct += 0; $tot += 0;
+
+        my $cost = $args{estimated_cost_usd};
+        unless (defined $cost) {
+            $cost = $self->_estimate_ai_cost_usd($provider, $model, $pt, $ct);
+        }
+
+        # === Wire in plan quota for "free calls" harmony ===
+        my $plan_id = undef;
+        my $plan_quota = 0;
+        my $within_free = 1;
+        my $bill_status = 'free';
+
+        eval {
+            my $memb_model = $c->model('Membership');
+            if ($memb_model && $site_id) {
+                $plan_quota = $memb_model->get_ai_daily_quota_for_site($c, $site_id, $user_id) || 0;
+
+                # Get active membership to snapshot plan_id (prefer membership id or plan? we store plan_id but using membership id is common in this codebase)
+                my $active_mem = $memb_model->get_active_plan($c, $user_id, $site_id);
+                $plan_id = $active_mem ? $active_mem->id : undef;
+
+                my ($is_within, $used_today) = $memb_model->is_ai_call_within_free_quota($c, $site_id, $provider, $user_id);
+                $within_free = $is_within ? 1 : 0;
+
+                my $is_paid_provider = $provider && lc($provider) ne 'ollama';
+                if ($is_paid_provider) {
+                    $bill_status = 'paid_provider';  # always cost-tracked
+                } elsif ($plan_quota > 0 && !$within_free) {
+                    $bill_status = 'overage';
+                } else {
+                    $bill_status = 'free';
+                }
+
+                # Update meta for visibility
+                $meta->{plan_quota} = $plan_quota;
+                $meta->{used_today_before_this} = $used_today;
+                $meta->{within_free_quota} = $within_free;
+            }
+        };
+
+        $schema->resultset('AiUsageLog')->create({
+            user_id                 => $user_id,
+            site_id                 => $site_id,
+            guest_session_id        => $guest_id,
+            provider                => $provider,
+            model                   => $model,
+            prompt_tokens           => $pt,
+            completion_tokens       => $ct,
+            total_tokens            => $tot,
+            estimated_cost_usd      => $cost,
+            duration_ms             => $dur_ms,
+            request_type            => $req_type,
+            conversation_id         => $conv_id,
+            status                  => $status,
+            error_message           => $err_msg,
+            ip_address              => $ip,
+            ollama_host             => $ollama_host,
+            plan_id                 => $plan_id,
+            plan_ai_requests_per_day=> $plan_quota,
+            within_free_quota       => $within_free,
+            billing_status          => $bill_status,
+            metadata                => (ref($meta) ? encode_json($meta) : $meta),
+        });
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_log_ai_usage',
+            sprintf("Logged AI usage: provider=%s model=%s tokens=%s/%s cost=%.6f site=%s user=%s status=%s",
+                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status));
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_log_ai_usage',
+            "Failed to write ai_usage_logs: $@");
+    }
 }
 
 __PACKAGE__->meta->make_immutable;

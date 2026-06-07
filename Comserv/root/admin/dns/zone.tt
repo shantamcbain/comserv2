@@ -1,0 +1,208 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>DNS Records &mdash; [% zone_name | html %]</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/admin/dns') %]" class="btn btn-secondary">&#8592; All Zones</a>
+        <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="btn btn-secondary">&#8592; OPNsense Gateway</a>
+    </div>
+</div>
+[% SET highlight_host = c.req.params.host %]
+[% IF highlight_host %]
+<div class="success-message" style="margin-bottom:12px;">
+    Looking for record <strong>[% highlight_host | html %]</strong> — highlighted below. Edit the <strong>Content</strong> field to change the IP.
+</div>
+[% END %]
+
+[% IF c.flash.error_msg %]
+<div class="error-message">[% c.flash.error_msg | html %]</div>
+[% END %]
+[% IF c.flash.success_msg %]
+<div class="success-message">[% c.flash.success_msg | html %]</div>
+[% END %]
+
+[% IF cf_error %]
+<div class="error-message">
+    <strong>Cloudflare API error:</strong> [% cf_error | html %]
+    &mdash; <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]">Check Cloudflare credentials</a>
+</div>
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+
+[% UNLESS cf_error %]
+
+<div class="data-container">
+<div class="form-section">
+    <h3>Add DNS Record</h3>
+    <form method="post" action="[% c.uri_for('/admin/dns/add_record/' _ zone_name) %]" class="app-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="add_type">Type</label>
+                <select id="add_type" name="type" class="form-input">
+                    <option value="A">A</option>
+                    <option value="AAAA">AAAA</option>
+                    <option value="CNAME">CNAME</option>
+                    <option value="MX">MX</option>
+                    <option value="TXT">TXT</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="add_name">Name <small>(e.g. <code>www</code> or <code>@</code>)</small></label>
+                <input type="text" id="add_name" name="name" class="form-input"
+                       placeholder="subdomain or @">
+            </div>
+            <div class="form-field">
+                <label for="add_content">Content <small>(IP or target)</small></label>
+                <input type="text" id="add_content" name="content" class="form-input"
+                       placeholder="e.g. 192.0.2.1">
+            </div>
+            <div class="form-field">
+                <label for="add_ttl">TTL <small>(1 = Auto)</small></label>
+                <input type="number" id="add_ttl" name="ttl" class="form-input" value="1" min="1">
+            </div>
+            <div class="form-field">
+                <label for="add_proxied">
+                    <input type="checkbox" id="add_proxied" name="proxied" value="1" checked>
+                    Proxied (orange cloud)
+                </label>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">+ Add Record</button>
+        </div>
+    </form>
+</div>
+</div>
+
+<div class="data-container">
+<div class="form-section">
+    <h3>Existing Records</h3>
+    [% IF records.size %]
+    <div class="table-container" style="overflow-x:auto">
+    <table class="data-table" style="table-layout:fixed;width:100%;min-width:700px">
+        <colgroup>
+            <col style="width:60px">
+            <col style="width:35%">
+            <col style="width:20%">
+            <col style="width:60px">
+            <col style="width:90px">
+            <col style="width:120px">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Name</th>
+                <th>Content</th>
+                <th>TTL</th>
+                <th>Proxied</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH r IN records %]
+            <tr id="row-[% r.id | html %]" class="dns-record-row" data-record-name="[% r.name | html %]">
+                <td><strong>[% r.type | html %]</strong></td>
+                <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0" title="[% r.name | html %]"><code>[% r.name | html %]</code></td>
+                <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0" title="[% r.content | html %]">[% r.content | html %]</td>
+                <td>[% r.ttl == 1 ? 'Auto' : r.ttl %]</td>
+                <td>[% r.proxied ? '&#9728; Yes' : '&#9679; DNS only' %]</td>
+                <td class="action-cell">
+                    <button class="btn btn-sm btn-edit" type="button"
+                            onclick="toggleEdit('[% r.id | html %]')">Edit</button>
+                    <form method="post"
+                          action="[% c.uri_for('/admin/dns/delete_record/' _ zone_name _ '/' _ r.id) %]"
+                          style="display:inline"
+                          onsubmit="return confirm('Delete [% r.type | html %] record [% r.name | html %]?')">
+                        <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            <tr id="edit-[% r.id | html %]" style="display:none">
+                <td colspan="6">
+                <form method="post" action="[% c.uri_for('/admin/dns/edit_record/' _ zone_name _ '/' _ r.id) %]"
+                      class="app-form" style="padding:0.5rem 0">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label>Type</label>
+                            <select name="type" class="form-input">
+                                [% FOREACH t IN ['A','AAAA','CNAME','MX','TXT'] %]
+                                <option value="[% t %]" [% IF r.type == t %]selected[% END %]>[% t %]</option>
+                                [% END %]
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label>Name</label>
+                            <input type="text" name="name" class="form-input" value="[% r.name | html %]">
+                        </div>
+                        <div class="form-field">
+                            <label>Content</label>
+                            <input type="text" name="content" class="form-input" value="[% r.content | html %]">
+                        </div>
+                        <div class="form-field">
+                            <label>TTL</label>
+                            <input type="number" name="ttl" class="form-input" value="[% r.ttl %]" min="1">
+                        </div>
+                        <div class="form-field">
+                            <label>
+                                <input type="checkbox" name="proxied" value="1"
+                                       [% IF r.proxied %]checked[% END %]>
+                                Proxied
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">&#10003; Save</button>
+                        <button type="button" class="btn btn-secondary"
+                                onclick="toggleEdit('[% r.id | html %]')">Cancel</button>
+                    </div>
+                </form>
+                </td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    </div>
+    [% ELSE %]
+    <div class="empty-state"><p>No DNS records found for this zone.</p></div>
+    [% END %]
+</div>
+</div>
+
+[% END %]
+
+</div>
+</div>
+
+</div>
+
+<style>
+.dns-record-row.dns-highlight > td { background: #fff9c4 !important; }
+.dns-record-row.dns-highlight { outline: 2px solid #f9a825; }
+</style>
+<script>
+function toggleEdit(id) {
+    var row = document.getElementById('edit-' + id);
+    row.style.display = (row.style.display === 'none') ? 'table-row' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var want = (new URLSearchParams(window.location.search)).get('host');
+    if (!want) return;
+    want = want.toLowerCase().replace(/\.$/, '');
+    var matchRow = null;
+    document.querySelectorAll('.dns-record-row').forEach(function(tr) {
+        var name = (tr.getAttribute('data-record-name') || '').toLowerCase().replace(/\.$/, '');
+        if (name === want || name === want.split('.')[0]) {
+            tr.classList.add('dns-highlight');
+            matchRow = tr;
+        }
+    });
+    if (matchRow) {
+        matchRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var id = matchRow.id.replace(/^row-/, '');
+        if (id) toggleEdit(id);
+    }
+});
+</script>

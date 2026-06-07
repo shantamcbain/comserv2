@@ -5,11 +5,9 @@
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
 
 <div class="app-container">
+  [% INCLUDE 'Accounting/_acct_inv_nav.tt' current_page='inventory' %]
   <div class="page-header">
     <h1>&#128230; Inventory — [% sitename | html %]</h1>
-    <div class="admin-actions">
-      <a href="/Accounting" class="btn btn-primary">&#128200; Accounting &amp; Inventory Hub</a>
-    </div>
   </div>
 
   <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.5rem;">
