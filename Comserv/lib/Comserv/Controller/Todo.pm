@@ -2929,144 +2929,143 @@ sub _do_reschedule {
         my $WORK_END_MIN   = 22 * 60;  # 1320 — 10 PM (calendar spans 5 AM–10 PM)
         my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
 
-        my $cur_dt = $today_dt->clone;
+        my $init_dt = $today_dt->clone;
 
         # For today, start from NOW (current minute within the day window).
         # If before 5 AM, start from 5 AM. If past 10 PM, roll to next day at 5 AM.
         my $now_total_min = $today_dt->hour * 60 + $today_dt->minute;
-        my $cur_slot_min;   # relative offset from WORK_START_MIN for current day
+        my $init_slot_min;
         if ($now_total_min >= $WORK_END_MIN) {
-            $cur_dt->add(days => 1);
-            $cur_slot_min = 0;
+            $init_dt->add(days => 1);
+            $init_slot_min = 0;
         } else {
-            # Start from current time (clamped to day start 5 AM)
-            $cur_slot_min = $now_total_min > $WORK_START_MIN
+            $init_slot_min = $now_total_min > $WORK_START_MIN
                 ? $now_total_min - $WORK_START_MIN
                 : 0;
         }
 
-        # Schedule ALL open non-fixed/non-recurring todos sequentially from now forward
+        # Group todos by site (skip fixed/recurring). Each site gets its own
+        # independent timeline so same-site todos never share a time slot.
+        my %todos_by_site;
         for my $todo (@rows) {
             my $is_rec   = $todo->can('is_recurring') ? ($todo->is_recurring // 0) : 0;
             my $is_fixed = $todo->can('is_fixed')     ? ($todo->is_fixed     // 0) : 0;
             my $ttype    = $todo->can('todo_type')    ? ($todo->todo_type    // 'task') : 'task';
             next if $is_rec || $is_fixed
                  || $ttype eq 'appointment' || $ttype eq 'meeting';
+            my $site = eval { $todo->sitename } // '';
+            $site = '_none' unless defined $site && length $site;
+            push @{ $todos_by_site{$site} }, $todo;
+        }
 
-            # Estimate duration in minutes: prefer log avg > stored > heuristic, min 5
-            my $stored_mins    = $todo->estimated_man_hours // 0;
-            my $heuristic_mins = exists $log_duration_mins{ $todo->record_id }
-                ? int($log_duration_mins{ $todo->record_id } + 0.5)
-                : _estimate_mins_heuristic($todo->subject // '');
-            my $est_mins = ($stored_mins > $heuristic_mins) ? $stored_mins : $heuristic_mins;
-            $est_mins = 5 if $est_mins < 5;
+        # Schedule each site independently — same starting cursor for every site
+        # so cross-site todos may share time slots but same-site todos never overlap.
+        for my $site (sort keys %todos_by_site) {
+            my $cur_dt       = $init_dt->clone;
+            my $cur_slot_min = $init_slot_min;
 
-            # Roll to next work day when current day is full
-            if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
-                $cur_dt->add(days => 1);
-                $cur_slot_min = 0;
-            }
+            for my $todo (@{ $todos_by_site{$site} }) {
+                # Estimate duration in minutes: prefer log avg > stored > heuristic, min 5
+                my $stored_mins    = $todo->estimated_man_hours // 0;
+                my $heuristic_mins = exists $log_duration_mins{ $todo->record_id }
+                    ? int($log_duration_mins{ $todo->record_id } + 0.5)
+                    : _estimate_mins_heuristic($todo->subject // '');
+                my $est_mins = ($stored_mins > $heuristic_mins) ? $stored_mins : $heuristic_mins;
+                $est_mins = 5 if $est_mins < 5;
 
-            my $new_start = $cur_dt->ymd;
-
-            # Advance past fixed/recurring blocked slots for this day
-            {
-                my $blocked = $get_blocked->($new_start);
-                my $changed = 1;
-                while ($changed) {
-                    $changed = 0;
-                    for my $b (@$blocked) {
-                        my ($bs, $be) = @$b;
-                        my $slot_abs = $WORK_START_MIN + $cur_slot_min;
-                        if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
-                            $cur_slot_min = $be - $WORK_START_MIN;
-                            $changed = 1;
-                        }
-                    }
-                }
-                # If blocked slots push us past end of day, roll to next day
+                # Roll to next work day when current day is full
                 if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
                     $cur_dt->add(days => 1);
                     $cur_slot_min = 0;
-                    $new_start    = $cur_dt->ymd;
-                    my $blocked2 = $get_blocked->($new_start);
-                    my $c2 = 1;
-                    while ($c2) {
-                        $c2 = 0;
-                        for my $b (@$blocked2) {
+                }
+
+                my $new_start = $cur_dt->ymd;
+
+                # Advance past fixed/recurring blocked slots for this day
+                {
+                    my $blocked = $get_blocked->($new_start);
+                    my $changed = 1;
+                    while ($changed) {
+                        $changed = 0;
+                        for my $b (@$blocked) {
                             my ($bs, $be) = @$b;
                             my $slot_abs = $WORK_START_MIN + $cur_slot_min;
                             if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
                                 $cur_slot_min = $be - $WORK_START_MIN;
-                                $c2 = 1;
+                                $changed = 1;
+                            }
+                        }
+                    }
+                    if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
+                        $cur_dt->add(days => 1);
+                        $cur_slot_min = 0;
+                        $new_start    = $cur_dt->ymd;
+                        my $blocked2 = $get_blocked->($new_start);
+                        my $c2 = 1;
+                        while ($c2) {
+                            $c2 = 0;
+                            for my $b (@$blocked2) {
+                                my ($bs, $be) = @$b;
+                                my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                                if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
+                                    $cur_slot_min = $be - $WORK_START_MIN;
+                                    $c2 = 1;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            my $slot_abs_min = $WORK_START_MIN + $cur_slot_min;
-            my $new_time_str = sprintf('%02d:%02d:00',
-                                   int($slot_abs_min / 60), $slot_abs_min % 60);
-            $cur_slot_min += $est_mins;
+                my $slot_abs_min = $WORK_START_MIN + $cur_slot_min;
+                my $new_time_str = sprintf('%02d:%02d:00',
+                                       int($slot_abs_min / 60), $slot_abs_min % 60);
+                $cur_slot_min += $est_mins;
 
-            # Priority adjustments based on staleness and due date
-            my $new_priority = $todo->priority || 5;
-            my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
-            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
-                my $days_stale = int(($now_epoch - $act_epoch) / 86400);
-                $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
-                    if $days_stale > 180;
-            }
-            my $new_due_date;
-            if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
-                my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
-                if ($days_until_due < 0) {
-                    $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
-                    $new_due_date = $today;
-                } elsif ($days_until_due <= 7) {
-                    $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
+                # Priority adjustments based on staleness and due date
+                my $new_priority = $todo->priority || 5;
+                my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
+                if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                    my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                    my $days_stale = int(($now_epoch - $act_epoch) / 86400);
+                    $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
+                        if $days_stale > 180;
                 }
-            }
-            $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1
-                if $todo->is_blocking;
+                if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                    my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                    my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
+                    if ($days_until_due < 0) {
+                        $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
+                    } elsif ($days_until_due <= 7) {
+                        $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
+                    }
+                }
+                $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1
+                    if $todo->is_blocking;
 
-            my $end_abs_min = $slot_abs_min + $est_mins;
-            my ($end_h, $end_m) = (int($end_abs_min / 60), $end_abs_min % 60);
-            ($end_h, $end_m) = (23, 59) if $end_h >= 24;
-            my $end_time_str = sprintf('%02d:%02d:00', $end_h, $end_m);
+                my $end_abs_min = $slot_abs_min + $est_mins;
+                my ($end_h, $end_m) = (int($end_abs_min / 60), $end_abs_min % 60);
+                ($end_h, $end_m) = (23, 59) if $end_h >= 24;
+                my $end_time_str = sprintf('%02d:%02d:00', $end_h, $end_m);
 
-            my $est_mins_int = int($est_mins + 0.5) || 5;
+                my $est_mins_int = int($est_mins + 0.5) || 5;
 
-            # Never push start_date past the todo's own due_date.
-            # Error/audit todos have due_date=today; scheduling them to August is wrong.
-            my $todo_due = do {
-                my $d = $new_due_date || ($todo->due_date ? (ref($todo->due_date) ? $todo->due_date->ymd : $todo->due_date) : '');
-                $d ? substr($d, 0, 10) : '';
-            };
-            $new_start = $todo_due if $todo_due && $new_start gt $todo_due;
-
-            my $ok = eval {
-                my $sql;
-                my @bind;
-                if ($new_due_date) {
-                    $sql = 'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=?, due_date=? WHERE record_id=?';
-                    @bind = ($new_start, $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
-                             $est_mins_int, $new_priority, 'reschedule', $today, $new_due_date, $todo->record_id);
+                # Only update scheduled_start and scheduled_end — never touch
+                # start_date, due_date, or time_of_day (those are the original dates).
+                my $ok = eval {
+                    $c->model('DBEncy')->storage->dbh->do(
+                        'UPDATE todo SET scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?',
+                        undef,
+                        "$new_start $new_time_str", "$new_start $end_time_str",
+                        $est_mins_int, $new_priority, 'reschedule', $today,
+                        $todo->record_id
+                    );
+                    1;
+                };
+                if (!$ok || $@) {
+                    push @errors, "id=" . $todo->record_id . ": " . ($@ || 'unknown error');
                 } else {
-                    $sql = 'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?';
-                    @bind = ($new_start, $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
-                             $est_mins_int, $new_priority, 'reschedule', $today, $todo->record_id);
+                    $count++;
                 }
-                $c->model('DBEncy')->storage->dbh->do($sql, undef, @bind);
-                1;
-            };
-            if (!$ok || $@) {
-                push @errors, "id=" . $todo->record_id . ": " . ($@ || 'unknown error');
-            } else {
-                $count++;
             }
         }
     };
