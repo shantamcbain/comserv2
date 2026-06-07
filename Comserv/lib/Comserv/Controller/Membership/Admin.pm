@@ -1467,11 +1467,43 @@ sub hosting_account_edit :Local :Args(1) {
             $c->flash->{success_msg} = $acct->sitename . ' hosting account updated.';
             # Auto-provision accounting DB if 'accounting' was just added
             if ($addons_str =~ /\baccounting\b/ && $old_addons !~ /\baccounting\b/) {
+                # Provision PostgreSQL accounting DB
                 my ($ok, $msg) = eval { Comserv::Model::AccountingDB->instance->provision_site($c, $acct->sitename) };
                 if ($@ || !$ok) {
                     $c->flash->{error_msg} = 'Accounting add-on saved but DB provisioning failed: ' . ($@ || $msg);
                 } else {
                     $c->flash->{success_msg} .= " Accounting DB provisioned: $msg";
+                }
+
+                # Grant 'accounting' role to the site owner via UserSiteRole
+                eval {
+                    my $schema = $c->model('DBEncy');
+                    my $site   = $schema->resultset('Site')->search({ name => $acct->sitename })->single;
+                    my $owner  = $schema->resultset('User')->search({ email => $acct->contact_email })->first;
+                    if ($site && $owner) {
+                        my $existing_role = $schema->resultset('UserSiteRole')->find({
+                            user_id => $owner->id,
+                            site_id => $site->id,
+                            role    => 'accounting',
+                        });
+                        if ($existing_role) {
+                            $existing_role->update({ is_active => 1 });
+                        } else {
+                            $schema->resultset('UserSiteRole')->create({
+                                user_id    => $owner->id,
+                                site_id    => $site->id,
+                                role       => 'accounting',
+                                granted_by => $c->session->{user_id} || 1,
+                                is_active  => 1,
+                            });
+                        }
+                        $c->flash->{success_msg} .= " Accounting role granted to " . $owner->username . ".";
+                    } else {
+                        $c->flash->{success_msg} .= " Note: could not auto-grant accounting role (site or user not found).";
+                    }
+                };
+                if ($@) {
+                    $c->flash->{success_msg} .= " Warning: accounting role grant failed: $@";
                 }
             }
         }

@@ -352,7 +352,7 @@ sub provision :Path('provision') :Args(0) {
             push @steps, "No user found for '$email' — admin role not auto-assigned (user must register first).";
         }
 
-        # 8. Provision accounting PostgreSQL DB if add-on was requested
+        # 8. Provision accounting PostgreSQL DB and grant accounting role if add-on was requested
         my $addons = $request->requested_addons || '';
         if ($addons =~ /\baccounting\b/) {
             my ($ok, $msg) = eval {
@@ -364,6 +364,31 @@ sub provision :Path('provision') :Args(0) {
                 push @steps, "Accounting DB provisioned: $msg";
             } else {
                 push @steps, "Accounting DB provisioning failed: $msg";
+            }
+
+            # Also grant 'accounting' role to the site owner (in addition to 'admin' from step 7)
+            if ($contact_user) {
+                eval {
+                    my $schema = $c->model('DBEncy');
+                    my $existing_acct_role = $schema->resultset('UserSiteRole')->find({
+                        user_id => $contact_user->id,
+                        site_id => $site->id,
+                        role    => 'accounting',
+                    });
+                    if ($existing_acct_role) {
+                        $existing_acct_role->update({ is_active => 1 });
+                    } else {
+                        $schema->resultset('UserSiteRole')->create({
+                            user_id    => $contact_user->id,
+                            site_id    => $site->id,
+                            role       => 'accounting',
+                            granted_by => $c->session->{user_id} || 1,
+                            is_active  => 1,
+                        });
+                    }
+                };
+                push @steps, $@ ? "Accounting role grant failed: $@"
+                                 : "Accounting role granted to '" . $contact_user->username . "'.";
             }
         }
 
