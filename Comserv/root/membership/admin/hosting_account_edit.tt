@@ -108,6 +108,7 @@
                     { key = 'membership',  label = '👥 Membership Plans' },
                     { key = 'accounting',  label = '💰 Accounting / Bookkeeping' },
                     { key = 'printing_3d', label = '🖨️ 3D Printing' },
+                    { key = 'brew',        label = '🍺 Brew / Brewhouse' },
                 ] %]
                 <label style="display:flex;gap:0.4rem;align-items:center;cursor:pointer;">
                   <input type="checkbox" name="addon_[% addon.key %]" value="1"

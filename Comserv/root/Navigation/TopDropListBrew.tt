@@ -1,0 +1,57 @@
+[%#
+    TopDropListBrew.tt — Brew / brewhouse addon menu.
+
+    Visibility (any one):
+      - site_modules / hosting: enabled_modules.brew
+      - SiteName Brew (dedicated brewhouse site)
+      - Hostname brew.<domain> (e.g. brew.local, brew.computersystemconsulting.ca)
+      - admin
+
+    Each item links to a Brew/*.tt feature page (guest promo + admin migration views).
+%]
+[% PageVersion = 'Navigation/TopDropListBrew.tt,v 0.06 2026/06/05 Brew feature page links' %]
+
+[% SET site = c.stash.SiteName || c.session.SiteName || '' %]
+[% SET site_lc = site | lower %]
+[% SET mods = c.stash.enabled_modules || {} %]
+[% SET host = c.req.uri.host %]
+[% SET host = host.replace('(?i)^www\.', '') %]
+[% SET is_brew_host = host.match('(?i)^brew\.') ? 1 : 0 %]
+[% SET can_brew = mods.item('brew') || mods.brew || (site_lc == 'brew') || is_brew_host || c.stash.is_brew_host || c.stash.brew_addon_active || c.stash.is_admin %]
+[% SET brew_home = c.uri_for('/brew') %]
+[% SET can_plan = c.stash.can_plan %]
+
+[% IF can_brew %]
+<li class="horizontal-dropdown brew-nav-dropdown">
+    <a href="[% brew_home %]" class="dropbtn"><i class="fas fa-beer"></i> Brew</a>
+    <div class="dropdown-content">
+        <span class="dropdown-section-label">Brewhouse</span>
+        <a href="[% brew_home %]" class="menu-item"><i class="fas fa-home"></i>Brew Home</a>
+        <a href="[% c.uri_for('/brew/recipes') %]" class="menu-item"><i class="fas fa-book"></i>Recipes</a>
+        <a href="[% c.uri_for('/brew/batches') %]" class="menu-item"><i class="fas fa-flask"></i>Batches</a>
+        <a href="[% c.uri_for('/brew/ingredients') %]" class="menu-item"><i class="fas fa-wheat-awn"></i>Ingredients</a>
+        <a href="[% c.uri_for('/brew/calendar') %]" class="menu-item"><i class="fas fa-calendar-alt"></i>Calendar</a>
+        <a href="[% c.uri_for('/brew/brewlog') %]" class="menu-item"><i class="fas fa-thermometer-half"></i>Brew log</a>
+        <div class="dropdown-divider"></div>
+        <a href="[% c.uri_for('/helpdesk') %]" class="menu-item"><i class="icon-help"></i>HelpDesk</a>
+        [% IF c.stash.is_admin %]
+        <div class="dropdown-divider"></div>
+        <span class="dropdown-section-label">Admin</span>
+        <a href="[% c.uri_for('/brew/import') %]" class="menu-item"><i class="fas fa-file-import"></i>Import legacy data</a>
+        <a href="[% c.uri_for('/admin/site_modules') %]" class="menu-item"><i class="fas fa-puzzle-piece"></i>Site modules</a>
+        [% END %]
+    </div>
+</li>
+<style>
+.brew-nav-dropdown .dropdown-section-label {
+    display: block;
+    padding: 6px 14px 2px;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #8d6e63;
+    cursor: default;
+}
+</style>
+[% END %]

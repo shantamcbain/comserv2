@@ -155,9 +155,14 @@ sub _load_coa_accounts {
     my $sitename = $self->_sitename($c);
     my @accounts;
     eval {
+        # Include site-specific rows and global (sitename NULL/empty) rows
         @accounts = $self->_schema($c)->resultset('Accounting::CoaAccount')->search(
-            { sitename => $sitename, obsolete => 0 },
-            { order_by => 'accno' }
+            [
+                { sitename => $sitename, obsolete => 0 },
+                { sitename => undef,     obsolete => 0 },
+                { sitename => '',        obsolete => 0 },
+            ],
+            { order_by => 'accno', distinct => 1 }
         )->all;
     };
     return \@accounts;
@@ -1302,7 +1307,13 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
     eval { @suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
     eval { @coa_accounts = $schema->resultset('Accounting::CoaAccount')->search(
-        { obsolete => 0 }, { order_by => 'accno' })->all };
+        [
+            { sitename => $sitename, obsolete => 0 },
+            { sitename => undef,     obsolete => 0 },
+            { sitename => '',        obsolete => 0 },
+        ],
+        { order_by => 'accno', distinct => 1 }
+    )->all };
 
     if ($c->req->method eq 'POST') {
         my $params      = $c->req->body_parameters;
@@ -3382,6 +3393,565 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
     }
 
     my $summary = "Filament seed complete for sitename=$target_site: $created created, $skipped skipped.";
+    $c->stash(
+        seed_log  => \@log,
+        summary   => $summary,
+        sitename  => $target_site,
+        template  => 'Inventory/seed_result.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Brew / Brewhouse starter catalog (ingredients + sample prices + example BOM)
+# Idempotent. Safe to re-run. Used for brew.addon sites including the
+# brew.computersystemconsulting.ca example.
+#
+# This (plus the accounting DB provisioned from accounting_template.sql)
+# serves as the reusable "accounting + BOMs" template for any new user/site
+# that enables the Brew addon.
+#
+# Recipes remain separate: real legacy recipes (Gambrinus and others) are
+# visible in /brew/recipes and the import preview. New users/sites can
+# browse and selectively import the ones they want rather than having
+# everything auto-included in their working set.
+# -------------------------------------------------------------------------
+sub seed_brew_ingredients :Path('/Inventory/seed_brew_ingredients') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+    my $roles    = $c->session->{roles} // [];
+    my $is_admin = ref($roles) eq 'ARRAY'
+        ? (grep { /admin/i } @$roles)
+        : ($roles =~ /admin/i);
+    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Admin access required for seeding brew catalog.';
+        return $c->res->redirect($c->uri_for('/Inventory'));
+    }
+
+    my $target_site = $c->req->query_parameters->{sitename} || $self->_sitename($c) || 'Brew';
+    my $schema = $self->_schema($c);
+    my $now    = $self->_now();
+    my $by     = $c->session->{username} || 'system';
+
+    # Declare early so legacy import code (which runs before the hard-coded list)
+    # and the rest of the function can safely push to @log and use the counters.
+    my @log;
+    my ($created, $skipped, $bom_created) = (0, 0, 0);
+    my $legacy_imported = 0;
+
+    # -----------------------------------------------------------------
+    # Affiliate suppliers only (those with which we have an affiliate relationship).
+    # These are B2B: limited public access, pallet shipment preferred,
+    # pickup not open to all. Users will source their own suppliers locally.
+    # -----------------------------------------------------------------
+    my @affiliate_suppliers = (
+        {
+            name         => 'Gambrinus Malting',
+            contact_name => 'Sales / Export',
+            email        => 'sales@gambrinus-malt.example',
+            phone        => '+420-XXX-XXX-XXX',
+            website      => 'https://www.gambrinus-malt.example',
+            address      => 'Czech Republic (EU)',
+            lead_time_days => 14,
+            notes        => 'AFFILIATE PARTNER. Premium Czech Pilsner malt specialist (Gambrinus). ' .
+                            'B2B only — pallet quantities strongly preferred for shipment. ' .
+                            'Limited public / retail access. Pickup not available to general customers. ' .
+                            'New users should source local malt equivalents.',
+        },
+        {
+            name         => 'Bohemian Noble Hops',
+            contact_name => 'Export Sales',
+            email        => 'export@bohemian-hops.example',
+            website      => 'https://bohemian-hops.example',
+            address      => 'Czech Republic (EU)',
+            lead_time_days => 10,
+            notes        => 'AFFILIATE PARTNER. Classic noble hops (Saaz etc.). ' .
+                            'Pallet / bulk shipments preferred. Not a retail supplier. ' .
+                            'Limited public access.',
+        },
+    );
+
+    my %supplier_id_for_name;
+    for my $sup (@affiliate_suppliers) {
+        eval {
+            my $rec = $schema->resultset('Accounting::InventorySupplier')->find_or_create({
+                sitename => $target_site,
+                name     => $sup->{name},
+            });
+            if ($rec) {
+                # Update key fields if missing or to refresh affiliate notes
+                $rec->update({
+                    contact_name   => $sup->{contact_name},
+                    email          => $sup->{email},
+                    phone          => $sup->{phone},
+                    website        => $sup->{website},
+                    address        => $sup->{address},
+                    lead_time_days => $sup->{lead_time_days},
+                    notes          => $sup->{notes},
+                    status         => 'active',
+                    updated_at     => $now,
+                }) if !$rec->notes || $rec->notes !~ /AFFILIATE PARTNER/;
+                $supplier_id_for_name{ $sup->{name} } = $rec->id;
+                push @log, "AFFILIATE SUPPLIER: $sup->{name} (id=$rec->id)";
+            }
+        };
+        if ($@) {
+            push @log, "AFFILIATE SUPPLIER ERROR for $sup->{name}: $@";
+        }
+    }
+
+    # -----------------------------------------------------------------
+    # Legacy Forager data is the real source for this historical brewery.
+    # Grains, ingredients etc. that were actually in stock at the time of
+    # the brews live in brew_item_list_tb (the master catalog) and are
+    # referenced from brew_ingrediant_tb in the recipes.
+    #
+    # We prefer to seed the modern inventory_items (and thus the accounting
+    # + BOM side) from the actual Forager legacy tables when they exist for
+    # the site (especially the demo brew.computersystemconsulting.ca).
+    # This gives authentic historical stock instead of purely invented data.
+    #
+    # The hard-coded list (further down) serves as:
+    #   1. A clean, generic "Brew starter template" (with sample prices +
+    #      example BOMs) for brand new users/sites that enable the Brew
+    #      addon and have no legacy Forager data.
+    #   2. A fallback / supplement of very common items.
+    #
+    # IMPORTANT (per requirements):
+    # - Seeding remains an explicit ADMIN DECISION only (button or CLI).
+    #   New users with brew+accounting addons get the schema ready but no
+    #   pre-populated catalog. Admin decides when to seed the template.
+    # - Only suppliers with which "we" have an affiliate relationship are
+    #   included in the seed data.
+    # - These are B2B suppliers: limited public access, prefer pallet-sized
+    #   orders for shipment. Pickup is not open to the general public.
+    #   Users will source their own local suppliers.
+    # - Example: Gambrinus is included as a maltster (affiliate malt supplier).
+    #
+    # This satisfies the original requirement: the accounting/BOM/ingredient
+    # part is a reusable template for new brew addon users, while the real
+    # recipes remain visible and opt-in via the /brew UI and import tools.
+    # -----------------------------------------------------------------
+    eval {
+        my $forager = eval { $c->model('DBForager') };
+        if ($forager && $forager->can('schema')) {
+            my $fs = $forager->schema;
+
+            # Master catalog from Forager (what was actually stocked)
+            my $rs = $fs->resultset('Brew::ItemList')->search({ sitename => $target_site });
+            while (my $f = $rs->next) {
+                my $name = $f->name || 'Legacy Ingredient';
+                my $code = $f->item_code || '';
+                my $sku  = $code ? $code : 'BREW-' . uc( ($name =~ s/\W+/-/gr) );
+                $sku = substr($sku, 0, 40);
+
+                my $exists = $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $target_site, sku => $sku
+                })->count;
+                next if $exists;
+
+                # Legacy Forager has no price/cost fields. We assign starter samples
+                # (this is where "gambrinas prices" etc. get applied). User can tune.
+                my $cost = 3.20;
+                my $price = 5.10;
+                my $lname = lc($name);
+                if ($lname =~ /malt|grain|barley|wheat|rye|oat|flaked|torrified/) { $cost = 2.80; $price = 4.50; }
+                if ($lname =~ /crystal|caramel|special b|biscuit|victory|honey|melanoidin/) { $cost = 4.10; $price = 6.45; }
+                if ($lname =~ /roast|chocolate|black|patent|carapils|dextrin/) { $cost = 4.60; $price = 7.20; }
+                if ($lname =~ /hop/) { $cost = 6.80; $price = 9.60; }
+                if ($lname =~ /yeast/) { $cost = 3.40; $price = 4.90; }
+
+                $schema->resultset('Accounting::InventoryItem')->create({
+                    sitename            => $target_site,
+                    sku                 => $sku,
+                    name                => $name,
+                    description         => $f->description || $f->comments || 'Imported from legacy Forager brew_item_list_tb — actual items in stock at the time of the historical brews.',
+                    category            => 'Brew - Ingredient (Historical)',
+                    item_origin         => 'purchased',
+                    unit_of_measure     => 'kg',   # dominant unit in the old data; fix per item in UI
+                    unit_cost           => $cost,
+                    unit_price          => $price,
+                    status              => 'active',
+                    reorder_point       => 1,
+                    reorder_quantity    => 3,
+                    notes               => 'Seeded from the real Forager legacy catalog (ingredients that were in stock and used in the recipes). Prices are starter values — adjust for Gambrinus etc. as needed.',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 0,
+                    list_in_marketplace => 0,
+                    accepts_points      => 0,
+                    is_consumable       => 1,
+                    is_reusable         => 0,
+                    created_by          => $by,
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+                $legacy_imported++;
+                push @log, "FROM FORAGER: $sku — $name";
+            }
+
+            # Also pull unique ingredients that appear in actual recipes (brew_ingrediant_tb)
+            # even if they weren't in the master item_list. This captures the full set
+            # of grains etc. that were in stock at the time of each brew.
+            my %seen;
+            my $ing_rs = $fs->resultset('Brew::Ingredient')->search({ sitename => $target_site });
+            while (my $ing = $ing_rs->next) {
+                my $name = $ing->ingrediant_name;
+                next unless $name;
+                my $key = lc($name);
+                next if $seen{$key}++;
+
+                # Avoid near-duplicates
+                my $exists = $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $target_site,
+                    -or => [
+                        { name => { like => '%' . $name . '%' } },
+                        { sku  => { like => '%' . $name . '%' } },
+                    ]
+                })->count;
+                next if $exists;
+
+                my $sku = 'BREW-ING-' . uc( substr( ($name =~ s/\W+/-/gr), 0, 12) );
+                my $cost = 3.30;
+                my $price = 5.20;
+                my $lname = lc($name);
+                if ($lname =~ /malt|grain|barley|wheat|rye|oat|flaked/) { $cost = 2.85; $price = 4.55; }
+                if ($lname =~ /crystal|caramel|roast|chocolate|hop|yeast/) { $cost = 4.50; $price = 6.80; }
+
+                $schema->resultset('Accounting::InventoryItem')->create({
+                    sitename            => $target_site,
+                    sku                 => $sku,
+                    name                => $name,
+                    description         => 'Imported from brew_ingrediant_tb — actually used in historical recipes (was in stock at brew time).',
+                    category            => 'Brew - Ingredient (Historical)',
+                    item_origin         => 'purchased',
+                    unit_of_measure     => $ing->unit || 'kg',
+                    unit_cost           => $cost,
+                    unit_price          => $price,
+                    status              => 'active',
+                    notes               => 'Pulled from recipe ingredient lines in legacy Forager. Real stock used in the brews.',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 0,
+                    list_in_marketplace => 0,
+                    accepts_points      => 0,
+                    is_consumable       => 1,
+                    is_reusable         => 0,
+                    created_by          => $by,
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+                $legacy_imported++;
+                push @log, "FROM RECIPE LINES: $name";
+            }
+        }
+    };
+    if ($@) {
+        push @log, "Legacy Forager import attempt had error (will fall back): $@";
+    } elsif ($legacy_imported > 0) {
+        push @log, "Imported $legacy_imported real historical items from Forager (brew_item_list_tb + recipe ingredients)";
+    } else {
+        push @log, "No Forager legacy catalog rows for this sitename — using hard-coded generic Brew starter template below";
+    }
+
+    # Ensure a minimal usable COA for this sitename so price/account fields and forms work.
+    # We create site-scoped rows (even though global accno unique exists, we rely on
+    # the loader fallback + these being additional or the seed having run).
+    my @brew_coa = (
+        { accno => '1200', description => 'Inventory Asset (Brew)',          category => 'A' },
+        { accno => '4000', description => 'Sales Revenue (Brew)',            category => 'I' },
+        { accno => '4100', description => 'Sales Returns & Allowances',      category => 'I', is_contra => 1 },
+        { accno => '5000', description => 'Cost of Goods Sold (Brew)',       category => 'E' },
+        { accno => '5100', description => 'Purchases - Brewing Ingredients', category => 'E' },
+        { accno => '6205', description => 'Brew Supplies & Materials',       category => 'E' },
+        { accno => '4235', description => 'Brew / Beer Sales',               category => 'I' },
+    );
+
+    for my $a (@brew_coa) {
+        eval {
+            my $existing = $schema->resultset('Accounting::CoaAccount')->find({ accno => $a->{accno} });
+            if ($existing) {
+                # Ensure this sitename sees it (if the row is global or we want override)
+                if (!$existing->sitename || $existing->sitename eq '') {
+                    # leave global as-is; loader will pick it up
+                }
+            } else {
+                $schema->resultset('Accounting::CoaAccount')->create({
+                    accno       => $a->{accno},
+                    description => $a->{description},
+                    category    => $a->{category},
+                    is_contra   => $a->{is_contra} || 0,
+                    obsolete    => 0,
+                    sitename    => $target_site,
+                    created_at  => $now,
+                    updated_at  => $now,
+                });
+            }
+        };
+    }
+
+    # Core brew ingredient catalog with sample costs/prices.
+    # Prices are realistic placeholders (CAD-ish) for the brew.example site.
+    # This is an expanded historical-style starter set (more grains to better reflect
+    # what a real brewhouse carried even back in the early 2000s). Adjust prices,
+    # add your exact lots, or extend the list via the Inventory UI.
+    #
+    # "Gambrinus" style Czech ingredients kept prominent.
+    my @brew_items = (
+        # === GRAINS (much expanded base + specialty + flaked to match real brewery stock) ===
+        # Base malts (kg)
+        { sku => 'BREW-GRAIN-PALE2',    name => 'Pale 2-Row Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 2.85, price => 4.50, desc => 'Workhorse base malt for ales and lagers.' },
+        { sku => 'BREW-GRAIN-PALE6',    name => 'Pale 6-Row Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 2.65, price => 4.20, desc => 'Traditional US base, higher enzyme content.' },
+        { sku => 'BREW-GRAIN-PILS',     name => 'Pilsner Malt (Gambrinus)',         category => 'Brew - Grain', unit => 'kg', cost => 2.95, price => 4.75, desc => 'Premium Czech Pilsner malt - key for Gambrinus-style lagers and classic pils.' },
+        { sku => 'BREW-GRAIN-MARIS',    name => 'Maris Otter Pale Ale Malt',        category => 'Brew - Grain', unit => 'kg', cost => 3.35, price => 5.35, desc => 'Premium English base malt, rich biscuit flavor.' },
+        { sku => 'BREW-GRAIN-GOLDEN',   name => 'Golden Promise Pale Malt',         category => 'Brew - Grain', unit => 'kg', cost => 3.20, price => 5.10, desc => 'Scottish-style base, excellent for session beers.' },
+        { sku => 'BREW-GRAIN-VIENNA',   name => 'Vienna Malt',                      category => 'Brew - Grain', unit => 'kg', cost => 3.10, price => 4.95, desc => 'Toasty, malty base for Vienna lagers and Märzen.' },
+        { sku => 'BREW-GRAIN-MUN-L',    name => 'Munich Light Malt',                category => 'Brew - Grain', unit => 'kg', cost => 3.15, price => 5.05, desc => 'Light Munich for subtle maltiness.' },
+        { sku => 'BREW-GRAIN-MUN',      name => 'Munich Malt',                      category => 'Brew - Grain', unit => 'kg', cost => 3.25, price => 5.25, desc => 'Rich malty character for Oktoberfest, bocks, amber lagers.' },
+        { sku => 'BREW-GRAIN-MUN-D',    name => 'Munich Dark Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 3.40, price => 5.45, desc => 'Darker Munich for deeper color and malt.' },
+        { sku => 'BREW-GRAIN-WHEAT-W',  name => 'White Wheat Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 3.40, price => 5.40, desc => 'For hefeweizen, witbier, and hazy IPAs.' },
+        { sku => 'BREW-GRAIN-WHEAT-R',  name => 'Red Wheat Malt',                   category => 'Brew - Grain', unit => 'kg', cost => 3.50, price => 5.55, desc => 'Deeper color wheat for wheat ales and lambics.' },
+        { sku => 'BREW-GRAIN-RYE',      name => 'Rye Malt',                         category => 'Brew - Grain', unit => 'kg', cost => 3.65, price => 5.80, desc => 'Spicy, dry character for rye IPAs and Roggenbiers.' },
+
+        # Crystal / Caramel / Specialty malts (kg)
+        { sku => 'BREW-GRAIN-CARA-P',   name => 'Carapils / Dextrin Malt',          category => 'Brew - Grain', unit => 'kg', cost => 3.80, price => 5.95, desc => 'Adds body and head retention without color.' },
+        { sku => 'BREW-GRAIN-C10',      name => 'Crystal 10L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 3.90, price => 6.10, desc => 'Light caramel, subtle sweetness.' },
+        { sku => 'BREW-GRAIN-C20',      name => 'Crystal 20L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.00, price => 6.25, desc => 'Light toffee caramel.' },
+        { sku => 'BREW-GRAIN-C40',      name => 'Crystal 40L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.05, price => 6.35, desc => 'Medium caramel, golden toffee notes.' },
+        { sku => 'BREW-GRAIN-C60',      name => 'Crystal 60L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.10, price => 6.50, desc => 'Caramel sweetness and color. Common in English and American ales.' },
+        { sku => 'BREW-GRAIN-C80',      name => 'Crystal 80L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.20, price => 6.65, desc => 'Rich caramel, dried fruit, deeper color.' },
+        { sku => 'BREW-GRAIN-C120',     name => 'Crystal 120L Malt',                category => 'Brew - Grain', unit => 'kg', cost => 4.35, price => 6.90, desc => 'Dark caramel, toffee, raisin, burnt sugar.' },
+        { sku => 'BREW-GRAIN-SPEC-B',   name => 'Special B Malt',                   category => 'Brew - Grain', unit => 'kg', cost => 4.80, price => 7.50, desc => 'Belgian specialty - intense raisin, plum, dark fruit.' },
+        { sku => 'BREW-GRAIN-BISC',     name => 'Biscuit Malt',                     category => 'Brew - Grain', unit => 'kg', cost => 4.15, price => 6.55, desc => 'Toasty, biscuit, bread crust character.' },
+        { sku => 'BREW-GRAIN-VIC',      name => 'Victory Malt',                     category => 'Brew - Grain', unit => 'kg', cost => 4.10, price => 6.45, desc => 'Nutty, toasty, biscuit-like (US Victory style).' },
+        { sku => 'BREW-GRAIN-HONEY',    name => 'Honey Malt',                       category => 'Brew - Grain', unit => 'kg', cost => 4.25, price => 6.70, desc => 'Sweet, honey-like, golden color.' },
+        { sku => 'BREW-GRAIN-MELANO',   name => 'Melanoidin Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 4.30, price => 6.80, desc => 'Red-brown color, intense malty aroma.' },
+        { sku => 'BREW-GRAIN-ACID',     name => 'Acidulated Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 4.50, price => 7.10, desc => 'Lowers mash pH naturally (sauermalz style).' },
+
+        # Roasted / Dark malts (kg)
+        { sku => 'BREW-GRAIN-CHOC',     name => 'Chocolate Malt',                   category => 'Brew - Grain', unit => 'kg', cost => 4.90, price => 7.75, desc => 'Roasty chocolate, coffee notes for stouts and porters.' },
+        { sku => 'BREW-GRAIN-BLACK',    name => 'Black (Patent) Malt',              category => 'Brew - Grain', unit => 'kg', cost => 5.20, price => 8.00, desc => 'Roasty color and dryness for stouts and porters.' },
+        { sku => 'BREW-GRAIN-ROAST',    name => 'Roasted Barley',                   category => 'Brew - Grain', unit => 'kg', cost => 4.75, price => 7.50, desc => 'Dry, coffee-like roast for Irish stouts and porters.' },
+
+        # Flaked / Unmalted grains & adjuncts (kg) - very common in real brewhouses
+        { sku => 'BREW-GRAIN-FLAKE-B',  name => 'Flaked Barley',                    category => 'Brew - Grain', unit => 'kg', cost => 2.70, price => 4.30, desc => 'Adds body and head; common in stouts.' },
+        { sku => 'BREW-GRAIN-FLAKE-O',  name => 'Flaked Oats',                      category => 'Brew - Grain', unit => 'kg', cost => 2.85, price => 4.55, desc => 'Silky mouthfeel for oatmeal stouts and hazy beers.' },
+        { sku => 'BREW-GRAIN-FLAKE-W',  name => 'Flaked Wheat',                     category => 'Brew - Grain', unit => 'kg', cost => 2.75, price => 4.40, desc => 'Head retention and haze for witbiers and hazy IPAs.' },
+        { sku => 'BREW-GRAIN-FLAKE-R',  name => 'Flaked Rye',                       category => 'Brew - Grain', unit => 'kg', cost => 3.05, price => 4.85, desc => 'Spicy character for rye beers.' },
+        { sku => 'BREW-GRAIN-TORR-W',   name => 'Torrified Wheat',                  category => 'Brew - Grain', unit => 'kg', cost => 2.90, price => 4.60, desc => 'Pre-gelatinized wheat for better head and body.' },
+
+        # === HOPS (per 100g) ===
+        { sku => 'BREW-HOP-SAAZ-100',   name => 'Saaz Hops (100g)',                 category => 'Brew - Hop',   unit => '100g', cost => 6.75, price => 9.50, desc => 'Classic Czech noble hop. Spicy, floral. Essential for Gambrinus Pilsner.' },
+        { sku => 'BREW-HOP-HALL-100',   name => 'Hallertau Mittelfrüh (100g)',      category => 'Brew - Hop',   unit => '100g', cost => 7.10, price => 9.95, desc => 'Noble German hop for lagers and German ales.' },
+        { sku => 'BREW-HOP-CASC-100',   name => 'Cascade Hops (100g)',              category => 'Brew - Hop',   unit => '100g', cost => 5.80, price => 8.25, desc => 'American classic - citrus, pine. APA and IPA workhorse.' },
+        { sku => 'BREW-HOP-CENT-100',   name => 'Centennial Hops (100g)',           category => 'Brew - Hop',   unit => '100g', cost => 6.40, price => 8.95, desc => 'Dual purpose - floral/citrus. Strong in many US IPAs.' },
+        { sku => 'BREW-HOP-FUG-100',    name => 'Fuggles Hops (100g)',              category => 'Brew - Hop',   unit => '100g', cost => 6.20, price => 8.75, desc => 'Earthy, woody English hop for bitters and porters.' },
+        { sku => 'BREW-HOP-EKG-100',    name => 'East Kent Goldings (100g)',        category => 'Brew - Hop',   unit => '100g', cost => 6.50, price => 9.10, desc => 'Classic English hop - spicy, earthy, floral.' },
+        { sku => 'BREW-HOP-NOR-100',    name => 'Northern Brewer (100g)',           category => 'Brew - Hop',   unit => '100g', cost => 5.95, price => 8.40, desc => 'Versatile bittering hop with minty/herbal notes.' },
+
+        # === YEAST ===
+        { sku => 'BREW-YEAST-SAFALE',   name => 'Safale US-05 Dry Yeast (11.5g)',   category => 'Brew - Yeast', unit => 'each', cost => 3.25, price => 4.75, desc => 'Clean American ale yeast. Workhorse for many recipes.' },
+        { sku => 'BREW-YEAST-S-04',     name => 'Safale S-04 Dry Yeast (11.5g)',    category => 'Brew - Yeast', unit => 'each', cost => 3.35, price => 4.85, desc => 'English ale yeast - good flocculation, malty profile.' },
+        { sku => 'BREW-YEAST-W34-70',   name => 'W-34/70 Lager Yeast (11.5g)',      category => 'Brew - Yeast', unit => 'each', cost => 4.10, price => 5.95, desc => 'Classic German lager strain. Great for Pils, Gambrinus-style.' },
+        { sku => 'BREW-YEAST-NOTTY',    name => 'Nottingham Ale Yeast (11.5g)',     category => 'Brew - Yeast', unit => 'each', cost => 3.45, price => 4.95, desc => 'Versatile English strain, clean and reliable.' },
+        { sku => 'BREW-YEAST-SAFE-L',   name => 'SafLager W-34/70 (11.5g)',         category => 'Brew - Yeast', unit => 'each', cost => 4.20, price => 6.10, desc => 'Dry version of the classic lager yeast.' },
+
+        # === ADJUNCTS / FININGS / WATER / PACKAGING ===
+        { sku => 'BREW-ADJ-DEXT-1',     name => 'Dextrose (Corn Sugar) 1kg',        category => 'Brew - Adjunct', unit => 'kg',  cost => 3.80, price => 5.50, desc => 'Lightens body, boosts ABV. Used in many Belgian and American styles.' },
+        { sku => 'BREW-ADJ-IRISH',      name => 'Irish Moss (50g)',                 category => 'Brew - Adjunct', unit => 'each', cost => 2.90, price => 4.25, desc => 'Natural fining agent for clearer beer.' },
+        { sku => 'BREW-ADJ-GYPSUM',     name => 'Brewing Gypsum (Calcium Sulfate) 500g', category => 'Brew - Adjunct', unit => 'each', cost => 4.50, price => 6.75, desc => 'Water adjustment for hop-forward and pale beers.' },
+        { sku => 'BREW-ADJ-CACL',       name => 'Calcium Chloride 500g',            category => 'Brew - Adjunct', unit => 'each', cost => 4.20, price => 6.40, desc => 'Water treatment for maltier, fuller beers.' },
+        { sku => 'BREW-PKG-CAP-100',    name => 'Crown Caps (100 count)',           category => 'Brew - Packaging', unit => 'each', cost => 4.25, price => 6.50, desc => 'Standard pry-off caps.' },
+        { sku => 'BREW-PKG-BOTTLE-12',  name => '500ml Amber Bottles (case/12)',    category => 'Brew - Packaging', unit => 'case', cost => 9.50, price => 14.00, desc => 'Recappable long-neck bottles.' },
+    );
+
+    # Create / update items
+    for my $item (@brew_items) {
+        my $exists = eval {
+            $schema->resultset('Accounting::InventoryItem')->search({
+                sitename => $target_site,
+                sku      => $item->{sku},
+            })->count;
+        } // 0;
+
+        if ($exists) {
+            # Update prices/cost if they were zero or to refresh sample values
+            eval {
+                my $rec = $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $target_site, sku => $item->{sku}
+                })->first;
+                if ($rec) {
+                    my $changed = 0;
+                    if (!defined $rec->unit_cost || $rec->unit_cost == 0) {
+                        $rec->unit_cost($item->{cost});
+                        $changed = 1;
+                    }
+                    if (!defined $rec->unit_price || $rec->unit_price == 0) {
+                        $rec->unit_price($item->{price});
+                        $changed = 1;
+                    }
+                    if ($changed) {
+                        $rec->updated_at($now);
+                        $rec->update;
+                        push @log, "$item->{sku}: updated prices";
+                    } else {
+                        push @log, "$item->{sku}: skipped (exists with prices)";
+                        $skipped++;
+                    }
+                }
+            };
+            next;
+        }
+
+        eval {
+            my %row = (
+                sitename            => $target_site,
+                sku                 => $item->{sku},
+                name                => $item->{name},
+                description         => $item->{desc},
+                category            => $item->{category},
+                item_origin         => 'purchased',
+                is_assemblable      => 0,
+                unit_of_measure     => $item->{unit},
+                unit_cost           => $item->{cost},
+                unit_price          => $item->{price},
+                status              => 'active',
+                reorder_point       => 2,
+                reorder_quantity    => 5,
+                notes               => 'Brew starter catalog seed. Adjust costs/prices for your market.',
+                show_in_shop        => 0,
+                hide_stock_count    => 0,
+                list_in_marketplace => 0,
+                accepts_points      => 0,
+                is_consumable       => 1,   # raw brewing ingredients are consumed
+                is_reusable         => 0,
+                created_by          => $by,
+                created_at          => $now,
+                updated_at          => $now,
+            );
+            $schema->resultset('Accounting::InventoryItem')->create(\%row);
+            push @log, "$item->{sku}: created (cost=$item->{cost}, price=$item->{price})";
+            $created++;
+        };
+        if ($@) {
+            push @log, "$item->{sku}: ERROR — $@";
+        }
+    }
+
+    # -----------------------------------------------------------------
+    # Link key items to our affiliate suppliers (only those with affiliate
+    # relationships). This demonstrates the B2B pallet-focused supply chain
+    # in the seed data. Gambrinus maltster is the canonical example.
+    # -----------------------------------------------------------------
+    eval {
+        # Gambrinus Pilsner Malt from affiliate maltster
+        my $malt_item = $schema->resultset('Accounting::InventoryItem')->find({
+            sitename => $target_site, sku => 'BREW-GRAIN-PILS'
+        });
+        my $gambrinus_sup = $supplier_id_for_name{'Gambrinus Malting'};
+        if ($malt_item && $gambrinus_sup) {
+            $schema->resultset('Accounting::InventoryItemSupplier')->update_or_create({
+                item_id      => $malt_item->id,
+                supplier_id  => $gambrinus_sup,
+                supplier_sku => 'PILS-GAM-25KG',
+                unit_cost    => 2.95,
+                is_preferred => 1,
+                notes        => 'Affiliate maltster. Pallet (approx 1 tonne) preferred. Limited public access.',
+            });
+            push @log, "LINK: BREW-GRAIN-PILS → Gambrinus Malting (affiliate, preferred)";
+        }
+
+        # Saaz hops from affiliate hops supplier
+        my $hop_item = $schema->resultset('Accounting::InventoryItem')->find({
+            sitename => $target_site, sku => 'BREW-HOP-SAAZ-100'
+        });
+        my $hops_sup = $supplier_id_for_name{'Bohemian Noble Hops'};
+        if ($hop_item && $hops_sup) {
+            $schema->resultset('Accounting::InventoryItemSupplier')->update_or_create({
+                item_id      => $hop_item->id,
+                supplier_id  => $hops_sup,
+                supplier_sku => 'SAAZ-100G',
+                unit_cost    => 6.75,
+                is_preferred => 1,
+                notes        => 'Affiliate noble hops supplier. Pallet orders preferred. B2B only.',
+            });
+            push @log, "LINK: BREW-HOP-SAAZ-100 → Bohemian Noble Hops (affiliate, preferred)";
+        }
+    };
+    if ($@) {
+        push @log, "AFFILIATE ITEM-SUPPLIER LINK ERROR: $@";
+    }
+
+    # Create one example BOM / kit to demonstrate accounting + BOMs for brew
+    eval {
+        my $kit_sku = 'BREW-KIT-PALE-19L';
+        my $kit = $schema->resultset('Accounting::InventoryItem')->find({
+            sitename => $target_site, sku => $kit_sku
+        });
+        if (!$kit) {
+            $kit = $schema->resultset('Accounting::InventoryItem')->create({
+                sitename            => $target_site,
+                sku                 => $kit_sku,
+                name                => 'Demo 19L Pale Ale Brew Kit',
+                description         => 'Example assemblable BOM for a standard pale ale batch. Shows how brew recipes can map to inventory costing/BOM when Accounting is enabled.',
+                category            => 'Brew - Kit',
+                item_origin         => 'crafted',
+                is_assemblable      => 1,
+                unit_of_measure     => 'batch',
+                unit_cost           => 18.50,   # will be recalculated from components in UI
+                unit_price          => 28.00,
+                status              => 'active',
+                show_in_shop        => 0,
+                hide_stock_count    => 0,
+                list_in_marketplace => 0,
+                accepts_points      => 0,
+                is_consumable       => 0,
+                is_reusable         => 0,
+                created_by          => $by,
+                created_at          => $now,
+                updated_at          => $now,
+            });
+            push @log, "$kit_sku: created as assemblable kit";
+        }
+
+        # Link several components as an example BOM (now using more of the expanded grain list)
+        my @components = (
+            { sku => 'BREW-GRAIN-PALE2',  qty => 4.0,  unit => 'kg' },
+            { sku => 'BREW-GRAIN-MUN',    qty => 0.75, unit => 'kg' },
+            { sku => 'BREW-GRAIN-C60',    qty => 0.4,  unit => 'kg' },
+            { sku => 'BREW-GRAIN-CARA-P', qty => 0.3,  unit => 'kg' },
+            { sku => 'BREW-HOP-SAAZ-100', qty => 2.0,  unit => '100g' },
+            { sku => 'BREW-YEAST-W34-70', qty => 1,    unit => 'each' },
+        );
+
+        for my $comp (@components) {
+            my $comp_item = $schema->resultset('Accounting::InventoryItem')->find({
+                sitename => $target_site, sku => $comp->{sku}
+            });
+            next unless $comp_item;
+
+            $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
+                parent_item_id    => $kit->id,
+                component_item_id => $comp_item->id,
+                quantity          => $comp->{qty},
+                unit              => $comp->{unit},
+                is_optional       => 0,
+                sort_order        => 10,
+                notes             => 'Brew starter BOM example',
+                created_at        => $now,
+                updated_at        => $now,
+            });
+            $bom_created++;
+        }
+    };
+    if ($@) {
+        push @log, "BOM kit: ERROR — $@";
+    } else {
+        push @log, "Example brew BOM kit created/updated with $bom_created component lines";
+    }
+
+    my $summary = "Brew ingredients seed for sitename=$target_site: $created created, $skipped skipped/updated, BOM lines: $bom_created.";
+    if ($legacy_imported) {
+        $summary .= " (plus $legacy_imported items imported from real Forager legacy data)";
+    }
     $c->stash(
         seed_log  => \@log,
         summary   => $summary,

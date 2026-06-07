@@ -29,8 +29,7 @@ has 'host_nfs_path' => (
     isa     => 'Maybe[Str]',
     lazy    => 1,
     default => sub {
-        # Support both old and new variable names during transition
-        return $ENV{NFS_HOST_PATH} || $ENV{WORKSHOP_HOST_NFS_PATH} || undef;
+        return $ENV{COMSERV_HOST_NFS_PATH} || $ENV{NFS_HOST_PATH} || $ENV{HOST_NFS_PATH} || $ENV{WORKSHOP_HOST_NFS_PATH} || undef;
     },
 );
 
@@ -71,6 +70,7 @@ sub to_container_path {
 
     my @prefixes;
     push @prefixes, $self->host_nfs_path if $self->host_nfs_path;
+    push @prefixes, '/data/nfs';
     push @prefixes, '/opt/comserv/workshop_resources';
 
     for my $prefix (@prefixes) {

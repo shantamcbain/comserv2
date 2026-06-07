@@ -103,6 +103,13 @@ sub index :Path('/Accounting') :Args(0) {
         }
     };
 
+    my $pg_db_name = '';
+    eval {
+        my $reg = $self->_schema($c)->resultset('SiteAccountingDb')
+                      ->find({ sitename => $sitename, status => 'active' });
+        $pg_db_name = $reg->db_name if $reg;
+    };
+
     $c->stash(
         acct_count      => $acct_count,
         entry_count     => $entry_count,
@@ -113,6 +120,7 @@ sub index :Path('/Accounting') :Args(0) {
         location_count  => $location_count,
         low_stock       => $low_stock,
         sitename        => $sitename,
+        pg_db_name      => $pg_db_name,
         template        => 'Accounting/index.tt',
     );
 }
@@ -1213,22 +1221,39 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
         %reg = map { $_->sitename => $_ } @rows;
     };
 
+    # Hosting accounts keyed by sitename for owner lookup
+    my %hosting;
+    eval {
+        my @ha = $schema->resultset('Accounting::HostingAccount')->search({})->all;
+        %hosting = map { $_->sitename => $_ } @ha;
+    };
+
     # Build status rows
     my @rows;
     for my $site (@sites) {
         my $sn  = $site->name;
         my $rec = $reg{$sn};
+        my $ha  = $hosting{$sn};
+
+        # Resolve site owner username as default DB user
+        my $owner_username = lc($sn);
+        if ($ha && $ha->contact_email) {
+            my $owner = eval { $schema->resultset('User')->search({ email => $ha->contact_email })->first };
+            $owner_username = $owner->username if $owner && $owner->username;
+        }
+
         my $row = {
-            sitename    => $sn,
-            registered  => $rec ? 1 : 0,
-            db_name     => $rec ? $rec->db_name     : lc($sn) . '_accounting',
-            db_host     => $rec ? $rec->db_host     : '192.168.1.20',
-            db_port     => $rec ? $rec->db_port     : 5432,
-            jurisdiction=> $rec ? $rec->jurisdiction: 'CA',
-            currency    => $rec ? $rec->currency    : 'CAD',
-            status      => $rec ? $rec->status      : 'not_provisioned',
-            db_ok       => 0,
-            db_error    => '',
+            sitename       => $sn,
+            registered     => $rec ? 1 : 0,
+            db_name        => $rec ? $rec->db_name     : lc($sn) . '_accounting',
+            db_host        => $rec ? $rec->db_host     : '192.168.1.20',
+            db_port        => $rec ? $rec->db_port     : 5432,
+            jurisdiction   => $rec ? $rec->jurisdiction: 'CA',
+            currency       => $rec ? $rec->currency    : 'CAD',
+            status         => $rec ? $rec->status      : 'not_provisioned',
+            db_ok          => 0,
+            db_error       => '',
+            owner_username => $rec ? $rec->db_user : $owner_username,
         };
 
         if ($rec && $rec->status eq 'active') {
@@ -1278,6 +1303,268 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
     $c->stash(
         rows     => \@rows,
         template => 'Accounting/admin/databases.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Migrate MariaDB accounting data → per-site PostgreSQL  /Accounting/migrate_to_pg
+# -------------------------------------------------------------------------
+
+sub migrate_to_pg :Path('/Accounting/migrate_to_pg') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename  = $self->_sitename($c);
+    my $maria     = $self->_schema($c);
+    my @log;
+    my $errors    = 0;
+
+    # ── 1. Connect to PostgreSQL accounting DB ─────────────────────────
+    my $acct_schema = eval { Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename) };
+    unless ($acct_schema) {
+        $c->flash->{error_msg} = "Cannot connect to PostgreSQL accounting DB for '$sitename'. Run provisioning first.";
+        $c->response->redirect($c->uri_for('/Accounting/my_database'));
+        return;
+    }
+    my $pg = $acct_schema->storage->dbh;
+
+    # ── 2. Migrate COA (coa_accounts → chart) ─────────────────────────
+    push @log, "=== Chart of Accounts ===";
+    my @coa_rows;
+    eval {
+        @coa_rows = $maria->resultset('Accounting::CoaAccount')->search(
+            [ { sitename => $sitename }, { sitename => undef } ],
+            { order_by => 'id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@coa_rows) . " COA accounts in MariaDB for '$sitename'.";
+
+    my $coa_ok = 0; my $coa_skip = 0; my $coa_fail = 0;
+    my %accno_to_pg_id;  # map accno → new PG chart.id
+
+    # First pass: insert without heading (to get PG IDs)
+    for my $row (@coa_rows) {
+        my ($exists) = $pg->selectrow_array("SELECT id FROM chart WHERE accno = ?", undef, $row->accno);
+        if ($exists) {
+            $accno_to_pg_id{ $row->accno } = $exists;
+            $coa_skip++;
+            next;
+        }
+        my $sth = $pg->prepare(
+            "INSERT INTO chart (accno, description, charttype, category, link,
+                                contra, tax, obsolete, notes, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, now()) RETURNING id");
+        $sth->execute(
+            $row->accno,
+            $row->description,
+            'A',
+            $row->category // 'A',
+            '',
+            $row->is_contra  ? 1 : 0,
+            $row->is_tax     ? 1 : 0,
+            $row->obsolete   ? 1 : 0,
+            $row->notes // '',
+        );
+        my ($new_id) = $sth->fetchrow_array;
+        if ($new_id) {
+            $accno_to_pg_id{ $row->accno } = $new_id;
+            $coa_ok++;
+        } else {
+            push @log, "  FAIL chart insert: accno=" . $row->accno . " err=" . ($pg->errstr//'?');
+            $coa_fail++; $errors++;
+        }
+    }
+
+    # Second pass: set heading FK now that all chart rows exist
+    for my $row (@coa_rows) {
+        next unless defined $row->heading_id;
+        # Find the accno of the heading row
+        my $heading_row = eval { $maria->resultset('Accounting::CoaAccount')->find($row->heading_id) };
+        next unless $heading_row;
+        my $pg_heading_id = $accno_to_pg_id{ $heading_row->accno };
+        next unless $pg_heading_id;
+        my $pg_self_id    = $accno_to_pg_id{ $row->accno };
+        next unless $pg_self_id;
+        $pg->do("UPDATE chart SET heading = ? WHERE id = ?", undef, $pg_heading_id, $pg_self_id);
+    }
+
+    push @log, "  COA: $coa_ok inserted, $coa_skip already existed, $coa_fail failed.";
+
+    # ── 3. Migrate GL entries (gl_entries + gl_entry_lines → gl + acc_trans) ──
+    push @log, "=== General Ledger ===";
+    my @gl_rows;
+    eval {
+        @gl_rows = $maria->resultset('Accounting::GlEntry')->search(
+            { sitename => $sitename },
+            { prefetch => 'gl_lines', order_by => 'me.id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@gl_rows) . " GL entries in MariaDB.";
+
+    my $gl_ok = 0; my $gl_skip = 0; my $gl_fail = 0;
+    for my $entry (@gl_rows) {
+        my ($exists) = $pg->selectrow_array(
+            "SELECT id FROM gl WHERE reference = ?", undef, $entry->reference);
+        if ($exists) { $gl_skip++; next; }
+
+        my $sth = $pg->prepare(
+            "INSERT INTO gl (reference, description, transdate, notes, approved)
+             VALUES (?, ?, ?, ?, ?) RETURNING id");
+        $sth->execute(
+            $entry->reference,
+            $entry->description // '',
+            $entry->post_date,
+            $entry->notes // '',
+            $entry->approved ? 1 : 0,
+        );
+        my ($gl_id) = $sth->fetchrow_array;
+        unless ($gl_id) {
+            push @log, "  FAIL gl insert ref=" . $entry->reference . " err=" . ($pg->errstr//'?');
+            $gl_fail++; $errors++; next;
+        }
+
+        # Insert acc_trans lines
+        my @lines = eval { $entry->lines->all };
+        for my $line (@lines) {
+            my $coa_row = eval { $line->account };
+            next unless $coa_row;
+            my $chart_id = $accno_to_pg_id{ $coa_row->accno };
+            next unless $chart_id;
+            $pg->do(
+                "INSERT INTO acc_trans (trans_id, chart_id, amount, transdate, memo)
+                 VALUES (?, ?, ?, ?, ?)",
+                undef,
+                $gl_id,
+                $chart_id,
+                $line->amount,
+                $entry->post_date,
+                $line->memo // '',
+            );
+        }
+        $gl_ok++;
+    }
+    push @log, "  GL: $gl_ok inserted, $gl_skip already existed, $gl_fail failed.";
+
+    # ── 4. Migrate Vendors (inventory_suppliers → vendor) ─────────────
+    push @log, "=== Vendors / Suppliers ===";
+    my @suppliers;
+    eval {
+        @suppliers = $maria->resultset('Accounting::InventorySupplier')->search(
+            { sitename => $sitename },
+            { order_by => 'id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@suppliers) . " suppliers in MariaDB.";
+
+    my $v_ok = 0; my $v_skip = 0; my $v_fail = 0;
+    for my $s (@suppliers) {
+        my ($exists) = $pg->selectrow_array(
+            "SELECT id FROM vendor WHERE name = ?", undef, $s->name);
+        if ($exists) { $v_skip++; next; }
+        my $phone = substr($s->phone // '', 0, 50);
+        if (($s->phone // '') ne $phone) {
+            push @log, "  WARN vendor '" . $s->name . "': phone truncated to 50 chars.";
+        }
+        eval {
+            $pg->do(
+                "INSERT INTO vendor (name, contact, email, phone, notes, curr)
+                 VALUES (?, ?, ?, ?, ?, 'CAD')",
+                undef,
+                substr($s->name // '', 0, 255),
+                substr($s->contact_name // '', 0, 255),
+                $s->email // '',
+                $phone,
+                $s->notes // '',
+            );
+        };
+        if ($@) {
+            push @log, "  FAIL vendor '" . $s->name . "': $@";
+            $v_fail++; $errors++;
+        } else {
+            $v_ok++;
+        }
+    }
+    push @log, "  Vendors: $v_ok inserted, $v_skip already existed, $v_fail failed.";
+
+    # ── Summary ────────────────────────────────────────────────────────
+    push @log, "=== Done — " . ($errors ? "$errors error(s)" : "No errors") . " ===";
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_to_pg',
+        "Migration for '$sitename': " . join('; ', @log));
+
+    $c->stash(
+        sitename => $sitename,
+        log      => \@log,
+        errors   => $errors,
+        template => 'Accounting/migrate_result.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# My Accounting Database  /Accounting/my_database
+# Shows the current site's PostgreSQL accounting DB status and schema.
+# Accessible to any site admin/accounting role.
+# -------------------------------------------------------------------------
+
+sub my_database :Path('/Accounting/my_database') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename = $self->_sitename($c);
+
+    # Look up registry entry
+    my $reg;
+    eval {
+        $reg = $self->_schema($c)->resultset('SiteAccountingDb')
+                   ->find({ sitename => $sitename });
+    };
+
+    my $db_ok    = 0;
+    my $db_error = '';
+    my @tables;
+
+    if ($reg && $reg->status eq 'active') {
+        eval {
+            my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+            if ($acct_schema) {
+                $acct_schema->storage->dbh->do('SELECT 1');
+                $db_ok = 1;
+
+                # Fetch table list with column details via DBI
+                my $dbh = $acct_schema->storage->dbh;
+                my $tsth = $dbh->prepare(
+                    "SELECT t.tablename, COUNT(c.column_name)::int AS col_count
+                     FROM pg_tables t
+                     LEFT JOIN information_schema.columns c
+                       ON c.table_schema = 'public' AND c.table_name = t.tablename
+                     WHERE t.schemaname = 'public'
+                     GROUP BY t.tablename ORDER BY t.tablename");
+                $tsth->execute();
+                while (my ($tname, $col_count) = $tsth->fetchrow_array()) {
+                    my $csth = $dbh->prepare(
+                        "SELECT column_name, data_type, character_maximum_length,
+                                is_nullable, column_default
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public' AND table_name = ?
+                         ORDER BY ordinal_position");
+                    $csth->execute($tname);
+                    my @cols;
+                    while (my $col = $csth->fetchrow_hashref()) { push @cols, $col }
+                    push @tables, { name => $tname, col_count => $col_count, columns => \@cols };
+                }
+            } else {
+                $db_error = 'Could not connect to accounting database.';
+            }
+        };
+        $db_error = $@ if $@;
+        $db_error =~ s/ at .+//s if $db_error;
+    }
+
+    $c->stash(
+        sitename  => $sitename,
+        reg       => $reg,
+        db_ok     => $db_ok,
+        db_error  => $db_error,
+        tables    => \@tables,
+        template  => 'Accounting/my_database.tt',
     );
 }
 

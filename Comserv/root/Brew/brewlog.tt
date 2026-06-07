@@ -1,0 +1,11 @@
+[% META
+  title = 'Brew — Brew log'
+  description = 'Mash temps and fermentation log — guest overview and admin migration map'
+  roles = 'guest,user,admin'
+  TemplateType = 'Application'
+  category = 'brew,addon'
+  page_version = '0.01'
+  last_updated = '2026/06/05'
+%]
+[% PageVersion = 'Brew/brewlog.tt,v 0.01 2026/06/05 Brew log feature' %]
+[% INCLUDE 'Brew/_feature_shell.tt' %]

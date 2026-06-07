@@ -1,0 +1,39 @@
+[% PageVersion = 'Accounting/migrate_result.tt,v 0.01 2026/06/03 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
+    <h1 style="margin:0;">📦 Migration to PostgreSQL — [% sitename | html %]</h1>
+    <a href="/Accounting/my_database" class="btn btn-secondary" style="font-size:0.88rem;">← My Accounting Database</a>
+  </div>
+
+  [% IF errors %]
+  <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:1rem 1.2rem;margin-bottom:1rem;">
+    <strong style="color:#991b1b;">⚠️ Migration completed with [% errors %] error(s).</strong>
+    <p style="margin:0.4rem 0 0;font-size:0.9rem;">Review the log below for details. You may re-run migration — already-migrated records will be skipped.</p>
+  </div>
+  [% ELSE %]
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.2rem;margin-bottom:1rem;">
+    <strong style="color:#065f46;">✅ Migration completed successfully — no errors.</strong>
+  </div>
+  [% END %]
+
+  <h2 style="font-size:1rem;margin-bottom:0.5rem;">Migration Log</h2>
+  <div style="background:#1e293b;color:#e2e8f0;border-radius:8px;padding:1rem 1.2rem;font-family:monospace;font-size:0.82rem;line-height:1.6;overflow-x:auto;">
+    [% FOREACH line IN log %]
+      [% IF line.match('^===') %]
+        <div style="color:#7dd3fc;font-weight:bold;margin-top:0.6rem;">[% line | html %]</div>
+      [% ELSIF line.match('FAIL') %]
+        <div style="color:#fca5a5;">[% line | html %]</div>
+      [% ELSE %]
+        <div>[% line | html %]</div>
+      [% END %]
+    [% END %]
+  </div>
+
+  <div style="margin-top:1.2rem;">
+    <a href="/Accounting/my_database" class="btn btn-secondary">← Back to My Accounting Database</a>
+    <a href="/Accounting" class="btn btn-secondary" style="margin-left:0.5rem;">← Accounting Dashboard</a>
+  </div>
+
+</div>

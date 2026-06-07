@@ -298,20 +298,11 @@ sub _start_health_evaluator {
                             $status, $score, scalar(@$summary))
                     );
 
-                    # Log Docker container health to system_log so all servers are visible
+                    # Log Docker container health to system_log (shared DB, all servers)
                     eval {
-                        my $containers = Comserv::Util::HealthLogger->get_docker_health();
-                        for my $ct (@$containers) {
-                            my $lvl = ($ct->{health} eq 'healthy') ? 'info'
-                                    : ($ct->{health} eq 'unhealthy') ? 'warn'
-                                    : 'debug';
-                            $logger->log_with_details(undef, $lvl, __FILE__, __LINE__,
-                                'docker_health',
-                                sprintf('[HEALTH][DOCKER_STATUS] container=%s health=%s status=%s last_check=%s',
-                                    $ct->{name}, $ct->{health}, $ct->{status_str},
-                                    $ct->{last_output} || 'ok')
-                            );
-                        }
+                        Comserv::Util::HealthLogger->record_docker_health_snapshot(
+                            $schema, all_containers => 1
+                        );
                     };
 
                     # Alert CSC admin if health has deteriorated

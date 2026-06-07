@@ -468,6 +468,49 @@ sub auto :Private {
                 $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
             }
 
+            # Check hosting account for subscribed addons to enable them by default
+            my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                -or => [
+                    sitename => $mod_site,
+                    sitename => lc($mod_site),
+                    sitename => uc($mod_site),
+                ]
+            }, { rows => 1 })->single;
+            if ($hosting && $hosting->requested_addons) {
+                my @addons = split(/\s*,\s*/, $hosting->requested_addons);
+                for my $a (@addons) {
+                    my $lc_addon = lc($a);
+                    $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
+                    if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
+                        $enabled{'3d'} = 1 unless exists $enabled{'3d'};
+                        $enabled{'printing_3d'} = 1 unless exists $enabled{'printing_3d'};
+                    }
+                    if ($lc_addon eq 'workshops' || $lc_addon eq 'workshop') {
+                        $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
+                        $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
+                    }
+                    if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
+                        $enabled{'brew'} = 1 unless exists $enabled{'brew'};
+                    }
+                }
+            }
+
+            # Brew site / brew.* hostnames / brew addon → nav + brew home
+            my $req_host = $c->req->uri->host || '';
+            $req_host =~ s/^www\.//i;
+            my $is_brew_host = ($req_host =~ /^brew\./i) ? 1 : 0;
+            $c->stash->{is_brew_host} = $is_brew_host;
+
+            if ($is_brew_host || lc($mod_site) eq 'brew') {
+                $enabled{brew} = 1;
+                $enabled{accounting} = 1 unless exists $enabled{accounting};
+            }
+
+            # Show Brew menu when site_modules or hosting lists the brew addon
+            if ($enabled{brew}) {
+                $c->stash->{brew_addon_active} = 1;
+            }
+
             # Apply per-user overrides from user_module_access
             if ($c->session->{username}) {
                 my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({
@@ -504,6 +547,24 @@ sub auto :Private {
                 "enabled_modules load failed (table may not exist yet): $@");
             $c->stash->{enabled_modules} = {};
         }
+
+        # Planning access — shared by TopDropListPlanning, Brew nav, login menu, etc.
+        my $can_plan = 0;
+        if ($c->session->{username}) {
+            my $user_roles = $c->stash->{user_roles} || [];
+            my %guest_role = map { $_ => 1 } qw(guest anonymous Guest Anonymous);
+            my $is_guest = ref($user_roles) eq 'ARRAY'
+                ? (grep { $guest_role{$_} } @$user_roles) ? 1 : 0
+                : 0;
+            unless ($is_guest) {
+                $can_plan = 1;
+                my $em = $c->stash->{enabled_modules};
+                if (ref($em) eq 'HASH' && exists $em->{planning} && !$em->{planning}) {
+                    $can_plan = 0;
+                }
+            }
+        }
+        $c->stash->{can_plan} = $can_plan;
 
         # Check if current site has active priced inventory items (for Shop nav visibility)
         eval {
@@ -917,6 +978,30 @@ sub index :Path('/') :Args(0) {
         if ($c->req->param('view')) {
             my $view = $c->req->param('view');
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
+        }
+
+        # Brew addon or brew.* host → brewing dashboard as site home (/)
+        my $brew_home = 0;
+        eval {
+            my $em = $c->stash->{enabled_modules};
+            $em = {} unless ref($em) eq 'HASH';
+            my $site_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
+            my $host = $c->req->uri->host || '';
+            $host =~ s/^www\.//i;
+            if ( $em->{brew} || $site_lc eq 'brew' || $host =~ /^brew\./i ) {
+                $brew_home = 1;
+            }
+        };
+        if ($brew_home) {
+            my $brew_ctrl = eval { $c->controller('Brew') };
+            if ($brew_ctrl) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                    'Forwarding / to Brew addon home');
+                eval { $c->forward( $brew_ctrl->action_for('index') ) };
+                return 1 unless $@;
+            }
+            $c->response->redirect( $c->uri_for('/brew') );
+            return;
         }
 
         # Get ControllerName from the session
@@ -2125,16 +2210,14 @@ sub end : ActionClass('RenderView') {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
 
-        unless ($ENV{COMSERV_NO_HEALTH_LOG}) {
-            eval {
-                require Comserv::Util::HealthLogger;
-                Comserv::Util::HealthLogger->log_health_event(
-                    undef, 'error', 'HTTP_ERROR',
-                    "Unhandled 500: $err_text",
-                    { sitename => ($c->stash->{SiteName} || '') }
-                );
-            };
-        }
+        eval {
+            require Comserv::Util::HealthLogger;
+            Comserv::Util::HealthLogger->log_health_event(
+                undef, 'error', 'HTTP_ERROR',
+                "Unhandled 500: $err_text",
+                { sitename => ($c->stash->{SiteName} || '') }
+            );
+        };
 
         $c->clear_errors;
         $c->response->status(500);

@@ -498,6 +498,72 @@ sub _send_request {
     return $result;
 }
 
+=head2 get_live_usage
+
+Attempts to fetch live account usage / balance information from the xAI API
+using the configured API key. 
+
+xAI's primary usage and billing details are available in the web console
+(https://console.x.ai). This method tries the /v1/usage endpoint (OpenAI-compatible
+style) and falls back gracefully. It also returns rate-limit headers when present.
+
+Combined with our internal ai_usage_logs tracking (tokens + estimated cost per site),
+this gives an accurate picture for refill alerts and careful usage.
+
+Returns a hashref with 'live' data (if successful) or 'error' + note.
+=cut
+
+sub get_live_usage {
+    my ($self) = @_;
+    
+    unless ($self->api_key) {
+        $self->last_error("No xAI API key available for live usage check");
+        return {
+            error => "No API key",
+            note  => "Add a grok key at /ai/manage_api_keys or configure XAI_API_KEY"
+        };
+    }
+    
+    my $ua = $self->ua;
+    
+    # Primary attempt: /v1/usage (may not be fully public on all keys; xAI usage is
+    # primarily in the console, but we try for any available data)
+    my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/usage');
+    $req->header('Authorization' => 'Bearer ' . $self->api_key);
+    $req->header('Accept'        => 'application/json');
+    
+    my $res;
+    eval {
+        $res = $ua->request($req);
+    };
+    if ($@ || !$res) {
+        return {
+            error => "HTTP request failed: $@",
+            note  => "Could not reach xAI usage endpoint. Using internal tracking only."
+        };
+    }
+    
+    my $result = {
+        http_status => $res->code,
+        headers     => {
+            ratelimit_remaining => $res->header('x-ratelimit-remaining') || $res->header('X-RateLimit-Remaining'),
+            ratelimit_reset     => $res->header('x-ratelimit-reset')     || $res->header('X-RateLimit-Reset'),
+        },
+    };
+    
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->content) };
+        $result->{live} = $data if $data;
+        $result->{note} = "Live data from xAI (may be limited). See console.x.ai for full balance/credits.";
+    } else {
+        $result->{error} = "xAI returned " . $res->status_line;
+        $result->{body_preview} = substr($res->content || '', 0, 300);
+        $result->{note} = "Live usage endpoint not available for this key (common). Rely on internal ai_usage_logs estimates + console.x.ai for exact remaining balance.";
+    }
+    
+    return $result;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

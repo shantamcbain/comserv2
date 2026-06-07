@@ -26,9 +26,39 @@ sub instance {
 }
 
 my $DEFAULT_HOST = '192.168.1.20';
-my $DEFAULT_PORT = 5432;
+my $DEFAULT_PORT = 5433;
 my $DEFAULT_USER = 'postgres';
 my $DEFAULT_PASS = '';
+
+sub _pg_admin_credentials {
+    my ($self) = @_;
+    my $host = $ENV{MIGRATION_POSTGRES_HOST} || $DEFAULT_HOST;
+    my $port = $ENV{MIGRATION_POSTGRES_PORT} || $DEFAULT_PORT;
+    my $user = $ENV{MIGRATION_POSTGRES_USER} || $DEFAULT_USER;
+    my $pass = $ENV{MIGRATION_POSTGRES_PASSWORD} // $DEFAULT_PASS;
+
+    unless ($pass) {
+        my $home     = $ENV{HOME} || '';
+        my $dbi_file = "$home/.comserv/secrets/dbi/db_production_postgres.json";
+        if (-f $dbi_file) {
+            eval {
+                require JSON;
+                local $/;
+                open my $fh, '<', $dbi_file or die $!;
+                my $data = JSON::decode_json(<$fh>);
+                close $fh;
+                my ($cfg) = values %$data;
+                if (ref $cfg eq 'HASH') {
+                    $pass = $cfg->{password} // '';
+                    $host = $cfg->{host}     if $cfg->{host};
+                    $port = $cfg->{port}     if $cfg->{port};
+                    $user = $cfg->{username} if $cfg->{username};
+                }
+            };
+        }
+    }
+    return ($host, $port, $user, $pass);
+}
 
 sub schema_for_site {
     my ($self, $c, $sitename) = @_;
@@ -71,7 +101,7 @@ sub schema_for_site {
         );
     };
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'schema_for_site',
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_for_site',
             "Cannot connect to accounting DB '$db_name' at $host:$port — $@");
         return undef;
     }
@@ -89,30 +119,112 @@ sub schema {
     return $self->schema_for_site($c, $sitename);
 }
 
+sub _generate_password {
+    my ($self, $len) = @_;
+    $len ||= 20;
+    my @chars = ('A'..'Z', 'a'..'z', '0'..'9');
+    return join '', map { $chars[int rand @chars] } 1..$len;
+}
+
 sub provision_site {
     my ($self, $c, $sitename, %opts) = @_;
 
-    my $db_name    = lc($sitename) . '_accounting';
-    my $host       = $opts{host}        || $DEFAULT_HOST;
-    my $port       = $opts{port}        || $DEFAULT_PORT;
-    my $db_user    = $opts{db_user}     || $DEFAULT_USER;
-    my $db_pass    = $opts{db_pass}     // $DEFAULT_PASS;
+    my $db_name      = lc($sitename) . '_accounting';
     my $jurisdiction = $opts{jurisdiction} || 'CA';
-    my $currency   = $opts{currency}    || 'CAD';
+    my $currency     = $opts{currency}     || 'CAD';
 
-    my $admin_dsn = "dbi:Pg:dbname=accounting_template;host=$host;port=$port";
-    my $dbh;
-    eval {
-        require DBI;
-        $dbh = DBI->connect($admin_dsn, $db_user, $db_pass,
-            { RaiseError => 1, PrintError => 0, AutoCommit => 1 });
-        $dbh->do("CREATE DATABASE $db_name TEMPLATE accounting_template");
+    # Read PostgreSQL admin credentials from secrets file / env vars (never from form input)
+    my ($host, $port, $admin_user, $admin_pass) = $self->_pg_admin_credentials;
+
+    # Site DB user/pass: caller may supply; otherwise auto-generate and store
+    my $db_user = $opts{db_user} || lc($sitename) . '_acct';
+    my $db_pass = $opts{db_pass} // $self->_generate_password;
+
+    require DBI;
+    my $err = '';
+
+    unless ($admin_pass) {
+        $err = "PostgreSQL admin password not found — set MIGRATION_POSTGRES_PASSWORD env var or add to ~/.comserv/secrets/dbi/db_production_postgres.json";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+        return (0, $err);
+    }
+
+    # Connect using the PostgreSQL ADMIN account to run CREATE DATABASE.
+    # Must use the 'postgres' maintenance DB (not the template or target DB).
+    my $admin_dsn = "dbi:Pg:dbname=postgres;host=$host;port=$port";
+    my $dbh = DBI->connect($admin_dsn, $admin_user, $admin_pass,
+        { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
+    unless ($dbh) {
+        $err = "Cannot connect to PostgreSQL at $host:$port as '$admin_user': " . ($DBI::errstr || 'unknown error');
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+        return (0, $err);
+    }
+
+    # Check whether accounting_template exists
+    my ($tmpl_exists) = $dbh->selectrow_array(
+        "SELECT 1 FROM pg_database WHERE datname = 'accounting_template'");
+    unless ($tmpl_exists) {
+        $err = "Template database 'accounting_template' does not exist on $host:$port — run sql/accounting_template.sql first.";
         $dbh->disconnect;
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site',
-            "Failed to CREATE DATABASE $db_name: $@");
-        return (0, "Database creation failed: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+        return (0, $err);
+    }
+
+    # Check whether target DB already exists; if not, create it
+    my ($db_exists) = $dbh->selectrow_array(
+        "SELECT 1 FROM pg_database WHERE datname = ?", undef, $db_name);
+    if (!$db_exists) {
+        my $ok = $dbh->do("CREATE DATABASE \"$db_name\" TEMPLATE accounting_template");
+        unless ($ok) {
+            $err = "CREATE DATABASE '$db_name' failed: " . ($DBI::errstr || 'unknown error');
+            $dbh->disconnect;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+            return (0, $err);
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
+            "Created database '$db_name'.");
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
+            "Database '$db_name' already exists — skipping CREATE.");
+    }
+
+    # Create PostgreSQL role (user) if it does not already exist
+    my ($role_exists) = $dbh->selectrow_array(
+        "SELECT 1 FROM pg_roles WHERE rolname = ?", undef, $db_user);
+    if (!$role_exists) {
+        # Use dollar-quoting to safely embed password
+        my $safe_pass = $db_pass;
+        $safe_pass =~ s/'/''/g;
+        $dbh->do("CREATE ROLE \"$db_user\" WITH LOGIN PASSWORD '$safe_pass'");
+        if ($dbh->err) {
+            $err = "CREATE ROLE '$db_user' failed: " . ($dbh->errstr || $DBI::errstr || 'unknown');
+            $dbh->disconnect;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+            return (0, $err);
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
+            "Created PostgreSQL role '$db_user'.");
+    } else {
+        # Role exists — update its password in case it changed
+        my $safe_pass = $db_pass;
+        $safe_pass =~ s/'/''/g;
+        $dbh->do("ALTER ROLE \"$db_user\" WITH PASSWORD '$safe_pass'");
+    }
+
+    # Grant the role connect + all privileges on the database
+    $dbh->do("GRANT CONNECT ON DATABASE \"$db_name\" TO \"$db_user\"");
+    $dbh->do("GRANT ALL PRIVILEGES ON DATABASE \"$db_name\" TO \"$db_user\"");
+    $dbh->disconnect;
+
+    # Connect to the target DB as admin to grant schema-level privileges
+    my $target_dbh = DBI->connect("dbi:Pg:dbname=$db_name;host=$host;port=$port",
+        $admin_user, $admin_pass, { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
+    if ($target_dbh) {
+        $target_dbh->do("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"$db_user\"");
+        $target_dbh->do("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"$db_user\"");
+        $target_dbh->do("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"$db_user\"");
+        $target_dbh->do("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"$db_user\"");
+        $target_dbh->disconnect;
     }
 
     eval {
@@ -139,7 +251,7 @@ sub provision_site {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
         "Provisioned accounting DB '$db_name' for site '$sitename' ($jurisdiction/$currency)");
 
-    return (1, "Accounting database '$db_name' provisioned successfully.");
+    return (1, "Accounting database '$db_name' provisioned for '$sitename'. DB user: $db_user");
 }
 
 __PACKAGE__->meta->make_immutable;

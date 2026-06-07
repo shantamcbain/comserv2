@@ -35,19 +35,40 @@ sub index :Path('/admin/logging/audit') :Args(0) {
 
     my $filter_system = $c->req->param('system') // '';
     my $filter_level  = $c->req->param('level')  // '';
-    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_system =~ s/[^\w\.\-:\s\(\)]//g;
+    $filter_system =~ s/^\s+|\s+$//g;
     $filter_level  =~ s/[^A-Z]//g;
+
+    # Refresh Docker snapshots into system_log (local + server room via SSH)
+    my $docker_sync_report = [];
+    my $schema = eval { $c->model('DBEncy') };
+    if ($schema) {
+        eval {
+            Comserv::Util::HealthLogger->record_docker_health_snapshot(
+                $schema, all_containers => 1
+            );
+        };
+        eval {
+            $docker_sync_report = Comserv::Util::HealthLogger->sync_remote_docker_hosts($schema);
+        };
+    }
 
     # Local Docker containers (fast — direct docker ps)
     my $docker_health = [];
-    eval { $docker_health = Comserv::Util::HealthLogger->get_docker_health() };
+    eval { $docker_health = Comserv::Util::HealthLogger->get_docker_health(all_containers => 1) };
 
     # All-server Docker health from shared system_log DB (includes production)
     my $docker_health_db = [];
     eval {
-        $docker_health_db = Comserv::Util::HealthLogger->get_docker_health_from_db(
-            $c->model('DBEncy')
-        );
+        $docker_health_db = Comserv::Util::HealthLogger->get_docker_health_from_db($schema)
+            if $schema;
+    };
+
+    # Active servers from system_log activity (works for ALL servers, no comserv_server.pl needed)
+    my $active_servers = [];
+    eval {
+        $active_servers = Comserv::Util::HealthLogger->get_active_servers_from_db($schema, hours => 2)
+            if $schema;
     };
 
     # When arriving via a health-alert link fetch the actual log entries that
@@ -64,8 +85,8 @@ sub index :Path('/admin/logging/audit') :Args(0) {
                     $cond{level} = $filter_level;
                 }
             }
-            # Match the same 10-minute window used by the health badge count
-            my $cutoff = DateTime->now->subtract(minutes => 10)->strftime('%Y-%m-%d %H:%M:%S');
+            # Show alerts from the last 60 minutes when arriving via a health-alert link
+            my $cutoff = DateTime->now->subtract(minutes => 60)->strftime('%Y-%m-%d %H:%M:%S');
             $cond{timestamp} = { '>=' => $cutoff };
 
             $recent_alerts = [
@@ -78,13 +99,15 @@ sub index :Path('/admin/logging/audit') :Args(0) {
     }
 
     $c->stash(
-        template         => 'admin/Logging/LogAudit.tt',
-        docker_health    => $docker_health,
-        docker_health_db => $docker_health_db,
-        hours            => $hours,
-        filter_system    => $filter_system,
-        filter_level     => $filter_level,
-        recent_alerts    => $recent_alerts,
+        template            => 'admin/Logging/LogAudit.tt',
+        docker_health       => $docker_health,
+        docker_health_db    => $docker_health_db,
+        docker_sync_report  => $docker_sync_report,
+        active_servers      => $active_servers,
+        hours               => $hours,
+        filter_system       => $filter_system,
+        filter_level        => $filter_level,
+        recent_alerts       => $recent_alerts,
     );
 }
 
@@ -98,7 +121,8 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
 
     my $filter_system = $c->req->param('system') // '';
     my $filter_level  = $c->req->param('level')  // '';
-    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_system =~ s/[^\w\.\-:\s\(\)]//g;
+    $filter_system =~ s/^\s+|\s+$//g;
     $filter_level  =~ s/[^A-Z]//g;
 
     my $audit      = {};

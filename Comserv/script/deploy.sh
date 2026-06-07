@@ -6,12 +6,14 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 EMAIL="csc@computersystemconsulting.ca"
 # Detect correct compose file location (either root or script directory)
-if [ -f "/opt/comserv/Comserv/docker-compose.server.yml" ]; then
+if [ -f "/opt/comserv/Comserv/docker-compose.prod.yml" ]; then
+    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
+elif [ -f "/opt/comserv/Comserv/docker-compose.server.yml" ]; then
     COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
 elif [ -f "/opt/comserv/Comserv/script/docker-compose.server.yml" ]; then
     COMPOSE_FILE="/opt/comserv/Comserv/script/docker-compose.server.yml"
 else
-    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
+    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 fi
 IMAGE="shantamcsbain/comserv-web-prod:latest"
 CONTAINER="comserv2-web-prod"
@@ -399,23 +401,29 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
     done
 fi
 
+MIGRATE_LOCAL_FALLBACK_TO_NFS="${MIGRATE_LOCAL_FALLBACK_TO_NFS:-1}"
+REMOVE_LOCAL_FALLBACK_AFTER_MIGRATION="${REMOVE_LOCAL_FALLBACK_AFTER_MIGRATION:-1}"
+
 echo "=== Comserv Production Deploy Check at $(date) ==="
 
 # ── Detect NFS and configure paths ───────────────────────────────────────────
 # Production server: /home/ubuntu/nfs (mounted from 192.168.1.175:/mnt/data)
 # Workstation:       /home/shanta/nfs (mounted from 192.168.1.175:/mnt/data)
-NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /home/shanta/nfs /mnt/nfs /mnt/data"
+NFS_MOUNT_CANDIDATES="${NFS_MOUNT_CANDIDATES:-/home/ubuntu/nfs /home/shanta/nfs /mnt/nfs /mnt/data}"
 NFS_MOUNT_DIR=""
 for candidate in $NFS_MOUNT_CANDIDATES; do
-    if mount | grep -q " on ${candidate} type nfs"; then
+    if mount | grep -Eq " on ${candidate} type nfs4? "; then
         NFS_MOUNT_DIR="$candidate"
         break
     fi
 done
+NFS_LOCAL_DIR="$NFS_MOUNT_DIR"
 
 # Default paths (local fallback if NFS not mounted)
+ALLOW_LOCAL_STORAGE_FALLBACK="${ALLOW_LOCAL_STORAGE_FALLBACK:-0}"
 COMSERV_LOGS_DIR="$HOME/comserv-logs"
-NFS_DATA_DIR="/var/lib/comserv/data"
+NFS_DATA_DIR=""
+WORKSHOP_LOCAL_DIR=""
 NFS_DEPLOY_LOG=""
 
 if [ -n "$NFS_MOUNT_DIR" ]; then
@@ -424,9 +432,46 @@ if [ -n "$NFS_MOUNT_DIR" ]; then
     # The application itself (Logging.pm) asynchronously copies archived/rotated logs to NFS.
     COMSERV_LOGS_DIR="$HOME/comserv-logs"
     NFS_DATA_DIR="$NFS_MOUNT_DIR"
-    mkdir -p "$COMSERV_LOGS_DIR" 2>/dev/null || true
+    WORKSHOP_LOCAL_DIR="$NFS_MOUNT_DIR/comserv-workshop"
+    mkdir -p "$COMSERV_LOGS_DIR" "$WORKSHOP_LOCAL_DIR" 2>/dev/null || true
     echo "   Container logs: $COMSERV_LOGS_DIR (local path to avoid NFS locking hangs)"
-    echo "   NFS data dir:   $NFS_DATA_DIR"
+    echo "   Routing workshop/NFS storage to: $WORKSHOP_LOCAL_DIR"
+    HOST_STORAGE_DF=$(df -P "$WORKSHOP_LOCAL_DIR" 2>/dev/null || true)
+    echo "$HOST_STORAGE_DF"
+    if echo "$HOST_STORAGE_DF" | awk 'NR > 1 {print $1}' | grep -vq ':'; then
+        echo "ERROR: One or more container storage paths are not backed by NFS." >&2
+        exit 1
+    fi
+
+    migrate_local_fallback_dir() {
+        local src="$1"
+        local dest="$2"
+        local label="$3"
+
+        if [ "$MIGRATE_LOCAL_FALLBACK_TO_NFS" != "1" ]; then
+            return 0
+        fi
+        if [ ! -d "$src" ] || [ -L "$src" ] || [ "$src" = "$dest" ]; then
+            return 0
+        fi
+        if ! find "$src" -mindepth 1 -maxdepth 1 2>/dev/null | grep -q .; then
+            return 0
+        fi
+
+        echo "Migrating old local $label fallback from $src to $dest"
+        mkdir -p "$dest"
+        cp -a "$src/." "$dest/"
+        if [ "$REMOVE_LOCAL_FALLBACK_AFTER_MIGRATION" = "1" ]; then
+            echo "Removing migrated local $label fallback: $src"
+            rm -rf "$src"
+            mkdir -p "$src"
+        else
+            echo "Keeping migrated local $label fallback because REMOVE_LOCAL_FALLBACK_AFTER_MIGRATION!=1"
+        fi
+    }
+
+    migrate_local_fallback_dir "/home/ubuntu/comserv-logs" "$COMSERV_LOGS_DIR" "log"
+    migrate_local_fallback_dir "/home/ubuntu/comserv-workshop" "$WORKSHOP_LOCAL_DIR" "workshop"
     
     # Configure NFS Deployment Log archive path
     NFS_LOG_DIR="$NFS_MOUNT_DIR/logs"
@@ -435,17 +480,24 @@ if [ -n "$NFS_MOUNT_DIR" ]; then
         NFS_DEPLOY_LOG="${NFS_LOG_DIR}/comserv-deploy.log"
     fi
 else
-    echo "NFS not mounted — using local fallbacks"
+    echo "ERROR: NFS is not mounted at any expected path: $NFS_MOUNT_CANDIDATES" >&2
+    echo "Refusing to deploy with local root-disk storage for /data/nfs." >&2
+    echo "Set ALLOW_LOCAL_STORAGE_FALLBACK=1 only for emergency/manual recovery." >&2
+    if [ "$ALLOW_LOCAL_STORAGE_FALLBACK" != "1" ]; then
+        exit 1
+    fi
+    echo "WARNING: ALLOW_LOCAL_STORAGE_FALLBACK=1 set — using local fallback paths"
     COMSERV_LOGS_DIR="$HOME/comserv-logs"
-    echo "   Container logs: $COMSERV_LOGS_DIR"
-    echo "   Data dir:       $NFS_DATA_DIR"
-    mkdir -p "$COMSERV_LOGS_DIR" "$NFS_DATA_DIR" 2>/dev/null || true
+    NFS_DATA_DIR="/var/lib/comserv/data"
+    WORKSHOP_LOCAL_DIR="/home/ubuntu/comserv-workshop"
+    mkdir -p "$COMSERV_LOGS_DIR" "$NFS_DATA_DIR" "$WORKSHOP_LOCAL_DIR" 2>/dev/null || true
 fi
 
 # ── Export environment variables for docker-compose ──────────────────────────
 # CRITICAL: Must export BEFORE any docker-compose commands (including pull)
 export COMSERV_LOGS_DIR
 export NFS_DATA_DIR
+export WORKSHOP_LOCAL_DIR
 
 # ── Disk space report ────────────────────────────────────────────────────────
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
@@ -538,6 +590,12 @@ if [ -d "$COMSERV_LOGS_DIR" ]; then
     # Also delete any rotated logs older than 7 days on the host
     echo "Pruning rotated application logs older than 7 days..."
     find "$COMSERV_LOGS_DIR" \( -name "*.log.*" -o -name "*.gz" \) -mtime +7 -type f -delete 2>/dev/null || true
+    
+    # Prune session files older than 7 days inside the active container to prevent filesystem bloat
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
+        echo "Pruning expired session files older than 7 days inside $CONTAINER..."
+        docker exec "$CONTAINER" find /tmp/comserv/session -type f -mtime +7 -delete 2>/dev/null || true
+    fi
 fi
 
 # ── Check for compose file ─���───────────────────────────────────────────���─────
@@ -583,6 +641,12 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
         if [ $RESTART_OK -eq 0 ]; then
             echo "   ❌ [Recovery] All 3 restart attempts failed! Falling back to backup images..."
             FALLBACK_HEALTHY=0
+            
+            # Capture failure reason and container logs before stopping/deleting
+            FAILED_STATE_HEALTH=$(docker inspect --format='{{json .State.Health}}' "$CONTAINER" 2>/dev/null || echo "N/A")
+            FAILED_STATE_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
+            FAIL_REASON="Container failed viability checks. State: Running=$FAILED_STATE_RUNNING, Health=$FAILED_STATE_HEALTH"
+            CONTAINER_LOGS=$(docker logs --tail 100 "$CONTAINER" 2>&1 || echo "No logs available.")
             
             # Get the image ID of the currently running unhealthy container
             CURRENT_IMAGE_ID=$(docker inspect --format='{{.Image}}' "$CONTAINER" 2>/dev/null || true)
@@ -642,13 +706,56 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
             done
             
             if [ $FALLBACK_HEALTHY -eq 1 ]; then
+                # Construct detailed email body with exact reasons and logs
+                EMAIL_BODY="⚠️ CRITICAL ALERT: Container rollback/rotation occurred on $HOSTNAME_VAL!\n\n"
+                EMAIL_BODY="${EMAIL_BODY}Details:\n"
+                EMAIL_BODY="${EMAIL_BODY}- Failed Container: $CONTAINER\n"
+                EMAIL_BODY="${EMAIL_BODY}- Reason: $FAIL_REASON\n"
+                EMAIL_BODY="${EMAIL_BODY}- Recovered/Rotated Image: $ACTIVE_BACKUP\n"
+                EMAIL_BODY="${EMAIL_BODY}- Time of Event: $(date)\n\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}LAST 100 LINES OF LOGS FOR FAILED CONTAINER:\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}$CONTAINER_LOGS\n"
+
                 if command -v mail >/dev/null 2>&1; then
-                    echo -e "Container health recovery succeeded via fallback to $ACTIVE_BACKUP image.\n\nServer : $HOSTNAME_VAL\nTime   : $(date)" \
-                        | mail -s "⚠️  Container Recovered via $ACTIVE_BACKUP on $HOSTNAME_VAL" "$EMAIL"
+                    echo -e "$EMAIL_BODY" | mail -s "⚠️ Container Failover to $ACTIVE_BACKUP on $HOSTNAME_VAL" "$EMAIL"
+                fi
+                
+                # Log critical system alert in DB
+                if [ -d "$GLOBAL_HOST_APP_DIR" ]; then
+                    perl -I"$GLOBAL_HOST_APP_DIR/lib" -MComserv::Util::Logging -MComserv::Util::HealthLogger -e '
+                        my ($b_tag, $reason) = @ARGV;
+                        eval { Comserv::Util::HealthLogger->log_event(undef, level => "CRITICAL", category => "HEALTH", message => "Container failover to $b_tag. Reason: $reason") };
+                    ' "$ACTIVE_BACKUP" "$FAIL_REASON"
                 fi
             else
                 echo "   ❌ [Fallback] All backup images failed or no backups available."
                 echo "   [Emergency] Starting host-level Starman so service is not interrupted..."
+                
+                # Construct detailed email body for complete failover failure
+                EMAIL_BODY="🚨 EMERGENCY CRITICAL ALERT: Container failover completely failed on $HOSTNAME_VAL!\n\n"
+                EMAIL_BODY="${EMAIL_BODY}Details:\n"
+                EMAIL_BODY="${EMAIL_BODY}- Failed Container: $CONTAINER\n"
+                EMAIL_BODY="${EMAIL_BODY}- Reason: $FAIL_REASON\n"
+                EMAIL_BODY="${EMAIL_BODY}- Recovery Action: All backup images failed. Starting host-level Starman.\n"
+                EMAIL_BODY="${EMAIL_BODY}- Time of Event: $(date)\n\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}LAST 100 LINES OF LOGS FOR FAILED CONTAINER:\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}$CONTAINER_LOGS\n"
+
+                if command -v mail >/dev/null 2>&1; then
+                    echo -e "$EMAIL_BODY" | mail -s "🚨 Container Failover FAILED - Host Starman Started on $HOSTNAME_VAL" "$EMAIL"
+                fi
+
+                # Log critical system alert in DB
+                if [ -d "$GLOBAL_HOST_APP_DIR" ]; then
+                    perl -I"$GLOBAL_HOST_APP_DIR/lib" -MComserv::Util::Logging -MComserv::Util::HealthLogger -e '
+                        my ($reason) = @ARGV;
+                        eval { Comserv::Util::HealthLogger->log_event(undef, level => "CRITICAL", category => "HEALTH", message => "Container failover completely FAILED! Switched to host Starman. Reason: $reason") };
+                    ' "$FAIL_REASON"
+                fi
                 
                 # Stop any failed docker container first to free port 5000
                 docker stop "$CONTAINER" 2>/dev/null || true
@@ -866,6 +973,10 @@ fi
 
 echo "3. Starting new container..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+
+echo "3a. Verifying container storage mounts..."
+CONTAINER_STORAGE_DF=$(docker exec "$CONTAINER" df -h /data/nfs 2>/dev/null || true)
+echo "$CONTAINER_STORAGE_DF"
 
 echo "3b. Ensuring SearXNG container is running..."
 SEARXNG_CONFIG_DIR="/opt/comserv/searxng-config"
