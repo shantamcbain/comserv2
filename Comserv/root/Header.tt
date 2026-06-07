@@ -146,8 +146,8 @@
     <!-- Admin-only styles -->
     <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
     [% END %]
-    [% IF is_admin && SiteName == 'CSC' %]
-    <!-- CSC-admin-only Health Monitoring -->
+    [% IF is_admin && SiteName == 'CSC' && !is_dev_server %]
+    <!-- CSC-admin-only Health Monitoring (production only) -->
     <script src="/static/js/HealthMonitor.js"></script>
     [% END %]
 

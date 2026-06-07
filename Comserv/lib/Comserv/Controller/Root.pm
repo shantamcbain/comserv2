@@ -6,9 +6,12 @@ use Data::Dumper;
 use DateTime;
 use JSON;
 use URI;
+use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
+
+use constant IS_DEV_WORKTREE => ($Bin =~ m{\.zenflow[\\/]worktrees[\\/]}) ? 1 : 0;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -116,6 +119,8 @@ sub auto :Private {
     if ($c->req->path =~ m{^/health(?:/|$)}) {
         return 1;
     }
+
+    $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip setup redirect for setup pages themselves and static assets
