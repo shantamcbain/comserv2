@@ -110,8 +110,8 @@ Ask the user questions when anything is unclear or needs their input.
 <!-- chat-id: e590d1bc-34a7-4393-ac11-d1ca0cce3e90 -->
 - [x] P5.1 BMaster/ + Apiary/ — clean, no changes needed
 - [x] P5.2 CSC/ — 11 files fixed (HelpDesk, FAQ, hosting pages)
-- [x] P5.3 Shanta/ + WeaverBeck/ + weaverbeck/ + ve7tit/ — 1 file fixed
-- [x] P5.4 Forager/ + USBM/ + SB/ + coop/ + ENCY/ — 9 files fixed
+- [x] P5.3 Shanta/ + WeaverBeck/ + weaverbeck/ + ve7tit/ — 2 files fixed (including compliance fixes in Shanta/workshop.tt)
+- [x] P5.4 Forager/ + USBM/ + SB/ + coop/ + ENCY/ — 10 files fixed (including compliance fixes in coop/index.tt)
 - [x] P5.5 WorkShops/ + todo/ + marketplace/ + file/ + ai/ — 44 files fixed
 - [x] P5.6 Shop/ + Cart/ + membership/ + Accounting/ + Inventory/ + NetworkMap/ + mail/ — 54 files fixed
 - [x] P5.7 Documentation/ — 60+ files fixed
