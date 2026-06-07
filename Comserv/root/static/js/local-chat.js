@@ -2016,8 +2016,8 @@
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
         
-        chatPanel.style.display = 'flex';
-        chatButton.style.display = 'none';
+        if (chatPanel) chatPanel.style.display = 'flex';
+        if (chatButton) chatButton.style.display = 'none';
         state.isOpen = true;
         
         try {
@@ -2103,8 +2103,8 @@
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
         
-        chatPanel.style.display = 'none';
-        chatButton.style.display = 'flex';
+        if (chatPanel) chatPanel.style.display = 'none';
+        if (chatButton) chatButton.style.display = 'flex';
         state.isOpen = false;
         
         try {
