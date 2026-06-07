@@ -52,6 +52,11 @@
     
     window.addEventListener('beforeunload', function() {
         state.isUnloading = true;
+        if (window.AI_WIDGET_POPUP) {
+            try {
+                localStorage.removeItem('ai_popup_active');
+            } catch(e) {}
+        }
     });
     
     // Per-tab nonce: generated fresh each time the script runs in a new JS context.
@@ -1024,7 +1029,11 @@
         var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
             || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
         chatButton.addEventListener('click', function() {
-            openChat();
+            if (localStorage.getItem('ai_popup_active') === '1') {
+                detachToPopup();
+            } else {
+                openChat();
+            }
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
@@ -1834,6 +1843,12 @@
 
         if (popup) {
             state._popupWindow = popup;
+            try {
+                localStorage.setItem('ai_popup_active', '1');
+            } catch(e) {}
+            // Close the inline chat panel so it doesn't stay open on the parent window
+            closeChat();
+            
             // Mark the chat button as "popup active" so the user knows where the chat is
             const chatButton = document.getElementById('chat-button');
             if (chatButton) {
@@ -5693,9 +5708,17 @@
                 }
             });
 
-            // In popup window mode or when previously open: auto-open the chat panel
-            if (window.AI_WIDGET_POPUP || sessionStorage.getItem('ai_chat_open') === '1') {
+            // In popup window mode or when previously open: auto-open the chat panel (if no active popup)
+            const isPopupActive = localStorage.getItem('ai_popup_active') === '1';
+            if (window.AI_WIDGET_POPUP || (sessionStorage.getItem('ai_chat_open') === '1' && !isPopupActive)) {
                 openChat();
+            } else if (isPopupActive) {
+                // If a popup is active, ensure the chat button is visually marked as popup-active
+                const chatButton = document.getElementById('chat-button');
+                if (chatButton) {
+                    chatButton.classList.add('popup-active');
+                    chatButton.title = 'AI chat is open in a separate window — click to bring to front';
+                }
             }
         }
 
