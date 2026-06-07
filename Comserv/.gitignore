@@ -4,6 +4,19 @@ workspace.xml
 .idea/workspace.xml
 .idea/vcs.xml
 /db_config.json
+.env
+.env.*
+*.log
+/local/
+/blib/
+/pm_to_blib
+/Makefile
+/Makefile.old
+/MYMETA.*
+/inc/
+/pretrained_models/
+/whisper_venv/
+/ency.db*
 
 # AI session history and working files (not tracked)
 root/Documentation/session_history/

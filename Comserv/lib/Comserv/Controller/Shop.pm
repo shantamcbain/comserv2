@@ -46,6 +46,31 @@ sub _cart_count {
     return $count;
 }
 
+sub _buyer_points_info {
+    my ($self, $c) = @_;
+    my $user_id  = $c->session->{user_id};
+    return (0, 0) unless $user_id;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $is_member = 0;
+    my $balance   = 0;
+
+    eval {
+        my $mem = $schema->resultset('UserMembership')->search(
+            { user_id => $user_id, sitename => $sitename, status => 'active' }
+        )->first;
+        $is_member = 1 if $mem;
+    };
+
+    eval {
+        my $pa = $schema->resultset('Accounting::PointAccount')->find({ user_id => $user_id });
+        $balance = $pa->balance if $pa && $pa->balance;
+    };
+
+    return ($is_member, $balance);
+}
+
 # -------------------------------------------------------------------------
 # Public storefront — /shop
 # -------------------------------------------------------------------------
@@ -53,6 +78,11 @@ sub index :Path('/shop') :Args(0) {
     my ($self, $c) = @_;
 
     my $sitename = $self->_sitename($c);
+    if (!$sitename || $sitename eq 'none') {
+        $c->res->status(404);
+        $c->stash(template => 'error.tt', error_msg => 'Shop not found.');
+        return;
+    }
     my $schema   = $self->_schema($c);
     my $params   = $c->req->query_parameters;
     my $category = $params->{category} || '';
@@ -86,11 +116,11 @@ sub index :Path('/shop') :Args(0) {
 
     my (@items, @categories);
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%where,
             { prefetch => 'stock_levels', order_by => $order_by }
         )->all;
-        @categories = $schema->resultset('InventoryItem')->search(
+        @categories = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', show_in_shop => 1, category => { '!=' => undef } },
             { columns => ['category'], distinct => 1, order_by => 'category' }
         )->all;
@@ -101,16 +131,20 @@ sub index :Path('/shop') :Args(0) {
         $c->stash(error_msg => 'Could not load shop items. Please try again later.');
     }
 
+    my ($buyer_is_member, $buyer_points) = $self->_buyer_points_info($c);
+
     $c->stash(
-        items         => \@items,
-        categories    => \@categories,
-        category      => $category,
-        search        => $search,
-        sort          => $sort,
-        sitename      => $sitename,
-        cart_count    => $self->_cart_count($c),
-        is_ecommerce  => $self->_ecommerce_enabled($c),
-        template      => 'Shop/index.tt',
+        items            => \@items,
+        categories       => \@categories,
+        category         => $category,
+        search           => $search,
+        sort             => $sort,
+        sitename         => $sitename,
+        cart_count       => $self->_cart_count($c),
+        is_ecommerce     => $self->_ecommerce_enabled($c),
+        buyer_is_member  => $buyer_is_member,
+        buyer_points     => $buyer_points,
+        template         => 'Shop/index.tt',
     );
 }
 
@@ -125,11 +159,11 @@ sub item :Path('/shop/item') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename, status => 'active', show_in_shop => 1 },
             { prefetch => 'stock_levels' }
         );
-        $item ||= $schema->resultset('InventoryItem')->find(
+        $item ||= $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename },
             { prefetch => 'stock_levels' }
         ) if $self->_is_admin($c);
@@ -154,7 +188,7 @@ sub item :Path('/shop/item') :Args(1) {
         next unless ($opt->{type} // '') eq 'filament_stock';
         my @filament_values;
         eval {
-            my @filaments = $schema->resultset('InventoryItem')->search(
+            my @filaments = $schema->resultset('Accounting::InventoryItem')->search(
                 {
                     'me.sitename' => $sitename,
                     'me.status'   => 'active',
@@ -202,16 +236,20 @@ sub item :Path('/shop/item') :Args(1) {
         $sale_price = sprintf('%.2f', $display_price * (1 - $item->discount_percent / 100));
     }
 
+    my ($buyer_is_member, $buyer_points) = $self->_buyer_points_info($c);
+
     $c->stash(
-        item          => $item,
-        options       => \@options,
-        total_stock   => $total_stock,
-        display_price => $display_price,
-        sale_price    => $sale_price,
-        cart_count    => $self->_cart_count($c),
-        sitename      => $sitename,
-        is_ecommerce  => $self->_ecommerce_enabled($c),
-        template      => 'Shop/item.tt',
+        item             => $item,
+        options          => \@options,
+        total_stock      => $total_stock,
+        display_price    => $display_price,
+        sale_price       => $sale_price,
+        cart_count       => $self->_cart_count($c),
+        sitename         => $sitename,
+        is_ecommerce     => $self->_ecommerce_enabled($c),
+        buyer_is_member  => $buyer_is_member,
+        buyer_points     => $buyer_points,
+        template         => 'Shop/item.tt',
     );
 }
 
@@ -240,7 +278,7 @@ sub admin :Path('/shop/admin') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%where,
             { order_by => [qw(category name)] }
         )->all;
@@ -277,7 +315,7 @@ sub admin_edit :Path('/shop/admin/edit') :Args(1) {
     my $sitename = $self->_sitename($c);
 
     my $item;
-    eval { $item = $schema->resultset('InventoryItem')->find($id) };
+    eval { $item = $schema->resultset('Accounting::InventoryItem')->find($id) };
 
     unless ($item && $item->sitename eq $sitename) {
         $c->flash->{error_msg} = 'Item not found.';
@@ -297,6 +335,7 @@ sub admin_edit :Path('/shop/admin/edit') :Args(1) {
             description      => $p->{description}      || undef,
             show_in_shop     => ($p->{show_in_shop}     ? 1 : 0),
             hide_stock_count => ($p->{hide_stock_count} ? 1 : 0),
+            accepts_points   => ($p->{accepts_points}   ? 1 : 0),
         );
 
         if ($p->{upload_image} && $c->req->upload('upload_image')) {
@@ -418,7 +457,7 @@ sub toggle_shop :Path('/shop/admin/toggle') :Args(1) {
     my $sitename = $self->_sitename($c);
 
     eval {
-        my $item = $schema->resultset('InventoryItem')->find(
+        my $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename }
         );
         if ($item) {
@@ -457,7 +496,7 @@ sub reset_visibility :Path('/shop/admin/reset_visibility') :Args(0) {
     my $sitename = $self->_sitename($c);
     my $count    = 0;
     eval {
-        $count = $schema->resultset('InventoryItem')->search(
+        $count = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename }
         )->update({ show_in_shop => 0 });
     };

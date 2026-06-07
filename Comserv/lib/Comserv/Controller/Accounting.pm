@@ -2,6 +2,7 @@ package Comserv::Controller::Accounting;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Model::AccountingDB;
 use POSIX qw(strftime);
 use LWP::UserAgent;
 use JSON;
@@ -22,9 +23,9 @@ sub auto :Private {
     my $roles = $c->session->{roles} // [];
     my $is_admin = 0;
     if (ref($roles) eq 'ARRAY') {
-        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+        $is_admin = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
     } elsif (!ref($roles) && $roles) {
-        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+        $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
     unless ($is_admin) {
@@ -38,7 +39,7 @@ sub auto :Private {
         }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
             'Accounting: access denied for user ' . ($c->session->{username} || 'guest'));
-        $c->flash->{error_msg} = 'Accounting is restricted to administrators.';
+        $c->flash->{error_msg} = 'Accounting requires admin, site_admin, or accounting role.';
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return 0;
     }
@@ -63,43 +64,50 @@ sub index :Path('/Accounting') :Args(0) {
     my ($acct_count, $entry_count, $ap_outstanding, $ar_outstanding,
         $item_count, $supplier_count, $location_count, $low_stock) = (0) x 8;
 
-    eval { $acct_count    = $schema->resultset('CoaAccount')->search({ obsolete => 0 })->count };
-    eval { $entry_count   = $schema->resultset('GlEntry')->search({ sitename => $sitename })->count };
+    eval { $acct_count    = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0 })->count };
+    eval { $entry_count   = $schema->resultset('Accounting::GlEntry')->search({ sitename => $sitename })->count };
     eval {
-        $ap_outstanding = $schema->resultset('InventorySupplierInvoice')->search(
+        $ap_outstanding = $schema->resultset('Accounting::InventorySupplierInvoice')->search(
             { sitename => $sitename, status => 'outstanding' }
         )->count;
     };
     eval {
-        $ar_outstanding = $schema->resultset('InventoryCustomerOrder')->search(
+        $ar_outstanding = $schema->resultset('Accounting::InventoryCustomerOrder')->search(
             { sitename => $sitename, status => { -not_in => [qw(paid cancelled)] } }
         )->count;
     };
     eval {
-        $item_count = $schema->resultset('InventoryItem')->search(
+        $item_count = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' }
         )->count;
     };
     eval {
-        $supplier_count = $schema->resultset('InventorySupplier')->search(
+        $supplier_count = $schema->resultset('Accounting::InventorySupplier')->search(
             { sitename => $sitename }
         )->count;
     };
     eval {
-        $location_count = $schema->resultset('InventoryLocation')->search(
+        $location_count = $schema->resultset('Accounting::InventoryLocation')->search(
             { sitename => $sitename }
         )->count;
     };
     eval {
-        my @items = $schema->resultset('InventoryItem')->search(
+        my @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', reorder_point => { '>' => 0 } }
         )->all;
         for my $item (@items) {
-            my $stock = $schema->resultset('InventoryStockLevel')->search(
+            my $stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 { item_id => $item->id }
             )->get_column('quantity')->sum // 0;
             $low_stock++ if $stock <= $item->reorder_point;
         }
+    };
+
+    my $pg_db_name = '';
+    eval {
+        my $reg = $self->_schema($c)->resultset('SiteAccountingDb')
+                      ->find({ sitename => $sitename, status => 'active' });
+        $pg_db_name = $reg->db_name if $reg;
     };
 
     $c->stash(
@@ -112,6 +120,7 @@ sub index :Path('/Accounting') :Args(0) {
         location_count  => $location_count,
         low_stock       => $low_stock,
         sitename        => $sitename,
+        pg_db_name      => $pg_db_name,
         template        => 'Accounting/index.tt',
     );
 }
@@ -128,7 +137,7 @@ sub coa_list :Path('/Accounting/coa') :Args(0) {
     my @accounts;
     my $list_error;
     eval {
-        @accounts = $schema->resultset('CoaAccount')->search(
+        @accounts = $schema->resultset('Accounting::CoaAccount')->search(
             { obsolete => 0 },
             { order_by => 'accno' }
         )->all;
@@ -149,7 +158,7 @@ sub coa_view :Path('/Accounting/coa/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $schema = $self->_schema($c);
     my $account;
-    eval { $account = $schema->resultset('CoaAccount')->find($id, { prefetch => 'heading' }) };
+    eval { $account = $schema->resultset('Accounting::CoaAccount')->find($id, { prefetch => 'heading' }) };
     unless ($account) {
         $c->flash->{error_msg} = 'Account not found';
         $c->res->redirect($c->uri_for('/Accounting/coa'));
@@ -158,7 +167,7 @@ sub coa_view :Path('/Accounting/coa/view') :Args(1) {
 
     my @lines;
     eval {
-        @lines = $schema->resultset('GlEntryLine')->search(
+        @lines = $schema->resultset('Accounting::GlEntryLine')->search(
             { account_id => $id },
             { order_by => { -desc => 'me.id' }, rows => 50 }
         )->all;
@@ -188,7 +197,7 @@ sub gl_list :Path('/Accounting/gl') :Args(0) {
 
     my (@entries, $gl_error);
     eval {
-        @entries = $schema->resultset('GlEntry')->search(
+        @entries = $schema->resultset('Accounting::GlEntry')->search(
             \%search,
             { order_by => { -desc => 'post_date' }, rows => 100 }
         )->all;
@@ -209,7 +218,7 @@ sub gl_view :Path('/Accounting/gl/view') :Args(1) {
     my $schema = $self->_schema($c);
     my $entry;
     eval {
-        $entry = $schema->resultset('GlEntry')->find(
+        $entry = $schema->resultset('Accounting::GlEntry')->find(
             $id,
             { prefetch => { lines => 'account' } }
         );
@@ -235,7 +244,7 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
     my $schema = $self->_schema($c);
 
     my $existing = 0;
-    eval { $existing = $schema->resultset('CoaAccount')->count };
+    eval { $existing = $schema->resultset('Accounting::CoaAccount')->count };
 
     if ($existing > 0) {
         $c->flash->{info_msg} = "Chart of Accounts already has $existing accounts — seed skipped.";
@@ -245,7 +254,13 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
 
     my @default_accounts = (
         # Assets
-        { accno => '1000', description => 'Cash',                          category => 'A' },
+        { accno => '1000', description => 'Cash / Chequing Account',        category => 'A' },
+        { accno => '1005', description => 'Savings Account',               category => 'A' },
+        # Payment processor accounts (treated as bank accounts)
+        { accno => '1010', description => 'PayPal Account',                category => 'A' },
+        { accno => '1011', description => 'Stripe Account',                category => 'A' },
+        { accno => '1012', description => 'Square Account',                category => 'A' },
+        { accno => '1029', description => 'Prepaid Vendor Balances',        category => 'A' },
         { accno => '1100', description => 'Accounts Receivable',           category => 'A' },
         { accno => '1200', description => 'Inventory Asset',               category => 'A' },
         { accno => '1300', description => 'Prepaid Expenses',              category => 'A' },
@@ -255,6 +270,10 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
         { accno => '2000', description => 'Accounts Payable',              category => 'L' },
         { accno => '2100', description => 'Sales Tax Payable',             category => 'L' },
         { accno => '2200', description => 'Accrued Liabilities',           category => 'L' },
+        # Credit card liabilities
+        { accno => '2300', description => 'Credit Card Payable — Visa',    category => 'L' },
+        { accno => '2310', description => 'Credit Card Payable — MasterCard', category => 'L' },
+        { accno => '2320', description => 'Credit Card Payable — Amex',   category => 'L' },
         # Equity
         { accno => '3000', description => "Owner's Equity",                category => 'Q' },
         { accno => '3100', description => 'Retained Earnings',             category => 'Q' },
@@ -262,6 +281,8 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
         { accno => '4000', description => 'Sales Revenue',                 category => 'I' },
         { accno => '4100', description => 'Sales Returns & Allowances',    category => 'I', is_contra => 1 },
         { accno => '4200', description => 'Service Revenue',               category => 'I' },
+        { accno => '4250', description => 'Developer / IT Services Revenue', category => 'I' },
+        { accno => '4260', description => 'Developer Services — GST/HST Collected', category => 'L' },
         { accno => '4900', description => 'Other Income',                  category => 'I' },
         # Cost of Goods Sold / Expenses
         { accno => '5000', description => 'Cost of Goods Sold',            category => 'E' },
@@ -280,6 +301,12 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
         { accno => '6400', description => 'Shipping & Postage',             category => 'E' },
         { accno => '6500', description => 'Depreciation Expense',           category => 'E' },
         { accno => '6510', description => '3D Printer Depreciation',        category => 'E' },
+        { accno => '6600', description => 'Domain Registration & Renewals', category => 'E' },
+        { accno => '6610', description => 'Web Hosting Expense',            category => 'E' },
+        { accno => '6620', description => 'SSL Certificates',               category => 'E' },
+        { accno => '6700', description => 'Software Subscriptions',         category => 'E' },
+        { accno => '6710', description => 'Bank & Payment Processing Fees', category => 'E' },
+        { accno => '6720', description => 'PayPal / Stripe Convenience Fees', category => 'E' },
         { accno => '6900', description => 'Other Expenses',                 category => 'E' },
         # Income — product lines
         { accno => '4210', description => '3D Print Sales',                 category => 'I' },
@@ -291,7 +318,7 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
     my $added = 0;
     eval {
         for my $acct (@default_accounts) {
-            $schema->resultset('CoaAccount')->find_or_create({
+            $schema->resultset('Accounting::CoaAccount')->find_or_create({
                 accno       => $acct->{accno},
                 description => $acct->{description},
                 category    => $acct->{category},
@@ -321,24 +348,34 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     my $schema = $self->_schema($c);
 
     my @all_accounts = (
-        { accno => '1000', description => 'Cash',                          category => 'A' },
-        { accno => '1100', description => 'Accounts Receivable',           category => 'A' },
-        { accno => '1200', description => 'Inventory Asset',               category => 'A' },
-        { accno => '1300', description => 'Prepaid Expenses',              category => 'A' },
-        { accno => '1310', description => 'GST/HST Receivable (ITC)',      category => 'A' },
-        { accno => '1500', description => 'Fixed Assets',                  category => 'A' },
-        { accno => '2000', description => 'Accounts Payable',              category => 'L' },
-        { accno => '2100', description => 'Sales Tax Payable',             category => 'L' },
-        { accno => '2200', description => 'Accrued Liabilities',           category => 'L' },
-        { accno => '3000', description => "Owner's Equity",                category => 'Q' },
-        { accno => '3100', description => 'Retained Earnings',             category => 'Q' },
-        { accno => '4000', description => 'Sales Revenue',                 category => 'I' },
-        { accno => '4100', description => 'Sales Returns & Allowances',    category => 'I', is_contra => 1 },
-        { accno => '4200', description => 'Service Revenue',               category => 'I' },
+        { accno => '1000', description => 'Cash / Chequing Account',        category => 'A' },
+        { accno => '1005', description => 'Savings Account',                category => 'A' },
+        { accno => '1010', description => 'PayPal Account',                 category => 'A' },
+        { accno => '1011', description => 'Stripe Account',                 category => 'A' },
+        { accno => '1012', description => 'Square Account',                 category => 'A' },
+        { accno => '1029', description => 'Prepaid Vendor Balances',        category => 'A' },
+        { accno => '1100', description => 'Accounts Receivable',            category => 'A' },
+        { accno => '1200', description => 'Inventory Asset',                category => 'A' },
+        { accno => '1300', description => 'Prepaid Expenses',               category => 'A' },
+        { accno => '1310', description => 'GST/HST Receivable (ITC)',       category => 'A' },
+        { accno => '1500', description => 'Fixed Assets',                   category => 'A' },
+        { accno => '2000', description => 'Accounts Payable',               category => 'L' },
+        { accno => '2100', description => 'Sales Tax Payable',              category => 'L' },
+        { accno => '2200', description => 'Accrued Liabilities',            category => 'L' },
+        { accno => '2300', description => 'Credit Card Payable — Visa',     category => 'L' },
+        { accno => '2310', description => 'Credit Card Payable — MasterCard', category => 'L' },
+        { accno => '2320', description => 'Credit Card Payable — Amex',    category => 'L' },
+        { accno => '3000', description => "Owner's Equity",                 category => 'Q' },
+        { accno => '3100', description => 'Retained Earnings',              category => 'Q' },
+        { accno => '4000', description => 'Sales Revenue',                  category => 'I' },
+        { accno => '4100', description => 'Sales Returns & Allowances',     category => 'I', is_contra => 1 },
+        { accno => '4200', description => 'Service Revenue',                category => 'I' },
         { accno => '4210', description => '3D Print Sales',                 category => 'I' },
         { accno => '4215', description => '3D Print Service Revenue',       category => 'I' },
         { accno => '4220', description => 'Honey & Apiary Sales',           category => 'I' },
         { accno => '4230', description => 'Craft & Handmade Sales',         category => 'I' },
+        { accno => '4250', description => 'Developer / IT Services Revenue', category => 'I' },
+        { accno => '4260', description => 'Developer Services — GST/HST Collected', category => 'L' },
         { accno => '4900', description => 'Other Income',                   category => 'I' },
         { accno => '5000', description => 'Cost of Goods Sold',             category => 'E' },
         { accno => '5100', description => 'Purchases',                      category => 'E' },
@@ -356,17 +393,23 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
         { accno => '6400', description => 'Shipping & Postage',             category => 'E' },
         { accno => '6500', description => 'Depreciation Expense',           category => 'E' },
         { accno => '6510', description => '3D Printer Depreciation',        category => 'E' },
+        { accno => '6600', description => 'Domain Registration & Renewals', category => 'E' },
+        { accno => '6610', description => 'Web Hosting Expense',            category => 'E' },
+        { accno => '6620', description => 'SSL Certificates',               category => 'E' },
+        { accno => '6700', description => 'Software Subscriptions',         category => 'E' },
+        { accno => '6710', description => 'Bank & Payment Processing Fees', category => 'E' },
+        { accno => '6720', description => 'PayPal / Stripe Convenience Fees', category => 'E' },
         { accno => '6900', description => 'Other Expenses',                 category => 'E' },
     );
 
     my ($added, $skipped) = (0, 0);
     eval {
         for my $acct (@all_accounts) {
-            my $existing = $schema->resultset('CoaAccount')->find({ accno => $acct->{accno} });
+            my $existing = $schema->resultset('Accounting::CoaAccount')->find({ accno => $acct->{accno} });
             if ($existing) {
                 $skipped++;
             } else {
-                $schema->resultset('CoaAccount')->create({
+                $schema->resultset('Accounting::CoaAccount')->create({
                     accno       => $acct->{accno},
                     description => $acct->{description},
                     category    => $acct->{category},
@@ -377,14 +420,176 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
             }
         }
     };
+    my ($retired, $updated) = (0, 0);
+    eval {
+        for my $old_accno (qw(1020 1021 1022 1023)) {
+            my $row = $schema->resultset('Accounting::CoaAccount')->find({ accno => $old_accno });
+            if ($row && !$row->obsolete) {
+                $row->update({ obsolete => 1 });
+                $retired++;
+            }
+        }
+        my $p1029 = $schema->resultset('Accounting::CoaAccount')->find({ accno => '1029' });
+        if ($p1029 && $p1029->description ne 'Prepaid Vendor Balances') {
+            $p1029->update({ description => 'Prepaid Vendor Balances', obsolete => 0 });
+            $updated++;
+        }
+    };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'seed_coa_merge', "Merge failed: $@");
         $c->flash->{error_msg} = "Merge failed: $@";
     } else {
-        $c->flash->{success_msg} = "Added $added new accounts, skipped $skipped existing.";
+        $c->flash->{success_msg} = "Added $added new accounts, skipped $skipped existing; retired $retired old prepaid accounts, updated $updated.";
     }
 
     $c->res->redirect($c->uri_for('/Accounting/coa'));
+}
+
+# =========================================================================
+# Account Transfer / Direct Payment
+# =========================================================================
+# Covers: Bank→PayPal, PayPal→Prepaid account, credit card payments, etc.
+# A "transfer" is a GL entry that moves money between two balance-sheet
+# accounts (both Asset or Liability) without creating an expense or income.
+# A "direct expense payment" skips AP: DR Expense, CR Payment Account.
+
+sub transfer_new :Path('/Accounting/transfer/new') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my (@asset_accounts, @liability_accounts, @expense_accounts);
+    eval {
+        my @all = $schema->resultset('Accounting::CoaAccount')->search(
+            { obsolete => 0 },
+            { order_by => 'accno' }
+        )->all;
+        for my $a (@all) {
+            push @asset_accounts,     $a if $a->category eq 'A';
+            push @liability_accounts, $a if $a->category eq 'L';
+            push @expense_accounts,   $a if $a->category eq 'E';
+        }
+    };
+
+    $c->stash(
+        asset_accounts     => \@asset_accounts,
+        liability_accounts => \@liability_accounts,
+        expense_accounts   => \@expense_accounts,
+        sitename           => $sitename,
+        template           => 'Accounting/transfer/new.tt',
+    );
+}
+
+sub transfer_create :Path('/Accounting/transfer/create') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $p        = $c->req->body_parameters;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $username = $c->session->{username} || 'admin';
+    my $user_id  = $c->session->{user_id};
+    my $today    = $self->_now();
+    my $date     = substr($today, 0, 10);
+
+    my $from_id    = $p->{from_account_id} or do {
+        $c->flash->{error_msg} = 'From account is required.';
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    };
+    my $to_id      = $p->{to_account_id} or do {
+        $c->flash->{error_msg} = 'To account is required.';
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    };
+    my $amount     = $p->{amount} + 0;
+    my $fee_amount = $p->{fee_amount} ? ($p->{fee_amount} + 0) : 0;
+    my $fee_acct   = $p->{fee_account_id} || undef;
+    my $post_date  = $p->{post_date} || $date;
+    my $reference  = $p->{reference} || '';
+    my $notes      = $p->{notes} || '';
+    my $entry_type = $p->{entry_type} || 'transfer';
+
+    unless ($amount > 0) {
+        $c->flash->{error_msg} = 'Amount must be greater than zero.';
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    }
+
+    my ($gl_id, $err);
+    eval {
+        $schema->txn_do(sub {
+            my $gl = $schema->resultset('Accounting::GlEntry')->create({
+                reference   => $reference,
+                description => $notes,
+                entry_type  => $entry_type,
+                post_date   => $post_date,
+                approved    => 1,
+                currency    => 'CAD',
+                sitename    => $sitename,
+                entered_by  => $user_id || undef,
+            });
+            $gl_id = $gl->id;
+
+            my $sort = 1;
+            $schema->resultset('Accounting::GlEntryLine')->create({
+                gl_entry_id => $gl_id,
+                account_id  => $to_id,
+                amount      => $amount,
+                memo        => $notes,
+                sort_order  => $sort++,
+            });
+            $schema->resultset('Accounting::GlEntryLine')->create({
+                gl_entry_id => $gl_id,
+                account_id  => $from_id,
+                amount      => -$amount,
+                memo        => $notes,
+                sort_order  => $sort++,
+            });
+
+            if ($fee_amount > 0 && $fee_acct) {
+                $schema->resultset('Accounting::GlEntryLine')->create({
+                    gl_entry_id => $gl_id,
+                    account_id  => $fee_acct,
+                    amount      => $fee_amount,
+                    memo        => 'Fee: ' . $notes,
+                    sort_order  => $sort++,
+                });
+                $schema->resultset('Accounting::GlEntryLine')->create({
+                    gl_entry_id => $gl_id,
+                    account_id  => $from_id,
+                    amount      => -$fee_amount,
+                    memo        => 'Fee debit from source: ' . $notes,
+                    sort_order  => $sort++,
+                });
+            }
+        });
+    };
+    $err = $@ if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'transfer_create', "Transfer failed: $err");
+        $c->flash->{error_msg} = "Transfer failed: $err";
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'transfer_create',
+        "Transfer GL $gl_id created: from=$from_id to=$to_id amount=$amount fee=$fee_amount");
+    $c->flash->{success_msg} = "Transfer recorded (GL #$gl_id).";
+    $c->res->redirect($c->uri_for('/Accounting/gl/view/' . $gl_id));
 }
 
 # =========================================================================
@@ -401,9 +606,9 @@ sub _api_auth {
     my $roles    = $c->session->{roles} // [];
     my $is_admin = 0;
     if (ref($roles) eq 'ARRAY') {
-        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+        $is_admin = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
     } elsif (!ref($roles) && $roles) {
-        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+        $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
 
@@ -532,7 +737,7 @@ sub api_gl :Path('/Accounting/api/gl') :Args(0) {
 
     eval {
         $schema->txn_do(sub {
-            my $gl = $schema->resultset('GlEntry')->create({
+            my $gl = $schema->resultset('Accounting::GlEntry')->create({
                 reference   => $reference,
                 description => $data->{description} || undef,
                 entry_type  => $data->{entry_type}  || 'general',
@@ -546,7 +751,7 @@ sub api_gl :Path('/Accounting/api/gl') :Args(0) {
 
             my $sort = 1;
             for my $line (@$lines) {
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl_entry_id,
                     account_id  => $line->{account_id},
                     amount      => $line->{amount},
@@ -592,7 +797,7 @@ sub api_gl_view :Path('/Accounting/api/gl') :Args(1) {
 
     my ($entry, $err);
     eval {
-        $entry = $self->_schema($c)->resultset('GlEntry')->find(
+        $entry = $self->_schema($c)->resultset('Accounting::GlEntry')->find(
             $id,
             { prefetch => { lines => 'account' } }
         );
@@ -718,6 +923,136 @@ sub _fetch_rate {
 
     return 1 unless $cached && $cached->{rates};
     return $cached->{rates}{ uc($to) } // 1;
+}
+
+# -------------------------------------------------------------------------
+# GET /Accounting/billing
+# Billable time report grouped by client (project.sitename).
+# CSC sees all clients; other sites see only their own.
+# Filters: date_from, date_to, client_sitename
+# -------------------------------------------------------------------------
+
+sub billing :Path('/Accounting/billing') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'billing', 'Billing report');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $is_csc   = ($sitename eq 'CSC');
+
+    my $date_from      = $c->req->params->{date_from}      || '';
+    my $date_to        = $c->req->params->{date_to}        || '';
+    my $filter_client  = $c->req->params->{client_sitename} || '';
+
+    my (%search, @rows, $report_error);
+
+    eval {
+        $search{'me.status'} = 3;
+
+        if ($date_from) { $search{'me.start_date'} = { '>=' => $date_from } }
+        if ($date_to)   {
+            my $existing = $search{'me.start_date'};
+            if (ref $existing eq 'HASH') {
+                $search{'me.start_date'} = { '>=' => $date_from, '<=' => $date_to };
+            } else {
+                $search{'me.start_date'} = { '<=' => $date_to };
+            }
+        }
+
+        my @logs = $schema->resultset('Log')->search(
+            \%search,
+            {
+                prefetch => { todo => 'project' },
+                order_by => { -desc => 'me.start_date' },
+            }
+        )->all;
+
+        my %by_client;
+
+        for my $log (@logs) {
+            my $todo    = $log->todo    or next;
+            my $project = $todo->project or next;
+
+            my $client = $project->sitename || 'Unknown';
+            next unless $todo->billable;
+            next if !$is_csc && $client ne $sitename;
+            next if $filter_client && $client ne $filter_client;
+
+            my $time_str = $log->time // '00:00:00';
+            my ($hh, $mm) = split /:/, $time_str;
+            my $hours = (int($hh || 0)) + (int($mm || 0) / 60);
+
+            my $rate   = $log->point_rate // $todo->point_rate // 60;
+            my $amount = sprintf('%.2f', $hours * $rate);
+
+            $by_client{$client} ||= {
+                client   => $client,
+                projects => {},
+                total_hrs => 0,
+                total_amt => 0,
+            };
+            $by_client{$client}{total_hrs} += $hours;
+            $by_client{$client}{total_amt} += $amount;
+
+            my $proj_name = $project->name || $project->project_code || "Project #" . $project->id;
+            $by_client{$client}{projects}{$proj_name} ||= {
+                name      => $proj_name,
+                logs      => [],
+                total_hrs => 0,
+                total_amt => 0,
+            };
+            $by_client{$client}{projects}{$proj_name}{total_hrs} += $hours;
+            $by_client{$client}{projects}{$proj_name}{total_amt} += $amount;
+            push @{ $by_client{$client}{projects}{$proj_name}{logs} }, {
+                log_id   => $log->record_id,
+                date     => $log->start_date || '',
+                abstract => $log->abstract || '(no description)',
+                username => $log->username || '',
+                hours    => sprintf('%.2f', $hours),
+                rate     => $rate + 0,
+                amount   => $amount + 0,
+            };
+        }
+
+        for my $client (sort keys %by_client) {
+            my $c_data = $by_client{$client};
+            $c_data->{total_hrs} = sprintf('%.2f', $c_data->{total_hrs});
+            $c_data->{total_amt} = sprintf('%.2f', $c_data->{total_amt});
+            my @proj_list = sort { $a->{name} cmp $b->{name} }
+                            values %{ $c_data->{projects} };
+            for my $p (@proj_list) {
+                $p->{total_hrs} = sprintf('%.2f', $p->{total_hrs});
+                $p->{total_amt} = sprintf('%.2f', $p->{total_amt});
+            }
+            $c_data->{project_list} = \@proj_list;
+            push @rows, $c_data;
+        }
+    };
+    $report_error = $@ if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'billing', "Billing report error: $report_error")
+        if $report_error;
+
+    my @client_list;
+    if ($is_csc) {
+        eval {
+            @client_list = map { $_->sitename }
+                $schema->resultset('Project')->search(
+                    {},
+                    { columns => ['sitename'], distinct => 1, order_by => 'sitename' }
+                )->all;
+        };
+    }
+
+    $c->stash(
+        rows         => \@rows,
+        date_from    => $date_from,
+        date_to      => $date_to,
+        filter_client => $filter_client,
+        client_list  => \@client_list,
+        is_csc       => $is_csc,
+        report_error => $report_error,
+        template     => 'Accounting/billing.tt',
+    );
 }
 
 sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
@@ -855,6 +1190,381 @@ sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
         usage        => \@usage,
         grand_calls  => $grand_calls,
         grand_tokens => $grand_tokens,
+    );
+}
+
+# -------------------------------------------------------------------------
+# Accounting Database Admin  /Accounting/admin/databases
+# Lists all sites, their PostgreSQL accounting DB status, and allows
+# provisioning. CSC global-admin only.
+# -------------------------------------------------------------------------
+
+sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{SiteName} eq 'CSC' || ($c->session->{roles} && grep { /^admin$/ } @{$c->session->{roles} // []})) {
+        $c->flash->{error_msg} = 'CSC admin access required.';
+        $c->response->redirect($c->uri_for('/Accounting'));
+        return;
+    }
+
+    my $schema = $self->_schema($c);
+
+    # All known sites
+    my @sites;
+    eval { @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all };
+
+    # All registered accounting DBs keyed by sitename
+    my %reg;
+    eval {
+        my @rows = $schema->resultset('SiteAccountingDb')->search({})->all;
+        %reg = map { $_->sitename => $_ } @rows;
+    };
+
+    # Hosting accounts keyed by sitename for owner lookup
+    my %hosting;
+    eval {
+        my @ha = $schema->resultset('Accounting::HostingAccount')->search({})->all;
+        %hosting = map { $_->sitename => $_ } @ha;
+    };
+
+    # Build status rows
+    my @rows;
+    for my $site (@sites) {
+        my $sn  = $site->name;
+        my $rec = $reg{$sn};
+        my $ha  = $hosting{$sn};
+
+        # Resolve site owner username as default DB user
+        my $owner_username = lc($sn);
+        if ($ha && $ha->contact_email) {
+            my $owner = eval { $schema->resultset('User')->search({ email => $ha->contact_email })->first };
+            $owner_username = $owner->username if $owner && $owner->username;
+        }
+
+        my $row = {
+            sitename       => $sn,
+            registered     => $rec ? 1 : 0,
+            db_name        => $rec ? $rec->db_name     : lc($sn) . '_accounting',
+            db_host        => $rec ? $rec->db_host     : '192.168.1.20',
+            db_port        => $rec ? $rec->db_port     : 5432,
+            jurisdiction   => $rec ? $rec->jurisdiction: 'CA',
+            currency       => $rec ? $rec->currency    : 'CAD',
+            status         => $rec ? $rec->status      : 'not_provisioned',
+            db_ok          => 0,
+            db_error       => '',
+            owner_username => $rec ? $rec->db_user : $owner_username,
+        };
+
+        if ($rec && $rec->status eq 'active') {
+            eval {
+                my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sn);
+                if ($acct_schema) {
+                    $acct_schema->storage->dbh->do('SELECT 1');
+                    $row->{db_ok} = 1;
+                } else {
+                    $row->{db_error} = 'Could not connect';
+                }
+            };
+            if ($@) {
+                $row->{db_error} = $@;
+                $row->{db_error} =~ s/ at .+//s;
+            }
+        }
+
+        push @rows, $row;
+    }
+
+    # Handle POST — provision a site's DB
+    if ($c->req->method eq 'POST') {
+        my $target = $c->req->body_parameters->{sitename} or do {
+            $c->flash->{error_msg} = 'No sitename specified.';
+            $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
+            return;
+        };
+        my $jurisdiction = $c->req->body_parameters->{jurisdiction} || 'CA';
+        my $currency     = $c->req->body_parameters->{currency}     || 'CAD';
+
+        my ($ok, $msg) = eval {
+            Comserv::Model::AccountingDB->instance->provision_site($c, $target,
+                jurisdiction => $jurisdiction,
+                currency     => $currency,
+            );
+        };
+        if ($@ || !$ok) {
+            $c->flash->{error_msg} = "Provisioning failed for '$target': " . ($@ || $msg);
+        } else {
+            $c->flash->{success_msg} = $msg;
+        }
+        $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
+        return;
+    }
+
+    $c->stash(
+        rows     => \@rows,
+        template => 'Accounting/admin/databases.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Migrate MariaDB accounting data → per-site PostgreSQL  /Accounting/migrate_to_pg
+# -------------------------------------------------------------------------
+
+sub migrate_to_pg :Path('/Accounting/migrate_to_pg') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename  = $self->_sitename($c);
+    my $maria     = $self->_schema($c);
+    my @log;
+    my $errors    = 0;
+
+    # ── 1. Connect to PostgreSQL accounting DB ─────────────────────────
+    my $acct_schema = eval { Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename) };
+    unless ($acct_schema) {
+        $c->flash->{error_msg} = "Cannot connect to PostgreSQL accounting DB for '$sitename'. Run provisioning first.";
+        $c->response->redirect($c->uri_for('/Accounting/my_database'));
+        return;
+    }
+    my $pg = $acct_schema->storage->dbh;
+
+    # ── 2. Migrate COA (coa_accounts → chart) ─────────────────────────
+    push @log, "=== Chart of Accounts ===";
+    my @coa_rows;
+    eval {
+        @coa_rows = $maria->resultset('Accounting::CoaAccount')->search(
+            [ { sitename => $sitename }, { sitename => undef } ],
+            { order_by => 'id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@coa_rows) . " COA accounts in MariaDB for '$sitename'.";
+
+    my $coa_ok = 0; my $coa_skip = 0; my $coa_fail = 0;
+    my %accno_to_pg_id;  # map accno → new PG chart.id
+
+    # First pass: insert without heading (to get PG IDs)
+    for my $row (@coa_rows) {
+        my ($exists) = $pg->selectrow_array("SELECT id FROM chart WHERE accno = ?", undef, $row->accno);
+        if ($exists) {
+            $accno_to_pg_id{ $row->accno } = $exists;
+            $coa_skip++;
+            next;
+        }
+        my $sth = $pg->prepare(
+            "INSERT INTO chart (accno, description, charttype, category, link,
+                                contra, tax, obsolete, notes, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, now()) RETURNING id");
+        $sth->execute(
+            $row->accno,
+            $row->description,
+            'A',
+            $row->category // 'A',
+            '',
+            $row->is_contra  ? 1 : 0,
+            $row->is_tax     ? 1 : 0,
+            $row->obsolete   ? 1 : 0,
+            $row->notes // '',
+        );
+        my ($new_id) = $sth->fetchrow_array;
+        if ($new_id) {
+            $accno_to_pg_id{ $row->accno } = $new_id;
+            $coa_ok++;
+        } else {
+            push @log, "  FAIL chart insert: accno=" . $row->accno . " err=" . ($pg->errstr//'?');
+            $coa_fail++; $errors++;
+        }
+    }
+
+    # Second pass: set heading FK now that all chart rows exist
+    for my $row (@coa_rows) {
+        next unless defined $row->heading_id;
+        # Find the accno of the heading row
+        my $heading_row = eval { $maria->resultset('Accounting::CoaAccount')->find($row->heading_id) };
+        next unless $heading_row;
+        my $pg_heading_id = $accno_to_pg_id{ $heading_row->accno };
+        next unless $pg_heading_id;
+        my $pg_self_id    = $accno_to_pg_id{ $row->accno };
+        next unless $pg_self_id;
+        $pg->do("UPDATE chart SET heading = ? WHERE id = ?", undef, $pg_heading_id, $pg_self_id);
+    }
+
+    push @log, "  COA: $coa_ok inserted, $coa_skip already existed, $coa_fail failed.";
+
+    # ── 3. Migrate GL entries (gl_entries + gl_entry_lines → gl + acc_trans) ──
+    push @log, "=== General Ledger ===";
+    my @gl_rows;
+    eval {
+        @gl_rows = $maria->resultset('Accounting::GlEntry')->search(
+            { sitename => $sitename },
+            { prefetch => 'gl_lines', order_by => 'me.id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@gl_rows) . " GL entries in MariaDB.";
+
+    my $gl_ok = 0; my $gl_skip = 0; my $gl_fail = 0;
+    for my $entry (@gl_rows) {
+        my ($exists) = $pg->selectrow_array(
+            "SELECT id FROM gl WHERE reference = ?", undef, $entry->reference);
+        if ($exists) { $gl_skip++; next; }
+
+        my $sth = $pg->prepare(
+            "INSERT INTO gl (reference, description, transdate, notes, approved)
+             VALUES (?, ?, ?, ?, ?) RETURNING id");
+        $sth->execute(
+            $entry->reference,
+            $entry->description // '',
+            $entry->post_date,
+            $entry->notes // '',
+            $entry->approved ? 1 : 0,
+        );
+        my ($gl_id) = $sth->fetchrow_array;
+        unless ($gl_id) {
+            push @log, "  FAIL gl insert ref=" . $entry->reference . " err=" . ($pg->errstr//'?');
+            $gl_fail++; $errors++; next;
+        }
+
+        # Insert acc_trans lines
+        my @lines = eval { $entry->lines->all };
+        for my $line (@lines) {
+            my $coa_row = eval { $line->account };
+            next unless $coa_row;
+            my $chart_id = $accno_to_pg_id{ $coa_row->accno };
+            next unless $chart_id;
+            $pg->do(
+                "INSERT INTO acc_trans (trans_id, chart_id, amount, transdate, memo)
+                 VALUES (?, ?, ?, ?, ?)",
+                undef,
+                $gl_id,
+                $chart_id,
+                $line->amount,
+                $entry->post_date,
+                $line->memo // '',
+            );
+        }
+        $gl_ok++;
+    }
+    push @log, "  GL: $gl_ok inserted, $gl_skip already existed, $gl_fail failed.";
+
+    # ── 4. Migrate Vendors (inventory_suppliers → vendor) ─────────────
+    push @log, "=== Vendors / Suppliers ===";
+    my @suppliers;
+    eval {
+        @suppliers = $maria->resultset('Accounting::InventorySupplier')->search(
+            { sitename => $sitename },
+            { order_by => 'id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@suppliers) . " suppliers in MariaDB.";
+
+    my $v_ok = 0; my $v_skip = 0; my $v_fail = 0;
+    for my $s (@suppliers) {
+        my ($exists) = $pg->selectrow_array(
+            "SELECT id FROM vendor WHERE name = ?", undef, $s->name);
+        if ($exists) { $v_skip++; next; }
+        my $phone = substr($s->phone // '', 0, 50);
+        if (($s->phone // '') ne $phone) {
+            push @log, "  WARN vendor '" . $s->name . "': phone truncated to 50 chars.";
+        }
+        eval {
+            $pg->do(
+                "INSERT INTO vendor (name, contact, email, phone, notes, curr)
+                 VALUES (?, ?, ?, ?, ?, 'CAD')",
+                undef,
+                substr($s->name // '', 0, 255),
+                substr($s->contact_name // '', 0, 255),
+                $s->email // '',
+                $phone,
+                $s->notes // '',
+            );
+        };
+        if ($@) {
+            push @log, "  FAIL vendor '" . $s->name . "': $@";
+            $v_fail++; $errors++;
+        } else {
+            $v_ok++;
+        }
+    }
+    push @log, "  Vendors: $v_ok inserted, $v_skip already existed, $v_fail failed.";
+
+    # ── Summary ────────────────────────────────────────────────────────
+    push @log, "=== Done — " . ($errors ? "$errors error(s)" : "No errors") . " ===";
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_to_pg',
+        "Migration for '$sitename': " . join('; ', @log));
+
+    $c->stash(
+        sitename => $sitename,
+        log      => \@log,
+        errors   => $errors,
+        template => 'Accounting/migrate_result.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# My Accounting Database  /Accounting/my_database
+# Shows the current site's PostgreSQL accounting DB status and schema.
+# Accessible to any site admin/accounting role.
+# -------------------------------------------------------------------------
+
+sub my_database :Path('/Accounting/my_database') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename = $self->_sitename($c);
+
+    # Look up registry entry
+    my $reg;
+    eval {
+        $reg = $self->_schema($c)->resultset('SiteAccountingDb')
+                   ->find({ sitename => $sitename });
+    };
+
+    my $db_ok    = 0;
+    my $db_error = '';
+    my @tables;
+
+    if ($reg && $reg->status eq 'active') {
+        eval {
+            my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+            if ($acct_schema) {
+                $acct_schema->storage->dbh->do('SELECT 1');
+                $db_ok = 1;
+
+                # Fetch table list with column details via DBI
+                my $dbh = $acct_schema->storage->dbh;
+                my $tsth = $dbh->prepare(
+                    "SELECT t.tablename, COUNT(c.column_name)::int AS col_count
+                     FROM pg_tables t
+                     LEFT JOIN information_schema.columns c
+                       ON c.table_schema = 'public' AND c.table_name = t.tablename
+                     WHERE t.schemaname = 'public'
+                     GROUP BY t.tablename ORDER BY t.tablename");
+                $tsth->execute();
+                while (my ($tname, $col_count) = $tsth->fetchrow_array()) {
+                    my $csth = $dbh->prepare(
+                        "SELECT column_name, data_type, character_maximum_length,
+                                is_nullable, column_default
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public' AND table_name = ?
+                         ORDER BY ordinal_position");
+                    $csth->execute($tname);
+                    my @cols;
+                    while (my $col = $csth->fetchrow_hashref()) { push @cols, $col }
+                    push @tables, { name => $tname, col_count => $col_count, columns => \@cols };
+                }
+            } else {
+                $db_error = 'Could not connect to accounting database.';
+            }
+        };
+        $db_error = $@ if $@;
+        $db_error =~ s/ at .+//s if $db_error;
+    }
+
+    $c->stash(
+        sitename  => $sitename,
+        reg       => $reg,
+        db_ok     => $db_ok,
+        db_error  => $db_error,
+        tables    => \@tables,
+        template  => 'Accounting/my_database.tt',
     );
 }
 

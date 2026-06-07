@@ -9,7 +9,7 @@
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38"
            value="[% ency_ai_entity_name | html %]" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-4-0709|grok" selected>Grok 4 (loading…)</option>
+      <option value="grok-4.20-non-reasoning|grok" selected>Grok 4.20 Fast (loading…)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
@@ -31,6 +31,15 @@
            style="width:28em;font-size:0.95em;margin-left:0.4em;"
            title="Only these fields will be filled by AI. All other fields are untouched regardless of what AI returns." />
     <span style="color:#888;margin-left:0.4em;">⚠ Always fill specific fields when correcting a single field.</span>
+  </div>
+  <div style="margin-top:0.5em;font-size:0.85em;color: var(--text-muted-color, #555);">
+    <label style="font-weight:bold;" title="Optional extra instructions appended to the AI prompt, e.g. 'include at least 3 references' or 'search for historical herb quantities'">
+      Additional instructions to AI (optional):
+    </label>
+    <textarea id="ency-ai-extra-instructions"
+              rows="2" cols="80"
+              placeholder="e.g. Please search for and provide at least 3 references for this formula. Include historical quantities for each herb where known. Use 1 part as default when no quantity is found."
+              style="display:block;width:100%;margin-top:0.3em;font-size:0.9em;box-sizing:border-box;"></textarea>
   </div>
   <div style="margin-top:0.4em;font-size:0.82em;color: var(--text-muted-color, #666);">
     <label style="cursor:pointer;">
@@ -96,14 +105,19 @@
                 var grokProvider = null;
                 data.providers.forEach(function(p) { if (p.service === 'grok') grokProvider = p; });
                 if (!grokProvider) return;
+                var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
                 var FALLBACK = [
-                    { val: 'grok-4-0709|grok',               label: 'Grok 4' },
-                    { val: 'grok-4-fast-non-reasoning|grok', label: 'Grok 4 Fast' },
-                    { val: 'grok-code-fast-1|grok',          label: 'Grok Code Fast' }
+                    { val: 'grok-4.20-non-reasoning|grok', label: 'Grok 4.20 Fast' }
                 ];
+                var DEAD_MODELS = {
+                    'grok-code-fast-1': 1, 'grok-4-fast-non-reasoning': 1,
+                    'grok-4-1-fast-non-reasoning': 1, 'grok-4-0709': 1,
+                    'grok-3': 1, 'grok-4-fast-reasoning': 1, 'grok-4-1-fast-reasoning': 1,
+                    'grok-4.3': 1
+                };
                 var models = (grokProvider.models && grokProvider.models.length > 0)
                     ? grokProvider.models
-                        .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
+                        .filter(function(m) { return m.id && !DEAD_MODELS[m.id] && !m.id.match(/imagine|video/i); })
                         .map(function(m) {
                             var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
                             return { val: m.id + '|grok', label: lbl + ' (xAI)' };
@@ -127,6 +141,23 @@
         if (pd && pd.getAttribute('data-auto-search') === '1') {
             var ws = document.getElementById('ency-ai-web-search');
             if (ws) ws.checked = true;
+        }
+        var wsCheckbox = document.getElementById('ency-ai-web-search');
+        if (wsCheckbox) {
+            var wsLabel = wsCheckbox.closest('label') || wsCheckbox.parentElement;
+            function updateWsStyle() {
+                if (wsCheckbox.checked) {
+                    wsLabel.style.color = '#1a7a1a';
+                    wsLabel.style.fontWeight = 'bold';
+                    wsLabel.title = 'Web search ACTIVE — Grok will search the web for current data';
+                } else {
+                    wsLabel.style.color = '';
+                    wsLabel.style.fontWeight = '';
+                    wsLabel.title = 'Enables Grok live web search for current data (may be unavailable on some plans)';
+                }
+            }
+            wsCheckbox.addEventListener('change', updateWsStyle);
+            updateWsStyle();
         }
     })();
     // ────────────────────────────────────────────────────────────────────────
@@ -160,7 +191,7 @@
             var parts = sel.value.split('|');
             return { model: parts[0], provider: parts[1] || 'grok' };
         }
-        return { model: 'grok-4-0709', provider: 'grok' };
+        return { model: 'grok-4.20-non-reasoning', provider: 'grok' };
     }
 
     function encyAiFill() {
@@ -196,8 +227,13 @@
             ? 'Return ONLY a raw JSON object containing ONLY these specific fields (no other fields): ' + fieldList + '. Do NOT include any other fields in the response even if you know them.'
             : 'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields. Fields to include: ' + fieldList;
 
+        var extraInstructionsEl = document.getElementById('ency-ai-extra-instructions');
+        var extraInstructions   = extraInstructionsEl ? extraInstructionsEl.value.trim() : '';
+        var basePrompt = fieldInstruction + ' The subject is: ' + name;
+        var fullPrompt = extraInstructions ? basePrompt + '\n\nAdditional instructions: ' + extraInstructions : basePrompt;
+
         var payload = {
-            prompt:     fieldInstruction + ' The subject is: ' + name,
+            prompt:     fullPrompt,
             system:     INTEGRATIVE_SYSTEM,
             provider:   mp.provider,
             model:      mp.model,
@@ -250,6 +286,28 @@
                         blocked.push(key);
                         return;
                     }
+
+                    // Special handling: common_names via junction table chip UI
+                    if (key === 'common_names' || key === 'common_name') {
+                        var cnMgr = document.getElementById('cn-manager');
+                        if (cnMgr && typeof cnAddBatch === 'function') {
+                            var orgId = cnMgr.getAttribute('data-organism-id');
+                            var rawCn = fields[key];
+                            if (!rawCn) return;
+                            var cnStr = Array.isArray(rawCn) ? rawCn.join('; ') : String(rawCn);
+                            var cnNames = cnStr.split(/[;,\n]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 1; });
+                            var existingTags = [];
+                            document.querySelectorAll('#cn-tag-list .cn-tag').forEach(function(t){ existingTags.push(t.textContent.trim().replace(/\s*✕\s*$/, '').trim().toLowerCase()); });
+                            cnNames.forEach(function(name) {
+                                if (existingTags.indexOf(name.toLowerCase()) === -1) {
+                                    cnAddBatch(orgId, name, null);
+                                    filled++;
+                                }
+                            });
+                            return;
+                        }
+                    }
+
                     var el = document.querySelector('[name="' + key + '"]');
                     if (!el) return;
                     var aiValue = fields[key];
@@ -257,13 +315,27 @@
 
                     // Normalise AI value to string
                     var val;
-                    if (Array.isArray(aiValue)) {
-                        val = aiValue.join('\n');
+                    function flattenAiValue(v) {
+                        if (v === null || v === undefined) return '';
+                        if (Array.isArray(v)) return v.map(flattenAiValue).filter(Boolean).join('; ');
+                        if (typeof v === 'object') {
+                            return Object.values(v).map(flattenAiValue).filter(Boolean).join('; ');
+                        }
+                        return String(v);
+                    }
+                    if (typeof aiValue === 'boolean') {
+                        val = aiValue ? '1' : '0';
+                    } else if (Array.isArray(aiValue)) {
+                        val = aiValue.map(flattenAiValue).join('; ');
                     } else if (typeof aiValue === 'object') {
-                        val = Object.entries(aiValue).map(function(e){ return e[0] + ': ' + e[1]; }).join('\n');
+                        val = flattenAiValue(aiValue);
                     } else {
                         val = String(aiValue);
                     }
+
+                    // Strip Markdown link syntax [text](url "title") → text
+                    // The ENCY system expects plain text and auto-generates links on display
+                    val = val.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
 
                     // --- Reference field: always APPEND, never replace ---
                     if (key === 'reference') {
@@ -277,20 +349,50 @@
                         return;
                     }
 
+                    // Checkbox group handling (e.g. host_type with multiple checkboxes)
+                    if (el.type === 'checkbox') {
+                        var allBoxes = document.querySelectorAll('[name="' + key + '"]');
+                        var anyChecked = false;
+                        allBoxes.forEach(function(cb) { if (cb.checked) anyChecked = true; });
+                        if (anyChecked && !overrideAll) { skipped.push(key); return; }
+                        var aiTerms = val.toLowerCase().split(/[;,\/\n]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+                        var matchedBoxes = 0;
+                        allBoxes.forEach(function(cb) {
+                            var cbVal = cb.value.toLowerCase();
+                            var shouldCheck = aiTerms.some(function(t) {
+                                return cbVal === t || t.indexOf(cbVal) !== -1 || cbVal.indexOf(t) !== -1;
+                            });
+                            if (overrideAll) cb.checked = shouldCheck;
+                            else if (shouldCheck) cb.checked = true;
+                            if (cb.checked) matchedBoxes++;
+                        });
+                        if (matchedBoxes > 0) filled++;
+                        else skipped.push(key + '=' + val);
+                        return;
+                    }
+
                     if (el.tagName === 'SELECT') {
                         // Only set if empty (no selection) or override enabled
                         var hasSelection = (el.selectedIndex > 0 && el.options[el.selectedIndex].value !== '');
                         if (hasSelection && !overrideAll) { skipped.push(key); return; }
                         var matched = false;
+                        var origIndex = el.selectedIndex;
+                        var aiVal   = val.toLowerCase().trim();
+                        // Normalise yes/no/true/false/1/0 AI responses for binary selects
+                        var isBoolTrue  = /^(1|yes|true|y)\b/.test(aiVal);
+                        var isBoolFalse = /^(0|no|false|n)\b/.test(aiVal);
                         for (var i = 0; i < el.options.length; i++) {
                             var optVal  = el.options[i].value.toLowerCase();
                             var optText = el.options[i].text.toLowerCase();
-                            var aiVal   = val.toLowerCase();
-                            if (optVal === aiVal || optText === aiVal ||
+                            var directMatch = (optVal === aiVal || optText === aiVal ||
                                 optVal === aiVal.replace(/\s*(only|required|status)\s*/gi,'').trim() ||
-                                aiVal.indexOf(optVal) !== -1 || optVal.indexOf(aiVal) !== -1) {
+                                aiVal.indexOf(optVal) !== -1 || optVal.indexOf(aiVal) !== -1);
+                            var boolMatch = (isBoolTrue  && (optVal === '1' || optText === 'yes')) ||
+                                           (isBoolFalse && (optVal === '0' || optText === 'no'));
+                            if (directMatch || boolMatch) {
                                 el.selectedIndex = i;
-                                matched = true; filled++;
+                                matched = true;
+                                if (i !== origIndex) filled++;
                                 break;
                             }
                         }
@@ -527,11 +629,13 @@
 
         var prompt = 'You are reviewing an ENCY encyclopedia record for "' + name + '". '
             + 'Below are the CURRENT field values from the form. '
-            + 'Identify fields that appear INCORRECT, inconsistent with the entity, or obviously wrong (e.g. a disease name in the wrong record, wrong species data, mismatched content). '
-            + 'ONLY flag fields you are confident are wrong. Do NOT suggest changes to fields that are merely incomplete. '
+            + 'Do TWO things: '
+            + '(1) Identify fields that appear INCORRECT or obviously wrong (e.g. therapeutic actions placed in sister_plants or contra_indications, wrong species data, mismatched content) — only flag fields you are CONFIDENT are wrong. '
+            + '(2) For critical fields that are EMPTY and you have reliable knowledge about, suggest the correct value with reason "missing critical field". '
+            + 'Critical fields that must not be empty: therapeutic_action, parts_used, medical_uses, ident_character, contra_indications, dosage, constituents. '
             + 'Return ONLY a raw JSON object with this structure: '
-            + '{"corrections": [{"field": "field_name", "current": "current value", "suggested": "corrected value", "reason": "why this is wrong"}]}. '
-            + 'If nothing appears wrong, return {"corrections": []}. '
+            + '{"corrections": [{"field": "field_name", "current": "current value or empty", "suggested": "corrected value", "reason": "why this is wrong or missing critical field"}]}. '
+            + 'If nothing to correct or fill, return {"corrections": []}. '
             + 'Current field values: ' + JSON.stringify(currentValues);
 
         fetch('/ai/generate', {
@@ -661,7 +765,11 @@
         constituents:          'Chemical constituents present in the herb. e.g. alkaloids, flavonoids, terpenes, essential oils.',
         solvents:              'Solvents used in preparation. e.g. water (infusion/decoction), alcohol (tincture), oil (infused oil), DMSO (topical carrier).',
         contra_indications:    'Conditions or circumstances where this herb should NOT be used. e.g. pregnancy, specific drug interactions, liver disease.',
-        apis:                  'Honeybee (Apis mellifera) interaction: does this plant attract or repel bees?',
+        apis:                  'Is this plant a nectar or pollen source for honeybees (Apis mellifera)? Return 1 for Yes or 0 for No.',
+        pollen:                'Does this plant produce significant pollen for bees or pollinators? Return 1 for Yes or 0 for No.',
+        nectar:                'Does this plant produce nectar accessible to bees or pollinators? Return 1 for Yes or 0 for No.',
+        pollennotes:           'Details about pollen production: bloom time, pollen type, forage value, amount produced, any toxicity concerns.',
+        nectarnotes:           'Details about nectar production: bloom time, nectar yield, sugar concentration, forage value, seasonal availability.',
         pollinator:            'Detailed notes on pollinator relationships — which insects visit, what they collect (nectar, pollen, resin), any known effects on pollinators.',
         cas_number:            'CAS Registry Number — unique numerical identifier assigned by Chemical Abstracts Service for chemical substances. e.g. 117-39-5 for Quercetin.',
         iupac_name:            'IUPAC systematic chemical name following International Union of Pure and Applied Chemistry nomenclature.',
@@ -689,6 +797,28 @@
         alternate_terms:       'Other names or spellings for this glossary term.',
         etymology:             'Origin of the word — Greek, Latin, or other language roots.',
         distribution:          'Geographic regions where this organism is naturally found or where this disease occurs.',
+        ident_character:       'Physical field identification: leaf shape, bark texture, height, habitat, distinctive features that help identify the plant in the wild.',
+        stem:                  'Stem description: height, shape (round/square/winged), texture (hairy/smooth/waxy), color, hollow or solid, branching pattern.',
+        leaves:                'Leaf description: shape, size, margin (toothed/smooth/lobed), arrangement (alternate/opposite/whorled), color, texture, petiole length.',
+        flowers:               'Flower description: color, shape, size, petal count, arrangement (solitary/cluster/spike), bloom season.',
+        fruit:                 'Fruit and seed description: type (berry/capsule/drupe/achene), size, color at maturity, seed count, ripening season.',
+        root:                  'Root description: type (taproot/fibrous/rhizome/bulb), color, odor, texture, typical depth.',
+        taste:                 'Taste of the plant parts used medicinally: bitter, sweet, astringent, pungent, salty, acrid, bland, or a combination.',
+        odour:                 'Distinctive smell of the herb: aromatic, fetid, musty, pleasant, faint, spicy — describe clearly.',
+        image:                 'Leave blank — images are linked via the organism/NCBI taxonomy system, not entered manually.',
+        dosage:                'Typical dosage ranges from traditional and clinical sources: e.g. tincture 2–4 ml 3x/day; tea 1 cup 2x/day; capsule 500 mg 2x/day. Include form.',
+        administration:        'Method and form of use: oral, topical, inhalation, poultice, suppository, enema. Include specific preparation instructions.',
+        preparation:           'How to prepare the herb: infusion (steep time/temperature), decoction (simmer time), tincture ratio (e.g. 1:5 in 60% alcohol), poultice method.',
+        formulas:              'Known traditional formulas that include this herb — formula names or numbers if known; semicolon-separated.',
+        history:               'Historical and ethnobotanical use: indigenous traditions, first documented use, cultural significance, how use has evolved.',
+        non_med:               'Non-medical uses: food ingredient, cosmetic, industrial (fiber, dye, construction material), ecological (habitat, erosion control).',
+        culinary:              'Culinary uses: flavor profile, how used in cooking (fresh, dried, as spice), regional cuisines, traditional dishes.',
+        cultivation:           'How the plant is cultivated: preferred soil, sun/shade, water needs, propagation method, companion planting, harvest cycle.',
+        harvest:               'When and how to harvest: season, plant age, time of day, part-specific timing (root in autumn, flower at opening), drying/processing method.',
+        chinese:               'TCM (Traditional Chinese Medicine) name and pinyin romanization, classical functions, organ meridians, classical formula names.',
+        homiopathic:           'Homeopathic preparation: common potencies (6C, 30C, 200C), classical indications, keynote symptoms, constitution type.',
+        vetrinary:             'Veterinary uses — Allopathic: ...; Herbal: ...; TCM: ... Include species commonly treated and dosage notes.',
+        reference:             'Key references for this herb — author, title, year, publisher or journal. Semicolon-separated. Page numbers welcome.',
     };
 
     function encyAddFieldTooltips() {
@@ -827,9 +957,30 @@
             .then(function(d) {
                 if (btn) btn.disabled = false;
                 if (d.success) {
-                    var count = d.count || (d.models && d.models.length) || '?';
-                    statusEl.textContent = '\u2713 Synced ' + count + ' models. Reloading dropdown\u2026';
-                    loadEncyModelOptions();
+                    var syncedModels = d.models || [];
+                    var sel = document.getElementById('ency-ai-model-sel');
+                    var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
+                    var added = 0;
+                    if (sel && syncedModels.length > 0) {
+                        var current = sel.value;
+                        sel.innerHTML = '';
+                        syncedModels.forEach(function(m) {
+                            if (!m.id || DEAD_MODELS[m.id] || m.id.match(/imagine|video/i)) return;
+                            var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+                            var opt = document.createElement('option');
+                            opt.value = m.id + '|grok';
+                            opt.textContent = lbl + ' (xAI)';
+                            if (m.id + '|grok' === current || added === 0) opt.selected = true;
+                            sel.appendChild(opt);
+                            added++;
+                        });
+                    }
+                    if (added > 0) {
+                        statusEl.textContent = '\u2713 Synced \u2014 ' + added + ' model' + (added === 1 ? '' : 's') + ' in dropdown.';
+                    } else {
+                        statusEl.textContent = '\u2713 Synced (no new models found \u2014 using grok-4.3)';
+                        loadEncyModelOptions();
+                    }
                 } else {
                     statusEl.textContent = 'Sync failed: ' + (d.error || 'unknown error');
                 }

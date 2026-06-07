@@ -9,7 +9,7 @@ use DBI;
 use Getopt::Long qw(GetOptions);
 use Comserv::Model::RemoteDB;
 
-my $nfs_root = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
+my $nfs_root = $ENV{NFS_DATA_PATH} || $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
 my $dry_run  = 1;
 my $force    = 0;
 my $help     = 0;

@@ -4,6 +4,7 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use JSON;
+use DateTime;
 use Comserv::Util::Logging;
 
 extends 'Catalyst::Model';
@@ -391,6 +392,108 @@ sub get_allowed_ai_models {
     );
 
     return $models;
+}
+
+=head2 get_ai_daily_quota_for_site
+
+Returns the ai_requests_per_day from the site's active plan (or 0).
+This represents the "free included local AI calls per day" that come with the
+hosting plan + AI addon. External/paid providers (Grok etc.) are tracked
+separately for cost-based billing.
+=cut
+
+sub get_ai_daily_quota_for_site {
+    my ($self, $c, $site_id, $user_id) = @_;
+    return 0 unless $site_id;
+
+    my $membership;
+    if (defined $user_id) {
+        $membership = $self->get_active_plan($c, $user_id, $site_id);
+    } else {
+        # Site-level fallback: pick any active membership for the site to read the plan's AI quota.
+        # This is useful for reports or when the call context doesn't have a specific user yet.
+        $membership = eval {
+            $self->schema->resultset('UserMembership')->search(
+                {
+                    site_id => $site_id,
+                    status  => ['active', 'grace'],
+                },
+                {
+                    prefetch => 'plan',
+                    rows     => 1,
+                    order_by => { -desc => 'created_at' },
+                }
+            )->single;
+        };
+        if ($@) {
+            $self->logging->log_with_details(
+                $c, 'warn', __FILE__, __LINE__, 'get_ai_daily_quota_for_site',
+                "Error fetching site-level membership for quota: $@"
+            );
+            return 0;
+        }
+    }
+
+    return 0 unless $membership && $membership->plan;
+
+    my $plan = $membership->plan;
+    # Prefer explicit column; fall back to benefit if plans evolve to use PlanBenefit for 'ai'
+    my $quota = $plan->ai_requests_per_day || 0;
+    if ($quota == 0) {
+        $quota = $plan->benefit_value('ai', 'requests_per_day', 0) || 0;
+    }
+    return $quota;
+}
+
+=head2 get_site_ai_usage_today
+
+Count of successful AI calls for the site today from the new usage logs.
+Used to determine if the call is still within the plan's free daily allowance.
+=cut
+
+sub get_site_ai_usage_today {
+    my ($self, $c, $site_id) = @_;
+    return 0 unless $site_id;
+
+    my $schema = eval { $c->model('DBEncy')->schema };
+    return 0 unless $schema;
+
+    my $today = DateTime->now->strftime('%Y-%m-%d');
+    my $rs = $schema->resultset('AiUsageLog')->search({
+        site_id => $site_id,
+        created_at => { '>=' => "$today 00:00:00" },
+        status => 'success',
+    });
+
+    return $rs->count;
+}
+
+=head2 is_ai_call_within_free_quota
+
+Given a site, returns (is_within, used, quota, remaining).
+Used by AI controller and logging to tag calls as free/included vs overage.
+Local Ollama calls are the primary "free calls" protected by the plan quota.
+Paid provider calls are usually billable on top.
+=cut
+
+sub is_ai_call_within_free_quota {
+    my ($self, $c, $site_id, $provider, $user_id) = @_;
+    my $quota = $self->get_ai_daily_quota_for_site($c, $site_id, $user_id);
+    my $used  = $self->get_site_ai_usage_today($c, $site_id);
+
+    # For paid providers (grok etc), we usually treat as billable on token cost
+    # even if under the "call count" quota. The quota mainly protects local capacity.
+    my $is_local = !$provider || lc($provider) eq 'ollama';
+
+    if ($quota <= 0) {
+        return (0, $used, $quota, 0);  # no free quota on this plan
+    }
+
+    my $within = ($used < $quota);
+    my $remaining = $quota - $used;
+    $remaining = 0 if $remaining < 0;
+
+    return ($within, $used, $quota, $remaining);
 }
 
 sub _deactivate_membership_services {

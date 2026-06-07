@@ -134,7 +134,7 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
 .widget-history-drawer {
     display: flex;
     flex-direction: column;
-    background-color: var(--secondary-color, #f9f9f9);
+    background-color: var(--table-header-bg, #f8f9fa);
     border-bottom: 1px solid var(--border-color, #ddd);
     max-height: 220px;
     overflow: hidden;
@@ -170,9 +170,9 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
     color: var(--text-color, #333);
     transition: background 0.15s;
 }
-.wh-item:hover { background: var(--secondary-color, #f0f0f0); }
+.wh-item:hover { background: var(--table-header-bg, #f0f0f0); }
 .wh-item.active {
-    background: var(--secondary-color, #f0f0f0);
+    background: var(--table-header-bg, #f0f0f0);
     border-left: 3px solid var(--nav-bg, #ccffff);
 }
 .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -182,7 +182,7 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
 /* Provider / model selector row */
 .provider-selector {
     padding: 6px 12px;
-    background-color: var(--secondary-color, #f5f5f5);
+    background-color: var(--table-header-bg, #f8f9fa);
     border-bottom: 1px solid var(--border-color, #ddd);
     display: flex;
     align-items: center;
@@ -280,7 +280,7 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
 }
 
 .system-message {
-    background-color: var(--secondary-color, #f5f5f5);
+    background-color: var(--table-header-bg, #f8f9fa);
     color: var(--text-color, #333);
     align-self: flex-start;
     margin-right: auto;
@@ -299,7 +299,7 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
 }
 
 .ai-message {
-    background-color: var(--secondary-color, #f0f4f8);
+    background-color: var(--table-header-bg, #f0f4f8);
     color: var(--text-color, #222);
     align-self: flex-start;
     margin-right: auto;
@@ -326,9 +326,9 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
     padding: 5px 10px;
     font-size: 0.8em;
     text-align: center;
-    background-color: var(--secondary-color, #fafafa);
+    background-color: var(--table-header-bg, #fafafa);
     border-top: 1px solid var(--border-color, #ddd);
-    color: var(--text-muted-color, #555);
+    color: var(--text-color, #555);
 }
 .chat-status.connected { color: var(--success-color, #2e7d32); }
 .chat-status.error     { color: var(--warning-color, #c62828); }
@@ -349,20 +349,26 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
     padding: 10px;
     border-top: 1px solid var(--border-color, #ddd);
     display: flex;
-    background-color: var(--secondary-color, #fafafa);
+    flex-direction: column;
+    background-color: var(--table-header-bg, #fafafa);
 }
 
 #message-input {
-    flex-grow: 1;
+    flex: 1;
     border: 1px solid var(--button-border, #ccc);
     border-radius: 4px;
     padding: 8px;
     resize: none;
+    min-height: 40px;
+    max-height: 200px;
     height: 40px;
     margin-right: 8px;
     background-color: var(--background-color, #fff);
     color: var(--text-color, #222);
     font-family: inherit;
+    min-width: 0;
+    overflow-y: hidden;
+    box-sizing: border-box;
 }
 
 /* Send button — uses standard button styles */
@@ -413,7 +419,7 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
 .chat-citations {
     font-size: 0.82em;
     padding: 6px 10px;
-    background: var(--secondary-color, #f9f9f9);
+    background: var(--table-header-bg, #f9f9f9);
     border-top: 1px solid var(--border-color, #eee);
     border-radius: 0 0 8px 8px;
     color: var(--text-color, #333);
@@ -428,7 +434,7 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
     border-radius: 6px;
     font-size: 0.80em;
     font-family: monospace;
-    background: var(--secondary-color, #f5f5f5);
+    background: var(--table-header-bg, #f5f5f5);
     color: var(--text-color, #333);
     overflow: hidden;
 }

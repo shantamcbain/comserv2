@@ -5,8 +5,22 @@
 [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
 
 <div class="app-container">
+  [% INCLUDE 'Accounting/_acct_inv_nav.tt' current_page='accounting' %]
   <div class="page-header">
     <h1>&#128200; Accounting &amp; Inventory — [% sitename | html %]</h1>
+  </div>
+
+  [%# ── Live DB indicator ──────────────────────────────────────────── %]
+  <div style="font-size:0.8rem;color:var(--text-muted-color,#555);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
+    <span>🗃️ Live accounting DB:</span>
+    <span style="font-family:monospace;background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 8px;">MariaDB</span>
+    [% IF pg_db_name %]
+    <span style="color:#6b7280;">·</span>
+    <a href="/Accounting/my_database" style="font-size:0.8rem;color:#065f46;">📦 PostgreSQL migration target: [% pg_db_name | html %]</a>
+    [% ELSE %]
+    <span style="color:#6b7280;">·</span>
+    <a href="/Accounting/my_database" style="font-size:0.8rem;color:#9ca3af;">PostgreSQL: not provisioned</a>
+    [% END %]
   </div>
 
   [%# ── Summary stat bar ──────────────────────────────────────────── %]
@@ -163,6 +177,10 @@
       </h2>
       <ul style="list-style:none;padding:0;margin:0;">
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Accounting/billing" style="font-weight:bold;">&#128176; Billable Time Report</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Hours logged per client / project — generates GL entries</div>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
           <a href="/Inventory/print/stock" target="_blank">Stock Level Report</a>
         </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
@@ -193,6 +211,10 @@
         </li>
         [% END %]
         <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
+          <a href="/Accounting/my_database">&#128452; My Accounting Database</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">View your PostgreSQL accounting DB status &amp; schema</div>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
           <a href="/Inventory/timesheet">&#9200; Timesheet / Log Time</a>
         </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
@@ -202,8 +224,12 @@
         <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
           <a href="/membership/admin/manage_plans">&#127760; Membership Plans (incl. Seed Hosting Plans)</a>
         </li>
-        <li style="padding:0.4rem 0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
           <a href="/membership/admin/hosting_accounts">&#127760; Hosting Accounts</a>
+        </li>
+        <li style="padding:0.4rem 0;">
+          <a href="/Accounting/admin/databases" style="font-weight:bold;">&#128452; Accounting Databases — All Sites</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Verify &amp; provision PostgreSQL accounting DB per site</div>
         </li>
         [% END %]
       </ul>

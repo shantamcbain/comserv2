@@ -23,6 +23,64 @@
   <div class="content-container">
     <div class="content-primary">
 
+      [% IF user_site_memberships.size %]
+      <div class="content-section">
+        <h2>My Sites &amp; Memberships</h2>
+        <p class="text-muted">A list of all sites you belong to, your roles, your personal memberships, and each site's hosting status with CSC.</p>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Site Name</th>
+                <th>My Role</th>
+                <th>My Personal Membership</th>
+                <th>Site Hosting Membership with CSC</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH s IN user_site_memberships %]
+              <tr>
+                <td>
+                  <strong>[% s.display_name | html %]</strong><br>
+                  <small style="color:var(--text-muted-color,#666)">([% s.site_name | html %])</small>
+                </td>
+                <td>
+                  [% IF s.is_admin %]
+                    <span class="badge badge-success" style="background-color:#28a745;color:white;font-weight:bold;padding:2px 8px;border-radius:12px;">Admin</span>
+                  [% ELSE %]
+                    <span class="badge badge-secondary" style="background-color:#6c757d;color:white;padding:2px 8px;border-radius:12px;">Member</span>
+                  [% END %]
+                </td>
+                <td>
+                  <span class="badge badge-info" style="font-weight:bold;">[% s.personal_plan | html %]</span>
+                  <small>([% s.personal_status | html %])</small>
+                </td>
+                <td>
+                  [% IF s.hosting_plan %]
+                    <span style="font-weight:bold;">[% s.hosting_plan | html %]</span><br>
+                    <small>Status: <strong>[% s.hosting_status | html %]</strong></small>
+                    [% IF s.hosting_cost %]<small> &bull; CAD [% s.hosting_cost %]/mo</small>[% END %]
+                  [% ELSIF s.is_admin %]
+                    [% IF s.site_name == 'CSC' %]
+                      <span class="text-muted">Parent Platform</span>
+                    [% ELSE %]
+                      <span class="text-warning" style="font-weight:bold;">Not Registered</span><br>
+                      <a href="/membership/hosting_signup?plan=hosting-subdomain" class="btn btn-sm btn-primary" style="font-size:0.8em;padding:2px 6px;margin-top:2px;">
+                        Register with CSC &rarr;
+                      </a>
+                    [% END %]
+                  [% ELSE %]
+                    <span class="text-muted">None</span>
+                  [% END %]
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+      </div>
+      [% END %]
+
       [% IF plans.size %]
       <div class="content-section">
         <div class="table-container">

@@ -1,0 +1,110 @@
+[%
+   title = "Edit Add-on Module"
+   roles = "admin"
+   PageVersion = 'admin/site_modules/edit_addon.tt v1.1 2026/06/05'
+%]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sm-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid var(--primary-color); }
+.sm-header h1 { margin:0; font-size:1.4em; }
+.add-form { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:20px; margin-top:16px; }
+.add-form h2 { margin-top:0; font-size:1.1em; }
+.add-form label { display:inline-block; width:160px; font-weight:bold; font-size:0.9em; margin-bottom:8px; vertical-align:top; }
+.add-form input[type="text"], .add-form select, .add-form textarea { width:100%; max-width:420px; padding:6px 12px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-color); color:var(--text-color); margin-bottom:12px; font-family:inherit; }
+.add-form textarea { height:100px; resize:vertical; }
+.add-form .field-row { margin-bottom:8px; }
+.btn-sm { padding:6px 16px; font-size:0.9em; border:none; border-radius:3px; cursor:pointer; text-decoration:none; display:inline-block; }
+.btn-primary   { background:var(--primary-color); color:#fff; }
+.btn-secondary { background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); }
+.site-panel { margin-top:24px; padding-top:16px; border-top:1px dashed var(--border-color); }
+.catalog-note { font-size:0.88em; color:var(--text-muted-color); margin:0 0 12px; padding:8px 12px; background:var(--bg-secondary); border-radius:4px; }
+</style>
+
+<div class="container">
+<div class="sm-header">
+    <h1>Edit Add-on Module</h1>
+    [% IF addon %]
+    <span style="font-size:0.85em; color:var(--text-muted-color);">Key: <code>[% addon.key | html %]</code></span>
+    [% END %]
+</div>
+
+[% IF error_msg %]
+<div style="background:#fee; border:1px solid #f88; padding:10px; border-radius:4px; margin-bottom:16px; color:#c00;">[% error_msg | html %]</div>
+<p><a href="[% c.uri_for('/membership/addons') %]" class="btn-sm btn-secondary">&larr; Back to add-ons</a></p>
+[% ELSIF addon %]
+
+[% IF addon.catalog_source && addon.catalog_source == 'builtin' %]
+<p class="catalog-note">
+    This add-on is loaded from the <strong>built-in catalog</strong> (Perl defaults), not a documentation .tt file.
+    Saving here creates or updates the <code>system_modules</code> database record used site-wide.
+</p>
+[% END %]
+
+<form method="post">
+    <input type="hidden" name="key" value="[% addon.key | html %]">
+    <div class="add-form">
+        <h2>Catalog (all sites)</h2>
+        <p class="field-row">
+            <label for="name">Display name</label>
+            <input type="text" id="name" name="name" value="[% addon.name | html %]" required>
+        </p>
+        <p class="field-row">
+            <label for="owner">Owner site</label>
+            <input type="text" id="owner" name="owner" value="[% addon.owner | html %]" required>
+        </p>
+        <p class="field-row">
+            <label for="route">Entry route</label>
+            <input type="text" id="route" name="route" value="[% addon.route | html %]" required>
+        </p>
+        <p class="field-row">
+            <label for="monthly_cost">Monthly cost (CAD)</label>
+            <input type="text" id="monthly_cost" name="monthly_cost" value="[% addon.monthly_cost || '0.00' | html %]">
+        </p>
+        <p class="field-row">
+            <label for="description">Description</label>
+            <textarea id="description" name="description">[% addon.description | html %]</textarea>
+        </p>
+        <p class="field-row">
+            <label>Catalog active</label>
+            <label style="width:auto;font-weight:normal;">
+                <input type="checkbox" name="is_active" value="1" [% IF !addon.is_active.defined || addon.is_active %]checked[% END %]>
+                Offer in add-on list
+            </label>
+        </p>
+    </div>
+
+    <div class="add-form site-panel">
+        <h2>Site configuration</h2>
+        <p class="field-row">
+            <label for="sitename">SiteName</label>
+            <select id="sitename" name="sitename">
+                [% FOREACH s IN sitenames %]
+                <option value="[% s | html %]" [% IF s == edit_site %]selected[% END %]>[% s | html %]</option>
+                [% END %]
+            </select>
+        </p>
+        <p class="field-row">
+            <label>Enabled on site</label>
+            <label style="width:auto;font-weight:normal;">
+                <input type="checkbox" name="site_enabled" value="1" [% IF site_enabled %]checked[% END %]>
+                Module enabled for this site
+            </label>
+        </p>
+        <p class="field-row">
+            <label for="min_role">Minimum role</label>
+            <select id="min_role" name="min_role">
+                [% FOREACH role IN ['member','editor','developer','admin'] %]
+                <option value="[% role %]" [% IF site_min_role == role %]selected[% END %]>[% role %]</option>
+                [% END %]
+            </select>
+        </p>
+    </div>
+
+    <div style="margin-top:20px;">
+        <button type="submit" class="btn-sm btn-primary">Save add-on</button>
+        <a href="[% c.uri_for('/membership/addons') %]" class="btn-sm btn-secondary" style="margin-left:10px;">Cancel</a>
+    </div>
+</form>
+[% END %]
+</div>

@@ -96,10 +96,10 @@ sub hosted_dashboard :Path('/hosted') :Args(0) {
     my $sitename = $c->session->{SiteName} || 'CSC';
     my $is_admin = $c->session->{is_admin} || 0;
 
-    my $acct = eval { $schema->resultset('HostingAccount')->find({ sitename => $sitename }) };
+    my $acct = eval { $schema->resultset('Accounting::HostingAccount')->find({ sitename => $sitename }) };
 
     my $cost_cfg = eval {
-        $schema->resultset('HostingCostConfig')->search(
+        $schema->resultset('Accounting::HostingCostConfig')->search(
             {}, { order_by => { -desc => 'id' }, rows => 1 }
         )->first;
     };
@@ -133,22 +133,22 @@ sub hosting_accounts :Path('/accounts') :Args(0) {
     my $search  = {};
     $search->{status} = $status unless $status eq 'all';
 
-    my @accounts = eval { $schema->resultset('HostingAccount')->search(
+    my @accounts = eval { $schema->resultset('Accounting::HostingAccount')->search(
         $search, { order_by => 'sitename' }
     )->all };
 
     my $cost_cfg = eval {
-        $schema->resultset('HostingCostConfig')->search(
+        $schema->resultset('Accounting::HostingCostConfig')->search(
             {}, { order_by => { -desc => 'id' }, rows => 1 }
         )->first;
     };
 
-    my @site_accounts = eval { $schema->resultset('SitePointAccount')->search(
+    my @site_accounts = eval { $schema->resultset('Accounting::SitePointAccount')->search(
         {}, { order_by => 'sitename' }
     )->all };
 
     my $founder_cfg = eval {
-        $schema->resultset('FounderRoyaltyConfig')->search(
+        $schema->resultset('Accounting::FounderRoyaltyConfig')->search(
             { active => 1 }, { rows => 1 }
         )->first;
     };
@@ -180,7 +180,7 @@ sub activate_hosting :Path('/hosting/activate') :Args(0) {
     };
     my $payment_amount = $c->req->param('payment_amount') || 0;
 
-    my $acct = $schema->resultset('HostingAccount')->find($acct_id);
+    my $acct = $schema->resultset('Accounting::HostingAccount')->find($acct_id);
     unless ($acct) {
         $c->flash->{error_msg} = "Hosting account #$acct_id not found.";
         $c->response->redirect($c->uri_for('/accounts'));
@@ -216,7 +216,7 @@ sub hosting_cost_admin :Path('/hosting/cost') :Args(0) {
 
     my $schema = $c->model('DBEncy');
     my $cfg    = eval {
-        $schema->resultset('HostingCostConfig')->search(
+        $schema->resultset('Accounting::HostingCostConfig')->search(
             {}, { order_by => { -desc => 'id' }, rows => 1 }
         )->first;
     };
@@ -235,7 +235,7 @@ sub hosting_cost_admin :Path('/hosting/cost') :Args(0) {
                     updated_by              => $c->session->{username},
                 });
             } else {
-                $cfg = $schema->resultset('HostingCostConfig')->create({
+                $cfg = $schema->resultset('Accounting::HostingCostConfig')->create({
                     server_cost_monthly     => $p->{server_cost_monthly}     || 0,
                     active_site_count       => $p->{active_site_count}       || 1,
                     overhead_percent        => $p->{overhead_percent}        || 20,
@@ -314,11 +314,11 @@ sub setup_hosting :Path('/hosting/setup') :Args(0) {
     };
 
     eval {
-        my $existing = $schema->resultset('HostingCostConfig')->search({}, { rows => 1 })->first;
+        my $existing = $schema->resultset('Accounting::HostingCostConfig')->search({}, { rows => 1 })->first;
         if ($existing) {
             push @log, "hosting_cost_config already has a row (id=" . $existing->id . ") — skipped.";
         } else {
-            my $row = $schema->resultset('HostingCostConfig')->create({
+            my $row = $schema->resultset('Accounting::HostingCostConfig')->create({
                 server_cost_monthly     => '50.00',
                 active_site_count       => 5,
                 overhead_percent        => '20.00',
@@ -333,11 +333,11 @@ sub setup_hosting :Path('/hosting/setup') :Args(0) {
     push @errors, "Error seeding hosting_cost_config: $@" if $@;
 
     eval {
-        my $existing = $schema->resultset('FounderRoyaltyConfig')->search({ active => 1 }, { rows => 1 })->first;
+        my $existing = $schema->resultset('Accounting::FounderRoyaltyConfig')->search({ active => 1 }, { rows => 1 })->first;
         if ($existing) {
             push @log, "founder_royalty_config already has an active row (" . $existing->founder_username . ") — skipped.";
         } else {
-            my $row = $schema->resultset('FounderRoyaltyConfig')->create({
+            my $row = $schema->resultset('Accounting::FounderRoyaltyConfig')->create({
                 founder_username => 'Shanta',
                 royalty_percent  => '5.00',
                 active           => 1,
@@ -395,14 +395,14 @@ sub setup_hosting :Path('/hosting/setup') :Args(0) {
 
     for my $item_data (@items) {
         eval {
-            my $existing = $schema->resultset('InventoryItem')->find({
+            my $existing = $schema->resultset('Accounting::InventoryItem')->find({
                 sku      => $item_data->{sku},
                 sitename => 'CSC',
             });
             if ($existing) {
                 push @log, "InventoryItem " . $item_data->{sku} . " already exists (id=" . $existing->id . ") — skipped.";
             } else {
-                my $row = $schema->resultset('InventoryItem')->create($item_data);
+                my $row = $schema->resultset('Accounting::InventoryItem')->create($item_data);
                 push @log, "Created InventoryItem " . $item_data->{sku} . " (id=" . $row->id . ").";
             }
         };

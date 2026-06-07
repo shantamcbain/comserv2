@@ -1,0 +1,74 @@
+[% PageVersion = 'Accounting/admin/databases.tt,v 0.01 2026/06/02 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]<div class="success" style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.success_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error" style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.error_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
+    <h1 style="margin:0;">🗄️ Accounting Database Status — All Sites</h1>
+    <a href="/Accounting" class="btn btn-secondary" style="font-size:0.88rem;">← Accounting Dashboard</a>
+  </div>
+
+  <p style="color:var(--text-muted-color,#555);margin-bottom:1.2rem;font-size:0.9rem;">
+    Each site with the <strong>Accounting</strong> add-on requires its own PostgreSQL database cloned from
+    <code>accounting_template</code> on <code>192.168.1.20:5432</code>.
+    Green = connected and healthy. Red = not provisioned or unreachable.
+  </p>
+
+  [% FOREACH row IN rows %]
+  [% SET bg    = row.db_ok       ? '#f0fdf4' : (row.registered ? '#fef9c3' : '#fef2f2') %]
+  [% SET border= row.db_ok       ? '#86efac' : (row.registered ? '#fde68a' : '#fca5a5') %]
+  [% SET badge = row.db_ok       ? '✅ Connected' : (row.registered ? '⚠️ Registered / Not Reachable' : '❌ Not Provisioned') %]
+  [% SET badge_color = row.db_ok ? '#065f46'      : (row.registered ? '#92400e'                       : '#991b1b') %]
+
+  <div style="background:[% bg %];border:1px solid [% border %];border-radius:8px;padding:1rem 1.2rem;margin-bottom:0.75rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.75rem;">
+
+    <div style="flex:2;min-width:160px;">
+      <strong style="font-size:1.05rem;">[% row.sitename | html %]</strong>
+      <span style="margin-left:0.6rem;font-size:0.8rem;font-weight:bold;color:[% badge_color %];">[% badge %]</span>
+    </div>
+
+    <div style="flex:3;min-width:220px;font-size:0.85rem;color:var(--text-muted-color,#555);">
+      <code>[% row.db_user | html %]@[% row.db_host | html %]:[% row.db_port %]/[% row.db_name | html %]</code>
+      &nbsp;&nbsp;
+      <span style="background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 7px;font-size:0.78rem;">[% row.jurisdiction | html %] / [% row.currency | html %]</span>
+    </div>
+
+    [% IF row.db_error %]
+    <div style="flex:3;min-width:200px;font-size:0.78rem;color:#b91c1c;font-style:italic;">
+      [% row.db_error | html %]
+    </div>
+    [% END %]
+
+    [% IF !row.registered || (row.registered && !row.db_ok) %]
+    <div style="flex:1 1 100%;margin-top:0.6rem;">
+      <form method="post" action="/Accounting/admin/databases"
+            style="background:rgba(0,0,0,0.05);padding:0.5rem 0.9rem;border-radius:6px;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+        <input type="hidden" name="sitename" value="[% row.sitename | html %]">
+        <label style="font-size:0.8rem;">Jurisdiction:
+          <input type="text" name="jurisdiction" value="[% row.jurisdiction | html %]"
+                 style="width:60px;font-size:0.8rem;padding:0.15rem 0.35rem;border:1px solid #ccc;border-radius:4px;">
+        </label>
+        <label style="font-size:0.8rem;">Currency:
+          <input type="text" name="currency" value="[% row.currency | html %]"
+                 style="width:60px;font-size:0.8rem;padding:0.15rem 0.35rem;border:1px solid #ccc;border-radius:4px;">
+        </label>
+        <span style="font-size:0.75rem;color:#6b7280;font-style:italic;">
+          Admin credentials read from server secrets file automatically.
+        </span>
+        <button type="submit" class="btn btn-primary" style="font-size:0.85rem;margin-left:auto;">
+          [% row.registered ? '🔁 Re-provision' : '➕ Provision DB' %]
+        </button>
+      </form>
+    </div>
+    [% END %]
+
+  </div>
+  [% END %]
+
+  [% IF !rows.size %]
+  <p style="color:var(--text-muted-color,#888);text-align:center;padding:2rem;">No sites found.</p>
+  [% END %]
+
+</div>

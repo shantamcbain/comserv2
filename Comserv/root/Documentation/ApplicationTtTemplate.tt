@@ -597,7 +597,7 @@ $c->stash->{
 my @queens = $c->model('ApiaryModel')->get_queens_for_hive($hive_id);
 
 ## Or via Result class relationship:
-my $hive = $schema->resultset('Hive')->find($hive_id);
+my $hive = $schema->resultset('Beekeeping::Hive')->find($hive_id);
 my $current_queen = $hive->current_queen;           # active assignment only
 my $queen_history = $hive->queen_history->all;      # all assignments</pre>
         </div>

@@ -78,11 +78,11 @@ sub index :Path('/Inventory') :Args(0) {
 
     my ($item_count, $low_stock, $supplier_count, $location_count);
     eval {
-        $item_count     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' })->count;
-        $supplier_count = $schema->resultset('InventorySupplier')->search({ sitename => $sitename, status => 'active' })->count;
-        $location_count = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' })->count;
+        $item_count     = $schema->resultset('Accounting::InventoryItem')->search({ sitename => $sitename, status => 'active' })->count;
+        $supplier_count = $schema->resultset('Accounting::InventorySupplier')->search({ sitename => $sitename, status => 'active' })->count;
+        $location_count = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' })->count;
 
-        my @items = $schema->resultset('InventoryItem')->search(
+        my @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { prefetch => 'stock_levels' }
         );
@@ -131,7 +131,7 @@ sub items :Path('/Inventory/items') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%search,
             {
                 prefetch => 'stock_levels',
@@ -155,9 +155,14 @@ sub _load_coa_accounts {
     my $sitename = $self->_sitename($c);
     my @accounts;
     eval {
-        @accounts = $self->_schema($c)->resultset('CoaAccount')->search(
-            { sitename => $sitename, obsolete => 0 },
-            { order_by => 'accno' }
+        # Include site-specific rows and global (sitename NULL/empty) rows
+        @accounts = $self->_schema($c)->resultset('Accounting::CoaAccount')->search(
+            [
+                { sitename => $sitename, obsolete => 0 },
+                { sitename => undef,     obsolete => 0 },
+                { sitename => '',        obsolete => 0 },
+            ],
+            { order_by => 'accno', distinct => 1 }
         )->all;
     };
     return \@accounts;
@@ -174,7 +179,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id },
             { prefetch => [
                 'stock_levels', 'item_suppliers', 'assignments',
@@ -191,7 +196,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my @transactions;
     eval {
-        @transactions = $schema->resultset('InventoryTransaction')->search(
+        @transactions = $schema->resultset('Accounting::InventoryTransaction')->search(
             { item_id => $id },
             { prefetch => ['location', 'gl_entry'], order_by => { -desc => 'transaction_date' }, rows => 20 }
         );
@@ -199,7 +204,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my @all_items;
     eval {
-        @all_items = $schema->resultset('InventoryItem')->search(
+        @all_items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', id => { '!=' => $id } },
             { columns => ['id','name','sku','unit_of_measure'], order_by => 'name' }
         )->all;
@@ -207,7 +212,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my @all_suppliers;
     eval {
-        @all_suppliers = $schema->resultset('InventorySupplier')->search(
+        @all_suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
             { sitename => $sitename, status => 'active' },
             { columns => ['id','name'], order_by => 'name' }
         )->all;
@@ -238,7 +243,7 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
 
         my $new_item;
         eval {
-            $new_item = $schema->resultset('InventoryItem')->create({
+            $new_item = $schema->resultset('Accounting::InventoryItem')->create({
                 sitename            => $sitename,
                 sku                 => $params->{sku},
                 name                => $params->{name},
@@ -301,7 +306,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $item;
-    eval { $item = $schema->resultset('InventoryItem')->find($id) };
+    eval { $item = $schema->resultset('Accounting::InventoryItem')->find($id) };
     if ($@ || !$item) {
         $c->stash->{error_msg} = 'Item not found';
         $c->res->redirect($c->uri_for('/Inventory/items'));
@@ -344,7 +349,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
 
     my @stock_levels;
     eval {
-        @stock_levels = $schema->resultset('InventoryStockLevel')->search(
+        @stock_levels = $schema->resultset('Accounting::InventoryStockLevel')->search(
             { item_id => $item->id },
             { prefetch => 'location', order_by => 'location.name' }
         )->all;
@@ -352,7 +357,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
 
     my @locations;
     eval {
-        @locations = $schema->resultset('InventoryLocation')->search(
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search(
             { sitename => $sitename },
             { order_by => 'name' }
         )->all;
@@ -376,7 +381,7 @@ sub item_delete :Path('/Inventory/item/delete') :Args(1) {
 
     my $schema = $self->_schema($c);
     eval {
-        my $item = $schema->resultset('InventoryItem')->find($id);
+        my $item = $schema->resultset('Accounting::InventoryItem')->find($id);
         $item->update({ status => 'deleted', updated_at => $self->_now() }) if $item;
     };
     if ($@) {
@@ -398,7 +403,7 @@ sub equipment_edit :Path('/Inventory/equipment') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $item_id },
             { prefetch => 'equipment' }
         );
@@ -414,7 +419,7 @@ sub equipment_edit :Path('/Inventory/equipment') :Args(1) {
         my $p = $c->req->body_parameters;
         my $now = $self->_now();
         eval {
-            $schema->resultset('InventoryEquipment')->update_or_create(
+            $schema->resultset('Accounting::InventoryEquipment')->update_or_create(
                 {
                     item_id               => $item_id,
                     wattage               => $p->{wattage}               || undef,
@@ -461,7 +466,7 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     my $from     = $params->{redirect_to} || 'bom';
 
     eval {
-        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($parent_id);
         unless ($parent && $parent->sitename eq $sitename) {
             die "Item not found\n";
         }
@@ -474,7 +479,7 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
 
         my $scrap = ($params->{scrap_factor} || 0) / 100;
 
-        $schema->resultset('InventoryItemBOM')->update_or_create({
+        $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
             parent_item_id    => $parent_id,
             component_item_id => $params->{component_item_id},
             quantity          => $params->{quantity}    || 1,
@@ -519,11 +524,11 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
     my $avg_watt_pct  = $params->{avg_watt_pct}  || 50;
 
     eval {
-        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($parent_id);
         die "Item not found\n" unless $parent && $parent->sitename eq $sitename;
         die "Not assemblable\n" unless $parent->is_assemblable;
 
-        my $printer = $schema->resultset('InventoryItem')->find($printer_id);
+        my $printer = $schema->resultset('Accounting::InventoryItem')->find($printer_id);
         die "Printer not found\n" unless $printer;
 
         my $now = $self->_now();
@@ -531,7 +536,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
         if ($filament_g > 0) {
             my $filament_item_id = $params->{filament_item_id};
             unless ($filament_item_id) {
-                my $default_fil = $schema->resultset('InventoryItem')->search({
+                my $default_fil = $schema->resultset('Accounting::InventoryItem')->search({
                     sitename     => $sitename,
                     filament_type => { '!=' => undef },
                     status       => 'active',
@@ -540,7 +545,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             }
             if ($filament_item_id) {
                 my $scrap = ($params->{filament_scrap} || 2) / 100;
-                $schema->resultset('InventoryItemBOM')->update_or_create({
+                $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
                     parent_item_id    => $parent_id,
                     component_item_id => $filament_item_id,
                     quantity          => $filament_g,
@@ -560,8 +565,8 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             my $elec_sku  = 'COST-ELEC-' . uc($printer->sku || 'PRINTER');
             $elec_sku =~ s/[^A-Z0-9-]/-/g;
             $elec_sku = substr($elec_sku, 0, 50);
-            my $elec_item = $schema->resultset('InventoryItem')->find({ sku => $elec_sku })
-                || $schema->resultset('InventoryItem')->create({
+            my $elec_item = $schema->resultset('Accounting::InventoryItem')->find({ sku => $elec_sku })
+                || $schema->resultset('Accounting::InventoryItem')->create({
                     sitename            => $sitename,
                     sku                 => $elec_sku,
                     name                => $printer->name . ' — Electricity',
@@ -578,7 +583,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                     updated_at          => $now,
                 });
             $elec_item->update({ unit_cost => $kwh_rate, updated_at => $now });
-            $schema->resultset('InventoryItemBOM')->update_or_create({
+            $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
                 parent_item_id    => $parent_id,
                 component_item_id => $elec_item->id,
                 quantity          => $kwh,
@@ -594,8 +599,8 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             my $depr_sku = 'COST-DEPR-' . uc($printer->sku || 'PRINTER');
             $depr_sku =~ s/[^A-Z0-9-]/-/g;
             $depr_sku = substr($depr_sku, 0, 50);
-            my $depr_item = $schema->resultset('InventoryItem')->find({ sku => $depr_sku })
-                || $schema->resultset('InventoryItem')->create({
+            my $depr_item = $schema->resultset('Accounting::InventoryItem')->find({ sku => $depr_sku })
+                || $schema->resultset('Accounting::InventoryItem')->create({
                     sitename            => $sitename,
                     sku                 => $depr_sku,
                     name                => $printer->name . ' — Depreciation',
@@ -612,7 +617,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                     updated_at          => $now,
                 });
             $depr_item->update({ unit_cost => $equip->depreciation_per_hour, updated_at => $now });
-            $schema->resultset('InventoryItemBOM')->update_or_create({
+            $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
                 parent_item_id    => $parent_id,
                 component_item_id => $depr_item->id,
                 quantity          => $print_hours,
@@ -643,7 +648,7 @@ sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
     my $params   = $c->req->body_parameters;
 
     eval {
-        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($parent_id);
         unless ($parent && $parent->sitename eq $sitename) {
             die "Item not found\n";
         }
@@ -661,8 +666,8 @@ sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
 
         my $now = $self->_now();
 
-        my $cost_item = $schema->resultset('InventoryItem')->find({ sku => $sku })
-            || $schema->resultset('InventoryItem')->create({
+        my $cost_item = $schema->resultset('Accounting::InventoryItem')->find({ sku => $sku })
+            || $schema->resultset('Accounting::InventoryItem')->create({
                 sitename            => $sitename,
                 sku                 => $sku,
                 name                => $label,
@@ -685,7 +690,7 @@ sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
             updated_at      => $now,
         });
 
-        $schema->resultset('InventoryItemBOM')->update_or_create({
+        $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
             parent_item_id    => $parent_id,
             component_item_id => $cost_item->id,
             quantity          => $qty,
@@ -712,9 +717,9 @@ sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
     my $from = $c->req->params->{from} || 'item';
 
     eval {
-        my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
+        my $bom = $schema->resultset('Accounting::InventoryItemBOM')->find($bom_id);
         if ($bom) {
-            my $parent = $schema->resultset('InventoryItem')->find($bom->parent_item_id);
+            my $parent = $schema->resultset('Accounting::InventoryItem')->find($bom->parent_item_id);
             die "Access denied\n" unless $parent && $parent->sitename eq $sitename;
             $parent_id = $bom->parent_item_id;
             $bom->delete;
@@ -743,7 +748,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $item_id },
             { prefetch => [
                 'inventory_account', 'income_account', 'expense_account', 'returns_account',
@@ -764,7 +769,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @all_items;
     eval {
-        @all_items = $schema->resultset('InventoryItem')->search(
+        @all_items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', id => { '!=' => $item_id } },
             { columns => ['id','name','sku','unit_of_measure','unit_cost'], order_by => 'name' }
         )->all;
@@ -772,7 +777,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @assemblable_items;
     eval {
-        @assemblable_items = $schema->resultset('InventoryItem')->search(
+        @assemblable_items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', is_assemblable => 1 },
             { columns => ['id','name','sku'], order_by => 'name' }
         )->all;
@@ -780,7 +785,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @printers;
     eval {
-        @printers = $schema->resultset('InventoryItem')->search(
+        @printers = $schema->resultset('Accounting::InventoryItem')->search(
             {
                 'me.sitename' => $sitename,
                 'me.status'   => 'active',
@@ -796,7 +801,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @filament_items;
     eval {
-        @filament_items = $schema->resultset('InventoryItem')->search(
+        @filament_items = $schema->resultset('Accounting::InventoryItem')->search(
             {
                 'me.sitename' => $sitename,
                 'me.status'   => 'active',
@@ -838,9 +843,9 @@ sub bom_edit_line :Path('/Inventory/bom/edit') :Args(1) {
     my $parent_id;
 
     eval {
-        my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
+        my $bom = $schema->resultset('Accounting::InventoryItemBOM')->find($bom_id);
         die "BOM line not found\n" unless $bom;
-        my $parent = $schema->resultset('InventoryItem')->find($bom->parent_item_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($bom->parent_item_id);
         die "Access denied\n" unless $parent && $parent->sitename eq $sitename;
         $parent_id = $bom->parent_item_id;
 
@@ -872,7 +877,7 @@ sub bom_list :Path('/Inventory/bom/list') :Args(0) {
 
     my @assemblable;
     eval {
-        @assemblable = $schema->resultset('InventoryItem')->search(
+        @assemblable = $schema->resultset('Accounting::InventoryItem')->search(
             { 'me.sitename' => $sitename, 'me.is_assemblable' => 1, 'me.status' => 'active' },
             {
                 prefetch => { 'bom_components' => 'component_item' },
@@ -908,7 +913,7 @@ sub suppliers :Path('/Inventory/suppliers') :Args(0) {
 
     my @suppliers;
     eval {
-        @suppliers = $schema->resultset('InventorySupplier')->search(
+        @suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
             \%search,
             { order_by => 'name' }
         );
@@ -937,7 +942,7 @@ sub supplier_add :Path('/Inventory/supplier/add') :Args(0) {
         my $now    = $self->_now();
 
         eval {
-            $schema->resultset('InventorySupplier')->create({
+            $schema->resultset('Accounting::InventorySupplier')->create({
                 sitename       => $sitename,
                 name           => $params->{name},
                 contact_name   => $params->{contact_name},
@@ -983,7 +988,7 @@ sub supplier_edit :Path('/Inventory/supplier/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $supplier;
-    eval { $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename }) };
+    eval { $supplier = $schema->resultset('Accounting::InventorySupplier')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$supplier) {
         $c->stash->{error_msg} = 'Supplier not found';
         $c->res->redirect($c->uri_for('/Inventory/suppliers'));
@@ -1031,7 +1036,7 @@ sub supplier_delete :Path('/Inventory/supplier/delete') :Args(1) {
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
     eval {
-        my $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename });
+        my $supplier = $schema->resultset('Accounting::InventorySupplier')->find({ id => $id, sitename => $sitename });
         $supplier->update({ status => 'inactive', updated_at => $self->_now() }) if $supplier;
     };
     if ($@) {
@@ -1053,7 +1058,7 @@ sub supplier_view :Path('/Inventory/supplier/view') :Args(1) {
 
     my $supplier;
     eval {
-        $supplier = $schema->resultset('InventorySupplier')->find(
+        $supplier = $schema->resultset('Accounting::InventorySupplier')->find(
             { id => $id, sitename => $sitename },
             { prefetch => { 'item_suppliers' => 'item' } }
         );
@@ -1083,7 +1088,7 @@ sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
     my $item_id  = $params->{item_id};
 
     eval {
-        my $existing = $schema->resultset('InventoryItemSupplier')->find({
+        my $existing = $schema->resultset('Accounting::InventoryItemSupplier')->find({
             item_id     => $item_id,
             supplier_id => $params->{supplier_id},
         });
@@ -1094,7 +1099,7 @@ sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
                 notes        => $params->{notes}        || undef,
             });
         } else {
-            $schema->resultset('InventoryItemSupplier')->create({
+            $schema->resultset('Accounting::InventoryItemSupplier')->create({
                 item_id      => $item_id,
                 supplier_id  => $params->{supplier_id},
                 supplier_sku => $params->{supplier_sku} || undef,
@@ -1104,7 +1109,7 @@ sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
             });
         }
         if ($params->{is_preferred} && $params->{is_preferred} eq '1') {
-            $schema->resultset('InventoryItemSupplier')->search({
+            $schema->resultset('Accounting::InventoryItemSupplier')->search({
                 item_id    => $item_id,
                 supplier_id => { '!=' => $params->{supplier_id} },
             })->update({ is_preferred => 0 });
@@ -1127,7 +1132,7 @@ sub item_supplier_remove :Path('/Inventory/item_supplier/remove') :Args(1) {
     my $schema  = $self->_schema($c);
     my $item_id;
     eval {
-        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        my $link = $schema->resultset('Accounting::InventoryItemSupplier')->find($id);
         if ($link) {
             $item_id = $link->item_id;
             $link->delete;
@@ -1150,10 +1155,10 @@ sub item_supplier_set_preferred :Path('/Inventory/item_supplier/preferred') :Arg
     my $schema  = $self->_schema($c);
     my $item_id;
     eval {
-        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        my $link = $schema->resultset('Accounting::InventoryItemSupplier')->find($id);
         if ($link) {
             $item_id = $link->item_id;
-            $schema->resultset('InventoryItemSupplier')->search({ item_id => $item_id })->update({ is_preferred => 0 });
+            $schema->resultset('Accounting::InventoryItemSupplier')->search({ item_id => $item_id })->update({ is_preferred => 0 });
             $link->update({ is_preferred => 1 });
         }
     };
@@ -1184,7 +1189,7 @@ sub locations :Path('/Inventory/locations') :Args(0) {
 
     my @locations;
     eval {
-        @locations = $schema->resultset('InventoryLocation')->search(
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search(
             \%search,
             { order_by => 'name' }
         );
@@ -1213,7 +1218,7 @@ sub location_add :Path('/Inventory/location/add') :Args(0) {
         my $now    = $self->_now();
 
         eval {
-            $schema->resultset('InventoryLocation')->create({
+            $schema->resultset('Accounting::InventoryLocation')->create({
                 sitename      => $sitename,
                 name          => $params->{name},
                 description   => $params->{description},
@@ -1251,7 +1256,7 @@ sub location_edit :Path('/Inventory/location/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $location;
-    eval { $location = $schema->resultset('InventoryLocation')->find({ id => $id, sitename => $sitename }) };
+    eval { $location = $schema->resultset('Accounting::InventoryLocation')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$location) {
         $c->stash->{error_msg} = 'Location not found';
         $c->res->redirect($c->uri_for('/Inventory/locations'));
@@ -1297,12 +1302,18 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
     my $schema   = $self->_schema($c);
 
     my (@items, @suppliers, @coa_accounts);
-    eval { @items     = $schema->resultset('InventoryItem')->search(
+    eval { @items     = $schema->resultset('Accounting::InventoryItem')->search(
         { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
-    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
+    eval { @suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
-    eval { @coa_accounts = $schema->resultset('CoaAccount')->search(
-        { obsolete => 0 }, { order_by => 'accno' })->all };
+    eval { @coa_accounts = $schema->resultset('Accounting::CoaAccount')->search(
+        [
+            { sitename => $sitename, obsolete => 0 },
+            { sitename => undef,     obsolete => 0 },
+            { sitename => '',        obsolete => 0 },
+        ],
+        { order_by => 'accno', distinct => 1 }
+    )->all };
 
     if ($c->req->method eq 'POST') {
         my $params      = $c->req->body_parameters;
@@ -1351,7 +1362,7 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
-                my $invoice = $schema->resultset('InventorySupplierInvoice')->create({
+                my $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
                     sitename       => $sitename,
                     supplier_id    => $supplier_id,
                     invoice_number => $inv_number,
@@ -1367,7 +1378,7 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
                 });
 
                 for my $ln (@lines_data) {
-                    $schema->resultset('InventorySupplierInvoiceLine')->create({
+                    $schema->resultset('Accounting::InventorySupplierInvoiceLine')->create({
                         invoice_id  => $invoice->id,
                         item_id     => $ln->{item_id},
                         description => $ln->{description},
@@ -1379,7 +1390,7 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
 
                     # Also update item unit_cost if currently blank
                     if ($ln->{unit_cost} > 0) {
-                        my $it = $schema->resultset('InventoryItem')->find($ln->{item_id});
+                        my $it = $schema->resultset('Accounting::InventoryItem')->find($ln->{item_id});
                         if ($it && !($it->unit_cost && $it->unit_cost > 0)) {
                             $it->update({ unit_cost => $ln->{unit_cost}, updated_at => $self->_now() });
                         }
@@ -1422,8 +1433,8 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 
     my (@items, @locations);
     eval {
-        @items     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
-        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @items     = $schema->resultset('Accounting::InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
     };
 
     if ($c->req->method eq 'POST') {
@@ -1437,7 +1448,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
-                my $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+                my $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
                     { item_id => $item_id, location_id => $loc_id },
                     { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
                 );
@@ -1454,7 +1465,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                 $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
 
                 # Update item unit_cost if provided and item cost is blank
-                my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+                my $item_rec = $schema->resultset('Accounting::InventoryItem')->find($item_id);
                 if ($item_rec && $params->{unit_cost} && $params->{unit_cost} > 0) {
                     $item_rec->update({ unit_cost => $params->{unit_cost}, updated_at => $now })
                         unless $item_rec->unit_cost && $item_rec->unit_cost > 0;
@@ -1466,7 +1477,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                     my $unit_cost  = $params->{unit_cost} || $item_rec->unit_cost || 0;
                     my $value      = $qty * $unit_cost;
                     my $ref        = 'INV-' . $item_id . '-' . time();
-                    my $gl = $schema->resultset('GlEntry')->create({
+                    my $gl = $schema->resultset('Accounting::GlEntry')->create({
                         reference   => $ref,
                         description => ucfirst($type) . ': ' . ($item_rec->name || "Item $item_id") . " x$qty",
                         entry_type  => 'inventory',
@@ -1488,7 +1499,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                             $cr_acct = $item_rec->inventory_accno_id;
                         }
                         if ($dr_acct) {
-                            $schema->resultset('GlEntryLine')->create({
+                            $schema->resultset('Accounting::GlEntryLine')->create({
                                 gl_entry_id => $gl_entry_id,
                                 account_id  => $dr_acct,
                                 amount      => $value,
@@ -1497,7 +1508,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                             });
                         }
                         if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
-                            $schema->resultset('GlEntryLine')->create({
+                            $schema->resultset('Accounting::GlEntryLine')->create({
                                 gl_entry_id => $gl_entry_id,
                                 account_id  => $cr_acct,
                                 amount      => -$value,
@@ -1508,7 +1519,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                     }
                 }
 
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     item_id          => $item_id,
                     location_id      => $loc_id,
                     transaction_type => $type,
@@ -1565,14 +1576,14 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
         my %item_search = (sitename => $sitename, status => 'active');
         $item_search{id} = $item_id if $item_id;
 
-        @items     = $schema->resultset('InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
-        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
+        @items     = $schema->resultset('Accounting::InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
 
         for my $item (@items) {
             my %sl_search = (item_id => $item->id);
             $sl_search{location_id} = $location_id if $location_id;
 
-            my @sls = $schema->resultset('InventoryStockLevel')->search(
+            my @sls = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 \%sl_search,
                 { prefetch => 'location', order_by => 'location.name' }
             )->all;
@@ -1636,7 +1647,7 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
 
     my (@transactions, @items, $total_count);
     eval {
-        @items = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @items = $schema->resultset('Accounting::InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
 
         my %search = (sitename => $sitename);
         $search{item_id}          = $item_id if $item_id;
@@ -1650,9 +1661,9 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
             }
         }
 
-        $total_count = $schema->resultset('InventoryTransaction')->search(\%search)->count;
+        $total_count = $schema->resultset('Accounting::InventoryTransaction')->search(\%search)->count;
 
-        @transactions = $schema->resultset('InventoryTransaction')->search(
+        @transactions = $schema->resultset('Accounting::InventoryTransaction')->search(
             \%search,
             {
                 prefetch => ['item', 'location'],
@@ -1700,7 +1711,7 @@ sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
     }
 
     my $item;
-    eval { $item = $schema->resultset('InventoryItem')->find($item_id) };
+    eval { $item = $schema->resultset('Accounting::InventoryItem')->find($item_id) };
 
     unless ($item) {
         $c->flash->{error_msg} = 'Item not found';
@@ -1716,7 +1727,7 @@ sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
 
     my $listing;
     eval {
-        $listing = $schema->resultset('MarketplaceListing')->create({
+        $listing = $schema->resultset('Accounting::MarketplaceListing')->create({
             seller_username => $c->session->{username} || 'admin',
             sitename        => $sitename,
             title           => $item->name,
@@ -1754,7 +1765,7 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'sku' }
         );
@@ -1787,7 +1798,7 @@ sub api_suppliers :Path('/Inventory/api/suppliers') :Args(0) {
     my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
     my @suppliers;
     eval {
-        @suppliers = $self->_schema($c)->resultset('InventorySupplier')->search(
+        @suppliers = $self->_schema($c)->resultset('Accounting::InventorySupplier')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -1803,7 +1814,7 @@ sub api_items_with_accounts :Path('/Inventory/api/items_with_accounts') :Args(0)
     my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
     my @items;
     eval {
-        @items = $self->_schema($c)->resultset('InventoryItem')->search(
+        @items = $self->_schema($c)->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -1839,7 +1850,7 @@ sub api_stock :Path('/Inventory/api/stock') :Args(0) {
 
     my @stock;
     eval {
-        @stock = $schema->resultset('InventoryStockLevel')->search(
+        @stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
             \%search,
             { join => ['item', 'location'] }
         );
@@ -1874,7 +1885,7 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
     my @invoices;
     my $list_error;
     eval {
-        @invoices = $self->_schema($c)->resultset('InventorySupplierInvoice')->search(
+        @invoices = $self->_schema($c)->resultset('Accounting::InventorySupplierInvoice')->search(
             { 'me.sitename' => $sitename },
             { prefetch => 'supplier', order_by => { -desc => 'me.invoice_date' } }
         )->all;
@@ -1910,13 +1921,14 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
             }
         }
 
+        my $saved_invoice;
         eval {
             $schema->txn_do(sub {
                 my $tax_amt      = $params->{tax_amount}      || 0;
                 my $shipping_amt = $params->{shipping_amount} || 0;
                 my $discount_amt = $params->{discount_amount} || 0;
 
-                my $invoice = $schema->resultset('InventorySupplierInvoice')->create({
+                my $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
                     sitename             => $sitename,
                     supplier_id          => $params->{supplier_id},
                     invoice_number       => $params->{invoice_number},
@@ -1959,13 +1971,83 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
 
                 my $grand_total = $line_total_sum + $tax_amt + $shipping_amt - $discount_amt;
                 $invoice->update({ total_amount => $grand_total });
+                $saved_invoice = $invoice;
             });
         };
         if ($@) {
             $c->stash->{error_msg} = "Failed to save invoice: $@";
             $c->stash->{submitted} = $c->req->body_parameters;
         } else {
-            $c->flash->{success_msg} = 'Invoice saved as draft. Review and Post when ready.';
+            my $todo_created = 0;
+            if ($saved_invoice) {
+                my $supplier_name = '';
+                eval {
+                    my $sup = $schema->resultset('InventorySupplier')->find($saved_invoice->supplier_id);
+                    $supplier_name = $sup->name if $sup;
+                };
+                $supplier_name ||= 'Unknown Supplier';
+
+                my $inv_num   = $saved_invoice->invoice_number || ('#' . $saved_invoice->id);
+                my $inv_total = sprintf('$%.2f', $saved_invoice->total_amount || 0);
+                my $inv_date  = $saved_invoice->invoice_date || '';
+                my $inv_url   = $c->uri_for('/Inventory/invoice/view', [$saved_invoice->id]);
+                my $poster    = $c->session->{username} || 'system';
+                my $now_date  = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+                my $now_dt    = $now_date . ' ' . do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+
+                my $admin_user = eval {
+                    $schema->resultset('Member')->search(
+                        { roles => { -like => '%admin%' }, sitename => $sitename },
+                        { rows => 1, order_by => 'username' }
+                    )->single;
+                };
+                my $assignee = ($admin_user ? $admin_user->username : undef) || 'admin';
+
+                eval {
+                    $schema->resultset('Todo')->create({
+                        subject              => "Review Draft Invoice: $supplier_name $inv_num $inv_total",
+                        description          => "Draft supplier invoice entered by $poster on $inv_date.\n"
+                                             . "Supplier: $supplier_name | Amount: $inv_total\n"
+                                             . "Please verify details, assign GL accounts, and Post.\n"
+                                             . "View invoice: $inv_url",
+                        status               => 'todo',
+                        priority             => 'medium',
+                        developer            => $assignee,
+                        sitename             => $sitename,
+                        date_time_posted     => $now_dt,
+                        username_of_poster   => $poster,
+                        last_mod_by          => $poster,
+                        last_mod_date        => $now_date,
+                        parent_todo          => '',
+                        estimated_man_hours  => 0,
+                        accumulative_time    => '00:00:00',
+                        group_of_poster      => 'admin',
+                        project_code         => 'accounting',
+                        share                => 0,
+                    });
+                    $todo_created = 1;
+                };
+                $c->log->warn("Failed to create accounting todo: $@") if $@;
+
+                if ($admin_user) {
+                    my $admin_email = eval { $admin_user->email } || '';
+                    if ($admin_email) {
+                        eval {
+                            my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+                            $notifier->send_error_notification($c, $admin_email,
+                                "Action Required: Draft Invoice $inv_num from $supplier_name",
+                                "A new draft supplier invoice has been entered and requires accounting review.\n\n"
+                                . "Supplier: $supplier_name\nInvoice #: $inv_num\nDate: $inv_date\nAmount: $inv_total\n"
+                                . "Entered by: $poster\n\nView and post: $inv_url"
+                            );
+                        };
+                        $c->log->warn("Failed to send accounting notification email: $@") if $@;
+                    }
+                }
+            }
+
+            my $todo_note = $todo_created ? ' An accounting review todo has been created.' : '';
+            $c->flash->{success_msg} = 'Invoice saved as draft.' . $todo_note . ' Accounting will review before posting.';
             $c->res->redirect($c->uri_for('/Inventory/invoice'));
             return;
         }
@@ -1975,18 +2057,18 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
     eval {
         my %seen_sup;
         @suppliers = grep { !$seen_sup{ lc($_->name) }++ }
-            $schema->resultset('InventorySupplier')->search(
+            $schema->resultset('Accounting::InventorySupplier')->search(
                 { sitename => $sitename, status => 'active' },
                 { order_by => 'name' }
             )->all;
     };
 
     my @items;
-    eval { @items = $schema->resultset('InventoryItem')->search(
+    eval { @items = $schema->resultset('Accounting::InventoryItem')->search(
         { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
 
     my @locations;
-    eval { @locations = $schema->resultset('InventoryLocation')->search(
+    eval { @locations = $schema->resultset('Accounting::InventoryLocation')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
 
     $c->stash(
@@ -2006,7 +2088,7 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => ['item'] } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2088,13 +2170,13 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
     }
 
     my @suppliers;
-    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
+    eval { @suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
     my @items;
-    eval { @items = $schema->resultset('InventoryItem')->search(
+    eval { @items = $schema->resultset('Accounting::InventoryItem')->search(
         { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
     my @locations;
-    eval { @locations = $schema->resultset('InventoryLocation')->search(
+    eval { @locations = $schema->resultset('Accounting::InventoryLocation')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
 
     $c->stash(
@@ -2115,7 +2197,7 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => ['item'] } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2136,11 +2218,11 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
             # Ensure a default location exists for this site so stock always posts
             my $default_loc;
             eval {
-                ($default_loc) = $schema->resultset('InventoryLocation')->search(
+                ($default_loc) = $schema->resultset('Accounting::InventoryLocation')->search(
                     { sitename => $sitename, name => 'Default' }
                 )->all;
                 unless ($default_loc) {
-                    $default_loc = $schema->resultset('InventoryLocation')->create({
+                    $default_loc = $schema->resultset('Accounting::InventoryLocation')->create({
                         sitename => $sitename,
                         name     => 'Default',
                         status   => 'active',
@@ -2161,11 +2243,11 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
 
                 my ($sl, $sl_err);
                 eval {
-                    $sl = $schema->resultset('InventoryStockLevel')->find({
+                    $sl = $schema->resultset('Accounting::InventoryStockLevel')->find({
                         item_id => $line->item_id, location_id => $loc_id
                     });
                     unless ($sl) {
-                        $sl = $schema->resultset('InventoryStockLevel')->create({
+                        $sl = $schema->resultset('Accounting::InventoryStockLevel')->create({
                             item_id           => $line->item_id,
                             location_id       => $loc_id,
                             quantity_on_hand  => 0,
@@ -2186,7 +2268,7 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                 }
 
                 eval {
-                    $schema->resultset('InventoryTransaction')->create({
+                    $schema->resultset('Accounting::InventoryTransaction')->create({
                         item_id          => $line->item_id,
                         location_id      => $loc_id,
                         transaction_type => 'receive',
@@ -2206,7 +2288,7 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
             $c->stash->{_stock_skipped} = $stock_skipped || 0;
 
             if ($invoice->ap_account_id && $invoice->total_amount > 0) {
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     sitename    => $sitename,
                     reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
                     entry_type  => 'AP',
@@ -2276,7 +2358,7 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => ['item'] } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2289,7 +2371,7 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
 
     eval {
         $schema->txn_do(sub {
-            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
+            my $default_loc = $schema->resultset('Accounting::InventoryLocation')->find_or_create(
                 { sitename => $sitename, name => 'Default' },
                 { key => 'sitename_name' }
             );
@@ -2300,7 +2382,7 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
                 my $item_nm = $line->item ? $line->item->name : "item #${\$line->item_id}";
 
                 # Skip if a 'receive' transaction already exists for this item+invoice
-                my $already = $schema->resultset('InventoryTransaction')->search({
+                my $already = $schema->resultset('Accounting::InventoryTransaction')->search({
                     item_id          => $line->item_id,
                     location_id      => $loc_id,
                     transaction_type => 'receive',
@@ -2313,13 +2395,13 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
                     next;
                 }
 
-                my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
+                my $sl = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
                     { item_id => $line->item_id, location_id => $loc_id },
                     { key => 'item_id_location_id' }
                 );
                 $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
 
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     item_id          => $line->item_id,
                     location_id      => $loc_id,
                     transaction_type => 'receive',
@@ -2353,7 +2435,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => 'item' } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2368,7 +2450,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
     # Find AP account: prefer invoice's own, fall back to first COA account starting with '2'
     my $ap_acct_id = $invoice->ap_account_id;
     unless ($ap_acct_id) {
-        my $ap = eval { $schema->resultset('CoaAccount')->search(
+        my $ap = eval { $schema->resultset('Accounting::CoaAccount')->search(
             { accno => { -like => '2%' }, obsolete => 0 },
             { order_by => 'accno', rows => 1 }
         )->single };
@@ -2382,7 +2464,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
 
     eval {
         $schema->txn_do(sub {
-            my $gl = $schema->resultset('GlEntry')->create({
+            my $gl = $schema->resultset('Accounting::GlEntry')->create({
                 sitename    => $sitename,
                 reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
                 entry_type  => 'AP',
@@ -2402,7 +2484,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
             for my $line ($invoice->lines->all) {
                 my $acct_id = $line->account_id;
                 unless ($acct_id) {
-                    my $exp = eval { $schema->resultset('CoaAccount')->search(
+                    my $exp = eval { $schema->resultset('Accounting::CoaAccount')->search(
                         { accno => { -like => '5%' }, obsolete => 0 },
                         { order_by => 'accno', rows => 1 }
                     )->single };
@@ -2421,7 +2503,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
 
             # Payment GL: if invoice is paid, also record DR AP / CR clearing
             if (($invoice->status || '') eq 'paid' && $invoice->total_amount > 0) {
-                my $pay_gl = $schema->resultset('GlEntry')->create({
+                my $pay_gl = $schema->resultset('Accounting::GlEntry')->create({
                     sitename    => $sitename,
                     reference   => 'PAY-' . ($invoice->invoice_number || $invoice->id),
                     entry_type  => 'general',
@@ -2436,7 +2518,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
                     sort_order => 1,
                 });
                 # CR side: find Points/Equity clearing account (3xxx) or use AP account as memo-only
-                my $pts_acct = eval { $schema->resultset('CoaAccount')->search(
+                my $pts_acct = eval { $schema->resultset('Accounting::CoaAccount')->search(
                     { accno => { -like => '3%' }, obsolete => 0 },
                     { order_by => 'accno', rows => 1 }
                 )->single };
@@ -2464,7 +2546,7 @@ sub invoice_view :Path('/Inventory/invoice/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $invoice;
     eval {
-        $invoice = $self->_schema($c)->resultset('InventorySupplierInvoice')->find(
+        $invoice = $self->_schema($c)->resultset('Accounting::InventorySupplierInvoice')->find(
             $id, { prefetch => ['supplier', 'ap_account', 'tax_account', 'shipping_account',
                                 'discount_account', { lines => ['item', 'account', 'location'] }] }
         );
@@ -2484,7 +2566,7 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find($id) };
     unless ($invoice && $invoice->sitename eq $sitename) {
         $c->flash->{error_msg} = 'Invoice not found';
         return $c->res->redirect($c->uri_for('/Inventory/invoice'));
@@ -2523,7 +2605,7 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
 
             # Update the corresponding CSC customer invoice (AR) to paid
             eval {
-                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                my $csc_inv = $schema->resultset('Accounting::InventoryCustomerInvoice')->search({
                     sitename       => 'CSC',
                     invoice_number => $invoice->invoice_number,
                 })->single;
@@ -2539,13 +2621,13 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
             $c->log->warn("CSC AR invoice update failed: $@") if $@;
 
             if ($auto_pay) {
-                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $ha = $schema->resultset('Accounting::HostingAccount')->search({ sitename => $sitename })->single;
                 $ha->update({ auto_pay => 1 }) if $ha;
             }
 
             # Mark paid_at on the hosting_account so CSC dashboard can show it
             eval {
-                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $ha = $schema->resultset('Accounting::HostingAccount')->search({ sitename => $sitename })->single;
                 if ($ha) {
                     my $note = 'PAID:' . $invoice->invoice_number . ':' . DateTime->now->strftime('%Y-%m-%d');
                     my $existing = $ha->notes || '';
@@ -2555,7 +2637,7 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
 
             # Email both CSC and the paying SiteName
             eval {
-                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $ha = $schema->resultset('Accounting::HostingAccount')->search({ sitename => $sitename })->single;
                 my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
                 $notifier->send_invoice_payment_notification($c,
                     invoice_number => $invoice->invoice_number,
@@ -2590,12 +2672,12 @@ sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
 
     if ($confirmed_id) {
         my $inv;
-        eval { $inv = $schema->resultset('InventorySupplierInvoice')->find($confirmed_id) };
+        eval { $inv = $schema->resultset('Accounting::InventorySupplierInvoice')->find($confirmed_id) };
         if ($inv && $inv->sitename eq $sitename && $inv->auto_pay && $inv->status ne 'paid') {
             eval {
                 $inv->update({ status => 'paid', updated_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
 
-                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                my $csc_inv = $schema->resultset('Accounting::InventoryCustomerInvoice')->search({
                     sitename       => 'CSC',
                     invoice_number => $inv->invoice_number,
                 })->single;
@@ -2621,7 +2703,7 @@ sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
     # Show list of auto-pay invoices needing confirmation (past due date)
     my @due_invoices;
     eval {
-        @due_invoices = $schema->resultset('InventorySupplierInvoice')->search(
+        @due_invoices = $schema->resultset('Accounting::InventorySupplierInvoice')->search(
             {
                 sitename => $sitename,
                 auto_pay => 1,
@@ -2657,7 +2739,7 @@ sub invoice_paid_by_shanta :Path('/Inventory/invoice/paid_by_shanta') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find($id) };
     unless ($invoice) {
         $c->flash->{error_msg} = 'Invoice not found';
         return $c->res->redirect($c->uri_for('/Inventory/invoice'));
@@ -2718,7 +2800,7 @@ sub _next_customer_invoice_number {
     my ($self, $c, $sitename) = @_;
     my $count = 0;
     eval {
-        $count = $self->_schema($c)->resultset('InventoryCustomerInvoice')->search(
+        $count = $self->_schema($c)->resultset('Accounting::InventoryCustomerInvoice')->search(
             { sitename => $sitename }
         )->count;
     };
@@ -2731,7 +2813,7 @@ sub customer_invoice_list :Path('/Inventory/sales') :Args(0) {
     my @invoices;
     my $err;
     eval {
-        @invoices = $self->_schema($c)->resultset('InventoryCustomerInvoice')->search(
+        @invoices = $self->_schema($c)->resultset('Accounting::InventoryCustomerInvoice')->search(
             { 'me.sitename' => $sitename },
             { prefetch => ['lines'], order_by => { -desc => 'me.invoice_date' } }
         )->all;
@@ -2753,7 +2835,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
     my $prefill_order;
     if (my $order_id = $c->req->params->{from_order}) {
         eval {
-            $prefill_order = $schema->resultset('InventoryCustomerOrder')->find(
+            $prefill_order = $schema->resultset('Accounting::InventoryCustomerOrder')->find(
                 $order_id, { prefetch => { lines => 'item' } }
             );
         };
@@ -2776,7 +2858,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
                 my $inv_num = $params->{invoice_number}
                     || $self->_next_customer_invoice_number($c, $sitename);
 
-                my $invoice = $schema->resultset('InventoryCustomerInvoice')->create({
+                my $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->create({
                     sitename          => $sitename,
                     customer_order_id => $params->{customer_order_id} || undef,
                     customer_name     => $params->{customer_name},
@@ -2806,7 +2888,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
 
                     my ($inc_id, $cogs_id, $inv_id);
                     if ($l->{item_id}) {
-                        my $item = eval { $schema->resultset('InventoryItem')->find($l->{item_id}) };
+                        my $item = eval { $schema->resultset('Accounting::InventoryItem')->find($l->{item_id}) };
                         if ($item) {
                             $inc_id  = $l->{income_account_id}    || $item->income_accno_id     || undef;
                             $cogs_id = $l->{cogs_account_id}      || $item->expense_accno_id    || undef;
@@ -2843,7 +2925,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -2851,7 +2933,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
 
     my @orders;
     eval {
-        @orders = $schema->resultset('InventoryCustomerOrder')->search(
+        @orders = $schema->resultset('Accounting::InventoryCustomerOrder')->search(
             { sitename => $sitename, status => { -in => ['confirmed', 'pending'] } },
             { order_by => { -desc => 'created_at' } }
         )->all;
@@ -2872,7 +2954,7 @@ sub customer_invoice_view :Path('/Inventory/sales/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $invoice;
     eval {
-        $invoice = $self->_schema($c)->resultset('InventoryCustomerInvoice')->find(
+        $invoice = $self->_schema($c)->resultset('Accounting::InventoryCustomerInvoice')->find(
             $id, { prefetch => ['customer_order', 'ar_account', 'income_account', 'tax_account',
                                 { lines => ['item', 'income_account', 'cogs_account'] }] }
         );
@@ -2893,7 +2975,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
 
     eval {
         $schema->txn_do(sub {
-            my $invoice = $schema->resultset('InventoryCustomerInvoice')->find(
+            my $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->find(
                 $id, { prefetch => { lines => 'item' } }
             );
             die "Invoice not found\n" unless $invoice;
@@ -2924,14 +3006,14 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                 }
 
                 if ($line->item_id) {
-                    my $sold_item = eval { $schema->resultset('InventoryItem')->find($line->item_id) };
+                    my $sold_item = eval { $schema->resultset('Accounting::InventoryItem')->find($line->item_id) };
 
                     if ($sold_item && $sold_item->is_assemblable) {
                         # For assemblable (3D-printed / assembled) items: deduct BOM components
                         # instead of the finished item (printed-on-demand — no finished stock).
                         my $qty_multiplier = $line->quantity || 1;
                         my @bom = eval {
-                            $schema->resultset('InventoryItemBOM')->search(
+                            $schema->resultset('Accounting::InventoryItemBOM')->search(
                                 { parent_item_id => $line->item_id },
                                 { prefetch => 'component_item' }
                             )->all;
@@ -2942,7 +3024,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                                          * $qty_multiplier
                                          * (1 + ($bom_line->scrap_factor || 0));
 
-                            my $comp_sl = $schema->resultset('InventoryStockLevel')->find(
+                            my $comp_sl = $schema->resultset('Accounting::InventoryStockLevel')->find(
                                 { item_id => $bom_line->component_item_id }
                             );
                             if ($comp_sl) {
@@ -2950,7 +3032,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                                 $comp_sl->update({ quantity_on_hand => $new_qty });
                             }
                             my $comp_name = eval { $bom_line->component_item->name } || 'component';
-                            $schema->resultset('InventoryTransaction')->create({
+                            $schema->resultset('Accounting::InventoryTransaction')->create({
                                 item_id          => $bom_line->component_item_id,
                                 sitename         => $sitename,
                                 transaction_type => 'use',
@@ -2967,14 +3049,14 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                         }
                     } else {
                         # Non-assemblable items: deduct finished stock directly
-                        my $sl = $schema->resultset('InventoryStockLevel')->find(
+                        my $sl = $schema->resultset('Accounting::InventoryStockLevel')->find(
                             { item_id => $line->item_id }
                         );
                         if ($sl) {
                             my $new_qty = ($sl->quantity_on_hand || 0) - ($line->quantity || 0);
                             $sl->update({ quantity_on_hand => $new_qty });
                         }
-                        $schema->resultset('InventoryTransaction')->create({
+                        $schema->resultset('Accounting::InventoryTransaction')->create({
                             item_id          => $line->item_id,
                             sitename         => $sitename,
                             transaction_type => 'sell',
@@ -2998,7 +3080,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
             }
 
             if (@gl_lines && $invoice->ar_account_id) {
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     reference   => $invoice->invoice_number,
                     description => 'Sales invoice - ' . $invoice->customer_name,
                     entry_date  => $invoice->invoice_date,
@@ -3008,7 +3090,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                 });
                 for my $l (@gl_lines) {
                     next unless $l->{accno_id};
-                    $schema->resultset('GlEntryLine')->create({
+                    $schema->resultset('Accounting::GlEntryLine')->create({
                         entry_id  => $gl->id,
                         accno_id  => $l->{accno_id},
                         amount    => $l->{amount},
@@ -3021,7 +3103,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
             $invoice->update({ status => 'posted', updated_at => $now });
 
             if ($invoice->customer_order_id) {
-                my $order = $schema->resultset('InventoryCustomerOrder')->find($invoice->customer_order_id);
+                my $order = $schema->resultset('Accounting::InventoryCustomerOrder')->find($invoice->customer_order_id);
                 $order->update({ status => 'completed', updated_at => $now }) if $order;
             }
         });
@@ -3049,7 +3131,7 @@ sub print_label :Path('/Inventory/print/label') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id },
             { prefetch => 'stock_levels' }
         );
@@ -3062,7 +3144,7 @@ sub print_label :Path('/Inventory/print/label') :Args(1) {
 
     my @locations;
     eval {
-        @locations = $schema->resultset('InventoryLocation')->search(
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search(
             { sitename => $sitename, status => 'active' },
             { columns => ['id','name'], order_by => 'name' }
         )->all;
@@ -3096,14 +3178,14 @@ sub print_labels_multi :Path('/Inventory/print/labels') :Args(0) {
 
     if (@item_ids) {
         eval {
-            @items = $schema->resultset('InventoryItem')->search(
+            @items = $schema->resultset('Accounting::InventoryItem')->search(
                 { id => { -in => \@item_ids }, sitename => $sitename },
                 { order_by => ['category','name'] }
             )->all;
         };
     } else {
         eval {
-            @items = $schema->resultset('InventoryItem')->search(
+            @items = $schema->resultset('Accounting::InventoryItem')->search(
                 { sitename => $sitename, status => 'active' },
                 { order_by => ['category','name'] }
             )->all;
@@ -3133,7 +3215,7 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
     eval {
         my %search = (sitename => $sitename, status => 'active');
         $search{category} = $category if $category;
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%search,
             {
                 prefetch => 'stock_levels',
@@ -3164,7 +3246,7 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
 
     my @categories;
     eval {
-        my @cat_rows = $schema->resultset('InventoryItem')->search(
+        my @cat_rows = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', category => { '!=' => undef } },
             { columns => ['category'], distinct => 1, order_by => 'category' }
         )->all;
@@ -3193,7 +3275,7 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id },
             { prefetch => [
                 { 'bom_components' => 'component_item' },
@@ -3274,7 +3356,7 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
     my @log;
     for my $f (@filaments) {
         my $exists = eval {
-            $schema->resultset('InventoryItem')->search({
+            $schema->resultset('Accounting::InventoryItem')->search({
                 sitename => $target_site,
                 sku      => $f->{sku},
             })->count;
@@ -3300,7 +3382,7 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
                 updated_at      => $now,
             );
             eval { $row{description} = $f->{brand} . ' filament for 3D printing. 1kg spool.' };
-            $schema->resultset('InventoryItem')->create(\%row);
+            $schema->resultset('Accounting::InventoryItem')->create(\%row);
         };
         if ($@) {
             push @log, "$f->{sku}: ERROR — $@";
@@ -3311,6 +3393,565 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
     }
 
     my $summary = "Filament seed complete for sitename=$target_site: $created created, $skipped skipped.";
+    $c->stash(
+        seed_log  => \@log,
+        summary   => $summary,
+        sitename  => $target_site,
+        template  => 'Inventory/seed_result.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Brew / Brewhouse starter catalog (ingredients + sample prices + example BOM)
+# Idempotent. Safe to re-run. Used for brew.addon sites including the
+# brew.computersystemconsulting.ca example.
+#
+# This (plus the accounting DB provisioned from accounting_template.sql)
+# serves as the reusable "accounting + BOMs" template for any new user/site
+# that enables the Brew addon.
+#
+# Recipes remain separate: real legacy recipes (Gambrinus and others) are
+# visible in /brew/recipes and the import preview. New users/sites can
+# browse and selectively import the ones they want rather than having
+# everything auto-included in their working set.
+# -------------------------------------------------------------------------
+sub seed_brew_ingredients :Path('/Inventory/seed_brew_ingredients') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+    my $roles    = $c->session->{roles} // [];
+    my $is_admin = ref($roles) eq 'ARRAY'
+        ? (grep { /admin/i } @$roles)
+        : ($roles =~ /admin/i);
+    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Admin access required for seeding brew catalog.';
+        return $c->res->redirect($c->uri_for('/Inventory'));
+    }
+
+    my $target_site = $c->req->query_parameters->{sitename} || $self->_sitename($c) || 'Brew';
+    my $schema = $self->_schema($c);
+    my $now    = $self->_now();
+    my $by     = $c->session->{username} || 'system';
+
+    # Declare early so legacy import code (which runs before the hard-coded list)
+    # and the rest of the function can safely push to @log and use the counters.
+    my @log;
+    my ($created, $skipped, $bom_created) = (0, 0, 0);
+    my $legacy_imported = 0;
+
+    # -----------------------------------------------------------------
+    # Affiliate suppliers only (those with which we have an affiliate relationship).
+    # These are B2B: limited public access, pallet shipment preferred,
+    # pickup not open to all. Users will source their own suppliers locally.
+    # -----------------------------------------------------------------
+    my @affiliate_suppliers = (
+        {
+            name         => 'Gambrinus Malting',
+            contact_name => 'Sales / Export',
+            email        => 'sales@gambrinus-malt.example',
+            phone        => '+420-XXX-XXX-XXX',
+            website      => 'https://www.gambrinus-malt.example',
+            address      => 'Czech Republic (EU)',
+            lead_time_days => 14,
+            notes        => 'AFFILIATE PARTNER. Premium Czech Pilsner malt specialist (Gambrinus). ' .
+                            'B2B only — pallet quantities strongly preferred for shipment. ' .
+                            'Limited public / retail access. Pickup not available to general customers. ' .
+                            'New users should source local malt equivalents.',
+        },
+        {
+            name         => 'Bohemian Noble Hops',
+            contact_name => 'Export Sales',
+            email        => 'export@bohemian-hops.example',
+            website      => 'https://bohemian-hops.example',
+            address      => 'Czech Republic (EU)',
+            lead_time_days => 10,
+            notes        => 'AFFILIATE PARTNER. Classic noble hops (Saaz etc.). ' .
+                            'Pallet / bulk shipments preferred. Not a retail supplier. ' .
+                            'Limited public access.',
+        },
+    );
+
+    my %supplier_id_for_name;
+    for my $sup (@affiliate_suppliers) {
+        eval {
+            my $rec = $schema->resultset('Accounting::InventorySupplier')->find_or_create({
+                sitename => $target_site,
+                name     => $sup->{name},
+            });
+            if ($rec) {
+                # Update key fields if missing or to refresh affiliate notes
+                $rec->update({
+                    contact_name   => $sup->{contact_name},
+                    email          => $sup->{email},
+                    phone          => $sup->{phone},
+                    website        => $sup->{website},
+                    address        => $sup->{address},
+                    lead_time_days => $sup->{lead_time_days},
+                    notes          => $sup->{notes},
+                    status         => 'active',
+                    updated_at     => $now,
+                }) if !$rec->notes || $rec->notes !~ /AFFILIATE PARTNER/;
+                $supplier_id_for_name{ $sup->{name} } = $rec->id;
+                push @log, "AFFILIATE SUPPLIER: $sup->{name} (id=$rec->id)";
+            }
+        };
+        if ($@) {
+            push @log, "AFFILIATE SUPPLIER ERROR for $sup->{name}: $@";
+        }
+    }
+
+    # -----------------------------------------------------------------
+    # Legacy Forager data is the real source for this historical brewery.
+    # Grains, ingredients etc. that were actually in stock at the time of
+    # the brews live in brew_item_list_tb (the master catalog) and are
+    # referenced from brew_ingrediant_tb in the recipes.
+    #
+    # We prefer to seed the modern inventory_items (and thus the accounting
+    # + BOM side) from the actual Forager legacy tables when they exist for
+    # the site (especially the demo brew.computersystemconsulting.ca).
+    # This gives authentic historical stock instead of purely invented data.
+    #
+    # The hard-coded list (further down) serves as:
+    #   1. A clean, generic "Brew starter template" (with sample prices +
+    #      example BOMs) for brand new users/sites that enable the Brew
+    #      addon and have no legacy Forager data.
+    #   2. A fallback / supplement of very common items.
+    #
+    # IMPORTANT (per requirements):
+    # - Seeding remains an explicit ADMIN DECISION only (button or CLI).
+    #   New users with brew+accounting addons get the schema ready but no
+    #   pre-populated catalog. Admin decides when to seed the template.
+    # - Only suppliers with which "we" have an affiliate relationship are
+    #   included in the seed data.
+    # - These are B2B suppliers: limited public access, prefer pallet-sized
+    #   orders for shipment. Pickup is not open to the general public.
+    #   Users will source their own local suppliers.
+    # - Example: Gambrinus is included as a maltster (affiliate malt supplier).
+    #
+    # This satisfies the original requirement: the accounting/BOM/ingredient
+    # part is a reusable template for new brew addon users, while the real
+    # recipes remain visible and opt-in via the /brew UI and import tools.
+    # -----------------------------------------------------------------
+    eval {
+        my $forager = eval { $c->model('DBForager') };
+        if ($forager && $forager->can('schema')) {
+            my $fs = $forager->schema;
+
+            # Master catalog from Forager (what was actually stocked)
+            my $rs = $fs->resultset('Brew::ItemList')->search({ sitename => $target_site });
+            while (my $f = $rs->next) {
+                my $name = $f->name || 'Legacy Ingredient';
+                my $code = $f->item_code || '';
+                my $sku  = $code ? $code : 'BREW-' . uc( ($name =~ s/\W+/-/gr) );
+                $sku = substr($sku, 0, 40);
+
+                my $exists = $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $target_site, sku => $sku
+                })->count;
+                next if $exists;
+
+                # Legacy Forager has no price/cost fields. We assign starter samples
+                # (this is where "gambrinas prices" etc. get applied). User can tune.
+                my $cost = 3.20;
+                my $price = 5.10;
+                my $lname = lc($name);
+                if ($lname =~ /malt|grain|barley|wheat|rye|oat|flaked|torrified/) { $cost = 2.80; $price = 4.50; }
+                if ($lname =~ /crystal|caramel|special b|biscuit|victory|honey|melanoidin/) { $cost = 4.10; $price = 6.45; }
+                if ($lname =~ /roast|chocolate|black|patent|carapils|dextrin/) { $cost = 4.60; $price = 7.20; }
+                if ($lname =~ /hop/) { $cost = 6.80; $price = 9.60; }
+                if ($lname =~ /yeast/) { $cost = 3.40; $price = 4.90; }
+
+                $schema->resultset('Accounting::InventoryItem')->create({
+                    sitename            => $target_site,
+                    sku                 => $sku,
+                    name                => $name,
+                    description         => $f->description || $f->comments || 'Imported from legacy Forager brew_item_list_tb — actual items in stock at the time of the historical brews.',
+                    category            => 'Brew - Ingredient (Historical)',
+                    item_origin         => 'purchased',
+                    unit_of_measure     => 'kg',   # dominant unit in the old data; fix per item in UI
+                    unit_cost           => $cost,
+                    unit_price          => $price,
+                    status              => 'active',
+                    reorder_point       => 1,
+                    reorder_quantity    => 3,
+                    notes               => 'Seeded from the real Forager legacy catalog (ingredients that were in stock and used in the recipes). Prices are starter values — adjust for Gambrinus etc. as needed.',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 0,
+                    list_in_marketplace => 0,
+                    accepts_points      => 0,
+                    is_consumable       => 1,
+                    is_reusable         => 0,
+                    created_by          => $by,
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+                $legacy_imported++;
+                push @log, "FROM FORAGER: $sku — $name";
+            }
+
+            # Also pull unique ingredients that appear in actual recipes (brew_ingrediant_tb)
+            # even if they weren't in the master item_list. This captures the full set
+            # of grains etc. that were in stock at the time of each brew.
+            my %seen;
+            my $ing_rs = $fs->resultset('Brew::Ingredient')->search({ sitename => $target_site });
+            while (my $ing = $ing_rs->next) {
+                my $name = $ing->ingrediant_name;
+                next unless $name;
+                my $key = lc($name);
+                next if $seen{$key}++;
+
+                # Avoid near-duplicates
+                my $exists = $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $target_site,
+                    -or => [
+                        { name => { like => '%' . $name . '%' } },
+                        { sku  => { like => '%' . $name . '%' } },
+                    ]
+                })->count;
+                next if $exists;
+
+                my $sku = 'BREW-ING-' . uc( substr( ($name =~ s/\W+/-/gr), 0, 12) );
+                my $cost = 3.30;
+                my $price = 5.20;
+                my $lname = lc($name);
+                if ($lname =~ /malt|grain|barley|wheat|rye|oat|flaked/) { $cost = 2.85; $price = 4.55; }
+                if ($lname =~ /crystal|caramel|roast|chocolate|hop|yeast/) { $cost = 4.50; $price = 6.80; }
+
+                $schema->resultset('Accounting::InventoryItem')->create({
+                    sitename            => $target_site,
+                    sku                 => $sku,
+                    name                => $name,
+                    description         => 'Imported from brew_ingrediant_tb — actually used in historical recipes (was in stock at brew time).',
+                    category            => 'Brew - Ingredient (Historical)',
+                    item_origin         => 'purchased',
+                    unit_of_measure     => $ing->unit || 'kg',
+                    unit_cost           => $cost,
+                    unit_price          => $price,
+                    status              => 'active',
+                    notes               => 'Pulled from recipe ingredient lines in legacy Forager. Real stock used in the brews.',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 0,
+                    list_in_marketplace => 0,
+                    accepts_points      => 0,
+                    is_consumable       => 1,
+                    is_reusable         => 0,
+                    created_by          => $by,
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+                $legacy_imported++;
+                push @log, "FROM RECIPE LINES: $name";
+            }
+        }
+    };
+    if ($@) {
+        push @log, "Legacy Forager import attempt had error (will fall back): $@";
+    } elsif ($legacy_imported > 0) {
+        push @log, "Imported $legacy_imported real historical items from Forager (brew_item_list_tb + recipe ingredients)";
+    } else {
+        push @log, "No Forager legacy catalog rows for this sitename — using hard-coded generic Brew starter template below";
+    }
+
+    # Ensure a minimal usable COA for this sitename so price/account fields and forms work.
+    # We create site-scoped rows (even though global accno unique exists, we rely on
+    # the loader fallback + these being additional or the seed having run).
+    my @brew_coa = (
+        { accno => '1200', description => 'Inventory Asset (Brew)',          category => 'A' },
+        { accno => '4000', description => 'Sales Revenue (Brew)',            category => 'I' },
+        { accno => '4100', description => 'Sales Returns & Allowances',      category => 'I', is_contra => 1 },
+        { accno => '5000', description => 'Cost of Goods Sold (Brew)',       category => 'E' },
+        { accno => '5100', description => 'Purchases - Brewing Ingredients', category => 'E' },
+        { accno => '6205', description => 'Brew Supplies & Materials',       category => 'E' },
+        { accno => '4235', description => 'Brew / Beer Sales',               category => 'I' },
+    );
+
+    for my $a (@brew_coa) {
+        eval {
+            my $existing = $schema->resultset('Accounting::CoaAccount')->find({ accno => $a->{accno} });
+            if ($existing) {
+                # Ensure this sitename sees it (if the row is global or we want override)
+                if (!$existing->sitename || $existing->sitename eq '') {
+                    # leave global as-is; loader will pick it up
+                }
+            } else {
+                $schema->resultset('Accounting::CoaAccount')->create({
+                    accno       => $a->{accno},
+                    description => $a->{description},
+                    category    => $a->{category},
+                    is_contra   => $a->{is_contra} || 0,
+                    obsolete    => 0,
+                    sitename    => $target_site,
+                    created_at  => $now,
+                    updated_at  => $now,
+                });
+            }
+        };
+    }
+
+    # Core brew ingredient catalog with sample costs/prices.
+    # Prices are realistic placeholders (CAD-ish) for the brew.example site.
+    # This is an expanded historical-style starter set (more grains to better reflect
+    # what a real brewhouse carried even back in the early 2000s). Adjust prices,
+    # add your exact lots, or extend the list via the Inventory UI.
+    #
+    # "Gambrinus" style Czech ingredients kept prominent.
+    my @brew_items = (
+        # === GRAINS (much expanded base + specialty + flaked to match real brewery stock) ===
+        # Base malts (kg)
+        { sku => 'BREW-GRAIN-PALE2',    name => 'Pale 2-Row Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 2.85, price => 4.50, desc => 'Workhorse base malt for ales and lagers.' },
+        { sku => 'BREW-GRAIN-PALE6',    name => 'Pale 6-Row Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 2.65, price => 4.20, desc => 'Traditional US base, higher enzyme content.' },
+        { sku => 'BREW-GRAIN-PILS',     name => 'Pilsner Malt (Gambrinus)',         category => 'Brew - Grain', unit => 'kg', cost => 2.95, price => 4.75, desc => 'Premium Czech Pilsner malt - key for Gambrinus-style lagers and classic pils.' },
+        { sku => 'BREW-GRAIN-MARIS',    name => 'Maris Otter Pale Ale Malt',        category => 'Brew - Grain', unit => 'kg', cost => 3.35, price => 5.35, desc => 'Premium English base malt, rich biscuit flavor.' },
+        { sku => 'BREW-GRAIN-GOLDEN',   name => 'Golden Promise Pale Malt',         category => 'Brew - Grain', unit => 'kg', cost => 3.20, price => 5.10, desc => 'Scottish-style base, excellent for session beers.' },
+        { sku => 'BREW-GRAIN-VIENNA',   name => 'Vienna Malt',                      category => 'Brew - Grain', unit => 'kg', cost => 3.10, price => 4.95, desc => 'Toasty, malty base for Vienna lagers and Märzen.' },
+        { sku => 'BREW-GRAIN-MUN-L',    name => 'Munich Light Malt',                category => 'Brew - Grain', unit => 'kg', cost => 3.15, price => 5.05, desc => 'Light Munich for subtle maltiness.' },
+        { sku => 'BREW-GRAIN-MUN',      name => 'Munich Malt',                      category => 'Brew - Grain', unit => 'kg', cost => 3.25, price => 5.25, desc => 'Rich malty character for Oktoberfest, bocks, amber lagers.' },
+        { sku => 'BREW-GRAIN-MUN-D',    name => 'Munich Dark Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 3.40, price => 5.45, desc => 'Darker Munich for deeper color and malt.' },
+        { sku => 'BREW-GRAIN-WHEAT-W',  name => 'White Wheat Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 3.40, price => 5.40, desc => 'For hefeweizen, witbier, and hazy IPAs.' },
+        { sku => 'BREW-GRAIN-WHEAT-R',  name => 'Red Wheat Malt',                   category => 'Brew - Grain', unit => 'kg', cost => 3.50, price => 5.55, desc => 'Deeper color wheat for wheat ales and lambics.' },
+        { sku => 'BREW-GRAIN-RYE',      name => 'Rye Malt',                         category => 'Brew - Grain', unit => 'kg', cost => 3.65, price => 5.80, desc => 'Spicy, dry character for rye IPAs and Roggenbiers.' },
+
+        # Crystal / Caramel / Specialty malts (kg)
+        { sku => 'BREW-GRAIN-CARA-P',   name => 'Carapils / Dextrin Malt',          category => 'Brew - Grain', unit => 'kg', cost => 3.80, price => 5.95, desc => 'Adds body and head retention without color.' },
+        { sku => 'BREW-GRAIN-C10',      name => 'Crystal 10L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 3.90, price => 6.10, desc => 'Light caramel, subtle sweetness.' },
+        { sku => 'BREW-GRAIN-C20',      name => 'Crystal 20L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.00, price => 6.25, desc => 'Light toffee caramel.' },
+        { sku => 'BREW-GRAIN-C40',      name => 'Crystal 40L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.05, price => 6.35, desc => 'Medium caramel, golden toffee notes.' },
+        { sku => 'BREW-GRAIN-C60',      name => 'Crystal 60L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.10, price => 6.50, desc => 'Caramel sweetness and color. Common in English and American ales.' },
+        { sku => 'BREW-GRAIN-C80',      name => 'Crystal 80L Malt',                 category => 'Brew - Grain', unit => 'kg', cost => 4.20, price => 6.65, desc => 'Rich caramel, dried fruit, deeper color.' },
+        { sku => 'BREW-GRAIN-C120',     name => 'Crystal 120L Malt',                category => 'Brew - Grain', unit => 'kg', cost => 4.35, price => 6.90, desc => 'Dark caramel, toffee, raisin, burnt sugar.' },
+        { sku => 'BREW-GRAIN-SPEC-B',   name => 'Special B Malt',                   category => 'Brew - Grain', unit => 'kg', cost => 4.80, price => 7.50, desc => 'Belgian specialty - intense raisin, plum, dark fruit.' },
+        { sku => 'BREW-GRAIN-BISC',     name => 'Biscuit Malt',                     category => 'Brew - Grain', unit => 'kg', cost => 4.15, price => 6.55, desc => 'Toasty, biscuit, bread crust character.' },
+        { sku => 'BREW-GRAIN-VIC',      name => 'Victory Malt',                     category => 'Brew - Grain', unit => 'kg', cost => 4.10, price => 6.45, desc => 'Nutty, toasty, biscuit-like (US Victory style).' },
+        { sku => 'BREW-GRAIN-HONEY',    name => 'Honey Malt',                       category => 'Brew - Grain', unit => 'kg', cost => 4.25, price => 6.70, desc => 'Sweet, honey-like, golden color.' },
+        { sku => 'BREW-GRAIN-MELANO',   name => 'Melanoidin Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 4.30, price => 6.80, desc => 'Red-brown color, intense malty aroma.' },
+        { sku => 'BREW-GRAIN-ACID',     name => 'Acidulated Malt',                  category => 'Brew - Grain', unit => 'kg', cost => 4.50, price => 7.10, desc => 'Lowers mash pH naturally (sauermalz style).' },
+
+        # Roasted / Dark malts (kg)
+        { sku => 'BREW-GRAIN-CHOC',     name => 'Chocolate Malt',                   category => 'Brew - Grain', unit => 'kg', cost => 4.90, price => 7.75, desc => 'Roasty chocolate, coffee notes for stouts and porters.' },
+        { sku => 'BREW-GRAIN-BLACK',    name => 'Black (Patent) Malt',              category => 'Brew - Grain', unit => 'kg', cost => 5.20, price => 8.00, desc => 'Roasty color and dryness for stouts and porters.' },
+        { sku => 'BREW-GRAIN-ROAST',    name => 'Roasted Barley',                   category => 'Brew - Grain', unit => 'kg', cost => 4.75, price => 7.50, desc => 'Dry, coffee-like roast for Irish stouts and porters.' },
+
+        # Flaked / Unmalted grains & adjuncts (kg) - very common in real brewhouses
+        { sku => 'BREW-GRAIN-FLAKE-B',  name => 'Flaked Barley',                    category => 'Brew - Grain', unit => 'kg', cost => 2.70, price => 4.30, desc => 'Adds body and head; common in stouts.' },
+        { sku => 'BREW-GRAIN-FLAKE-O',  name => 'Flaked Oats',                      category => 'Brew - Grain', unit => 'kg', cost => 2.85, price => 4.55, desc => 'Silky mouthfeel for oatmeal stouts and hazy beers.' },
+        { sku => 'BREW-GRAIN-FLAKE-W',  name => 'Flaked Wheat',                     category => 'Brew - Grain', unit => 'kg', cost => 2.75, price => 4.40, desc => 'Head retention and haze for witbiers and hazy IPAs.' },
+        { sku => 'BREW-GRAIN-FLAKE-R',  name => 'Flaked Rye',                       category => 'Brew - Grain', unit => 'kg', cost => 3.05, price => 4.85, desc => 'Spicy character for rye beers.' },
+        { sku => 'BREW-GRAIN-TORR-W',   name => 'Torrified Wheat',                  category => 'Brew - Grain', unit => 'kg', cost => 2.90, price => 4.60, desc => 'Pre-gelatinized wheat for better head and body.' },
+
+        # === HOPS (per 100g) ===
+        { sku => 'BREW-HOP-SAAZ-100',   name => 'Saaz Hops (100g)',                 category => 'Brew - Hop',   unit => '100g', cost => 6.75, price => 9.50, desc => 'Classic Czech noble hop. Spicy, floral. Essential for Gambrinus Pilsner.' },
+        { sku => 'BREW-HOP-HALL-100',   name => 'Hallertau Mittelfrüh (100g)',      category => 'Brew - Hop',   unit => '100g', cost => 7.10, price => 9.95, desc => 'Noble German hop for lagers and German ales.' },
+        { sku => 'BREW-HOP-CASC-100',   name => 'Cascade Hops (100g)',              category => 'Brew - Hop',   unit => '100g', cost => 5.80, price => 8.25, desc => 'American classic - citrus, pine. APA and IPA workhorse.' },
+        { sku => 'BREW-HOP-CENT-100',   name => 'Centennial Hops (100g)',           category => 'Brew - Hop',   unit => '100g', cost => 6.40, price => 8.95, desc => 'Dual purpose - floral/citrus. Strong in many US IPAs.' },
+        { sku => 'BREW-HOP-FUG-100',    name => 'Fuggles Hops (100g)',              category => 'Brew - Hop',   unit => '100g', cost => 6.20, price => 8.75, desc => 'Earthy, woody English hop for bitters and porters.' },
+        { sku => 'BREW-HOP-EKG-100',    name => 'East Kent Goldings (100g)',        category => 'Brew - Hop',   unit => '100g', cost => 6.50, price => 9.10, desc => 'Classic English hop - spicy, earthy, floral.' },
+        { sku => 'BREW-HOP-NOR-100',    name => 'Northern Brewer (100g)',           category => 'Brew - Hop',   unit => '100g', cost => 5.95, price => 8.40, desc => 'Versatile bittering hop with minty/herbal notes.' },
+
+        # === YEAST ===
+        { sku => 'BREW-YEAST-SAFALE',   name => 'Safale US-05 Dry Yeast (11.5g)',   category => 'Brew - Yeast', unit => 'each', cost => 3.25, price => 4.75, desc => 'Clean American ale yeast. Workhorse for many recipes.' },
+        { sku => 'BREW-YEAST-S-04',     name => 'Safale S-04 Dry Yeast (11.5g)',    category => 'Brew - Yeast', unit => 'each', cost => 3.35, price => 4.85, desc => 'English ale yeast - good flocculation, malty profile.' },
+        { sku => 'BREW-YEAST-W34-70',   name => 'W-34/70 Lager Yeast (11.5g)',      category => 'Brew - Yeast', unit => 'each', cost => 4.10, price => 5.95, desc => 'Classic German lager strain. Great for Pils, Gambrinus-style.' },
+        { sku => 'BREW-YEAST-NOTTY',    name => 'Nottingham Ale Yeast (11.5g)',     category => 'Brew - Yeast', unit => 'each', cost => 3.45, price => 4.95, desc => 'Versatile English strain, clean and reliable.' },
+        { sku => 'BREW-YEAST-SAFE-L',   name => 'SafLager W-34/70 (11.5g)',         category => 'Brew - Yeast', unit => 'each', cost => 4.20, price => 6.10, desc => 'Dry version of the classic lager yeast.' },
+
+        # === ADJUNCTS / FININGS / WATER / PACKAGING ===
+        { sku => 'BREW-ADJ-DEXT-1',     name => 'Dextrose (Corn Sugar) 1kg',        category => 'Brew - Adjunct', unit => 'kg',  cost => 3.80, price => 5.50, desc => 'Lightens body, boosts ABV. Used in many Belgian and American styles.' },
+        { sku => 'BREW-ADJ-IRISH',      name => 'Irish Moss (50g)',                 category => 'Brew - Adjunct', unit => 'each', cost => 2.90, price => 4.25, desc => 'Natural fining agent for clearer beer.' },
+        { sku => 'BREW-ADJ-GYPSUM',     name => 'Brewing Gypsum (Calcium Sulfate) 500g', category => 'Brew - Adjunct', unit => 'each', cost => 4.50, price => 6.75, desc => 'Water adjustment for hop-forward and pale beers.' },
+        { sku => 'BREW-ADJ-CACL',       name => 'Calcium Chloride 500g',            category => 'Brew - Adjunct', unit => 'each', cost => 4.20, price => 6.40, desc => 'Water treatment for maltier, fuller beers.' },
+        { sku => 'BREW-PKG-CAP-100',    name => 'Crown Caps (100 count)',           category => 'Brew - Packaging', unit => 'each', cost => 4.25, price => 6.50, desc => 'Standard pry-off caps.' },
+        { sku => 'BREW-PKG-BOTTLE-12',  name => '500ml Amber Bottles (case/12)',    category => 'Brew - Packaging', unit => 'case', cost => 9.50, price => 14.00, desc => 'Recappable long-neck bottles.' },
+    );
+
+    # Create / update items
+    for my $item (@brew_items) {
+        my $exists = eval {
+            $schema->resultset('Accounting::InventoryItem')->search({
+                sitename => $target_site,
+                sku      => $item->{sku},
+            })->count;
+        } // 0;
+
+        if ($exists) {
+            # Update prices/cost if they were zero or to refresh sample values
+            eval {
+                my $rec = $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $target_site, sku => $item->{sku}
+                })->first;
+                if ($rec) {
+                    my $changed = 0;
+                    if (!defined $rec->unit_cost || $rec->unit_cost == 0) {
+                        $rec->unit_cost($item->{cost});
+                        $changed = 1;
+                    }
+                    if (!defined $rec->unit_price || $rec->unit_price == 0) {
+                        $rec->unit_price($item->{price});
+                        $changed = 1;
+                    }
+                    if ($changed) {
+                        $rec->updated_at($now);
+                        $rec->update;
+                        push @log, "$item->{sku}: updated prices";
+                    } else {
+                        push @log, "$item->{sku}: skipped (exists with prices)";
+                        $skipped++;
+                    }
+                }
+            };
+            next;
+        }
+
+        eval {
+            my %row = (
+                sitename            => $target_site,
+                sku                 => $item->{sku},
+                name                => $item->{name},
+                description         => $item->{desc},
+                category            => $item->{category},
+                item_origin         => 'purchased',
+                is_assemblable      => 0,
+                unit_of_measure     => $item->{unit},
+                unit_cost           => $item->{cost},
+                unit_price          => $item->{price},
+                status              => 'active',
+                reorder_point       => 2,
+                reorder_quantity    => 5,
+                notes               => 'Brew starter catalog seed. Adjust costs/prices for your market.',
+                show_in_shop        => 0,
+                hide_stock_count    => 0,
+                list_in_marketplace => 0,
+                accepts_points      => 0,
+                is_consumable       => 1,   # raw brewing ingredients are consumed
+                is_reusable         => 0,
+                created_by          => $by,
+                created_at          => $now,
+                updated_at          => $now,
+            );
+            $schema->resultset('Accounting::InventoryItem')->create(\%row);
+            push @log, "$item->{sku}: created (cost=$item->{cost}, price=$item->{price})";
+            $created++;
+        };
+        if ($@) {
+            push @log, "$item->{sku}: ERROR — $@";
+        }
+    }
+
+    # -----------------------------------------------------------------
+    # Link key items to our affiliate suppliers (only those with affiliate
+    # relationships). This demonstrates the B2B pallet-focused supply chain
+    # in the seed data. Gambrinus maltster is the canonical example.
+    # -----------------------------------------------------------------
+    eval {
+        # Gambrinus Pilsner Malt from affiliate maltster
+        my $malt_item = $schema->resultset('Accounting::InventoryItem')->find({
+            sitename => $target_site, sku => 'BREW-GRAIN-PILS'
+        });
+        my $gambrinus_sup = $supplier_id_for_name{'Gambrinus Malting'};
+        if ($malt_item && $gambrinus_sup) {
+            $schema->resultset('Accounting::InventoryItemSupplier')->update_or_create({
+                item_id      => $malt_item->id,
+                supplier_id  => $gambrinus_sup,
+                supplier_sku => 'PILS-GAM-25KG',
+                unit_cost    => 2.95,
+                is_preferred => 1,
+                notes        => 'Affiliate maltster. Pallet (approx 1 tonne) preferred. Limited public access.',
+            });
+            push @log, "LINK: BREW-GRAIN-PILS → Gambrinus Malting (affiliate, preferred)";
+        }
+
+        # Saaz hops from affiliate hops supplier
+        my $hop_item = $schema->resultset('Accounting::InventoryItem')->find({
+            sitename => $target_site, sku => 'BREW-HOP-SAAZ-100'
+        });
+        my $hops_sup = $supplier_id_for_name{'Bohemian Noble Hops'};
+        if ($hop_item && $hops_sup) {
+            $schema->resultset('Accounting::InventoryItemSupplier')->update_or_create({
+                item_id      => $hop_item->id,
+                supplier_id  => $hops_sup,
+                supplier_sku => 'SAAZ-100G',
+                unit_cost    => 6.75,
+                is_preferred => 1,
+                notes        => 'Affiliate noble hops supplier. Pallet orders preferred. B2B only.',
+            });
+            push @log, "LINK: BREW-HOP-SAAZ-100 → Bohemian Noble Hops (affiliate, preferred)";
+        }
+    };
+    if ($@) {
+        push @log, "AFFILIATE ITEM-SUPPLIER LINK ERROR: $@";
+    }
+
+    # Create one example BOM / kit to demonstrate accounting + BOMs for brew
+    eval {
+        my $kit_sku = 'BREW-KIT-PALE-19L';
+        my $kit = $schema->resultset('Accounting::InventoryItem')->find({
+            sitename => $target_site, sku => $kit_sku
+        });
+        if (!$kit) {
+            $kit = $schema->resultset('Accounting::InventoryItem')->create({
+                sitename            => $target_site,
+                sku                 => $kit_sku,
+                name                => 'Demo 19L Pale Ale Brew Kit',
+                description         => 'Example assemblable BOM for a standard pale ale batch. Shows how brew recipes can map to inventory costing/BOM when Accounting is enabled.',
+                category            => 'Brew - Kit',
+                item_origin         => 'crafted',
+                is_assemblable      => 1,
+                unit_of_measure     => 'batch',
+                unit_cost           => 18.50,   # will be recalculated from components in UI
+                unit_price          => 28.00,
+                status              => 'active',
+                show_in_shop        => 0,
+                hide_stock_count    => 0,
+                list_in_marketplace => 0,
+                accepts_points      => 0,
+                is_consumable       => 0,
+                is_reusable         => 0,
+                created_by          => $by,
+                created_at          => $now,
+                updated_at          => $now,
+            });
+            push @log, "$kit_sku: created as assemblable kit";
+        }
+
+        # Link several components as an example BOM (now using more of the expanded grain list)
+        my @components = (
+            { sku => 'BREW-GRAIN-PALE2',  qty => 4.0,  unit => 'kg' },
+            { sku => 'BREW-GRAIN-MUN',    qty => 0.75, unit => 'kg' },
+            { sku => 'BREW-GRAIN-C60',    qty => 0.4,  unit => 'kg' },
+            { sku => 'BREW-GRAIN-CARA-P', qty => 0.3,  unit => 'kg' },
+            { sku => 'BREW-HOP-SAAZ-100', qty => 2.0,  unit => '100g' },
+            { sku => 'BREW-YEAST-W34-70', qty => 1,    unit => 'each' },
+        );
+
+        for my $comp (@components) {
+            my $comp_item = $schema->resultset('Accounting::InventoryItem')->find({
+                sitename => $target_site, sku => $comp->{sku}
+            });
+            next unless $comp_item;
+
+            $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
+                parent_item_id    => $kit->id,
+                component_item_id => $comp_item->id,
+                quantity          => $comp->{qty},
+                unit              => $comp->{unit},
+                is_optional       => 0,
+                sort_order        => 10,
+                notes             => 'Brew starter BOM example',
+                created_at        => $now,
+                updated_at        => $now,
+            });
+            $bom_created++;
+        }
+    };
+    if ($@) {
+        push @log, "BOM kit: ERROR — $@";
+    } else {
+        push @log, "Example brew BOM kit created/updated with $bom_created component lines";
+    }
+
+    my $summary = "Brew ingredients seed for sitename=$target_site: $created created, $skipped skipped/updated, BOM lines: $bom_created.";
+    if ($legacy_imported) {
+        $summary .= " (plus $legacy_imported items imported from real Forager legacy data)";
+    }
     $c->stash(
         seed_log  => \@log,
         summary   => $summary,
@@ -3589,7 +4230,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
 
     eval {
         $schema->txn_do(sub {
-            my $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+            my $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
                 { item_id => $item_id, location_id => ($loc_id || \'NULL') },
                 { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
             ) if $loc_id;
@@ -3604,12 +4245,12 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                 $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
             }
 
-            my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+            my $item_rec = $schema->resultset('Accounting::InventoryItem')->find($item_id);
             if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
                 my $unit_cost = $params->{unit_cost} || $item_rec->unit_cost || 0;
                 my $value     = $qty * $unit_cost;
                 my $ref       = 'API-TXN-' . $item_id . '-' . time();
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     reference   => $ref,
                     description => ucfirst($type) . ' (API): ' . ($item_rec->name || "Item $item_id") . " x$qty",
                     entry_type  => 'inventory',
@@ -3631,7 +4272,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                         $cr_acct = $item_rec->inventory_accno_id;
                     }
                     if ($dr_acct) {
-                        $schema->resultset('GlEntryLine')->create({
+                        $schema->resultset('Accounting::GlEntryLine')->create({
                             gl_entry_id => $gl_entry_id,
                             account_id  => $dr_acct,
                             amount      => $value,
@@ -3640,7 +4281,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                         });
                     }
                     if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
-                        $schema->resultset('GlEntryLine')->create({
+                        $schema->resultset('Accounting::GlEntryLine')->create({
                             gl_entry_id => $gl_entry_id,
                             account_id  => $cr_acct,
                             amount      => -$value,
@@ -3651,7 +4292,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                 }
             }
 
-            my $txn = $schema->resultset('InventoryTransaction')->create({
+            my $txn = $schema->resultset('Accounting::InventoryTransaction')->create({
                 item_id          => $item_id,
                 location_id      => $loc_id || undef,
                 transaction_type => $type,
@@ -3705,7 +4346,7 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
 
         if ($action eq 'delete') {
             eval {
-                my $partner = $schema->resultset('InventoryConsignmentPartner')->find($p->{partner_id});
+                my $partner = $schema->resultset('Accounting::InventoryConsignmentPartner')->find($p->{partner_id});
                 $partner->delete if $partner && $partner->sitename eq $sitename;
             };
             $c->flash->{error_msg} = "Delete failed: $@" if $@;
@@ -3727,10 +4368,10 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
                     created_by         => $c->session->{username} || 'admin',
                 );
                 if ($id) {
-                    my $partner = $schema->resultset('InventoryConsignmentPartner')->find($id);
+                    my $partner = $schema->resultset('Accounting::InventoryConsignmentPartner')->find($id);
                     $partner->update(\%data) if $partner && $partner->sitename eq $sitename;
                 } else {
-                    $schema->resultset('InventoryConsignmentPartner')->create(\%data);
+                    $schema->resultset('Accounting::InventoryConsignmentPartner')->create(\%data);
                 }
             };
             $c->flash->{error_msg}   = "Save failed: $@" if $@;
@@ -3741,7 +4382,7 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
     }
 
     my (@partners, $edit_partner);
-    eval { @partners = $schema->resultset('InventoryConsignmentPartner')->search(
+    eval { @partners = $schema->resultset('Accounting::InventoryConsignmentPartner')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
     my $edit_id = $c->req->params->{edit};
     if ($edit_id) {
@@ -3768,7 +4409,7 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
 
     my @consignments;
     eval {
-        @consignments = $schema->resultset('InventoryConsignment')->search(
+        @consignments = $schema->resultset('Accounting::InventoryConsignment')->search(
             \%where,
             { prefetch => ['partner', { 'lines' => 'item' }], order_by => { -desc => 'me.date_sent' } }
         )->all;
@@ -3797,7 +4438,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
             die "Partner required\n" unless $p->{partner_id};
             die "Date sent required\n" unless $p->{date_sent};
 
-            my $consignment = $schema->resultset('InventoryConsignment')->create({
+            my $consignment = $schema->resultset('Accounting::InventoryConsignment')->create({
                 sitename         => $inv_sitename,
                 partner_id       => $p->{partner_id},
                 reference_number => $p->{reference_number} || undef,
@@ -3831,7 +4472,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 my $line_note = $opts_str
                     ? ($user_note ? "$opts_str $user_note" : $opts_str)
                     : $user_note || undef;
-                $schema->resultset('InventoryConsignmentLine')->create({
+                $schema->resultset('Accounting::InventoryConsignmentLine')->create({
                     consignment_id    => $consignment->id,
                     item_id           => $item_id,
                     quantity_sent     => $qty,
@@ -3840,7 +4481,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                     retail_price      => $retail_price || undef,
                     notes             => $line_note    || undef,
                 });
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     sitename         => $inv_sitename,
                     item_id          => $item_id,
                     transaction_type => 'consignment_out',
@@ -3870,11 +4511,11 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
     my $source_sitename = $c->req->params->{source_sitename} || $sitename;
     my (@partners, @items, @all_sitenames, @avail_filaments);
     eval {
-        @partners = $schema->resultset('InventoryConsignmentPartner')->search(
+        @partners = $schema->resultset('Accounting::InventoryConsignmentPartner')->search(
             { sitename => $source_sitename, status => 'active' }, { order_by => 'name' })->all;
     };
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $source_sitename, status => 'active', show_in_shop => 1 },
             { columns => [qw(id name sku unit_price unit_cost unit_of_measure category item_origin)],
               order_by => 'name' })->all;
@@ -3936,7 +4577,7 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
 
     my $consignment;
     eval {
-        $consignment = $schema->resultset('InventoryConsignment')->find(
+        $consignment = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
         );
@@ -3973,7 +4614,7 @@ sub consignment_queue :Path('/Inventory/consignment/queue') :Args(1) {
 
     my $consignment;
     eval {
-        $consignment = $schema->resultset('InventoryConsignment')->find(
+        $consignment = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
         );
@@ -4037,7 +4678,7 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
 
     my $consignment;
     eval {
-        $consignment = $schema->resultset('InventoryConsignment')->search(
+        $consignment = $schema->resultset('Accounting::InventoryConsignment')->search(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
         )->first;
@@ -4079,7 +4720,7 @@ sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {
     }
 
     eval {
-        my $con = $schema->resultset('InventoryConsignment')->find(
+        my $con = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename }
         ) or die "Not found\n";
         die "Cannot delete a settled consignment\n" if $con->status eq 'settled';
@@ -4108,7 +4749,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
     my $p = $c->req->body_parameters;
 
     eval {
-        my $consignment = $schema->resultset('InventoryConsignment')->find(
+        my $consignment = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', 'lines'] }
         ) or die "Consignment not found\n";
@@ -4125,7 +4766,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
         my @qty_returns = $c->req->params->get_all('qty_return');
 
         for my $i (0 .. $#line_ids) {
-            my $line = $schema->resultset('InventoryConsignmentLine')->find($line_ids[$i]);
+            my $line = $schema->resultset('Accounting::InventoryConsignmentLine')->find($line_ids[$i]);
             next unless $line && $line->consignment_id == $id;
 
             my $new_sold   = ($qty_solds[$i]   || 0) + ($line->quantity_sold     || 0);
@@ -4139,7 +4780,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
                 $total_net   += $gross * (1 - $commission_pct / 100);
                 $total_comm  += $gross * ($commission_pct / 100);
 
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     sitename         => $sitename,
                     item_id          => $line->item_id,
                     transaction_type => 'consignment_sold',
@@ -4153,7 +4794,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
                 });
             }
             if (($qty_returns[$i] || 0) > 0) {
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     sitename         => $sitename,
                     item_id          => $line->item_id,
                     transaction_type => 'consignment_return',
@@ -4184,7 +4825,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
             my $comm_account_id   = $p->{comm_account_id}   || undef;
 
             if ($income_account_id && $ar_account_id) {
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     sitename    => $sitename,
                     entry_date  => $now,
                     description => sprintf('Consignment settlement — %s (%.0f%% commission)',
@@ -4193,19 +4834,19 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
                     created_by  => $c->session->{username} || 'admin',
                     created_at  => $now,
                 });
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl->id, account_id => $ar_account_id,
                     debit => sprintf('%.2f', $total_net), credit => 0,
                     description => 'Consignment net receivable',
                 });
                 if ($comm_account_id && $total_comm > 0) {
-                    $schema->resultset('GlEntryLine')->create({
+                    $schema->resultset('Accounting::GlEntryLine')->create({
                         gl_entry_id => $gl->id, account_id => $comm_account_id,
                         debit => sprintf('%.2f', $total_comm), credit => 0,
                         description => 'Consignment commission expense',
                     });
                 }
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl->id, account_id => $income_account_id,
                     debit => 0, credit => sprintf('%.2f', $total_gross),
                     description => 'Consignment sales revenue',

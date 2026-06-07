@@ -296,12 +296,12 @@ sub create_table_from_sql {
     };
 }
 
-# Create pages_content table specifically
+# Create page table specifically
 sub create_pages_table {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_pages_table', 
-        "Starting pages_content table creation");
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_pages_table',
+        "Starting page table creation");
     
     # Find the SQL file path
     my $sql_file_path;
@@ -781,6 +781,7 @@ sub create_ai_chat_tables_from_results {
     my @result_files = (
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiUsageLog.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm",

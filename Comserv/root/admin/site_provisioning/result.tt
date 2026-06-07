@@ -1,0 +1,61 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Provisioning [% success ? 'Complete' : 'Failed' %]</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">&#8592; Back to Requests</a>
+    </div>
+</div>
+
+[% IF success %]
+<div class="success-message">
+    Site <strong>[% site_name | html %]</strong> provisioned at <code>[% domain | html %]</code>.
+    Routing is DB-driven via the SiteHome controller — no app restart required.
+</div>
+[% ELSE %]
+<div class="error-message">Provisioning encountered errors — see log below.</div>
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="data-container">
+
+[% IF steps.size %]
+<div class="form-section">
+    <h3>Steps</h3>
+    <ul>
+    [% FOREACH step IN steps %]
+        <li>&#10003; [% step | html %]</li>
+    [% END %]
+    </ul>
+</div>
+[% END %]
+
+[% IF errors.size %]
+<div class="form-section">
+    <h3>Errors</h3>
+    <ul>
+    [% FOREACH err IN errors %]
+        <li class="error-message">&#10005; [% err | html %]</li>
+    [% END %]
+    </ul>
+</div>
+[% END %]
+
+[% IF success %]
+<div class="form-section">
+    <h3>Next Steps</h3>
+    <ul>
+        <li>Verify DNS propagation for <code>[% domain | html %]</code> (may take up to 48 hours).</li>
+        <li>The site home page is served by the generic <strong>SiteHome</strong> controller — no recompile needed.</li>
+        <li>Edit the home page template at <code>root/SiteHome/[% site_name | html %].tt</code> as needed.</li>
+        <li>Set up navigation links via <a href="[% c.uri_for('/admin') %]">Admin</a>.</li>
+    </ul>
+</div>
+[% END %]
+
+</div>
+</div>
+</div>
+
+</div>

@@ -277,6 +277,25 @@ sub auto :Private {
                                 role      => { -like => 'admin' },
                                 is_active => 1,
                             })->count;
+                            unless ($site_admin_count) {
+                                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                                    sitename => $site_name_check,
+                                }, { rows => 1 })->single;
+                                if ($hosting && $hosting->contact_email) {
+                                    my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id);
+                                    if ($user_obj && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                        $c->model('DBEncy')->resultset('UserSiteRole')->find_or_create({
+                                            user_id   => $user_id,
+                                            site_id   => $site_obj->id,
+                                            role      => 'admin',
+                                        }, {
+                                            key => 'user_site_role_unique',
+                                            values => { granted_by => 1, is_active => 1 },
+                                        });
+                                        $site_admin_count = 1;
+                                    }
+                                }
+                            }
                             if ($site_admin_count) {
                                 $is_admin = 1;
                                 $c->session->{is_admin} = 1;
@@ -306,6 +325,9 @@ sub auto :Private {
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
         $c->stash->{user_logged_in} = $user_logged_in;
+
+        # Restore backward compatibility for c.stash.dbi
+        $c->stash->{dbi} = Comserv::Util::LegacyDBIWrapper->new($c);
 
         # Initialize navigation variables with defaults to prevent template crashes
         $c->stash->{main_pages} = [];
@@ -446,6 +468,49 @@ sub auto :Private {
                 $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
             }
 
+            # Check hosting account for subscribed addons to enable them by default
+            my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                -or => [
+                    sitename => $mod_site,
+                    sitename => lc($mod_site),
+                    sitename => uc($mod_site),
+                ]
+            }, { rows => 1 })->single;
+            if ($hosting && $hosting->requested_addons) {
+                my @addons = split(/\s*,\s*/, $hosting->requested_addons);
+                for my $a (@addons) {
+                    my $lc_addon = lc($a);
+                    $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
+                    if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
+                        $enabled{'3d'} = 1 unless exists $enabled{'3d'};
+                        $enabled{'printing_3d'} = 1 unless exists $enabled{'printing_3d'};
+                    }
+                    if ($lc_addon eq 'workshops' || $lc_addon eq 'workshop') {
+                        $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
+                        $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
+                    }
+                    if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
+                        $enabled{'brew'} = 1 unless exists $enabled{'brew'};
+                    }
+                }
+            }
+
+            # Brew site / brew.* hostnames / brew addon → nav + brew home
+            my $req_host = $c->req->uri->host || '';
+            $req_host =~ s/^www\.//i;
+            my $is_brew_host = ($req_host =~ /^brew\./i) ? 1 : 0;
+            $c->stash->{is_brew_host} = $is_brew_host;
+
+            if ($is_brew_host || lc($mod_site) eq 'brew') {
+                $enabled{brew} = 1;
+                $enabled{accounting} = 1 unless exists $enabled{accounting};
+            }
+
+            # Show Brew menu when site_modules or hosting lists the brew addon
+            if ($enabled{brew}) {
+                $c->stash->{brew_addon_active} = 1;
+            }
+
             # Apply per-user overrides from user_module_access
             if ($c->session->{username}) {
                 my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({
@@ -483,10 +548,28 @@ sub auto :Private {
             $c->stash->{enabled_modules} = {};
         }
 
+        # Planning access — shared by TopDropListPlanning, Brew nav, login menu, etc.
+        my $can_plan = 0;
+        if ($c->session->{username}) {
+            my $user_roles = $c->stash->{user_roles} || [];
+            my %guest_role = map { $_ => 1 } qw(guest anonymous Guest Anonymous);
+            my $is_guest = ref($user_roles) eq 'ARRAY'
+                ? (grep { $guest_role{$_} } @$user_roles) ? 1 : 0
+                : 0;
+            unless ($is_guest) {
+                $can_plan = 1;
+                my $em = $c->stash->{enabled_modules};
+                if (ref($em) eq 'HASH' && exists $em->{planning} && !$em->{planning}) {
+                    $can_plan = 0;
+                }
+            }
+        }
+        $c->stash->{can_plan} = $can_plan;
+
         # Check if current site has active priced inventory items (for Shop nav visibility)
         eval {
             my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
-            my $shop_count = $c->model('DBEncy')->resultset('InventoryItem')->search({
+            my $shop_count = $c->model('DBEncy')->resultset('Accounting::InventoryItem')->search({
                 sitename     => $shop_site,
                 status       => 'active',
                 show_in_shop => 1,
@@ -841,7 +924,10 @@ sub health_detail :Path('/health/detail') :Args(0) {
     eval {
         my $sess_dir = $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session';
         $info{session_dir_ok} = (-d $sess_dir && -w $sess_dir) ? 1 : 0;
-        $ok = 0 unless $info{session_dir_ok};
+        my $using_dbic = ($c->config->{'Plugin::Session'} && $c->config->{'Plugin::Session'}{dbic_class}) ? 1 : 0;
+        if (!$info{session_dir_ok} && !$using_dbic) {
+            $ok = 0;
+        }
     };
 
     # 5. Quick DB ping (non-blocking, 2s timeout)
@@ -894,6 +980,30 @@ sub index :Path('/') :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
         }
 
+        # Brew addon or brew.* host → brewing dashboard as site home (/)
+        my $brew_home = 0;
+        eval {
+            my $em = $c->stash->{enabled_modules};
+            $em = {} unless ref($em) eq 'HASH';
+            my $site_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
+            my $host = $c->req->uri->host || '';
+            $host =~ s/^www\.//i;
+            if ( $em->{brew} || $site_lc eq 'brew' || $host =~ /^brew\./i ) {
+                $brew_home = 1;
+            }
+        };
+        if ($brew_home) {
+            my $brew_ctrl = eval { $c->controller('Brew') };
+            if ($brew_ctrl) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                    'Forwarding / to Brew addon home');
+                eval { $c->forward( $brew_ctrl->action_for('index') ) };
+                return 1 unless $@;
+            }
+            $c->response->redirect( $c->uri_for('/brew') );
+            return;
+        }
+
         # Get ControllerName from the session
         my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: " . ($ControllerName // 'undefined'));
@@ -911,10 +1021,8 @@ sub index :Path('/') :Args(0) {
                 # Forward to the controller's index action
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
 
-                # Use a standard redirect to the controller's path
-                # This is a more reliable approach that works for all controllers
-                $c->response->redirect("/$ControllerName");
-                return 1;  # Return after redirect, do not detach (causes catalyst_detach exception)
+                eval { $c->forward($c->controller($ControllerName)->action_for('index')) };
+                return 1 unless $@;
             } else {
                 # Log the error and fall back to Root's index template
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
@@ -1022,14 +1130,14 @@ sub fetch_and_set {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
 
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . ($site_domain ? Dumper({ $site_domain->get_columns }) : 'undef'));
 
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
 
             my $site = $c->model('Site')->get_site_details($c, $site_id);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . ($site ? Dumper({ $site->get_columns }) : 'undef'));
 
             if ($site) {
                 $value = $site->name;
@@ -1665,6 +1773,8 @@ sub site_setup {
     my $test_url = $c->uri_for('/test');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
 
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
     # Primary attempt: lookup by SiteName (as provided)
@@ -1739,7 +1849,7 @@ sub site_setup {
     my $site_name         = $site->can('name')              ? ($site->name || $SiteName) : $SiteName;
 
     # If site has a document_root_url, use it for HostName
-    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url ne '') {
+    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url =~ /^https?:/i) {
         $c->stash->{HostName} = $site->document_root_url;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
             "Set HostName from document_root_url: " . $site->document_root_url);
@@ -1917,6 +2027,30 @@ sub begin :Private {
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
     }
+
+    eval {
+        my @ha = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+            { status => 'active' },
+            { order_by => 'sitename' }
+        )->all;
+        $c->stash->{nav_hosting_accounts} = \@ha;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "DB ERROR loading hosting accounts: $@");
+        $c->stash->{nav_hosting_accounts} = [];
+    }
+
+    eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
+        my $rows = $dbh->selectcol_arrayref(
+            "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+        );
+        my %at = map { $_ => 1 } @{ $rows || [] };
+        $c->stash->{active_todos} = \%at;
+    };
+    if ($@) {
+        $c->stash->{active_todos} = {};
+    }
 }
 
 sub _port_label {
@@ -2003,6 +2137,17 @@ sub port_favicon :Path('/favicon/port') :Args(1) {
     $c->response->body($svg);
 }
 
+sub helpdesk_favicon :Path('/favicon/helpdesk') :Args(0) {
+    my ($self, $c) = @_;
+    my $svg = q{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="#1a7a4a"/>
+  <text x="16" y="22" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="13" fill="white">HD</text>
+</svg>};
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
 sub site_favicon :Path('/favicon/site') :Args(1) {
     my ($self, $c, $sitename) = @_;
 
@@ -2045,6 +2190,22 @@ sub end : ActionClass('RenderView') {
     if (@{$c->error || []} && !$c->response->body && !$catalyst_debug) {
         my @errors   = @{$c->error};
         my $err_text = join(' | ', map { defined $_ ? "$_" : 'UNDEF' } @errors);
+
+        # Noise/security patterns — do NOT log to HealthLogger (no todo created)
+        my $is_noise = (
+            $err_text =~ /invalid session id/i                  ||
+            $err_text =~ /Tried to set invalid session/i        ||
+            $err_text =~ /couldn't render template.*not found/i
+        );
+
+        if ($is_noise) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'end',
+                "Security/noise error (no todo): $err_text");
+            $c->clear_errors;
+            $c->response->status(400);
+            $c->response->body('Bad Request');
+            return;
+        }
 
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
@@ -2181,5 +2342,37 @@ sub default :Path {
 }
 
 __PACKAGE__->meta->make_immutable;
+
+1;
+
+package Comserv::Util::LegacyDBIWrapper;
+
+sub new {
+    my ($class, $c) = @_;
+    return bless { c => $c }, $class;
+}
+
+sub query {
+    my ($self, $sql, @bind) = @_;
+    my $c = $self->{c};
+    return [] unless $c && $sql;
+    my $results = [];
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        if ($dbh) {
+            my $sth = $dbh->prepare($sql);
+            if ($sth) {
+                $sth->execute(@bind);
+                while (my $row = $sth->fetchrow_hashref) {
+                    push @$results, $row;
+                }
+            }
+        }
+    };
+    if ($@) {
+        $c->log->error("LegacyDBIWrapper error executing query [$sql]: $@");
+    }
+    return $results;
+}
 
 1;

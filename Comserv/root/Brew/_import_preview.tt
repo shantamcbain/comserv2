@@ -1,0 +1,136 @@
+[%# Live field maps + forager record preview for admin migration. %]
+[% IF brew_import_preview %]
+<div class="admin-only content-section brew-import-preview">
+    <h3><i class="fas fa-exchange-alt"></i> Import field map &amp; legacy records</h3>
+    <p>Planned <strong>source → target</strong> mappings and every legacy row for
+       <code>[% brew_import_preview.sitename | html %]</code>
+       [% IF forager_connected %](live from <code>DBForager</code>)[% ELSE %]
+       — connect <code>DBForager</code> to load record rows[% END %].</p>
+
+    [% FOREACH section IN brew_import_preview.sections %]
+    <div class="content-section brew-import-section" id="map-[% section.id | html %]">
+        <h4>[% section.title | html %]</h4>
+        <p class="text-muted">
+            <code>[% section.source_table | html %]</code>
+            → [% FOREACH t IN section.target_tables %]<code>[% t | html %]</code>[% UNLESS loop.last %], [% END %][% END %]
+        </p>
+        <div class="table-container brew-map-scroll">
+            <table class="data-table brew-field-map">
+                <thead>
+                    <tr>
+                        <th>Legacy field</th>
+                        <th>ENCY / Planning target</th>
+                        <th>Transform</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    [% FOREACH m IN section.mappings %]
+                    <tr>
+                        <td><code>[% m.source | html %]</code></td>
+                        <td><code>[% m.target | html %]</code></td>
+                        <td>[% m.transform | html %]</td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </div>
+
+        [% IF section.record_table %]
+        [% SET rec = brew_import_preview.records.item(section.record_table) %]
+        <h5>Legacy records: <code>[% section.record_table | html %]</code>
+            [% IF section.record_note %]<span class="text-muted">— [% section.record_note | html %]</span>[% END %]
+            [% IF rec && rec.count %]([% rec.count %] row[% IF rec.count != 1 %]s[% END %])[% END %]
+        </h5>
+        [% IF rec.error %]
+        <p class="error">[% rec.error | html %]</p>
+        [% ELSIF !rec || !rec.count %]
+        <p class="text-muted">No rows for sitename <code>[% brew_import_preview.sitename | html %]</code>.</p>
+        [% ELSE %]
+        <div class="table-container brew-records-scroll">
+            <table class="data-table brew-record-preview">
+                <thead>
+                    <tr>
+                        [% FOREACH col IN rec.columns %]
+                        <th>[% col | html %]</th>
+                        [% END %]
+                    </tr>
+                </thead>
+                <tbody>
+                    [% FOREACH row IN rec.rows %]
+                    <tr>
+                        [% FOREACH col IN rec.columns %]
+                        <td>[% row.$col | html %]</td>
+                        [% END %]
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </div>
+        [% END %]
+        [% END %]
+    </div>
+    [% END %]
+
+    [% IF brew_import_preview.feature_key == 'batches' || brew_import_preview.feature_key == 'import' %]
+    <div class="content-section">
+        <h4>Batch status code mapping</h4>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Legacy <code>brew_batch_tb.status</code></th><th><code>brew_batch.status</code></th><th>Note</th></tr>
+                </thead>
+                <tbody>
+                    [% FOREACH sm IN brew_import_preview.status_map %]
+                    <tr>
+                        <td>[% sm.legacy | html %]</td>
+                        <td><code>[% sm.target | html %]</code></td>
+                        <td>[% sm.note | html %]</td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </div>
+    </div>
+    [% END %]
+
+    [% IF brew_import_preview.feature_key == 'import' && forager_connected %]
+    <div class="content-section">
+        <h4>Quick navigation</h4>
+        <ul class="sidebar-list">
+            <li><a href="#map-recipe_header">Recipes → ency_recipe</a></li>
+            <li><a href="#map-recipe_profile">Brew profile</a></li>
+            <li><a href="#map-recipe_lines_table">Ingredient lines (256 rows)</a></li>
+            <li><a href="#map-batches">Batches (81 rows)</a></li>
+            <li><a href="#map-temp_log">Mash temps (132 rows)</a></li>
+            <li><a href="#map-time_log">Fermentation times (433 rows)</a></li>
+        </ul>
+    </div>
+    [% END %]
+</div>
+
+<style>
+.brew-import-preview .brew-map-scroll,
+.brew-import-preview .brew-records-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+    margin-bottom: 1rem;
+}
+.brew-import-preview .brew-record-preview {
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+.brew-import-preview .brew-record-preview td {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.brew-import-preview .brew-field-map td:last-child {
+    font-size: 0.9rem;
+}
+.brew-import-section {
+    border-top: 1px solid var(--border-color, #ddd);
+    padding-top: 1rem;
+    margin-top: 1rem;
+}
+</style>
+[% END %]

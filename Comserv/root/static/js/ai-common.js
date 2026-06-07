@@ -37,8 +37,8 @@ const AIUtils = {
     renderTextWithLinks: function(text) {
         if (!text) return '';
         // Tokenise: markdown links [label](url), bare https:// URLs, bare /paths
-        // Group 1+2 = markdown link, group 3 = bare URL, group 4 = bare /path
-        const TOKEN_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>")\]]+)|(\/[a-zA-Z][a-zA-Z0-9_\-/.?=&#%]*)/g;
+        // Group 1+2 = markdown link (url can be absolute or relative), group 3 = bare URL, group 4 = bare /path
+        const TOKEN_RE = /\[([^\]]+)\]\(([^)]+)\)|(https?:\/\/[^\s<>")\]]+)|(\/[a-zA-Z][a-zA-Z0-9_\-/.?=&#%]*)/g;
         let result = '';
         let lastIndex = 0;
         let match;

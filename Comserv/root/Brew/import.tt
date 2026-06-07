@@ -1,0 +1,11 @@
+[% META
+  title = 'Brew — Import legacy data'
+  description = 'Admin migration hub for forager brewhouse tables into ENCY and Planning'
+  roles = 'guest,user,admin'
+  TemplateType = 'Application'
+  category = 'brew,addon,admin'
+  page_version = '0.01'
+  last_updated = '2026/06/05'
+%]
+[% PageVersion = 'Brew/import.tt,v 0.01 2026/06/05 Brew import hub' %]
+[% INCLUDE 'Brew/_feature_shell.tt' %]

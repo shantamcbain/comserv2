@@ -425,6 +425,122 @@ sub create_mail_account {
     };
 }
 
+# ── cPanel mailing list API ───────────────────────────────────────────────────
+# Calls the cPanel UAPI /Email/add_list endpoint to create a real mailing list.
+# Config: comserv.conf <cPanel> block — host, username, api_token (or password)
+sub _cpanel_ua {
+    my ($self, $c) = @_;
+    my $cfg   = $c->config->{cPanel} || {};
+    my $host  = $cfg->{host}      || 'localhost';
+    my $user  = $cfg->{username}  || '';
+    my $token = $cfg->{api_token} || '';
+    my $pass  = $cfg->{password}  || '';
+
+    unless ($host && $user && ($token || $pass)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_cpanel_ua',
+            "cPanel credentials not configured in comserv.conf <cPanel> block");
+        return (undef, undef, undef, "cPanel credentials not configured");
+    }
+
+    my $ua = LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 }, timeout => 15);
+    my $auth = $token
+        ? "cpanel $user:$token"
+        : "Basic " . MIME::Base64::encode_base64("$user:$pass", '');
+    return ($ua, $host, $auth, undef);
+}
+
+sub create_cpanel_list {
+    my ($self, $c, %args) = @_;
+    my ($ua, $host, $auth, $err) = $self->_cpanel_ua($c);
+    return (0, $err) unless $ua;
+
+    my $list_name = $args{list_name} or return (0, "list_name required");
+    my $domain    = $args{domain}    or return (0, "domain required");
+    my $password  = $args{password}  || _random_password();
+    my $prefix    = $args{prefix}    || '';
+
+    require URI;
+    my $url = URI->new("https://$host:2083/execute/Email/add_list");
+    $url->query_form(
+        list     => $list_name,
+        domain   => $domain,
+        password => $password,
+        ($prefix ? (prefix => $prefix) : ()),
+    );
+
+    my $req = HTTP::Request->new(GET => $url->as_string);
+    $req->header(Authorization => $auth);
+
+    my $res = eval { $ua->request($req) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_cpanel_list', "Request failed: $@");
+        return (0, "Request failed: $@");
+    }
+    unless ($res->is_success) {
+        return (0, "HTTP " . $res->status_line);
+    }
+    eval { require JSON; };
+    my $data = eval { JSON::decode_json($res->content) } || {};
+    if ($data->{status}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_cpanel_list',
+            "Created cPanel list $list_name\@$domain");
+        return (1, undef, $data);
+    } else {
+        my $msg = ($data->{errors} && ref $data->{errors} eq 'ARRAY') ? join('; ', @{$data->{errors}}) : 'unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_cpanel_list', "cPanel error: $msg");
+        return (0, $msg);
+    }
+}
+
+sub subscribe_cpanel_list {
+    my ($self, $c, %args) = @_;
+    my ($ua, $host, $auth, $err) = $self->_cpanel_ua($c);
+    return (0, $err) unless $ua;
+
+    my $list_address = $args{list_address} or return (0, "list_address required");
+    my $subscriber   = $args{email}        or return (0, "email required");
+
+    require URI;
+    my $url = URI->new("https://$host:2083/execute/Email/add_list_subscriber");
+    $url->query_form(list => $list_address, subscriber => $subscriber);
+
+    my $req = HTTP::Request->new(GET => $url->as_string);
+    $req->header(Authorization => $auth);
+
+    my $res = eval { $ua->request($req) } || do { return (0, $@) };
+    unless ($res->is_success) { return (0, "HTTP " . $res->status_line) }
+    eval { require JSON; };
+    my $data = eval { JSON::decode_json($res->content) } || {};
+    return $data->{status} ? (1, undef) : (0, join('; ', @{$data->{errors} || ['unknown']}));
+}
+
+sub unsubscribe_cpanel_list {
+    my ($self, $c, %args) = @_;
+    my ($ua, $host, $auth, $err) = $self->_cpanel_ua($c);
+    return (0, $err) unless $ua;
+
+    my $list_address = $args{list_address} or return (0, "list_address required");
+    my $subscriber   = $args{email}        or return (0, "email required");
+
+    require URI;
+    my $url = URI->new("https://$host:2083/execute/Email/delete_list_subscriber");
+    $url->query_form(list => $list_address, subscriber => $subscriber);
+
+    my $req = HTTP::Request->new(GET => $url->as_string);
+    $req->header(Authorization => $auth);
+
+    my $res = eval { $ua->request($req) } || do { return (0, $@) };
+    unless ($res->is_success) { return (0, "HTTP " . $res->status_line) }
+    eval { require JSON; };
+    my $data = eval { JSON::decode_json($res->content) } || {};
+    return $data->{status} ? (1, undef) : (0, join('; ', @{$data->{errors} || ['unknown']}));
+}
+
+sub _random_password {
+    my @chars = ('A'..'Z','a'..'z','0'..'9','!','@','#','$');
+    return join('', map { $chars[int rand @chars] } 1..16);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

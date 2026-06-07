@@ -4,9 +4,9 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 BEGIN { extends 'Catalyst::Controller'; }
-# In your controller or script file
 use Try::Tiny;
 use Comserv::Model::Site;
+use Comserv::Util::CloudflareManager;
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -693,13 +693,43 @@ sub add_domain_post :Local {
         return;
     }
 
-    # Insert the new domain into the SiteDomain table
+    my $add_to_cloudflare = $c->request->parameters->{add_to_cloudflare};
+    my $cf_record_type    = $c->request->parameters->{cf_record_type} || 'A';
+    my $cf_content        = $c->request->parameters->{cf_content}     || '';
+    my $cf_zone_name      = $c->request->parameters->{cf_zone_name}   || '';
+    my $is_subdomain      = $c->request->parameters->{is_subdomain}   || 0;
+    my $subdomain_prefix  = $c->request->parameters->{subdomain_prefix} || '';
+
+    my $full_domain = $domain;
+    if ($is_subdomain && $subdomain_prefix) {
+        $full_domain = "$subdomain_prefix.$domain";
+    }
+
     try {
         $c->model('DBEncy::SiteDomain')->create({
             site_id => $site_id,
-            domain => $domain,
+            domain  => $full_domain,
         });
-        $c->flash->{success_msg} = 'Domain added successfully';
+
+        my $cf_msg = '';
+        if ($add_to_cloudflare && $cf_content && $cf_zone_name) {
+            my $user_email = $c->session->{email} || $c->session->{username} || 'admin';
+            try {
+                my $cf      = Comserv::Util::CloudflareManager->new();
+                my $proxied = ($cf_record_type eq 'A' || $cf_record_type eq 'CNAME') ? 1 : 0;
+                my $result  = $cf->create_dns_record(
+                    $user_email, $cf_zone_name, $cf_record_type,
+                    $full_domain, $cf_content, 1, $proxied
+                );
+                $cf_msg = $result ? ' Cloudflare DNS record created.' : ' Warning: Cloudflare DNS creation failed — check logs.';
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_domain_post',
+                    "Cloudflare error: $_");
+                $cf_msg = ' Warning: Cloudflare error — ' . $_;
+            };
+        }
+
+        $c->flash->{success_msg} = "Domain $full_domain added successfully.$cf_msg";
         $c->res->redirect($c->uri_for('/site/details', { id => $site_id }));
     } catch {
         push @errors, "Failed to add domain: $_";

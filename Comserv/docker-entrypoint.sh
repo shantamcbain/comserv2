@@ -89,9 +89,32 @@ fi
 rm -f /var/run/supervisor.sock /var/run/supervisord.pid
 
 # Ensure log, session, and backup directories exist and are writable by comserv user
-mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
-chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
-chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
+# NOTE: /opt/comserv/applogs is the persistent log dir (volume-mounted), separate from root/log/ (templates)
+mkdir -p /opt/comserv/applogs ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
+chmod 755 /opt/comserv/applogs ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
+chown -R comserv:comserv /opt/comserv/applogs ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
+
+# Ensure comserv_server.psgi is accessible in both script/ and the root directory
+mkdir -p "${CATALYST_HOME}/script"
+if [ -f "${CATALYST_HOME}/script/comserv_server.psgi" ]; then
+    ln -sf "${CATALYST_HOME}/script/comserv_server.psgi" "${CATALYST_HOME}/comserv_server.psgi"
+    chown comserv:comserv "${CATALYST_HOME}/comserv_server.psgi" 2>/dev/null || true
+elif [ -f "${CATALYST_HOME}/comserv_server.psgi" ]; then
+    ln -sf "${CATALYST_HOME}/comserv_server.psgi" "${CATALYST_HOME}/script/comserv_server.psgi"
+    chown comserv:comserv "${CATALYST_HOME}/script/comserv_server.psgi" 2>/dev/null || true
+fi
+
+# Symlink ${CATALYST_HOME}/logs → /opt/comserv/applogs (persistent volume, NOT inside root/)
+# root/log/ is reserved for Template Toolkit templates only.
+if [ ! -L "${CATALYST_HOME}/logs" ]; then
+    if [ -d "${CATALYST_HOME}/logs" ]; then
+        echo "Moving existing logs to persistent volume directory..."
+        cp -a ${CATALYST_HOME}/logs/. /opt/comserv/applogs/ 2>/dev/null || true
+        rm -rf "${CATALYST_HOME}/logs"
+    fi
+    ln -s /opt/comserv/applogs "${CATALYST_HOME}/logs"
+    echo "✓ Symlinked ${CATALYST_HOME}/logs to /opt/comserv/applogs"
+fi
 
 # Ensure Catalyst Session::Store::File directory exists and is writable by comserv user.
 # COMSERV_SESSION_DIR is the session FILES directory (e.g. /tmp/comserv/session).
@@ -138,6 +161,27 @@ else
   echo "⚠ Warning: cron not available - log rotation disabled"
 fi
 
+# Bootstrap whisper_venv on named volume if not yet installed — runs in background
+# so it does not block app startup or health checks
+if [ ! -f "/opt/comserv/whisper_venv/bin/python3" ] || ! /opt/comserv/whisper_venv/bin/python3 -c "import whisper" &>/dev/null; then
+  echo "Whisper venv not found or incomplete — bootstrapping in background (first-run only)..."
+  (
+    if command -v python3 &>/dev/null; then
+      python3 -m venv /opt/comserv/whisper_venv >> /tmp/whisper_install.log 2>&1 && \
+      /opt/comserv/whisper_venv/bin/pip install --no-cache-dir \
+        torch --index-url https://download.pytorch.org/whl/cpu \
+        openai-whisper >> /tmp/whisper_install.log 2>&1 && \
+      chown -R comserv:comserv /opt/comserv/whisper_venv && \
+      echo "✓ Whisper install complete" >> /tmp/whisper_install.log || \
+      echo "⚠ Whisper install failed — check /tmp/whisper_install.log" >> /tmp/whisper_install.log
+    fi
+  ) &
+  echo "  Whisper install started in background — see /tmp/whisper_install.log"
+else
+  chown -R comserv:comserv /opt/comserv/whisper_venv
+  echo "✓ Whisper venv ready at /opt/comserv/whisper_venv"
+fi
+
 # Create workshop files directory on shared volume
 if [ "${SKIP_NFS_SETUP}" != "1" ]; then
   WORKSHOP_DIR="/data/nfs/workshop_files"
@@ -149,6 +193,14 @@ if [ "${SKIP_NFS_SETUP}" != "1" ]; then
         chmod 775 "$WORKSHOP_DIR" 2>/dev/null || true
         chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
     fi
+    NFS_LOG_DIR="/data/nfs/logs"
+    if [ ! -d "$NFS_LOG_DIR" ]; then
+        echo "Creating NFS log directory: $NFS_LOG_DIR"
+        mkdir -p "$NFS_LOG_DIR"
+        chmod 775 "$NFS_LOG_DIR" 2>/dev/null || true
+        chown comserv:comserv "$NFS_LOG_DIR" 2>/dev/null || true
+    fi
+    echo "✓ NFS log directory ready: $NFS_LOG_DIR"
   else
     echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
   fi
@@ -159,17 +211,30 @@ fi
 # Configure log rotation to prevent disk space issues
 echo "Configuring log rotation..."
 cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
-/opt/comserv/root/log/*.log {
+/opt/comserv/applogs/*.log {
+    su comserv comserv
     daily
+    dateext
     rotate 7
     compress
     delaycompress
     missingok
     notifempty
     maxsize 100M
+    create 0644 comserv comserv
+    sharedscripts
+    postrotate
+        supervisorctl status > /dev/null 2>&1 || true
+        NFS_ARCHIVE=/data/nfs/logs/archive
+        [ -d "/data/nfs" ] || NFS_ARCHIVE=/home/shanta/nfs/logs/archive
+        [ -d "$NFS_ARCHIVE" ] || mkdir -p "$NFS_ARCHIVE" 2>/dev/null || true
+        find /opt/comserv/applogs -name "*.log-*.gz" -mmin -5 \
+            -exec cp -p {} "$NFS_ARCHIVE/" \; 2>/dev/null || true
+    endscript
 }
 
 /opt/comserv/root/Documentation/session_history/*.log {
+    su comserv comserv
     weekly
     rotate 4
     compress

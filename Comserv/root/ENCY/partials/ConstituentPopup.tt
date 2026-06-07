@@ -1,0 +1,5 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3><a href="/ENCY/Constituent/[% constituent.record_id %]" target="_blank">[% constituent.name | html %][% IF constituent.common_name %] <small>([% constituent.common_name | html %])</small>[% END %]</a></h3>
+  [% IF constituent.therapeutic_action %]<p>[% constituent.therapeutic_action | html %]</p>[% END %]
+</div>

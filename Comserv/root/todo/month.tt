@@ -470,10 +470,10 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="month-navigation view-navigation">
         <a href="[% base_url %]/[% prev_month_date %][% month_hash %]">◀ Previous Month</a>
         <a href="/todo[% url_hash %]">List View</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Planning (Day)</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Daily Schedule</a>
         <a href="[% base_url %]/[% date || current_date_str %][% week_hash %]">Week View</a>
         <a href="/todo/addtodo">Add New Todo</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Back to Planning</a>
         <a href="[% base_url %]/[% next_month_date %][% month_hash %]">Next Month ▶</a>
     </div>
 [% ELSE %]
@@ -488,7 +488,32 @@ document.addEventListener('DOMContentLoaded', function() {
         <a href="/todo[% url_hash %]">Back to Todo List</a>
         <a href="/todo/month/[% next_month_date %][% url_hash %]">Next Month ▶</a>
     </div>
+    [% IF ap_all_sitenames.size > 0 %]
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;padding:4px 0 8px 0;">
+        <span style="font-size:0.82em;color:var(--text-muted-color,#70757a);white-space:nowrap;">Site:</span>
+        <select id="month-site-filter" onchange="monthApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;">
+            <option value="">All</option>
+            [% FOREACH sname IN ap_all_sitenames %]
+            <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
+            [% END %]
+        </select>
+    </div>
+    [% END %]
 [% END %]
+
+<script>
+function monthApplyFilters() {
+    var siteSel = document.getElementById('month-site-filter');
+    var filterSite = siteSel ? siteSel.value : '';
+    var newUrl = window.location.pathname;
+    fetch('/planning/set_filter', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site: filterSite })
+    }).then(function() { window.location.href = newUrl; }).catch(function() { window.location.href = newUrl; });
+}
+</script>
 
 [% # Calculate overdue todos (before the first day of this month) %]
 [% SET all_overdue_todos = [] %]
@@ -546,7 +571,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             <div class="calendar-cell month-day-cell [% IF is_today %]today[% END %]" data-day-name="[% day_name %]" data-date="[% cell.date %]" [% IF is_today %]id="today-cell"[% END %]>
                 <div class="day-number">
-                    <a href="[% IF is_daily_plan %][% base_url %]/[% cell.date %][% planning_hash %][% ELSE %]/todo/day/[% cell.date %][% url_hash %][% END %]" title="View day details for [% cell.date %]">[% cell.day %]</a>
+                    <a href="#" onclick="showMonthDayModal('[% cell.date %]',event)" title="View day schedule for [% cell.date %]">[% cell.day %]</a>
                 </div>
                 
                 <div class="todos-container" style="max-height: 120px; overflow-y: auto;" data-date="[% cell.date %]">
@@ -644,3 +669,116 @@ document.addEventListener('DOMContentLoaded', function() {
     <a href="/todo/month/[% next_month_date %][% url_hash %]">Next Month</a>
 </div>
 [% END %]
+
+<div id="month-day-modal" onclick="if(event.target===this)closeMonthDayModal()" style="display:none;position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);width:min(960px,96vw);height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:2px solid #4CAF50;background:#f8f9fa;flex-shrink:0;">
+            <span id="month-day-modal-title" style="font-weight:bold;font-size:1em;"></span>
+            <button onclick="closeMonthDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
+        </div>
+        <div id="month-day-modal-body" style="flex:1;overflow:hidden;padding:0;display:flex;"></div>
+    </div>
+</div>
+<script>
+var MONTH_PALETTE = [];
+var _monthSiteColors = {};
+var _monthColorIdx = 0;
+function _buildMonthPalette() {
+    var s = getComputedStyle(document.documentElement);
+    var accent  = s.getPropertyValue('--accent-color').trim()  || '#FB8C00';
+    var info    = s.getPropertyValue('--info-color').trim()    || '#00897B';
+    var success = s.getPropertyValue('--success-color').trim() || '#43A047';
+    return [info, accent, success, '#8e24aa', '#e53935', '#1565c0', '#6d4c41', '#558b2f', '#c62828', '#00838f', '#4527a0'];
+}
+function monthSiteColor(site) {
+    if (!MONTH_PALETTE.length) MONTH_PALETTE = _buildMonthPalette();
+    if (!site) return '#757575';
+    if (!_monthSiteColors[site]) {
+        _monthSiteColors[site] = MONTH_PALETTE[_monthColorIdx % MONTH_PALETTE.length];
+        _monthColorIdx++;
+    }
+    return _monthSiteColors[site];
+}
+function monthColorizeAndLayout(container) {
+    container.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
+        var col = monthSiteColor(el.getAttribute('data-site') || '');
+        el.style.background = col;
+        el.style.borderLeft = '3px solid ' + col;
+    });
+    var area = container.querySelector('.gcal-events-area, .gcal-events-area-col');
+    if (!area) return;
+    var evs = Array.from(area.querySelectorAll('.gcal-ev'));
+    if (!evs.length) return;
+    var parsed = evs.map(function(el) {
+        var s = parseInt(el.getAttribute('data-start-min')) || 300;
+        var d = Math.max(1, parseInt(el.getAttribute('data-dur-min')) || 30);
+        return { el: el, start: s, end: s + d, col: 0 };
+    });
+    parsed.sort(function(a,b){ return a.start - b.start; });
+    var ends = [];
+    parsed.forEach(function(ev) {
+        var placed = false;
+        for (var c = 0; c < ends.length; c++) {
+            if (ends[c] <= ev.start) { ev.col = c; ends[c] = ev.end; placed = true; break; }
+        }
+        if (!placed) { ev.col = ends.length; ends.push(ev.end); }
+    });
+    var nc = ends.length || 1;
+    parsed.forEach(function(ev) {
+        var pct = 100 / nc;
+        ev.el.style.left  = (ev.col * pct + 0.3) + '%';
+        ev.el.style.width = (pct - 0.6) + '%';
+        ev.el.style.right = '';
+    });
+    var now = new Date();
+    var totalMin = now.getHours() * 60 + now.getMinutes();
+    var line = container.querySelector('.gcal-now-line');
+    if (line && totalMin >= 300 && totalMin <= 1320) {
+        line.style.top = (totalMin - 300) + 'px';
+        line.style.display = 'block';
+    }
+    var outer = container.querySelector('.gcal-grid-outer');
+    if (outer) {
+        var minsFromStart = totalMin - 300;
+        if (minsFromStart > 0) outer.scrollTop = Math.max(0, minsFromStart - 60);
+    }
+}
+function showMonthDayModal(dateStr, event) {
+    event.preventDefault();
+    document.getElementById('month-day-modal-title').textContent = dateStr;
+    var body = document.getElementById('month-day-modal-body');
+    body.innerHTML = '<p style="padding:20px;color:#888;">Loading...</p>';
+    document.getElementById('month-day-modal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    fetch('/todo/day/' + encodeURIComponent(dateStr) + '?embed=1', { credentials: 'same-origin' })
+    .then(function(r) {
+        if (!r.ok) return Promise.reject('HTTP ' + r.status);
+        return r.text();
+    })
+    .then(function(html) {
+        body.innerHTML = '';
+        var iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:100%;height:100%;border:none;flex:1;display:block;';
+        iframe.onload = function() {
+            try {
+                var outer = iframe.contentDocument.querySelector('.gcal-grid-outer');
+                if (outer) {
+                    var now = new Date();
+                    var minsFromStart = now.getHours() * 60 + now.getMinutes() - 300;
+                    if (minsFromStart > 0) outer.scrollTop = Math.max(0, minsFromStart - 60);
+                }
+            } catch(e) {}
+        };
+        iframe.srcdoc = html;
+        body.appendChild(iframe);
+    })
+    .catch(function(err) {
+        body.innerHTML = '<p style="padding:20px;color:#c00;">Could not load day view: ' + err + '</p>';
+    });
+}
+function closeMonthDayModal() {
+    document.getElementById('month-day-modal').style.display = 'none';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeMonthDayModal(); });
+</script>

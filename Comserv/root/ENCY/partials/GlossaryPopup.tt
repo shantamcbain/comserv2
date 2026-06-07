@@ -1,0 +1,5 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3><a href="/ENCY/Glossary/[% glossary_term.record_id %]" target="_blank">[% glossary_term.term | html %]</a></h3>
+  [% IF glossary_term.definition %]<p>[% glossary_term.definition | html %]</p>[% END %]
+</div>

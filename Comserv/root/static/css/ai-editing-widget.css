@@ -1,0 +1,271 @@
+/* AI Code Editor — Shanta admin workspace */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #1e1e1e;
+    color: #d4d4d4;
+}
+
+.aew-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    height: 42px;
+    padding: 0 0.75rem;
+    background: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+}
+
+.aew-header h1 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.aew-header .aew-sub {
+    font-size: 0.75rem;
+    color: #888;
+}
+
+.aew-header-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.aew-btn {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #333;
+    color: #eee;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.aew-btn:hover { background: #444; }
+.aew-btn-primary { background: #0e639c; border-color: #0e639c; }
+.aew-btn-primary:hover { background: #1177bb; }
+.aew-btn-success { background: #2a7a2a; border-color: #2a7a2a; }
+.aew-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.aew-main {
+    display: flex;
+    height: calc(100% - 42px);
+}
+
+.aew-files {
+    width: 240px;
+    min-width: 180px;
+    max-width: 320px;
+    border-right: 1px solid #3c3c3c;
+    background: #252526;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.aew-files-toolbar {
+    padding: 0.4rem;
+    border-bottom: 1px solid #3c3c3c;
+    display: flex;
+    gap: 0.3rem;
+}
+
+.aew-files-toolbar input {
+    flex: 1;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #1e1e1e;
+    color: #ccc;
+    font-size: 0.78rem;
+}
+
+.aew-tree {
+    flex: 1;
+    overflow: auto;
+    padding: 0.25rem 0;
+    font-size: 0.8rem;
+}
+
+.aew-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem 0.2rem 0.35rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.aew-tree-item:hover { background: #2a2d2e; }
+.aew-tree-item.active { background: #094771; color: #fff; }
+.aew-tree-item.dir { font-weight: 500; }
+.aew-tree-indent { display: inline-block; width: 12px; flex-shrink: 0; }
+
+.aew-editor-pane {
+    flex: 1;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    background: #1e1e1e;
+}
+
+.aew-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid #3c3c3c;
+    background: #2d2d2d;
+    font-size: 0.78rem;
+}
+
+.aew-editor-path {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #9cdcfe;
+    font-family: monospace;
+}
+
+.aew-editor {
+    flex: 1;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    resize: none;
+    padding: 0.6rem;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    outline: none;
+}
+
+.aew-chat-pane {
+    width: 380px;
+    min-width: 300px;
+    max-width: 480px;
+    border-left: 1px solid #3c3c3c;
+    background: #252526;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.aew-chat-toolbar {
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid #3c3c3c;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    font-size: 0.78rem;
+}
+
+.aew-chat-toolbar select {
+    padding: 0.25rem 0.4rem;
+    background: #1e1e1e;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-size: 0.78rem;
+}
+
+.aew-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.aew-msg {
+    margin-bottom: 0.6rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.aew-msg-user {
+    background: #264f78;
+    color: #e8e8e8;
+    margin-left: 0.5rem;
+}
+
+.aew-msg-ai {
+    background: #2d2d30;
+    color: #d4d4d4;
+    margin-right: 0.5rem;
+}
+
+.aew-msg-system {
+    background: #3a3a1a;
+    color: #dcdcaa;
+    font-size: 0.78rem;
+}
+
+.aew-fix-panel {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid #4a90d9;
+    border-radius: 4px;
+    background: #1a2a3a;
+}
+
+.aew-fix-panel pre {
+    max-height: 120px;
+    overflow: auto;
+    font-size: 0.72rem;
+    margin: 0.4rem 0;
+    background: #111;
+    padding: 0.4rem;
+}
+
+.aew-input-row {
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.45rem;
+    border-top: 1px solid #3c3c3c;
+}
+
+.aew-input-row textarea {
+    flex: 1;
+    min-height: 52px;
+    max-height: 120px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-size: 0.82rem;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.aew-status {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.72rem;
+    color: #888;
+    border-top: 1px solid #333;
+}
+
+.aew-status.err { color: #f48771; }
+.aew-status.ok { color: #89d185; }
+
+@media (max-width: 900px) {
+    .aew-files { width: 180px; }
+    .aew-chat-pane { width: 300px; }
+}

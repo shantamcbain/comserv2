@@ -236,5 +236,173 @@ sub revoke_user :Path('/admin/site_modules/revoke_user') :Args(1) {
     $c->detach;
 }
 
+sub _ensure_system_modules_table {
+    my ($self, $c) = @_;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        $dbh->do(q{
+            CREATE TABLE IF NOT EXISTS `system_modules` (
+                `key` VARCHAR(100) NOT NULL,
+                `name` VARCHAR(255) NOT NULL,
+                `owner` VARCHAR(100) NOT NULL,
+                `description` TEXT,
+                `route` VARCHAR(255) NOT NULL,
+                `monthly_cost` DECIMAL(10,2) NOT NULL DEFAULT '0.00',
+                `is_active` TINYINT(1) NOT NULL DEFAULT '1',
+                `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        });
+    };
+}
+
+sub _default_addon_catalog {
+    return (
+        { key => 'beekeeping', name => 'Beekeeping & Apiary Management', owner => 'BMaster', description => 'Track bee hives, apiaries, queen logs, and inspections.', route => '/apiary' },
+        { key => 'planning', name => 'AI Planning & Project System', owner => 'CSC', description => 'Advanced project planning, todo tracking, and AI-assisted workflows.', route => '/todo' },
+        { key => 'accounting', name => 'Accounting & Ledger System', owner => 'CSC', description => 'Chart of accounts, general ledger entries, inventory items, and suppliers.', route => '/Accounting' },
+        { key => 'ency', name => 'Encyclopedia & Herbal Database', owner => 'ENCY', description => 'Share scientific crop data, botanical encyclopedia, and medicinal herb logs.', route => '/ency' },
+        { key => 'ecommerce', name => 'E-Commerce & Store', owner => 'CSC', description => 'Sell products, list items, handle currency checkout, and manage shipping.', route => '/shop' },
+        { key => 'helpdesk', name => 'HelpDesk Support & Guide system', owner => 'CSC', description => 'Issue ticket tracking, linux guides, and support desk system.', route => '/helpdesk' },
+        { key => 'foraging', name => 'Foraging & Wild Harvesting Log', owner => 'Forager', description => 'Map and log foraging spots, wild harvest logs, and seasonal wild botany.', route => '/foraging' },
+        { key => 'brew', name => 'Brew — Brewhouse Management', owner => 'Brew', description => 'Beer, mead, wine, and brewhouse operations. Use brew.yourdomain.com.', route => '/brew' },
+        { key => 'membership', name => 'Multi-Site Membership System', owner => 'CSC', description => 'Set up recurring billing, regional pricing, payment gateways, and coins.', route => '/membership' },
+        { key => '3d', name => '3D Printing & Custom Fabrication', owner => '3D', description => 'Order 3D prints, upload design models, and track build queues.', route => '/3d' },
+    );
+}
+
+sub _addon_to_hash {
+    my ( $self, $addon ) = @_;
+    return unless $addon;
+    if ( ref($addon) eq 'HASH' ) {
+        return $addon;
+    }
+    return {
+        key          => $addon->get_column('key'),
+        name         => $addon->get_column('name'),
+        owner        => $addon->get_column('owner'),
+        description  => $addon->get_column('description'),
+        route        => $addon->get_column('route'),
+        monthly_cost => $addon->get_column('monthly_cost'),
+        is_active    => $addon->get_column('is_active'),
+    };
+}
+
+sub edit_addon :Path('/admin/site_modules/edit_addon') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $key = $c->req->param('key') || '';
+    unless ($key) {
+        $c->flash->{error_msg} = "No module key specified.";
+        $c->res->redirect($c->uri_for('/membership/addons'));
+        return $c->detach;
+    }
+
+    $self->_ensure_system_modules_table($c);
+
+    my $addon_row;
+    try {
+        $addon_row = $c->model('DBEncy')->resultset('SystemModule')->find($key);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_addon',
+            "Failed to load SystemModule: $_");
+    };
+
+    my $addon = $self->_addon_to_hash($addon_row);
+    unless ($addon) {
+        my ($found) = grep { $_->{key} eq $key } $self->_default_addon_catalog();
+        if ($found) {
+            $addon = { %$found, monthly_cost => 0, is_active => 1, catalog_source => 'builtin' };
+        }
+    } else {
+        $addon->{catalog_source} = 'database';
+    }
+
+    my @sitenames;
+    try {
+        @sitenames = $c->model('DBEncy')->resultset('Site')
+            ->search({}, { columns => ['name'], order_by => 'name' })
+            ->get_column('name')->all;
+    } catch {
+        @sitenames = ($c->stash->{SiteName} || $c->session->{SiteName} || 'CSC');
+    };
+
+    my $edit_site = $c->req->param('sitename')
+        || $c->stash->{SiteName}
+        || $c->session->{SiteName}
+        || 'CSC';
+
+    my $site_module;
+    try {
+        $site_module = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename    => $edit_site,
+            module_name => $key,
+        }, { rows => 1 })->single;
+    } catch { };
+
+    if ($c->req->method eq 'POST') {
+        my $name         = $c->req->param('name') || '';
+        my $owner        = $c->req->param('owner') || '';
+        my $description  = $c->req->param('description') || '';
+        my $route        = $c->req->param('route') || '';
+        my $monthly_cost = $c->req->param('monthly_cost') || 0;
+        my $is_active    = $c->req->param('is_active') ? 1 : 0;
+        my $site_enabled = $c->req->param('site_enabled') ? 1 : 0;
+        my $min_role     = $c->req->param('min_role') || 'member';
+        $edit_site       = $c->req->param('sitename') || $edit_site;
+
+        try {
+            $c->model('DBEncy')->resultset('SystemModule')->update_or_create(
+                {
+                    key          => $key,
+                    name         => $name,
+                    owner        => $owner,
+                    description  => $description,
+                    route        => $route,
+                    monthly_cost => $monthly_cost,
+                    is_active    => $is_active,
+                },
+                { key_cols => ['key'] }
+            );
+            $c->model('DBEncy')->resultset('SiteModule')->update_or_create(
+                {
+                    sitename    => $edit_site,
+                    module_name => $key,
+                    enabled     => $site_enabled,
+                    min_role    => $min_role,
+                },
+                { key => 'site_module_unique' }
+            );
+            $c->flash->{success_msg} = "Add-on '$key' saved (catalog + site $edit_site).";
+            $c->res->redirect($c->uri_for('/membership/addons'));
+            return $c->detach;
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_addon',
+                "Failed to save addon: $_");
+            $c->stash->{error_msg} = "Failed to save addon: $_";
+        };
+    }
+
+    unless ($addon) {
+        $c->stash(
+            error_msg => "Unknown add-on key '$key'. Add it under Module Access Control or choose a key from the catalog list.",
+            template  => 'admin/site_modules/edit_addon.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $c->stash(
+        addon         => $addon,
+        sitenames     => \@sitenames,
+        edit_site     => $edit_site,
+        site_enabled  => $site_module ? ($site_module->enabled ? 1 : 0) : 0,
+        site_min_role => $site_module ? ($site_module->min_role || 'member') : 'member',
+        template      => 'admin/site_modules/edit_addon.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
