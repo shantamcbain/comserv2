@@ -121,18 +121,27 @@ sub send_email {
         my $use_ssl     = ($ssl_setting eq 'ssl' || $port == 465) ? 1 : 0;
         my $use_starttls = ($ssl_setting eq 'starttls' || $port == 587) ? 1 : 0;
 
-        # Connect to the SMTP server
-        my $smtp = Net::SMTP->new(
-            $smtp_config->{host},
-            Port    => $port,
-            SSL     => $use_ssl,
-            Debug   => 1,
-            Timeout => 15
-        );
-        
+        # Connect to the SMTP server — retry up to 3 times for transient failures
+        my $smtp;
+        my $max_attempts = 3;
+        for my $attempt (1 .. $max_attempts) {
+            $smtp = Net::SMTP->new(
+                $smtp_config->{host},
+                Port    => $port,
+                SSL     => $use_ssl,
+                Debug   => 0,
+                Timeout => 15
+            );
+            last if $smtp;
+            my $err = $!;
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+                "SMTP connect attempt $attempt/$max_attempts failed: $err");
+            sleep(2) if $attempt < $max_attempts;
+        }
+
         unless ($smtp) {
             die "CONNECT failed: Could not connect to " . $smtp_config->{host} . ":$port"
-              . ($use_ssl ? " (SSL)" : "") . ": $!";
+              . ($use_ssl ? " (SSL)" : "") . " after $max_attempts attempts: $!";
         }
         
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
