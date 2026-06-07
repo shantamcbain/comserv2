@@ -3049,13 +3049,21 @@ sub _do_reschedule {
 
                 my $est_mins_int = int($est_mins + 0.5) || 5;
 
-                # Update scheduled_start/end and time_of_day (display time) only.
-                # Never touch start_date or due_date (those are the original dates).
+                # Cap start_date at the todo's own due_date so urgent/audit todos
+                # are never pushed months into the future.  due_date itself is
+                # never modified — only start_date, time_of_day, and scheduled_*.
+                my $todo_due = do {
+                    my $d = $todo->due_date;
+                    $d ? (ref($d) ? $d->ymd : substr("$d", 0, 10)) : '';
+                };
+                $new_start = $todo_due if $todo_due && $new_start gt $todo_due;
+
                 my $ok = eval {
                     $c->model('DBEncy')->storage->dbh->do(
-                        'UPDATE todo SET time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?',
+                        'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?',
                         undef,
-                        $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
+                        $new_start, $new_time_str,
+                        "$new_start $new_time_str", "$new_start $end_time_str",
                         $est_mins_int, $new_priority, 'reschedule', $today,
                         $todo->record_id
                     );
