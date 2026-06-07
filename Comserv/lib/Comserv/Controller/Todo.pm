@@ -3040,6 +3040,14 @@ sub _do_reschedule {
 
             my $est_mins_int = int($est_mins + 0.5) || 5;
 
+            # Never push start_date past the todo's own due_date.
+            # Error/audit todos have due_date=today; scheduling them to August is wrong.
+            my $todo_due = do {
+                my $d = $new_due_date || ($todo->due_date ? (ref($todo->due_date) ? $todo->due_date->ymd : $todo->due_date) : '');
+                $d ? substr($d, 0, 10) : '';
+            };
+            $new_start = $todo_due if $todo_due && $new_start gt $todo_due;
+
             my $ok = eval {
                 my $sql;
                 my @bind;
