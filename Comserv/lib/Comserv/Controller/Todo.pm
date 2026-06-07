@@ -3049,13 +3049,13 @@ sub _do_reschedule {
 
                 my $est_mins_int = int($est_mins + 0.5) || 5;
 
-                # Only update scheduled_start and scheduled_end — never touch
-                # start_date, due_date, or time_of_day (those are the original dates).
+                # Update scheduled_start/end and time_of_day (display time) only.
+                # Never touch start_date or due_date (those are the original dates).
                 my $ok = eval {
                     $c->model('DBEncy')->storage->dbh->do(
-                        'UPDATE todo SET scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?',
+                        'UPDATE todo SET time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?',
                         undef,
-                        "$new_start $new_time_str", "$new_start $end_time_str",
+                        $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
                         $est_mins_int, $new_priority, 'reschedule', $today,
                         $todo->record_id
                     );
