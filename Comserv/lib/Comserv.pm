@@ -19,6 +19,7 @@ use Catalyst qw/
     Static::Simple
     Session
     Session::State::Cookie
+    Session::Store::Dummy
     Authentication
 /;
 
