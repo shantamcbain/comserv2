@@ -417,7 +417,8 @@ EMAIL
     }
 }
 
-_start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1';
+my $_is_dev_worktree = ($FindBin::Bin =~ m{\.zenflow[\\/]worktrees[\\/]});
+_start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
 
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 
