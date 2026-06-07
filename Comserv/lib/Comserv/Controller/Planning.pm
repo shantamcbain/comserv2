@@ -864,18 +864,19 @@ sub daily :Path('/planning/daily') :Args {
         audit_todos => do {
             my @at;
             eval {
+                my @done_vals = (3, 4, 'done', 'completed', 'Completed', 'DONE', 'Closed', 'closed');
                 my $audit_cond = {
                     -or => [
                         { subject => { -like => '%Morning Audit%' } },
                         { subject => { -like => '[Error]%' } },
                     ],
-                    status  => { -in => [1, 2, 5] },
+                    status  => { -not_in => \@done_vals },
                 };
                 $audit_cond->{sitename} = $sitename unless $is_csc;
                 my %audit_cond = %$audit_cond;
                 my @roots = $c->model('DBEncy')->resultset('Todo')->search(
                     \%audit_cond,
-                    { order_by => { -desc => 'start_date' }, rows => 10 }
+                    { order_by => { -desc => 'date_time_posted' }, rows => 50 }
                 )->all;
                 my %proj_cache;
                 my $resolve_proj = sub {
@@ -893,13 +894,35 @@ sub daily :Path('/planning/daily') :Args {
                     return $name;
                 };
 
+                my $tdrs = $c->model('DBEncy')->resultset('Todo');
                 for my $root (@roots) {
+                    my $rid = $root->record_id;
+
+                    # Auto-close Morning Audit roots whose sub-todos are all done
+                    if ($root->subject =~ /Morning Audit/i) {
+                        my $total_children = eval { $tdrs->search({ parent_id => $rid })->count } // 0;
+                        my $open_children  = eval {
+                            $tdrs->search({ parent_id => $rid,
+                                            status     => { -not_in => \@done_vals } })->count
+                        } // 1;
+                        if ($total_children > 0 && $open_children == 0) {
+                            eval {
+                                $tdrs->search({ record_id => $rid })->update({
+                                    status      => 3,
+                                    last_mod_by => 'auto-close',
+                                    last_mod_date => $current_date_str,
+                                });
+                            };
+                            next;
+                        }
+                    }
+
                     my %cols = $root->get_columns;
                     $cols{project_name} = $resolve_proj->($root);
                     push @at, { %cols, is_root => 1 };
-                    my @children = $c->model('DBEncy')->resultset('Todo')->search(
-                        { parent_id => $root->record_id,
-                          status    => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                    my @children = $tdrs->search(
+                        { parent_id => $rid,
+                          status    => { -not_in => \@done_vals } },
                         { order_by => { -asc => 'priority' } }
                     )->all;
                     for my $ch (@children) {
