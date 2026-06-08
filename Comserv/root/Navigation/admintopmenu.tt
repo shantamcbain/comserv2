@@ -31,7 +31,9 @@
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
                 <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
                 <a href='/ProxyManager'><i class="icon-proxy"></i>Proxy Manager</a>
-                <a href="/admin/compare_schema"><i class="icon-schema"></i>Schema Compare</a>
+                <a href="/admin/schema_compare"><i class="icon-schema"></i>Schema Compare &amp; Migration</a>
+                <a href="/admin/environment_variables"><i class="icon-settings"></i>DB Passwords / Env</a>
+                <a href="/remotedb"><i class="icon-server"></i>Database Servers</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
             </div>
         </div>

@@ -1,0 +1,394 @@
+[% META title = 'Migration Server Database Setup Guide' %]
+[% META description = 'How to connect the Schema Compare tool to the new MySQL and PostgreSQL servers on 192.168.1.20 for production database migration planning.' %]
+[% PageVersion = 'Documentation/migration-server-database-setup.tt,v 1.1 2026/06/08 shanta Exp' %]
+
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="documentation-container">
+    <header class="doc-header">
+        <h1><i class="fas fa-server"></i> Migration Server Database Setup Guide</h1>
+        <div class="doc-meta">
+            <span class="doc-version"><i class="fas fa-tag"></i> Version 1.1</span>
+            <span class="doc-date"><i class="fas fa-calendar"></i> June 8, 2026</span>
+            <span class="doc-author"><i class="fas fa-user"></i> shanta</span>
+        </div>
+        <p style="margin-top:1rem;color:var(--text-muted-color,#666);">
+            This guide explains how to connect the Schema Compare tool to the new MySQL and PostgreSQL
+            servers running in Docker on <strong>192.168.1.20</strong>, so you can view and plan the
+            migration of production data to the new VM.
+        </p>
+    </header>
+
+    <nav class="doc-toc">
+        <h2><i class="fas fa-list"></i> Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#architecture">How It Works</a></li>
+            <li><a href="#navigation">Finding the Tools</a></li>
+            <li><a href="#set-passwords">Step 1 — Set the Passwords</a></li>
+            <li><a href="#restart">Step 2 — Restart the App</a></li>
+            <li><a href="#verify">Step 3 — Verify Connection</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+            <li><a href="#server-details">New Server Details</a></li>
+        </ul>
+    </nav>
+
+    <!-- Overview -->
+    <section id="overview" class="doc-section">
+        <h2><i class="fas fa-info-circle"></i> Overview</h2>
+
+        <div class="overview-card">
+            <h3>What was set up</h3>
+            <p>
+                A new VM at <strong>192.168.1.20</strong> runs two database servers inside Docker containers:
+                a <strong>MySQL server</strong> on port <strong>3307</strong> and a
+                <strong>PostgreSQL server</strong> on port <strong>5433</strong>.
+                These are the migration targets — the new home for the production database.
+            </p>
+            <p>
+                The Schema Compare page (<code>/admin/schema_compare</code>) now includes two extra
+                read-only sections at the bottom that show you what databases already exist on the new
+                servers, so you can plan the migration side-by-side with the current production schema.
+            </p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3><i class="fas fa-eye"></i> Read-Only View</h3>
+                <p>The new server sections are view-only — no sync or create buttons. They are there to let you see what is on the new server without risk of accidental changes.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-lock"></i> Secure Credentials</h3>
+                <p>Passwords are stored in the <code>Comserv/.env</code> file (gitignored, never committed). You manage them through the Admin UI — never in source code or JSON config files.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-database"></i> Two Servers</h3>
+                <p>MySQL Docker (port 3307) for the relational data migration, and PostgreSQL Docker (port 5433) as the future database engine for the new stack.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture -->
+    <section id="architecture" class="doc-section">
+        <h2><i class="fas fa-project-diagram"></i> How It Works</h2>
+
+        <p>The following diagram shows the full flow from the Admin UI to the new servers:</p>
+
+        <div style="background:var(--card-bg-color,#f8f9fa);border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1.5rem;margin:1rem 0;font-family:monospace;font-size:0.9rem;line-height:2;">
+            <strong>Admin Dashboard</strong> → <em>Database Management</em> → <strong>Schema Compare &amp; Migration</strong><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
+            <strong>Schema Compare page</strong> (<code>/admin/schema_compare</code>)<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;Calls <code>Admin.pm → get_database_comparison()</code><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ reads <code>$ENV{MIGRATION_MYSQL_PASSWORD}</code><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ reads <code>$ENV{MIGRATION_POSTGRES_PASSWORD}</code><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ connects via DBI directly to 192.168.1.20<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ lists all user databases + table counts<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ renders read-only sections in Schema Compare UI
+        </div>
+
+        <h3>Where credentials are stored</h3>
+        <table class="doc-table" style="width:100%;border-collapse:collapse;margin:1rem 0;">
+            <thead>
+                <tr style="background:var(--primary-color,#007bff);color:#fff;">
+                    <th style="padding:10px;text-align:left;">What</th>
+                    <th style="padding:10px;text-align:left;">Where</th>
+                    <th style="padding:10px;text-align:left;">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;"><code>MIGRATION_MYSQL_PASSWORD</code></td>
+                    <td style="padding:10px;"><code>Comserv/.env</code></td>
+                    <td style="padding:10px;">Gitignored. Edit via Admin UI.</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;"><code>MIGRATION_POSTGRES_PASSWORD</code></td>
+                    <td style="padding:10px;"><code>Comserv/.env</code></td>
+                    <td style="padding:10px;">Gitignored. Edit via Admin UI.</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;">Source of truth (new VM)</td>
+                    <td style="padding:10px;"><code>/opt/csc-db/.env</code> on 192.168.1.20</td>
+                    <td style="padding:10px;"><code>MYSQL_ROOT_PASSWORD</code> and <code>POSTGRES_PASSWORD</code></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Navigation -->
+    <section id="navigation" class="doc-section">
+        <h2><i class="fas fa-map-signs"></i> Finding the Tools</h2>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3><i class="fas fa-route"></i> To set passwords</h3>
+                <ol style="margin:0.5rem 0 0 1rem;padding:0;">
+                    <li>Go to <strong>Admin Dashboard</strong></li>
+                    <li>Click <strong>Database Management</strong> section</li>
+                    <li>Click <strong>"DB Connection Passwords"</strong></li>
+                    <li>Find <code>MIGRATION_MYSQL_PASSWORD</code> or <code>MIGRATION_POSTGRES_PASSWORD</code></li>
+                    <li>Click <strong>Edit</strong> → enter value → Save</li>
+                </ol>
+                <p style="margin-top:0.75rem;">
+                    <a href="[% c.uri_for('/admin/environment_variables') %]" class="btn btn-primary" style="display:inline-block;padding:0.4rem 1rem;background:var(--primary-color,#007bff);color:#fff;border-radius:4px;text-decoration:none;">
+                        <i class="fas fa-key"></i> Open DB Connection Passwords
+                    </a>
+                </p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-route"></i> To view migration servers</h3>
+                <ol style="margin:0.5rem 0 0 1rem;padding:0;">
+                    <li>Go to <strong>Admin Dashboard</strong></li>
+                    <li>Click <strong>Database Management</strong> section</li>
+                    <li>Click <strong>"Schema Compare &amp; Migration"</strong></li>
+                    <li>Scroll to the bottom of the page</li>
+                    <li>Expand <strong>"New Server — MySQL Docker"</strong> or <strong>"New Server — PostgreSQL Docker"</strong></li>
+                </ol>
+                <p style="margin-top:0.75rem;">
+                    <a href="[% c.uri_for('/admin/schema_compare') %]" class="btn btn-primary" style="display:inline-block;padding:0.4rem 1rem;background:var(--primary-color,#007bff);color:#fff;border-radius:4px;text-decoration:none;">
+                        <i class="fas fa-code-branch"></i> Open Schema Compare
+                    </a>
+                </p>
+            </div>
+        </div>
+
+        <!-- UI Screenshots for Navigation Reference -->
+        <div class="doc-images" style="margin: 1.5rem 0; text-align: center; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem;">
+            <div style="flex: 1; min-width: 280px; max-width: 48%; border: 1px solid var(--border-color,#dee2e6); border-radius: 6px; padding: 10px; background: var(--card-bg-color,#fff); box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <img src="/static/images/documentation/admin_guides_nav.png" alt="Admin Guides Navigation" style="width: 100%; height: auto; border-radius: 4px; border: 1px solid #eee;" />
+                <p style="font-size: 0.85rem; color: var(--text-muted-color,#666); margin: 8px 0 0 0; font-weight: bold;">
+                    <i class="fas fa-image"></i> Administrator Guides Section
+                </p>
+            </div>
+            <div style="flex: 1; min-width: 280px; max-width: 48%; border: 1px solid var(--border-color,#dee2e6); border-radius: 6px; padding: 10px; background: var(--card-bg-color,#fff); box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <img src="/static/images/documentation/user_guides_nav.png" alt="User Guides Navigation" style="width: 100%; height: auto; border-radius: 4px; border: 1px solid #eee;" />
+                <p style="font-size: 0.85rem; color: var(--text-muted-color,#666); margin: 8px 0 0 0; font-weight: bold;">
+                    <i class="fas fa-image"></i> User Guides Section
+                </p>
+            </div>
+        </div>
+
+        <div class="warning-box" style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:1rem;margin:1rem 0;">
+            <strong><i class="fas fa-exclamation-triangle"></i> Important:</strong>
+            The Environment Configuration section (under "Config" in the quick nav) also links to Environment Variables,
+            but <strong>Database Management → DB Connection Passwords</strong> is the intended path for DB-related credentials.
+            Both routes lead to the same page.
+        </div>
+    </section>
+
+    <!-- Step 1 -->
+    <section id="set-passwords" class="doc-section">
+        <h2><i class="fas fa-key"></i> Step 1 — Set the Passwords</h2>
+
+        <div class="step-list" style="counter-reset:steps;">
+
+            <div class="step" style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+                <div style="min-width:2rem;height:2rem;background:var(--primary-color,#007bff);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;">1</div>
+                <div>
+                    <h4 style="margin:0 0 0.25rem;">Get the passwords from the new VM</h4>
+                    <p>SSH into <strong>192.168.1.20</strong> and run:</p>
+                    <pre style="background:#1e1e1e;color:#d4d4d4;padding:0.75rem;border-radius:4px;overflow-x:auto;">cat /opt/csc-db/.env | grep -E "MYSQL_ROOT_PASSWORD|POSTGRES_PASSWORD"</pre>
+                    <p>Note the values — you will need them in the next step.</p>
+                </div>
+            </div>
+
+            <div class="step" style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+                <div style="min-width:2rem;height:2rem;background:var(--primary-color,#007bff);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;">2</div>
+                <div>
+                    <h4 style="margin:0 0 0.25rem;">Open DB Connection Passwords in the Admin UI</h4>
+                    <p>From the Admin Dashboard → <strong>Database Management</strong> → <strong>DB Connection Passwords</strong>, or go directly:</p>
+                    <p>
+                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="display:inline-block;padding:0.4rem 1rem;background:var(--primary-color,#007bff);color:#fff;border-radius:4px;text-decoration:none;">
+                            <i class="fas fa-external-link-alt"></i> Admin → Environment Variables
+                        </a>
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+                <div style="min-width:2rem;height:2rem;background:var(--primary-color,#007bff);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;">3</div>
+                <div>
+                    <h4 style="margin:0 0 0.25rem;">Set MIGRATION_MYSQL_PASSWORD</h4>
+                    <p>In the variable list, find <code>MIGRATION_MYSQL_PASSWORD</code> → click <strong>Edit</strong> → paste the value of <code>MYSQL_ROOT_PASSWORD</code> from the new VM → click <strong>Save</strong>.</p>
+                    <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:4px;padding:0.5rem 0.75rem;margin-top:0.5rem;font-size:0.9rem;">
+                        <i class="fas fa-check-circle" style="color:#28a745;"></i> The field is masked because it contains "PASSWORD" — this is correct behaviour.
+                    </div>
+                </div>
+            </div>
+
+            <div class="step" style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+                <div style="min-width:2rem;height:2rem;background:var(--primary-color,#007bff);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;">4</div>
+                <div>
+                    <h4 style="margin:0 0 0.25rem;">Set MIGRATION_POSTGRES_PASSWORD</h4>
+                    <p>Find <code>MIGRATION_POSTGRES_PASSWORD</code> → click <strong>Edit</strong> → paste the value of <code>POSTGRES_PASSWORD</code> from the new VM → click <strong>Save</strong>.</p>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Step 2 -->
+    <section id="restart" class="doc-section">
+        <h2><i class="fas fa-redo"></i> Step 2 — Restart the App</h2>
+
+        <p>
+            Environment variables are loaded <strong>once at startup</strong>. After saving passwords, the app must be restarted before the new values take effect.
+        </p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3><i class="fas fa-docker"></i> If running in Docker</h3>
+                <pre style="background:#1e1e1e;color:#d4d4d4;padding:0.75rem;border-radius:4px;font-size:0.85rem;">docker compose restart web</pre>
+                <p style="font-size:0.85rem;">Or from the Admin Dashboard → Docker Containers → restart the <code>web</code> container.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-terminal"></i> If running natively</h3>
+                <pre style="background:#1e1e1e;color:#d4d4d4;padding:0.75rem;border-radius:4px;font-size:0.85rem;">cd /home/shanta/PycharmProjects/comserv2/Comserv
+perl script/comserv_server.pl -r</pre>
+                <p style="font-size:0.85rem;">The <code>-r</code> flag auto-restarts on file changes during development.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Step 3 -->
+    <section id="verify" class="doc-section">
+        <h2><i class="fas fa-check-circle"></i> Step 3 — Verify Connection</h2>
+
+        <ol style="line-height:2;">
+            <li>Go to <strong>Admin Dashboard → Database Management → Schema Compare &amp; Migration</strong></li>
+            <li>Scroll to the bottom of the page</li>
+            <li>The <strong>"New Server — MySQL Docker (192.168.1.20:3307)"</strong> section should show a green <strong>Connected</strong> badge</li>
+            <li>The <strong>"New Server — PostgreSQL Docker (192.168.1.20:5433)"</strong> section should show a green <strong>Connected</strong> badge</li>
+            <li>Expand each section to see the list of databases on the new server</li>
+        </ol>
+
+        <div class="success-box" style="background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;padding:1rem;margin:1rem 0;">
+            <strong><i class="fas fa-check-circle" style="color:#28a745;"></i> What a successful connection looks like:</strong>
+            <ul style="margin:0.5rem 0 0 1rem;">
+                <li>Green <strong>Connected</strong> badge next to the server name</li>
+                <li>A list of user databases (system databases like <code>information_schema</code> are hidden)</li>
+                <li>For MySQL: each database shows a table count</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Troubleshooting -->
+    <section id="troubleshooting" class="doc-section">
+        <h2><i class="fas fa-wrench"></i> Troubleshooting</h2>
+
+        <div class="troubleshooting-grid" style="display:grid;gap:1rem;">
+
+            <div style="border:1px solid var(--border-color,#dee2e6);border-radius:6px;padding:1rem;">
+                <h4 style="color:var(--danger-color,#dc3545);margin:0 0 0.5rem;"><i class="fas fa-exclamation-circle"></i> "MIGRATION_MYSQL_PASSWORD not set"</h4>
+                <p><strong>Cause:</strong> The env var is empty or the app was not restarted after saving.</p>
+                <p><strong>Fix:</strong></p>
+                <ol>
+                    <li>Go to <a href="[% c.uri_for('/admin/environment_variables') %]">Admin → Environment Variables</a></li>
+                    <li>Confirm <code>MIGRATION_MYSQL_PASSWORD</code> has a non-empty value</li>
+                    <li>Restart the app</li>
+                </ol>
+            </div>
+
+            <div style="border:1px solid var(--border-color,#dee2e6);border-radius:6px;padding:1rem;">
+                <h4 style="color:var(--danger-color,#dc3545);margin:0 0 0.5rem;"><i class="fas fa-exclamation-circle"></i> "MySQL connection failed: Access denied"</h4>
+                <p><strong>Cause:</strong> Wrong password, or the MySQL root user does not allow connections from this machine's IP.</p>
+                <p><strong>Fix:</strong></p>
+                <ol>
+                    <li>Double-check the password from <code>/opt/csc-db/.env</code> on 192.168.1.20</li>
+                    <li>On 192.168.1.20, run: <code>docker exec -it &lt;mysql-container&gt; mysql -u root -p</code> and verify <code>GRANT ALL ON *.* TO 'root'@'%'</code></li>
+                </ol>
+            </div>
+
+            <div style="border:1px solid var(--border-color,#dee2e6);border-radius:6px;padding:1rem;">
+                <h4 style="color:var(--danger-color,#dc3545);margin:0 0 0.5rem;"><i class="fas fa-exclamation-circle"></i> "MySQL connection failed: Can't connect to server"</h4>
+                <p><strong>Cause:</strong> Port 3307 is not reachable — Docker container may not be running, or firewall is blocking the port.</p>
+                <p><strong>Fix:</strong></p>
+                <ol>
+                    <li>On 192.168.1.20: <code>docker compose ps</code> — verify MySQL container is running</li>
+                    <li>Check port binding: <code>docker compose port db 3306</code> should show <code>0.0.0.0:3307</code></li>
+                    <li>Test from this machine: <code>nc -zv 192.168.1.20 3307</code></li>
+                </ol>
+            </div>
+
+            <div style="border:1px solid var(--border-color,#dee2e6);border-radius:6px;padding:1rem;">
+                <h4 style="color:var(--danger-color,#dc3545);margin:0 0 0.5rem;"><i class="fas fa-exclamation-circle"></i> "DBD::Pg not installed"</h4>
+                <p><strong>Cause:</strong> The PostgreSQL Perl driver is not yet installed in this environment.</p>
+                <p><strong>Fix:</strong></p>
+                <pre style="background:#1e1e1e;color:#d4d4d4;padding:0.75rem;border-radius:4px;font-size:0.85rem;">cd /home/shanta/PycharmProjects/comserv2/Comserv
+cpanm --installdeps .</pre>
+                <p>Or install directly: <code>cpanm DBD::Pg</code></p>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Server Details -->
+    <section id="server-details" class="doc-section">
+        <h2><i class="fas fa-server"></i> New Server Details</h2>
+
+        <table class="doc-table" style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:var(--primary-color,#007bff);color:#fff;">
+                    <th style="padding:10px;text-align:left;">Property</th>
+                    <th style="padding:10px;text-align:left;">MySQL Docker</th>
+                    <th style="padding:10px;text-align:left;">PostgreSQL Docker</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;"><strong>Host</strong></td>
+                    <td style="padding:10px;">192.168.1.20</td>
+                    <td style="padding:10px;">192.168.1.20</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;"><strong>Port</strong></td>
+                    <td style="padding:10px;">3307 (Docker) / 3306 (native system service)</td>
+                    <td style="padding:10px;">5433 (Docker) / 5432 (native system service)</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;"><strong>User</strong></td>
+                    <td style="padding:10px;">root</td>
+                    <td style="padding:10px;">postgres</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;"><strong>Password source</strong></td>
+                    <td style="padding:10px;"><code>MYSQL_ROOT_PASSWORD</code> in <code>/opt/csc-db/.env</code> on the VM</td>
+                    <td style="padding:10px;"><code>POSTGRES_PASSWORD</code> in <code>/opt/csc-db/.env</code> on the VM</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border-color,#dee2e6);">
+                    <td style="padding:10px;"><strong>Env var in Comserv</strong></td>
+                    <td style="padding:10px;"><code>MIGRATION_MYSQL_PASSWORD</code></td>
+                    <td style="padding:10px;"><code>MIGRATION_POSTGRES_PASSWORD</code></td>
+                </tr>
+                <tr>
+                    <td style="padding:10px;"><strong>Purpose</strong></td>
+                    <td style="padding:10px;">Migration target — read-only view in Schema Compare</td>
+                    <td style="padding:10px;">Future database engine — read-only view in Schema Compare</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="margin-top:1.5rem;padding:1rem;background:var(--card-bg-color,#f8f9fa);border-radius:6px;border:1px solid var(--border-color,#dee2e6);">
+            <h4><i class="fas fa-code"></i> Related Code Files</h4>
+            <ul style="margin:0.5rem 0 0 1rem;font-family:monospace;font-size:0.9rem;">
+                <li><code>Comserv/lib/Comserv/Controller/Admin.pm</code> — <code>get_migration_mysql_info()</code>, <code>get_migration_postgres_info()</code></li>
+                <li><code>Comserv/root/admin/schema_compare.tt</code> — Migration server UI sections</li>
+                <li><code>Comserv/root/admin/index.tt</code> — Database Management nav links</li>
+                <li><code>Comserv/.env</code> — Credential storage (gitignored)</li>
+                <li><code>Comserv/lib/Comserv/Controller/Admin/EnvironmentVariables.pm</code> — Admin UI for editing <code>.env</code></li>
+            </ul>
+        </div>
+    </section>
+
+    <footer class="doc-footer" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border-color,#dee2e6);color:var(--text-muted-color,#666);font-size:0.85rem;">
+        <p>
+            <strong>Related guides:</strong>
+            <a href="[% c.uri_for('/documentation/schema-compare-guide') %]">Schema Compare Tool Guide</a>
+            &bull;
+            <a href="[% c.uri_for('/admin/schema_compare') %]">Open Schema Compare</a>
+            &bull;
+            <a href="[% c.uri_for('/admin/environment_variables') %]">Environment Variables</a>
+        </p>
+    </footer>
+
+</div>
