@@ -7703,10 +7703,56 @@ sub get_migration_mysql_info {
         my @databases;
         while (my ($db_name) = $sth->fetchrow_array()) {
             next if $db_name =~ /^(information_schema|performance_schema|sys|mysql)$/i;
-            my $tbl_sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?");
-            $tbl_sth->execute($db_name);
-            my ($table_count) = $tbl_sth->fetchrow_array();
-            push @databases, { name => $db_name, table_count => $table_count };
+
+            my $db_entry = { name => $db_name, tables => [], table_count => 0, error => undef };
+
+            eval {
+                # Get all tables in this database
+                my $tbl_sth = $dbh->prepare(
+                    "SELECT TABLE_NAME 
+                     FROM information_schema.TABLES 
+                     WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'
+                     ORDER BY TABLE_NAME"
+                );
+                $tbl_sth->execute($db_name);
+
+                my @tables;
+                while (my ($tname) = $tbl_sth->fetchrow_array()) {
+                    # Fetch column details for this table
+                    my $col_sth = $dbh->prepare(
+                        "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE, COLUMN_DEFAULT
+                         FROM information_schema.COLUMNS
+                         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+                         ORDER BY ORDINAL_POSITION"
+                    );
+                    $col_sth->execute($db_name, $tname);
+
+                    my @cols;
+                    while (my ($col_name, $data_type, $char_max_len, $is_nullable, $col_default) = $col_sth->fetchrow_array()) {
+                        push @cols, {
+                            column_name              => $col_name,
+                            data_type                => $data_type,
+                            character_maximum_length => $char_max_len,
+                            is_nullable              => $is_nullable,
+                            column_default           => $col_default,
+                        };
+                    }
+
+                    push @tables, {
+                        name      => $tname,
+                        columns   => \@cols,
+                        col_count => scalar(@cols),
+                    };
+                }
+
+                $db_entry->{tables}      = \@tables;
+                $db_entry->{table_count} = scalar(@tables);
+            };
+            if ($@) {
+                $db_entry->{error} = "Failed to query database metadata: $@";
+            }
+
+            push @databases, $db_entry;
         }
         $dbh->disconnect();
 
