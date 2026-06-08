@@ -583,6 +583,62 @@
                                     <i class="fas fa-chevron-down" style="font-size:0.8rem;color:#6c757d;"></i>
                                 </div>
                                 <div style="padding:0.5rem 1rem;display:none;">
+                                [% IF db.has_mapped_schema %]
+                                    <div style="display:flex;flex-direction:column;gap:0.8rem;">
+                                        [% IF db.tables_with_results.size > 0 %]
+                                            <div>
+                                                <h5 style="margin:0 0 0.4rem 0;font-size:0.85rem;color:#198754;border-bottom:1px solid #dee2e6;padding-bottom:2px;"><i class="fas fa-check-circle"></i> Tables with Result Files ([% db.tables_with_results.size %])</h5>
+                                                [% FOREACH tbl_comp IN db.tables_with_results %]
+                                                    <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:4px;padding:0.4rem 0.6rem;margin-bottom:0.3rem;">
+                                                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                                                            <span style="font-family:monospace;font-size:0.8rem;font-weight:bold;">
+                                                                <i class="fas fa-table" style="color:#6c757d;margin-right:0.3rem;"></i>[% tbl_comp.table_name | html %]
+                                                            </span>
+                                                            [% IF tbl_comp.sync_status == 'synchronized' %]
+                                                                <span style="color:#198754;font-size:0.7rem;font-weight:bold;"><i class="fas fa-check"></i> Sync OK</span>
+                                                            [% ELSE %]
+                                                                <span style="color:#dc3545;font-size:0.7rem;font-weight:bold;"><i class="fas fa-exclamation-triangle"></i> Drifted ([% tbl_comp.differences.size %] issues)</span>
+                                                            [% END %]
+                                                        </div>
+                                                        [% IF tbl_comp.differences.size > 0 %]
+                                                            <ul style="margin:0.25rem 0 0 0.8rem;padding:0;font-size:0.75rem;color:#b02a37;list-style-type:square;">
+                                                            [% FOREACH diff IN tbl_comp.differences %]
+                                                                <li>[% diff.description | html %]</li>
+                                                            [% END %]
+                                                            </ul>
+                                                        [% END %]
+                                                    </div>
+                                                [% END %]
+                                            </div>
+                                        [% END %]
+                                        
+                                        [% IF db.tables_without_results.size > 0 %]
+                                            <div>
+                                                <h5 style="margin:0 0 0.4rem 0;font-size:0.85rem;color:#fd7e14;border-bottom:1px solid #dee2e6;padding-bottom:2px;"><i class="fas fa-plus-square"></i> Tables without Result Files ([% db.tables_without_results.size %])</h5>
+                                                <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+                                                [% FOREACH tbl IN db.tables_without_results %]
+                                                    <span style="background:#fff3e0;color:#e65100;padding:0.2rem 0.4rem;border-radius:4px;font-size:0.75rem;font-family:monospace;border:1px solid #ffe0b2;">
+                                                        <i class="fas fa-table"></i> [% tbl.table_name | html %]
+                                                    </span>
+                                                [% END %]
+                                                </div>
+                                            </div>
+                                        [% END %]
+                                        
+                                        [% IF db.results_without_tables.size > 0 %]
+                                            <div>
+                                                <h5 style="margin:0 0 0.4rem 0;font-size:0.85rem;color:#0dcaf0;border-bottom:1px solid #dee2e6;padding-bottom:2px;"><i class="fas fa-exclamation-circle"></i> Result Files without Tables ([% db.results_without_tables.size %])</h5>
+                                                <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+                                                [% FOREACH res IN db.results_without_tables %]
+                                                    <span style="background:#e0f7fa;color:#006064;padding:0.2rem 0.4rem;border-radius:4px;font-size:0.75rem;font-family:monospace;border:1px solid #b2ebf2;" title="[% res.result_path | html %]">
+                                                        <i class="fas fa-file-alt"></i> [% res.result_name | html %]
+                                                    </span>
+                                                [% END %]
+                                                </div>
+                                            </div>
+                                        [% END %]
+                                    </div>
+                                [% ELSE %]
                                 [% IF db.tables.size > 0 %]
                                     [% FOREACH tbl IN db.tables %]
                                     <div style="margin-bottom:0.3rem;border:1px solid #dee2e6;border-radius:4px;overflow:hidden;">
@@ -618,6 +674,7 @@
                                     [% END %]
                                 [% ELSE %]
                                     <p style="color:#6c757d;font-size:0.85rem;margin:0.5rem 0;">No tables found in this database.</p>
+                                [% END %]
                                 [% END %]
                                 </div>
                             </div>
@@ -688,6 +745,62 @@
                                     <i class="fas fa-chevron-down" style="font-size:0.8rem;color:#6c757d;"></i>
                                 </div>
                                 <div style="padding:0.5rem 1rem;display:none;">
+                                [% IF db.has_mapped_schema %]
+                                    <div style="display:flex;flex-direction:column;gap:0.8rem;">
+                                        [% IF db.tables_with_results.size > 0 %]
+                                            <div>
+                                                <h5 style="margin:0 0 0.4rem 0;font-size:0.85rem;color:#198754;border-bottom:1px solid #dee2e6;padding-bottom:2px;"><i class="fas fa-check-circle"></i> Tables with Result Files ([% db.tables_with_results.size %])</h5>
+                                                [% FOREACH tbl_comp IN db.tables_with_results %]
+                                                    <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:4px;padding:0.4rem 0.6rem;margin-bottom:0.3rem;">
+                                                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                                                            <span style="font-family:monospace;font-size:0.8rem;font-weight:bold;">
+                                                                <i class="fas fa-table" style="color:#6c757d;margin-right:0.3rem;"></i>[% tbl_comp.table_name | html %]
+                                                            </span>
+                                                            [% IF tbl_comp.sync_status == 'synchronized' %]
+                                                                <span style="color:#198754;font-size:0.7rem;font-weight:bold;"><i class="fas fa-check"></i> Sync OK</span>
+                                                            [% ELSE %]
+                                                                <span style="color:#dc3545;font-size:0.7rem;font-weight:bold;"><i class="fas fa-exclamation-triangle"></i> Drifted ([% tbl_comp.differences.size %] issues)</span>
+                                                            [% END %]
+                                                        </div>
+                                                        [% IF tbl_comp.differences.size > 0 %]
+                                                            <ul style="margin:0.25rem 0 0 0.8rem;padding:0;font-size:0.75rem;color:#b02a37;list-style-type:square;">
+                                                            [% FOREACH diff IN tbl_comp.differences %]
+                                                                <li>[% diff.description | html %]</li>
+                                                            [% END %]
+                                                            </ul>
+                                                        [% END %]
+                                                    </div>
+                                                [% END %]
+                                            </div>
+                                        [% END %]
+                                        
+                                        [% IF db.tables_without_results.size > 0 %]
+                                            <div>
+                                                <h5 style="margin:0 0 0.4rem 0;font-size:0.85rem;color:#fd7e14;border-bottom:1px solid #dee2e6;padding-bottom:2px;"><i class="fas fa-plus-square"></i> Tables without Result Files ([% db.tables_without_results.size %])</h5>
+                                                <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+                                                [% FOREACH tbl IN db.tables_without_results %]
+                                                    <span style="background:#fff3e0;color:#e65100;padding:0.2rem 0.4rem;border-radius:4px;font-size:0.75rem;font-family:monospace;border:1px solid #ffe0b2;">
+                                                        <i class="fas fa-table"></i> [% tbl.table_name | html %]
+                                                    </span>
+                                                [% END %]
+                                                </div>
+                                            </div>
+                                        [% END %]
+                                        
+                                        [% IF db.results_without_tables.size > 0 %]
+                                            <div>
+                                                <h5 style="margin:0 0 0.4rem 0;font-size:0.85rem;color:#0dcaf0;border-bottom:1px solid #dee2e6;padding-bottom:2px;"><i class="fas fa-exclamation-circle"></i> Result Files without Tables ([% db.results_without_tables.size %])</h5>
+                                                <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+                                                [% FOREACH res IN db.results_without_tables %]
+                                                    <span style="background:#e0f7fa;color:#006064;padding:0.2rem 0.4rem;border-radius:4px;font-size:0.75rem;font-family:monospace;border:1px solid #b2ebf2;" title="[% res.result_path | html %]">
+                                                        <i class="fas fa-file-alt"></i> [% res.result_name | html %]
+                                                    </span>
+                                                [% END %]
+                                                </div>
+                                            </div>
+                                        [% END %]
+                                    </div>
+                                [% ELSE %]
                                 [% IF db.tables.size > 0 %]
                                     [% FOREACH tbl IN db.tables %]
                                     <div style="margin-bottom:0.3rem;border:1px solid #dee2e6;border-radius:4px;overflow:hidden;">
@@ -723,6 +836,7 @@
                                     [% END %]
                                 [% ELSE %]
                                     <p style="color:#6c757d;font-size:0.85rem;margin:0.5rem 0;">No tables found in this database.</p>
+                                [% END %]
                                 [% END %]
                                 </div>
                             </div>
