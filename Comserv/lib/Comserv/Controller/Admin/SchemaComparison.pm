@@ -705,6 +705,7 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     
     my $table_name = $json_data->{table_name};
     my $database = $json_data->{database};
+    my $confirm = $json_data->{confirm};
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
         "Received parameters - table_name: " . ($table_name || 'UNDEFINED') . 
@@ -717,6 +718,17 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
         
         $c->response->status(400);
         $c->stash(json => { success => 0, error => $error_msg });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    if (!$confirm) {
+        $c->response->status(400);
+        $c->stash(json => {
+            success => 0,
+            error => "NON-PREFERRED DIRECTION: The 'Result file first' policy requires defining the Result file first, then generating the DB table from it. Creating a Result file from an existing table is blocked/non-preferred.",
+            needs_confirmation => 1
+        });
         $c->forward('View::JSON');
         return;
     }
@@ -2200,9 +2212,19 @@ sub create_result_from_table :Chained('base') :PathPart('create-result-from-tabl
     
     my $table_name = $c->req->param('table_name');
     my $database = $c->req->param('database');
+    my $confirm = $c->req->param('confirm');
     
     unless ($table_name && $database) {
         $c->response->body(encode_json({ error => 'Missing required parameters' }));
+        return;
+    }
+
+    if (!$confirm) {
+        $c->response->body(encode_json({
+            success => 0,
+            error => "NON-PREFERRED DIRECTION: The 'Result file first' policy requires defining the Result file first, then generating the DB table from it. Creating a Result file from an existing table is blocked/non-preferred.",
+            needs_confirmation => 1
+        }));
         return;
     }
     

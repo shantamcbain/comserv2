@@ -2060,6 +2060,40 @@ function createResultFromTable(tableName, database) {
     })
     .then(handleFetchResponse)
     .then(data => {
+        if (data.needs_confirmation) {
+            if (confirm(data.error + '\n\nAre you sure you want to bypass this policy and force creation of the Result file?')) {
+                requestData.confirm = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Retrying...';
+                fetch('[% c.uri_for("/schema-comparison/create_result_from_table") %]', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                })
+                .then(handleFetchResponse)
+                .then(retryData => {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                    if (retryData.success) {
+                        alert('Result file created successfully!\n\nFile: ' + retryData.result_file_path + '\n\nThe application will restart to load the new file. Please refresh the page in a moment.');
+                        setTimeout(() => { window.location.reload(); }, 3000);
+                    } else {
+                        alert('Error creating result on retry: ' + (retryData.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                    alert('Failed to create result on retry. Please try again.');
+                });
+            } else {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+            return;
+        }
+        
         button.innerHTML = originalText;
         button.disabled = false;
         
