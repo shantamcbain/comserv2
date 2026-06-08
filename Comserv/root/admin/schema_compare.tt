@@ -574,7 +574,7 @@
                                         <i class="fas fa-database"></i>
                                         <h4 style="margin:0;">[% db.name | html %]</h4>
                                         <span style="font-size:0.8rem;color:#6c757d;margin-left:0.5rem;">
-                                            [% db.table_count %] table[% db.table_count != 1 ? 's' : '' %]
+                                            [% db.table_count %] table[% IF db.table_count != 1 %]s[% END %]
                                         </span>
                                         [% IF db.error %]
                                         <span style="color:#dc3545;font-size:0.8rem;margin-left:0.5rem;">⚠ [% db.error | html %]</span>
@@ -679,7 +679,7 @@
                                         <i class="fas fa-database"></i>
                                         <h4 style="margin:0;">[% db.name | html %]</h4>
                                         <span style="font-size:0.8rem;color:#6c757d;margin-left:0.5rem;">
-                                            [% db.table_count %] table[% db.table_count != 1 ? 's' : '' %]
+                                            [% db.table_count %] table[% IF db.table_count != 1 %]s[% END %]
                                         </span>
                                         [% IF db.error %]
                                         <span style="color:#dc3545;font-size:0.8rem;margin-left:0.5rem;">⚠ [% db.error | html %]</span>

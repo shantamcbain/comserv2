@@ -7695,7 +7695,7 @@ sub get_migration_mysql_info {
     try {
         my $dsn = "DBI:mysql:host=$host;port=$port";
         my $dbh = DBI->connect($dsn, $user, $password, {
-            RaiseError => 1, PrintError => 0, AutoCommit => 1, mysql_connect_timeout => 5,
+            RaiseError => 1, PrintError => 0, AutoCommit => 1, mysql_connect_timeout => 2,
         });
 
         my $sth = $dbh->prepare("SHOW DATABASES");
@@ -7808,7 +7808,7 @@ sub get_migration_postgres_info {
     my $result = { connection_status => 'unknown', databases => [] };
 
     try {
-        my $dsn = "DBI:Pg:host=$host;port=$port";
+        my $dsn = "DBI:Pg:host=$host;port=$port;connect_timeout=2";
         my $dbh = DBI->connect($dsn, $user, $password, {
             RaiseError => 1, PrintError => 0, AutoCommit => 1,
         });
@@ -7827,7 +7827,7 @@ sub get_migration_postgres_info {
         for my $db_name (@db_names) {
             my $db_entry = { name => $db_name, tables => [], table_count => 0, error => undef };
             eval {
-                my $db_dbh = DBI->connect("DBI:Pg:dbname=$db_name;host=$host;port=$port",
+                my $db_dbh = DBI->connect("DBI:Pg:dbname=$db_name;host=$host;port=$port;connect_timeout=2",
                     $user, $password, { RaiseError => 1, PrintError => 0, AutoCommit => 1 });
                 my $tsth = $db_dbh->prepare(
                     "SELECT t.tablename, COUNT(c.column_name)::int AS col_count
