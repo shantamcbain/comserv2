@@ -2525,6 +2525,143 @@ it under the same terms as Perl itself.
 
 =cut
 
+sub get_dbh_for_database {
+    my ($self, $c, $database_id) = @_;
+    
+    if ($database_id eq 'ency') {
+        return $c->model('DBEncy')->schema->storage->dbh;
+    } elsif ($database_id eq 'forager') {
+        return $c->model('DBForager')->schema->storage->dbh;
+    } elsif ($database_id =~ /^migration_mysql:(.+)$/) {
+        my $db_name = $1;
+        my $host     = $ENV{MIGRATION_MYSQL_HOST}     || '192.168.1.20';
+        my $port     = $ENV{MIGRATION_MYSQL_PORT}     || 3307;
+        my $user     = $ENV{MIGRATION_MYSQL_USER}     || 'shanta_forager';
+        my $password = $ENV{MIGRATION_MYSQL_PASSWORD} // '';
+        
+        unless ($password) {
+            my $home = $ENV{HOME} || '';
+            my $dbi_file = "$home/.comserv/secrets/dbi/db_production_mysql.json";
+            if (-f $dbi_file) {
+                eval {
+                    local $/;
+                    open my $fh, '<', $dbi_file or die $!;
+                    my $data = JSON::decode_json(<$fh>);
+                    close $fh;
+                    my ($cfg) = values %$data;
+                    $password = $cfg->{password} // '' if ref $cfg eq 'HASH';
+                    $user     = $cfg->{username} if ref $cfg eq 'HASH' && $cfg->{username};
+                };
+            }
+        }
+        
+        my $dsn = "DBI:mysql:database=$db_name;host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1, mysql_connect_timeout => 2,
+        });
+        return $dbh;
+    } elsif ($database_id =~ /^migration_postgres:(.+)$/) {
+        my $db_name = $1;
+        my $host     = $ENV{MIGRATION_POSTGRES_HOST}     || '192.168.1.20';
+        my $port     = $ENV{MIGRATION_POSTGRES_PORT}     || 5433;
+        my $user     = $ENV{MIGRATION_POSTGRES_USER}     || 'postgres';
+        my $password = $ENV{MIGRATION_POSTGRES_PASSWORD} // '';
+        
+        unless ($password) {
+            my $home = $ENV{HOME} || '';
+            my $dbi_file = "$home/.comserv/secrets/dbi/db_production_postgres.json";
+            if (-f $dbi_file) {
+                eval {
+                    local $/;
+                    open my $fh, '<', $dbi_file or die $!;
+                    my $data = JSON::decode_json(<$fh>);
+                    close $fh;
+                    my ($cfg) = values %$data;
+                    $password = $cfg->{password} // '' if ref $cfg eq 'HASH';
+                    $user     = $cfg->{username} if ref $cfg eq 'HASH' && $cfg->{username};
+                };
+            }
+        }
+        
+        my $dsn = "DBI:Pg:dbname=$db_name;host=$host;port=$port;connect_timeout=2";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1,
+        });
+        return $dbh;
+    }
+    
+    die "Unknown database ID: $database_id";
+}
+
+sub get_table_schema_v3 {
+    my ($self, $c, $table_name, $database_id) = @_;
+    
+    my $schema_info = {
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        foreign_keys => [],
+        indexes => []
+    };
+    
+    my $dbh = $self->get_dbh_for_database($c, $database_id);
+    
+    if ($database_id eq 'ency' || $database_id eq 'forager' || $database_id =~ /^migration_mysql:/) {
+        # MySQL/MariaDB
+        my $sth = $dbh->prepare("DESCRIBE \`$table_name\`");
+        $sth->execute();
+        while (my $row = $sth->fetchrow_hashref()) {
+            my $column_name = $row->{Field};
+            $schema_info->{columns}->{$column_name} = {
+                data_type => $row->{Type},
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                default_value => $row->{Default},
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra},
+                size => undef
+            };
+            if ($row->{Key} eq 'PRI') {
+                push @{$schema_info->{primary_keys}}, $column_name;
+            }
+        }
+    } elsif ($database_id =~ /^migration_postgres:/) {
+        # PostgreSQL
+        my $sth = $dbh->prepare(
+            "SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+             FROM information_schema.columns
+             WHERE table_name = ?
+             ORDER BY ordinal_position"
+        );
+        $sth->execute($table_name);
+        while (my ($col_name, $data_type, $char_max_len, $is_nullable, $col_default) = $sth->fetchrow_array()) {
+            $schema_info->{columns}->{$col_name} = {
+                data_type => $data_type,
+                is_nullable => ($is_nullable =~ /^(YES|1)$/i ? 1 : 0),
+                default_value => $col_default,
+                is_auto_increment => ($col_default && $col_default =~ /nextval/i ? 1 : 0),
+                extra => '',
+                size => $char_max_len
+            };
+        }
+        
+        # Primary keys
+        my $pk_sth = $dbh->prepare(
+            "SELECT a.attname
+             FROM pg_index i
+             JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+             WHERE i.indrelid = ?::regclass AND i.indisprimary"
+        );
+        eval {
+            $pk_sth->execute($table_name);
+            while (my ($pk_col) = $pk_sth->fetchrow_array()) {
+                push @{$schema_info->{primary_keys}}, $pk_col;
+            }
+        };
+    }
+    
+    return $schema_info;
+}
+
 sub _strip_fk_constraints {
     my ($sql) = @_;
     my @lines = split /\n/, $sql;

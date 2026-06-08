@@ -3791,7 +3791,7 @@ sub get_database_name {
     my $database_name = 'Unknown Database';
     
     try {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $dbh = $self->_get_active_dbh($c, 'ency');
         my $sth = $dbh->prepare("SELECT DATABASE()");
         $sth->execute();
         
@@ -3814,7 +3814,7 @@ sub get_database_tables {
     my @tables = ();
     
     try {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $dbh = $self->_get_active_dbh($c, 'ency');
         my $sth = $dbh->prepare("SHOW TABLES");
         $sth->execute();
         
@@ -3837,7 +3837,7 @@ sub get_ency_database_tables {
     my @tables = ();
     
     try {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $dbh = $self->_get_active_dbh($c, 'ency');
         my $sth = $dbh->prepare("SHOW TABLES");
         $sth->execute();
         
@@ -3864,7 +3864,7 @@ sub get_forager_database_tables {
     my @tables = ();
     
     try {
-        my $dbh = $c->model('DBForager')->schema->storage->dbh;
+        my $dbh = $self->_get_active_dbh($c, 'forager');
         my $sth = $dbh->prepare("SHOW TABLES");
         $sth->execute();
         
@@ -3897,7 +3897,7 @@ sub get_ency_table_schema {
     };
     
     try {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $dbh = $self->_get_active_dbh($c, 'ency');
         
         # Get column information
         my $sth = $dbh->prepare("DESCRIBE $table_name");
@@ -3966,7 +3966,7 @@ sub get_forager_table_schema {
     };
     
     try {
-        my $dbh = $c->model('DBForager')->schema->storage->dbh;
+        my $dbh = $self->_get_active_dbh($c, 'forager');
         
         # Get column information
         my $sth = $dbh->prepare("DESCRIBE $table_name");
@@ -4035,7 +4035,7 @@ sub get_database_table_schema {
     };
     
     try {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $dbh = $self->_get_active_dbh($c, 'ency');
         
         # Get column information
         my $sth = $dbh->prepare("DESCRIBE `$table_name`");
@@ -5345,9 +5345,9 @@ sub update_table_field_from_result {
 
     my $dbh;
     if (lc($database) eq 'ency') {
-        $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        $dbh = $self->_get_active_dbh($c, 'ency');
     } elsif (lc($database) eq 'forager') {
-        $dbh = $c->model('DBForager')->schema->storage->dbh;
+        $dbh = $self->_get_active_dbh($c, 'forager');
     } else {
         die "Unknown database '$database'";
     }
@@ -8456,6 +8456,94 @@ sub pages :Path('/admin/pages') :Args(0) {
         sites_list => \@sites_list,
         template => 'admin/pages.tt'
     );
+}
+
+sub _get_db_tables {
+    my ($self, $schema) = @_;
+    my $storage = $schema->storage;
+    my $dbh = $storage->dbh;
+    my @tables;
+    if ($dbh) {
+        my $sth = $dbh->table_info('', '%', '%', 'TABLE');
+        while (my $row = $sth->fetchrow_hashref) {
+            push @tables, $row->{TABLE_NAME} || $row->{table_name};
+        }
+    }
+    return @tables;
+}
+
+sub _get_result_classes {
+    my ($self, $schema) = @_;
+    my @results;
+    for my $source_name ($schema->sources) {
+        my $source = $schema->source($source_name);
+        push @results, {
+            source_name => $source_name,
+            table_name  => $source->from,
+            class_name  => $source->result_class,
+        };
+    }
+    return @results;
+}
+
+sub _get_active_dbh {
+    my ($self, $c, $db_name) = @_;
+    $db_name ||= 'ency';
+    
+    # Try to load the active environment's connection
+    try {
+        require Comserv::Util::DatabaseEnv;
+        my $db_env = Comserv::Util::DatabaseEnv->new;
+        my $conn_info = $db_env->get_connection_for_database($c, $db_name);
+        if ($conn_info && $conn_info->{config}) {
+            my $conn = $conn_info->{config};
+            my $db_type = $conn->{db_type} || 'mysql';
+            my $host = $conn->{host};
+            my $port = $conn->{port};
+            my $username = $conn->{username};
+            my $password = $conn->{password} // '';
+            my $database = $conn->{database};
+            
+            if ($db_type eq 'sqlite') {
+                my $db_path = $conn->{database_path} || "data/${db_name}_offline.db";
+                my $dsn = "dbi:SQLite:dbname=$db_path";
+                return DBI->connect($dsn, "", "", { RaiseError => 1, PrintError => 0, sqlite_unicode => 1 });
+            } elsif ($db_type eq 'Pg' || $db_type eq 'postgres' || $db_type eq 'postgresql') {
+                my $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port;connect_timeout=2";
+                return DBI->connect($dsn, $username, $password, { RaiseError => 1, PrintError => 0 });
+            } else {
+                # mysql or MariaDB
+                my $driver = 'MariaDB';
+                my $driver_available = 0;
+                eval { require DBD::MariaDB; $driver_available = 1; };
+                if (!$driver_available) {
+                    eval { require DBD::mysql; $driver = 'mysql'; $driver_available = 1; };
+                }
+                
+                my $dsn = "dbi:$driver:database=$database;host=$host;port=$port";
+                if ($driver eq 'mysql') {
+                    $dsn .= ";mysql_connect_timeout=2";
+                }
+                
+                my $dbh = DBI->connect($dsn, $username, $password, {
+                    RaiseError => 1,
+                    PrintError => 0,
+                    AutoCommit => 1,
+                });
+                return $dbh;
+            }
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_active_dbh',
+            "Failed to dynamically connect to active $db_name database: $_. Falling back to default Catalyst model.");
+    };
+    
+    # Fallback to standard Catalyst models
+    if ($db_name eq 'forager') {
+        return $c->model('DBForager')->schema->storage->dbh;
+    } else {
+        return $c->model('DBEncy')->schema->storage->dbh;
+    }
 }
 
 =head1 AUTHOR
