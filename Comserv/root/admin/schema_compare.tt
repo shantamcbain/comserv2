@@ -236,6 +236,7 @@
     </div>
 
     <!-- Database Sections -->
+    [% IF database_comparison.summary.connected_databases > 0 %]
     [% FOREACH db_item IN database_comparison.pairs.sort('key') %]
         [% db_key = db_item.key %]
         [% db = db_item.value %]
