@@ -457,7 +457,8 @@
         tabsHeader.className = 'aew-tabs-header';
         tabsHeader.innerHTML = 
             '<button type="button" class="aew-tab-btn active" id="aew-tab-chat">💬 Chat</button>' +
-            '<button type="button" class="aew-tab-btn" id="aew-tab-deploy">🚀 Deploy</button>';
+            '<button type="button" class="aew-tab-btn" id="aew-tab-deploy">🚀 Deploy</button>' +
+            '<button type="button" class="aew-tab-btn" id="aew-tab-cli">💻 CLI</button>';
 
         var chatContent = document.createElement('div');
         chatContent.id = 'aew-tab-chat-content';
@@ -503,22 +504,101 @@
             '<pre class="aew-terminal-console" id="aew-terminal-console">Ready to deploy...</pre>' +
           '</div>';
 
+        var cliContent = document.createElement('div');
+        cliContent.id = 'aew-tab-cli-content';
+        cliContent.className = 'aew-tab-content';
+        cliContent.innerHTML = 
+          '<div class="aew-cli-panel">' +
+            '<div class="aew-cli-history-container">' +
+              '<pre class="aew-cli-output" id="aew-cli-output">Ready to execute commands...</pre>' +
+            '</div>' +
+            '<div class="aew-cli-input-row">' +
+              '<input type="text" id="aew-cli-input" placeholder="Type safe command (e.g. ls -la, grok status)...">' +
+              '<button type="button" class="aew-btn aew-btn-primary" id="aew-btn-cli-run">Run</button>' +
+            '</div>' +
+          '</div>';
+
         chatPane.appendChild(tabsHeader);
         chatPane.appendChild(chatContent);
         chatPane.appendChild(deployContent);
+        chatPane.appendChild(cliContent);
 
         $('aew-tab-chat').onclick = function() {
             $('aew-tab-chat').classList.add('active');
             $('aew-tab-deploy').classList.remove('active');
+            $('aew-tab-cli').classList.remove('active');
             $('aew-tab-chat-content').classList.add('active-tab');
             $('aew-tab-deploy-content').classList.remove('active-tab');
+            $('aew-tab-cli-content').classList.remove('active-tab');
         };
 
         $('aew-tab-deploy').onclick = function() {
             $('aew-tab-deploy').classList.add('active');
             $('aew-tab-chat').classList.remove('active');
+            $('aew-tab-cli').classList.remove('active');
             $('aew-tab-deploy-content').classList.add('active-tab');
             $('aew-tab-chat-content').classList.remove('active-tab');
+            $('aew-tab-cli-content').classList.remove('active-tab');
+        };
+
+        $('aew-tab-cli').onclick = function() {
+            $('aew-tab-cli').classList.add('active');
+            $('aew-tab-chat').classList.remove('active');
+            $('aew-tab-deploy').classList.remove('active');
+            $('aew-tab-cli-content').classList.add('active-tab');
+            $('aew-tab-chat-content').classList.remove('active-tab');
+            $('aew-tab-deploy-content').classList.remove('active-tab');
+        };
+
+        function runCliCommand() {
+            var inputEl = $('aew-cli-input');
+            var runBtn = $('aew-btn-cli-run');
+            var outputEl = $('aew-cli-output');
+            if (!inputEl || !runBtn || !outputEl) return;
+
+            var cmd = (inputEl.value || '').trim();
+            if (!cmd) return;
+
+            inputEl.disabled = true;
+            runBtn.disabled = true;
+
+            outputEl.textContent += '\n$ ' + cmd + '\nExecuting...\n';
+            outputEl.scrollTop = outputEl.scrollHeight;
+
+            fetch('/ai/run_command', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'command=' + encodeURIComponent(cmd)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    outputEl.textContent += data.output + '\n[Exit Code: ' + data.exit_code + ']\n';
+                } else {
+                    outputEl.textContent += 'Error: ' + (data.error || 'Unknown error') + '\n';
+                }
+                outputEl.scrollTop = outputEl.scrollHeight;
+                inputEl.disabled = false;
+                runBtn.disabled = false;
+                inputEl.value = '';
+                inputEl.focus();
+            })
+            .catch(function(e) {
+                outputEl.textContent += 'Network Error: ' + e + '\n';
+                outputEl.scrollTop = outputEl.scrollHeight;
+                inputEl.disabled = false;
+                runBtn.disabled = false;
+                inputEl.focus();
+            });
+        }
+
+        $('aew-btn-cli-run').onclick = runCliCommand;
+        $('aew-cli-input').onkeydown = function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                runCliCommand();
+            }
         };
 
         $('aew-terminal-clear').onclick = function() {

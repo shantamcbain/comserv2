@@ -12275,6 +12275,50 @@ sub deploy_progress :Local :Args(0) {
     }));
 }
 
+sub run_command :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $cmd = $c->request->params->{command} || '';
+    unless ($cmd =~ /\S/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Command is required' }));
+        return;
+    }
+
+    if ($cmd =~ /rm\s+-rf\s+\/|mkfs|dd\s+if=/i) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Command blocked for safety' }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    chdir $root or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
+        return;
+    };
+
+    my $api_key = $self->_grok_cli_api_key($c);
+
+    local $ENV{XAI_API_KEY} = $api_key if $api_key;
+    local $ENV{GROK_API_KEY} = $api_key if $api_key;
+    local $ENV{HOME} = $self->_grok_home() || $ENV{HOME};
+    local $ENV{USER} = 'shanta';
+    local $ENV{LOGNAME} = 'shanta';
+
+    my $output = qx($cmd 2>&1);
+    my $exit_val = $? >> 8;
+
+    $c->response->body(encode_json({
+        success   => JSON::true,
+        output    => $output,
+        exit_code => $exit_val
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
