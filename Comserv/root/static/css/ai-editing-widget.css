@@ -265,6 +265,27 @@ html, body {
 .aew-status.err { color: #f48771; }
 .aew-status.ok { color: #89d185; }
 
+.aew-chat-history-bar {
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid #3c3c3c;
+    background: #1e1e1e;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.aew-chat-history-bar select {
+    flex: 1;
+    background: #2d2d2d;
+    color: #cccccc;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
+    outline: none;
+    height: 26px;
+}
+
 @media (max-width: 900px) {
     .aew-files { width: 180px; }
     .aew-chat-pane { width: 300px; }

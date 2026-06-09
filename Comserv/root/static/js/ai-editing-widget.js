@@ -10,6 +10,7 @@
         currentContent: '',
         dirty: false,
         chatHistory: [],
+        conversationTurns: [],
         conversationId: null,
         provider: 'grok',
         pendingReadFile: null,
@@ -302,6 +303,52 @@
         box.scrollTop = box.scrollHeight;
     }
 
+    function renderConversation() {
+        var box = $('aew-messages');
+        if (!box) return;
+        box.innerHTML = '';
+        var selectEl = $('aew-chat-history-select');
+        var selectedVal = selectEl ? selectEl.value : '';
+        if (selectedVal) {
+            var turnId = parseInt(selectedVal, 10);
+            var turn = state.conversationTurns.find(function(t) { return t.id === turnId; });
+            if (turn) {
+                var dUser = document.createElement('div');
+                dUser.className = 'aew-msg aew-msg-user';
+                dUser.textContent = turn.user;
+                box.appendChild(dUser);
+                var dAi = document.createElement('div');
+                dAi.className = 'aew-msg aew-msg-ai';
+                dAi.textContent = turn.ai;
+                box.appendChild(dAi);
+            }
+        } else {
+            state.chatHistory.forEach(function(m) {
+                var d = document.createElement('div');
+                d.className = 'aew-msg aew-msg-' + m.role;
+                d.textContent = m.content;
+                box.appendChild(d);
+            });
+        }
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function updateHistoryDropdown() {
+        var selectEl = $('aew-chat-history-select');
+        if (!selectEl) return;
+        selectEl.innerHTML = '<option value="">-- Active Conversation (Show All) --</option>';
+        state.conversationTurns.forEach(function(turn) {
+            var opt = document.createElement('option');
+            opt.value = turn.id;
+            var label = turn.user.replace(/\s+/g, ' ').trim();
+            if (label.length > 35) {
+                label = label.substring(0, 35) + '...';
+            }
+            opt.textContent = 'Q: ' + label;
+            selectEl.appendChild(opt);
+        });
+    }
+
     function parseFixBlock(raw) {
         var re = /##\s*FIX:\s*([^\n\r]+)[\r\n]+```[^\n\r]*\n([\s\S]*?)```/i;
         var m = raw.match(re);
@@ -371,6 +418,11 @@
 
     function sendChat(userText, isFollowUp) {
         if (!userText.trim()) return;
+        var selectEl = $('aew-chat-history-select');
+        if (selectEl && selectEl.value !== '') {
+            selectEl.value = '';
+            renderConversation();
+        }
         if (!isFollowUp) {
             addMessage(userText, 'user');
             state.chatHistory.push({ role: 'user', content: userText });
@@ -408,6 +460,15 @@
             var reply = data.response || '';
             addMessage(reply, 'ai');
             state.chatHistory.push({ role: 'assistant', content: reply });
+
+            var turnIndex = state.conversationTurns.length + 1;
+            state.conversationTurns.push({
+                id: turnIndex,
+                user: userText,
+                ai: reply
+            });
+            updateHistoryDropdown();
+
             setStatus('Ready', 'ok');
 
             var rf = reply.match(/\[READ_FILE:\s*([^\]]+)\]/i);
@@ -463,6 +524,14 @@
         var chatContent = document.createElement('div');
         chatContent.id = 'aew-tab-chat-content';
         chatContent.className = 'aew-tab-content active-tab';
+
+        var historyBar = document.createElement('div');
+        historyBar.className = 'aew-chat-history-bar';
+        historyBar.innerHTML = 
+            '<select id="aew-chat-history-select">' +
+              '<option value="">-- Active Conversation (Show All) --</option>' +
+            '</select>';
+        chatContent.appendChild(historyBar);
 
         var children = Array.from(chatPane.childNodes);
         children.forEach(function(child) {
@@ -701,6 +770,13 @@
     function init() {
         refreshTree();
         loadProviders();
+
+        var histSel = $('aew-chat-history-select');
+        if (histSel) {
+            histSel.onchange = function() {
+                renderConversation();
+            };
+        }
 
         $('aew-save-btn').onclick = saveFile;
         $('aew-reload-btn').onclick = function() {

@@ -16,6 +16,7 @@
         currentContent: '',
         dirty: false,
         chatHistory: [],
+        conversationTurns: [],
         backend: 'grok_cli',
         treeExpanded: {},
         treeSeq: 0,
@@ -84,6 +85,11 @@
                   '<button type="button" class="aew-tab-btn" id="aew-tab-cli">💻 CLI</button>' +
                 '</div>' +
                 '<div id="aew-tab-chat-content" class="aew-tab-content active-tab">' +
+                  '<div class="aew-chat-history-bar">' +
+                    '<select id="aew-chat-history-select">' +
+                      '<option value="">-- Active Conversation (Show All) --</option>' +
+                    '</select>' +
+                  '</div>' +
                   '<div class="aew-messages" id="aew-messages"></div>' +
                   '<div class="aew-input-row">' +
                     '<textarea id="aew-chat-input" rows="2" placeholder="Ask Grok CLI…"></textarea>' +
@@ -340,6 +346,9 @@
             state.backend = q('#aew-backend').value;
             addMsg('Backend: ' + state.backend, 'system');
         };
+        q('#aew-chat-history-select').onchange = function() {
+            renderConversation();
+        };
         q('#aew-editor').addEventListener('input', function() {
             state.dirty = q('#aew-editor').value !== state.currentContent;
         });
@@ -396,6 +405,58 @@
         d.textContent = text;
         box.appendChild(d);
         box.scrollTop = box.scrollHeight;
+    }
+
+    function renderConversation() {
+        var box = q('#aew-messages');
+        if (!box) return;
+        box.innerHTML = '';
+        var selectEl = q('#aew-chat-history-select');
+        var selectedVal = selectEl ? selectEl.value : '';
+        if (selectedVal) {
+            var turnId = parseInt(selectedVal, 10);
+            var turn = state.conversationTurns.find(function(t) { return t.id === turnId; });
+            if (turn) {
+                var dUser = document.createElement('div');
+                dUser.className = 'aew-msg aew-msg-user';
+                dUser.textContent = turn.user;
+                box.appendChild(dUser);
+                var dAi = document.createElement('div');
+                dAi.className = 'aew-msg aew-msg-ai';
+                dAi.textContent = turn.ai;
+                box.appendChild(dAi);
+            }
+        } else {
+            if (!window.AEW_POPUP_MODE) {
+                var dSys = document.createElement('div');
+                dSys.className = 'aew-msg aew-msg-system';
+                dSys.textContent = 'Inline dock — use ⤢ for a separate window (recommended).';
+                box.appendChild(dSys);
+            }
+            state.chatHistory.forEach(function(m) {
+                var d = document.createElement('div');
+                d.className = 'aew-msg aew-msg-' + m.role;
+                d.textContent = m.content;
+                box.appendChild(d);
+            });
+        }
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function updateHistoryDropdown() {
+        var selectEl = q('#aew-chat-history-select');
+        if (!selectEl) return;
+        selectEl.innerHTML = '<option value="">-- Active Conversation (Show All) --</option>';
+        state.conversationTurns.forEach(function(turn) {
+            var opt = document.createElement('option');
+            opt.value = turn.id;
+            var label = turn.user.replace(/\s+/g, ' ').trim();
+            if (label.length > 35) {
+                label = label.substring(0, 35) + '...';
+            }
+            opt.textContent = 'Q: ' + label;
+            selectEl.appendChild(opt);
+        });
     }
 
     function treeLabel(ent, depth) {
@@ -743,6 +804,11 @@
     }
 
     function sendChat(userText) {
+        var selectEl = q('#aew-chat-history-select');
+        if (selectEl && selectEl.value !== '') {
+            selectEl.value = '';
+            renderConversation();
+        }
         addMsg(userText, 'user');
         state.chatHistory.push({ role: 'user', content: userText });
         var full = state.backend === 'comserv' ? buildPrompt(userText) : buildGrokCliPrompt(userText);
@@ -760,6 +826,15 @@
             var reply = data.response || '';
             addMsg(reply, 'ai');
             state.chatHistory.push({ role: 'assistant', content: reply });
+
+            var turnIndex = state.conversationTurns.length + 1;
+            state.conversationTurns.push({
+                id: turnIndex,
+                user: userText,
+                ai: reply
+            });
+            updateHistoryDropdown();
+
             var backendLabel = data.backend === 'grok_api' ? 'Grok xAI API' : (data.backend || state.backend);
             setStatus(backendLabel + ' done', 'ok');
             var rf = reply.match(/\[READ_FILE:\s*([^\]]+)\]/i);
