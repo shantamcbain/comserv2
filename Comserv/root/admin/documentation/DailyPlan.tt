@@ -544,7 +544,7 @@
             'main'                                     => 3001,
             'planningsystem-59ae'                      => 4001,
             'aichatsystem-ef4e'                        => 4010,
-            'schema-managment-system-7eb3'             => 4002,
+            'schema-management-enforce-result-f2fb'    => 4002,
             'new-task-9cf1'                            => 4003,
             'workshops-7d21'                           => 4004,
             'users-e5b8'                               => 4005,
@@ -574,7 +574,7 @@
             { name => 'main',                                  port => 3001, label => 'MAIN',                 url => '/Documentation/DailyPlan' },
             { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',       url => '/Documentation/DailyPlan' },
             { name => 'aichatsystem-ef4e',                     port => 4010, label => 'AIChatSystem',         url => '/Documentation/DailyPlan' },
-            { name => 'schema-managment-system-7eb3',          port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
+            { name => 'schema-management-enforce-result-f2fb',  port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
             { name => 'new-task-9cf1',                         port => 4003, label => 'InfrastructureHA',     url => '/Documentation/DailyPlan' },
             { name => 'workshops-7d21',                        port => 4004, label => 'WorkShops',            url => '/workshop' },
             { name => 'users-e5b8',                            port => 4005, label => 'Users',                url => '/user/dashboard' },
@@ -1194,7 +1194,7 @@
         </div>
 
         <div style="background:color-mix(in srgb,#28a745 10%,var(--bg-color));border:1px solid #28a745;border-radius:4px;padding:12px 16px;margin-bottom:16px;font-size:0.88em;">
-            <strong>✅ Branch:</strong> <code>schema-managment-system-7eb3</code> running on port 4002.
+            <strong>✅ Branch:</strong> <code>schema-management-enforce-result-f2fb</code> running on port 4002.
             Both <strong>MariaDB</strong> and <strong>PostgreSQL</strong> on <code>db-production (192.168.1.20)</code> are connected with full privileges — schema operations are enabled.
         </div>
 

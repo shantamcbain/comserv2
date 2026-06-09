@@ -589,7 +589,7 @@ last_updated = '2026/02/08'
             <details id="priority-schema-system" class="priority-container">
                 <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
                 <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Branch:</strong> <code>schema-managment-system-7eb3</code> (port 4002)</p>
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Branch:</strong> <code>schema-management-enforce-result-f2fb</code> (port 4002)</p>
                     <p><strong>Plan file:</strong> <a href="/Documentation/DailyPlan" target="_blank">DailyPlan.tt</a> | <strong>Schema Compare:</strong> <a href="/admin/schema_comparison" target="_blank">/admin/schema_comparison</a></p>
 
                     <h4>✅ Completed Work</h4>
