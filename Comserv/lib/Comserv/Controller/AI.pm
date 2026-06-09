@@ -900,6 +900,11 @@ sub _find_grok_binary {
     return $home_grok if -x $home_grok;
     my $alt = "$home/.grok/bin/grok";
     return $alt if -x $alt;
+    my @caches = glob("$home/.cache/JetBrains/PyCharm*/acp-agents/grok-build/*/grok");
+    if (@caches) {
+        my $latest = $caches[-1];
+        return $latest if -x $latest;
+    }
     for my $dir (split /:/, $ENV{PATH} || '') {
         my $bin = "$dir/grok";
         return $bin if -x $bin;
