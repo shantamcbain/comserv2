@@ -447,6 +447,176 @@
             .catch(function() {});
     }
 
+    function setupDeployTabs() {
+        var messages = $('aew-messages');
+        if (!messages) return;
+        var chatPane = messages.parentNode;
+        if (!chatPane) return;
+
+        var tabsHeader = document.createElement('div');
+        tabsHeader.className = 'aew-tabs-header';
+        tabsHeader.innerHTML = 
+            '<button type="button" class="aew-tab-btn active" id="aew-tab-chat">💬 Chat</button>' +
+            '<button type="button" class="aew-tab-btn" id="aew-tab-deploy">🚀 Deploy</button>';
+
+        var chatContent = document.createElement('div');
+        chatContent.id = 'aew-tab-chat-content';
+        chatContent.className = 'aew-tab-content active-tab';
+
+        var children = Array.from(chatPane.childNodes);
+        children.forEach(function(child) {
+            chatContent.appendChild(child);
+        });
+
+        var deployContent = document.createElement('div');
+        deployContent.id = 'aew-tab-deploy-content';
+        deployContent.className = 'aew-tab-content';
+        deployContent.innerHTML = 
+          '<div class="aew-deploy-form">' +
+            '<div class="aew-form-group">' +
+              '<label>Git Commit Message:</label>' +
+              '<textarea id="aew-deploy-commit-msg" rows="2" placeholder="Enter commit message for on-demand commit..."></textarea>' +
+            '</div>' +
+            '<div class="aew-form-group-row">' +
+              '<div class="aew-form-group">' +
+                '<label>Target Host:</label>' +
+                '<select id="aew-deploy-target">' +
+                  '<option value="production1">Production 1 (Live)</option>' +
+                  '<option value="production2">Production 2 (Staging)</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="aew-form-group-row checkbox-row">' +
+              '<label><input type="checkbox" id="aew-deploy-vols"> Recreate Volumes</label>' +
+              '<label><input type="checkbox" id="aew-deploy-noroll"> No Rollback</label>' +
+            '</div>' +
+            '<div class="aew-deploy-actions">' +
+              '<button type="button" class="aew-btn aew-btn-success" id="aew-btn-commit-deploy">Commit & Deploy</button>' +
+              '<button type="button" class="aew-btn" id="aew-btn-deploy-only">Deploy Only</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="aew-terminal-container">' +
+            '<div class="aew-terminal-header">' +
+              '<span>Terminal Console Output</span>' +
+              '<button type="button" class="aew-btn-clear" id="aew-terminal-clear">Clear</button>' +
+            '</div>' +
+            '<pre class="aew-terminal-console" id="aew-terminal-console">Ready to deploy...</pre>' +
+          '</div>';
+
+        chatPane.appendChild(tabsHeader);
+        chatPane.appendChild(chatContent);
+        chatPane.appendChild(deployContent);
+
+        $('aew-tab-chat').onclick = function() {
+            $('aew-tab-chat').classList.add('active');
+            $('aew-tab-deploy').classList.remove('active');
+            $('aew-tab-chat-content').classList.add('active-tab');
+            $('aew-tab-deploy-content').classList.remove('active-tab');
+        };
+
+        $('aew-tab-deploy').onclick = function() {
+            $('aew-tab-deploy').classList.add('active');
+            $('aew-tab-chat').classList.remove('active');
+            $('aew-tab-deploy-content').classList.add('active-tab');
+            $('aew-tab-chat-content').classList.remove('active-tab');
+        };
+
+        $('aew-terminal-clear').onclick = function() {
+            var consoleEl = $('aew-terminal-console');
+            if (consoleEl) consoleEl.textContent = 'Ready to deploy...';
+        };
+
+        var deployPollingInterval = null;
+
+        function pollDeployProgress() {
+            fetch('/ai/deploy_progress', { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var consoleEl = $('aew-terminal-console');
+                    if (consoleEl && data.content) {
+                        consoleEl.textContent = data.content;
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+                    if (data.done) {
+                        if (deployPollingInterval) {
+                            clearInterval(deployPollingInterval);
+                            deployPollingInterval = null;
+                        }
+                        $('aew-btn-commit-deploy').disabled = false;
+                        $('aew-btn-deploy-only').disabled = false;
+                    }
+                })
+                .catch(function() {
+                    if (deployPollingInterval) {
+                        clearInterval(deployPollingInterval);
+                        deployPollingInterval = null;
+                    }
+                    $('aew-btn-commit-deploy').disabled = false;
+                    $('aew-btn-deploy-only').disabled = false;
+                });
+        }
+
+        function runDeploy(withCommit) {
+            var commitMsg = withCommit ? $('aew-deploy-commit-msg').value.trim() : '';
+            if (withCommit && !commitMsg) {
+                alert('Please enter a commit message for on-demand commit.');
+                return;
+            }
+
+            var target = $('aew-deploy-target').value;
+            var recreateVols = $('aew-deploy-vols').checked ? 1 : 0;
+            var noRollback = $('aew-deploy-noroll').checked ? 1 : 0;
+
+            $('aew-btn-commit-deploy').disabled = true;
+            $('aew-btn-deploy-only').disabled = true;
+
+            var consoleEl = $('aew-terminal-console');
+            if (consoleEl) {
+                consoleEl.textContent = 'Initializing connection to deployment backend...\n';
+            }
+
+            var body = 'target=' + encodeURIComponent(target) +
+                       '&commit_msg=' + encodeURIComponent(commitMsg) +
+                       '&recreate_volumes=' + recreateVols +
+                       '&no_rollback=' + noRollback;
+
+            fetch('/ai/deploy_docker', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (deployPollingInterval) clearInterval(deployPollingInterval);
+                    deployPollingInterval = setInterval(pollDeployProgress, 1000);
+                } else {
+                    if (consoleEl) {
+                        consoleEl.textContent += 'Error starting deployment: ' + (data.error || 'Unknown error') + '\n';
+                    }
+                    $('aew-btn-commit-deploy').disabled = false;
+                    $('aew-btn-deploy-only').disabled = false;
+                }
+            })
+            .catch(function(e) {
+                if (consoleEl) {
+                    consoleEl.textContent += 'Network error: ' + e + '\n';
+                }
+                $('aew-btn-commit-deploy').disabled = false;
+                $('aew-btn-deploy-only').disabled = false;
+            });
+        }
+
+        $('aew-btn-commit-deploy').onclick = function() {
+            runDeploy(true);
+        };
+
+        $('aew-btn-deploy-only').onclick = function() {
+            runDeploy(false);
+        };
+    }
+
     // ── Init ────────────────────────────────────────────────────────────────
     function init() {
         refreshTree();
@@ -488,6 +658,7 @@
 
         addMessage('AI Code Editor ready. Open a file from the tree or ask a coding question.', 'system');
         checkForErrorSourceAndLoad();
+        setupDeployTabs();
     }
 
     if (document.readyState === 'loading') {

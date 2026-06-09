@@ -217,3 +217,166 @@ body.aew-inline-open #chat-button {
     cursor: nwse-resize;
     opacity: 0.4;
 }
+
+#aew-panel .aew-tabs-header {
+    display: flex;
+    background: #2d2d30;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+}
+
+#aew-panel .aew-tab-btn {
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    background: transparent;
+    color: #858585;
+    font-weight: 600;
+}
+
+#aew-panel .aew-tab-btn:hover {
+    color: #cccccc;
+    background: #333337;
+}
+
+#aew-panel .aew-tab-btn.active {
+    border-bottom-color: #0e639c;
+    color: #ffffff;
+    background: #252526;
+}
+
+#aew-panel .aew-tab-content {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+#aew-panel .aew-tab-content.active-tab {
+    display: flex;
+}
+
+#aew-panel .aew-deploy-form {
+    padding: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-bottom: 1px solid #3c3c3c;
+    background: #252526;
+    flex-shrink: 0;
+}
+
+#aew-panel .aew-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+#aew-panel .aew-form-group label {
+    font-size: 0.7rem;
+    color: #aaaaaa;
+    font-weight: 600;
+}
+
+#aew-panel .aew-form-group textarea {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    padding: 0.3rem;
+    resize: none;
+}
+
+#aew-panel .aew-form-group select {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    padding: 0.25rem;
+    height: 26px;
+}
+
+#aew-panel .aew-form-group-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+#aew-panel .checkbox-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.1rem 0;
+}
+
+#aew-panel .checkbox-row label {
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    color: #cccccc;
+    user-select: none;
+}
+
+#aew-panel .checkbox-row input {
+    margin: 0;
+}
+
+#aew-panel .aew-deploy-actions {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.2rem 0;
+}
+
+#aew-panel .aew-terminal-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+    background: #000000;
+}
+
+#aew-panel .aew-terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    background: #1e1e1e;
+    font-size: 0.7rem;
+    color: #888888;
+    border-bottom: 1px solid #2d2d2d;
+    user-select: none;
+}
+
+#aew-panel .aew-terminal-console {
+    flex: 1;
+    margin: 0;
+    padding: 0.5rem;
+    background: #000000;
+    color: #39ff14;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+#aew-panel .aew-btn-clear {
+    border: none;
+    background: transparent;
+    color: #0e639c;
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+#aew-panel .aew-btn-clear:hover {
+    text-decoration: underline;
+    color: #4a90d9;
+}

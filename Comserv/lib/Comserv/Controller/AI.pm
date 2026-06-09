@@ -12106,6 +12106,175 @@ sub _log_ai_usage {
     }
 }
 
+sub git_commit :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $message = $c->request->params->{message} || '';
+    unless ($message =~ /\S/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Commit message required' }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    chdir $root or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
+        return;
+    };
+
+    my $add_out = qx(git add -A 2>&1);
+    my $commit_out = qx(git commit -m "$message" 2>&1);
+    my $exit_val = $? >> 8;
+
+    $c->response->body(encode_json({
+        success => $exit_val == 0 ? JSON::true : JSON::false,
+        output  => "Add:\n$add_out\nCommit:\n$commit_out",
+        exit_code => $exit_val
+    }));
+}
+
+sub deploy_docker :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $target = $c->request->params->{target} || 'production1';
+    my $commit_msg = $c->request->params->{commit_msg} || '';
+    my $recreate_vols = $c->request->params->{recreate_volumes} ? 1 : 0;
+    my $no_rollback = $c->request->params->{no_rollback} ? 1 : 0;
+    my $session_id = $c->sessionid || 'unknown';
+    my $progress_file = "/tmp/comserv_deploy_progress_${session_id}";
+
+    unlink $progress_file if -f $progress_file;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Fork failed: $!" }));
+        return;
+    }
+
+    if ($pid == 0) {
+        close(STDOUT);
+        close(STDERR);
+        open(STDOUT, '>', $progress_file) or exit(1);
+        open(STDERR, '>&', STDOUT) or exit(1);
+        
+        select((select(STDOUT), $| = 1)[0]);
+
+        print "Starting deployment pipeline for target: " . uc($target) . "\n";
+        my $root = $self->_project_root_path($c);
+        chdir $root or do {
+            print "ERROR: Failed to chdir to project root $root: $!\n";
+            print "__DONE__\n";
+            exit(1);
+        };
+
+        if ($commit_msg =~ /\S/) {
+            print "\n--- [Git Commit] ---\n";
+            print "Adding changes to git...\n";
+            system("git add -A");
+            print "Committing changes with message: '$commit_msg'\n";
+            my $commit_output = qx(git commit -m "$commit_msg" 2>&1);
+            my $exit_val = $? >> 8;
+            print $commit_output;
+            if ($exit_val == 0) {
+                print "✓ Changes committed successfully\n";
+            } else {
+                if ($commit_output =~ /nothing to commit/i || $commit_output =~ /no changes added to commit/i) {
+                    print "✓ Nothing to commit, working tree clean\n";
+                } else {
+                    print "⚠ Git commit failed with exit code $exit_val, but continuing to deploy...\n";
+                }
+            }
+        }
+
+        print "\n--- [Docker Deploy] ---\n";
+        my $deploy_script = "Comserv/script/deploy_docker_to_production.pl";
+        if (!-f $deploy_script) {
+            print "ERROR: Deployment script not found at $deploy_script\n";
+            print "__DONE__\n";
+            exit(1);
+        }
+
+        my $ssh_password = $ENV{SSHPASS} || '';
+        if (!$ssh_password) {
+            my $home = $ENV{HOME} || '/home/shanta';
+            my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+            if (-f $creds_file && open my $cf, '<', $creds_file) {
+                local $/;
+                my $json = <$cf>;
+                close $cf;
+                my $creds = eval { decode_json($json) };
+                if ($creds && $creds->{ssh_password}) {
+                    $ssh_password = $creds->{ssh_password};
+                }
+            }
+        }
+        local $ENV{SSHPASS} = $ssh_password if $ssh_password;
+
+        my $cmd = "perl $deploy_script --target=$target";
+        $cmd .= " --recreate-volumes" if $recreate_vols;
+        $cmd .= " --no-rollback" if $no_rollback;
+
+        print "Running: $cmd\n";
+        system($cmd);
+        my $deploy_exit = $? >> 8;
+
+        if ($deploy_exit == 0) {
+            print "\n🎉 Deployment completed successfully!\n";
+        } else {
+            print "\n❌ Deployment failed with exit code $deploy_exit.\n";
+        }
+
+        print "__DONE__\n";
+        exit(0);
+    }
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        message => "Deployment started in background",
+        pid     => $pid
+    }));
+}
+
+sub deploy_progress :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $session_id = $c->sessionid || '';
+    my $progress_file = "/tmp/comserv_deploy_progress_${session_id}";
+
+    unless ($session_id && -f $progress_file) {
+        $c->response->body(encode_json({ content => '', done => JSON::true }));
+        return;
+    }
+
+    my $content = '';
+    my $done = 0;
+    if (open my $fh, '<:utf8', $progress_file) {
+        $content = do { local $/; <$fh> };
+        close $fh;
+    }
+
+    if ($content =~ s/__DONE__\n?$//) {
+        $done = 1;
+    }
+
+    $c->response->body(encode_json({
+        content => $content,
+        done    => $done ? JSON::true : JSON::false,
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
