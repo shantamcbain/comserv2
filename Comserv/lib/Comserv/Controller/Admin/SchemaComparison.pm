@@ -1525,10 +1525,10 @@ sub get_all_result_files {
     my $lib_path = dirname(dirname(dirname(dirname(__FILE__))));
     my $base_path = "$lib_path/Comserv/Model/Schema";
     
-    if (lc($database) eq 'ency') {
+    if ($database =~ /ency/i) {
         my $result_dir = "$base_path/Ency/Result";
         @result_files = $self->scan_result_directory_recursive($result_dir, '');
-    } elsif (lc($database) eq 'forager') {
+    } elsif ($database =~ /forager/i) {
         my $result_dir = "$base_path/Forager/Result";
         @result_files = $self->scan_result_directory_recursive($result_dir, '');
     }
@@ -1813,10 +1813,8 @@ sub get_table_result_comparison_v2 {
     # Get table schema
     my $table_schema;
     eval {
-        if ($database eq 'ency') {
-            $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
-            $table_schema = $self->get_forager_table_schema($c, $table_name);
+        if ($database eq 'ency' || $database eq 'forager' || $database =~ /^migration_/) {
+            $table_schema = $self->get_table_schema_v3($c, $table_name, $database);
         } else {
             die "Invalid database: $database";
         }
