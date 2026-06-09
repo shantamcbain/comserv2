@@ -77,19 +77,166 @@
                 '<div style="padding:0.25rem 0.4rem;font-size:0.72rem;color:#9cdcfe;" id="aew-editor-path">—</div>' +
                 '<textarea class="aew-editor" id="aew-editor" spellcheck="false"></textarea>' +
               '</section>' +
-              '<aside class="aew-chat-pane">' +
-                '<div class="aew-messages" id="aew-messages"></div>' +
-                '<div class="aew-input-row">' +
-                  '<textarea id="aew-chat-input" rows="2" placeholder="Ask Grok CLI…"></textarea>' +
-                  '<button type="button" class="aew-btn aew-btn-primary" id="aew-send-btn">Send</button>' +
+              '<aside class="aew-chat-pane" id="aew-aside-pane">' +
+                '<div class="aew-tabs-header">' +
+                  '<button type="button" class="aew-tab-btn active" id="aew-tab-chat">💬 Chat</button>' +
+                  '<button type="button" class="aew-tab-btn" id="aew-tab-deploy">🚀 Deploy</button>' +
                 '</div>' +
-                '<div class="aew-status" id="aew-status"></div>' +
+                '<div id="aew-tab-chat-content" class="aew-tab-content active-tab">' +
+                  '<div class="aew-messages" id="aew-messages"></div>' +
+                  '<div class="aew-input-row">' +
+                    '<textarea id="aew-chat-input" rows="2" placeholder="Ask Grok CLI…"></textarea>' +
+                    '<button type="button" class="aew-btn aew-btn-primary" id="aew-send-btn">Send</button>' +
+                  '</div>' +
+                  '<div class="aew-status" id="aew-status"></div>' +
+                '</div>' +
+                '<div id="aew-tab-deploy-content" class="aew-tab-content">' +
+                  '<div class="aew-deploy-form">' +
+                    '<div class="aew-form-group">' +
+                      '<label>Git Commit Message:</label>' +
+                      '<textarea id="aew-deploy-commit-msg" rows="2" placeholder="Enter commit message for on-demand commit..."></textarea>' +
+                    '</div>' +
+                    '<div class="aew-form-group-row">' +
+                      '<div class="aew-form-group">' +
+                        '<label>Target Host:</label>' +
+                        '<select id="aew-deploy-target">' +
+                          '<option value="production1">Production 1 (Live)</option>' +
+                          '<option value="production2">Production 2 (Staging)</option>' +
+                        '</select>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div class="aew-form-group-row checkbox-row">' +
+                      '<label><input type="checkbox" id="aew-deploy-vols"> Recreate Volumes</label>' +
+                      '<label><input type="checkbox" id="aew-deploy-noroll"> No Rollback</label>' +
+                    '</div>' +
+                    '<div class="aew-deploy-actions">' +
+                      '<button type="button" class="aew-btn aew-btn-success" id="aew-btn-commit-deploy">Commit & Deploy</button>' +
+                      '<button type="button" class="aew-btn" id="aew-btn-deploy-only">Deploy Only</button>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="aew-terminal-container">' +
+                    '<div class="aew-terminal-header">' +
+                      '<span>Terminal Console Output</span>' +
+                      '<button type="button" class="aew-btn-clear" id="aew-terminal-clear">Clear</button>' +
+                    '</div>' +
+                    '<pre class="aew-terminal-console" id="aew-terminal-console">Ready to deploy...</pre>' +
+                  '</div>' +
+                '</div>' +
               '</aside>' +
             '</div>' +
             '<div id="aew-resize-handle" title="Resize"></div>';
 
         document.body.appendChild(wrap);
         document.body.appendChild(panel);
+
+        var deployPollingInterval = null;
+
+        function pollDeployProgress() {
+            fetch('/ai/deploy_progress', { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var consoleEl = q('#aew-terminal-console');
+                    if (consoleEl && data.content) {
+                        consoleEl.textContent = data.content;
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+                    if (data.done) {
+                        if (deployPollingInterval) {
+                            clearInterval(deployPollingInterval);
+                            deployPollingInterval = null;
+                        }
+                        q('#aew-btn-commit-deploy').disabled = false;
+                        q('#aew-btn-deploy-only').disabled = false;
+                    }
+                })
+                .catch(function() {
+                    if (deployPollingInterval) {
+                        clearInterval(deployPollingInterval);
+                        deployPollingInterval = null;
+                    }
+                    q('#aew-btn-commit-deploy').disabled = false;
+                    q('#aew-btn-deploy-only').disabled = false;
+                });
+        }
+
+        function runDeploy(withCommit) {
+            var commitMsg = withCommit ? q('#aew-deploy-commit-msg').value.trim() : '';
+            if (withCommit && !commitMsg) {
+                alert('Please enter a commit message for on-demand commit.');
+                return;
+            }
+
+            var target = q('#aew-deploy-target').value;
+            var recreateVols = q('#aew-deploy-vols').checked ? 1 : 0;
+            var noRollback = q('#aew-deploy-noroll').checked ? 1 : 0;
+
+            q('#aew-btn-commit-deploy').disabled = true;
+            q('#aew-btn-deploy-only').disabled = true;
+
+            var consoleEl = q('#aew-terminal-console');
+            if (consoleEl) {
+                consoleEl.textContent = 'Initializing connection to deployment backend...\n';
+            }
+
+            var body = 'target=' + encodeURIComponent(target) +
+                       '&commit_msg=' + encodeURIComponent(commitMsg) +
+                       '&recreate_volumes=' + recreateVols +
+                       '&no_rollback=' + noRollback;
+
+            fetch('/ai/deploy_docker', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (deployPollingInterval) clearInterval(deployPollingInterval);
+                    deployPollingInterval = setInterval(pollDeployProgress, 1000);
+                } else {
+                    if (consoleEl) {
+                        consoleEl.textContent += 'Error starting deployment: ' + (data.error || 'Unknown error') + '\n';
+                    }
+                    q('#aew-btn-commit-deploy').disabled = false;
+                    q('#aew-btn-deploy-only').disabled = false;
+                }
+            })
+            .catch(function(e) {
+                if (consoleEl) {
+                    consoleEl.textContent += 'Network error: ' + e + '\n';
+                }
+                q('#aew-btn-commit-deploy').disabled = false;
+                q('#aew-btn-deploy-only').disabled = false;
+            });
+        }
+
+        q('#aew-tab-chat').onclick = function() {
+            q('#aew-tab-chat').classList.add('active');
+            q('#aew-tab-deploy').classList.remove('active');
+            q('#aew-tab-chat-content').classList.add('active-tab');
+            q('#aew-tab-deploy-content').classList.remove('active-tab');
+        };
+
+        q('#aew-tab-deploy').onclick = function() {
+            q('#aew-tab-deploy').classList.add('active');
+            q('#aew-tab-chat').classList.remove('active');
+            q('#aew-tab-deploy-content').classList.add('active-tab');
+            q('#aew-tab-chat-content').classList.remove('active-tab');
+        };
+
+        q('#aew-terminal-clear').onclick = function() {
+            var consoleEl = q('#aew-terminal-console');
+            if (consoleEl) consoleEl.textContent = 'Ready to deploy...';
+        };
+
+        q('#aew-btn-commit-deploy').onclick = function() {
+            runDeploy(true);
+        };
+
+        q('#aew-btn-deploy-only').onclick = function() {
+            runDeploy(false);
+        };
 
         q('#aew-launcher').onclick = function() { AEW.open(); };
         q('#aew-close').onclick = function() { AEW.close(); };
