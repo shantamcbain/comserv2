@@ -109,7 +109,9 @@ body.aew-inline-open #chat-button {
 }
 
 #aew-panel .aew-tree-children {
-    margin-left: 0;
+    border-left: 1px dashed #3a3d3e;
+    margin-left: 10px;
+    padding-left: 6px;
 }
 
 #aew-panel .aew-editor-pane {
