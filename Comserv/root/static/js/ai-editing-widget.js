@@ -148,6 +148,8 @@
         try {
             if (window.opener && !window.opener.closed) {
                 doc = window.opener.document;
+            } else if (window.parent && window.parent !== window) {
+                doc = window.parent.document;
             }
         } catch (e) {}
 
@@ -202,27 +204,60 @@
         };
     }
 
+    function applyErrorSource(errInfo) {
+        if (!errInfo || !errInfo.path) return;
+        loadFile(errInfo.path, errInfo.lineNum);
+        var promptText = "I encountered an error:\n" +
+                         "File: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : "") + "\n";
+        if (errInfo.subject) {
+            promptText += "Subject: " + errInfo.subject + "\n";
+        }
+        if (errInfo.description) {
+            promptText += "Details:\n" + errInfo.description + "\n";
+        }
+        promptText += "\nPlease analyze the code around the error source and help me fix it.";
+        var input = $('aew-chat-input');
+        if (input) {
+            input.value = promptText;
+            input.focus();
+        }
+        addMessage("Detected error source on parent page. Loaded file: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : ""), "system");
+    }
+
     function checkForErrorSourceAndLoad() {
-        var errInfo = detectPageErrorSource();
+        var errInfo = null;
+        try {
+            errInfo = detectPageErrorSource();
+        } catch (e) {}
+
         if (errInfo && errInfo.path) {
-            loadFile(errInfo.path, errInfo.lineNum);
-            var promptText = "I encountered an error:\n" +
-                             "File: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : "") + "\n";
-            if (errInfo.subject) {
-                promptText += "Subject: " + errInfo.subject + "\n";
+            applyErrorSource(errInfo);
+        } else {
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'AEW_REQUEST_ERROR_SOURCE' }, '*');
+            } else if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'AEW_REQUEST_ERROR_SOURCE' }, '*');
             }
-            if (errInfo.description) {
-                promptText += "Details:\n" + errInfo.description + "\n";
-            }
-            promptText += "\nPlease analyze the code around the error source and help me fix it.";
-            var input = $('aew-chat-input');
-            if (input) {
-                input.value = promptText;
-                input.focus();
-            }
-            addMessage("Detected error source on parent page. Loaded file: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : ""), "system");
         }
     }
+
+    window.addEventListener('message', function(event) {
+        if (!event || !event.data) return;
+        if (event.data.type === 'AEW_REQUEST_ERROR_SOURCE') {
+            var errInfo = null;
+            try {
+                errInfo = detectPageErrorSource();
+            } catch (e) {}
+            if (errInfo && event.source) {
+                event.source.postMessage({
+                    type: 'AEW_RESPONSE_ERROR_SOURCE',
+                    errorSource: errInfo
+                }, '*');
+            }
+        } else if (event.data.type === 'AEW_RESPONSE_ERROR_SOURCE') {
+            applyErrorSource(event.data.errorSource);
+        }
+    });
 
     function saveFile() {
         if (!state.currentPath) {
