@@ -1200,10 +1200,10 @@ sub generate :Local :Args(0) {
     }
 
     if (lc($normalized_agent_type) eq 'coding') {
-        unless ($self->_is_dev_mode($c)) {
+        unless ($self->_is_dev_mode($c) || $self->_is_shanta_editor($c)) {
             $c->response->body(encode_json({
                 success => JSON::false,
-                error   => 'The Coding Assistant is only available in development mode.',
+                error   => 'The Coding Assistant is only available in development mode or for Shanta admin.',
             }));
             $c->response->content_type('application/json');
             $c->response->status(403);
@@ -2811,10 +2811,10 @@ sub chat :Local :Args(0) {
     }
 
     if (lc($chat_agent_id) eq 'coding') {
-        unless ($self->_is_dev_mode($c)) {
+        unless ($self->_is_dev_mode($c) || $self->_is_shanta_editor($c)) {
             $c->response->body(encode_json({
                 success => JSON::false,
-                error   => 'The Coding Assistant is only available in development mode.',
+                error   => 'The Coding Assistant is only available in development mode or for Shanta admin.',
             }));
             $c->response->content_type('application/json');
             $c->response->status(403);
