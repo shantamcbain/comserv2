@@ -655,18 +655,42 @@ sub _grok_home {
 sub _grok_cli_api_key {
     my ($self, $c) = @_;
     return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
-    my $cfg_key = $c->config->{grok_cli_xai_api_key} || $c->config->{xai_api_key};
+    return $ENV{GROK_API_KEY} if $ENV{GROK_API_KEY} && $ENV{GROK_API_KEY} =~ /\S/;
+
+    my $k8s_secret_path = '/run/secrets/grok_api_key';
+    if (-e $k8s_secret_path) {
+        if (open my $fh, '<', $k8s_secret_path) {
+            my $key = do { local $/; <$fh> };
+            close $fh;
+            chomp($key);
+            return $key if $key && $key =~ /\S/;
+        }
+    }
+
+    try {
+        my $grok = $c->model('Grok');
+        if ($grok && $grok->api_key && $grok->api_key =~ /\S/) {
+            return $grok->api_key;
+        }
+    } catch {};
+
+    my $cfg_key = $c->config->{grok_cli_xai_api_key}
+               || $c->config->{xai_api_key}
+               || $c->config->{grok_api_key}
+               || $c->config->{grok_cli_grok_api_key};
     return $cfg_key if $cfg_key && $cfg_key =~ /\S/;
 
     my $user_id = $c->session->{user_id} || 0;
-    return '' unless $user_id;
 
     try {
         my $schema = $c->model('DBEncy')->schema;
-        my $key_obj = $schema->resultset('UserApiKeys')->search(
-            { user_id => $user_id, service => 'grok', is_active => '1' },
-            { rows => 1 }
-        )->first;
+        my $key_obj;
+        if ($user_id) {
+            $key_obj = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, service => 'grok', is_active => '1' },
+                { rows => 1 }
+            )->first;
+        }
         $key_obj ||= $schema->resultset('UserApiKeys')->search(
             { service => 'grok', is_active => '1' },
             { rows => 1 }
