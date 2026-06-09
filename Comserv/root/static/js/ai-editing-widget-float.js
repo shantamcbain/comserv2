@@ -265,7 +265,7 @@
         appendTreeEntries(root, '', 0, seq);
     }
 
-    function loadFile(path) {
+    function loadFile(path, lineNum) {
         if (state.dirty && !confirm('Discard unsaved changes?')) return;
         setStatus('Loading…');
         fetchJson('/ai/read_file?path=' + encodeURIComponent(path) + '&limit=800')
@@ -278,7 +278,109 @@
                 q('#aew-editor-path').textContent = data.path;
                 setStatus('Loaded', 'ok');
                 markTreeActive();
+                if (lineNum) {
+                    setTimeout(function() {
+                        scrollToLine(lineNum);
+                    }, 50);
+                }
             });
+    }
+
+    function scrollToLine(lineNum) {
+        var textarea = q('#aew-editor');
+        if (!textarea || !lineNum) return;
+        var lines = textarea.value.split('\n');
+        var targetLine = parseInt(lineNum, 10);
+        if (isNaN(targetLine) || targetLine < 1 || targetLine > lines.length) return;
+        var charIndex = 0;
+        for (var i = 0; i < targetLine - 1; i++) {
+            charIndex += lines[i].length + 1;
+        }
+        textarea.focus();
+        textarea.setSelectionRange(charIndex, charIndex + (lines[targetLine - 1] || '').length);
+        var lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 16;
+        textarea.scrollTop = (targetLine - 1) * lineHeight - (textarea.clientHeight / 2);
+    }
+
+    function detectPageErrorSource() {
+        var doc = document;
+        try {
+            if (window.AEW_POPUP_MODE && window.opener && !window.opener.closed) {
+                doc = window.opener.document;
+            }
+        } catch (e) {}
+
+        var fileTd = Array.from(doc.querySelectorAll('td, th')).find(function(el) {
+            var text = el.textContent.trim();
+            return text === 'File:' || text.indexOf('File:') >= 0;
+        });
+        if (!fileTd) return null;
+
+        var pathTd = fileTd.nextElementSibling;
+        if (!pathTd) return null;
+
+        var fullPath = pathTd.textContent.trim();
+        if (!fullPath) return null;
+
+        var parts = fullPath.split(':');
+        var rawPath = parts[0];
+        var lineNum = '';
+        if (parts[1] && /^\d+$/.test(parts[1].trim())) {
+            lineNum = parts[1].trim();
+        }
+
+        var match = rawPath.match(/(?:^|\/)(lib|root|sql|script|t)\/(.+)$/);
+        var path = '';
+        if (match) {
+            path = match[1] + '/' + match[2];
+        } else {
+            path = rawPath;
+        }
+
+        var subject = '';
+        var subjectTh = Array.from(doc.querySelectorAll('th, td')).find(function(el) {
+            return el.textContent.trim().toLowerCase() === 'subject';
+        });
+        if (subjectTh && subjectTh.nextElementSibling) {
+            subject = subjectTh.nextElementSibling.textContent.trim();
+        }
+
+        var desc = '';
+        var descTh = Array.from(doc.querySelectorAll('th, td')).find(function(el) {
+            return el.textContent.trim().toLowerCase() === 'description';
+        });
+        if (descTh && descTh.nextElementSibling) {
+            desc = descTh.nextElementSibling.textContent.trim();
+        }
+
+        return {
+            path: path,
+            lineNum: lineNum,
+            subject: subject,
+            description: desc
+        };
+    }
+
+    function checkForErrorSourceAndLoad() {
+        var errInfo = detectPageErrorSource();
+        if (errInfo && errInfo.path) {
+            loadFile(errInfo.path, errInfo.lineNum);
+            var promptText = "I encountered an error:\n" +
+                             "File: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : "") + "\n";
+            if (errInfo.subject) {
+                promptText += "Subject: " + errInfo.subject + "\n";
+            }
+            if (errInfo.description) {
+                promptText += "Details:\n" + errInfo.description + "\n";
+            }
+            promptText += "\nPlease analyze the code around the error source and help me fix it.";
+            var input = q('#aew-chat-input');
+            if (input) {
+                input.value = promptText;
+                input.focus();
+            }
+            addMsg("Detected error source on parent page. Loaded file: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : ""), "system");
+        }
     }
 
     function saveFile() {
@@ -436,6 +538,7 @@
             addMsg('Inline dock — use ⤢ for a separate window (recommended).', 'system');
         }
         refreshTree();
+        checkForErrorSourceAndLoad();
     }
 
     function closePanel() {
@@ -540,7 +643,10 @@
         if (cfg.project_root) {
             addMsg('Project root: ' + cfg.project_root + ' — expand lib/ → Comserv/ → Controller/ in the tree.', 'system');
         }
-        if (window.AEW_POPUP_MODE) return;
+        if (window.AEW_POPUP_MODE) {
+            checkForErrorSourceAndLoad();
+            return;
+        }
         if (sessionStorage.getItem('aew_open') === 'inline') openPanel();
         if (window.location.search.match(/open_aew=(?:1|popup)/)) openPopup();
         if (window.location.search.indexOf('open_aew=inline') >= 0) openPanel();
