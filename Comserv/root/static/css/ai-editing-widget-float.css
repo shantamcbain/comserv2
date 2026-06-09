@@ -380,3 +380,53 @@ body.aew-inline-open #chat-button {
     text-decoration: underline;
     color: #4a90d9;
 }
+
+#aew-panel .aew-cli-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #000000;
+    min-height: 0;
+}
+
+#aew-panel .aew-cli-history-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#aew-panel .aew-cli-output {
+    flex: 1;
+    margin: 0;
+    padding: 0.5rem;
+    background: #000000;
+    color: #39ff14;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+#aew-panel .aew-cli-input-row {
+    display: flex;
+    padding: 0.4rem;
+    background: #1e1e1e;
+    gap: 0.4rem;
+    border-top: 1px solid #3c3c3c;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#aew-panel .aew-cli-input-row input {
+    flex: 1;
+    background: #1e1e1e;
+    color: #ffffff;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.5rem;
+    font-family: Consolas, Monaco, monospace;
+}
