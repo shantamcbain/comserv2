@@ -10649,7 +10649,7 @@ sub _list_dir_param {
 }
 
 sub _sanitize_editor_rel_path {
-    my ($rel) = @_;
+    my ($self, $rel) = @_;
     return '' unless defined $rel;
     return '' if ref $rel;
     $rel = "$rel";
