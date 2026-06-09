@@ -72,6 +72,9 @@
                   '<button type="button" class="aew-btn" id="aew-refresh-tree">↻</button>' +
                   '<button type="button" class="aew-btn aew-btn-primary" id="aew-save-btn">Save</button>' +
                 '</div>' +
+                '<div style="padding:0 0.3rem 0.3rem 0.3rem;">' +
+                  '<input type="text" id="aew-tree-search" placeholder="Search files..." style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:0.2rem;background:#1e1e1e;color:#ccc;border:1px solid #3c3c3c;border-radius:2px;margin-top:0.2rem;">' +
+                '</div>' +
                 '<div class="aew-tree" id="aew-tree"></div>' +
               '</aside>' +
               '<section class="aew-editor-pane">' +
@@ -333,6 +336,12 @@
         };
         q('#aew-save-btn').onclick = saveFile;
         q('#aew-refresh-tree').onclick = refreshTree;
+        var searchInput = q('#aew-tree-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                filterTree();
+            });
+        }
         q('#aew-send-btn').onclick = function() {
             var t = q('#aew-chat-input').value.trim();
             if (!t) return;
@@ -459,11 +468,65 @@
         });
     }
 
-    function treeLabel(ent, depth) {
-        var ind = '';
-        for (var i = 0; i < depth; i++) ind += '  ';
-        var open = ent.type === 'dir' && state.treeExpanded[ent.path];
-        return ind + (ent.type === 'dir' ? (open ? '📂 ' : '📁 ') : '📄 ') + ent.name;
+    function filterTree() {
+        var searchInput = q('#aew-tree-search');
+        var query = ((searchInput || {}).value || '').toLowerCase().trim();
+        var root = q('#aew-tree');
+        if (!root) return;
+        var items = root.querySelectorAll('.aew-tree-item');
+        var childrenContainers = root.querySelectorAll('.aew-tree-children');
+        if (!query) {
+            items.forEach(function(row) {
+                row.style.display = '';
+                var rel = row.dataset.rel;
+                if (row.classList.contains('dir')) {
+                    var open = state.treeExpanded[rel];
+                    row.innerHTML = (open ? '📂 ' : '📁 ') + escapeHtml(row.dataset.name || rel.split('/').pop());
+                }
+            });
+            childrenContainers.forEach(function(box) {
+                var rel = box.dataset.rel;
+                box.style.display = state.treeExpanded[rel] ? '' : 'none';
+            });
+            return;
+        }
+        childrenContainers.forEach(function(box) {
+            box.style.display = 'none';
+        });
+        var visiblePaths = {};
+        items.forEach(function(row) {
+            var rel = row.dataset.rel || '';
+            var name = (row.dataset.name || rel.split('/').pop()).toLowerCase();
+            if (name.indexOf(query) !== -1) {
+                row.style.display = '';
+                visiblePaths[rel] = true;
+                var parts = rel.split('/');
+                while (parts.length > 0) {
+                    parts.pop();
+                    if (parts.length > 0) {
+                        var parentPath = parts.join('/');
+                        visiblePaths[parentPath] = true;
+                    }
+                }
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        items.forEach(function(row) {
+            var rel = row.dataset.rel || '';
+            if (visiblePaths[rel]) {
+                row.style.display = '';
+                if (row.classList.contains('dir')) {
+                    row.innerHTML = '📂 ' + escapeHtml(row.dataset.name || rel.split('/').pop());
+                }
+            }
+        });
+        childrenContainers.forEach(function(box) {
+            var rel = box.dataset.rel || '';
+            if (visiblePaths[rel]) {
+                box.style.display = '';
+            }
+        });
     }
 
     function markTreeActive() {
@@ -501,8 +564,10 @@
                     var row = document.createElement('div');
                     row.className = 'aew-tree-item' + (ent.type === 'dir' ? ' dir' : '');
                     row.dataset.rel = ent.path;
+                    row.dataset.name = ent.name;
                     if (ent.path === state.currentPath) row.classList.add('active');
-                    row.textContent = treeLabel(ent, depth);
+                    var open = ent.type === 'dir' && state.treeExpanded[ent.path];
+                    row.innerHTML = (ent.type === 'dir' ? (open ? '📂 ' : '📁 ') : '📄 ') + escapeHtml(ent.name);
 
                     var childBox = null;
                     if (ent.type === 'dir') {
@@ -516,7 +581,8 @@
                         ev.stopPropagation();
                         if (ent.type === 'dir' && childBox) {
                             state.treeExpanded[ent.path] = !state.treeExpanded[ent.path];
-                            row.textContent = treeLabel(ent, depth);
+                            var openNow = state.treeExpanded[ent.path];
+                            row.innerHTML = (openNow ? '📂 ' : '📁 ') + escapeHtml(row.dataset.name);
                             if (state.treeExpanded[ent.path]) {
                                 childBox.style.display = '';
                                 appendTreeEntries(childBox, ent.path, depth + 1, state.treeSeq);
@@ -544,7 +610,9 @@
         if (!root) return;
         state.treeSeq += 1;
         var seq = state.treeSeq;
-        state.treeExpanded = { lib: true };
+        if (!state.treeExpanded || Object.keys(state.treeExpanded).length === 0) {
+            state.treeExpanded = { lib: true };
+        }
         root.innerHTML = '';
         appendTreeEntries(root, '', 0, seq);
     }

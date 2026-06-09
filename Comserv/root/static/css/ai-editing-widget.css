@@ -109,7 +109,11 @@ html, body {
 .aew-tree-item:hover { background: #2a2d2e; }
 .aew-tree-item.active { background: #094771; color: #fff; }
 .aew-tree-item.dir { font-weight: 500; }
-.aew-tree-indent { display: inline-block; width: 12px; flex-shrink: 0; }
+.aew-tree-children {
+    border-left: 1px dashed #3a3d3e;
+    margin-left: 10px;
+    padding-left: 6px;
+}
 
 .aew-editor-pane {
     flex: 1;

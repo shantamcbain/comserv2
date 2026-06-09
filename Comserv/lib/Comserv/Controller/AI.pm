@@ -10636,6 +10636,10 @@ sub _require_shanta_editor {
 
 sub _project_root_path {
     my ($self, $c) = @_;
+    my $pycharm_path = '/home/shanta/PycharmProjects/comserv2/Comserv';
+    if (-d $pycharm_path) {
+        return $pycharm_path;
+    }
     return $c->config->{home}
         || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
 }
@@ -12314,8 +12318,8 @@ sub run_command :Local :Args(0) {
     local $ENV{USER} = 'shanta';
     local $ENV{LOGNAME} = 'shanta';
 
-    my $output = qx($cmd 2>&1);
-    my $exit_val = $? >> 8;
+    my $output = qx($cmd 2>&1) // '';
+    my $exit_val = ($? == -1) ? -1 : ($? >> 8);
 
     $c->response->body(encode_json({
         success   => JSON::true,
