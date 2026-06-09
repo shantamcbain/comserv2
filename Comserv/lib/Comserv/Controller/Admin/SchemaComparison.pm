@@ -314,12 +314,7 @@ sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_tabl
         
         my $pk_list = join(', ', @$pks);
         
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        }
+        my $dbh = $self->get_dbh_for_database($c, $database);
         
         # Try to drop existing PK first, ignore error if none exists
         eval { $dbh->do("ALTER TABLE $table_name DROP PRIMARY KEY") };
@@ -384,12 +379,7 @@ sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constr
         
         my $cols_list = join(', ', @{$constraint->{columns}});
         
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        }
+        my $dbh = $self->get_dbh_for_database($c, $database);
         
         # Try to drop existing index first, ignore error if none exists
         eval { $dbh->do("ALTER TABLE $table_name DROP INDEX $constraint_name") };
@@ -858,7 +848,7 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         # Load the Result class dynamically
         # result_name may contain '/' from scan_result_directory_recursive (subdir prefix);
         # convert to '::' so the eval'd require is valid Perl
-        my $namespace  = $database eq 'ency' ? 'Ency' : 'Forager';
+        my $namespace  = ($database && $database =~ /forager/i) ? 'Forager' : 'Ency';
         (my $result_path = $result_name) =~ s{/}{::}g;
         my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_path}";
 
@@ -867,17 +857,9 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
             die "Could not load Result class '$class_name': $@";
         }
 
-        # Get the schema / DBH
-        my $schema;
-        if ($database eq 'ency') {
-            $schema = $c->model('DBEncy')->schema;
-        } elsif ($database eq 'forager') {
-            $schema = $c->model('DBForager')->schema;
-        } else {
-            die "Invalid database: $database";
-        }
-
-        my $dbh = $schema->storage->dbh;
+        # Get the DBH dynamically
+        my $dbh = $self->get_dbh_for_database($c, $database);
+        my $schema = ($database && $database =~ /forager/i) ? $c->model('DBForager')->schema : $c->model('DBEncy')->schema;
 
         # Get table name from the loaded Result class
         my $table_name = $class_name->table;
@@ -1348,14 +1330,7 @@ sub update_table_field_from_result {
     my $extra = "";
     $extra = "AUTO_INCREMENT" if $result_field_info->{is_auto_increment};
     
-    my $dbh;
-    if ($database eq 'ency') {
-        $dbh = $c->model('DBEncy')->schema->storage->dbh;
-    } elsif ($database eq 'forager') {
-        $dbh = $c->model('DBForager')->schema->storage->dbh;
-    } else {
-        die "Invalid database: $database";
-    }
+    my $dbh = $self->get_dbh_for_database($c, $database);
 
     # Check if column exists to determine if we should use ADD or MODIFY
     my $column_exists = 0;
@@ -2501,7 +2476,7 @@ sub get_result_file_path {
     my ($self, $c, $table_name, $database) = @_;
 
     my $class_name = _table_to_class_name($table_name);
-    my $ns = ($database && lc($database) eq 'forager') ? 'Forager' : 'Ency';
+    my $ns = ($database && $database =~ /forager/i) ? 'Forager' : 'Ency';
 
     my $base_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', $ns, 'Result');
     return File::Spec->catfile($base_path, "$class_name.pm");

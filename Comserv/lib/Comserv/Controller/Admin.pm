@@ -3194,7 +3194,7 @@ sub get_schema_type_for_db_name {
     } elsif ($name eq 'accounting' || $name =~ /accounting/ || $name =~ /ledger/) {
         return 'accounting';
     }
-    return undef;
+    return 'ency';
 }
 
 sub normalize_migration_table_schema {
@@ -8066,7 +8066,7 @@ sub get_result_file_path {
     my ($self, $c, $table_name, $database) = @_;
     
     my $class_name = $self->table_name_to_class_name($table_name);
-    my $namespace = $database eq 'ency' ? 'Ency' : 'Forager';
+    my $namespace = ($database && $database =~ /forager/i) ? 'Forager' : 'Ency';
     
     # Build the file path
     my $base_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', $namespace, 'Result');
