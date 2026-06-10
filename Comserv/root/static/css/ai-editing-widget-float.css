@@ -453,3 +453,59 @@ body.aew-inline-open #chat-button {
     outline: none;
     height: 26px;
 }
+
+#aew-panel .aew-btn-inline-tool {
+    display: inline-block;
+    margin: 4px 2px;
+    padding: 3px 6px;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #39b54a;
+    font-size: 0.72rem;
+    font-family: monospace;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+#aew-panel .aew-btn-inline-tool:hover {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #4df363;
+}
+#aew-panel .run-cmd-btn {
+    color: #00bfff;
+}
+#aew-panel .run-cmd-btn:hover {
+    color: #33ccff;
+}
+#aew-panel .search-grep-btn {
+    color: #ffaa00;
+}
+#aew-panel .search-grep-btn:hover {
+    color: #ffbb33;
+}
+#aew-panel .aew-pre-code {
+    background: #1e1e1e;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 0.5rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+}
+
+#aew-panel .aew-fix-panel {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid #4a90d9;
+    border-radius: 4px;
+    background: #1a2a3a;
+}
+
+#aew-panel .aew-fix-panel pre {
+    max-height: 120px;
+    overflow: auto;
+    font-size: 0.72rem;
+    margin: 0.4rem 0;
+    background: #111;
+    padding: 0.4rem;
+}

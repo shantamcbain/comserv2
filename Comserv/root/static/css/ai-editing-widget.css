@@ -290,6 +290,45 @@ html, body {
     height: 26px;
 }
 
+.aew-btn-inline-tool {
+    display: inline-block;
+    margin: 4px 2px;
+    padding: 3px 6px;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #39b54a;
+    font-size: 0.72rem;
+    font-family: monospace;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.aew-btn-inline-tool:hover {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #4df363;
+}
+.run-cmd-btn {
+    color: #00bfff;
+}
+.run-cmd-btn:hover {
+    color: #33ccff;
+}
+.search-grep-btn {
+    color: #ffaa00;
+}
+.search-grep-btn:hover {
+    color: #ffbb33;
+}
+.aew-pre-code {
+    background: #1e1e1e;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 0.5rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+}
+
 @media (max-width: 900px) {
     .aew-files { width: 180px; }
     .aew-chat-pane { width: 300px; }

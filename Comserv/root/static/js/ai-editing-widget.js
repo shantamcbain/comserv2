@@ -358,12 +358,95 @@
     }
 
     // ── Chat ────────────────────────────────────────────────────────────────
+    function formatMessageHtml(text) {
+        if (!text) return '';
+        var escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        var codeBlocks = [];
+        escaped = escaped.replace(/```([a-zA-Z0-9_\-#\+]*)\n([\s\S]*?)```/g, function(match, lang, code) {
+            var placeholder = '___CODEBLOCK_' + codeBlocks.length + '___';
+            codeBlocks.push('<pre class="aew-pre-code"><code class="language-' + escapeHtml(lang) + '">' + code + '</code></pre>');
+            return placeholder;
+        });
+
+        escaped = escaped.replace(/\[READ_FILE:\s*([^\]]+)\]/gi, function(match, path) {
+            var cleanPath = path.trim();
+            return '<button type="button" class="aew-btn-inline-tool" onclick="window.AEW.loadFile(\'' + cleanPath.replace(/'/g, "\\'") + '\')">📄 Load: ' + escapeHtml(cleanPath) + '</button>';
+        });
+
+        escaped = escaped.replace(/\[RUN_COMMAND:\s*([^\]]+)\]/gi, function(match, cmd) {
+            var cleanCmd = cmd.trim();
+            return '<button type="button" class="aew-btn-inline-tool run-cmd-btn" onclick="window.AEW.runApprovedCommand(\'' + cleanCmd.replace(/'/g, "\\'") + '\')">💻 Run: <code>' + escapeHtml(cleanCmd) + '</code></button>';
+        });
+
+        escaped = escaped.replace(/\[SEARCH_GREP:\s*([^\]]+)\]/gi, function(match, pattern) {
+            var cleanPattern = pattern.trim();
+            return '<button type="button" class="aew-btn-inline-tool search-grep-btn" onclick="window.AEW.runApprovedGrep(\'' + cleanPattern.replace(/'/g, "\\'") + '\')">🔍 Search: ' + escapeHtml(cleanPattern) + '</button>';
+        });
+
+        escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+        escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/\n/g, '<br>');
+
+        codeBlocks.forEach(function(block, idx) {
+            escaped = escaped.replace('___CODEBLOCK_' + idx + '___', block);
+        });
+
+        return escaped;
+    }
+
+    function runApprovedCommand(cmd) {
+        if (!confirm('Execute command on server?\n\n' + cmd)) return;
+        setStatus('Running command…');
+        addMessage('Running: ' + cmd, 'system');
+        fetch('/ai/run_command', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'command=' + encodeURIComponent(cmd),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var outText = 'Command output (exit code: ' + data.exit_code + '):\n' + (data.output || '(no output)');
+                addMessage(outText, 'system');
+                setStatus('Command complete', 'ok');
+            } else {
+                addMessage('Error: ' + data.error, 'system');
+                setStatus('Command failed', 'err');
+            }
+        })
+        .catch(function(e) {
+            addMessage('Command request failed: ' + e, 'system');
+            setStatus('Command error', 'err');
+        });
+    }
+
+    function runApprovedGrep(pattern) {
+        var cmd = 'grep -rn -I --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=logs ' + shellEscape(pattern) + ' .';
+        runApprovedCommand(cmd);
+    }
+
+    function shellEscape(s) {
+        return '"' + s.replace(/(["\\])/g, '\\$1') + '"';
+    }
+
+    // Export AEW globally inside the window
+    window.AEW = {
+        loadFile: loadFile,
+        runApprovedCommand: runApprovedCommand,
+        runApprovedGrep: runApprovedGrep,
+    };
+
     function addMessage(text, role) {
         var box = $('aew-messages');
         if (!box) return;
         var div = document.createElement('div');
         div.className = 'aew-msg aew-msg-' + role;
-        div.textContent = text;
+        div.innerHTML = formatMessageHtml(text);
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
     }
@@ -380,18 +463,18 @@
             if (turn) {
                 var dUser = document.createElement('div');
                 dUser.className = 'aew-msg aew-msg-user';
-                dUser.textContent = turn.user;
+                dUser.innerHTML = formatMessageHtml(turn.user);
                 box.appendChild(dUser);
                 var dAi = document.createElement('div');
                 dAi.className = 'aew-msg aew-msg-ai';
-                dAi.textContent = turn.ai;
+                dAi.innerHTML = formatMessageHtml(turn.ai);
                 box.appendChild(dAi);
             }
         } else {
             state.chatHistory.forEach(function(m) {
                 var d = document.createElement('div');
                 d.className = 'aew-msg aew-msg-' + m.role;
-                d.textContent = m.content;
+                d.innerHTML = formatMessageHtml(m.content);
                 box.appendChild(d);
             });
         }
