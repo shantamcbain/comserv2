@@ -224,7 +224,7 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
             <a href="/ai/template_editor">Template / code editor</a> ·
             <a href="/admin/docker-containers">Docker containers</a> ·
             <a href="/ai">AI chat</a> (add Grok API key at <a href="/ai/manage_api_keys">manage API keys</a>).
-            In-app AI and external agents (e.g. Grok CLI) can edit the repo when run on the workstation with git access.
+            In-app AI and external agents (e.g. AI Code Editor) can edit the repo when run on the workstation with git access.
         </div>
 
     </div>

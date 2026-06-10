@@ -1,5 +1,5 @@
 /**
- * Floating AI Code Editor — Grok CLI + file tree (not Comserv /ai/chat by default).
+ * Floating AI Code Editor — file tree (not Comserv /ai/chat by default).
  * Toggle: window.AEW.open() / AEW.close() / AEW.toggle()
  */
 (function() {
@@ -57,9 +57,9 @@
             '<div id="aew-panel-header">' +
               '<span id="aew-drag-handle" title="Drag">⠿</span>' +
               '<span id="aew-panel-title">AI Code Editor</span>' +
-              '<span id="aew-panel-sub">Grok CLI · floating</span>' +
+              '<span id="aew-panel-sub">Local CLI · floating</span>' +
               '<select id="aew-backend" title="AI backend" style="font-size:0.72rem;margin-left:6px;">' +
-                '<option value="grok_cli">Grok CLI (Cursor)</option>' +
+                '<option value="grok_cli">AI Code Editor CLI (Cursor)</option>' +
                 '<option value="comserv">Comserv AI (Ollama/Grok API)</option>' +
               '</select>' +
               '<button type="button" class="aew-btn" id="aew-popout" title="Open in separate window (move to another monitor)">⤢</button>' +
@@ -95,7 +95,7 @@
                   '</div>' +
                   '<div class="aew-messages" id="aew-messages"></div>' +
                   '<div class="aew-input-row">' +
-                    '<textarea id="aew-chat-input" rows="2" placeholder="Ask Grok CLI…"></textarea>' +
+                    '<textarea id="aew-chat-input" rows="2" placeholder="Ask AI Code Editor…"></textarea>' +
                     '<button type="button" class="aew-btn aew-btn-primary" id="aew-send-btn">Send</button>' +
                   '</div>' +
                   '<div class="aew-status" id="aew-status"></div>' +
@@ -837,7 +837,7 @@
     }
 
     function sendChatGrokCli(prompt) {
-        setStatus('Grok CLI running…');
+        setStatus('AI Code Editor running…');
         q('#aew-send-btn').disabled = true;
         var ctx = openerContext();
         var body = 'prompt=' + encodeURIComponent(prompt)
