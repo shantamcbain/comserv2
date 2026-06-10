@@ -406,12 +406,136 @@
         document.addEventListener('mouseup', function() { resizing = false; });
     }
 
+    function formatMessageHtml(text) {
+        if (!text) return '';
+        var escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        var codeBlocks = [];
+        escaped = escaped.replace(/```([a-zA-Z0-9_\-#\+]*)\n([\s\S]*?)```/g, function(match, lang, code) {
+            var placeholder = '___CODEBLOCK_' + codeBlocks.length + '___';
+            codeBlocks.push('<pre class="aew-pre-code"><code class="language-' + escapeHtml(lang) + '">' + code + '</code></pre>');
+            return placeholder;
+        });
+
+        escaped = escaped.replace(/\[READ_FILE:\s*([^\]]+)\]/gi, function(match, path) {
+            var cleanPath = path.trim();
+            return '<button type="button" class="aew-btn-inline-tool" onclick="window.AEW.loadFile(\'' + cleanPath.replace(/'/g, "\\'") + '\')">📄 Load: ' + escapeHtml(cleanPath) + '</button>';
+        });
+
+        escaped = escaped.replace(/\[RUN_COMMAND:\s*([^\]]+)\]/gi, function(match, cmd) {
+            var cleanCmd = cmd.trim();
+            return '<button type="button" class="aew-btn-inline-tool run-cmd-btn" onclick="window.AEW.runApprovedCommand(\'' + cleanCmd.replace(/'/g, "\\'") + '\')">💻 Run: <code>' + escapeHtml(cleanCmd) + '</code></button>';
+        });
+
+        escaped = escaped.replace(/\[SEARCH_GREP:\s*([^\]]+)\]/gi, function(match, pattern) {
+            var cleanPattern = pattern.trim();
+            return '<button type="button" class="aew-btn-inline-tool search-grep-btn" onclick="window.AEW.runApprovedGrep(\'' + cleanPattern.replace(/'/g, "\\'") + '\')">🔍 Search: ' + escapeHtml(cleanPattern) + '</button>';
+        });
+
+        escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+        escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/\n/g, '<br>');
+
+        codeBlocks.forEach(function(block, idx) {
+            escaped = escaped.replace('___CODEBLOCK_' + idx + '___', block);
+        });
+
+        return escaped;
+    }
+
+    function runApprovedCommand(cmd) {
+        if (!confirm('Execute command on server?\n\n' + cmd)) return;
+        setStatus('Running command…');
+        addMsg('Running: ' + cmd, 'system');
+        fetch('/ai/run_command', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'command=' + encodeURIComponent(cmd),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var outText = 'Command output (exit code: ' + data.exit_code + '):\n' + (data.output || '(no output)');
+                addMsg(outText, 'system');
+                setStatus('Command complete', 'ok');
+            } else {
+                addMsg('Error: ' + data.error, 'system');
+                setStatus('Command failed', 'err');
+            }
+        })
+        .catch(function(e) {
+            addMsg('Command request failed: ' + e, 'system');
+            setStatus('Command error', 'err');
+        });
+    }
+
+    function runApprovedGrep(pattern) {
+        var cmd = 'grep -rn -I --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=logs ' + shellEscape(pattern) + ' .';
+        runApprovedCommand(cmd);
+    }
+
+    function shellEscape(s) {
+        return '"' + s.replace(/(["\\])/g, '\\$1') + '"';
+    }
+
+    function parseFixBlock(raw) {
+        var re = /##\s*FIX:\s*([^\n\r]+)[\r\n]+```[^\n\r]*\n([\s\S]*?)```/i;
+        var m = raw.match(re);
+        if (!m) return null;
+        return { path: m[1].trim(), content: m[2] };
+    }
+
+    function showFixPanel(fix) {
+        var box = q('#aew-messages');
+        if (!box) return;
+        var panel = document.createElement('div');
+        panel.className = 'aew-fix-panel';
+        panel.innerHTML = '<strong>Proposed fix:</strong> ' + escapeHtml(fix.path)
+            + '<pre class="aew-pre-code">' + escapeHtml(fix.content.slice(0, 2000)) + (fix.content.length > 2000 ? '\n…' : '') + '</pre>';
+        var applyBtn = document.createElement('button');
+        applyBtn.className = 'aew-btn aew-btn-success';
+        applyBtn.textContent = 'Apply Fix';
+        applyBtn.style.marginTop = '4px';
+        applyBtn.onclick = function() {
+            if (!confirm('Apply AI fix to ' + fix.path + '?')) return;
+            fetch('/ai/apply_fix', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'path=' + encodeURIComponent(fix.path)
+                    + '&content=' + encodeURIComponent(fix.content),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    addMsg('Applied fix to ' + fix.path, 'system');
+                    if (fix.path === state.currentPath) {
+                        state.currentContent = fix.content;
+                        state.dirty = false;
+                        var ed = q('#aew-editor');
+                        if (ed) ed.value = fix.content;
+                    }
+                    setStatus('Fix applied', 'ok');
+                } else {
+                    setStatus('Apply failed: ' + data.error, 'err');
+                }
+            });
+        };
+        panel.appendChild(applyBtn);
+        box.appendChild(panel);
+        box.scrollTop = box.scrollHeight;
+    }
+
     function addMsg(text, role) {
         var box = q('#aew-messages');
         if (!box) return;
         var d = document.createElement('div');
         d.className = 'aew-msg aew-msg-' + role;
-        d.textContent = text;
+        d.innerHTML = formatMessageHtml(text);
         box.appendChild(d);
         box.scrollTop = box.scrollHeight;
     }
@@ -428,24 +552,24 @@
             if (turn) {
                 var dUser = document.createElement('div');
                 dUser.className = 'aew-msg aew-msg-user';
-                dUser.textContent = turn.user;
+                dUser.innerHTML = formatMessageHtml(turn.user);
                 box.appendChild(dUser);
                 var dAi = document.createElement('div');
                 dAi.className = 'aew-msg aew-msg-ai';
-                dAi.textContent = turn.ai;
+                dAi.innerHTML = formatMessageHtml(turn.ai);
                 box.appendChild(dAi);
             }
         } else {
             if (!window.AEW_POPUP_MODE) {
                 var dSys = document.createElement('div');
                 dSys.className = 'aew-msg aew-msg-system';
-                dSys.textContent = 'Inline dock — use ⤢ for a separate window (recommended).';
+                dSys.innerHTML = formatMessageHtml('Inline dock — use ⤢ for a separate window (recommended).');
                 box.appendChild(dSys);
             }
             state.chatHistory.forEach(function(m) {
                 var d = document.createElement('div');
                 d.className = 'aew-msg aew-msg-' + m.role;
-                d.textContent = m.content;
+                d.innerHTML = formatMessageHtml(m.content);
                 box.appendChild(d);
             });
         }
@@ -907,6 +1031,9 @@
             setStatus(backendLabel + ' done', 'ok');
             var rf = reply.match(/\[READ_FILE:\s*([^\]]+)\]/i);
             if (rf) loadFile(rf[1].trim());
+
+            var fix = parseFixBlock(reply);
+            if (fix) showFixPanel(fix);
         }).catch(function(e) {
             addMsg('Network error: ' + e, 'system');
             setStatus(String(e), 'err');
@@ -1005,6 +1132,8 @@
         },
         loadFile: loadFile,
         refreshTree: refreshTree,
+        runApprovedCommand: runApprovedCommand,
+        runApprovedGrep: runApprovedGrep,
     };
 
     fetchJson('/ai/editor_config').then(function(cfg) {
