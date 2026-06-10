@@ -49,7 +49,7 @@
         var wrap = document.createElement('div');
         wrap.id = 'aew-launcher-wrap';
         wrap.innerHTML =
-            '<button type="button" id="aew-launcher" title="AI Code Editor (Grok CLI)">💻 Code + Grok</button>';
+            '<button type="button" id="aew-launcher" title="AI Code Editor">💻 Code</button>';
 
         var panel = document.createElement('div');
         panel.id = 'aew-panel';
