@@ -11431,6 +11431,304 @@ sub revert_code :Local :Args(0) {
     }));
 }
 
+# Helper path for the file index
+sub _file_index_path {
+    my ($self, $c) = @_;
+    my $root = $self->_project_root_path($c);
+    return "$root/comserv_file_index.json";
+}
+
+# Recursively build list of files
+sub _build_index_for_dir {
+    my ($self, $c, $dir, $files_ref) = @_;
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$dir";
+    return unless -d $full;
+
+    if (opendir(my $dh, $full)) {
+        my @names = readdir($dh);
+        closedir $dh;
+        for my $name (@names) {
+            next if $name eq '.' || $name eq '..';
+            next if $name =~ /^\./; # skip hidden
+            next if $name =~ /\.bak$/; # skip backup files
+            my $rel_path = $dir ? "$dir/$name" : $name;
+            $rel_path =~ s{//+}{/}g;
+            next unless $self->_editor_path_allowed($rel_path);
+            
+            my $child_full = "$root/$rel_path";
+            if (-d $child_full) {
+                $self->_build_index_for_dir($c, $rel_path, $files_ref);
+            } elsif (-f $child_full) {
+                push @$files_ref, $rel_path;
+            }
+        }
+    }
+}
+
+# Internal rebuild routine
+sub _rebuild_index_internal {
+    my ($self, $c) = @_;
+    my $files = [];
+    for my $top (@_EDITOR_ROOTS) {
+        $self->_build_index_for_dir($c, $top, $files);
+    }
+    my @sorted_files = sort { lc($a) cmp lc($b) } @$files;
+    
+    my $index_file = $self->_file_index_path($c);
+    if (open(my $fh, '>:utf8', $index_file)) {
+        print $fh encode_json(\@sorted_files);
+        close $fh;
+    }
+    return \@sorted_files;
+}
+
+# Internal add_to_index routine
+sub _add_to_index_internal {
+    my ($self, $c, $rel) = @_;
+    my $index_file = $self->_file_index_path($c);
+    my $files = [];
+    if (-f $index_file && open(my $fh, '<:utf8', $index_file)) {
+        local $/;
+        my $json_text = <$fh>;
+        close $fh;
+        try { $files = decode_json($json_text); };
+    }
+    
+    unless (grep { $_ eq $rel } @$files) {
+        push @$files, $rel;
+        my @sorted = sort { lc($a) cmp lc($b) } @$files;
+        if (open(my $wfh, '>:utf8', $index_file)) {
+            print $wfh encode_json(\@sorted);
+            close $wfh;
+        }
+    }
+}
+
+# Internal remove_from_index routine
+sub _remove_from_index_internal {
+    my ($self, $c, $rel) = @_;
+    my $index_file = $self->_file_index_path($c);
+    my $files = [];
+    if (-f $index_file && open(my $fh, '<:utf8', $index_file)) {
+        local $/;
+        my $json_text = <$fh>;
+        close $fh;
+        try { $files = decode_json($json_text); };
+    }
+    
+    my @filtered = grep { $_ ne $rel } @$files;
+    if (open(my $wfh, '>:utf8', $index_file)) {
+        print $wfh encode_json(\@filtered);
+        close $wfh;
+    }
+}
+
+=head2 get_file_index
+
+GET /ai/get_file_index - Get complete list of indexed files
+
+=cut
+
+sub get_file_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $index_file = $self->_file_index_path($c);
+    my $files = [];
+
+    if (-f $index_file) {
+        if (open(my $fh, '<:utf8', $index_file)) {
+            local $/;
+            my $json_text = <$fh>;
+            close $fh;
+            try {
+                $files = decode_json($json_text);
+            } catch {
+                $files = [];
+            };
+        }
+    }
+
+    if (!@$files) {
+        $files = $self->_rebuild_index_internal($c);
+    }
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        files   => $files,
+    }));
+}
+
+=head2 rebuild_file_index
+
+POST/GET /ai/rebuild_file_index - Rebuild the file index from scratch
+
+=cut
+
+sub rebuild_file_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $files = $self->_rebuild_index_internal($c);
+    $c->response->body(encode_json({
+        success => JSON::true,
+        files   => $files,
+    }));
+}
+
+=head2 add_to_index
+
+POST /ai/add_to_index - Manually add a file path to the index
+
+=cut
+
+sub add_to_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
+    unless ($self->_editor_path_allowed($rel)) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
+        return;
+    }
+
+    $self->_add_to_index_internal($c, $rel);
+    $c->response->body(encode_json({ success => JSON::true, path => $rel }));
+}
+
+=head2 remove_from_index
+
+POST /ai/remove_from_index - Manually remove a file path from the index
+
+=cut
+
+sub remove_from_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
+    unless ($self->_editor_path_allowed($rel)) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
+        return;
+    }
+
+    $self->_remove_from_index_internal($c, $rel);
+    $c->response->body(encode_json({ success => JSON::true, path => $rel }));
+}
+
+=head2 create_file
+
+POST /ai/create_file - Create a new file on disk and add it to the index
+
+=cut
+
+sub create_file :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
+    unless ($self->_editor_path_allowed($rel)) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$rel";
+
+    if (-e $full) {
+        $c->response->body(encode_json({ success => JSON::false, error => "File or directory already exists: $rel" }));
+        return;
+    }
+
+    require File::Path;
+    require File::Spec;
+    my ($vol, $parent_dir, $file) = File::Spec->splitpath($full);
+    File::Path::make_path($parent_dir) unless -d $parent_dir;
+
+    if (open(my $fh, '>', $full)) {
+        print $fh "";
+        close $fh;
+    } else {
+        $c->response->body(encode_json({ success => JSON::false, error => "Cannot write file: $!" }));
+        return;
+    }
+
+    $self->_add_to_index_internal($c, $rel);
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        path    => $rel,
+        message => "File created successfully: $rel",
+    }));
+}
+
+=head2 delete_file
+
+POST /ai/delete_file - Delete a file from disk and subtract/remove it from the index
+
+=cut
+
+sub delete_file :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
+    unless ($self->_editor_path_allowed($rel)) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$rel";
+
+    unless (-f $full) {
+        $c->response->body(encode_json({ success => JSON::false, error => "File not found: $rel" }));
+        return;
+    }
+
+    if (unlink $full) {
+        $self->_remove_from_index_internal($c, $rel);
+        $c->response->body(encode_json({
+            success => JSON::true,
+            path    => $rel,
+            message => "File deleted successfully: $rel",
+        }));
+    } else {
+        $c->response->body(encode_json({ success => JSON::false, error => "Cannot delete file: $!" }));
+    }
+}
+
 =head2 transcribe
 
 POST /ai/transcribe — Accept a multipart audio file upload, run it through Whisper,

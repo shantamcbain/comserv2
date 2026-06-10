@@ -20,6 +20,7 @@
         backend: 'grok_cli',
         treeExpanded: {},
         treeSeq: 0,
+        fileIndex: [],
     };
 
     function q(sel, root) {
@@ -68,8 +69,11 @@
             '</div>' +
             '<div id="aew-panel-body" class="aew-panel-body">' +
               '<aside class="aew-files">' +
-                '<div style="padding:0.3rem;display:flex;gap:0.25rem;">' +
-                  '<button type="button" class="aew-btn" id="aew-refresh-tree">↻</button>' +
+                '<div style="padding:0.3rem;display:flex;gap:0.25rem;align-items:center;">' +
+                  '<button type="button" class="aew-btn" id="aew-refresh-tree" title="Refresh tree and load index">↻</button>' +
+                  '<button type="button" class="aew-btn" id="aew-new-file-btn" title="Create a new file" style="font-weight:bold;">+</button>' +
+                  '<button type="button" class="aew-btn" id="aew-delete-file-btn" title="Delete current file" style="font-weight:bold;">–</button>' +
+                  '<button type="button" class="aew-btn" id="aew-rebuild-index-btn" title="Rebuild whole file index" style="font-size:0.7rem;padding:0.2rem 0.4rem;">Rebuild</button>' +
                   '<button type="button" class="aew-btn aew-btn-primary" id="aew-save-btn">Save</button>' +
                 '</div>' +
                 '<div style="padding:0 0.3rem 0.3rem 0.3rem;">' +
@@ -336,6 +340,99 @@
         };
         q('#aew-save-btn').onclick = saveFile;
         q('#aew-refresh-tree').onclick = refreshTree;
+
+        var newFileBtn = q('#aew-new-file-btn');
+        if (newFileBtn) {
+            newFileBtn.onclick = function() {
+                var path = prompt("Enter new file path relative to project root (e.g. lib/Comserv/Controller/MyTest.pm):");
+                if (!path) return;
+                path = path.trim();
+                if (!path) return;
+                setStatus("Creating " + path + "...");
+                fetch("/ai/create_file", {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'path=' + encodeURIComponent(path)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        setStatus("Created file: " + path, "ok");
+                        loadFileIndex().then(function() {
+                            refreshTree();
+                            loadFile(path);
+                        });
+                    } else {
+                        setStatus("Create failed: " + (data.error || "unknown"), "err");
+                    }
+                })
+                .catch(function(err) {
+                    setStatus("Create error: " + err, "err");
+                });
+            };
+        }
+
+        var deleteFileBtn = q('#aew-delete-file-btn');
+        if (deleteFileBtn) {
+            deleteFileBtn.onclick = function() {
+                if (!state.currentPath) {
+                    alert("Please open a file first to delete it.");
+                    return;
+                }
+                if (!confirm("Are you sure you want to permanently delete " + state.currentPath + "?")) {
+                    return;
+                }
+                var path = state.currentPath;
+                setStatus("Deleting " + path + "...");
+                fetch("/ai/delete_file", {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'path=' + encodeURIComponent(path)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        setStatus("Deleted file: " + path, "ok");
+                        state.currentPath = '';
+                        state.currentContent = '';
+                        state.dirty = false;
+                        q('#aew-editor').value = '';
+                        q('#aew-editor-path').textContent = '—';
+                        loadFileIndex().then(function() {
+                            refreshTree();
+                        });
+                    } else {
+                        setStatus("Delete failed: " + (data.error || "unknown"), "err");
+                    }
+                })
+                .catch(function(err) {
+                    setStatus("Delete error: " + err, "err");
+                });
+            };
+        }
+
+        var rebuildIndexBtn = q('#aew-rebuild-index-btn');
+        if (rebuildIndexBtn) {
+            rebuildIndexBtn.onclick = function() {
+                setStatus("Rebuilding file index...");
+                fetchJson("/ai/rebuild_file_index")
+                    .then(function(data) {
+                        if (data.success) {
+                            state.fileIndex = data.files || [];
+                            setStatus("Rebuilt file index with " + state.fileIndex.length + " files", "ok");
+                            refreshTree();
+                        } else {
+                            setStatus("Rebuild failed: " + (data.error || "unknown"), "err");
+                        }
+                    })
+                    .catch(function(err) {
+                        setStatus("Rebuild error: " + err, "err");
+                    });
+            };
+        }
+
         var searchInput = q('#aew-tree-search');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
@@ -592,64 +689,72 @@
         });
     }
 
+    function loadFileIndex() {
+        return fetchJson('/ai/get_file_index')
+            .then(function(data) {
+                if (data.success) {
+                    state.fileIndex = data.files || [];
+                }
+                return data;
+            })
+            .catch(function(err) {
+                console.error("Failed to load file index:", err);
+            });
+    }
+
     function filterTree() {
         var searchInput = q('#aew-tree-search');
         var query = ((searchInput || {}).value || '').toLowerCase().trim();
         var root = q('#aew-tree');
         if (!root) return;
-        var items = root.querySelectorAll('.aew-tree-item');
-        var childrenContainers = root.querySelectorAll('.aew-tree-children');
+
+        // If no query, restore standard tree directory structure
         if (!query) {
-            items.forEach(function(row) {
-                row.style.display = '';
-                var rel = row.dataset.rel;
-                if (row.classList.contains('dir')) {
-                    var open = state.treeExpanded[rel];
-                    row.innerHTML = (open ? '📂 ' : '📁 ') + escapeHtml(row.dataset.name || rel.split('/').pop());
-                }
-            });
-            childrenContainers.forEach(function(box) {
-                var rel = box.dataset.rel;
-                box.style.display = state.treeExpanded[rel] ? '' : 'none';
-            });
+            root.innerHTML = '';
+            appendTreeEntries(root, '', 0, state.treeSeq);
             return;
         }
-        childrenContainers.forEach(function(box) {
-            box.style.display = 'none';
-        });
-        var visiblePaths = {};
-        items.forEach(function(row) {
-            var rel = row.dataset.rel || '';
-            var name = (row.dataset.name || rel.split('/').pop()).toLowerCase();
-            if (name.indexOf(query) !== -1) {
-                row.style.display = '';
-                visiblePaths[rel] = true;
-                var parts = rel.split('/');
-                while (parts.length > 0) {
-                    parts.pop();
-                    if (parts.length > 0) {
-                        var parentPath = parts.join('/');
-                        visiblePaths[parentPath] = true;
-                    }
-                }
-            } else {
-                row.style.display = 'none';
-            }
-        });
-        items.forEach(function(row) {
-            var rel = row.dataset.rel || '';
-            if (visiblePaths[rel]) {
-                row.style.display = '';
-                if (row.classList.contains('dir')) {
-                    row.innerHTML = '📂 ' + escapeHtml(row.dataset.name || rel.split('/').pop());
-                }
-            }
-        });
-        childrenContainers.forEach(function(box) {
-            var rel = box.dataset.rel || '';
-            if (visiblePaths[rel]) {
-                box.style.display = '';
-            }
+
+        // If query is present, do whole-project matched file search in state.fileIndex
+        var matched = [];
+        if (state.fileIndex && state.fileIndex.length > 0) {
+            matched = state.fileIndex.filter(function(path) {
+                return path.toLowerCase().indexOf(query) !== -1;
+            });
+        }
+
+        // Render matched files as a flat list
+        root.innerHTML = '';
+        if (matched.length === 0) {
+            var empty = document.createElement('div');
+            empty.className = 'aew-tree-hint';
+            empty.style.padding = '0.5rem';
+            empty.style.color = '#888';
+            empty.style.fontSize = '0.72rem';
+            empty.textContent = 'No files found matching "' + query + '"';
+            root.appendChild(empty);
+            return;
+        }
+
+        matched.forEach(function(path) {
+            var row = document.createElement('div');
+            row.className = 'aew-tree-item';
+            row.dataset.rel = path;
+            // Get the filename only for display name
+            var name = path.split('/').pop();
+            row.dataset.name = name;
+            if (path === state.currentPath) row.classList.add('active');
+            
+            // Show file icon and name, with path in small font or parentheses
+            row.innerHTML = '📄 ' + escapeHtml(name) + ' <span style="font-size:0.65rem;color:#777;margin-left:4px;">(' + escapeHtml(path) + ')</span>';
+            row.title = path;
+
+            row.onclick = function(ev) {
+                ev.stopPropagation();
+                loadFile(path);
+            };
+
+            root.appendChild(row);
         });
     }
 
@@ -739,6 +844,7 @@
         }
         root.innerHTML = '';
         appendTreeEntries(root, '', 0, seq);
+        loadFileIndex();
     }
 
     function loadFile(path, lineNum) {
