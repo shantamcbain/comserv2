@@ -4242,6 +4242,192 @@ sub remove_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 auto_sync_models
+
+Pull all recommended models that are not installed, and remove deprecated models on all configured Ollama servers.
+
+=cut
+
+sub auto_sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'auto_sync_models', "Unauthorized access attempt to AI auto-sync models");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Authentication required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(401);
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_manage_models = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_manage_models = grep { $_ =~ /^(admin|developer)$/i } @$user_roles;
+    }
+    
+    unless ($can_manage_models) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'auto_sync_models', "Unauthorized model auto-sync attempt by user: $username");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Insufficient permissions to sync models'
+        });
+        $c->response->body($error_response);
+        $c->response->status(403);
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'auto_sync_models', "Processing AI models auto-sync request");
+    
+    my $response_data;
+    
+    try {
+        my $ollama = $c->model('Ollama');
+        unless ($ollama) {
+            die "Failed to load Ollama model";
+        }
+        
+        my $ollama_cfg2   = $c->config->{Ollama} || {};
+        my $cfg_host      = $ollama_cfg2->{host}          || 'localhost';
+        my $cfg_fallback  = $ollama_cfg2->{fallback_host} || $cfg_host;
+        my $cfg_port      = $ollama_cfg2->{port}          || 11434;
+
+        my @server_configs = (
+            { host => $cfg_host, port => $cfg_port },
+        );
+        if ($cfg_fallback ne $cfg_host) {
+            push @server_configs, { host => $cfg_fallback, port => $cfg_port };
+        }
+        
+        my @servers_result;
+        my $total_pulled = 0;
+        my $total_removed = 0;
+        
+        my $available = $ollama->list_available_models() || [];
+        my @rec_models = map { $_->{name} } grep { $_->{recommended} && !$_->{cloud} } @$available;
+        my $dep_models = $ollama->deprecated_models() || [];
+        
+        for my $srv (@server_configs) {
+            my $srv_host = $srv->{host};
+            my $srv_port = $srv->{port};
+            
+            my $srv_res = {
+                host => $srv_host,
+                port => $srv_port,
+                pulled => [],
+                removed => [],
+                skipped => [],
+                errors => []
+            };
+            
+            $ollama->host($srv_host);
+            $ollama->port($srv_port);
+            $ollama->clear_endpoint;
+            
+            my $orig_timeout = $ollama->timeout;
+            $ollama->timeout(3);
+            
+            if (!$ollama->check_connection()) {
+                $srv_res->{error} = "Connection failed: " . ($ollama->last_error || "Offline");
+                push @servers_result, $srv_res;
+                $ollama->timeout($orig_timeout) if defined $orig_timeout;
+                next;
+            }
+            
+            $ollama->timeout($orig_timeout) if defined $orig_timeout;
+            
+            my $installed = $ollama->list_models() || [];
+            my @installed_names;
+            my %installed_map;
+            for my $m (@$installed) {
+                my $name = ref($m) ? ($m->{name} || '') : ($m || '');
+                next unless $name;
+                push @installed_names, $name;
+                $installed_map{$name} = 1;
+                (my $base = $name) =~ s/:.*$//;
+                $installed_map{$base} = 1;
+            }
+            
+            for my $installed_name (@installed_names) {
+                (my $base_name = $installed_name) =~ s/:.*$//;
+                
+                my $is_deprecated = 0;
+                for my $dep_model (@$dep_models) {
+                    if ($installed_name eq $dep_model || $base_name eq $dep_model) {
+                        $is_deprecated = 1;
+                        last;
+                    }
+                }
+                
+                if ($is_deprecated) {
+                    my $del_res = $ollama->remove_model(model => $installed_name);
+                    if ($del_res && $del_res->{success}) {
+                        push @{$srv_res->{removed}}, $installed_name;
+                        $total_removed++;
+                    } else {
+                        my $err = $del_res->{error} || $ollama->last_error || 'Unknown error';
+                        push @{$srv_res->{errors}}, "Failed to remove $installed_name: $err";
+                    }
+                }
+            }
+            
+            for my $rec_model (@rec_models) {
+                (my $base_rec = $rec_model) =~ s/:.*$//;
+                
+                if ($installed_map{$rec_model} || $installed_map{$base_rec}) {
+                    push @{$srv_res->{skipped}}, $rec_model;
+                } else {
+                    my $pull_res = $ollama->pull_model(model => $rec_model);
+                    if ($pull_res && $pull_res->{success}) {
+                        push @{$srv_res->{pulled}}, $rec_model;
+                        $total_pulled++;
+                    } else {
+                        my $err = $pull_res->{error} || $ollama->last_error || 'Unknown error';
+                        push @{$srv_res->{errors}}, "Failed to pull $rec_model: $err";
+                    }
+                }
+            }
+            
+            push @servers_result, $srv_res;
+        }
+        
+        $response_data = {
+            success => JSON::true,
+            total_pulled => $total_pulled,
+            total_removed => $total_removed,
+            servers => \@servers_result
+        };
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'auto_sync_models', "Model auto-sync failed for user '$username': $error");
+        
+        $response_data = {
+            success => JSON::false,
+            error => 'Failed to sync models: ' . $error
+        };
+        $c->response->status(500);
+    };
+    
+    my $json_response = encode_json($response_data);
+    $c->response->body($json_response);
+}
+
 =head2 unload_model
 
 Force-unload a model from Ollama memory (keep_alive=0).

@@ -4,15 +4,14 @@ use Test::More;
 
 BEGIN { use_ok 'Comserv::Controller::AI' }
 
-# Test that models method exists in the AI controller
 can_ok('Comserv::Controller::AI', 'models');
+can_ok('Comserv::Controller::AI', 'auto_sync_models');
 
-# Test method signature and basic functionality
 {
     my $controller = bless {}, 'Comserv::Controller::AI';
     
-    # Test that the method can be called (basic check)
     ok($controller->can('models'), 'models method is available');
+    ok($controller->can('auto_sync_models'), 'auto_sync_models method is available');
 }
 
 # Test AI controller loads without errors
