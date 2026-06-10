@@ -217,7 +217,7 @@ sub _should_use_shell {
     my ($self) = @_;
     return 1 if $self->use_docker || $self->use_podman;
     my $host = $self->host || '';
-    return 1 if $host eq '127.0.0.1' || $host eq 'localhost' || $host eq '0.0.0.0' || $host eq '::1';
+    return 1 if $host eq '127.0.0.1' || $host eq 'localhost' || $host eq '0.0.0.0' || $host eq '::1' || $host eq '192.168.1.199';
     return 0;
 }
 
@@ -1895,7 +1895,7 @@ sub start_server {
     my $async = $args{async} || 0;              # Synchronous by default
     
     # Only support localhost
-    if ($self->host ne 'localhost' && $self->host ne '127.0.0.1') {
+    if ($self->host ne 'localhost' && $self->host ne '127.0.0.1' && $self->host ne '192.168.1.199') {
         $self->last_error("Server start only supported on localhost");
         $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'start_server',
             "Attempted to start server on non-localhost host: " . $self->host);
