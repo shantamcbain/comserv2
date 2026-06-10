@@ -11359,6 +11359,71 @@ sub apply_fix :Local :Args(0) {
     }));
 }
 
+=head2 revert_code
+
+Revert changes back to their original state using .bak backup files and optionally git.
+Restores any file with a .bak extension back to its original name.
+
+=cut
+
+sub revert_code :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_is_shanta_editor($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Unauthorized access' }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    
+    require File::Find;
+    require File::Copy;
+    my @restored;
+    my @errors;
+
+    eval {
+        File::Find::find({
+            wanted => sub {
+                return unless -f $_ && $_ =~ /\.bak$/;
+                my $bak_path = $File::Find::name;
+                (my $orig_path = $bak_path) =~ s/\.bak$//;
+                
+                if (File::Copy::copy($bak_path, $orig_path)) {
+                    push @restored, $orig_path;
+                    unlink($bak_path);
+                } else {
+                    push @errors, "Failed to restore $orig_path: $!";
+                }
+            },
+            no_chdir => 1,
+        }, $root);
+    };
+
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Error during find: $@" }));
+        return;
+    }
+
+    my $git_msg = '';
+    my $git_exit = -1;
+    if (!$ENV{HARNESS_ACTIVE} && eval { my $out = `git --version 2>&1`; $? == 0 }) {
+        my $git_out = `git checkout -- . 2>&1`;
+        $git_exit = $?;
+        $git_msg = "Git checkout output: $git_out (exit $git_exit)";
+    }
+
+    $c->response->body(encode_json({
+        success  => JSON::true,
+        restored => \@restored,
+        errors   => \@errors,
+        git_info => $git_msg,
+        message  => scalar(@restored) . " files restored successfully via .bak backups." . ($git_msg ? " Git checkout also performed." : "")
+    }));
+}
+
 =head2 transcribe
 
 POST /ai/transcribe — Accept a multipart audio file upload, run it through Whisper,
