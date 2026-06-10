@@ -49,7 +49,7 @@
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
                 [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
-                <a href="#" id="nav-aew-open" onclick="if(window.AEW){AEW.openPopup();return false;}window.open('/ai/editing_widget_popup','aew-grok-editor','width=920,height=640,resizable=yes');return false;"><i class="icon-edit"></i>AI Code Editor (Grok CLI)</a>
+                <a href="#" id="nav-aew-open" onclick="if(window.AEW){AEW.openPopup();return false;}window.open('/ai/editing_widget_popup','aew-code-editor','width=920,height=640,resizable=yes');return false;"><i class="icon-edit"></i>AI Code Editor</a>
                 <a href="/ai/template_editor"><i class="icon-ttml"></i>Template Editor</a>
                 [% END %]
                 [% IF c.session.roles.grep('admin').size %]

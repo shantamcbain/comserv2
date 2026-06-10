@@ -6,8 +6,8 @@
     <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css">
 </head>
 <body style="margin:1rem;font-family:sans-serif;">
-    <p>Opening the <strong>floating</strong> AI Code Editor (Grok CLI)…</p>
-    <p>If nothing appears, use the <strong>💻 Code + Grok</strong> button at the bottom-left of any admin page.</p>
+    <p>Opening the <strong>floating</strong> AI Code Editor…</p>
+    <p>If nothing appears, use the <strong>💻 Code</strong> button at the bottom-left of any admin page.</p>
     <script src="/static/js/ai-editing-widget-float.js"></script>
     <script>
         (function() {

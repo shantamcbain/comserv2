@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Code Editor — Grok CLI</title>
+    <title>AI Code Editor</title>
     <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=20260605b">
     <style>
         html, body {
