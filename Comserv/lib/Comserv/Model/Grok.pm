@@ -423,11 +423,21 @@ sub _send_request {
     # Check response status
     unless ($response->is_success) {
         my $status = $response->status_line;
-        my $error = "Grok API error: $status";
+        my $body = $response->content || '';
+        my $api_err_msg = '';
+        if ($body) {
+            my $decoded = eval { decode_json($body) };
+            if ($decoded && ref($decoded) eq 'HASH' && $decoded->{error} && ref($decoded->{error}) eq 'HASH') {
+                $api_err_msg = $decoded->{error}->{message} || '';
+            } elsif ($decoded && ref($decoded) eq 'HASH' && $decoded->{message}) {
+                $api_err_msg = $decoded->{message};
+            }
+        }
+        my $error = "Grok API error: $status" . ($api_err_msg ? " - $api_err_msg" : "");
         
         # Add specific handling for common HTTP errors
         if ($status =~ /401|403/) {
-            $error = "Grok API authentication failed. Check your API key.";
+            $error = "Grok API authentication failed. Check your API key." . ($api_err_msg ? " Details: $api_err_msg" : "");
         } elsif ($status =~ /410/) {
             $error = "Grok model '" . ($payload->{model} || 'unknown') . "' is no longer available (410 Gone). "
                    . "Please sync your model list at /ai/models and select an available model.";
@@ -442,7 +452,7 @@ sub _send_request {
         
         $self->last_error($error);
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_send_request',
-            "HTTP request failed: $status");
+            "HTTP request failed: $status" . ($body ? " | Response body: $body" : ""));
         return undef;
     }
     
