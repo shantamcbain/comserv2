@@ -5918,7 +5918,7 @@ sub _pick_ollama_tier {
 
     # Exclude sub-2B toy models (tinyllama, 1.1b, etc.) from auto-selection —
     # they produce unreliable answers.  Only fall back to them if nothing better exists.
-    my @usable = grep { ($size_score{$_} // 7) >= 3 } @sorted;
+    my @usable = grep { ($size_score{$_} // 7) >= 2 } @sorted;
     @usable = @sorted unless @usable;  # fallback if ALL models are tiny
 
     my $small = $usable[0]  || $default_model || 'gemma3:4b';
@@ -6801,8 +6801,9 @@ sub _get_current_ollama_config {
             # Zerotier IP, Hostname, and LAN default, then local loopback as a last resort
             push @fallbacks, '172.30.131.126';
             push @fallbacks, 'workstation.zero';
-            push @fallbacks, '192.168.1.199';
+            push @fallbacks, '127.0.0.1';
             push @fallbacks, 'localhost';
+            push @fallbacks, '192.168.1.199';
             
             # Deduplicate the fallback list while preserving order
             my %seen;
