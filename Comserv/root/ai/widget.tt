@@ -236,7 +236,7 @@
             }
         })();
     </script>
-    <script src="/static/js/local-chat.js?v=20260513e"></script>
+    <script src="/static/js/local-chat.js?v=20260611f"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Note: local-chat.js auto-opens the chat panel when AI_WIDGET_POPUP is true.
