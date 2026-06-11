@@ -200,6 +200,13 @@ has 'use_podman' => (
     documentation => 'Use podman exec for commands instead of HTTP API'
 );
 
+has 'no_options' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0,
+    documentation => 'Disable options block in request payload'
+);
+
 =head1 METHODS
 
 =head2 _build_endpoint
@@ -432,12 +439,14 @@ sub chat {
         messages   => $messages,
         stream     => $self->stream ? JSON::true : JSON::false,
         keep_alive => '2h',
-        options    => {
+    };
+    if (!$args{no_options} && !$self->no_options) {
+        $payload->{options} = {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
             num_ctx     => 4096,
-        }
-    };
+        };
+    }
     
     # Encode the payload
     my $json_payload;

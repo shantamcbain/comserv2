@@ -615,3 +615,17 @@ body.ai-widget-popup .chat-panel {
     transform: none !important;
 }
 
+body.ai-widget-popup .chat-header {
+    display: none !important;
+}
+
+@media (max-width: 600px) {
+    body.ai-widget-popup .chat-panel {
+        top: 38px !important;
+        bottom: 0 !important;
+        height: calc(100vh - 38px) !important;
+        max-height: calc(100vh - 38px) !important;
+        border-radius: 0 !important;
+    }
+}
+

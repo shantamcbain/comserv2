@@ -6,7 +6,7 @@
     <title>AI Chat</title>
     <link rel="stylesheet" href="/static/css/themes/[% theme_name || 'default' %].css">
     <link rel="stylesheet" href="/static/css/theme-overrides.css">
-    <link rel="stylesheet" href="/static/css/ai-chat.css">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=20260611g">
     <style>
         html, body {
             margin: 0;
@@ -79,12 +79,7 @@
             padding: 0 !important;
         }
         #detach-chat, #close-chat, #dock-chat-inline { display: none !important; }
-        .chat-header-drag { display: none !important; }
-        .chat-header h3, #chat-title { display: none !important; }
-        .chat-header {
-            padding: 3px 8px !important;
-            border-radius: 0 !important;
-        }
+        .chat-header { display: none !important; }
         .chat-resize-handle { display: none !important; }
 
         /* Form fill panel */
@@ -161,7 +156,7 @@
         #ff-fields-info { font-size:0.8em; color:#888; margin-bottom:0.4em; }
     </style>
 </head>
-<body class="theme-[% theme_name || 'default' %]">
+<body class="theme-[% theme_name || 'default' %] ai-widget-popup">
 
     <!-- Tab bar -->
     <div id="widget-tab-bar">

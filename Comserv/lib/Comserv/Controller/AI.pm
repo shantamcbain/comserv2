@@ -6835,11 +6835,23 @@ sub _get_current_ollama_config {
     my $installed_models = [];
 
     # Session override (admin/privileged users can switch host via /ai/models UI)
+    my $use_session_host = 0;
     if ($can_select_model && $c->session->{ollama_host}) {
-        $current_host = $c->session->{ollama_host};
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-            '_get_current_ollama_config', "Using session preferred host: $current_host");
-    } else {
+        my $sh = $c->session->{ollama_host};
+        my $test_sh = Comserv::Model::Ollama->new(host => $sh, port => $config_port, timeout => 3);
+        if ($test_sh && $test_sh->check_connection()) {
+            $current_host = $sh;
+            $use_session_host = 1;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Using session preferred host: $current_host");
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Session preferred host $sh is unreachable. Falling back to dynamic probe.");
+            delete $c->session->{ollama_host};
+        }
+    }
+
+    if (!$use_session_host) {
         # Try primary host first
         my $test = Comserv::Model::Ollama->new(host => $primary_host, port => $config_port, timeout => 3);
         if ($test && $test->check_connection()) {
