@@ -337,12 +337,6 @@ sub editing_widget :Local :Args(0) {
         return;
     }
 
-    unless ($self->_is_dev_mode($c)) {
-        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-
     if (($c->request->param('mode') || '') eq 'full') {
         my $template_path = $c->path_to('root')->stringify;
         my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
@@ -380,12 +374,6 @@ sub editing_widget_popup :Local :Args(0) {
         return;
     }
 
-    unless ($self->_is_dev_mode($c)) {
-        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-
     my $template_path = $c->path_to('root')->stringify;
     my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
     my $output = '';
@@ -416,6 +404,60 @@ sub editor_config :Local :Args(0) {
     my $enabled = $self->_editor_enabled($c) ? 1 : 0;
     my $has_key = $enabled && $self->_grok_cli_api_key($c) ? 1 : 0;
 
+    my $current_model = 'phi4:14b';
+    my $installed_models = [];
+    my @ext_models;
+
+    if ($enabled) {
+        try {
+            my ($chost, $cport, $cmodel, $inst) = $self->_get_current_ollama_config($c, 1);
+            $current_model = $cmodel if $cmodel;
+            $installed_models = $inst if $inst;
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'editor_config', "Failed to get ollama config: $_");
+        };
+
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $user_id = $c->session->{user_id};
+            if ($user_id) {
+                my $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+                unless ($grok_key) {
+                    $grok_key = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                }
+                if ($grok_key && $grok_key->api_key_encrypted) {
+                    my $meta = $grok_key->get_metadata() || {};
+                    my $synced = $meta->{available_models};
+                    if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
+                        foreach my $m (@$synced) {
+                            my $id = $m->{id} || $m->{name} || '';
+                            next unless $id;
+                            next if $id =~ /^(grok-imagine|grok-.*video)/i;
+                            (my $label = $id) =~ s/-/ /g;
+                            $label = ucfirst($label) . ' (xAI)';
+                            push @ext_models, { name => $id, provider => 'grok', label => $label };
+                        }
+                    } else {
+                        push @ext_models, (
+                            { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' },
+                            { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' },
+                            { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' },
+                            { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' },
+                        );
+                    }
+                }
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'editor_config', "Failed to get external models: $_");
+        };
+    }
+
     my $ssh_host = $c->config->{aew_ssh_host}     || '172.30.131.126';
     my $zt_host  = $c->config->{aew_zerotier_host} || $ssh_host;
     my $browser_host = $c->config->{aew_browser_host} || 'workstation.local';
@@ -437,6 +479,9 @@ sub editor_config :Local :Args(0) {
         grok_auth   => $enabled ? ($has_key ? 'api_key' : (-r $self->_grok_home() . '/.grok/auth.json' ? 'session' : 'unavailable')) : undef,
         grok_mode   => $has_key ? 'xai_api' : 'local_cli',
         remote_ok   => $enabled ? JSON::true : JSON::false,
+        installed_models => $installed_models,
+        external_models  => \@ext_models,
+        current_model    => $current_model,
         ssh_host    => $ssh_host,
         ssh_user    => $ssh_user,
         ssh_port    => $ssh_port,
@@ -527,12 +572,89 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
+    my $model = $json->{model}
+             || $c->request->body_parameters->{model}
+             || $c->request->params->{model}
+             || '';
+
     my $grok = $self->_find_grok_binary();
-    unless ($grok && -x $grok) {
+    my $has_grok_binary = ($grok && -x $grok) ? 1 : 0;
+
+    my $page_path  = $json->{page_path}  || $c->request->body_parameters->{page_path} || $c->request->params->{page_path} || '';
+    my $page_title = $json->{page_title} || $c->request->body_parameters->{page_title} || $c->request->params->{page_title} || '';
+    if ($page_path || $page_title) {
+        $prompt = "Context: user is viewing Comserv page $page_path ($page_title)\n\n$prompt";
+    }
+
+    $prompt = $self->_inject_read_file_tags($c, $prompt);
+
+    if (!$has_grok_binary) {
+        # Fallback 1: Use xAI API key if configured
+        if ($self->_grok_cli_api_key($c)) {
+            my $api_resp = $self->_grok_cli_via_api($c, $prompt, $model);
+            if ($api_resp && $api_resp->{response} && $api_resp->{response} =~ /\S/) {
+                my $reply = $api_resp->{response};
+                while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
+                    my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
+                    if ($snippet) {
+                        $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
+                    } elsif ($err) {
+                        $reply .= "\n\n[Could not load $1: $err]";
+                    }
+                }
+                $reply = $self->_apply_response_file_actions($c, $reply);
+                $c->response->body(encode_json({
+                    success  => JSON::true,
+                    response => $reply,
+                    backend  => 'grok_api',
+                    model    => $api_resp->{model},
+                }));
+                return;
+            }
+        }
+
+        # Fallback 2: Ollama Local model
+        my $ollama = $c->model('Ollama');
+        if ($ollama) {
+            my ($chost, $cport, $cmodel) = $self->_get_current_ollama_config($c, 1);
+            my $active_model = $model || $cmodel;
+            
+            $ollama->set_host($chost);
+            $ollama->port($cport);
+            $ollama->model($active_model);
+            
+            my $system = $self->_build_coding_system_prompt($c);
+            my @ollama_messages = (
+                { role => 'system', content => $system },
+                { role => 'user',   content => $prompt },
+            );
+            
+            my $response = $ollama->chat(messages => \@ollama_messages);
+            if ($response && $response->{response}) {
+                my $reply = $response->{response};
+                while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
+                    my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
+                    if ($snippet) {
+                        $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
+                    } elsif ($err) {
+                        $reply .= "\n\n[Could not load $1: $err]";
+                    }
+                }
+                $reply = $self->_apply_response_file_actions($c, $reply);
+                $c->response->body(encode_json({
+                    success  => JSON::true,
+                    response => $reply,
+                    backend  => 'ollama_fallback',
+                    model    => $active_model,
+                }));
+                return;
+            }
+        }
+
         $c->response->status(503);
         $c->response->body(encode_json({
             success => JSON::false,
-            error   => 'grok CLI not found (install Grok Build CLI or set GROK_BIN)',
+            error   => 'grok CLI not found, and no API key or Ollama connection is available as fallback.',
         }));
         return;
     }
@@ -548,16 +670,8 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
-    my $page_path  = $json->{page_path}  || '';
-    my $page_title = $json->{page_title} || '';
-    if ($page_path || $page_title) {
-        $prompt = "Context: user is viewing Comserv page $page_path ($page_title)\n\n$prompt";
-    }
-
-    $prompt = $self->_inject_read_file_tags($c, $prompt);
-
     if ($self->_grok_cli_api_key($c)) {
-        my $api_resp = $self->_grok_cli_via_api($c, $prompt);
+        my $api_resp = $self->_grok_cli_via_api($c, $prompt, $model);
         if ($api_resp && $api_resp->{response} && $api_resp->{response} =~ /\S/) {
             my $reply = $api_resp->{response};
             if ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/i) {
@@ -568,6 +682,7 @@ sub grok_cli :Local :Args(0) {
                     $reply .= "\n\n[Could not load $1: $err]";
                 }
             }
+            $reply = $self->_apply_response_file_actions($c, $reply);
             $c->response->body(encode_json({
                 success  => JSON::true,
                 response => $reply,
@@ -625,6 +740,7 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
+    $stdout = $self->_apply_response_file_actions($c, $stdout);
     $c->response->body(encode_json({
         success  => JSON::true,
         response => $stdout,
@@ -720,7 +836,7 @@ sub _grok_cli_timeout_sec {
 }
 
 sub _grok_cli_via_api {
-    my ($self, $c, $prompt) = @_;
+    my ($self, $c, $prompt, $model_override) = @_;
     my $api_key = $self->_grok_cli_api_key($c);
     return { error => 'No xAI API key configured' } unless $api_key;
 
@@ -730,7 +846,7 @@ sub _grok_cli_via_api {
     }
 
     $grok->api_key($api_key);
-    my $model = $c->config->{grok_cli_model} || 'grok-4-fast-non-reasoning';
+    my $model = $model_override || $c->config->{grok_cli_model} || 'grok-4-fast-non-reasoning';
     $grok->model($model);
 
     my $system = $self->_build_coding_system_prompt($c);
@@ -3518,6 +3634,10 @@ sub chat :Local :Args(0) {
 
         # Mark progress as done so poller stops
         $self->_flush_progress($progress_file, \@chat_trace, 1);
+
+        if ($chat_agent_id && lc($chat_agent_id) eq 'coding') {
+            $ai_response = $self->_apply_response_file_actions($c, $ai_response);
+        }
 
         # Build JSON response
         $response_data = {
@@ -10794,15 +10914,9 @@ END_PROMPT
 # ── _is_shanta_editor ─────────────────────────────────────────────────────────
 sub _is_shanta_editor {
     my ($self, $c) = @_;
-    my $auth = Comserv::Util::AdminAuth->new();
-    return 1 if $auth->is_csc_admin($c);
     my $username = $c->session->{username} || ($c->user ? $c->user->username : '') || '';
-    return 1 if lc($username) eq 'shanta';
-    # On dev workstations, any logged-in admin may use the code editor
-    if ($self->_is_dev_mode($c)) {
-        return 1 if $c->stash->{is_admin};
-        return 1 if $auth->check_admin_access($c, 'shanta_editor');
-    }
+    my $host = $c->req->uri->host || '';
+    return 1 if lc($username) eq 'shanta' && $host eq '172.30.131.126';
     return 0;
 }
 
@@ -10822,15 +10936,24 @@ sub _require_shanta_editor {
 
 sub _project_root_path {
     my ($self, $c) = @_;
-    my $pycharm_path = '/home/shanta/PycharmProjects/comserv2/Comserv';
+    my $pycharm_path = '/home/shanta/PycharmProjects/comserv2';
     if (-d $pycharm_path) {
         return $pycharm_path;
     }
-    return $c->config->{home}
+    my $home = $c->config->{home}
         || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    if ($home =~ m{/Comserv$} && -d "$home/../.git") {
+        (my $parent = $home) =~ s{/Comserv$}{};
+        return $parent;
+    }
+    return $home;
 }
 
-my @_EDITOR_ROOTS = qw(lib root sql script t);
+my @_EDITOR_ROOTS = qw(
+    Comserv lib root sql script t admin app config data deploy-logs Documentation
+    infrastructure local logs proxmox scripts tests venv aimanager
+    CHANGELOG.tt README.tt AGENTS.md docker-compose.yml .env .gitignore
+);
 
 sub _list_dir_param {
     my ($self, $c) = @_;
@@ -10854,7 +10977,6 @@ sub _sanitize_editor_rel_path {
     $rel =~ s{\.\.}{}g;
     $rel =~ s{//+}{/}g;
     $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
-    $rel =~ s{^Comserv/}{}i;
     return $rel;
 }
 
@@ -10913,6 +11035,136 @@ sub _inject_read_file_tags {
         $out =~ s/\[READ_FILE:\s*\Q$path\E\s*\]/$block/i;
     }
     return $out;
+}
+
+sub _apply_response_file_actions {
+    my ($self, $c, $response_text) = @_;
+    return $response_text unless defined $response_text && $response_text =~ /\S/;
+
+    my $root = $self->_project_root_path($c);
+    my $action_logs = "";
+
+    # 1. Parse WRITE_FILE blocks
+    # Format: [WRITE_FILE: path] content [/WRITE_FILE]
+    while ($response_text =~ s{\[WRITE_FILE:\s*([^\]]+)\]([\s\S]*?)\[/WRITE_FILE\]}{}i) {
+        my $rel_path = $1;
+        my $content = $2;
+        $rel_path =~ s/^\s+|\s+$//g;
+        
+        $rel_path = $self->_sanitize_editor_rel_path($rel_path);
+        if ($self->_editor_path_allowed($rel_path)) {
+            my $full_path = "$root/$rel_path";
+            
+            # Make backup
+            if (-f $full_path) {
+                require File::Copy;
+                File::Copy::copy($full_path, $full_path . '.bak');
+            } else {
+                # Create parent directories if they don't exist
+                my ($vol, $dir, $file) = File::Spec->splitpath($full_path);
+                if ($dir) {
+                    require File::Path;
+                    File::Path::make_path($dir);
+                }
+            }
+
+            if (open my $fh, '>:utf8', $full_path) {
+                print $fh $content;
+                close $fh;
+                $action_logs .= "✅ Instantly wrote file: $rel_path\n";
+            } else {
+                $action_logs .= "❌ Failed to write file: $rel_path ($!)\n";
+            }
+        } else {
+            $action_logs .= "❌ Blocked writing to disallowed path: $rel_path\n";
+        }
+    }
+
+    # 2. Parse EDIT_FILE blocks
+    # Format: [EDIT_FILE: path] ... [/EDIT_FILE]
+    # Inside may be multiple: <<<<<<< SEARCH ... ======= ... >>>>>>> REPLACE
+    while ($response_text =~ s{\[EDIT_FILE:\s*([^\]]+)\]([\s\S]*?)\[/EDIT_FILE\]}{}i) {
+        my $rel_path = $1;
+        my $edit_block = $2;
+        $rel_path =~ s/^\s+|\s+$//g;
+
+        $rel_path = $self->_sanitize_editor_rel_path($rel_path);
+        if ($self->_editor_path_allowed($rel_path)) {
+            my $full_path = "$root/$rel_path";
+            unless (-f $full_path) {
+                $action_logs .= "❌ File not found for editing: $rel_path\n";
+                next;
+            }
+
+            # Read file content
+            open my $rfh, '<:utf8', $full_path or do {
+                $action_logs .= "❌ Failed to read $rel_path for editing: $!\n";
+                next;
+            };
+            local $/;
+            my $file_content = <$rfh>;
+            close $rfh;
+
+            # Backup
+            require File::Copy;
+            File::Copy::copy($full_path, $full_path . '.bak');
+
+            # Parse search & replace blocks
+            my $applied_count = 0;
+            my $failed_count = 0;
+            while ($edit_block =~ m{<<<<<<< SEARCH[\r\n]+([\s\S]*?)=======[\r\n]+([\s\S]*?)>>>>>>> REPLACE}g) {
+                my $search = $1;
+                my $replace = $2;
+
+                # Check for exact match
+                if ($file_content =~ s/\Q$search\E/$replace/) {
+                    $applied_count++;
+                } else {
+                    # Try with trailing/leading space trimming on lines
+                    my $cleaned_search = $search;
+                    $cleaned_search =~ s/^\s+|\s+$//g;
+                    
+                    if ($cleaned_search && index($file_content, $cleaned_search) >= 0) {
+                        $file_content =~ s/\Q$cleaned_search\E/$replace/;
+                        $applied_count++;
+                    } else {
+                        # Try line-by-line whitespace normalization match
+                        my $norm_search = $search;
+                        $norm_search =~ s/\s+/ /g;
+                        $norm_search =~ s/^\s+|\s+$//g;
+                        
+                        my $norm_content = $file_content;
+                        $norm_content =~ s/\s+/ /g;
+                        
+                        if ($norm_search && index($norm_content, $norm_search) >= 0) {
+                            # Attempt to replace by escaping special chars or using relaxed regex
+                            # Let's fallback to search string matching
+                            $failed_count++;
+                        } else {
+                            $failed_count++;
+                        }
+                    }
+                }
+            }
+
+            if ($applied_count > 0) {
+                open my $wfh, '>:utf8', $full_path;
+                print $wfh $file_content;
+                close $wfh;
+                $action_logs .= "✅ Instantly updated file $rel_path ($applied_count blocks applied" . ($failed_count ? ", $failed_count failed" : "") . ")\n";
+            } else {
+                $action_logs .= "❌ Failed to apply search/replace blocks for $rel_path (exact search blocks not found in file)\n";
+            }
+        } else {
+            $action_logs .= "❌ Blocked editing disallowed path: $rel_path\n";
+        }
+    }
+
+    if ($action_logs) {
+        $response_text = "### 🛠️ AI Actions Executed:\n$action_logs\n---\n\n$response_text";
+    }
+
+    return $response_text;
 }
 
 # ── _editor_enabled ───────────────────────────────────────────────────────────
@@ -11084,6 +11336,24 @@ You have access to interactive, click-to-run tools that the developer can execut
 3. To search for a text pattern/grep across files in the codebase, write exactly:
      [SEARCH_GREP: pattern_here]
    Example: [SEARCH_GREP: sub _build_coding_system_prompt]
+
+## INSTANT AGENTIC FILE ACTIONS (HIGHLY RECOMMENDED)
+You have the power to instantly create, write, or edit files on the development server automatically. To perform these actions without needing any click from the user, write exactly:
+
+1. To write a new file or completely overwrite an existing file:
+[WRITE_FILE: relative/path/to/file.pm]
+... complete file content here ...
+[/WRITE_FILE]
+
+2. To edit an existing file using search/replace blocks (target specific sections cleanly):
+[EDIT_FILE: relative/path/to/file.pm]
+<<<<<<< SEARCH
+exact lines to find in the original file
+=======
+new replacement lines
+>>>>>>> REPLACE
+[/EDIT_FILE]
+(You can include multiple SEARCH/REPLACE blocks inside a single [EDIT_FILE] block. The SEARCH block must match the original lines in the file exactly, including spaces and indentation.)
 
 ## PROPOSING FIXES
 When you have diagnosed an issue and want to provide an applicable fix, use this exact format
@@ -12882,6 +13152,211 @@ sub run_command :Local :Args(0) {
         output    => $output,
         exit_code => $exit_val
     }));
+}
+
+sub list_branches :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    chdir $root or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir: $!" }));
+        return;
+    };
+
+    my $output = qx(git branch -a 2>&1) // '';
+    my $exit_val = $? >> 8;
+
+    if ($exit_val != 0) {
+        $c->response->body(encode_json({ success => JSON::false, error => "git branch -a failed: $output" }));
+        return;
+    }
+
+    my @branches;
+    my $current = '';
+    my %seen;
+
+    for my $line (split /\n/, $output) {
+        $line =~ s/^\s+//;
+        $line =~ s/\s+$//;
+        next unless $line;
+        
+        my $is_current = 0;
+        if ($line =~ s/^\*\s+//) {
+            $is_current = 1;
+            $current = $line;
+        }
+        
+        # Clean up remote branch names if needed, but let's keep them distinctive
+        next if $line =~ m{/HEAD\s+->}; # skip remote HEAD pointers
+        
+        next if $seen{$line}++; # avoid duplicates
+        
+        push @branches, {
+            name => $line,
+            current => $is_current ? JSON::true : JSON::false,
+        };
+    }
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        branches => \@branches,
+        current => $current
+    }));
+}
+
+sub switch_branch :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $branch = $c->request->params->{branch};
+    unless ($branch =~ /\S/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Branch name is required' }));
+        return;
+    }
+
+    # Sanitize branch name for shell safety
+    unless ($branch =~ m{^[a-zA-Z0-9_\-\./\+]+$}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid branch name characters' }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    chdir $root or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir: $!" }));
+        return;
+    };
+
+    # If it is a remote branch name, we might want to track it
+    my $remote_match = '';
+    if ($branch =~ m{^remotes/([^/]+)/(.*)$}) {
+        $remote_match = $2;
+    }
+
+    my $target_branch = $remote_match || $branch;
+    my $output = qx(git checkout "$target_branch" 2>&1) // '';
+    my $exit_val = $? >> 8;
+
+    if ($exit_val != 0) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "git checkout failed (exit $exit_val): $output"
+        }));
+        return;
+    }
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        message => "Switched branch to $target_branch",
+        output => $output
+    }));
+}
+
+sub revert_to_main :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    # Enforce editor access check
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    my $is_docker = -f '/.dockerenv' ? 1 : 0;
+
+    my $output = '';
+    my $exit_val = 0;
+
+    if ($is_docker) {
+        # We are inside the docker container! We must run SSH to the host to checkout main and revert changes.
+        # Let's load the SSH credentials.
+        my $home = $ENV{HOME} || '/home/shanta';
+        my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+        
+        # Fallback path if HOME is /root or different in container
+        unless (-f $creds_file) {
+            $creds_file = "/home/shanta/.comserv/secrets/ssh_credentials.json";
+        }
+
+        my $ssh_password = '';
+        my $ssh_port = 22;
+        my $ssh_user = 'shanta';
+        my $ssh_host = '172.30.131.126';
+
+        if (-f $creds_file && open my $cf, '<', $creds_file) {
+            local $/;
+            my $json = <$cf>;
+            close $cf;
+            my $creds = eval { decode_json($json) };
+            if ($creds) {
+                $ssh_password = $creds->{ssh_password} || '';
+                $ssh_port = $creds->{ssh_port} || 22;
+                if (my $target = $creds->{ssh_target}) {
+                    if ($target =~ /^([a-zA-Z0-9_\-]+)\@([a-zA-Z0-9_\-\.]+)$/) {
+                        $ssh_user = $1;
+                        $ssh_host = $2;
+                    }
+                }
+            }
+        }
+
+        # Override host/user specifically for our workstation reset
+        $ssh_user = 'shanta';
+        $ssh_host = '172.30.131.126';
+
+        if (!$ssh_password) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => "SSH password not found. Please save host credentials under Admin -> Docker Containers first."
+            }));
+            return;
+        }
+
+        # Let's run SSH command to checkout main and reset hard!
+        my $git_cmd = 'cd /home/shanta/PycharmProjects/comserv2 && git checkout main && git reset --hard origin/main && git pull';
+        my $escaped_git_cmd = $git_cmd;
+        $escaped_git_cmd =~ s/'/'\\''/g;
+
+        local $ENV{SSHPASS} = $ssh_password;
+        my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host '$escaped_git_cmd' 2>&1);
+        $output = `$cmd` // '';
+        $exit_val = $? >> 8;
+    } else {
+        # We are on the host directly! We can run it directly.
+        chdir $root or do {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to $root: $!" }));
+            return;
+        };
+
+        $output = qx(git checkout main && git reset --hard origin/main && git pull 2>&1) // '';
+        $exit_val = $? >> 8;
+    }
+
+    if ($exit_val != 0) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Git revert failed (exit $exit_val): $output",
+            is_docker => $is_docker ? JSON::true : JSON::false,
+        }));
+    } else {
+        $c->response->body(encode_json({
+            success => JSON::true,
+            message => "Successfully reverted /home/shanta/PycharmProjects/comserv2 to main branch and discarded changes.",
+            output => $output,
+            is_docker => $is_docker ? JSON::true : JSON::false,
+        }));
+    }
 }
 
 __PACKAGE__->meta->make_immutable;

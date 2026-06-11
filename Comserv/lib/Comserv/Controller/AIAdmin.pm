@@ -106,7 +106,7 @@ sub add_model :Path('/ai/admin/add_model') :Args(0) {
         my $config = $schema->resultset('AiModelConfig')->create(\%create_data);
         
         if ($params->{api_key} && length($params->{api_key}) > 0) {
-            my $encryption_key = $ENV{ENCRYPTION_KEY} || die "ENCRYPTION_KEY not configured";
+            my $encryption_key = $ENV{API_KEY_ENCRYPTION_KEY} || $ENV{ENCRYPTION_KEY} || 'default-encryption-key-change-in-production';
             $config->set_encrypted_api_key($params->{api_key}, $encryption_key);
             $config->update;
         }
@@ -170,7 +170,7 @@ sub update_model :Path('/ai/admin/update_model') :Args(0) {
         $config->update(\%update_data) if %update_data;
         
         if ($params->{api_key} && length($params->{api_key}) > 0) {
-            my $encryption_key = $ENV{ENCRYPTION_KEY} || die "ENCRYPTION_KEY not configured";
+            my $encryption_key = $ENV{API_KEY_ENCRYPTION_KEY} || $ENV{ENCRYPTION_KEY} || 'default-encryption-key-change-in-production';
             $config->set_encrypted_api_key($params->{api_key}, $encryption_key);
             $config->update;
         }

@@ -63,6 +63,12 @@
                 '<option value="grok_cli">AI Code Editor CLI (Cursor)</option>' +
                 '<option value="comserv">Comserv AI (Ollama/Grok API)</option>' +
               '</select>' +
+              '<select id="aew-branch" title="Git Branch" style="font-size:0.72rem;margin-left:6px;max-width:140px;">' +
+                '<option value="">Loading branches...</option>' +
+              '</select>' +
+              '<select id="aew-model" title="Select AI Model" style="font-size:0.72rem;margin-left:6px;max-width:140px;background:#1e1e1e;color:#ccc;border:1px solid #3c3c3c;border-radius:2px;">' +
+                '<option value="">Loading models...</option>' +
+              '</select>' +
               '<button type="button" class="aew-btn" id="aew-popout" title="Open in separate window (move to another monitor)">⤢</button>' +
               '<button type="button" class="aew-btn" id="aew-dock-inline" title="Dock inline on this page">⊞</button>' +
               '<button type="button" class="aew-btn" id="aew-close">✕</button>' +
@@ -75,6 +81,7 @@
                   '<button type="button" class="aew-btn" id="aew-delete-file-btn" title="Delete current file" style="font-weight:bold;">–</button>' +
                   '<button type="button" class="aew-btn" id="aew-rebuild-index-btn" title="Rebuild whole file index" style="font-size:0.7rem;padding:0.2rem 0.4rem;">Rebuild</button>' +
                   '<button type="button" class="aew-btn aew-btn-primary" id="aew-save-btn">Save</button>' +
+                  '<button type="button" class="aew-btn" id="aew-revert-btn" title="Emergency Revert to Main branch (Discards all unsaved and uncommitted changes via Git/SSH)" style="background:#cc3333;color:#fff;font-size:0.7rem;padding:0.2rem 0.4rem;border:1px solid #990000;border-radius:2px;cursor:pointer;">Revert to Main</button>' +
                 '</div>' +
                 '<div style="padding:0 0.3rem 0.3rem 0.3rem;">' +
                   '<input type="text" id="aew-tree-search" placeholder="Search files..." style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:0.2rem;background:#1e1e1e;color:#ccc;border:1px solid #3c3c3c;border-radius:2px;margin-top:0.2rem;">' +
@@ -433,6 +440,35 @@
             };
         }
 
+        var revertBtn = q('#aew-revert-btn');
+        if (revertBtn) {
+            revertBtn.onclick = function() {
+                if (!confirm("⚠️ WARNING: This will discard all unsaved/uncommitted changes and revert /home/shanta/PycharmProjects/comserv2 to the 'main' branch. Continue?")) {
+                    return;
+                }
+                setStatus("Reverting codebase to main...", "info");
+                fetch("/ai/revert_to_main", { method: 'POST', credentials: 'include' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            setStatus("Successfully reverted to main!", "ok");
+                            alert(data.message + "\n\nGit Output:\n" + data.output);
+                            loadBranches();
+                            if (window.AEW && AEW.refreshTree) {
+                                AEW.refreshTree();
+                            }
+                        } else {
+                            setStatus("Revert failed: " + data.error, "err");
+                            alert("Revert failed: " + data.error);
+                        }
+                    })
+                    .catch(function(err) {
+                        setStatus("Revert network error: " + err, "err");
+                        alert("Revert network error: " + err);
+                    });
+            };
+        }
+
         var searchInput = q('#aew-tree-search');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
@@ -452,6 +488,65 @@
             state.backend = q('#aew-backend').value;
             addMsg('Backend: ' + state.backend, 'system');
         };
+
+        function loadBranches() {
+            var selectEl = q('#aew-branch');
+            if (!selectEl) return;
+            fetch('/ai/list_branches', { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success && data.branches) {
+                        selectEl.innerHTML = '';
+                        data.branches.forEach(function(b) {
+                            var opt = document.createElement('option');
+                            opt.value = b.name;
+                            opt.textContent = b.name;
+                            if (b.current) {
+                                opt.selected = true;
+                            }
+                            selectEl.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Failed to load branches', err);
+                });
+        }
+
+        q('#aew-branch').onchange = function() {
+            var branch = this.value;
+            if (!branch) return;
+            if (!confirm('Are you sure you want to switch to branch "' + branch + '"? Unsaved changes may be lost.')) {
+                loadBranches();
+                return;
+            }
+            setStatus('Switching branch...', 'info');
+            fetch('/ai/switch_branch', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'branch=' + encodeURIComponent(branch)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    setStatus('Switched branch successfully', 'ok');
+                    loadBranches();
+                    if (window.AEW && AEW.refreshTree) {
+                        AEW.refreshTree();
+                    }
+                } else {
+                    setStatus('Error: ' + data.error, 'err');
+                    loadBranches();
+                }
+            })
+            .catch(function(e) {
+                setStatus('Network error: ' + e, 'err');
+                loadBranches();
+            });
+        };
+
+        loadBranches();
         q('#aew-chat-history-select').onchange = function() {
             renderConversation();
         };
@@ -461,6 +556,50 @@
 
         initDrag(panel);
         initResize(panel);
+    }
+
+    function populateModels(cfg) {
+        var selectEl = q('#aew-model');
+        if (!selectEl) return;
+        selectEl.innerHTML = '';
+
+        if (cfg.installed_models && cfg.installed_models.length > 0) {
+            var localGrp = document.createElement('optgroup');
+            localGrp.label = 'Ollama (Local)';
+            cfg.installed_models.forEach(function(m) {
+                var opt = document.createElement('option');
+                opt.value = m.name;
+                var label = m.name;
+                if (m.details && m.details.parameter_size) {
+                    label += ' (' + m.details.parameter_size + ')';
+                }
+                opt.textContent = label;
+                if (m.name === cfg.current_model) {
+                    opt.selected = true;
+                }
+                localGrp.appendChild(opt);
+            });
+            selectEl.appendChild(localGrp);
+        }
+
+        if (cfg.external_models && cfg.external_models.length > 0) {
+            var extGrp = document.createElement('optgroup');
+            extGrp.label = 'External AI';
+            cfg.external_models.forEach(function(m) {
+                var opt = document.createElement('option');
+                opt.value = m.name;
+                opt.textContent = m.label;
+                if (m.name === cfg.current_model) {
+                    opt.selected = true;
+                }
+                extGrp.appendChild(opt);
+            });
+            selectEl.appendChild(extGrp);
+        }
+
+        if (!selectEl.childElementCount) {
+            selectEl.innerHTML = '<option value="">No models available</option>';
+        }
     }
 
     function initDrag(panel) {
@@ -1070,9 +1209,12 @@
         setStatus('AI Code Editor running…');
         q('#aew-send-btn').disabled = true;
         var ctx = openerContext();
+        var modelEl = q('#aew-model');
+        var selectedModel = modelEl ? modelEl.value : '';
         var body = 'prompt=' + encodeURIComponent(prompt)
             + '&page_path=' + encodeURIComponent(ctx.page_path)
-            + '&page_title=' + encodeURIComponent(ctx.page_title);
+            + '&page_title=' + encodeURIComponent(ctx.page_title)
+            + '&model=' + encodeURIComponent(selectedModel);
         return fetch('/ai/grok_cli', {
             method: 'POST',
             credentials: 'include',
@@ -1086,6 +1228,8 @@
     function sendChatComserv(prompt) {
         setStatus('Comserv AI…');
         q('#aew-send-btn').disabled = true;
+        var modelEl = q('#aew-model');
+        var selectedModel = modelEl ? modelEl.value : '';
         return fetch('/ai/chat', {
             method: 'POST',
             credentials: 'include',
@@ -1093,6 +1237,7 @@
             body: JSON.stringify({
                 prompt: prompt,
                 agent_id: 'coding',
+                model: selectedModel,
                 history: state.chatHistory.slice(-20),
                 page_path: window.location.pathname,
             }),
@@ -1246,6 +1391,7 @@
         if (!cfg.success || !cfg.enabled) return;
         state.enabled = true;
         buildDom();
+        populateModels(cfg);
         if (cfg.grok_cli) {
             var authNote = cfg.grok_auth ? (' auth=' + cfg.grok_auth) : '';
             var modeNote = cfg.grok_mode === 'xai_api'
