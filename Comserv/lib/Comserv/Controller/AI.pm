@@ -4058,6 +4058,14 @@ sub upgrade_ollama :Local :Args(0) {
         return;
     }
     
+    # Get current version before starting the background upgrade
+    my ($chost, $cport, $cmodel, $installed_models) = $self->_get_current_ollama_config($c, 1);
+    my $ollama = $c->model('Ollama');
+    my $version_before = 'unknown';
+    if ($ollama) {
+        $version_before = eval { $ollama->get_version() } || 'unknown';
+    }
+
     # Run the upgrade command safely in the background via the shell & operator
     # This avoids any Perl fork memory/DBI connection pollution.
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upgrade_ollama',
@@ -4068,7 +4076,10 @@ sub upgrade_ollama :Local :Args(0) {
     
     $c->response->body(encode_json({
         success => JSON::true,
-        message => "Ollama upgrade process started successfully in background."
+        version_before => $version_before,
+        version_after  => "Upgrading...",
+        output         => "The official Ollama installer script has been successfully launched on the server in the background.\n\nThis process typically takes 10 to 30 seconds to download and complete the update.\nPlease wait a moment and refresh this page to see your updated Ollama version.",
+        message        => "Ollama upgrade process started successfully in background."
     }));
 }
 
