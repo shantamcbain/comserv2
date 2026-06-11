@@ -709,7 +709,12 @@
             '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
               '<option value="auto">⚡ Auto</option>' +
             '</select>' +
-            '<label for="ai-provider">Model:</label>' +
+            '<label for="conversation-selector" style="font-size:0.82em;color:#555;margin-left:6px;">Chat:</label>' +
+            '<select id="conversation-selector" title="Select past conversation to resume" style="font-size:0.82em;max-width:110px;">' +
+              '<option value="">Current Chat</option>' +
+            '</select>' +
+            '<button id="widget-new-chat-btn" class="chat-header-icon-btn" title="New conversation" style="margin-left:2px;font-size:1.1em;border:1px solid #ccc;border-radius:4px;padding:1px 5px;background:#fff;color:#000;">✏️</button>' +
+            '<label for="ai-provider" style="margin-left:6px;">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
@@ -1035,6 +1040,21 @@
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
+        const widgetNewChatBtn = document.getElementById('widget-new-chat-btn');
+        if (widgetNewChatBtn) {
+            widgetNewChatBtn.addEventListener('click', function() { resetConversation(); });
+        }
+        const convSelector = document.getElementById('conversation-selector');
+        if (convSelector) {
+            convSelector.addEventListener('change', function(e) {
+                const val = e.target.value;
+                if (val) {
+                    loadConversation(val);
+                } else {
+                    resetConversation();
+                }
+            });
+        }
         var dockBtn = document.getElementById('dock-chat-inline');
         if (dockBtn) {
             dockBtn.addEventListener('click', function() {
@@ -1591,19 +1611,21 @@
         .then(data => {
             if (data.success && data.conversations) {
                 const selector = document.getElementById('conversation-selector');
-                // Clear existing options except first one
-                selector.innerHTML = '<option value="">Current Chat</option>';
-                
-                // Add conversations to dropdown
-                data.conversations.forEach(conv => {
-                    const option = document.createElement('option');
-                    option.value = conv.id;
-                    option.textContent = `${conv.title} (${conv.message_count} msgs)`;
-                    if (state.currentConversationId && conv.id === state.currentConversationId) {
-                        option.selected = true;
-                    }
-                    selector.appendChild(option);
-                });
+                if (selector) {
+                    // Clear existing options except first one
+                    selector.innerHTML = '<option value="">Current Chat</option>';
+                    
+                    // Add conversations to dropdown
+                    data.conversations.forEach(conv => {
+                        const option = document.createElement('option');
+                        option.value = conv.id;
+                        option.textContent = `${conv.title} (${conv.message_count} msgs)`;
+                        if (state.currentConversationId && conv.id === state.currentConversationId) {
+                            option.selected = true;
+                        }
+                        selector.appendChild(option);
+                    });
+                }
                 
                 console.debug('Loaded', data.conversations.length, 'conversations');
             }
@@ -5243,17 +5265,20 @@
 
             /* In a detached popup window: fill the entire window so resize works naturally */
             body.ai-widget-popup .chat-panel {
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
+                position: fixed !important;
+                top: 38px !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
                 width: 100% !important;
-                height: 100% !important;
+                height: calc(100vh - 38px) !important;
                 max-width: 100% !important;
                 max-height: 100% !important;
                 min-width: 0 !important;
                 min-height: 0 !important;
-                border-radius: 0;
-                box-shadow: none;
-                margin: 0;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                margin: 0 !important;
             }
             body.ai-widget-popup .chat-input {
                 flex-shrink: 0;
