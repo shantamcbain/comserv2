@@ -13,6 +13,11 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance },
 );
 
+sub admin_configure :Path('/admin/ai/configure') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/ai/admin/models'));
+}
+
 sub models :Path('/ai/admin/models') :Args(0) {
     my ($self, $c) = @_;
     
