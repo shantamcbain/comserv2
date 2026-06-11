@@ -149,6 +149,29 @@ body.aew-inline-open #chat-button {
     font-size: 0.8rem;
 }
 
+#aew-panel .aew-messages::-webkit-scrollbar,
+#aew-panel .aew-tree::-webkit-scrollbar,
+#aew-panel .aew-editor::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+#aew-panel .aew-messages::-webkit-scrollbar-track,
+#aew-panel .aew-tree::-webkit-scrollbar-track,
+#aew-panel .aew-editor::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+#aew-panel .aew-messages::-webkit-scrollbar-thumb,
+#aew-panel .aew-tree::-webkit-scrollbar-thumb,
+#aew-panel .aew-editor::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 4px;
+}
+#aew-panel .aew-messages::-webkit-scrollbar-thumb:hover,
+#aew-panel .aew-tree::-webkit-scrollbar-thumb:hover,
+#aew-panel .aew-editor::-webkit-scrollbar-thumb:hover {
+    background: #4f4f4f;
+}
+
 #aew-panel .aew-msg {
     margin-bottom: 0.45rem;
     padding: 0.35rem 0.5rem;
