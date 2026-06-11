@@ -11022,6 +11022,7 @@ sub _sanitize_editor_rel_path {
     $rel =~ s{^/+}{};
     $rel =~ s{\.\.}{}g;
     $rel =~ s{//+}{/}g;
+    $rel =~ s{\[([^\]]+)\]\(http[s]?://[^\)]+\)}{$1}g;
     $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
     return $rel;
 }
