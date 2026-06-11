@@ -276,6 +276,9 @@ h6.section-subhead {
                 <div id="status-[% loop.index %]">
                     [% IF server.connected %]
                     <span class="models-badge badge-connected">Connected</span>
+                    [% IF server.version %]
+                    <span class="models-badge badge-size" style="background-color: var(--primary-color, #0077cc);">v[% server.version %]</span>
+                    [% END %]
                     [% ELSE %]
                     <span class="models-badge badge-disconnected">Disconnected</span>
                     [% END %]

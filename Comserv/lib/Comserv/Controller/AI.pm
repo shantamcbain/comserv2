@@ -3905,6 +3905,10 @@ sub models :Local :Args(0) {
                 if ($ollama->check_connection()) {
                     $server_info->{connected} = 1;
                     
+                    # Get Ollama version
+                    my $version = $ollama->get_version();
+                    $server_info->{version} = $version if $version;
+                    
                     # Get installed models
                     my $installed = $ollama->list_models();
                     if ($installed && ref($installed) eq 'ARRAY') {
@@ -3991,6 +3995,15 @@ sub models :Local :Args(0) {
             'models', "Failed to fetch user API keys: $_");
     };
     
+    # Determine if user is a CSC admin
+    my $is_csc_admin = 0;
+    try {
+        use Comserv::Util::AdminAuth;
+        $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
+    } catch {
+        $is_csc_admin = ($username eq 'shanta' || grep { $_ =~ /^admin$/i } @$user_roles) ? 1 : 0;
+    };
+
     # Set template variables
     $c->stash(
         template => 'ai/models.tt',
@@ -3998,12 +4011,82 @@ sub models :Local :Args(0) {
         username => $username,
         servers => $servers,
         can_select_model => $can_select_model,
+        is_csc_admin => $is_csc_admin,
         servers_json => encode_json($servers || []),
         user_api_keys => \@user_api_keys
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'models', "AI models interface loaded for user: $username (can_select: " . ($can_select_model ? 'yes' : 'no') . ") with " . scalar(@$servers) . " servers configured");
+}
+
+=head2 upgrade_ollama
+
+Endpoint to run the official Ollama upgrade script. Accessible only to csc admins.
+
+=cut
+
+sub upgrade_ollama :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    # Check authentication and authorization
+    my $username = $c->session->{username};
+    unless ($username) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => "Unauthorized" }));
+        return;
+    }
+    
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    
+    my $is_csc_admin = 0;
+    try {
+        use Comserv::Util::AdminAuth;
+        $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
+    } catch {
+        $is_csc_admin = ($username eq 'shanta' || grep { $_ =~ /^admin$/i } @$user_roles) ? 1 : 0;
+    };
+    
+    unless ($is_csc_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => "Forbidden" }));
+        return;
+    }
+    
+    # Run the upgrade command in a background thread or process
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to fork upgrade process" }));
+        return;
+    }
+    
+    if ($pid == 0) {
+        # Child process: perform the installer script upgrade
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'upgrade_ollama',
+            "Ollama upgrade started by child process for user: $username");
+            
+        # Official installer command
+        my $cmd = "curl -fsSL https://ollama.com/install.sh | sh";
+        
+        # Execute and log
+        system($cmd);
+        my $exit_code = $? >> 8;
+        
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'upgrade_ollama',
+            "Ollama upgrade completed with exit code: $exit_code");
+            
+        exit(0);
+    }
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        message => "Ollama upgrade process started successfully in background."
+    }));
 }
 
 =head2 pull_model
