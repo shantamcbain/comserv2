@@ -572,6 +572,12 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
+    my $original_prompt = $prompt;
+    my $conversation_id = $json->{conversation_id}
+                       || $c->request->body_parameters->{conversation_id}
+                       || $c->request->params->{conversation_id}
+                       || undef;
+
     my $model = $json->{model}
              || $c->request->body_parameters->{model}
              || $c->request->params->{model}
@@ -603,11 +609,21 @@ sub grok_cli :Local :Args(0) {
                     }
                 }
                 $reply = $self->_apply_response_file_actions($c, $reply);
+
+                my $persisted_id = $self->_persist_chat($c, {
+                    username        => $c->session->{username} || 'Shanta',
+                    conversation_id => $conversation_id,
+                    model           => $api_resp->{model} || $model || 'grok-fallback-api',
+                    prompt          => $original_prompt,
+                    response        => $reply,
+                });
+
                 $c->response->body(encode_json({
-                    success  => JSON::true,
-                    response => $reply,
-                    backend  => 'grok_api',
-                    model    => $api_resp->{model},
+                    success         => JSON::true,
+                    response        => $reply,
+                    backend         => 'grok_api',
+                    model           => $api_resp->{model},
+                    conversation_id => $persisted_id,
                 }));
                 return;
             }
@@ -641,11 +657,21 @@ sub grok_cli :Local :Args(0) {
                     }
                 }
                 $reply = $self->_apply_response_file_actions($c, $reply);
+
+                my $persisted_id = $self->_persist_chat($c, {
+                    username        => $c->session->{username} || 'Shanta',
+                    conversation_id => $conversation_id,
+                    model           => $active_model || 'ollama-fallback',
+                    prompt          => $original_prompt,
+                    response        => $reply,
+                });
+
                 $c->response->body(encode_json({
-                    success  => JSON::true,
-                    response => $reply,
-                    backend  => 'ollama_fallback',
-                    model    => $active_model,
+                    success         => JSON::true,
+                    response        => $reply,
+                    backend         => 'ollama_fallback',
+                    model           => $active_model,
+                    conversation_id => $persisted_id,
                 }));
                 return;
             }
@@ -683,11 +709,21 @@ sub grok_cli :Local :Args(0) {
                 }
             }
             $reply = $self->_apply_response_file_actions($c, $reply);
+
+            my $persisted_id = $self->_persist_chat($c, {
+                username        => $c->session->{username} || 'Shanta',
+                conversation_id => $conversation_id,
+                model           => $api_resp->{model} || $model || 'grok-api',
+                prompt          => $original_prompt,
+                response        => $reply,
+            });
+
             $c->response->body(encode_json({
-                success  => JSON::true,
-                response => $reply,
-                backend  => 'grok_api',
-                model    => $api_resp->{model},
+                success         => JSON::true,
+                response        => $reply,
+                backend         => 'grok_api',
+                model           => $api_resp->{model},
+                conversation_id => $persisted_id,
             }));
             return;
         }
@@ -741,12 +777,22 @@ sub grok_cli :Local :Args(0) {
     }
 
     $stdout = $self->_apply_response_file_actions($c, $stdout);
+
+    my $persisted_id = $self->_persist_chat($c, {
+        username        => $c->session->{username} || 'Shanta',
+        conversation_id => $conversation_id,
+        model           => $model || 'grok-cli',
+        prompt          => $original_prompt,
+        response        => $stdout,
+    });
+
     $c->response->body(encode_json({
-        success  => JSON::true,
-        response => $stdout,
-        backend  => 'grok_cli',
-        exit     => $exit,
-        stderr   => ($stderr ? $stderr : undef),
+        success         => JSON::true,
+        response        => $stdout,
+        backend         => 'grok_cli',
+        exit            => $exit,
+        stderr          => ($stderr ? $stderr : undef),
+        conversation_id => $persisted_id,
     }));
 }
 
