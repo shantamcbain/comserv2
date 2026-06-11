@@ -217,7 +217,7 @@ sub _should_use_shell {
     my ($self) = @_;
     return 1 if $self->use_docker || $self->use_podman;
     my $host = $self->host || '';
-    return 1 if $host eq '127.0.0.1' || $host eq 'localhost' || $host eq '0.0.0.0' || $host eq '::1' || $host eq '192.168.1.199';
+    return 1 if $host eq '127.0.0.1' || $host eq 'localhost' || $host eq '0.0.0.0' || $host eq '::1' || $host eq '192.168.1.199' || $host eq '172.30.131.126';
     return 0;
 }
 

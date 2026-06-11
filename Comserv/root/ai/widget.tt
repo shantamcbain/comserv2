@@ -78,8 +78,13 @@
             margin: 0 !important;
             padding: 0 !important;
         }
-        #detach-chat { display: none !important; }
-        .chat-header-drag { cursor: default !important; opacity: 0.2 !important; pointer-events: none !important; }
+        #detach-chat, #close-chat, #dock-chat-inline { display: none !important; }
+        .chat-header-drag { display: none !important; }
+        .chat-header h3, #chat-title { display: none !important; }
+        .chat-header {
+            padding: 3px 8px !important;
+            border-radius: 0 !important;
+        }
         .chat-resize-handle { display: none !important; }
 
         /* Form fill panel */

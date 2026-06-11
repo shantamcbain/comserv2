@@ -836,7 +836,7 @@
                                     const sorted = chatModels.slice().sort(function(a, b) {
                                         return modelSizeScore(a.id) - modelSizeScore(b.id);
                                     });
-                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                                     const pool   = usable.length > 0 ? usable : sorted; // fallback if all tiny
                                     state.modelTiers.small  = 'ollama|' + pool[0].id;
                                     state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
@@ -1713,7 +1713,7 @@
                                 const sorted = chatModels.slice().sort(function(a, b) {
                                     return modelSizeScore(a.id) - modelSizeScore(b.id);
                                 });
-                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                                 const pool   = usable.length > 0 ? usable : sorted;
                                 state.modelTiers.small  = 'ollama|' + pool[0].id;
                                 state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
@@ -1746,14 +1746,14 @@
                             const sorted = chatModels.slice().sort(function(a, b) {
                                 return modelSizeScore(a.id) - modelSizeScore(b.id);
                             });
-                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                             const pool   = usable.length > 0 ? usable : sorted;
                             state.modelTiers.small  = 'ollama|' + pool[0].id;
                             state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
                             state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                         }
-                        // Only show usable (≥3B) models in dropdown; hide toy models
-                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                        // Only show usable (≥2B) models in dropdown; hide toy models
+                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                         const listModels = displayModels.length > 0 ? displayModels : chatModels;
                         listModels.forEach(function(m) {
                             const opt = document.createElement('option');
