@@ -9,7 +9,7 @@
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38"
            value="[% ency_ai_entity_name | html %]" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-4.20-non-reasoning|grok" selected>Grok 4.20 Fast (loading…)</option>
+      <option value="grok-beta|grok" selected>Grok Beta (loading…)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
@@ -107,7 +107,7 @@
                 if (!grokProvider) return;
                 var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
                 var FALLBACK = [
-                    { val: 'grok-4.20-non-reasoning|grok', label: 'Grok 4.20 Fast' }
+                    { val: 'grok-beta|grok', label: 'Grok Beta' }
                 ];
                 var DEAD_MODELS = {
                     'grok-code-fast-1': 1, 'grok-4-fast-non-reasoning': 1,
@@ -191,7 +191,7 @@
             var parts = sel.value.split('|');
             return { model: parts[0], provider: parts[1] || 'grok' };
         }
-        return { model: 'grok-4.20-non-reasoning', provider: 'grok' };
+        return { model: 'grok-beta', provider: 'grok' };
     }
 
     function encyAiFill() {
@@ -978,7 +978,7 @@
                     if (added > 0) {
                         statusEl.textContent = '\u2713 Synced \u2014 ' + added + ' model' + (added === 1 ? '' : 's') + ' in dropdown.';
                     } else {
-                        statusEl.textContent = '\u2713 Synced (no new models found \u2014 using grok-4.3)';
+                        statusEl.textContent = '\u2713 Synced (no new models found \u2014 using grok-beta)';
                         loadEncyModelOptions();
                     }
                 } else {

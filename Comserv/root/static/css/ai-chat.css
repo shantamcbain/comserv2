@@ -586,3 +586,32 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
         font-size: 16px;
     }
 }
+
+/* Specific overrides for the detached popup widget so it fills the screen below the tab bar at all viewport sizes */
+body.ai-widget-popup .local-chat-widget {
+    position: fixed !important;
+    top: 38px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: calc(100vh - 38px) !important;
+    z-index: 1 !important;
+}
+
+body.ai-widget-popup .chat-panel {
+    position: fixed !important;
+    top: 38px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: calc(100vh - 38px) !important;
+    max-height: 100vh !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    transform: none !important;
+}
+
