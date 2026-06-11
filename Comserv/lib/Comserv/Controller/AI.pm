@@ -1799,15 +1799,13 @@ sub generate :Local :Args(0) {
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive asynchronously — fork so it never delays the chat request
+                    # Renew keep_alive asynchronously without Perl fork DBI handle pollution
                     my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
                     my $ping_payload = encode_json({ model => $use_model, keep_alive => '2h' });
-                    my $ping_pid = fork();
-                    if (defined $ping_pid && $ping_pid == 0) {
-                        my $child_ua = LWP::UserAgent->new(timeout => 15);
-                        $child_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        exit 0;
-                    }
+                    my $escaped_payload = $ping_payload;
+                    $escaped_payload =~ s/'/'\\''/g;
+                    my $ping_cmd = "curl -s -X POST -H 'Content-Type: application/json' -d '$escaped_payload' --max-time 15 '$ping_url' > /dev/null 2>&1 &";
+                    system($ping_cmd);
                     push @trace, "🔁 keep_alive renewal dispatched async for '$use_model'";
                 }
             }
@@ -3309,15 +3307,13 @@ sub chat :Local :Args(0) {
                     } else {
                         push @chat_trace, "💾 '$chat_use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive asynchronously — fork so it never delays the chat request
+                    # Renew keep_alive asynchronously without Perl fork DBI handle pollution
                     my $chat_ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
                     my $chat_ping_payload = encode_json({ model => $chat_use_model, keep_alive => '2h' });
-                    my $chat_ping_pid = fork();
-                    if (defined $chat_ping_pid && $chat_ping_pid == 0) {
-                        my $child_ua = LWP::UserAgent->new(timeout => 15);
-                        $child_ua->post($chat_ping_url, 'Content-Type' => 'application/json', Content => $chat_ping_payload);
-                        exit 0;
-                    }
+                    my $escaped_payload = $chat_ping_payload;
+                    $escaped_payload =~ s/'/'\\''/g;
+                    my $chat_ping_cmd = "curl -s -X POST -H 'Content-Type: application/json' -d '$escaped_payload' --max-time 15 '$chat_ping_url' > /dev/null 2>&1 &";
+                    system($chat_ping_cmd);
                     push @chat_trace, "🔁 keep_alive renewal dispatched async for '$chat_use_model'";
                 }
             }
