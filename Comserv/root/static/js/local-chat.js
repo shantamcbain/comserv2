@@ -787,8 +787,9 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-4.3',               label: 'Grok 4.3 (xAI)' },
-                                    { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast (xAI)' }
+                                    { val: 'grok|grok-2',                 label: 'Grok 2 (xAI)' },
+                                    { val: 'grok|grok-2-mini',            label: 'Grok 2 Mini (xAI)' },
+                                    { val: 'grok|grok-beta',              label: 'Grok Beta (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -1779,8 +1780,9 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-4.3',               label: 'Grok 4.3' },
-                            { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast' }
+                            { val: 'grok|grok-2',                 label: 'Grok 2' },
+                            { val: 'grok|grok-2-mini',            label: 'Grok 2 Mini' },
+                            { val: 'grok|grok-beta',              label: 'Grok Beta' }
                         ];
                     grokModels.forEach(function(m) {
                         const opt = document.createElement('option');

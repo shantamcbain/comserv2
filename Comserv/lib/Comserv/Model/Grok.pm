@@ -79,8 +79,8 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'grok-4.20-non-reasoning',
-    documentation => 'Grok model to use (default: grok-4.20-non-reasoning)'
+    default => 'grok-2',
+    documentation => 'Grok model to use (default: grok-2)'
 );
 
 has 'timeout' => (
