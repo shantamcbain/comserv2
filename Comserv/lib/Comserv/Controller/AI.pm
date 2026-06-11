@@ -6710,19 +6710,44 @@ sub _get_current_ollama_config {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
             '_get_current_ollama_config', "Using session preferred host: $current_host");
     } else {
-        # Try primary host; fall back to fallback_host if unreachable
+        # Try primary host first
         my $test = Comserv::Model::Ollama->new(host => $primary_host, port => $config_port, timeout => 3);
         if ($test && $test->check_connection()) {
             $current_host = $primary_host;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                 '_get_current_ollama_config', "Primary host $primary_host available");
-        } elsif ($fallback_host ne $primary_host) {
-            $current_host = $fallback_host;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                '_get_current_ollama_config', "Primary host $primary_host unavailable, using fallback $fallback_host");
         } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                '_get_current_ollama_config', "Ollama host $primary_host is not reachable");
+            # Build list of fallback hosts to probe dynamically
+            my @fallbacks;
+            push @fallbacks, $fallback_host if $fallback_host && $fallback_host ne $primary_host;
+            
+            # Zerotier IP, Hostname, and LAN default, then local loopback as a last resort
+            push @fallbacks, '172.30.131.126';
+            push @fallbacks, 'workstation.zero';
+            push @fallbacks, '192.168.1.199';
+            push @fallbacks, 'localhost';
+            
+            # Deduplicate the fallback list while preserving order
+            my %seen;
+            $seen{$primary_host} = 1;
+            my @unique_fallbacks = grep { !$seen{$_}++ } @fallbacks;
+            
+            my $found = 0;
+            for my $fb (@unique_fallbacks) {
+                my $fb_test = Comserv::Model::Ollama->new(host => $fb, port => $config_port, timeout => 3);
+                if ($fb_test && $fb_test->check_connection()) {
+                    $current_host = $fb;
+                    $found = 1;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        '_get_current_ollama_config', "Primary host $primary_host unavailable, fell back to reachable host $fb");
+                    last;
+                }
+            }
+            
+            unless ($found) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    '_get_current_ollama_config', "Ollama host $primary_host is not reachable and no automatic fallbacks were available");
+            }
         }
     }
     
