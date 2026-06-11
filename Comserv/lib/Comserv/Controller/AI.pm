@@ -4058,30 +4058,13 @@ sub upgrade_ollama :Local :Args(0) {
         return;
     }
     
-    # Run the upgrade command in a background thread or process
-    my $pid = fork();
-    if (!defined $pid) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Failed to fork upgrade process" }));
-        return;
-    }
-    
-    if ($pid == 0) {
-        # Child process: perform the installer script upgrade
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'upgrade_ollama',
-            "Ollama upgrade started by child process for user: $username");
-            
-        # Official installer command
-        my $cmd = "curl -fsSL https://ollama.com/install.sh | sh";
-        
-        # Execute and log
-        system($cmd);
-        my $exit_code = $? >> 8;
-        
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'upgrade_ollama',
-            "Ollama upgrade completed with exit code: $exit_code");
-            
-        exit(0);
-    }
+    # Run the upgrade command safely in the background via the shell & operator
+    # This avoids any Perl fork memory/DBI connection pollution.
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upgrade_ollama',
+        "Ollama upgrade started in background for user: $username");
+
+    my $cmd = "curl -fsSL https://ollama.com/install.sh | sh >/dev/null 2>&1 &";
+    system($cmd);
     
     $c->response->body(encode_json({
         success => JSON::true,
