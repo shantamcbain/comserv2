@@ -934,6 +934,49 @@ sub list_models {
     return \@models;
 }
 
+=head2 get_version
+
+Get the version of the Ollama server.
+
+    my $version = $ollama->get_version();
+
+Returns a string with the version (e.g. "0.1.48"), or undef on failure.
+
+=cut
+
+sub get_version {
+    my ($self) = @_;
+    
+    my $endpoint = $self->endpoint;
+    $endpoint =~ s/\/api\/generate$/\/api\/version/;
+    
+    $self->ua->timeout(3);
+    my $req = HTTP::Request->new(GET => $endpoint);
+    
+    my $response;
+    try {
+        $response = $self->ua->request($req);
+    } catch {
+        $self->last_error("HTTP API failed: $_");
+        return undef;
+    };
+    
+    unless ($response->is_success) {
+        $self->last_error("HTTP API returned: " . $response->status_line);
+        return undef;
+    }
+    
+    my $data;
+    try {
+        $data = decode_json($response->content);
+    } catch {
+        $self->last_error("Failed to parse JSON version: $_");
+        return undef;
+    };
+    
+    return $data->{version};
+}
+
 =head2 pull_model
 
 Pull (download/install) a model from the Ollama library.
