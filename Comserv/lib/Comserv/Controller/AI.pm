@@ -171,10 +171,8 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-2',    provider => 'grok', label => 'Grok 2 (xAI)' };
+                    push @external_models, { name => 'grok-beta', provider => 'grok', label => 'Grok Beta (xAI)' };
                 }
             }
         } catch {
@@ -444,10 +442,8 @@ sub editor_config :Local :Args(0) {
                         }
                     } else {
                         push @ext_models, (
-                            { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' },
-                            { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' },
-                            { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' },
-                            { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' },
+                            { name => 'grok-2',    provider => 'grok', label => 'Grok 2 (xAI)' },
+                            { name => 'grok-beta', provider => 'grok', label => 'Grok Beta (xAI)' },
                         );
                     }
                 }
@@ -593,6 +589,67 @@ sub grok_cli :Local :Args(0) {
     }
 
     $prompt = $self->_inject_read_file_tags($c, $prompt);
+
+    # Direct routing: If the requested model is an Ollama model (does not contain 'grok' in its name),
+    # bypass any Grok binary or xAI API key fallbacks and use the local Ollama backend immediately.
+    my $is_grok_model = (!$model || $model =~ /grok/i) ? 1 : 0;
+    if (!$is_grok_model) {
+        my $ollama = $c->model('Ollama');
+        if ($ollama) {
+            my ($chost, $cport, $cmodel) = $self->_get_current_ollama_config($c, 1);
+            my $active_model = $model || $cmodel;
+            
+            $ollama->set_host($chost);
+            $ollama->port($cport);
+            $ollama->model($active_model);
+            
+            my $system = $self->_build_coding_system_prompt($c);
+            my @ollama_messages = (
+                { role => 'system', content => $system },
+                { role => 'user',   content => $prompt },
+            );
+            
+            my $response = $ollama->chat(messages => \@ollama_messages);
+            if ($response && $response->{response}) {
+                my $reply = $response->{response};
+                while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
+                    my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
+                    if ($snippet) {
+                        $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
+                    } elsif ($err) {
+                        $reply .= "\n\n[Could not load $1: $err]";
+                    }
+                }
+                $reply = $self->_apply_response_file_actions($c, $reply);
+
+                my $persisted_id = $self->_persist_chat($c, {
+                    username        => $c->session->{username} || 'Shanta',
+                    conversation_id => $conversation_id,
+                    model           => $active_model || 'ollama-grok-fallback',
+                    prompt          => $original_prompt,
+                    response        => $reply,
+                });
+
+                $c->response->body(encode_json({
+                    success         => JSON::true,
+                    response        => $reply,
+                    backend         => 'ollama_local',
+                    model           => $active_model,
+                    conversation_id => $persisted_id,
+                }));
+                return;
+            } else {
+                my $err = $ollama->last_error || 'Ollama connection failed or returned no response';
+                $c->response->status(503);
+                $c->response->body(encode_json({
+                    success => JSON::false,
+                    error   => "Ollama failed: $err",
+                    hint    => 'Verify that Ollama is running and accessible at ' . $chost,
+                }));
+                return;
+            }
+        }
+    }
 
     if (!$has_grok_binary) {
         # Fallback 1: Use xAI API key if configured
@@ -892,7 +949,7 @@ sub _grok_cli_via_api {
     }
 
     $grok->api_key($api_key);
-    my $model = $model_override || $c->config->{grok_cli_model} || 'grok-4-fast-non-reasoning';
+    my $model = $model_override || $c->config->{grok_cli_model} || 'grok-beta';
     $grok->model($model);
 
     my $system = $self->_build_coding_system_prompt($c);
@@ -1548,7 +1605,7 @@ sub generate :Local :Args(0) {
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
             # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD = map { $_ => 'grok-beta' } qw(
                 grok-code-fast-1
             );
             if ($model && $GROK_DEAD{$model}) {
@@ -1835,7 +1892,7 @@ sub generate :Local :Args(0) {
                     push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
                     my $fb_grok = $c->model('Grok');
                     $fb_grok->api_key($fallback_key);
-                    $fb_grok->model('grok-3-fast');
+                    $fb_grok->model('grok-beta');
                     my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
                     push @fb_msgs, { role => 'user', content => $prompt };
                     my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
@@ -1846,7 +1903,7 @@ sub generate :Local :Args(0) {
                         $c->res->body(encode_json({
                             success        => 1,
                             response       => $fb_resp,
-                            model          => 'grok-3-fast (cold-start fallback)',
+                            model          => 'grok-beta (cold-start fallback)',
                             provider       => 'grok',
                             trace          => $trace_txt,
                             thinking_trace => \@trace,
@@ -3151,7 +3208,7 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-beta' } qw(
                 grok-code-fast-1
             );
             if ($model && $GROK_DEAD_CHAT{$model}) {
@@ -6794,9 +6851,11 @@ sub _get_current_ollama_config {
             my @fallbacks;
             push @fallbacks, $fallback_host if $fallback_host && $fallback_host ne $primary_host;
             
-            # Zerotier IP, Hostname, and LAN default, then local loopback as a last resort
+            # Zerotier IP, Hostname, LAN default, Docker host interfaces, and then local loopback as a last resort
             push @fallbacks, '172.30.131.126';
             push @fallbacks, 'workstation.zero';
+            push @fallbacks, 'host.docker.internal';
+            push @fallbacks, '172.17.0.1';
             push @fallbacks, '127.0.0.1';
             push @fallbacks, 'localhost';
             push @fallbacks, '192.168.1.199';
@@ -7946,10 +8005,8 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4-fast-reasoning' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-3' },
-                        { id => 'grok-3-mini' },
+                        { id => 'grok-2' },
+                        { id => 'grok-beta' },
                     ];
                 }
 
@@ -8234,14 +8291,31 @@ sub _persist_chat {
     my $prompt          = $args->{prompt}          || '';
     my $response        = $args->{response}        || '';
 
-    my $user_id = $c->session->{user_id};
+    my $user_id = $c->session->{user_id} || ($c->user ? $c->user->id : undef);
+    my $schema = $c->model('DBEncy')->schema;
+
+    unless ($user_id) {
+        # Fallback: look up username in database to make sure we don't drop developer chats
+        try {
+            my $target_username = $username || $c->session->{username} || 'Shanta';
+            my $u = $schema->resultset('User')->find({ username => $target_username });
+            if ($u) {
+                $user_id = $u->id;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    '_persist_chat', "Recovered user_id=$user_id for username='$target_username' via DB lookup");
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                '_persist_chat', "Failed to look up user in DB: $_");
+        };
+    }
+
     unless ($user_id) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            '_persist_chat', "No user_id in session for user '$username', skipping DB persist");
+            '_persist_chat', "No user_id in session/DB for user '$username', skipping DB persist");
         return undef;
     }
 
-    my $schema = $c->model('DBEncy')->schema;
     my $conv;
 
     eval {
