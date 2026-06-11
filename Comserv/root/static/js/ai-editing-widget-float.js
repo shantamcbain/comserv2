@@ -853,12 +853,12 @@
         box.scrollTop = box.scrollHeight;
     }
 
-    function addMsg(text, role) {
+    function addMsg(text, role, isHtml) {
         var box = q('#aew-messages');
         if (!box) return;
         var d = document.createElement('div');
         d.className = 'aew-msg aew-msg-' + role;
-        d.innerHTML = formatMessageHtml(text);
+        d.innerHTML = isHtml ? text : formatMessageHtml(text);
         box.appendChild(d);
         box.scrollTop = box.scrollHeight;
     }
@@ -1490,37 +1490,42 @@
         buildDom();
         populateModels(cfg);
         loadPastConversations();
+        var diagHtml = '<details style="font-size:0.75rem; color:#dcdcaa; cursor:pointer;">' +
+            '<summary style="font-weight:bold; outline:none; color:#dcdcaa;">🔌 Remote Connection Info (Click to Expand)</summary>' +
+            '<div style="margin-top:6px; padding:6px; background:#111; border:1px solid #444; border-radius:3px; color:#ccc; font-family:monospace; line-height:1.4;">';
         if (cfg.grok_cli) {
             var authNote = cfg.grok_auth ? (' auth=' + cfg.grok_auth) : '';
             var modeNote = cfg.grok_mode === 'xai_api'
                 ? ' — uses xAI API (works from tablet/remote; no local CLI)'
                 : ' — local CLI (workstation only)';
-            addMsg('Grok: ' + cfg.grok_cli + authNote + modeNote, 'system');
+            diagHtml += '<strong>Grok:</strong> ' + escapeHtml(cfg.grok_cli) + escapeHtml(authNote) + escapeHtml(modeNote) + '<br>';
         }
         if (cfg.remote_ok) {
             if (cfg.zerotier_dns_note) {
-                addMsg(cfg.zerotier_dns_note, 'system');
+                diagHtml += '<strong>ZeroTier DNS:</strong> ' + escapeHtml(cfg.zerotier_dns_note) + '<br>';
             }
             if (cfg.editor_url_workstation_zero) {
-                addMsg('Dev (ZT hostname): ' + cfg.editor_url_workstation_zero, 'system');
+                diagHtml += '<strong>Dev (ZT hostname):</strong> ' + escapeHtml(cfg.editor_url_workstation_zero) + '<br>';
             }
             if (cfg.editor_url_zerotier) {
-                addMsg('Dev (ZT IP): ' + cfg.editor_url_zerotier, 'system');
+                diagHtml += '<strong>Dev (ZT IP):</strong> ' + escapeHtml(cfg.editor_url_zerotier) + '<br>';
             }
-            addMsg('LAN hostname: ' + (cfg.editor_url_lan || 'http://workstation.local:3001/ai/editing_widget_popup'), 'system');
+            diagHtml += '<strong>LAN hostname:</strong> ' + escapeHtml(cfg.editor_url_lan || 'http://workstation.local:3001/ai/editing_widget_popup') + '<br>';
             if (cfg.ssh_tunnel_cmd) {
-                addMsg('SSH: ' + cfg.ssh_tunnel_cmd, 'system');
-                addMsg('Tunnel browser: ' + (cfg.editor_url_tunnel || 'http://workstation.local:3001/ai/editing_widget_popup'), 'system');
-                addMsg(cfg.tunnel_hosts_hint || 'Tablet hosts: 127.0.0.1 workstation.local', 'system');
+                diagHtml += '<strong>SSH:</strong> <code>' + escapeHtml(cfg.ssh_tunnel_cmd) + '</code><br>';
+                diagHtml += '<strong>Tunnel browser:</strong> ' + escapeHtml(cfg.editor_url_tunnel || 'http://workstation.local:3001/ai/editing_widget_popup') + '<br>';
+                diagHtml += '<strong>Hosts Hint:</strong> ' + escapeHtml(cfg.tunnel_hosts_hint || 'Tablet hosts: 127.0.0.1 workstation.local') + '<br>';
             }
             if (cfg.ssh_tunnel_cmd_named) {
-                addMsg('SSH alias: ' + cfg.ssh_tunnel_cmd_named + ' (Host ' + (cfg.ssh_config_host || 'comserv-aew') + ')', 'system');
+                diagHtml += '<strong>SSH alias:</strong> <code>' + escapeHtml(cfg.ssh_tunnel_cmd_named) + '</code> (Host ' + escapeHtml(cfg.ssh_config_host || 'comserv-aew') + ')<br>';
             }
-            addMsg('Do not use raw IP 192.168.1.199 — not a configured site domain.', 'system');
+            diagHtml += '<span style="color:#ffaa00;">⚠️ Do not use raw IP 192.168.1.199 — not a configured site domain.</span><br>';
         }
         if (cfg.project_root) {
-            addMsg('Project root: ' + cfg.project_root + ' — expand lib/ → Comserv/ → Controller/ in the tree.', 'system');
+            diagHtml += '<strong>Project root:</strong> ' + escapeHtml(cfg.project_root) + ' — expand lib/ → Comserv/ → Controller/ in the tree.<br>';
         }
+        diagHtml += '</div></details>';
+        addMsg(diagHtml, 'system', true);
         if (window.AEW_POPUP_MODE) {
             checkForErrorSourceAndLoad();
             return;
