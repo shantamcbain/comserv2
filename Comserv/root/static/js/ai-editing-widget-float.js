@@ -17,6 +17,7 @@
         dirty: false,
         chatHistory: [],
         conversationTurns: [],
+        conversationId: null,
         backend: 'grok_cli',
         treeExpanded: {},
         treeSeq: 0,
@@ -42,6 +43,34 @@
 
     function escapeHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function loadPastConversations() {
+        var selectEl = q('#aew-conversation-select') || document.getElementById('aew-conversation-select');
+        if (!selectEl) return;
+        fetch('/ai/get_conversation_list', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success && data.conversations) {
+                    selectEl.innerHTML = '<option value="">-- Load Past Chat (DB) --</option>';
+                    data.conversations.forEach(function(conv) {
+                        var opt = document.createElement('option');
+                        opt.value = conv.id;
+                        var label = conv.title || conv.preview || 'Untitled';
+                        if (label.length > 40) {
+                            label = label.substring(0, 40) + '...';
+                        }
+                        opt.textContent = label + ' (' + conv.message_count + ' msgs)';
+                        selectEl.appendChild(opt);
+                    });
+                    if (state.conversationId) {
+                        selectEl.value = state.conversationId;
+                    }
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load past conversations', err);
+            });
     }
 
     function buildDom() {
@@ -99,9 +128,12 @@
                   '<button type="button" class="aew-tab-btn" id="aew-tab-cli">💻 CLI</button>' +
                 '</div>' +
                 '<div id="aew-tab-chat-content" class="aew-tab-content active-tab">' +
-                  '<div class="aew-chat-history-bar">' +
-                    '<select id="aew-chat-history-select">' +
-                      '<option value="">-- Active Conversation (Show All) --</option>' +
+                  '<div class="aew-chat-history-bar" style="display:flex; gap:4px; padding:2px; background:#222; border-bottom:1px solid #3c3c3c;">' +
+                    '<select id="aew-conversation-select" style="flex:1.2; font-size:0.7rem; padding:1px; background:#1e1e1e; color:#ccc; border:1px solid #444; border-radius:2px; min-width:0;">' +
+                      '<option value="">-- Load Past Chat (DB) --</option>' +
+                    '</select>' +
+                    '<select id="aew-chat-history-select" style="flex:1; font-size:0.7rem; padding:1px; background:#1e1e1e; color:#ccc; border:1px solid #444; border-radius:2px; min-width:0;">' +
+                      '<option value="">-- Active Chat (Show All) --</option>' +
                     '</select>' +
                   '</div>' +
                   '<div class="aew-messages" id="aew-messages"></div>' +
@@ -550,6 +582,61 @@
         q('#aew-chat-history-select').onchange = function() {
             renderConversation();
         };
+
+        var convSel = q('#aew-conversation-select');
+        if (convSel) {
+            convSel.onchange = function() {
+                var convId = this.value;
+                if (!convId) {
+                    state.conversationId = null;
+                    state.chatHistory = [];
+                    state.conversationTurns = [];
+                    updateHistoryDropdown();
+                    renderConversation();
+                    return;
+                }
+                setStatus('Loading past chat ' + convId + '...', 'info');
+                fetch('/ai/get_conversation_messages/' + convId, { credentials: 'include' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success && data.messages) {
+                            state.conversationId = convId;
+                            state.chatHistory = [];
+                            state.conversationTurns = [];
+                            
+                            var lastUser = null;
+                            data.messages.forEach(function(msg) {
+                                state.chatHistory.push({
+                                    role: msg.role,
+                                    content: msg.content
+                                });
+                                
+                                if (msg.role === 'user') {
+                                    lastUser = msg.content;
+                                } else if (msg.role === 'assistant' && lastUser !== null) {
+                                    var turnIndex = state.conversationTurns.length + 1;
+                                    state.conversationTurns.push({
+                                        id: turnIndex,
+                                        user: lastUser,
+                                        ai: msg.content
+                                    });
+                                    lastUser = null;
+                                }
+                            });
+                            
+                            setStatus('Loaded past chat successfully', 'ok');
+                            updateHistoryDropdown();
+                            renderConversation();
+                        } else {
+                            setStatus('Failed to load past chat: ' + (data.error || 'unknown'), 'err');
+                        }
+                    })
+                    .catch(function(err) {
+                        setStatus('Network error loading chat: ' + err, 'err');
+                    });
+            };
+        }
+
         q('#aew-editor').addEventListener('input', function() {
             state.dirty = q('#aew-editor').value !== state.currentContent;
         });
@@ -1215,6 +1302,9 @@
             + '&page_path=' + encodeURIComponent(ctx.page_path)
             + '&page_title=' + encodeURIComponent(ctx.page_title)
             + '&model=' + encodeURIComponent(selectedModel);
+        if (state.conversationId) {
+            body += '&conversation_id=' + encodeURIComponent(state.conversationId);
+        }
         return fetch('/ai/grok_cli', {
             method: 'POST',
             credentials: 'include',
@@ -1240,6 +1330,7 @@
                 model: selectedModel,
                 history: state.chatHistory.slice(-20),
                 page_path: window.location.pathname,
+                conversation_id: state.conversationId || undefined,
             }),
         })
         .then(function(r) { return r.json(); })
@@ -1269,6 +1360,11 @@
             var reply = data.response || '';
             addMsg(reply, 'ai');
             state.chatHistory.push({ role: 'assistant', content: reply });
+
+            if (data.conversation_id) {
+                state.conversationId = data.conversation_id;
+                loadPastConversations();
+            }
 
             var turnIndex = state.conversationTurns.length + 1;
             state.conversationTurns.push({
@@ -1316,6 +1412,7 @@
         }
         refreshTree();
         checkForErrorSourceAndLoad();
+        loadPastConversations();
     }
 
     function closePanel() {
@@ -1392,6 +1489,7 @@
         state.enabled = true;
         buildDom();
         populateModels(cfg);
+        loadPastConversations();
         if (cfg.grok_cli) {
             var authNote = cfg.grok_auth ? (' auth=' + cfg.grok_auth) : '';
             var modeNote = cfg.grok_mode === 'xai_api'
