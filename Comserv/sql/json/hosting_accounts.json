@@ -1,0 +1,91 @@
+{
+  "table_name": "hosting_accounts",
+  "description": "Hosted customer sites managed by CSC; drives Hosted nav catalogue and membership admin",
+  "columns": {
+    "id": {
+      "data_type": "integer",
+      "is_auto_increment": true,
+      "is_nullable": false,
+      "description": "Primary key"
+    },
+    "sitename": {
+      "data_type": "varchar",
+      "size": 100,
+      "is_nullable": false,
+      "description": "SiteName being hosted (e.g. Brew, 3d)"
+    },
+    "plan_slug": {
+      "data_type": "varchar",
+      "size": 100,
+      "is_nullable": true,
+      "description": "hosting-subdomain or hosting-app"
+    },
+    "domain": {
+      "data_type": "varchar",
+      "size": 255,
+      "is_nullable": true,
+      "description": "Full domain or subdomain prefix"
+    },
+    "domain_type": {
+      "data_type": "varchar",
+      "size": 20,
+      "is_nullable": true,
+      "default_value": "subdomain",
+      "description": "subdomain | custom | subpath"
+    },
+    "parent_domain": {
+      "data_type": "varchar",
+      "size": 255,
+      "is_nullable": true,
+      "description": "Parent domain when domain_type=subdomain"
+    },
+    "status": {
+      "data_type": "varchar",
+      "size": 20,
+      "is_nullable": false,
+      "default_value": "pending",
+      "description": "pending | active | suspended | cancelled"
+    },
+    "list_publicly": {
+      "data_type": "tinyint",
+      "is_nullable": false,
+      "default_value": 1,
+      "description": "1 = show in public Hosted catalogue for guests; 0 = logged-in members and admins only"
+    },
+    "referring_sitename": {
+      "data_type": "varchar",
+      "size": 100,
+      "is_nullable": true,
+      "description": "SiteName whose admin referred this registration"
+    },
+    "contact_email": {
+      "data_type": "varchar",
+      "size": 255,
+      "is_nullable": true,
+      "description": "Billing contact email"
+    },
+    "created_at": {
+      "data_type": "timestamp",
+      "is_nullable": false,
+      "default_value": "CURRENT_TIMESTAMP"
+    },
+    "updated_at": {
+      "data_type": "timestamp",
+      "is_nullable": false,
+      "default_value": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    }
+  },
+  "primary_key": ["id"],
+  "indexes": [
+    {
+      "name": "idx_hosting_accounts_sitename",
+      "columns": ["sitename"]
+    },
+    {
+      "name": "idx_hosting_accounts_status",
+      "columns": ["status"]
+    }
+  ],
+  "relationships": [],
+  "sample_data": []
+}

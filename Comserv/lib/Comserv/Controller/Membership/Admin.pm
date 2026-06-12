@@ -1356,6 +1356,9 @@ sub hosting_accounts :Local :Args(0) {
     my ($self, $c) = @_;
     return unless $self->_require_admin($c);
 
+    my $nav = $c->controller('Navigation');
+    $nav->_ensure_hosting_list_publicly_column($c) if $nav;
+
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     unless (lc($site_name) eq 'csc') {
         $c->flash->{error_msg} = 'Hosting account management is only available on the CSC site.';
@@ -1391,6 +1394,14 @@ sub hosting_accounts :Local :Args(0) {
                 } elsif ($action eq 'cancel') {
                     $acct->update({ status => 'cancelled', updated_at => \'NOW()' });
                     $c->flash->{success_msg} = $acct->sitename . " hosting cancelled.";
+                } elsif ($action eq 'toggle_list_publicly') {
+                    my $nav = $c->controller('Navigation');
+                    $nav->_ensure_hosting_list_publicly_column($c) if $nav;
+                    my $new_val = $acct->list_publicly ? 0 : 1;
+                    $acct->update({ list_publicly => $new_val, updated_at => \'NOW()' });
+                    $nav->clear_navigation_cache($c) if $nav;
+                    $c->flash->{success_msg} = $acct->sitename
+                        . ( $new_val ? ' will appear in the public Hosted catalogue.' : ' is hidden from public Hosted lists (members only).' );
                 }
             }
         };
@@ -1429,6 +1440,9 @@ sub hosting_account_edit :Local :Args(1) {
     my ($self, $c, $id) = @_;
     return unless $self->_require_admin($c);
 
+    my $nav = $c->controller('Navigation');
+    $nav->_ensure_hosting_list_publicly_column($c) if $nav;
+
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     unless (lc($site_name) eq 'csc') {
         $c->response->redirect($c->uri_for('/membership/admin'));
@@ -1448,7 +1462,9 @@ sub hosting_account_edit :Local :Args(1) {
         my $old_addons = $acct->requested_addons || '';
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         eval {
-            $acct->update({
+            my $nav = $c->controller('Navigation');
+            $nav->_ensure_hosting_list_publicly_column($c) if $nav;
+            my %updates = (
                 plan_slug        => $p->{plan_slug}       || $acct->plan_slug,
                 domain           => $p->{domain}          // '',
                 domain_type      => $p->{domain_type}     || 'subdomain',
@@ -1459,7 +1475,12 @@ sub hosting_account_edit :Local :Args(1) {
                 notes            => $p->{notes}           // '',
                 requested_addons => $addons_str,
                 updated_at       => \'NOW()',
-            });
+            );
+            if ( $nav && $nav->_hosting_has_list_publicly_column($c) ) {
+                $updates{list_publicly} = $p->{list_publicly} ? 1 : 0;
+            }
+            $acct->update(\%updates);
+            $nav->clear_navigation_cache($c) if $nav;
         };
         if ($@) {
             $c->flash->{error_msg} = "Update failed: $@";

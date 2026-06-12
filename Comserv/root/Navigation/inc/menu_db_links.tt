@@ -1,0 +1,39 @@
+[%# Renders DB navigation links (one row each) plus contextual Add Link.
+    Params: db_links, add_link_category, add_link_submenu, add_link_menu, add_link_label, skip_add_link
+%]
+[% SET nav_db_links = db_links || [] %]
+[% SET nav_add_cat = add_link_category || (nav_db_links.size ? nav_db_links.0.category : '') %]
+[% SET nav_add_sub = add_link_submenu || (nav_db_links.size ? nav_db_links.0.submenu : '') %]
+
+[% FOREACH link IN nav_db_links %]
+    [% IF link.name && link.url %]
+    [% SET nav_roles = c.stash.user_roles || c.session.roles || [] %]
+    [% SET nav_is_admin = c.stash.is_admin || c.session.is_admin || nav_roles.grep('admin').size || nav_roles.grep('Admin').size %]
+    [% SET show_edit = 0 %]
+    [% IF c.session.username %]
+        [% IF nav_is_admin || link.can_edit || link.link_type == 'private' || (link.owner && link.owner == c.session.username) || (link.description && link.description == c.session.username) %]
+            [% SET show_edit = 1 %]
+        [% END %]
+    [% END %]
+    <div class="nav-db-link-row">
+        <a href="[% link.url %]"
+           class="submenu-link[% IF link.link_type == 'private' || (link.description && link.description == c.session.username) %] nav-link-private[% END %]"
+           target="[% link.target || '_self' %]"
+           title="[% link.name | nav_label %]">
+            [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+            <span class="nav-db-link-name">[% link.name | nav_label %]</span>
+        </a>
+        [% IF show_edit %]
+            <a href="/navigation/edit_link?id=[% link.id %]" class="edit-link" title="Edit [% link.name | nav_label %]">Edit</a>
+        [% END %]
+    </div>
+    [% END %]
+[% END %]
+
+[% IF nav_add_cat && !skip_add_link %]
+    [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+        add_link_category = nav_add_cat
+        add_link_submenu  = nav_add_sub
+        add_link_menu     = add_link_menu
+        add_link_label    = add_link_label %]
+[% END %]

@@ -8,8 +8,8 @@
     <a href="/ENCY" class="dropbtn"><i class="icon-ency"></i>ENCY</a>
     <div class="dropdown-content">
         <!-- Core — visible to everyone -->
-        <a href="/ENCY"><i class="icon-home"></i>ENCY Home</a>
-        <a href="/ENCY/search"><i class="icon-search"></i>Search Encyclopedia</a>
+        <a href="/ENCY" class="menu-item"><i class="icon-home"></i>ENCY Home</a>
+        <a href="/ENCY/search" class="menu-item"><i class="icon-search"></i>Search Encyclopedia</a>
 
         <div class="dropdown-divider"></div>
 
@@ -17,10 +17,14 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-biology"></i>Biological</span>
             <div class="submenu">
-                <a href="/ENCY/BotanicalNameView"><i class="icon-plant"></i>Plants &amp; Herbs</a>
-                <a href="/ENCY/Animal"><i class="icon-animal"></i>Animals</a>
-                <a href="/ENCY/Insect"><i class="icon-insect"></i>Insects</a>
-                <a href="/ENCY/bee_pasture_view"><i class="icon-pollinator"></i>Bee Pasture / Pollinators</a>
+                <a href="/ENCY/BotanicalNameView" class="submenu-link"><i class="icon-plant"></i>Plants &amp; Herbs</a>
+                <a href="/ENCY/Animal" class="submenu-link"><i class="icon-animal"></i>Animals</a>
+                <a href="/ENCY/Insect" class="submenu-link"><i class="icon-insect"></i>Insects</a>
+                <a href="/ENCY/bee_pasture_view" class="submenu-link"><i class="icon-pollinator"></i>Bee Pasture / Pollinators</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'ENCY_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'ENCY' %]
             </div>
         </div>
 
@@ -28,11 +32,15 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-medical"></i>Therapeutic</span>
             <div class="submenu">
-                <a href="/ENCY/Constituent"><i class="icon-chemistry"></i>Constituents</a>
-                <a href="/ENCY/Disease"><i class="icon-disease"></i>Diseases</a>
-                <a href="/ENCY/Symptom"><i class="icon-symptom"></i>Symptoms</a>
-                <a href="/ENCY/Drug"><i class="icon-medicine"></i>Drugs &amp; Pharmaceuticals</a>
-                <a href="/ENCY/Formula"><i class="icon-recipe"></i>Herbal Formulas</a>
+                <a href="/ENCY/Constituent" class="submenu-link"><i class="icon-chemistry"></i>Constituents</a>
+                <a href="/ENCY/Disease" class="submenu-link"><i class="icon-disease"></i>Diseases</a>
+                <a href="/ENCY/Symptom" class="submenu-link"><i class="icon-symptom"></i>Symptoms</a>
+                <a href="/ENCY/Drug" class="submenu-link"><i class="icon-medicine"></i>Drugs &amp; Pharmaceuticals</a>
+                <a href="/ENCY/Formula" class="submenu-link"><i class="icon-recipe"></i>Herbal Formulas</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'ENCY_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'ENCY' %]
             </div>
         </div>
 
@@ -40,12 +48,16 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-docs"></i>Reference</span>
             <div class="submenu">
-                <a href="/ENCY/Glossary"><i class="icon-glossary"></i>Glossary</a>
-                <a href="/ENCY/Reference"><i class="icon-book"></i>Reference Library</a>
-                <a href="/ENCY/Author"><i class="icon-author"></i>Authors</a>
-                <a href="/ENCY/search?q=cultivation"><i class="icon-grow"></i>Cultivation</a>
-                <a href="/ENCY/search?q=conservation"><i class="icon-conservation"></i>Conservation</a>
-                <a href="/ENCY/search?q=ecology"><i class="icon-ecology"></i>Ecology</a>
+                <a href="/ENCY/Glossary" class="submenu-link"><i class="icon-glossary"></i>Glossary</a>
+                <a href="/ENCY/Reference" class="submenu-link"><i class="icon-book"></i>Reference Library</a>
+                <a href="/ENCY/Author" class="submenu-link"><i class="icon-author"></i>Authors</a>
+                <a href="/ENCY/search?q=cultivation" class="submenu-link"><i class="icon-grow"></i>Cultivation</a>
+                <a href="/ENCY/search?q=conservation" class="submenu-link"><i class="icon-conservation"></i>Conservation</a>
+                <a href="/ENCY/search?q=ecology" class="submenu-link"><i class="icon-ecology"></i>Ecology</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'ENCY_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'ENCY' %]
             </div>
         </div>
 
@@ -55,17 +67,21 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-edit"></i>Add Entries</span>
             <div class="submenu">
-                <a href="/ENCY/add_herb"><i class="icon-add"></i>Add Herb</a>
-                <a href="/ENCY/Animal/add"><i class="icon-add"></i>Add Animal</a>
-                <a href="/ENCY/Insect/add"><i class="icon-add"></i>Add Insect</a>
-                <a href="/ENCY/Disease/add"><i class="icon-add"></i>Add Disease</a>
-                <a href="/ENCY/Symptom/add"><i class="icon-add"></i>Add Symptom</a>
-                <a href="/ENCY/Constituent/add"><i class="icon-add"></i>Add Constituent</a>
-                <a href="/ENCY/Drug/add"><i class="icon-add"></i>Add Drug</a>
-                <a href="/ENCY/Formula/add"><i class="icon-add"></i>Add Formula</a>
-                <a href="/ENCY/Glossary/add"><i class="icon-add"></i>Add Glossary Term</a>
-                <a href="/ENCY/Reference/add"><i class="icon-add"></i>Add Reference</a>
-                <a href="/ENCY/Author/add"><i class="icon-add"></i>Add Author</a>
+                <a href="/ENCY/add_herb" class="submenu-link"><i class="icon-add"></i>Add Herb</a>
+                <a href="/ENCY/Animal/add" class="submenu-link"><i class="icon-add"></i>Add Animal</a>
+                <a href="/ENCY/Insect/add" class="submenu-link"><i class="icon-add"></i>Add Insect</a>
+                <a href="/ENCY/Disease/add" class="submenu-link"><i class="icon-add"></i>Add Disease</a>
+                <a href="/ENCY/Symptom/add" class="submenu-link"><i class="icon-add"></i>Add Symptom</a>
+                <a href="/ENCY/Constituent/add" class="submenu-link"><i class="icon-add"></i>Add Constituent</a>
+                <a href="/ENCY/Drug/add" class="submenu-link"><i class="icon-add"></i>Add Drug</a>
+                <a href="/ENCY/Formula/add" class="submenu-link"><i class="icon-add"></i>Add Formula</a>
+                <a href="/ENCY/Glossary/add" class="submenu-link"><i class="icon-add"></i>Add Glossary Term</a>
+                <a href="/ENCY/Reference/add" class="submenu-link"><i class="icon-add"></i>Add Reference</a>
+                <a href="/ENCY/Author/add" class="submenu-link"><i class="icon-add"></i>Add Author</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'ENCY_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'ENCY' %]
             </div>
         </div>
         [% END %]

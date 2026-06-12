@@ -347,6 +347,7 @@ sub auto :Private {
         $c->stash->{it_links} = [];
         $c->stash->{helpdesk_links} = [];
         $c->stash->{hosted_links} = [];
+        $c->stash->{show_hosted_nav} = 0;
         $c->stash->{admin_pages} = [];
         $c->stash->{admin_links} = [];
         $c->stash->{private_links} = [];
@@ -403,13 +404,14 @@ sub auto :Private {
                 $c->stash->{helpdesk_pages} = $nav_controller->get_pages($c, 'HelpDesk', $site_name);
                 $c->stash->{hosted_pages} = $nav_controller->get_pages($c, 'Hosted', $site_name);
                 
-                # Get internal links
-                $c->stash->{main_links} = $nav_controller->get_internal_links($c, 'Main_links', $site_name);
-                $c->stash->{member_links} = $nav_controller->get_internal_links($c, 'Member_links', $site_name);
-                $c->stash->{coop_links} = $nav_controller->get_internal_links($c, 'Coop_links', $site_name);
-                $c->stash->{it_links} = $nav_controller->get_internal_links($c, 'IT_links', $site_name);
-                $c->stash->{helpdesk_links} = $nav_controller->get_internal_links($c, 'HelpDesk_links', $site_name);
-                $c->stash->{hosted_links} = $nav_controller->get_internal_links($c, 'Hosted_links', $site_name);
+                # Merged public + user-private links (preserve can_edit / owner metadata)
+                $c->stash->{main_links} = $nav_controller->get_merged_menu_links($c, 'Main_links', $site_name);
+                $c->stash->{member_links} = $nav_controller->get_merged_menu_links($c, 'Member_links', $site_name);
+                $c->stash->{coop_links} = $nav_controller->get_merged_menu_links($c, 'COOP_links', $site_name);
+                $c->stash->{it_links} = $nav_controller->get_merged_menu_links($c, 'IT_links', $site_name);
+                $c->stash->{helpdesk_links} = $nav_controller->get_merged_menu_links($c, 'HelpDesk_links', $site_name);
+                $c->stash->{hosted_links} = $nav_controller->get_merged_menu_links($c, 'Hosted_links', $site_name);
+                $c->stash->{weather_links} = $nav_controller->get_merged_menu_links($c, 'Weather_links', $site_name);
                 
                 # Get admin data if user is admin
                 if ($c->stash->{is_admin}) {
@@ -417,9 +419,11 @@ sub auto :Private {
                     $c->stash->{admin_links} = $nav_controller->get_admin_links($c, $site_name);
                 }
                 
-                # Get private links for logged in users
+                # Private links for user dropdown — always load full list (any site scope).
                 if ($c->stash->{user_logged_in}) {
-                    $c->stash->{private_links} = $nav_controller->get_private_links($c, $c->session->{username}, $site_name);
+                    $c->stash->{private_links} = $nav_controller->get_all_private_links_for_user(
+                        $c, $c->session->{username}
+                    );
                 }
             }
             

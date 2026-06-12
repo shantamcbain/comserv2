@@ -73,21 +73,43 @@
                 <i class="icon-cog"></i> Account Settings
             </a>
 
-            <!-- Private Links Submenu -->
+            <!-- Private links: quick access here; same links also appear in their chosen menu -->
             [% IF c.stash.private_links && c.stash.private_links.size %]
             <div class="dropdown-divider"></div>
-            <div class="submenu-item">
-                <span class="submenu-header"><i class="icon-link"></i>My Private Links</span>
-                <div class="submenu">
+            <div class="submenu-item my-links-submenu-item">
+                <span class="submenu-header"><i class="icon-link"></i>My Links</span>
+                <div class="submenu my-links-submenu">
                     [% FOREACH link IN c.stash.private_links %]
-                        <a href="[% link.url %]" class="submenu-link" target="[% link.target || '_self' %]">
-                            [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                            [% link.name %]
-                        </a>
-                        [% IF is_admin || link.owner == c.session.username %]
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                        [% END %]
+                        <div class="my-link-row">
+                            <a href="[% link.url %]" class="my-link-anchor"
+                               target="[% link.target || '_self' %]"
+                               title="[% link.name | nav_label %]">
+                                <span class="my-link-name">[% link.name | nav_label %]</span>
+                            </a>
+                            <a href="/navigation/edit_link?id=[% link.id %]" class="my-link-edit" title="Edit [% link.name | nav_label %]">Edit</a>
+                        </div>
                     [% END %]
+                    [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                        add_link_category = 'Private_links'
+                        add_link_submenu = 'login_dropdown'
+                        add_link_label = 'Add Private Link' %]
+                    <a href="/navigation/manage_private_links" class="my-links-manage">
+                        <i class="icon-manage"></i> Manage All My Links
+                    </a>
+                </div>
+            </div>
+            [% ELSE %]
+            <div class="dropdown-divider"></div>
+            <div class="submenu-item my-links-submenu-item">
+                <span class="submenu-header"><i class="icon-link"></i>My Links</span>
+                <div class="submenu my-links-submenu">
+                    [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                        add_link_category = 'Private_links'
+                        add_link_submenu = 'login_dropdown'
+                        add_link_label = 'Add Private Link' %]
+                    <a href="/navigation/manage_private_links" class="my-links-manage">
+                        <i class="icon-manage"></i> Manage All My Links
+                    </a>
                 </div>
             </div>
             [% END %]
@@ -99,6 +121,10 @@
                 <div class="submenu">
                     <a href="/ai" class="submenu-link"><i class="icon-chat"></i>AI Chat</a>
                     <a href="/ai/conversations" class="submenu-link"><i class="icon-history"></i>Chat History</a>
+                    [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                        add_link_category = 'Private_links'
+                        add_link_submenu = 'login_dropdown'
+                        add_link_label = 'Add Private Link' %]
                 </div>
             </div>
 
@@ -128,6 +154,10 @@
                             <i class="icon-check-square"></i> My Todos
                         </a>
                     [% END %]
+                    [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                        add_link_category = 'Planning_links'
+                        add_link_submenu = 'top'
+                        add_link_menu = 'Planning' %]
                 </div>
             </div>
 

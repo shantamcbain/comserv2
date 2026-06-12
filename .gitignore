@@ -23,8 +23,10 @@ _build/
 Build
 Build.bat
 
-# Module::Install
-inc/
+# Module::Install (repo-root only; not Navigation template includes)
+/inc/
+!Comserv/root/Navigation/inc/
+!Comserv/root/Navigation/inc/**
 
 # ExtUtils::MakeMaker
 /blib/

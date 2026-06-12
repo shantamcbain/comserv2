@@ -44,6 +44,10 @@
                 <a href="/ENCY/BeePastureView" class="submenu-link"><i class="icon-pollinator"></i>Browse Bee Pasture Plants</a>
                 <a href="/ENCY/search" class="submenu-link"><i class="icon-search"></i>Search Encyclopedia</a>
                 <a href="/BMaster/environment" class="submenu-link"><i class="icon-ecology"></i>Environmental Planning</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Beekeeping_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Beekeeping' %]
             </div>
         </div>
 
@@ -62,6 +66,10 @@
                 <a href="/BMaster/beehealth" class="submenu-link"><i class="icon-medical"></i>Bee Health Monitoring</a>
                 <a href="/BMaster/honey" class="submenu-link"><i class="icon-honey"></i>Honey &amp; Harvest</a>
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Beekeeping_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Beekeeping' %]
             </div>
         </div>
 
@@ -77,6 +85,10 @@
                 [% ELSE %]
                 <a href="/BMaster/apiary" class="submenu-link"><i class="icon-inspect"></i>Learn About Hive Inspections</a>
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Beekeeping_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Beekeeping' %]
             </div>
         </div>
 
@@ -91,6 +103,10 @@
                 [% ELSE %]
                 <a href="/BMaster/Queens" class="submenu-link"><i class="icon-insect"></i>About Queen Rearing</a>
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Beekeeping_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Beekeeping' %]
             </div>
         </div>
 
@@ -101,6 +117,10 @@
                 <a href="/BMaster/education" class="submenu-link"><i class="icon-docs"></i>Beekeeping Education</a>
                 <a href="/workshop" class="submenu-link"><i class="icon-workshop"></i>Workshops</a>
                 <a href="/Documentation/BMaster" class="submenu-link"><i class="icon-documentation"></i>BMaster Documentation</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Beekeeping_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Beekeeping' %]
             </div>
         </div>
 

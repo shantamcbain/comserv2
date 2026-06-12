@@ -1,0 +1,42 @@
+[%# One-line submenu row: main link + optional Edit.
+    row_href (required), row_label (required)
+    row_title, row_target, row_icon, row_edit_href, row_edit_kind, row_edit_id
+    row_can_edit, row_link_type, row_link_owner, row_link_description
+    row_extra_class, row_edit_text
+    row_tag = submenu-link | menu-item (default submenu-link)
+    row_edit_kind: nav_link | cms_page | legacy_page
+%]
+[% DEFAULT row_tag = 'submenu-link' %]
+[% SET nav_roles = c.stash.user_roles || c.session.roles || [] %]
+[% SET nav_is_admin = c.stash.is_admin || c.session.is_admin || nav_roles.grep('admin').size || nav_roles.grep('Admin').size %]
+[% SET nav_is_editor = nav_roles.grep('editor').size || nav_roles.grep('Editor').size %]
+[% SET nav_is_owner = c.session.username && (
+    row_can_edit
+    || row_link_type == 'private'
+    || (row_link_owner && row_link_owner == c.session.username)
+    || (row_link_description && row_link_description == c.session.username)
+) %]
+[% SET edit_href = row_edit_href %]
+[% IF !edit_href && row_edit_kind && row_edit_id %]
+    [% IF row_edit_kind == 'nav_link' && c.session.username && (nav_is_owner || nav_is_admin) %]
+        [% SET edit_href = '/navigation/edit_link?id=' _ row_edit_id %]
+    [% ELSIF (row_edit_kind == 'cms_page' || row_edit_kind == 'legacy_page') && (nav_is_admin || nav_is_editor) %]
+        [% IF row_edit_kind == 'cms_page' %]
+            [% SET edit_href = '/admin/pages?action=edit&id=' _ row_edit_id %]
+        [% ELSE %]
+            [% SET edit_href = '/pages/edit?page_id=' _ row_edit_id %]
+        [% END %]
+    [% END %]
+[% END %]
+<div class="nav-db-link-row">
+    <a href="[% row_href %]"
+       class="[% row_tag %][% IF row_extra_class %] [% row_extra_class %][% END %]"
+       target="[% row_target || '_self' %]"
+       title="[% (row_title || row_label) | nav_label %]">
+        [% IF row_icon %]<i class="[% row_icon %]"></i>[% END %]
+        <span class="nav-db-link-name">[% row_label | nav_label %]</span>
+    </a>
+    [% IF edit_href %]
+    <a href="[% edit_href %]" class="edit-link" title="Edit [% row_label | nav_label %]">[% row_edit_text || 'Edit' %]</a>
+    [% END %]
+</div>

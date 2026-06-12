@@ -2,6 +2,7 @@ package Comserv::View::TT;
 use Moose;
 use namespace::autoclean;
 use JSON::MaybeXS ();
+use HTML::Entities qw(decode_entities encode_entities);
 extends 'Catalyst::View::TT';
 
 __PACKAGE__->config(
@@ -33,6 +34,13 @@ __PACKAGE__->config(
             $text =~ s{<}{&lt;}g;
             $text =~ s{>}{&gt;}g;
             return $text;
+        },
+        # Decode stored HTML entities, then escape for safe UTF-8 menu labels
+        nav_label => sub {
+            my $text = shift;
+            return '' unless defined $text;
+            $text = decode_entities($text);
+            return encode_entities( $text, '<>&"' );
         },
     },
 );

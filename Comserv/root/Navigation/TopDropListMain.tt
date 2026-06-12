@@ -44,17 +44,16 @@
                 <a href="/mail/subscribe" class="submenu-link"><i class="icon-mail"></i>Join Mailing List</a>
                 [% END %]
                 [% IF c.session.username == 'Shanta' %]
-                <a href="http://mail.coop.ca/roundcube/" target="_blank"><i class="icon-webmail"></i>COOP Webmail</a>
-                <a href="http://wbeck.zapto.org/roundcube/" target="_blank"><i class="icon-webmail"></i>WB Webmail</a>
+                <a href="http://mail.coop.ca/roundcube/" target="_blank" class="submenu-link"><i class="icon-webmail"></i>COOP Webmail</a>
+                <a href="http://wbeck.zapto.org/roundcube/" target="_blank" class="submenu-link"><i class="icon-webmail"></i>WB Webmail</a>
                 [% END %]
                 
-                <!-- Public Main Links added by admin -->
-                [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Main_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-                    <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.name %]">[% link.name %]</a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
+                [% SET main_db_links = c.stash.nav_merged_links.Main_links || c.stash.main_links || [] %]
+                [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+                    db_links = main_db_links
+                    add_link_menu = 'Main'
+                    add_link_category = 'Main_links'
+                    add_link_submenu = 'join_services' %]
             </div>
         </div>
 
@@ -62,49 +61,16 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-folder"></i>Shared Folders</span>
             <div class="submenu">
-                <a href="/Shares"><i class="icon-cloud"></i>File Shares</a>
-                <a href="/media"><i class="icon-image"></i>Media Server</a>
-                <a href="/" onclick="activateSite('BMaster')"><i class="icon-drive"></i>BMaster</a>
-                <a href="/cloud"><i class="icon-sync"></i>Cloud Sync</a>
+                <a href="/Shares" class="submenu-link"><i class="icon-cloud"></i>File Shares</a>
+                <a href="/media" class="submenu-link"><i class="icon-image"></i>Media Server</a>
+                <a href="/" onclick="activateSite('BMaster')" class="submenu-link"><i class="icon-drive"></i>BMaster</a>
+                <a href="/cloud" class="submenu-link"><i class="icon-sync"></i>Cloud Sync</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Main_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Main' %]
             </div>
         </div>
-
-        <!-- Private Links for logged in users -->
-        [% IF c.session.username %]
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-user-links"></i>My Main Links</span>
-            <div class="submenu">
-                [% SET found_private_main_links = 0 %]
-                <!-- Get private links for this user in Main category -->
-                [% IF c.stash.private_links %]
-                    [% FOREACH link IN c.stash.private_links %]
-                        [% IF link.category == 'Main_links' || link.menu == 'Main' %]
-                            [% SET found_private_main_links = 1 %]
-                            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]">
-                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                                [% link.name %]
-                            </a>
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                        [% END %]
-                    [% END %]
-                [% END %]
-                
-                <!-- Fallback query if no private_links in stash -->
-                [% IF !found_private_main_links %]
-                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE (category = 'Main_links' OR menu = 'Main') AND description = '$username' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-                        <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]">
-                            [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                            [% link.name %]
-                        </a>
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-                
-                <!-- Add link option for this specific menu -->
-                <a href="/navigation/add_link?menu=Main" class="add-submenu-link"><i class="icon-add"></i>Add Main Link</a>
-            </div>
-        </div>
-        [% END %]
 
         <!-- Global/Public Links -->
         <div class="submenu-item">
@@ -112,10 +78,11 @@
             <div class="submenu">
                 <!-- Dynamic Page-based links for Main menu from new page system -->
                 [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'main' AND (status = 'active' OR status = '2' OR status = 2)) AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
-                    <a href="/page/[% link.page_code %]" name="Contact" target="_self" title="[% link.title | html %]">[% link.title | html %]</a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/admin/pages?action=edit&amp;id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
+                    [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                        row_href = '/page/' _ link.page_code
+                        row_label = link.title
+                        row_edit_kind = 'cms_page'
+                        row_edit_id = link.id %]
                 [% END %]
                 
                 <!-- Legacy Page-based links for Main menu -->
@@ -123,12 +90,18 @@
                     [%# Check if page is already in the new page system to avoid duplicates %]
                     [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
                     [% IF is_migrated == 0 %]
-                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% legacy_link.page_code %]" name="Contact" target="[% legacy_link.target %]" title="[% legacy_link.view_name %]">[% legacy_link.view_name %]</a>
-                        [% IF c.session.roles.grep('admin').size %]
-                            <a href="/pages/edit?page_id=[% legacy_link.id %]" class="edit-link">Edit</a>
-                        [% END %]
+                        [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                            row_href = '/cgi-bin/index.cgi?site=' _ SiteName _ '&' _ session_string _ '&page=' _ legacy_link.page_code
+                            row_label = legacy_link.view_name
+                            row_target = legacy_link.target
+                            row_edit_kind = 'legacy_page'
+                            row_edit_id = legacy_link.id %]
                     [% END %]
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Main_links'
+                    add_link_submenu = 'public_links'
+                    add_link_menu = 'Main' %]
             </div>
         </div>
         

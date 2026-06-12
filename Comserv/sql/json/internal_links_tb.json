@@ -42,7 +42,14 @@
     "description": {
       "data_type": "text",
       "is_nullable": true,
-      "description": "Description of the link for administrative purposes"
+      "description": "For private links: owner username. For public links: optional admin notes"
+    },
+    "submenu": {
+      "data_type": "varchar",
+      "size": 50,
+      "is_nullable": true,
+      "default_value": "",
+      "description": "Submenu section within the parent menu (e.g. hosted_links, it_services)"
     },
     "link_order": {
       "data_type": "integer",
@@ -55,6 +62,12 @@
       "is_nullable": true,
       "default_value": 1,
       "description": "Status of the link (1 = active, 0 = inactive, 2 = featured)"
+    },
+    "public_visible": {
+      "data_type": "tinyint",
+      "is_nullable": false,
+      "default_value": 1,
+      "description": "For public links: 1 = visible to guests, 0 = logged-in members only"
     },
     "created_at": {
       "data_type": "datetime",

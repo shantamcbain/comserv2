@@ -1,0 +1,66 @@
+[%# Submenu placement within the selected top-level menu.
+    Expects: permissions, form (category, submenu), optional preset_submenu %]
+
+<div class="form-group" id="submenu-field-group">
+    <label for="submenu">Appear in Submenu:</label>
+    <select id="submenu" name="submenu" class="form-control">
+        [% FOREACH cat IN permissions.available_categories %]
+            [% SET sub_items = permissions.submenu_catalog.item(cat) %]
+            [% NEXT UNLESS sub_items && sub_items.size %]
+            [% FOREACH item IN sub_items %]
+                <option value="[% item.id %]"
+                        data-category="[% cat %]"
+                        [% IF (form.submenu && form.submenu == item.id && form.category == cat)
+                              || (!form.submenu && preset_submenu == item.id && form.category == cat)
+                              || (!form.submenu && !preset_submenu && permissions.submenu_defaults.item(cat) == item.id && form.category == cat) %]selected[% END %]>
+                    [% item.label %]
+                </option>
+            [% END %]
+        [% END %]
+    </select>
+    <small class="form-text text-muted">Choose which section inside the menu. For <strong>Login menu (My Links)</strong>, pick <strong>My Links (login dropdown)</strong>.</small>
+</div>
+
+<script>
+function updateLinkSubmenuField() {
+    var catEl = document.getElementById('category');
+    var subEl = document.getElementById('submenu');
+    var group = document.getElementById('submenu-field-group');
+    if (!catEl || !subEl) return;
+
+    var cat = catEl.value;
+    var visible = 0;
+    var firstVisible = null;
+    var current = subEl.value;
+
+    Array.prototype.forEach.call(subEl.options, function(opt) {
+        var show = opt.getAttribute('data-category') === cat;
+        opt.hidden = !show;
+        opt.disabled = !show;
+        if (show) {
+            visible++;
+            if (!firstVisible) firstVisible = opt;
+            if (opt.value === current) opt.selected = true;
+        }
+    });
+
+    if (group) group.style.display = visible ? '' : 'none';
+    subEl.disabled = !visible;
+    if (visible && !subEl.value && firstVisible) {
+        firstVisible.selected = true;
+    }
+}
+
+(function() {
+    var orig = window.updateLinkScopeFields;
+    window.updateLinkScopeFields = function() {
+        if (typeof orig === 'function') orig();
+        updateLinkSubmenuField();
+    };
+    document.addEventListener('DOMContentLoaded', function() {
+        var catEl = document.getElementById('category');
+        if (catEl) catEl.addEventListener('change', updateLinkSubmenuField);
+        updateLinkSubmenuField();
+    });
+})();
+</script>

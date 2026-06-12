@@ -30,6 +30,10 @@
                 <a href="/Shares" class="submenu-link"><i class="icon-cloud"></i>File Shares</a>
                 <a href="/media" class="submenu-link"><i class="icon-image"></i>Media Server</a>
                 <a href="/cloud" class="submenu-link"><i class="icon-sync"></i>Cloud Sync</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Workshop_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Workshop' %]
             </div>
         </div>
         [% END %]
