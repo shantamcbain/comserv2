@@ -465,7 +465,12 @@ sub log_with_details {
     # DEBUG/INFO messages go to file log only.
     my $level_prio    = $LEVEL_PRIORITY{ uc($level) }           // 0;
     my $db_min_prio   = $LEVEL_PRIORITY{ uc($DB_LOG_MIN_LEVEL) } // 3;
-    if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio) {
+    my $_skip_db_noise = (
+        $message =~ /\bPage not found\b/i
+        || (($subroutine // '') =~ /\bview\b/i && $message =~ /\d{10,}/)
+        || $message =~ /DBI Connection failed|Can't connect to (?:MySQL|server)/i
+    );
+    if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio && !$_skip_db_noise) {
         my $now = time();
         if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
             _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");

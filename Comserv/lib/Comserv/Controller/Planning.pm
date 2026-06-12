@@ -1189,12 +1189,21 @@ sub _run_audit_scan {
             { order_by => { -desc => 'timestamp' }, rows => 200 }
         )->all;
         for my $e (@errs) {
+            my $msg = $e->message // '';
             my $sub = $e->subroutine || 'unknown';
+            # Skip the same noise categories filtered in Logging.pm:
+            #   - external 404s ("Page not found")
+            #   - large numeric page IDs in the view subroutine (bot crawls)
+            #   - transient DB connection failures (handled by RemoteDB failover)
+            next if $msg =~ /\bPage not found\b/i;
+            next if $sub =~ /\bview\b/i && $msg =~ /\d{10,}/;
+            next if $msg =~ /DBI Connection failed|Can't connect to (?:MySQL|server)/i;
+
             $sub =~ s/^Comserv:://;
             push @{ $groups{$sub} }, {
                 level   => uc($e->level),
                 ts      => $e->timestamp,
-                message => substr($e->message || '', 0, 500),
+                message => substr($msg, 0, 500),
                 file    => $e->file || '',
                 line    => $e->line || '',
             };
@@ -1203,80 +1212,38 @@ sub _run_audit_scan {
     $error_count = scalar keys %groups;
 
     if ($error_count) {
+        # Look for ANY open Morning Audit (any date) — not just today's.
+        # This prevents creating a new root every day when yesterday's is still unresolved.
         my $existing_audit;
         eval {
             $existing_audit = $schema->resultset('Todo')->search(
-                { sitename   => $sitename,
-                  subject    => { -like => "%Morning Audit%$today%" },
-                  start_date => $today },
-                { rows => 1 }
+                { sitename => $sitename,
+                  subject  => { -like => '%Morning Audit%' },
+                  status   => { -not_in => [3] } },
+                { order_by => { -desc => 'record_id' }, rows => 1 }
             )->first;
         };
 
         if ($existing_audit) {
-            my $root_st = $existing_audit->status // 0;
-            my $root_closed = ($root_st == 3 || $root_st =~ /^(done|completed|closed)$/i);
+            # An open audit exists (possibly from a previous day) — add new children only.
+            my $root_id = $existing_audit->record_id;
+            my $ollama;
+            eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
 
-            if ($root_closed) {
-                my $close_date = $existing_audit->last_mod_date || $today;
-                my $close_tod  = $existing_audit->time_of_day   || '23:59:59';
-                my $cutoff = $close_date . ' ' . $close_tod;
-                my %new_groups;
-                for my $sub (keys %groups) {
-                    my @newer = grep { ($_->{ts} || '') gt $cutoff } @{ $groups{$sub} };
-                    $new_groups{$sub} = \@newer if @newer;
-                }
-                if (keys %new_groups) {
-                    my $ollama;
-                    eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
-                    my $new_error_count = scalar keys %new_groups;
-                    my $root_desc = "=== Audit Refresh - $today ===\n\n"
-                        . "Found $new_error_count area(s) with new errors since previous audit was closed.\n"
-                        . "Each sub-todo below was created from the system error log.\n"
-                        . "Resolve each sub-todo to clear this audit.";
-                    my $root_todo;
-                    eval {
-                        $root_todo = $schema->resultset('Todo')->create({
-                            subject             => "\x{26A0}\x{FE0F} Morning Audit: $new_error_count area(s) need review ($today)",
-                            description         => $root_desc,
-                            status              => 1,
-                            priority            => 1,
-                            is_blocking         => 1,
-                            sitename            => $sitename,
-                            developer           => $username,
-                            username_of_poster  => $username,
-                            user_id             => $admin_user_id,
-                            project_id          => $system_project_id,
-                            last_mod_by         => $username,
-                            last_mod_date       => $today,
-                            date_time_posted    => $today . ' 00:00:00',
-                            start_date          => $today,
-                            due_date            => $today,
-                            parent_todo         => '',
-                            estimated_man_hours => 0,
-                            accumulative_time   => '00:00:00',
-                            group_of_poster     => 'admin',
-                            project_code        => 'PLANNING',
-                            share               => 0,
-                        });
-                    };
-                    if ($root_todo && !$@) {
-                        $todo_created = 1;
-                        my $root_id = $root_todo->record_id;
-                        for my $sub (sort keys %new_groups) {
-                            my @entries = @{ $new_groups{$sub} };
-                            my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
-                                $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
-                            push @subjects, $ai_subject if $ai_subject;
-                        }
-                    }
-                }
-            } else {
-                $todo_created = 0;
-                my $root_id = $existing_audit->record_id;
-                my $ollama;
-                eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
-                for my $sub (sort keys %groups) {
+            eval {
+                my $area_list_now = join("\n", map { "  \x{2022} $_" } sort keys %groups);
+                $schema->resultset('Todo')->search({ record_id => $root_id })->update({
+                    subject       => "\x{26A0}\x{FE0F} Morning Audit: $error_count area(s) need review ($today)",
+                    description   => "=== Morning Audit - $today ===\n\n"
+                        . "Found errors in $error_count area(s):\n$area_list_now\n\n"
+                        . "Each sub-todo below was created with AI assistance from the system error log.\n"
+                        . "Resolve each sub-todo to clear this audit.",
+                    last_mod_by   => $username,
+                    last_mod_date => $today,
+                });
+            };
+
+            for my $sub (sort keys %groups) {
                     my $safe_sub = $sub;
                     $safe_sub =~ s/[%_]/\\$&/g;
                     my $open_exists;
@@ -1320,7 +1287,6 @@ sub _run_audit_scan {
                     push @subjects, $ai_subject if $ai_subject;
                     $todo_created++ if $ai_subject;
                 }
-            }
         } else {
             my $ollama;
             eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
