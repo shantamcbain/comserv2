@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListHosted.tt,v 0.03 2025/09/03 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListHosted.tt,v 0.05 2026/06/12 Scoped sites: public DNS for users; .local for site admins only' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -12,166 +12,86 @@
         <!-- Core Hosted Services -->
         <a href="/hosted" class="menu-item"><i class="icon-home"></i>My Hosting</a>
         <a href="/hosting_signup" class="menu-item"><i class="icon-apply"></i>Apply for Hosting</a>
-        <a href="/marketplace?type=job&q=hosting" class="menu-item"><i class="icon-marketplace"></i>Hosting on Marketplace</a>
+        <a href="/marketplace?type=job&amp;q=hosting" class="menu-item"><i class="icon-marketplace"></i>Hosting on Marketplace</a>
+
+        <!-- Quick shortcuts pinned to the top of the dropdown -->
+        [% SET hosted_top_links = c.stash.hosted_top_links || [] %]
+        [% FOREACH link IN hosted_top_links %]
+        <a href="[% link.url %]" target="[% link.target || '_blank' %]" class="menu-item" title="[% link.name | nav_label %]">
+            [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+            [% link.name | nav_label %]
+        </a>
+        [% END %]
 
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>
-        <a href="/navigation/add_link?menu=Hosted" class="menu-item"><i class="icon-add"></i>Add Hosted Link</a>
+        <a href="/navigation/add_link?menu=Hosted&amp;category=Hosted_links&amp;submenu=hosted_links" class="menu-item"><i class="icon-add"></i>Add Hosting Bookmark</a>
         [% END %]
 
-        <!-- Hosted sites from database (SiteDomain table) -->
-        [% SET hosted_sites = [] %]
-        [% TRY %]
-        [% SET hosted_sites = c.model('DBEncy').resultset('SiteDomain').search({}, { order_by => 'domain' }).all %]
-        [% CATCH %][% END %]
-        [% IF hosted_sites.size %]
+        <!-- Sites we host: active hosting accounts + extra SiteDomain rows (deduped) -->
+        [% SET hosted_sites_merged = c.stash.hosted_sites_merged || [] %]
+        [% IF hosted_sites_merged.size %]
         <div class="dropdown-divider"></div>
         <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-production"></i>Hosted Sites</span>
+            <span class="submenu-header"><i class="icon-production"></i>Sites We Host</span>
             <div class="submenu">
-                [% TRY %]
-                [% FOREACH sd IN hosted_sites %]
-                <a href="https://[% sd.domain | html %]" target="_blank" class="submenu-link">
-                    <i class="icon-site"></i>[% sd.domain | html %]
+                [% FOREACH site IN hosted_sites_merged %]
+                <a href="[% site.url %]" target="_blank" class="submenu-link[% IF site.internal %] nav-link-internal[% END %]" title="[% site.label | nav_label %]">
+                    <i class="icon-site"></i>[% site.label | nav_label %][% IF site.internal %] <span class="nav-dev-badge">dev</span>[% END %]
                 </a>
                 [% END %]
-                [% CATCH %][% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Hosted_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Hosted'
+                    add_link_label = 'Add Shortcut' %]
             </div>
         </div>
         [% END %]
 
-        <!-- Active HostingAccounts from DB -->
-        [% SET ha_list = c.stash.nav_hosting_accounts || [] %]
-        [% IF ha_list.size %]
+        <!-- Guides, docs, and bookmarks (merged hosted_links + hosted_pages + CMS pages) -->
+        [% SET hosted_resource_links = c.stash.hosted_resource_links || [] %]
         <div class="dropdown-divider"></div>
         <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-accounts"></i>Active Hosted Accounts</span>
+            <span class="submenu-header"><i class="icon-docs"></i>Guides &amp; Bookmarks</span>
             <div class="submenu">
-                [% FOREACH ha IN ha_list %]
-                <a href="[% IF ha.domain %]http://[% ha.domain | html %][% ELSE %]#[% END %]" target="_blank" class="submenu-link">
-                    <i class="icon-site"></i>[% ha.sitename | html %][% IF ha.domain %] — [% ha.domain | html %][% END %]
-                </a>
+                [% IF hosted_resource_links.size %]
+                    [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+                        db_links = hosted_resource_links
+                        add_link_menu = 'Hosted'
+                        add_link_category = 'Hosted_links'
+                        add_link_submenu = 'hosted_links'
+                        skip_add_link = 1 %]
                 [% END %]
-            </div>
-        </div>
-        [% END %]
-
-        <!-- Public Hosted Links from database -->
-        [% SET hosted_db_links = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Hosted_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-        [% IF hosted_db_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-admin-links"></i>Additional Hosted Services</span>
-            <div class="submenu">
-                [% FOREACH link IN hosted_db_links %]
-                    <a href="[% link.url %]" target="[% link.target || '_blank' %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-
-        <!-- Hosted Pages (Dynamic & Legacy Support) -->
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-pages"></i>Hosted Pages</span>
-            <div class="submenu">
-                <!-- Dynamic Page-based links for Hosted menu -->
+                <!-- CMS pages assigned to the Hosted menu -->
                 [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'hosted' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
-                    <a href="/page/[% link.page_code %]" target="_self" title="[% link.title | html %]" class="submenu-link">
-                        <i class="fas fa-file-alt"></i> [% link.title | html %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/admin/pages?action=edit&amp;id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
+                    [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                        row_href = '/page/' _ link.page_code
+                        row_label = link.title
+                        row_icon = 'fas fa-file-alt'
+                        row_edit_kind = 'cms_page'
+                        row_edit_id = link.id %]
                 [% END %]
-                
-                <!-- Legacy Page-based links for Hosted menu -->
                 [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'hosted' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
                     [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
                     [% IF is_migrated == 0 %]
-                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% legacy_link.page_code %]" target="[% legacy_link.target %]" title="[% legacy_link.view_name %]" class="submenu-link">
-                            <i class="fas fa-file-alt"></i> [% legacy_link.view_name %]
-                        </a>
-                        [% IF c.session.roles.grep('admin').size %]
-                            <a href="/pages/edit?page_id=[% legacy_link.id %]" class="edit-link">Edit</a>
-                        [% END %]
+                        [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                            row_href = '/cgi-bin/index.cgi?site=' _ SiteName _ '&' _ session_string _ '&page=' _ legacy_link.page_code
+                            row_label = legacy_link.view_name
+                            row_target = legacy_link.target
+                            row_icon = 'fas fa-file-alt'
+                            row_edit_kind = 'legacy_page'
+                            row_edit_id = legacy_link.id %]
                     [% END %]
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Hosted_links'
+                    add_link_submenu = 'hosted_links'
+                    add_link_menu = 'Hosted'
+                    add_link_label = 'Add Bookmark' %]
             </div>
         </div>
-        
-        <!-- Legacy Hosted Links Support -->
-        [% IF hosted_links.defined && hosted_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-legacy"></i>Legacy Hosted Links</span>
-            <div class="submenu">
-                [% FOREACH link IN hosted_links %]
-                    <a href="[% link.url %]" name="Contact" target="[% link.target %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.group == 'admin' %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Session-based Hosted Links -->
-        [% IF c.session.hosted_links && c.session.hosted_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-session"></i>Session Hosted Links</span>
-            <div class="submenu">
-                [% FOREACH link IN c.session.hosted_links %]
-                    <a href="[% link.url %]" target="[% link.target || '_blank' %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.group == 'admin' %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Private Hosted Links for logged in users -->
-        [% IF c.session.username && c.stash.private_links %]
-            [% SET has_private_hosted_links = 0 %]
-            [% FOREACH link IN c.stash.private_links %]
-                [% IF link.category == 'Hosted_links' || link.menu == 'Hosted' %]
-                    [% SET has_private_hosted_links = 1 %]
-                [% END %]
-            [% END %]
-            
-            [% IF has_private_hosted_links %]
-            <div class="dropdown-divider"></div>
-            <div class="submenu-item">
-                <span class="submenu-header"><i class="icon-user-hosted"></i>My Hosted Links</span>
-                <div class="submenu">
-                    [% FOREACH link IN c.stash.private_links %]
-                        [% IF link.category == 'Hosted_links' || link.menu == 'Hosted' %]
-                            <a href="[% link.url %]" target="[% link.target || '_blank' %]" title="[% link.name %]" class="submenu-link">
-                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                                [% link.name %]
-                            </a>
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                        [% END %]
-                    [% END %]
-                </div>
-            </div>
-            [% END %]
-        [% END %]
-        
+
         [% IF c.stash.is_admin || c.session.roles.grep('admin').size %]
         <div class="dropdown-divider"></div>
         <a href="/accounts" class="menu-item"><i class="icon-accounts"></i>All Hosting Accounts</a>
@@ -182,4 +102,3 @@
         [% END %]
     </div>
 </li>
-

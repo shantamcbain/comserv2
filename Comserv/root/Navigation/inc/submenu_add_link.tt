@@ -1,0 +1,35 @@
+[%# Add Link — last row in every submenu; pre-fills category, submenu, and menu.
+    Params: add_link_category (or add_link_menu), add_link_submenu, add_link_menu, add_link_label
+%]
+[% IF c.session.username %]
+    [% SET nav_add_cat = add_link_category %]
+    [% IF !nav_add_cat && add_link_menu %]
+        [% SET nav_menu_cat_map = {
+            'Main'       => 'Main_links',
+            'Member'     => 'Member_links',
+            'HelpDesk'   => 'HelpDesk_links',
+            'Hosted'     => 'Hosted_links',
+            'Planning'   => 'Planning_links',
+            'Workshop'   => 'Workshop_links',
+            'Weather'    => 'Weather_links',
+            'weather'    => 'Weather_links',
+            'ENCY'       => 'ENCY_links',
+            'Beekeeping' => 'Beekeeping_links',
+            'Brew'       => 'Brew_links',
+            '3d'         => '3d_links',
+            'COOP'       => 'COOP_links',
+            'IT'         => 'IT_links',
+            'Global'     => 'Global_links',
+            'Shop'       => 'Shop_links',
+        } %]
+        [% SET nav_add_cat = nav_menu_cat_map.item(add_link_menu) || (add_link_menu _ '_links') %]
+    [% END %]
+    [% IF nav_add_cat %]
+        [% SET nav_add_sub = add_link_submenu || 'top' %]
+        <a href="/navigation/add_link?category=[% nav_add_cat | uri %]&amp;submenu=[% nav_add_sub | uri %][% IF add_link_menu %]&amp;menu=[% add_link_menu | uri %][% END %]"
+           class="submenu-link submenu-add-link"
+           title="Add a link to this menu section">
+            <i class="icon-add"></i>[% add_link_label || 'Add Link' %]
+        </a>
+    [% END %]
+[% END %]

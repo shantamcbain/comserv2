@@ -21,19 +21,19 @@
     <div class="dropdown-content">
 
         [%# Planning calendar tabs %]
-        <a href="/planning/daily#today-work"><i class="icon-check-square"></i>Daily Priorities</a>
-        <a href="/planning/daily#daily-schedule"><i class="icon-calendar"></i>Daily Schedule</a>
-        <a href="/planning/daily#weekly-view"><i class="icon-calendar"></i>Week View</a>
-        <a href="/planning/daily#month-view"><i class="icon-calendar"></i>Month View</a>
-        <a href="/planning/daily#planning"><i class="icon-planning"></i>Planning Board</a>
-        <a href="/planning/daily#gantt-view"><i class="icon-list"></i>Gantt View</a>
-        <a href="/planning/daily#resources-view"><i class="icon-file"></i>Resources</a>
+        <a href="/planning/daily#today-work" class="menu-item"><i class="icon-check-square"></i>Daily Priorities</a>
+        <a href="/planning/daily#daily-schedule" class="menu-item"><i class="icon-calendar"></i>Daily Schedule</a>
+        <a href="/planning/daily#weekly-view" class="menu-item"><i class="icon-calendar"></i>Week View</a>
+        <a href="/planning/daily#month-view" class="menu-item"><i class="icon-calendar"></i>Month View</a>
+        <a href="/planning/daily#planning" class="menu-item"><i class="icon-planning"></i>Planning Board</a>
+        <a href="/planning/daily#gantt-view" class="menu-item"><i class="icon-list"></i>Gantt View</a>
+        <a href="/planning/daily#resources-view" class="menu-item"><i class="icon-file"></i>Resources</a>
 
         <div class="dropdown-divider"></div>
 
         [%# Todo &amp; Logs %]
-        <a href="/todo"><i class="icon-check-square"></i>Todo List</a>
-        <a href="/log"><i class="icon-log"></i>Logs</a>
+        <a href="/todo" class="menu-item"><i class="icon-check-square"></i>Todo List</a>
+        <a href="/log" class="menu-item"><i class="icon-log"></i>Logs</a>
 
         <div class="dropdown-divider"></div>
 
@@ -45,6 +45,10 @@
                 [% IF is_admin %]
                 <a href="/project/addproject" class="submenu-link"><i class="icon-add"></i>Add Project</a>
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Planning_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Planning' %]
             </div>
         </div>
 
@@ -55,6 +59,10 @@
             <div class="submenu">
                 <a href="/admin/plan/list" class="submenu-link"><i class="icon-list"></i>All Plans</a>
                 <a href="/admin/plan/create" class="submenu-link"><i class="icon-add"></i>New Plan</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Planning_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Planning' %]
             </div>
         </div>
         [% END %]
@@ -63,11 +71,15 @@
         [% IF is_csc && is_admin %]
         <div class="dropdown-divider"></div>
         <div class="submenu-item">
-            <span class="submenu-header" style="font-size:0.85em;color:var(--text-muted-color);"><i class="icon-documentation"></i>CSC Docs</span>
+            <span class="submenu-header submenu-header-muted"><i class="icon-documentation"></i>CSC Docs</span>
             <div class="submenu">
                 <a href="/Documentation/MasterPlanCoordination" class="submenu-link"><i class="icon-planning"></i>Master Plan</a>
                 <a href="/Documentation/Planning" class="submenu-link"><i class="icon-planning"></i>Planning Docs</a>
                 <a href="/Documentation" class="submenu-link"><i class="icon-documentation"></i>All Docs</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Planning_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Planning' %]
             </div>
         </div>
         [% END %]

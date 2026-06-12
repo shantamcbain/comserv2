@@ -23,6 +23,10 @@
                 <a href="/it/network" class="submenu-link"><i class="icon-network"></i>Network</a>
                 <a href="/it/servers" class="submenu-link"><i class="icon-server"></i>Servers</a>
                 <a href="/it/security" class="submenu-link"><i class="icon-security"></i>Security</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'IT_links'
+                    add_link_submenu = 'it_tools'
+                    add_link_menu = 'IT' %]
             </div>
         </div>
         
@@ -34,16 +38,33 @@
             <span class="submenu-header"><i class="icon-admin-links"></i>IT Services</span>
             <div class="submenu">
                 [% FOREACH link IN it_links %]
-                    <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
+                    [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                        row_href = link.url
+                        row_label = link.name
+                        row_target = link.target || '_self'
+                        row_icon = link.icon
+                        row_edit_kind = 'nav_link'
+                        row_edit_id = link.id %]
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'IT_links'
+                    add_link_submenu = 'it_services'
+                    add_link_menu = 'IT' %]
             </div>
         </div>
+        [% ELSE %]
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-admin-links"></i>IT Services</span>
+            <div class="submenu">
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'IT_links'
+                    add_link_submenu = 'it_services'
+                    add_link_menu = 'IT' %]
+            </div>
+        </div>
+        [% END %]
         [% END %]
 
         <!-- IT Pages (Dynamic & Legacy Support) -->
@@ -53,26 +74,32 @@
             <div class="submenu">
                 <!-- Dynamic Page-based links for IT menu -->
                 [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'it' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
-                    <a href="/page/[% link.page_code %]" target="_self" title="[% link.title | html %]" class="submenu-link">
-                        <i class="fas fa-file-alt"></i> [% link.title | html %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/admin/pages?action=edit&amp;id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
+                    [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                        row_href = '/page/' _ link.page_code
+                        row_label = link.title
+                        row_icon = 'fas fa-file-alt'
+                        row_edit_kind = 'cms_page'
+                        row_edit_id = link.id %]
                 [% END %]
                 
                 <!-- Legacy Page-based links for IT menu -->
                 [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'it' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
                     [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
                     [% IF is_migrated == 0 %]
-                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% legacy_link.page_code %]" target="[% legacy_link.target %]" title="[% legacy_link.view_name %]" class="submenu-link">
-                            <i class="fas fa-file-alt"></i> [% legacy_link.view_name %]
-                        </a>
-                        [% IF c.session.roles.grep('admin').size %]
-                            <a href="/pages/edit?page_id=[% legacy_link.id %]" class="edit-link">Edit</a>
-                        [% END %]
+                        [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                            row_href = '/cgi-bin/index.cgi?site=' _ SiteName _ '&' _ session_string _ '&page=' _ legacy_link.page_code
+                            row_label = legacy_link.view_name
+                            row_target = legacy_link.target
+                            row_icon = 'fas fa-file-alt'
+                            row_edit_kind = 'legacy_page'
+                            row_edit_id = legacy_link.id %]
                     [% END %]
                 [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'IT_links'
+                    add_link_submenu = 'it_pages'
+                    add_link_menu = 'IT'
+                    add_link_label = 'Add IT Page Link' %]
             </div>
         </div>
         
@@ -92,13 +119,19 @@
                 <div class="submenu">
                     [% FOREACH link IN c.stash.private_links %]
                         [% IF link.category == 'IT_links' || link.menu == 'IT' %]
-                            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
-                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                                [% link.name %]
-                            </a>
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+                            [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                                row_href = link.url
+                                row_label = link.name
+                                row_target = link.target || '_self'
+                                row_icon = link.icon
+                                row_extra_class = 'nav-link-private'
+                                row_edit_href = '/navigation/edit_link?id=' _ link.id %]
                         [% END %]
                     [% END %]
+                    [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                        add_link_category = 'IT_links'
+                        add_link_submenu = 'top'
+                        add_link_menu = 'IT' %]
                 </div>
             </div>
             [% END %]

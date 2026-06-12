@@ -85,6 +85,19 @@
               </td>
             </tr>
             <tr>
+              <th style="text-align:left;padding:0.5rem;">Public Hosted list</th>
+              <td style="padding:0.5rem;">
+                <label style="display:flex;gap:0.5rem;align-items:flex-start;cursor:pointer;">
+                  <input type="checkbox" name="list_publicly" value="1"
+                    [% IF !acct.list_publicly.defined || acct.list_publicly %]checked[% END %]>
+                  <span>
+                    Show in public <strong>Sites We Host</strong> (Hosted menu and <code>/hosted</code>)
+                    <br><small style="color:#888;">Uncheck for internal or member-only sites (e.g. MCoop) that should not appear in the public CSC catalogue.</small>
+                  </span>
+                </label>
+              </td>
+            </tr>
+            <tr>
               <th style="text-align:left;vertical-align:top;padding:0.5rem;">Notes</th>
               <td style="padding:0.5rem;">
                 <textarea name="notes" rows="4" class="form-control"

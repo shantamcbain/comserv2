@@ -42,6 +42,12 @@ __PACKAGE__->add_columns(
         data_type => 'text',
         is_nullable => 1,
     },
+    'submenu' => {
+        data_type => 'varchar',
+        size => 50,
+        is_nullable => 1,
+        default_value => '',
+    },
     'link_order' => {
         data_type => 'integer',
         is_nullable => 1,
@@ -50,6 +56,11 @@ __PACKAGE__->add_columns(
     'status' => {
         data_type => 'integer',
         is_nullable => 1,
+        default_value => 1,
+    },
+    'public_visible' => {
+        data_type => 'tinyint',
+        is_nullable => 0,
         default_value => 1,
     },
     'created_at' => {
@@ -106,6 +117,12 @@ sub columns_info {
         'description' => {
             data_type => 'text',
             is_nullable => 1,
+        },
+        'submenu' => {
+            data_type => 'varchar',
+            size => 50,
+            is_nullable => 1,
+            default_value => '',
         },
         'link_order' => {
             data_type => 'integer',

@@ -345,6 +345,122 @@
     border-color: #555;
 }
 
+/* ── Hosting accounts admin table ───────────────────────────────────── */
+
+.hosting-accounts-page {
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.hosting-admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.hosting-accounts-table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hosting-accounts-table {
+    width: 100%;
+    min-width: 720px;
+    table-layout: fixed;
+}
+
+.hosting-accounts-table .col-sitename { width: 7%; }
+.hosting-accounts-table .col-plan     { width: 12%; word-break: break-word; }
+.hosting-accounts-table .col-domain   { width: 12%; word-break: break-word; }
+.hosting-accounts-table .col-email    { width: 14%; word-break: break-all; }
+.hosting-accounts-table .col-monthly  { width: 7%; white-space: nowrap; }
+.hosting-accounts-table .col-status   { width: 7%; }
+.hosting-accounts-table .col-public   { width: 10%; }
+.hosting-accounts-table .col-submitted { width: 11%; font-size: 0.82em; word-break: break-word; }
+
+.hosting-accounts-table .action-cell {
+    white-space: normal;
+    width: 20%;
+    vertical-align: top;
+}
+
+.public-list-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.hosting-action-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.hosting-action-group .inline-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+}
+
+.hosting-action-group .approve-form {
+    flex-wrap: wrap;
+}
+
+.approve-cost-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.approve-cost-input {
+    width: 4.5rem;
+    padding: 0.15rem 0.3rem;
+    font-size: 0.8rem;
+}
+
+.hosting-notes-icon {
+    font-size: 0.75rem;
+    color: var(--text-muted-color, #666);
+    cursor: help;
+    text-decoration: underline dotted;
+}
+
+.badge-success    { background: #28a745; color: #fff; }
+.badge-warning    { background: #ffc107; color: #333; }
+.badge-danger     { background: #dc3545; color: #fff; }
+.badge-secondary  { background: #6c757d; color: #fff; }
+
+.btn-outline-secondary {
+    background: transparent;
+    border: 1px solid var(--border-color, #aaa);
+    color: var(--text-color, #333);
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: #fff;
+    border-color: #c82333;
+}
+
+.btn-info {
+    background: #17a2b8;
+    color: #fff;
+    border-color: #138496;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #333;
+    border-color: #e0a800;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────── */
 
 @media (max-width: 680px) {
@@ -358,5 +474,19 @@
     .data-table td {
         font-size: 0.8rem;
         padding: 0.35rem 0.4rem;
+    }
+
+    .hosting-accounts-table {
+        min-width: 640px;
+    }
+
+    .hosting-action-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .hosting-action-group .btn,
+    .hosting-action-group .inline-form {
+        width: 100%;
     }
 }

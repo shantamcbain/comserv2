@@ -1,0 +1,59 @@
+[%# Shared menu / site scope fields for add_link and edit_link.
+    Expects: permissions, form (category, sitename, link_type, cross_site) %]
+[% SET labels = permissions.category_labels || {} %]
+
+[% IF permissions.can_create_public %]
+<div class="form-group">
+    <label for="link_type">Link Type:</label>
+    <select id="link_type" name="link_type" class="form-control" onchange="updateLinkScopeFields()">
+        <option value="private" [% IF form.link_type == 'private' || !form.link_type %]selected[% END %]>Private (only you see it in the menu)</option>
+        <option value="public" [% IF form.link_type == 'public' %]selected[% END %]>Public (all users on this site scope)</option>
+    </select>
+    <small class="form-text text-muted">Private links appear in the menu you choose below. Choose <strong>Login menu (My Links)</strong> to show the link only in your username dropdown.</small>
+</div>
+[% ELSE %]
+<input type="hidden" id="link_type" name="link_type" value="private">
+[% END %]
+
+<div class="form-group">
+    <label for="category">Appear in Menu:</label>
+    <select id="category" name="category" class="form-control" required>
+        [% FOREACH cat IN permissions.available_categories %]
+            [% NEXT IF cat == 'Private_links' && form.link_type != 'private' %]
+            [% SET cat_label = labels.item(cat) || cat.replace('_', ' ') %]
+            [% SET is_legacy_cat = cat.match('legacy') || cat == 'IT_links' || cat == 'Global_links' || cat == 'COOP_links' %]
+            <option value="[% cat %]"
+                    [% IF form.category == cat %]selected[% END %]
+                    [% IF cat == 'Admin_links' %]data-admin-only="1"[% END %]
+                    [% IF cat == 'Private_links' %]data-private-only="1"[% END %]
+                    [% IF is_legacy_cat %]data-legacy-cat="1"[% END %]>
+                [% cat_label %]
+            </option>
+        [% END %]
+    </select>
+    <small class="form-text text-muted">Matches the top navigation dropdowns. Use <strong>Login menu (My Links)</strong> for links in your username dropdown only.</small>
+</div>
+
+<div class="form-group">
+    <label>Site Scope:</label>
+    <div class="site-scope-row">
+        <select id="sitename" name="sitename" class="form-control" [% IF form.cross_site %]disabled[% END %]>
+            [% FOREACH site IN permissions.available_sites %]
+                <option value="[% site %]" [% IF form.sitename == site || (!form.cross_site && !form.sitename && loop.first) %]selected[% END %]>
+                    [% site %] only
+                </option>
+            [% END %]
+        </select>
+        <label class="cross-site-toggle" for="cross_site">
+            <input type="checkbox" id="cross_site" name="cross_site" value="1"
+                   [% IF form.cross_site || form.sitename == 'All' %]checked[% END %]
+                   onchange="updateLinkScopeFields()">
+            All sites (global — like a page shared with every site)
+        </label>
+    </div>
+    [% IF permissions.is_csc %]
+    <small class="form-text text-muted">CSC: pick any site, or check <strong>All sites</strong> for global visibility (same as page <code>sitename=All</code> / <code>share_with=all</code>).</small>
+    [% ELSE %]
+    <small class="form-text text-muted">Your site only, or all sites if you need the link on every hosted site.</small>
+    [% END %]
+</div>

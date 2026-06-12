@@ -400,7 +400,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
         [%# Global discontinued — Mail/Jobs/Join moved to Main %]
         [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
-        [% IF c.session.SiteName == 'CSC' %][% INCLUDE 'Navigation/TopDropListHosted.tt' %][% END %]
+        [% IF c.stash.show_hosted_nav %][% INCLUDE 'Navigation/TopDropListHosted.tt' %][% END %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
         [% INCLUDE 'Navigation/TopDropListWeather.tt' %]

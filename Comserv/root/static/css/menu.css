@@ -1,8 +1,7 @@
-
-}
+/* Legacy menu.css — prefer menu-theme.css; kept for site records that still reference this file */
 /* Main Menu */
 nav {
-    background-color: #ccffff;
+    background-color: var(--nav-bg, var(--primary-color, #ccffff));
 }
 
 .horizontal-menu {
@@ -19,7 +18,7 @@ nav {
 
 .dropbtn {
     display: inline-block;
-    color: black;
+    color: var(--nav-text, var(--text-color));
     text-align: center;
     padding: 14px 16px;
     text-decoration: none;

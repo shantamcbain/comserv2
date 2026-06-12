@@ -21,6 +21,10 @@
             <div class="submenu">
                 <a href="/3d/browse" class="submenu-link"><i class="icon-database"></i>Browse Catalog</a>
                 <a href="/3d/search_deeper" class="submenu-link"><i class="icon-ai"></i>AI / Web Search</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = '3d_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = '3d' %]
             </div>
         </div>
         [% END %]
@@ -36,6 +40,10 @@
                 <a href="/Inventory/items?category=3d_filament" class="submenu-link"><i class="icon-resources"></i>Filament Stock</a>
                 <a href="/Inventory/items?category=3d_supply" class="submenu-link"><i class="icon-tools"></i>Supplies</a>
                 <a href="/Inventory/items?category=3d_printed_item" class="submenu-link"><i class="icon-shop"></i>Items for Sale</a>
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = '3d_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = '3d' %]
             </div>
         </div>
         [% END %]

@@ -20,8 +20,8 @@
         [%# Global Menu discontinued — Mail/Jobs/Join moved to Main %]
         [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
         
-        <!-- Hosted Menu (CSC only — hosting is managed by CSC) -->
-        [% IF c.session.SiteName == 'CSC' %]
+        <!-- Hosted Menu (CSC hub + active hosted / referring sites) -->
+        [% IF c.stash.show_hosted_nav %]
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         [% END %]
         

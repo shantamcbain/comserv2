@@ -32,6 +32,10 @@
         <a href="[% c.uri_for('/brew/ingredients') %]" class="menu-item"><i class="fas fa-wheat-awn"></i>Ingredients</a>
         <a href="[% c.uri_for('/brew/calendar') %]" class="menu-item"><i class="fas fa-calendar-alt"></i>Calendar</a>
         <a href="[% c.uri_for('/brew/brewlog') %]" class="menu-item"><i class="fas fa-thermometer-half"></i>Brew log</a>
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/add_link?menu=Brew&amp;category=Brew_links" class="menu-item"><i class="icon-add"></i>Add Brew Link</a>
+        [% END %]
         <div class="dropdown-divider"></div>
         <a href="[% c.uri_for('/helpdesk') %]" class="menu-item"><i class="icon-help"></i>HelpDesk</a>
         [% IF c.stash.is_admin %]
@@ -50,7 +54,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #8d6e63;
+    color: var(--text-muted, var(--nav-link-color, inherit));
     cursor: default;
 }
 </style>

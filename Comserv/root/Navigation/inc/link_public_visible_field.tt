@@ -1,0 +1,14 @@
+[%# Guest visibility toggle for public links (admin only).
+    Expects: permissions, form with public_visible and link_type %]
+[% IF permissions.can_create_public && (form.link_type == 'public' || !form.link_type) %]
+<div class="form-group" id="row_public_visible">
+    <label class="cross-site-toggle" for="public_visible">
+        <input type="checkbox" id="public_visible" name="public_visible" value="1"
+               [% IF !form.public_visible.defined || form.public_visible == 1 %]checked[% END %]>
+        Visible to public (guests)
+    </label>
+    <small class="form-text text-muted">
+        Uncheck to hide this link from anonymous visitors. Logged-in members and admins will still see it in the menu.
+    </small>
+</div>
+[% END %]

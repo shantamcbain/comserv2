@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListWeather.tt,v 0.02 2026/04/22 theme-compliance: removed font tags, modernised admin checks' %]
+[% PageVersion = 'Navigation/TopDropListWeather.tt,v 0.03 2026/06/12 submenu + row_edit_kind migration' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -11,18 +11,18 @@
          <li class="horizontal-dropdown">
                 <a href="/Weather" class="dropbtn"><i class="icon-weather"></i>Weather</a>
                 <div class="dropdown-content">
-                    <a href="/Weather" onclick="activateSite('Weather Dashboard')"><i class="icon-dashboard"></i>Dashboard</a>
-                    <a href="/Weather/current" onclick="activateSite('Current Weather')"><i class="icon-thermometer"></i>Current Weather</a>
-                    <a href="/Weather/forecast" onclick="activateSite('Weather Forecast')"><i class="icon-forecast"></i>5-Day Forecast</a>
-                    <a href="/Weather/configuration" onclick="activateSite('Weather Configuration')"><i class="icon-config"></i>Configuration</a>
+                    <a href="/Weather" class="menu-item" onclick="activateSite('Weather Dashboard')"><i class="icon-dashboard"></i>Dashboard</a>
+                    <a href="/Weather/current" class="menu-item" onclick="activateSite('Current Weather')"><i class="icon-thermometer"></i>Current Weather</a>
+                    <a href="/Weather/forecast" class="menu-item" onclick="activateSite('Weather Forecast')"><i class="icon-forecast"></i>5-Day Forecast</a>
+                    <a href="/Weather/configuration" class="menu-item" onclick="activateSite('Weather Configuration')"><i class="icon-config"></i>Configuration</a>
                     
                     <!-- Weather Tools Submenu -->
                     <div class="submenu-item">
                         <span class="submenu-header"><i class="icon-tools"></i>Weather Tools</span>
                         <div class="submenu">
-                            <a href="/Weather/alerts" onclick="activateSite('Weather Alerts')">Weather Alerts</a>
-                            <a href="/Weather/history" onclick="activateSite('Weather History')">Historical Data</a>
-                            <a href="/Weather/export" onclick="activateSite('Weather Export')">Export Data</a>
+                            <a href="/Weather/alerts" class="submenu-link" onclick="activateSite('Weather Alerts')">Weather Alerts</a>
+                            <a href="/Weather/history" class="submenu-link" onclick="activateSite('Weather History')">Historical Data</a>
+                            <a href="/Weather/export" class="submenu-link" onclick="activateSite('Weather Export')">Export Data</a>
                         </div>
                     </div>
                     
@@ -31,46 +31,62 @@
                     <div class="submenu-item">
                         <span class="submenu-header"><i class="icon-admin"></i>Admin</span>
                         <div class="submenu">
-                            <a href="/Weather/admin" onclick="activateSite('Weather Admin')">Weather Admin</a>
-                            <a href="/Weather/api_settings" onclick="activateSite('API Settings')">API Settings</a>
-                            <a href="/Weather/maintenance" onclick="activateSite('Weather Maintenance')">Maintenance</a>
+                            <a href="/Weather/admin" class="submenu-link" onclick="activateSite('Weather Admin')">Weather Admin</a>
+                            <a href="/Weather/api_settings" class="submenu-link" onclick="activateSite('API Settings')">API Settings</a>
+                            <a href="/Weather/maintenance" class="submenu-link" onclick="activateSite('Weather Maintenance')">Maintenance</a>
                         </div>
                     </div>
                     [% END %]
 
-                    <!-- populate from Page_tb for weather pages -->
-                    [% IF weather_pages.defined %]
-                        [% FOREACH link IN weather_pages %]
-                            <a href="&amp;page=[% link.page_code %]" name="Weather" target="[% link.target %]"
-                               title="[% link.view_name %]" class="menu-item">[% link.view_name %]</a>
-                            [% IF c.session.roles && c.session.roles.grep('admin').size %]
-                               <a href="/edit_link?link_id=[% link.record_id %]" class="edit-link">Edit/Delete</a>
+                    <!-- DB links, CMS pages, and legacy pages -->
+                    [% SET weather_db_links = (c.stash.nav_merged_links && c.stash.nav_merged_links.item('Weather_links')) || c.stash.weather_links || [] %]
+                    <div class="dropdown-divider"></div>
+                    <div class="submenu-item">
+                        <span class="submenu-header"><i class="icon-links"></i>Weather Links</span>
+                        <div class="submenu">
+                            [% IF weather_db_links.size %]
+                                [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+                                    db_links = weather_db_links
+                                    add_link_menu = 'Weather'
+                                    add_link_category = 'Weather_links'
+                                    add_link_submenu = 'top'
+                                    skip_add_link = 1 %]
                             [% END %]
-                        [% END %]
-                    [% END %]
 
-                    <!-- populate from links_tb for weather links -->
-                    [% IF weather_links.defined %]
-                        [% FOREACH link IN weather_links %]
-                            <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Weather" target="[% link.target %]" title="[% link.name %]" class="menu-item">[% link.name %]</a>
-                            [% IF c.session.roles && c.session.roles.grep('admin').size %]
-                               <a href="/edit_link/[% link.record_id %]" class="edit-link">Edit/Delete</a>
+                            <!-- CMS pages assigned to the Weather menu -->
+                            [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'weather' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                                [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                                    row_href = '/page/' _ link.page_code
+                                    row_label = link.title
+                                    row_icon = 'fas fa-file-alt'
+                                    row_edit_kind = 'cms_page'
+                                    row_edit_id = link.id %]
                             [% END %]
-                        [% END %]
-                    [% END %]
 
-                    <!-- Weather module specific links -->
-                    [% IF c.session.weather_links.defined AND c.session.weather_links.size %]
-                        [% FOREACH link IN c.session.weather_links %]
-                            <a href="[% link.url %]" class="menu-item">[% link.name %]</a>
-                            [% IF c.session.roles && c.session.roles.grep('admin').size %]
-                                <a href="/edit_link?link_id=[% link.id %]" class="edit-link">Edit/Delete</a>
+                            <!-- Legacy page_tb rows for Weather menu -->
+                            [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'weather' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                                [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
+                                [% IF is_migrated == 0 %]
+                                    [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                                        row_href = '/cgi-bin/index.cgi?site=' _ SiteName _ '&' _ session_string _ '&page=' _ legacy_link.page_code
+                                        row_label = legacy_link.view_name
+                                        row_target = legacy_link.target
+                                        row_icon = 'fas fa-file-alt'
+                                        row_edit_kind = 'legacy_page'
+                                        row_edit_id = legacy_link.id %]
+                                [% END %]
                             [% END %]
-                        [% END %]
-                    [% END %]
+
+                            [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                                add_link_category = 'Weather_links'
+                                add_link_submenu = 'top'
+                                add_link_menu = 'Weather' %]
+                        </div>
+                    </div>
 
                     [% IF c.session.roles && c.session.roles.grep('admin').size %]
-                        <a href="/navigation/add_link?menu=weather" class="menu-item"><i class="icon-plus"></i> Add Menu Link</a>
+                        <div class="dropdown-divider"></div>
+                        <a href="/navigation/manage_links?menu=Weather" class="menu-item"><i class="icon-manage"></i>Manage Weather Menu</a>
                     [% END %]
                 </div>
         </li>

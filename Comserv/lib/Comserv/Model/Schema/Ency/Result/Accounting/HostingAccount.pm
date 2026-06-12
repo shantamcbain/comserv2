@@ -47,6 +47,12 @@ __PACKAGE__->add_columns(
         default_value => 'pending',
         documentation => 'pending | active | suspended | cancelled',
     },
+    list_publicly => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 1,
+        documentation => '1 = show in public Hosted catalogue; 0 = members/admins only',
+    },
     referring_sitename => {
         data_type   => 'varchar',
         size        => 100,
@@ -119,5 +125,15 @@ __PACKAGE__->add_unique_constraint(['sitename']);
 
 sub is_active   { return ($_[0]->status // '') eq 'active'  }
 sub is_pending  { return ($_[0]->status // '') eq 'pending' }
+
+sub resolved_hostname {
+    require Comserv::Util::HostingAccount;
+    return Comserv::Util::HostingAccount::resolve_hostname( $_[0] );
+}
+
+sub public_url {
+    require Comserv::Util::HostingAccount;
+    return Comserv::Util::HostingAccount::public_url( $_[0] );
+}
 
 1;

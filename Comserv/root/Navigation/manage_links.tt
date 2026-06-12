@@ -49,10 +49,12 @@
                     <tr>
                         <th>Type</th>
                         <th>Category</th>
+                        <th>Submenu</th>
                         <th>Name</th>
                         <th>URL</th>
                         <th>Site</th>
                         <th>Target</th>
+                        <th>Guests</th>
                         <th>Order</th>
                         <th>Actions</th>
                     </tr>
@@ -66,11 +68,12 @@
                                 </span>
                             </td>
                             <td>
-                                [% IF link.category == 'Private_links' %]
-                                    Private Links
-                                [% ELSE %]
-                                    [% link.category.replace('_', ' ') | ucfirst %]
-                                [% END %]
+                                [% SET cat_label = permissions.category_labels.item(link.category) || link.category.replace('_', ' ') %]
+                                [% cat_label %]
+                            </td>
+                            <td>
+                                [% SET sub_label = permissions.submenu_labels.item(link.submenu) || link.submenu || '—' %]
+                                [% sub_label %]
                             </td>
                             <td>[% link.name | html %]</td>
                             <td>
@@ -84,6 +87,19 @@
                             </td>
                             <td>[% link.sitename %]</td>
                             <td>[% link.target || '_self' %]</td>
+                            <td>
+                                [% IF link.link_type == 'public' %]
+                                    [% IF link.public_visible == 0 %]
+                                        <span class="badge badge-secondary" title="Hidden from anonymous guests">Members only</span>
+                                        <a href="/navigation/toggle_link_visibility?id=[% link.id %]" class="btn btn-sm btn-outline-secondary">Show guests</a>
+                                    [% ELSE %]
+                                        <span class="badge badge-success" title="Visible to everyone">Public</span>
+                                        <a href="/navigation/toggle_link_visibility?id=[% link.id %]" class="btn btn-sm btn-outline-secondary">Hide guests</a>
+                                    [% END %]
+                                [% ELSE %]
+                                    <span class="badge badge-secondary">Private</span>
+                                [% END %]
+                            </td>
                             <td>[% link.link_order %]</td>
                             <td class="actions">
                                 [% IF link.manageable %]
@@ -106,6 +122,11 @@
         </div>
         
         <div class="summary-info">
+            <p class="form-text text-muted" style="margin-bottom:0.75rem;">
+                All of your private links are listed here (every site scope).
+                A link only appears in the top nav when you are on that site or when scope is <strong>All</strong>.
+                Duplicate rows (same name, URL, menu, and site) are collapsed to one entry.
+            </p>
             <p>
                 Showing [% user_links.size %] link[% IF user_links.size != 1 %]s[% END %]
                 [% private_count = 0; public_count = 0 %]
