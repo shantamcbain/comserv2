@@ -11912,6 +11912,11 @@ DEDICATED WORKSPACE:
 - Shanta admin opens /ai/editing_widget for a Cursor-like UI: file tree, editor, and this chat side-by-side.
 - When a file is open in that editor, the user message will include a [FILE: path] block automatically.
 
+KNOWN ROUTE → TEMPLATE (use exact paths; never guess):
+- /planning/daily → root/admin/planning/DailyPlan.tt (Planning.pm daily())
+- root/DailyPlan.tt does NOT exist — never use [READ_FILE: root/DailyPlan.tt]
+- Legacy copies: root/Documentation/DailyPlan.tt, root/admin/documentation/DailyPlan.tt
+
 RESTRICTION: This agent is DEVELOPMENT ONLY. Never available on production.
 END_PROMPT
 }
@@ -12536,6 +12541,12 @@ sub resolve_route :Local :Args(0) {
     }
 
     my $path = _normalize_editor_route($c->request->params->{path} // '');
+    my $q    = $c->request->params->{q} // '';
+    if (!$path && $q =~ /\S/) {
+        if ($q =~ /\b(?:daily\s*plan(?:ning)?|dailyplan|planning)\b/i) {
+            $path = '/planning/daily';
+        }
+    }
     unless ($path) {
         $c->response->body(encode_json({ success => JSON::false, error => 'path parameter required (e.g. /planning/daily)' }));
         return;
