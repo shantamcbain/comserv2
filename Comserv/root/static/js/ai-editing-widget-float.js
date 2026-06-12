@@ -976,7 +976,8 @@
     }
 
     function extractFileFindQuery(text) {
-        var m = String(text || '').match(/^(?:find|locate|search(?:\s+for)?|where\s+is|open|show)\s+(.+)$/i);
+        var t = String(text || '').trim();
+        var m = t.match(/^(?:please\s+|can you\s+)?(?:find|locate|search(?:\s+for)?|where\s+is|open|show)\s+(?:the\s+)?(.+)$/i);
         return m ? m[1].trim() : '';
     }
 
@@ -1001,9 +1002,15 @@
 
     function formatFileFindReply(query, files, fuzzy) {
         if (!files || !files.length) {
-            return 'No files matching "' + query + '" in the project index.\n'
-                + 'Try the **Search files** box above the tree.\n'
-                + 'Common typo: DailyPlan.tt (not DailPlan.tt)';
+            var none = 'No files matching "' + query + '" in the project index.';
+            if (/dailyplan/i.test(query)) {
+                none += '\n\nPlanning does NOT use root/DailyPlan.tt.'
+                    + '\nTry route lookup: the live template is root/admin/planning/DailyPlan.tt'
+                    + '\n(route /planning/daily, controller Planning.pm → daily()).';
+            } else {
+                none += '\nTry the Search files box above the tree.';
+            }
+            return none;
         }
         var lines = [];
         if (fuzzy) {
@@ -1012,15 +1019,29 @@
             lines.push('Found ' + files.length + ' match(es) for "' + query + '":', '');
         }
         files.forEach(function(path, i) {
-            lines.push((i + 1) + '. ' + path);
+            var tag = (path === 'root/admin/planning/DailyPlan.tt') ? ' ← live /planning/daily' : '';
+            lines.push((i + 1) + '. ' + path + tag);
         });
-        lines.push('', 'Say: open ' + files[0].split('/').pop() + ' — or use the Search files box.');
+        if (/dailyplan/i.test(query)) {
+            lines.push('', 'Live route: /planning/daily → root/admin/planning/DailyPlan.tt');
+            lines.push('(root/DailyPlan.tt does not exist — do not use that path.)');
+        }
+        lines.push('', 'Say: open ' + files[0].split('/').pop() + ' — or click Load in the tree.');
         return lines.join('\n');
     }
 
     function extractRouteFromQuestion(text) {
         var t = String(text || '');
         if (/\/plan[n]?ing\/daily\b/i.test(t) || /\bplan[n]?ing\/daily\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        if (/\b(?:open|show|load|edit|find|view)\s+(?:the\s+)?(?:daily\s*plan(?:ning)?(?:\s+page)?|planning(?:\s+(?:page|daily|module|feature))?)\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        if (/\b(?:what|which)\b.*\b(?:\.tt|template|file)\b.*\b(?:planning|daily\s*plan)\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        if (/\bDailyPlan\.tt\b/i.test(t) && /\b(?:open|planning|route|what|which|file|template|find)\b/i.test(t)) {
             return '/planning/daily';
         }
         var m = t.match(/(\/[a-z][a-z0-9_\/-]{2,})/i);
@@ -1030,7 +1051,8 @@
         return '';
     }
 
-    function formatRouteReply(data) {
+    function formatRouteReply(data, opts) {
+        opts = opts || {};
         if (!data.success) {
             if (data.guessed_templates && data.guessed_templates.length) {
                 return 'Route ' + data.route + ' — no exact mapping. Guessed templates:\n'
@@ -1038,36 +1060,48 @@
             }
             return 'Could not map route ' + (data.route || '') + ' to a template.';
         }
-        var lines = [
-            'Route: ' + data.route,
-            'Template: ' + data.template,
-            'Controller: ' + (data.controller || '—'),
-        ];
+        var lines = [];
+        if (opts.reason === 'no_index_match') {
+            lines.push('File search found no index match — looked up controller route instead:', '');
+        }
+        lines.push('Route: ' + data.route);
+        lines.push('Template: ' + data.template);
+        lines.push('Controller: ' + (data.controller || '—'));
         if (data.note) lines.push('Note: ' + data.note);
         if (data.related && data.related.length) {
-            lines.push('', 'Related copies:');
+            lines.push('', 'Related copies (not the live route):');
             data.related.forEach(function(p, i) { lines.push('  ' + (i + 1) + '. ' + p); });
         }
-        lines.push('', 'Say: open ' + data.template.split('/').pop());
+        if (data.route === '/planning/daily') {
+            lines.push('', 'root/DailyPlan.tt does NOT exist. Use the template path above.');
+        }
+        if (opts.autoOpen && data.template) {
+            lines.push('', 'Opening ' + data.template + '…');
+        } else {
+            lines.push('', 'Say: open ' + data.template.split('/').pop());
+        }
         return lines.join('\n');
     }
 
-    function tryLocalRouteLookup(userText) {
-        var route = extractRouteFromQuestion(userText);
-        if (!route) return null;
+    function resolveRouteAndReply(route, opts) {
+        opts = opts || {};
         setStatus('Resolving route ' + route + '…');
         return fetchJson('/ai/resolve_route?path=' + encodeURIComponent(route))
             .then(function(data) {
-                var reply = formatRouteReply(data);
+                var reply = formatRouteReply(data, opts);
                 addMsg(reply, 'ai');
                 state.chatHistory.push({ role: 'assistant', content: reply });
                 updateHistoryDropdown();
-                setStatus('Route resolved locally', 'ok');
+                setStatus(data.success ? 'Route resolved locally' : 'Route lookup incomplete',
+                    data.success ? 'ok' : 'err');
                 if (data.template) {
                     var searchInput = q('#aew-tree-search');
                     if (searchInput) {
                         searchInput.value = data.template.split('/').pop();
                         filterTree();
+                    }
+                    if (opts.autoOpen) {
+                        loadFile(data.template);
                     }
                 }
                 return true;
@@ -1077,6 +1111,13 @@
                 setStatus(String(err), 'err');
                 return true;
             });
+    }
+
+    function tryLocalRouteLookup(userText) {
+        var route = extractRouteFromQuestion(userText);
+        if (!route) return null;
+        var autoOpen = /\b(?:open|load|show|edit)\b/i.test(userText);
+        return resolveRouteAndReply(route, { autoOpen: autoOpen, userText: userText });
     }
 
     function tryLocalFileFind(userText) {
@@ -1105,7 +1146,17 @@
                 setStatus(data.error || 'search failed', 'err');
                 return true;
             }
-            renderResults(data.files || [], data.fuzzy);
+            var files = data.files || [];
+            if (!files.length && /dailyplan/i.test(query)) {
+                return resolveRouteAndReply('/planning/daily', {
+                    reason: 'no_index_match',
+                    autoOpen: /\b(?:open|load|show)\b/i.test(userText),
+                });
+            }
+            renderResults(files, data.fuzzy);
+            if (files.length === 1 && /\b(?:open|load|show)\b/i.test(userText)) {
+                loadFile(files[0]);
+            }
             return true;
         }).catch(function(err) {
             addMsg('File search error: ' + err + '\nUse the Search files box above the tree.', 'system');
@@ -1317,7 +1368,18 @@
         setStatus('Loading…');
         fetchJson('/ai/read_file?path=' + encodeURIComponent(path) + '&limit=800')
             .then(function(data) {
-                if (!data.success) { setStatus(data.error, 'err'); return; }
+                if (!data.success) {
+                    var errMsg = 'File not found: ' + path;
+                    if (data.error) errMsg += ' — ' + data.error;
+                    setStatus(errMsg, 'err');
+                    addMsg(errMsg, 'system');
+                    if (/dailyplan/i.test(path) || path === 'root/DailyPlan.tt') {
+                        addMsg('Planning uses root/admin/planning/DailyPlan.tt (route /planning/daily). '
+                            + 'Resolving from controller…', 'system');
+                        resolveRouteAndReply('/planning/daily', { autoOpen: true });
+                    }
+                    return;
+                }
                 state.currentPath = data.path;
                 state.currentContent = data.content;
                 state.dirty = false;
@@ -1330,6 +1392,29 @@
                         scrollToLine(lineNum);
                     }, 50);
                 }
+            })
+            .catch(function(err) {
+                var errMsg = 'Failed to load ' + path + ': ' + err;
+                setStatus(errMsg, 'err');
+                addMsg(errMsg, 'system');
+            });
+    }
+
+    function verifyAndLoadFile(path) {
+        fetchJson('/ai/read_file?path=' + encodeURIComponent(path) + '&limit=50')
+            .then(function(data) {
+                if (data.success) {
+                    loadFile(path);
+                    return;
+                }
+                addMsg('AI suggested a file that does not exist: ' + path, 'system');
+                if (/dailyplan/i.test(path) || path === 'root/DailyPlan.tt') {
+                    addMsg('Correct path: root/admin/planning/DailyPlan.tt via /planning/daily (Planning.pm).', 'system');
+                    resolveRouteAndReply('/planning/daily', { autoOpen: true });
+                }
+            })
+            .catch(function(err) {
+                addMsg('Could not verify file ' + path + ': ' + err, 'system');
             });
     }
 
@@ -1557,8 +1642,10 @@
     function classifyEditorQuery(msg) {
         var m = String(msg || '').trim();
         if (!m) return 'simple';
-        if (/^(find|search|locate|where is|what .tt|open |list |grep )/i.test(m)) return 'local';
+        if (/^(?:please\s+)?(?:find|search|locate|where is|what .tt|open |list |grep )/i.test(m)) return 'local';
         if (/^\/[a-z]/i.test(m) || /\b(route|template).*(for|return|serves?)\b/i.test(m)) return 'local';
+        if (/\b(?:open|show|load)\s+(?:the\s+)?(?:daily\s*plan|planning)\b/i.test(m)) return 'local';
+        if (/\bDailyPlan\.tt\b/i.test(m)) return 'local';
         var words = m.split(/\s+/);
         if (/\b(refactor|implement|fix bug|debug|write code|explain in detail|compare|analyze|architect)\b/i.test(m)) {
             return 'complex';
@@ -1732,7 +1819,7 @@
             }
             setStatus(backendLabel + ' done', 'ok');
             var rf = reply.match(/\[READ_FILE:\s*([^\]]+)\]/i);
-            if (rf) loadFile(rf[1].trim());
+            if (rf) verifyAndLoadFile(rf[1].trim());
 
             var fix = parseFixBlock(reply);
             if (fix) showFixPanel(fix);
