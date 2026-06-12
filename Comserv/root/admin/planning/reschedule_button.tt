@@ -1,0 +1,87 @@
+<!--
+    reschedule_button.tt - Reschedule focus+site selector widget.
+    Include from any planning template: INCLUDE 'admin/planning/reschedule_button.tt'
+
+    Reads ap_all_sitenames (array) from stash for the site dropdown.
+    Omit ap_all_sitenames or have only one site to hide the site selector.
+
+    To add a new focus type:
+      1. Add an <option> in the focus <select> below.
+      2. Add the key/label in the focusLabel map in the JS.
+      3. Add a matching branch in Todo.pm _do_reschedule focus-filter block.
+-->
+<span id="reschedule-widget" style="display:inline-flex;align-items:center;gap:0;border:1px solid #6f42c1;border-radius:4px;overflow:hidden;flex-shrink:0;">
+    [% IF ap_all_sitenames && ap_all_sitenames.size > 1 %]
+    <select id="reschedule-sites" multiple
+            size="[% ap_all_sitenames.size > 6 ? 6 : ap_all_sitenames.size %]"
+            style="padding:2px 4px;border:none;border-right:1px solid #6f42c1;background:transparent;font-size:0.75em;color:#6f42c1;cursor:pointer;outline:none;max-width:100px;min-width:70px;height:auto;"
+            title="Select site(s) to reschedule. Ctrl/Cmd+click for multiple. None selected = All sites.">
+        [% FOREACH sname IN ap_all_sitenames %]
+        <option value="[% sname %]">[% sname %]</option>
+        [% END %]
+    </select>
+    [% END %]
+    <select id="reschedule-focus"
+            style="padding:3px 4px;border:none;border-right:1px solid #6f42c1;background:transparent;font-size:0.78em;color:#6f42c1;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;max-width:88px;"
+            title="Focus: which category of todos to schedule">
+        <option value="all">All</option>
+        <option value="programming">Programming</option>
+        <option value="accounting">Data Entry</option>
+        <option value="errors">Errors Only</option>
+    </select>
+    <button onclick="rescheduleTodos(this)"
+            style="padding:3px 8px;border:none;background:transparent;font-size:0.78em;color:#6f42c1;cursor:pointer;white-space:nowrap;"
+            title="Re-schedule todos starting from NOW for selected site(s) and focus">&#9851; Reschedule</button>
+</span>
+
+<script>
+(function(){
+    if (window._rescheduleTodosLoaded) return;
+    window._rescheduleTodosLoaded = true;
+
+    window.rescheduleTodos = function(btn) {
+        var focusSel = document.getElementById('reschedule-focus');
+        var sitesSel = document.getElementById('reschedule-sites');
+        var focus = focusSel ? focusSel.value : 'all';
+        var sites = [];
+        if (sitesSel) {
+            var opts = sitesSel.options;
+            for (var i = 0; i < opts.length; i++) {
+                if (opts[i].selected && opts[i].value) sites.push(opts[i].value);
+            }
+        }
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = 'Rescheduling...';
+        fetch('/todo/reschedule', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({focus: focus, sites: sites})
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) {
+                var labels = {
+                    all: 'All', programming: 'Programming',
+                    accounting: 'Data Entry', errors: 'Errors Only'
+                };
+                var focusLabel = labels[d.focus] || d.focus || 'All';
+                var siteLabel  = (d.sites && d.sites.length) ? d.sites.join(', ') : 'All Sites';
+                var msg = 'Rescheduled ' + d.count + ' todo' + (d.count !== 1 ? 's' : '')
+                        + ' [' + siteLabel + ' / ' + focusLabel + ']'
+                        + ' from ' + (d.today || 'today') + ' forward.';
+                if (d.error_count) msg += '\n' + d.error_count + ' update(s) failed.';
+                msg += '\n\nReloading page...';
+                alert(msg);
+                location.reload();
+            } else {
+                btn.disabled = false;
+                btn.textContent = origText;
+                alert('Error: ' + (d.error || 'unknown'));
+            }
+        }).catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = origText;
+            alert('Error: ' + e);
+        });
+    };
+}());
+</script>

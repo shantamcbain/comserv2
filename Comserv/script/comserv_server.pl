@@ -269,10 +269,12 @@ sub _start_health_evaluator {
                 "Health evaluator daemon started (PID=$$)"
             );
 
-            my $eval_interval_sec  = $ENV{HEALTH_EVAL_INTERVAL}  // 300;  # 5 min
-            my $prune_interval_sec = $ENV{HEALTH_PRUNE_INTERVAL}  // 3600; # 1 hr
+            my $eval_interval_sec       = $ENV{HEALTH_EVAL_INTERVAL}   // 300;   # 5 min
+            my $prune_interval_sec      = $ENV{HEALTH_PRUNE_INTERVAL}  // 3600;  # 1 hr
+            my $link_audit_interval_sec = $ENV{LINK_AUDIT_INTERVAL}    // 86400; # 24 hr
             my $alert_threshold    = $ENV{HEALTH_ALERT_THRESHOLD} // 60;   # score < 60 = alert
-            my $last_prune = time();
+            my $last_prune        = time();
+            my $last_link_audit   = 0; # run shortly after startup
             my $last_alert_status = 'OK';
 
             while (1) {
@@ -327,6 +329,16 @@ sub _start_health_evaluator {
                             "Pruned $deleted old application_log records"
                         );
                         $last_prune = time();
+                    }
+
+                    # Daily link audit — check internal_links_tb entries that point
+                    # to /page/<page_code> and verify the page_code exists in the
+                    # page table.  Creates a single consolidated todo for broken links.
+                    if (time() - $last_link_audit >= $link_audit_interval_sec) {
+                        eval { _run_link_audit($schema, $logger) };
+                        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__,
+                            'link_audit', "Link audit error: $@") if $@;
+                        $last_link_audit = time();
                     }
                 };
                 if ($@) {
@@ -414,6 +426,115 @@ EMAIL
             '_send_health_alert',
             "Failed to send health alert email to $admin_email: $@"
         );
+    }
+}
+
+sub _run_link_audit {
+    my ($schema, $logger) = @_;
+
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
+        'link_audit', "Starting daily link audit");
+
+    my $today = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my @links = $schema->resultset('InternalLinksTb')->search(
+        { url => { -like => '/page/%' }, status => 1 },
+        { columns => [qw(id name url sitename category)] }
+    )->all;
+
+    my @broken;
+    for my $link (@links) {
+        my $url  = eval { $link->url } // '';
+        next unless $url =~ m{^/page/(.+)$};
+        my $page_code = $1;
+        my $sitename  = eval { $link->sitename } // 'CSC';
+
+        my $page = eval {
+            $schema->resultset('Page')->search(
+                { sitename => $sitename, page_code => $page_code },
+                { rows => 1 }
+            )->single
+        };
+        $page ||= eval {
+            $schema->resultset('Page')->search(
+                { page_code => $page_code,
+                  '-or' => [
+                      { sitename => 'CSC' },
+                      { share_with => 'all' },
+                  ] },
+                { rows => 1 }
+            )->single
+        };
+
+        unless ($page) {
+            push @broken, sprintf(
+                "  [%s] %s -> %s (category: %s, sitename: %s)",
+                eval { $link->id } // '?',
+                eval { $link->name } // '(unnamed)',
+                $url,
+                eval { $link->category } // '',
+                $sitename,
+            );
+        }
+    }
+
+    if (@broken) {
+        my $subject = sprintf('[Link Audit] %d broken /page/ link(s) (%s)', scalar(@broken), $today);
+        my $desc    = "=== Daily Link Audit - $today ===\n\n"
+            . "The following internal navigation links point to /page/<code> URLs\n"
+            . "where no matching page record exists:\n\n"
+            . join("\n", @broken)
+            . "\n\nFix or remove the broken links in Navigation / Internal Links admin.";
+
+        my $existing = eval {
+            $schema->resultset('Todo')->search(
+                { subject => { -like => '[Link Audit]%' },
+                  status  => { -not_in => [3] } },
+                { order_by => { -desc => 'record_id' }, rows => 1 }
+            )->first
+        };
+
+        if ($existing) {
+            eval {
+                $schema->resultset('Todo')->search({ record_id => $existing->record_id })->update({
+                    subject       => $subject,
+                    description   => $desc,
+                    last_mod_by   => 'link-audit',
+                    last_mod_date => $today,
+                });
+            };
+        } else {
+            eval {
+                $schema->resultset('Todo')->create({
+                    subject             => $subject,
+                    description         => $desc,
+                    status              => 1,
+                    priority            => 3,
+                    is_blocking         => 0,
+                    sitename            => 'CSC',
+                    developer           => 'link-audit',
+                    username_of_poster  => 'link-audit',
+                    user_id             => 1,
+                    last_mod_by         => 'link-audit',
+                    last_mod_date       => $today,
+                    date_time_posted    => $today . ' 00:00:00',
+                    start_date          => $today,
+                    due_date            => $today,
+                    parent_todo         => '',
+                    estimated_man_hours => 0,
+                    accumulative_time   => '00:00:00',
+                    group_of_poster     => 'admin',
+                    project_code        => 'PLANNING',
+                    share               => 0,
+                });
+            };
+        }
+
+        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__,
+            'link_audit', sprintf("Found %d broken /page/ links", scalar(@broken)));
+    } else {
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
+            'link_audit', "No broken /page/ links found");
     }
 }
 
