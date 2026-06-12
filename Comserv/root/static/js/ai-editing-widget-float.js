@@ -976,48 +976,122 @@
         return m ? m[1].trim() : '';
     }
 
-    function formatFileFindReply(query, files) {
+    function levenshtein(a, b) {
+        a = a || '';
+        b = b || '';
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        var row = [];
+        for (var j = 0; j <= b.length; j++) row[j] = j;
+        for (var i = 1; i <= a.length; i++) {
+            var prev = i;
+            for (var j = 1; j <= b.length; j++) {
+                var cur = row[j];
+                var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+                row[j] = Math.min(prev + 1, row[j - 1] + 1, row[j] + cost);
+                prev = cur;
+            }
+        }
+        return row[b.length];
+    }
+
+    function formatFileFindReply(query, files, fuzzy) {
         if (!files || !files.length) {
             return 'No files matching "' + query + '" in the project index.\n'
-                + 'Try the **Search files** box above the tree, or check spelling (e.g. DailyPlan.tt).';
+                + 'Try the **Search files** box above the tree.\n'
+                + 'Common typo: DailyPlan.tt (not DailPlan.tt)';
         }
-        var lines = ['Found ' + files.length + ' match(es) for "' + query + '":', ''];
+        var lines = [];
+        if (fuzzy) {
+            lines.push('No exact match for "' + query + '" — showing close matches:', '');
+        } else {
+            lines.push('Found ' + files.length + ' match(es) for "' + query + '":', '');
+        }
         files.forEach(function(path, i) {
             lines.push((i + 1) + '. ' + path);
         });
-        lines.push('', 'Click a path in the file tree search box, or say: open ' + files[0]);
+        lines.push('', 'Say: open ' + files[0].split('/').pop() + ' — or use the Search files box.');
         return lines.join('\n');
+    }
+
+    function extractRouteFromQuestion(text) {
+        var t = String(text || '');
+        if (/\/plan[n]?ing\/daily\b/i.test(t) || /\bplan[n]?ing\/daily\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        var m = t.match(/(\/[a-z][a-z0-9_\/-]{2,})/i);
+        if (m && /(?:\.tt|template|route|return|what|which|file|url|path)/i.test(t)) {
+            return m[1].replace(/\/+$/, '');
+        }
+        return '';
+    }
+
+    function formatRouteReply(data) {
+        if (!data.success) {
+            if (data.guessed_templates && data.guessed_templates.length) {
+                return 'Route ' + data.route + ' — no exact mapping. Guessed templates:\n'
+                    + data.guessed_templates.map(function(p, i) { return (i + 1) + '. ' + p; }).join('\n');
+            }
+            return 'Could not map route ' + (data.route || '') + ' to a template.';
+        }
+        var lines = [
+            'Route: ' + data.route,
+            'Template: ' + data.template,
+            'Controller: ' + (data.controller || '—'),
+        ];
+        if (data.note) lines.push('Note: ' + data.note);
+        if (data.related && data.related.length) {
+            lines.push('', 'Related copies:');
+            data.related.forEach(function(p, i) { lines.push('  ' + (i + 1) + '. ' + p); });
+        }
+        lines.push('', 'Say: open ' + data.template.split('/').pop());
+        return lines.join('\n');
+    }
+
+    function tryLocalRouteLookup(userText) {
+        var route = extractRouteFromQuestion(userText);
+        if (!route) return null;
+        setStatus('Resolving route ' + route + '…');
+        return fetchJson('/ai/resolve_route?path=' + encodeURIComponent(route))
+            .then(function(data) {
+                var reply = formatRouteReply(data);
+                addMsg(reply, 'ai');
+                state.chatHistory.push({ role: 'assistant', content: reply });
+                updateHistoryDropdown();
+                setStatus('Route resolved locally', 'ok');
+                if (data.template) {
+                    var searchInput = q('#aew-tree-search');
+                    if (searchInput) {
+                        searchInput.value = data.template.split('/').pop();
+                        filterTree();
+                    }
+                }
+                return true;
+            })
+            .catch(function(err) {
+                addMsg('Route lookup error: ' + err, 'system');
+                setStatus(String(err), 'err');
+                return true;
+            });
     }
 
     function tryLocalFileFind(userText) {
         var query = extractFileFindQuery(userText);
         if (!query) return null;
-        var qLower = query.toLowerCase();
 
-        function renderResults(files) {
-            var reply = formatFileFindReply(query, files);
+        function renderResults(files, fuzzy) {
+            var reply = formatFileFindReply(query, files, fuzzy);
             addMsg(reply, 'ai');
             state.chatHistory.push({ role: 'assistant', content: reply });
             updateHistoryDropdown();
             setStatus('Found ' + files.length + ' file(s) locally (no AI call)', 'ok');
-            if (files.length === 1) {
+            if (files.length >= 1) {
                 var searchInput = q('#aew-tree-search');
                 if (searchInput) {
                     searchInput.value = files[0].split('/').pop();
                     filterTree();
                 }
             }
-        }
-
-        if (state.fileIndex && state.fileIndex.length) {
-            var local = state.fileIndex
-                .map(function(path) { return { path: path, score: scoreFileMatch(path, qLower) }; })
-                .filter(function(item) { return item.score > 0; })
-                .sort(function(a, b) { return b.score - a.score || a.path.localeCompare(b.path); })
-                .map(function(item) { return item.path; })
-                .slice(0, 50);
-            renderResults(local);
-            return Promise.resolve(true);
         }
 
         setStatus('Searching files for "' + query + '"…');
@@ -1027,10 +1101,7 @@
                 setStatus(data.error || 'search failed', 'err');
                 return true;
             }
-            if (data.files && data.files.length) {
-                state.fileIndex = state.fileIndex.length ? state.fileIndex : data.files;
-            }
-            renderResults(data.files || []);
+            renderResults(data.files || [], data.fuzzy);
             return true;
         }).catch(function(err) {
             addMsg('File search error: ' + err + '\nUse the Search files box above the tree.', 'system');
@@ -1046,6 +1117,12 @@
         if (name.indexOf(query) === 0) return 80;
         if (name.indexOf(query) !== -1) return 60;
         if (lower.indexOf(query) !== -1) return 40;
+        if (query.length >= 4 && name) {
+            var dist = levenshtein(name, query);
+            var maxLen = Math.max(name.length, query.length);
+            var sim = 1 - (dist / maxLen);
+            if (sim >= 0.72) return Math.floor(30 + 20 * sim);
+        }
         return 0;
     }
 
@@ -1504,11 +1581,23 @@
         addMsg(userText, 'user');
         state.chatHistory.push({ role: 'user', content: userText });
 
+        var routeLookup = tryLocalRouteLookup(userText);
+        if (routeLookup) {
+            routeLookup.then(function(handled) {
+                if (handled) return;
+                var fileFind = tryLocalFileFind(userText);
+                if (fileFind) {
+                    fileFind.then(function(h2) { if (!h2) sendChatToBackend(userText); });
+                } else {
+                    sendChatToBackend(userText);
+                }
+            });
+            return;
+        }
         var fileFind = tryLocalFileFind(userText);
         if (fileFind) {
             fileFind.then(function(handled) {
-                if (handled) return;
-                sendChatToBackend(userText);
+                if (!handled) sendChatToBackend(userText);
             });
             return;
         }
@@ -1702,10 +1791,19 @@
             diagHtml += '<span style="color:#ffaa00;">⚠️ Do not use raw IP 192.168.1.199 — not a configured site domain.</span><br>';
         }
         if (cfg.project_root) {
-            diagHtml += '<strong>Project root:</strong> ' + escapeHtml(cfg.project_root) + ' — expand lib/ → Comserv/ → Controller/ in the tree.<br>';
+            diagHtml += '<strong>Project root:</strong> ' + escapeHtml(cfg.project_root) + ' — expand lib/ or root/ in the tree.<br>';
         }
         diagHtml += '</div></details>';
         addMsg(diagHtml, 'system', true);
+
+        var host = window.location.hostname || '';
+        var isRemote = cfg.remote_ok && !/^(localhost|127\.0\.0\.1)$/i.test(host)
+            && !/\.local$/i.test(host);
+        if (isRemote || cfg.grok_mode === 'xai_api') {
+            state.backend = 'comserv';
+            var be = q('#aew-backend');
+            if (be) be.value = 'comserv';
+        }
         if (window.AEW_POPUP_MODE) {
             checkForErrorSourceAndLoad();
             return;

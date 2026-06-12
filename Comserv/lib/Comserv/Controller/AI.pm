@@ -12105,16 +12105,88 @@ sub _load_file_index {
     return $files;
 }
 
+sub _levenshtein {
+    my ($s, $t) = @_;
+    my @s = split //, ($s // '');
+    my @t = split //, ($t // '');
+    my $m = @s;
+    my $n = @t;
+    return $n if !$m;
+    return $m if !$n;
+    my @prev = (0 .. $n);
+    for my $i (1 .. $m) {
+        my @cur;
+        $cur[0] = $i;
+        for my $j (1 .. $n) {
+            my $cost = ($s[$i - 1] eq $t[$j - 1]) ? 0 : 1;
+            my $del = $prev[$j] + 1;
+            my $ins = $cur[$j - 1] + 1;
+            my $sub = $prev[$j - 1] + $cost;
+            $cur[$j] = $del < $ins ? ($del < $sub ? $del : $sub) : ($ins < $sub ? $ins : $sub);
+        }
+        @prev = @cur;
+    }
+    return $prev[$n];
+}
+
 sub _score_file_search {
     my ($path, $query) = @_;
     my $lower = lc($path // '');
     my $q     = lc($query // '');
-    return 0 unless $q && $lower =~ /\Q$q\E/;
+    return 0 unless $q;
     my ($name) = $lower =~ m{([^/]+)$};
-    return 100 if defined $name && $name eq $q;
-    return 80  if defined $name && CORE::index($name, $q) == 0;
-    return 60  if defined $name && CORE::index($name, $q) >= 0;
-    return 40;
+    return 0 unless defined $name;
+
+    return 100 if $name eq $q;
+    return 80  if CORE::index($name, $q) == 0;
+    return 60  if CORE::index($name, $q) >= 0;
+    return 40  if $lower =~ /\Q$q\E/;
+
+    return 0 if length($q) < 4;
+    my $dist = _levenshtein($name, $q);
+    my $max  = length($q) > length($name) ? length($q) : length($name);
+    return 0 unless $max;
+    my $sim = 1 - ($dist / $max);
+    return int(30 + 20 * $sim) if $sim >= 0.72;
+    return 0;
+}
+
+# Known Comserv routes → primary TT template (editor paths under root/).
+my %_EDITOR_KNOWN_ROUTES = (
+    '/planning/daily' => {
+        template   => 'root/admin/planning/DailyPlan.tt',
+        controller => 'Planning.pm → daily()',
+        note       => 'Main daily planning dashboard. Legacy URL: /Documentation/DailyPlan',
+        related    => [
+            'root/admin/documentation/DailyPlan.tt',
+            'root/Documentation/DailyPlan.tt',
+        ],
+    },
+    '/planning/daily_log' => {
+        template   => 'root/admin/planning/DailyPlan.tt',
+        controller => 'Planning.pm → daily_log()',
+        note       => 'Daily log JSON endpoint (same DailyPlan context)',
+    },
+    '/documentation/dailyplan' => {
+        template   => 'root/Documentation/DailyPlan.tt',
+        controller => 'Documentation.pm redirect',
+        note       => 'Legacy documentation path; live app uses /planning/daily',
+        related    => ['root/admin/planning/DailyPlan.tt'],
+    },
+);
+
+sub _normalize_editor_route {
+    my ($path) = @_;
+    return '' unless defined $path && $path =~ /\S/;
+    $path = lc($path);
+    $path =~ s/^\s+|\s+$//g;
+    $path =~ s{^https?://[^/]+}{}i;
+    $path =~ s/\?.*$//;
+    $path =~ s{//+}{/}g;
+    $path = "/$path" unless $path =~ m{^/};
+    $path =~ s{/$}{};
+    $path =~ s{/planing/}{/planning/}g;
+    return $path;
 }
 
 =head2 get_file_index
@@ -12179,6 +12251,62 @@ sub search_files :Local :Args(0) {
         files   => \@matched,
         count   => scalar(@matched),
         total_indexed => scalar(@$files),
+        fuzzy   => (@matched && _score_file_search($matched[0], $query) < 40) ? JSON::true : JSON::false,
+    }));
+}
+
+=head2 resolve_route
+
+GET /ai/resolve_route?path=/planning/daily — Map URL path to TT template (no AI call).
+
+=cut
+
+sub resolve_route :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $path = _normalize_editor_route($c->request->params->{path} // '');
+    unless ($path) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'path parameter required (e.g. /planning/daily)' }));
+        return;
+    }
+
+    my $info = $_EDITOR_KNOWN_ROUTES{$path};
+    unless ($info) {
+        my $files = $self->_load_file_index($c);
+        my $slug  = $path;
+        $slug =~ s{^/}{};
+        $slug =~ s{/}{.}g;
+        my @guessed = grep {
+            my $score = _score_file_search($_, $slug);
+            $score >= 35;
+        } @$files;
+        @guessed = sort {
+            _score_file_search($b, $slug) <=> _score_file_search($a, $slug)
+        } @guessed;
+        splice @guessed, 10 if @guessed > 10;
+
+        $c->response->body(encode_json({
+            success => @guessed ? JSON::true : JSON::false,
+            route   => $path,
+            error   => @guessed ? undef : "No known template mapping for $path",
+            guessed_templates => \@guessed,
+        }));
+        return;
+    }
+
+    $c->response->body(encode_json({
+        success    => JSON::true,
+        route      => $path,
+        template   => $info->{template},
+        controller => $info->{controller},
+        note       => $info->{note},
+        related    => $info->{related} || [],
     }));
 }
 
