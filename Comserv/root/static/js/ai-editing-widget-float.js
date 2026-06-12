@@ -22,6 +22,7 @@
         treeExpanded: {},
         treeSeq: 0,
         fileIndex: [],
+        fileIndexLoading: false,
     };
 
     function q(sel, root) {
@@ -915,17 +916,48 @@
         });
     }
 
+    function applySearchIfActive() {
+        var searchInput = q('#aew-tree-search');
+        if (searchInput && searchInput.value.trim()) {
+            filterTree();
+        }
+    }
+
     function loadFileIndex() {
+        if (state.fileIndexLoading) {
+            return Promise.resolve({ success: true, files: state.fileIndex });
+        }
+        state.fileIndexLoading = true;
         return fetchJson('/ai/get_file_index')
             .then(function(data) {
                 if (data.success) {
                     state.fileIndex = data.files || [];
+                    if (state.fileIndex.length) {
+                        setStatus('File index: ' + state.fileIndex.length + ' files', 'ok');
+                    }
+                } else if (data.error) {
+                    setStatus('File index: ' + data.error, 'err');
                 }
                 return data;
             })
             .catch(function(err) {
                 console.error("Failed to load file index:", err);
+                setStatus('File index load failed', 'err');
+            })
+            .finally(function() {
+                state.fileIndexLoading = false;
+                applySearchIfActive();
             });
+    }
+
+    function scoreFileMatch(path, query) {
+        var lower = path.toLowerCase();
+        var name = lower.split('/').pop();
+        if (name === query) return 100;
+        if (name.indexOf(query) === 0) return 80;
+        if (name.indexOf(query) !== -1) return 60;
+        if (lower.indexOf(query) !== -1) return 40;
+        return 0;
     }
 
     function filterTree() {
@@ -941,13 +973,33 @@
             return;
         }
 
-        // If query is present, do whole-project matched file search in state.fileIndex
-        var matched = [];
-        if (state.fileIndex && state.fileIndex.length > 0) {
-            matched = state.fileIndex.filter(function(path) {
-                return path.toLowerCase().indexOf(query) !== -1;
+        if (!state.fileIndex || state.fileIndex.length === 0) {
+            root.innerHTML = '';
+            var loading = document.createElement('div');
+            loading.className = 'aew-tree-hint';
+            loading.style.padding = '0.5rem';
+            loading.style.color = '#888';
+            loading.style.fontSize = '0.72rem';
+            loading.textContent = 'Loading file index...';
+            root.appendChild(loading);
+            loadFileIndex().then(function() {
+                if (searchInput && searchInput.value.trim()) {
+                    filterTree();
+                }
             });
+            return;
         }
+
+        // Whole-project matched file search in state.fileIndex
+        var matched = state.fileIndex
+            .map(function(path) {
+                return { path: path, score: scoreFileMatch(path, query) };
+            })
+            .filter(function(item) { return item.score > 0; })
+            .sort(function(a, b) {
+                return b.score - a.score || a.path.localeCompare(b.path);
+            })
+            .map(function(item) { return item.path; });
 
         // Render matched files as a flat list
         root.innerHTML = '';
@@ -1068,8 +1120,12 @@
         if (!state.treeExpanded || Object.keys(state.treeExpanded).length === 0) {
             state.treeExpanded = { lib: true };
         }
-        root.innerHTML = '';
-        appendTreeEntries(root, '', 0, seq);
+        var searchInput = q('#aew-tree-search');
+        var hasSearch = searchInput && searchInput.value.trim();
+        if (!hasSearch) {
+            root.innerHTML = '';
+            appendTreeEntries(root, '', 0, seq);
+        }
         loadFileIndex();
     }
 

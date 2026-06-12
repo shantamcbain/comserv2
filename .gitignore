@@ -119,6 +119,10 @@ Thumbs.db
 Comserv/cpanfile.temp
 *.backup-*
 
+# AI editor file index (generated at runtime)
+comserv_file_index.json
+Comserv/comserv_file_index.json
+
 # Development scripts (temporary)
 Comserv/script/simple_server.pl
 Comserv/script/start_server.pl
