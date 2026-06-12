@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListCoop.tt,v 0.04 2025/09/03 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListCoop.tt,v 0.05 2026/06/12 row_edit_kind + merged COOP_links submenu' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -7,86 +7,55 @@
 <li class="horizontal-dropdown">
     <a href="/coop" class="dropbtn"><i class="icon-coop"></i>COOP</a>
     <div class="dropdown-content">
-        <a href="/coop"><i class="icon-home"></i>COOP Home</a>
-        
-        [% IF c.session.username %]
-        <div class="dropdown-divider"></div>
-        <a href="/navigation/add_link?menu=COOP" class="menu-item"><i class="icon-add"></i>Add COOP Link</a>
-        [% END %]
-        
-        <!-- Public COOP Links added by admin -->
-        [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'COOP_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-            [% SET row_edit = c.session.roles.grep('admin').size ? '/navigation/edit_link?id=' _ link.id : '' %]
-            [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
-                row_href = link.url
-                row_label = link.name
-                row_target = link.target || '_self'
-                row_icon = link.icon
-                row_tag = 'menu-item'
-                row_edit_href = row_edit %]
-        [% END %]
+        <a href="/coop" class="menu-item"><i class="icon-home"></i>COOP Home</a>
 
-        <!-- Dynamic Page-based links for COOP menu -->
-        [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'coop' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
-            [% SET row_edit = c.session.roles.grep('admin').size ? '/admin/pages?action=edit&id=' _ link.id : '' %]
-            [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
-                row_href = '/page/' _ link.page_code
-                row_label = link.title
-                row_icon = 'fas fa-file-alt'
-                row_tag = 'menu-item'
-                row_edit_href = row_edit %]
-        [% END %]
-        
-        <!-- Legacy Page-based links for COOP menu -->
-        [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'coop' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-            [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
-            [% IF is_migrated == 0 %]
-                [% SET row_edit = c.session.roles.grep('admin').size ? '/pages/edit?page_id=' _ legacy_link.id : '' %]
-                [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
-                    row_href = '/cgi-bin/index.cgi?site=' _ SiteName _ '&' _ session_string _ '&page=' _ legacy_link.page_code
-                    row_label = legacy_link.view_name
-                    row_target = legacy_link.target
-                    row_icon = 'fas fa-file-alt'
-                    row_tag = 'menu-item'
-                    row_edit_href = row_edit %]
-            [% END %]
-        [% END %]
-        
-        <!-- Private COOP Links for logged in users -->
-        [% IF c.session.username %]
-            [% SET has_private_coop_links = 0 %]
-            [% FOREACH link IN (c.stash.private_links || []) %]
-                [% IF link.category == 'COOP_links' || link.menu == 'COOP' %]
-                    [% SET has_private_coop_links = 1 %]
-                [% END %]
-            [% END %]
-            <div class="dropdown-divider"></div>
-            <div class="submenu-item">
-                <span class="submenu-header"><i class="icon-link"></i>My COOP Links</span>
-                <div class="submenu">
-                    [% IF has_private_coop_links %]
-                    [% FOREACH link IN c.stash.private_links %]
-                        [% IF link.category == 'COOP_links' || link.menu == 'COOP' %]
-                        [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
-                            row_href = link.url
-                            row_label = link.name
-                            row_target = link.target || '_self'
-                            row_icon = link.icon
-                            row_extra_class = 'nav-link-private'
-                            row_edit_href = '/navigation/edit_link?id=' _ link.id %]
-                        [% END %]
-                    [% END %]
-                    [% END %]
-                    [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+        [% SET coop_db_links = (c.stash.nav_merged_links && c.stash.nav_merged_links.item('COOP_links')) || c.stash.coop_links || [] %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-links"></i>COOP Links</span>
+            <div class="submenu">
+                [% IF coop_db_links.size %]
+                    [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+                        db_links = coop_db_links
+                        add_link_menu = 'COOP'
                         add_link_category = 'COOP_links'
                         add_link_submenu = 'top'
-                        add_link_menu = 'COOP'
-                        add_link_label = 'Add COOP Link' %]
-                </div>
+                        skip_add_link = 1 %]
+                [% END %]
+
+                <!-- CMS pages assigned to the COOP menu -->
+                [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'coop' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                    [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                        row_href = '/page/' _ link.page_code
+                        row_label = link.title
+                        row_icon = 'fas fa-file-alt'
+                        row_edit_kind = 'cms_page'
+                        row_edit_id = link.id %]
+                [% END %]
+
+                <!-- Legacy page_tb rows for COOP menu -->
+                [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'coop' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                    [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
+                    [% IF is_migrated == 0 %]
+                        [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
+                            row_href = '/cgi-bin/index.cgi?site=' _ SiteName _ '&' _ session_string _ '&page=' _ legacy_link.page_code
+                            row_label = legacy_link.view_name
+                            row_target = legacy_link.target
+                            row_icon = 'fas fa-file-alt'
+                            row_edit_kind = 'legacy_page'
+                            row_edit_id = legacy_link.id %]
+                    [% END %]
+                [% END %]
+
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'COOP_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'COOP'
+                    add_link_label = 'Add COOP Link' %]
             </div>
-        [% END %]
-        
-        [% IF c.session.roles.grep('admin').size %]
+        </div>
+
+        [% IF c.session.roles && c.session.roles.grep('admin').size %]
         <div class="dropdown-divider"></div>
         <a href="/navigation/manage_links?menu=COOP" class="menu-item"><i class="icon-manage"></i>Manage COOP Menu</a>
         [% END %]
