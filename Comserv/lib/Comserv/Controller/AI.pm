@@ -1364,7 +1364,10 @@ sub generate :Local :Args(0) {
         $agent_id = $c->request->params->{agent_id} || 'general';
         $agent_name = $c->request->params->{agent_name} || 'AI Assistant';
         $conversation_id = $c->request->params->{conversation_id};  # May be undef if new conversation
+        $model = $c->request->params->{model} || '';
     }
+
+    $model = $self->_substitute_dead_grok_model($c, $model, 'generate') if $model;
     
     # Fall back to session-stored conversation_id if not provided in request
     unless ($conversation_id) {
@@ -1650,16 +1653,7 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
-            # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
-            # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-beta' } qw(
-                grok-code-fast-1
-            );
-            if ($model && $GROK_DEAD{$model}) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                    'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
-                $model = $GROK_DEAD{$model};
-            }
+            $model = $self->_substitute_dead_grok_model($c, $model, 'generate') if $model;
             if ($model) {
                 # Pre-flight: if the requested model is known deprecated in DB, use last_working_model instead
                 eval {
@@ -1672,7 +1666,7 @@ sub generate :Local :Args(0) {
                         my $deprecated = $meta->{deprecated_models} || {};
                         if ($deprecated->{$model}) {
                             my $replacement = $meta->{last_working_model} || '';
-                            if ($replacement && $replacement ne $model && !$GROK_DEAD{$replacement}) {
+                            if ($replacement && $replacement ne $model) {
                                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                                     'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
                                 $model = $replacement;
@@ -1813,11 +1807,47 @@ sub generate :Local :Args(0) {
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
+                    push @trace, sprintf("❌ Grok failed: %s", $error);
+                    push @trace, "🔀 Attempting Ollama fallback (Grok unavailable)";
+                    $self->_flush_progress($gen_progress_file, \@trace, 0);
+                    my $ollama_fb = $c->model('Ollama');
+                    if ($ollama_fb) {
+                        my ($fb_host, $fb_port, $fb_default, $fb_installed)
+                            = $self->_get_current_ollama_config($c, $can_select_model_gen);
+                        my ($fb_small, $fb_large) = $self->_pick_ollama_tier(
+                            $fb_installed, $fb_default, $agent_id, $agent_id);
+                        my $fb_model = $fb_large || $fb_small || $fb_default;
+                        my ($fb_resp, $fb_used_host) = $self->_ollama_chat_with_failover(
+                            $c, $ollama_fb, \@grok_messages, {
+                                port       => $fb_port || 11434,
+                                model      => $fb_model,
+                                timeout    => 300,
+                                start_host => $fb_host,
+                                trace      => \@trace,
+                            });
+                        if ($fb_resp) {
+                            $response   = $fb_resp;
+                            $provider   = 'ollama';
+                            $active_ollama_host = $fb_used_host || $fb_host;
+                            push @trace, sprintf("✅ Ollama fallback OK @%s model=%s",
+                                $active_ollama_host, $fb_model);
+                        }
+                    }
+                    unless ($response) {
+                        die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
+                    }
                 }
             }
             
             $model_used = $response->{model} || $grok->model;
+            if ($provider eq 'ollama' && $response) {
+                my $fb_text = ($response->{message} && $response->{message}{content})
+                           || $response->{response} || '';
+                $response->{response} = $fb_text;
+                $model_used = $response->{model} || $model_used;
+            } elsif ($response->{choices} && @{$response->{choices} || []}) {
+                $response->{response} = $response->{choices}[0]{message}{content} || '';
+            }
         } else {
             # Default to Ollama
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -2952,6 +2982,7 @@ sub chat :Local :Args(0) {
     # Get parameters from JSON or fallback to form params
     my $prompt = $json_data->{prompt} || $c->request->params->{prompt} || '';
     my $model = $json_data->{model} || $c->request->params->{model} || '';
+    $model = $self->_substitute_dead_grok_model($c, $model, 'chat') if $model;
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
@@ -3256,15 +3287,7 @@ sub chat :Local :Args(0) {
             }
 
             $grok->api_key($grok_api_key);
-            # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-beta' } qw(
-                grok-code-fast-1
-            );
-            if ($model && $GROK_DEAD_CHAT{$model}) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                    'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
-                $model = $GROK_DEAD_CHAT{$model};
-            }
+            $model = $self->_substitute_dead_grok_model($c, $model, 'chat') if $model;
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
@@ -3337,12 +3360,40 @@ sub chat :Local :Args(0) {
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    die "Grok chat failed: $error — Admin: please go to /ai/models and Sync to update available models";
+                    push @chat_trace, sprintf("❌ Grok failed: %s", $error);
+                    push @chat_trace, "🔀 Attempting Ollama fallback (Grok unavailable)";
+                    $self->_flush_progress($progress_file, \@chat_trace, 0);
+                    my $ollama_fb = $c->model('Ollama');
+                    if ($ollama_fb) {
+                        my ($fb_host, $fb_port, $fb_default, $fb_installed)
+                            = $self->_get_current_ollama_config($c, $can_select_model_perm);
+                        my ($fb_small, $fb_large) = $self->_pick_ollama_tier(
+                            $fb_installed, $fb_default, $chat_agent_id, $chat_agent_id);
+                        my $fb_model = $fb_large || $fb_small || $fb_default;
+                        my ($fb_resp, $fb_used_host) = $self->_ollama_chat_with_failover(
+                            $c, $ollama_fb, \@final_messages, {
+                                port       => $fb_port || 11434,
+                                model      => $fb_model,
+                                timeout    => 300,
+                                start_host => $fb_host,
+                                trace      => \@chat_trace,
+                            });
+                        if ($fb_resp) {
+                            $response = $fb_resp;
+                            push @chat_trace, sprintf("✅ Ollama fallback OK @%s model=%s",
+                                $fb_used_host || $fb_host, $fb_model);
+                        }
+                    }
+                    unless ($response) {
+                        die "Grok chat failed: $error — Admin: please go to /ai/models and Sync to update available models";
+                    }
                 }
             }
 
             if ($response->{choices} && ref($response->{choices}) eq 'ARRAY' && @{$response->{choices}}) {
                 $ai_response = $response->{choices}[0]{message}{content} || '';
+            } elsif ($response->{message} && $response->{message}{content}) {
+                $ai_response = $response->{message}{content};
             } elsif ($response->{response}) {
                 $ai_response = $response->{response};
             }
@@ -3351,11 +3402,11 @@ sub chat :Local :Args(0) {
             # Capture Grok token usage for billing
             $response_eval_count = ($response->{usage} && $response->{usage}{total_tokens})
                 ? $response->{usage}{total_tokens}
-                : 0;
+                : ($response->{eval_count} || 0);
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars" .
+                'chat', "Grok/Ollama-fallback chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars" .
                 ($response_eval_count ? ", tokens=$response_eval_count" : ''));
-            push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars%s", $model_used, length($ai_response),
+            push @chat_trace, sprintf("✅ Responded — model=%s %d chars%s", $model_used, length($ai_response),
                 $response_eval_count ? " ($response_eval_count tokens)" : '');
 
         } else {
@@ -6869,6 +6920,35 @@ sub _select_model_for_context {
     my @chat_values = values %installed;
     return $chat_values[0] if @chat_values;
     return 'llama3.1:latest';
+}
+
+=head2 _substitute_dead_grok_model
+
+Replace retired xAI model IDs (410 Gone) before any API call.
+
+=cut
+
+sub _substitute_dead_grok_model {
+    my ($self, $c, $model, $ctx) = @_;
+    return $model unless $model;
+    my %dead = (
+        'grok-code-fast-1' => 'grok-2',
+        'grok-build-0.1'   => 'grok-2',
+        'grok-build'       => 'grok-2',
+    );
+    my $replacement;
+    if ($dead{$model}) {
+        $replacement = $dead{$model};
+    } elsif ($model =~ /^grok-build/i) {
+        $replacement = 'grok-2';
+    }
+    if ($replacement && $replacement ne $model) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            $ctx || '_substitute_dead_grok_model',
+            "Model '$model' is retired; substituting '$replacement'");
+        return $replacement;
+    }
+    return $model;
 }
 
 =head2 _prefer_local_ollama
