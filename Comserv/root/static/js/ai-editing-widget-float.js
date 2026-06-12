@@ -23,6 +23,10 @@
         treeSeq: 0,
         fileIndex: [],
         fileIndexLoading: false,
+        modelTiers: { small: '', large: '' },
+        ollamaReachable: false,
+        ollamaHost: '',
+        currentAbortCtrl: null,
     };
 
     function q(sel, root) {
@@ -1550,26 +1554,103 @@
         .finally(function() { q('#aew-send-btn').disabled = false; });
     }
 
-    function sendChatComserv(prompt) {
+    function classifyEditorQuery(msg) {
+        var m = String(msg || '').trim();
+        if (!m) return 'simple';
+        if (/^(find|search|locate|where is|what .tt|open |list |grep )/i.test(m)) return 'local';
+        if (/^\/[a-z]/i.test(m) || /\b(route|template).*(for|return|serves?)\b/i.test(m)) return 'local';
+        var words = m.split(/\s+/);
+        if (/\b(refactor|implement|fix bug|debug|write code|explain in detail|compare|analyze|architect)\b/i.test(m)) {
+            return 'complex';
+        }
+        if (words.length < 12 && /^(what|where|who|how do|is there|can i|list|give me|show me)/i.test(m)) {
+            return 'simple';
+        }
+        if (words.length > 22) return 'complex';
+        return 'medium';
+    }
+
+    function fetchAiJson(url, body, opts) {
+        opts = opts || {};
+        var timeoutMs = opts.timeoutMs || 660000;
+        var abortCtrl = new AbortController();
+        state.currentAbortCtrl = abortCtrl;
+        var abortTimer = setTimeout(function() { abortCtrl.abort(); }, timeoutMs);
+        var progressPoller = null;
+        if (opts.pollProgress) {
+            progressPoller = setInterval(function() {
+                fetch('/ai/chat_progress', { credentials: 'include' })
+                    .then(function(r) { return r.ok ? r.json() : null; })
+                    .then(function(d) {
+                        if (!d || !d.steps || !d.steps.length) return;
+                        var last = d.steps[d.steps.length - 1];
+                        if (last) setStatus(last.slice(0, 120) + '…');
+                        if (d.done) {
+                            clearInterval(progressPoller);
+                            progressPoller = null;
+                        }
+                    })
+                    .catch(function() {});
+            }, 3000);
+        }
+        return fetch(url, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: abortCtrl.signal,
+        })
+        .then(function(r) {
+            return r.text().then(function(text) {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error('Server returned non-JSON (HTTP ' + r.status + ')');
+                }
+            });
+        })
+        .finally(function() {
+            clearTimeout(abortTimer);
+            if (progressPoller) clearInterval(progressPoller);
+            state.currentAbortCtrl = null;
+            q('#aew-send-btn').disabled = false;
+        });
+    }
+
+    function sendChatQuick(userText) {
+        setStatus('Ollama quick…');
+        q('#aew-send-btn').disabled = true;
+        var model = state.modelTiers.small || '';
+        return fetchAiJson('/ai/quick_chat', {
+            prompt: userText,
+            model: model || undefined,
+            history: state.chatHistory.slice(-6),
+        }, { timeoutMs: 120000 }).then(function(data) {
+            if (!data.success) {
+                data.error = data.error || 'quick_chat failed';
+                if (data.hint) data.error += '\n' + data.hint;
+            }
+            return data;
+        });
+    }
+
+    function sendChatComserv(prompt, userText) {
         setStatus('Comserv AI…');
         q('#aew-send-btn').disabled = true;
         var modelEl = q('#aew-model');
         var selectedModel = modelEl ? modelEl.value : '';
-        return fetch('/ai/chat', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: prompt,
-                agent_id: 'coding',
-                model: selectedModel,
-                history: state.chatHistory.slice(-20),
-                page_path: window.location.pathname,
-                conversation_id: state.conversationId || undefined,
-            }),
-        })
-        .then(function(r) { return r.json(); })
-        .finally(function() { q('#aew-send-btn').disabled = false; });
+        var tier = classifyEditorQuery(userText || prompt);
+        if (tier === 'simple' && state.ollamaReachable) {
+            return sendChatQuick(userText || prompt);
+        }
+        return fetchAiJson('/ai/chat', {
+            prompt: prompt,
+            agent_id: 'coding',
+            model: selectedModel,
+            history: state.chatHistory.slice(-20),
+            page_path: window.location.pathname,
+            conversation_id: state.conversationId || undefined,
+        }, { timeoutMs: 660000, pollProgress: true });
     }
 
     function sendChat(userText) {
@@ -1605,8 +1686,15 @@
     }
 
     function sendChatToBackend(userText) {
-        var full = state.backend === 'comserv' ? buildPrompt(userText) : buildGrokCliPrompt(userText);
-        var req = state.backend === 'comserv' ? sendChatComserv(full) : sendChatGrokCli(full);
+        var tier = classifyEditorQuery(userText);
+        var useComserv = state.backend === 'comserv'
+            || tier === 'simple'
+            || (tier === 'medium' && state.ollamaReachable && !/grok/i.test((q('#aew-model') || {}).value || ''));
+        if (tier === 'simple' && state.ollamaReachable) {
+            useComserv = true;
+        }
+        var full = useComserv ? buildPrompt(userText) : buildGrokCliPrompt(userText);
+        var req = useComserv ? sendChatComserv(full, userText) : sendChatGrokCli(full);
         req.then(function(data) {
             if (!data.success) {
                 var err = data.error || 'failed';
@@ -1634,7 +1722,14 @@
             });
             updateHistoryDropdown();
 
-            var backendLabel = data.backend === 'grok_api' ? 'Grok xAI API' : (data.backend || state.backend);
+            var backendLabel;
+            if (data.backend === 'grok_api') {
+                backendLabel = 'Grok xAI API';
+            } else if (data.backend === 'ollama_quick') {
+                backendLabel = 'Ollama quick' + (data.ollama_host ? ' @' + data.ollama_host : '');
+            } else {
+                backendLabel = data.backend || (useComserv ? 'comserv' : state.backend);
+            }
             setStatus(backendLabel + ' done', 'ok');
             var rf = reply.match(/\[READ_FILE:\s*([^\]]+)\]/i);
             if (rf) loadFile(rf[1].trim());
@@ -1644,11 +1739,13 @@
         }).catch(function(e) {
             var errMsg = String(e);
             var hint = '';
-            if (/NetworkError|Failed to fetch|fetch resource/i.test(errMsg)) {
+            if (/NetworkError|Failed to fetch|fetch resource|aborted/i.test(errMsg)) {
                 hint = '\n\nTip: For finding files, use the Search files box (above the tree) '
                     + 'or type "find DailyPlan.tt" — that uses local index, not Grok CLI.';
-                if (state.backend === 'grok_cli') {
-                    hint += '\nRemote? Switch backend to "Comserv AI" or ensure SSH tunnel stays open for long Grok CLI calls.';
+                if (state.ollamaReachable) {
+                    hint += '\nSimple questions use free Ollama via /ai/quick_chat on the workstation.';
+                } else if (state.backend === 'grok_cli') {
+                    hint += '\nRemote? Switch backend to "Comserv AI" or open the editor on 172.30.131.126:3001.';
                 }
             }
             addMsg('Network error: ' + errMsg + hint, 'system');
@@ -1756,6 +1853,12 @@
     fetchJson('/ai/editor_config').then(function(cfg) {
         if (!cfg.success || !cfg.enabled) return;
         state.enabled = true;
+        state.ollamaReachable = !!cfg.ollama_reachable;
+        state.ollamaHost = cfg.ollama_host || '';
+        if (cfg.model_tiers) {
+            state.modelTiers.small = cfg.model_tiers.small || '';
+            state.modelTiers.large = cfg.model_tiers.large || '';
+        }
         buildDom();
         populateModels(cfg);
         loadPastConversations();
@@ -1796,13 +1899,29 @@
         diagHtml += '</div></details>';
         addMsg(diagHtml, 'system', true);
 
+        if (cfg.ollama_reachable && cfg.ollama_host) {
+            diagHtml += '<strong>Ollama:</strong> ' + escapeHtml(cfg.ollama_host) + ':' + (cfg.ollama_port || 11434);
+            if (cfg.model_tiers && cfg.model_tiers.small) {
+                diagHtml += ' (quick: ' + escapeHtml(cfg.model_tiers.small) + ')';
+            }
+            diagHtml += '<br>';
+        } else if (cfg.ollama_hosts && cfg.ollama_hosts.length) {
+            diagHtml += '<strong>Ollama hosts to try:</strong> ' + escapeHtml(cfg.ollama_hosts.join(', ')) + '<br>';
+        }
+
         var host = window.location.hostname || '';
         var isRemote = cfg.remote_ok && !/^(localhost|127\.0\.0\.1)$/i.test(host)
+            && !/172\.30\.131\.126/.test(host)
             && !/\.local$/i.test(host);
-        if (isRemote || cfg.grok_mode === 'xai_api') {
-            state.backend = 'comserv';
+        if (isRemote || cfg.grok_mode === 'xai_api' || cfg.default_backend === 'comserv') {
+            state.backend = cfg.default_backend || 'comserv';
             var be = q('#aew-backend');
-            if (be) be.value = 'comserv';
+            if (be) be.value = state.backend;
+        }
+        if (cfg.ollama_reachable && !isRemote) {
+            state.backend = 'comserv';
+            var be2 = q('#aew-backend');
+            if (be2) be2.value = 'comserv';
         }
         if (window.AEW_POPUP_MODE) {
             checkForErrorSourceAndLoad();

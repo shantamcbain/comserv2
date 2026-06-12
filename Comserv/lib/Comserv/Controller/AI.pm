@@ -405,12 +405,27 @@ sub editor_config :Local :Args(0) {
     my $current_model = 'phi4:14b';
     my $installed_models = [];
     my @ext_models;
+    my $ollama_host = '';
+    my $ollama_port = 11434;
+    my $ollama_reachable = 0;
+    my @ollama_hosts;
+    my $tier_small = '';
+    my $tier_large = '';
 
     if ($enabled) {
         try {
             my ($chost, $cport, $cmodel, $inst) = $self->_get_current_ollama_config($c, 1);
             $current_model = $cmodel if $cmodel;
             $installed_models = $inst if $inst;
+            $ollama_host = $chost || '';
+            $ollama_port = $cport || 11434;
+            @ollama_hosts = $self->_ollama_hosts_to_probe($c);
+            if ($ollama_host) {
+                my $check = Comserv::Model::Ollama->new(host => $ollama_host, port => $ollama_port, timeout => 3);
+                $ollama_reachable = ($check && $check->check_connection()) ? 1 : 0;
+            }
+            ($tier_small, $tier_large) = $self->_pick_ollama_tier(
+                $installed_models, $current_model, 'coding', 'coding');
         } catch {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                 'editor_config', "Failed to get ollama config: $_");
@@ -478,6 +493,14 @@ sub editor_config :Local :Args(0) {
         installed_models => $installed_models,
         external_models  => \@ext_models,
         current_model    => $current_model,
+        ollama_host      => $ollama_host,
+        ollama_port      => $ollama_port,
+        ollama_reachable => $ollama_reachable ? JSON::true : JSON::false,
+        ollama_hosts     => \@ollama_hosts,
+        model_tiers      => { small => $tier_small, large => $tier_large },
+        quick_chat       => $ollama_reachable ? JSON::true : JSON::false,
+        default_backend  => $ollama_reachable ? 'comserv' : ($has_key ? 'comserv' : 'grok_cli'),
+        prefer_local_ollama => $self->_prefer_local_ollama($c) ? JSON::true : JSON::false,
         ssh_host    => $ssh_host,
         ssh_user    => $ssh_user,
         ssh_port    => $ssh_port,
@@ -608,10 +631,21 @@ sub grok_cli :Local :Args(0) {
                 { role => 'system', content => $system },
                 { role => 'user',   content => $prompt },
             );
-            
-            my $response = $ollama->chat(messages => \@ollama_messages);
-            if ($response && $response->{response}) {
-                my $reply = $response->{response};
+
+            my ($response, $used_host, $ollama_err) = $self->_ollama_chat_with_failover(
+                $c, $ollama, \@ollama_messages, {
+                    port       => $cport,
+                    model      => $active_model,
+                    timeout    => 300,
+                    start_host => $chost,
+                    save_host  => 1,
+                });
+            my $reply_body = $response
+                ? (($response->{message} && $response->{message}{content})
+                    || $response->{response} || '')
+                : '';
+            if ($reply_body) {
+                my $reply = $reply_body;
                 while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
                     my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
                     if ($snippet) {
@@ -635,16 +669,17 @@ sub grok_cli :Local :Args(0) {
                     response        => $reply,
                     backend         => 'ollama_local',
                     model           => $active_model,
+                    ollama_host     => $used_host || $chost,
                     conversation_id => $persisted_id,
                 }));
                 return;
             } else {
-                my $err = $ollama->last_error || 'Ollama connection failed or returned no response';
+                my $err = $ollama_err || $ollama->last_error || 'Ollama connection failed or returned no response';
                 $c->response->status(503);
                 $c->response->body(encode_json({
                     success => JSON::false,
                     error   => "Ollama failed: $err",
-                    hint    => 'Verify that Ollama is running and accessible at ' . $chost,
+                    hint    => 'Tried multiple Ollama hosts. Verify Ollama is running on the workstation (127.0.0.1 or ' . ($chost || '172.30.131.126') . ').',
                 }));
                 return;
             }
@@ -701,10 +736,21 @@ sub grok_cli :Local :Args(0) {
                 { role => 'system', content => $system },
                 { role => 'user',   content => $prompt },
             );
-            
-            my $response = $ollama->chat(messages => \@ollama_messages);
-            if ($response && $response->{response}) {
-                my $reply = $response->{response};
+
+            my ($response, $used_host, $ollama_err) = $self->_ollama_chat_with_failover(
+                $c, $ollama, \@ollama_messages, {
+                    port       => $cport,
+                    model      => $active_model,
+                    timeout    => 300,
+                    start_host => $chost,
+                    save_host  => 1,
+                });
+            my $reply_body = $response
+                ? (($response->{message} && $response->{message}{content})
+                    || $response->{response} || '')
+                : '';
+            if ($reply_body) {
+                my $reply = $reply_body;
                 while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
                     my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
                     if ($snippet) {
@@ -728,6 +774,7 @@ sub grok_cli :Local :Args(0) {
                     response        => $reply,
                     backend         => 'ollama_fallback',
                     model           => $active_model,
+                    ollama_host     => $used_host || $chost,
                     conversation_id => $persisted_id,
                 }));
                 return;
@@ -3479,11 +3526,25 @@ sub chat :Local :Args(0) {
             $self->_flush_progress($progress_file, \@chat_trace, 0);
 
             my $chat_start = time();
-            $response   = $ollama->chat(messages => \@ollama_messages);
+            my ($chat_resp, $failover_host, $failover_err) = $self->_ollama_chat_with_failover(
+                $c, $ollama, \@ollama_messages, {
+                    port       => $current_port || 11434,
+                    model      => $use_model,
+                    timeout    => $chat_timeout,
+                    start_host => $current_host,
+                    trace      => \@chat_trace,
+                    save_host  => $can_select_model_perm ? 1 : 0,
+                });
+            $response = $chat_resp;
+            if ($failover_host && $failover_host ne $current_host) {
+                $current_host = $failover_host;
+                push @chat_trace, "🔀 Ollama host switched to $failover_host";
+                $self->_flush_progress($progress_file, \@chat_trace, 0);
+            }
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
-                my $error = $ollama->last_error || 'Unknown error';
+                my $error = $failover_err || $ollama->last_error || 'Unknown error';
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
                 push @chat_trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $chat_elapsed, $error);
@@ -6808,6 +6869,116 @@ sub _select_model_for_context {
     return 'llama3.1:latest';
 }
 
+=head2 _prefer_local_ollama
+
+True when Comserv runs on the dev workstation (Ollama is on localhost).
+
+=cut
+
+sub _prefer_local_ollama {
+    my ($self, $c) = @_;
+    return 1 if $ENV{COMSERV_WORKSTATION};
+    return 1 if ($ENV{COMSERV_DEPLOYMENT_ENV} || '') =~ /^(development|dev|workstation)/i;
+    return 1 if $ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG};
+    my $ws = $c->config->{aew_ssh_host} || '';
+    return 1 if $ws =~ /^(127\.0\.0\.1|localhost|172\.30\.131\.126)$/i;
+    my $port = ($c->config->{Ollama} || {})->{port} || 11434;
+    my $test = Comserv::Model::Ollama->new(host => '127.0.0.1', port => $port, timeout => 1);
+    return ($test && $test->check_connection()) ? 1 : 0;
+}
+
+=head2 _ollama_hosts_to_probe
+
+Ordered list of Ollama hosts to try. On the workstation, localhost is probed first.
+
+=cut
+
+sub _ollama_hosts_to_probe {
+    my ($self, $c) = @_;
+    my $ollama_cfg    = $c->config->{Ollama} || {};
+    my $primary_host  = $ollama_cfg->{host}          || '192.168.1.199';
+    my $fallback_host = $ollama_cfg->{fallback_host} || $primary_host;
+    my $ws_host       = $c->config->{aew_ssh_host}     || '172.30.131.126';
+    my $zt_host       = $c->config->{aew_zerotier_host} || $ws_host;
+
+    my @hosts;
+    if ($self->_prefer_local_ollama($c)) {
+        push @hosts, '127.0.0.1', 'localhost', $ws_host, $zt_host;
+    }
+    push @hosts, $primary_host;
+    push @hosts, $fallback_host if $fallback_host && $fallback_host ne $primary_host;
+    push @hosts, $ws_host, $zt_host, 'workstation.zero';
+    push @hosts, 'host.docker.internal', '172.17.0.1', '192.168.1.199';
+    unless ($self->_prefer_local_ollama($c)) {
+        push @hosts, '127.0.0.1', 'localhost';
+    }
+
+    my %seen;
+    return grep { $_ && !$seen{$_}++ } @hosts;
+}
+
+=head2 _ollama_retryable_error
+
+True when an Ollama failure should trigger trying the next host.
+
+=cut
+
+sub _ollama_retryable_error {
+    my ($self, $err) = @_;
+    return 1 unless $err;
+    return 1 if $err =~ /connection|timeout|refused|reset|unreachable|network|can't connect|failed to connect|HTTP 5\d\d|timed out|nodename|resolve/i;
+    return 0;
+}
+
+=head2 _ollama_chat_with_failover
+
+Run Ollama chat, retrying across reachable hosts on connection errors.
+
+Returns: ($response, $host_used, $last_error)
+
+=cut
+
+sub _ollama_chat_with_failover {
+    my ($self, $c, $ollama, $messages_ref, $opts) = @_;
+    $opts ||= {};
+    my $port    = $opts->{port} || 11434;
+    my $model   = $opts->{model};
+    my $timeout = $opts->{timeout} || 120;
+    my $trace   = $opts->{trace};
+    my $start   = $opts->{start_host};
+
+    my @hosts = $self->_ollama_hosts_to_probe($c);
+    if ($start) {
+        @hosts = ($start, grep { $_ ne $start } @hosts);
+    }
+
+    my $last_error = '';
+    for my $host (@hosts) {
+        my $probe = Comserv::Model::Ollama->new(host => $host, port => $port, timeout => 3);
+        next unless $probe && $probe->check_connection();
+
+        push @$trace, "📡 Ollama chat → $host" if $trace && ref($trace) eq 'ARRAY';
+
+        $ollama->set_host($host);
+        $ollama->port($port);
+        $ollama->clear_endpoint;
+        $ollama->model($model) if $model;
+        $ollama->timeout($timeout);
+
+        my $response = $ollama->chat(messages => $messages_ref);
+        if ($response) {
+            $c->session->{ollama_host} = $host if $opts->{save_host};
+            return ($response, $host, '');
+        }
+
+        $last_error = $ollama->last_error || 'Unknown error';
+        push @$trace, "❌ $host failed: $last_error" if $trace && ref($trace) eq 'ARRAY';
+        next if $self->_ollama_retryable_error($last_error);
+    }
+
+    return (undef, '', $last_error);
+}
+
 =head2 _get_current_ollama_config
 
 Private method to determine current Ollama configuration with automatic fallback.
@@ -6820,13 +6991,7 @@ sub _get_current_ollama_config {
     # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
     my $ollama_cfg      = $c->config->{Ollama} || {};
     my $primary_host    = $ollama_cfg->{host}          || '192.168.1.199';
-    my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
     my $config_port     = $ollama_cfg->{port}          || 11434;
-    # Never silently fall back to localhost — production Docker has no local Ollama.
-    # If fallback is localhost/127.0.0.1 and primary is a real host, keep primary.
-    if ($fallback_host =~ /^(localhost|127\.0\.0\.1)$/i && $primary_host !~ /^(localhost|127\.0\.0\.1)$/i) {
-        $fallback_host = $primary_host;
-    }
 
     my $ollama = $c->model('Ollama');
     my $current_host  = $primary_host;
@@ -6851,48 +7016,23 @@ sub _get_current_ollama_config {
         }
     }
 
-    if (!$use_session_host) {
-        # Try primary host first
-        my $test = Comserv::Model::Ollama->new(host => $primary_host, port => $config_port, timeout => 3);
-        if ($test && $test->check_connection()) {
-            $current_host = $primary_host;
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                '_get_current_ollama_config', "Primary host $primary_host available");
-        } else {
-            # Build list of fallback hosts to probe dynamically
-            my @fallbacks;
-            push @fallbacks, $fallback_host if $fallback_host && $fallback_host ne $primary_host;
-            
-            # Zerotier IP, Hostname, LAN default, Docker host interfaces, and then local loopback as a last resort
-            push @fallbacks, '172.30.131.126';
-            push @fallbacks, 'workstation.zero';
-            push @fallbacks, 'host.docker.internal';
-            push @fallbacks, '172.17.0.1';
-            push @fallbacks, '127.0.0.1';
-            push @fallbacks, 'localhost';
-            push @fallbacks, '192.168.1.199';
-            
-            # Deduplicate the fallback list while preserving order
-            my %seen;
-            $seen{$primary_host} = 1;
-            my @unique_fallbacks = grep { !$seen{$_}++ } @fallbacks;
-            
-            my $found = 0;
-            for my $fb (@unique_fallbacks) {
-                my $fb_test = Comserv::Model::Ollama->new(host => $fb, port => $config_port, timeout => 3);
-                if ($fb_test && $fb_test->check_connection()) {
-                    $current_host = $fb;
-                    $found = 1;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                        '_get_current_ollama_config', "Primary host $primary_host unavailable, fell back to reachable host $fb");
-                    last;
-                }
-            }
-            
-            unless ($found) {
+    unless ($use_session_host) {
+        my @candidates = $self->_ollama_hosts_to_probe($c);
+        my $found = 0;
+        for my $host (@candidates) {
+            my $test = Comserv::Model::Ollama->new(host => $host, port => $config_port, timeout => 3);
+            if ($test && $test->check_connection()) {
+                $current_host = $host;
+                $found = 1;
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                    '_get_current_ollama_config', "Ollama host $primary_host is not reachable and no automatic fallbacks were available");
+                    '_get_current_ollama_config', "Ollama reachable at $host" .
+                    ($host ne $primary_host ? " (config primary $primary_host unavailable)" : ''));
+                last;
             }
+        }
+        unless ($found) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "No Ollama host reachable (tried " . scalar(@candidates) . " candidates)");
         }
     }
     
@@ -8634,6 +8774,120 @@ sub _doc_candidates {
     # De-duplicate while preserving order
     my %seen;
     return grep { !$seen{$_}++ } @cands;
+}
+
+=head2 quick_chat
+
+Lightweight Ollama endpoint for simple editor/search questions.
+Uses the small model tier, short timeout, and multi-host failover.
+
+POST JSON: { prompt, model (optional), history (optional) }
+
+=cut
+
+sub quick_chat :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $json_data;
+    try {
+        my $raw = $c->request->body;
+        $json_data = $raw ? decode_json($raw) : {};
+    } catch {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON' }));
+        return;
+    };
+
+    my $prompt = $json_data->{prompt} || '';
+    $prompt =~ s/\A\s+|\s+\z//g;
+    unless ($prompt) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'prompt is required' }));
+        return;
+    }
+    if (length($prompt) > 8_000) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'prompt too large (max 8k)' }));
+        return;
+    }
+
+    my $ollama = $c->model('Ollama');
+    unless ($ollama) {
+        $c->response->status(503);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Ollama service unavailable' }));
+        return;
+    }
+
+    my ($host, $port, $default_model, $installed) = $self->_get_current_ollama_config($c, 0);
+    unless ($host) {
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'No reachable Ollama host',
+            hint    => 'Ollama should run on the workstation at 127.0.0.1:11434',
+        }));
+        return;
+    }
+
+    my ($tier_small, undef) = $self->_pick_ollama_tier($installed, $default_model, 'coding', 'coding');
+    my $use_model = $json_data->{model} || $tier_small || $default_model;
+
+    my @messages = (
+        { role => 'system', content =>
+            'You are a concise Comserv coding assistant. Answer briefly and practically. '
+          . 'For file lookups, suggest exact paths under lib/ or root/ when known.' },
+    );
+    my $history = $json_data->{history};
+    if ($history && ref($history) eq 'ARRAY') {
+        for my $h (@$history) {
+            next unless ref($h) eq 'HASH';
+            my $role = $h->{role} || '';
+            my $content = $h->{content} || '';
+            next unless $content =~ /\S/;
+            next unless $role =~ /^(user|assistant)$/i;
+            push @messages, { role => lc($role), content => substr($content, 0, 500) };
+        }
+    }
+    push @messages, { role => 'user', content => $prompt };
+
+    my @trace;
+    my ($response, $used_host, $err) = $self->_ollama_chat_with_failover(
+        $c, $ollama, \@messages, {
+            port       => $port || 11434,
+            model      => $use_model,
+            timeout    => 90,
+            start_host => $host,
+            trace      => \@trace,
+            save_host  => 1,
+        });
+
+    if ($response) {
+        my $reply = ($response->{message} && $response->{message}{content})
+                 || $response->{response} || '';
+        $c->response->body(encode_json({
+            success     => JSON::true,
+            response    => $reply,
+            model       => $response->{model} || $use_model,
+            backend     => 'ollama_quick',
+            ollama_host => $used_host || $host,
+        }));
+        return;
+    }
+
+    $c->response->status(503);
+    $c->response->body(encode_json({
+        success => JSON::false,
+        error   => "Ollama quick chat failed: " . ($err || 'unknown'),
+        hint    => 'Tried hosts: ' . join(', ', $self->_ollama_hosts_to_probe($c)),
+        trace   => \@trace,
+    }));
 }
 
 =head2 chat_progress
