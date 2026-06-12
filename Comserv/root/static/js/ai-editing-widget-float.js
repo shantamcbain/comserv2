@@ -690,8 +690,9 @@
 
         if (cfg.external_models && cfg.external_models.length > 0) {
             var extGrp = document.createElement('optgroup');
-            extGrp.label = 'External AI';
+            extGrp.label = 'xAI (Grok)';
             cfg.external_models.forEach(function(m) {
+                if (/^grok-build/i.test(m.name || '')) return;
                 var opt = document.createElement('option');
                 opt.value = m.name;
                 opt.textContent = m.label;
@@ -700,7 +701,18 @@
                 }
                 extGrp.appendChild(opt);
             });
-            selectEl.appendChild(extGrp);
+            if (extGrp.childElementCount) {
+                selectEl.appendChild(extGrp);
+            }
+        } else if (cfg.enabled && cfg.grok_sync_hint) {
+            var hintGrp = document.createElement('optgroup');
+            hintGrp.label = 'xAI (Grok)';
+            var hintOpt = document.createElement('option');
+            hintOpt.value = '';
+            hintOpt.textContent = '(no xAI models — sync at /ai/models)';
+            hintOpt.disabled = true;
+            hintGrp.appendChild(hintOpt);
+            selectEl.appendChild(hintGrp);
         }
 
         if (!selectEl.childElementCount) {
@@ -1646,7 +1658,10 @@
     function pickEditorModel(userText) {
         var modelEl = q('#aew-model');
         var selected = modelEl ? modelEl.value : '';
-        if (state.ollamaReachable && (isErrorDiagnosisRequest(userText) || /^grok/i.test(selected))) {
+        if (/^grok-build/i.test(selected)) {
+            return 'grok-2';
+        }
+        if (state.ollamaReachable && isErrorDiagnosisRequest(userText)) {
             return state.modelTiers.large || state.modelTiers.small || selected;
         }
         return selected;
@@ -2017,6 +2032,9 @@
         diagHtml += '</div></details>';
         addMsg(diagHtml, 'system', true);
 
+        if (cfg.grok_sync_hint) {
+            diagHtml += '<strong>xAI:</strong> ' + escapeHtml(cfg.grok_sync_hint) + '<br>';
+        }
         if (cfg.ollama_reachable && cfg.ollama_host) {
             diagHtml += '<strong>Ollama:</strong> ' + escapeHtml(cfg.ollama_host) + ':' + (cfg.ollama_port || 11434);
             if (cfg.model_tiers && cfg.model_tiers.small) {
