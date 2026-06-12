@@ -11178,6 +11178,14 @@ my @_EDITOR_ROOTS = qw(
     CHANGELOG.tt README.tt AGENTS.md docker-compose.yml .env .gitignore
 );
 
+# Catalyst app code lives under Comserv/ — API paths use lib/... not Comserv/lib/...
+my @_EDITOR_APP_DIRS = qw(lib root sql script t);
+
+my @_EDITOR_INDEX_SKIP_DIRS = map { lc $_ } qw(
+    .git .idea .svn blib local logs node_modules venv whisper_venv
+    __pycache__ aimanager deploy-logs site-packages pycache
+);
+
 sub _list_dir_param {
     my ($self, $c) = @_;
     my $raw = $c->request->param('rel');
@@ -11213,6 +11221,44 @@ sub _editor_path_allowed {
     return $rel;
 }
 
+sub _editor_has_comserv_subdir {
+    my ($self, $c) = @_;
+    my $root = $self->_project_root_path($c);
+    return -d "$root/Comserv/lib";
+}
+
+# Map API path (lib/Comserv/...) to on-disk path (Comserv/lib/Comserv/...).
+sub _editor_fs_path {
+    my ($self, $c, $rel) = @_;
+    my $root = $self->_project_root_path($c);
+    $rel = $self->_sanitize_editor_rel_path($rel // '');
+    return "$root/$rel" unless $rel;
+    if ($self->_editor_has_comserv_subdir($c) && $rel =~ m{^(?:lib|root|sql|script|t)(?:/|$)}) {
+        return "$root/Comserv/$rel";
+    }
+    return "$root/$rel";
+}
+
+# Normalize filesystem path back to API path for index + read_file responses.
+sub _editor_canonical_rel {
+    my ($self, $c, $fs_path) = @_;
+    my $root = $self->_project_root_path($c);
+    my $rel = $fs_path // '';
+    $rel =~ s/^\Q$root\E\/?//;
+    if ($self->_editor_has_comserv_subdir($c) && $rel =~ s{^Comserv/}{}) {
+        $rel = $self->_sanitize_editor_rel_path($rel);
+    }
+    return $self->_sanitize_editor_rel_path($rel);
+}
+
+sub _editor_index_is_stale {
+    my ($self, $files) = @_;
+    return 1 unless $files && ref $files eq 'ARRAY' && @$files;
+    return 1 if @$files > 15_000;
+    return 1 if grep { m{^Comserv/} } @$files;
+    return 0;
+}
+
 sub _editor_read_file_snippet {
     my ($self, $c, $rel, $limit) = @_;
     $limit //= 400;
@@ -11227,9 +11273,9 @@ sub _editor_read_file_snippet {
         return (undef, "Path not allowed: $rel (use lib/, root/, sql/, script/, or t/ under the project root)");
     }
 
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$rel";
+    my $full = $self->_editor_fs_path($c, $rel);
     unless (-f $full) {
+        my $root = $self->_project_root_path($c);
         return (undef, "File not found: $rel (project root: $root)");
     }
 
@@ -11642,12 +11688,20 @@ sub list_dir :Local :Args(0) {
     my @entries;
 
     if ($dir eq '') {
+        if ($self->_editor_has_comserv_subdir($c)) {
+            for my $sub (@_EDITOR_APP_DIRS) {
+                my $full = $self->_editor_fs_path($c, $sub);
+                push @entries, { name => $sub, path => $sub, type => 'dir' } if -d $full;
+            }
+        }
         for my $top (@_EDITOR_ROOTS) {
+            next if $top eq 'Comserv';
+            next if $self->_editor_has_comserv_subdir($c) && grep { $_ eq $top } @_EDITOR_APP_DIRS;
             my $full = "$root/$top";
             push @entries, { name => $top, path => $top, type => 'dir' } if -d $full;
         }
     } else {
-        my $full = "$root/$dir";
+        my $full = $self->_editor_fs_path($c, $dir);
         unless (-d $full) {
             $c->response->body(encode_json({ success => JSON::false, error => "Not a directory: $dir" }));
             return;
@@ -11662,7 +11716,7 @@ sub list_dir :Local :Args(0) {
             my $child_rel = "$dir/$name";
             $child_rel =~ s{//+}{/}g;
             next unless $self->_editor_path_allowed($child_rel);
-            my $child_full = "$root/$child_rel";
+            my $child_full = $self->_editor_fs_path($c, $child_rel);
             push @entries, {
                 name => $name,
                 path => $child_rel,
@@ -11730,8 +11784,7 @@ sub read_file :Local :Args(0) {
         return;
     }
 
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$rel";
+    my $full = $self->_editor_fs_path($c, $rel);
 
     unless (-f $full) {
         $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
@@ -11796,8 +11849,7 @@ sub apply_fix :Local :Args(0) {
         return;
     }
 
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$rel";
+    my $full = $self->_editor_fs_path($c, $rel);
 
     unless (-f $full) {
         $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
@@ -11925,14 +11977,17 @@ sub revert_code :Local :Args(0) {
     }));
 }
 
-# Helper path for the file index
+# Helper path for the file index (lives under Comserv/ when app is in a subdir)
 sub _file_index_path {
     my ($self, $c) = @_;
     my $root = $self->_project_root_path($c);
+    if ($self->_editor_has_comserv_subdir($c)) {
+        return "$root/Comserv/comserv_file_index.json";
+    }
     return "$root/comserv_file_index.json";
 }
 
-# Recursively build list of files
+# Recursively build list of files (stores canonical API paths: lib/..., root/...)
 sub _build_index_for_dir {
     my ($self, $c, $dir, $files_ref) = @_;
     my $root = $self->_project_root_path($c);
@@ -11946,16 +12001,18 @@ sub _build_index_for_dir {
             next if $name eq '.' || $name eq '..';
             next if $name =~ /^\./; # skip hidden
             next if $name =~ /\.bak$/; # skip backup files
+            next if grep { lc($name) eq $_ } @_EDITOR_INDEX_SKIP_DIRS;
             my $rel_path = $dir ? "$dir/$name" : $name;
             $rel_path =~ s{//+}{/}g;
-            next unless $self->_editor_path_allowed($rel_path);
-            
             my $child_full = "$root/$rel_path";
             if (-d $child_full) {
                 $self->_build_index_for_dir($c, $rel_path, $files_ref);
-            } elsif (-f $child_full) {
-                push @$files_ref, $rel_path;
+                next;
             }
+            next unless -f $child_full;
+            my $canonical = $self->_editor_canonical_rel($c, $child_full);
+            next unless $canonical && $self->_editor_path_allowed($canonical);
+            push @$files_ref, $canonical;
         }
     }
 }
@@ -11964,10 +12021,22 @@ sub _build_index_for_dir {
 sub _rebuild_index_internal {
     my ($self, $c) = @_;
     my $files = [];
-    for my $top (@_EDITOR_ROOTS) {
-        $self->_build_index_for_dir($c, $top, $files);
+    my $root = $self->_project_root_path($c);
+    if ($self->_editor_has_comserv_subdir($c)) {
+        for my $sub (@_EDITOR_APP_DIRS) {
+            my $scan = "Comserv/$sub";
+            $self->_build_index_for_dir($c, $scan, $files) if -d "$root/$scan";
+        }
     }
-    my @sorted_files = sort { lc($a) cmp lc($b) } @$files;
+    for my $top (@_EDITOR_ROOTS) {
+        next if $top eq 'Comserv';
+        next if $self->_editor_has_comserv_subdir($c) && grep { $_ eq $top } @_EDITOR_APP_DIRS;
+        $self->_build_index_for_dir($c, $top, $files) if -d "$root/$top";
+    }
+    my %seen;
+    my @sorted_files = sort { lc($a) cmp lc($b) }
+        grep { !$seen{$_}++ }
+        grep { defined $_ && $_ ne '' } @$files;
     
     my $index_file = $self->_file_index_path($c);
     if (open(my $fh, '>:utf8', $index_file)) {
@@ -12049,13 +12118,14 @@ sub get_file_index :Local :Args(0) {
         }
     }
 
-    if (!@$files) {
+    if (!@$files || $self->_editor_index_is_stale($files)) {
         $files = $self->_rebuild_index_internal($c);
     }
 
     $c->response->body(encode_json({
         success => JSON::true,
         files   => $files,
+        count   => scalar(@$files),
     }));
 }
 
@@ -12152,8 +12222,7 @@ sub create_file :Local :Args(0) {
         return;
     }
 
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$rel";
+    my $full = $self->_editor_fs_path($c, $rel);
 
     if (-e $full) {
         $c->response->body(encode_json({ success => JSON::false, error => "File or directory already exists: $rel" }));
@@ -12203,8 +12272,7 @@ sub delete_file :Local :Args(0) {
         return;
     }
 
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$rel";
+    my $full = $self->_editor_fs_path($c, $rel);
 
     unless (-f $full) {
         $c->response->body(encode_json({ success => JSON::false, error => "File not found: $rel" }));
