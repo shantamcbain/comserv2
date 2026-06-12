@@ -158,22 +158,7 @@ sub index :Path :Args(0) {
                 )->first;
             }
             if ($grok_key && $grok_key->api_key_encrypted) {
-                # Use synced models from metadata if available, else hardcoded fallback
-                my $meta = $grok_key->get_metadata() || {};
-                my $synced = $meta->{available_models};
-                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
-                    foreach my $m (@$synced) {
-                        my $id = $m->{id} || $m->{name} || '';
-                        next unless $id;
-                        next if $id =~ /^(grok-imagine|grok-.*video)/i;  # skip image/video models
-                        (my $label = $id) =~ s/-/ /g;
-                        $label = ucfirst($label) . ' (xAI)';
-                        push @external_models, { name => $id, provider => 'grok', label => $label };
-                    }
-                } else {
-                    push @external_models, { name => 'grok-2',    provider => 'grok', label => 'Grok 2 (xAI)' };
-                    push @external_models, { name => 'grok-beta', provider => 'grok', label => 'Grok Beta (xAI)' };
-                }
+                @external_models = @{ $self->_grok_external_models_for_user($c, $user_id, $can_select_model) };
             }
         } catch {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -431,42 +416,11 @@ sub editor_config :Local :Args(0) {
                 'editor_config', "Failed to get ollama config: $_");
         };
 
-        try {
-            my $schema = $c->model('DBEncy')->schema;
-            my $user_id = $c->session->{user_id};
-            if ($user_id) {
-                my $grok_key = $schema->resultset('UserApiKeys')->search(
-                    { user_id => $user_id, service => 'grok', is_active => '1' }
-                )->first;
-                unless ($grok_key) {
-                    $grok_key = $schema->resultset('UserApiKeys')->search(
-                        { service => 'grok', is_active => '1' }
-                    )->first;
-                }
-                if ($grok_key && $grok_key->api_key_encrypted) {
-                    my $meta = $grok_key->get_metadata() || {};
-                    my $synced = $meta->{available_models};
-                    if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
-                        foreach my $m (@$synced) {
-                            my $id = $m->{id} || $m->{name} || '';
-                            next unless $id;
-                            next if $id =~ /^(grok-imagine|grok-.*video)/i;
-                            (my $label = $id) =~ s/-/ /g;
-                            $label = ucfirst($label) . ' (xAI)';
-                            push @ext_models, { name => $id, provider => 'grok', label => $label };
-                        }
-                    } else {
-                        push @ext_models, (
-                            { name => 'grok-2',    provider => 'grok', label => 'Grok 2 (xAI)' },
-                            { name => 'grok-beta', provider => 'grok', label => 'Grok Beta (xAI)' },
-                        );
-                    }
-                }
-            }
-        } catch {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                'editor_config', "Failed to get external models: $_");
-        };
+        my $user_id = $c->session->{user_id};
+        if ($user_id) {
+            my $can_sel = 1;
+            @ext_models = @{ $self->_grok_external_models_for_user($c, $user_id, $can_sel) };
+        }
     }
 
     my $ssh_host = $c->config->{aew_ssh_host}     || '172.30.131.126';
@@ -501,6 +455,10 @@ sub editor_config :Local :Args(0) {
         quick_chat       => $ollama_reachable ? JSON::true : JSON::false,
         default_backend  => $ollama_reachable ? 'comserv' : ($has_key ? 'comserv' : 'grok_cli'),
         prefer_local_ollama => $self->_prefer_local_ollama($c) ? JSON::true : JSON::false,
+        grok_api_available  => (@ext_models ? JSON::true : JSON::false),
+        grok_sync_hint      => @ext_models
+            ? 'xAI models loaded. Retired grok-build-* models are hidden.'
+            : 'No xAI models — add Grok API key at /ai/manage_api_keys then Sync at /ai/models',
         ssh_host    => $ssh_host,
         ssh_user    => $ssh_user,
         ssh_port    => $ssh_port,
@@ -6951,6 +6909,73 @@ sub _substitute_dead_grok_model {
     return $model;
 }
 
+=head2 _is_retired_grok_model
+
+True for xAI model IDs that should not appear in pickers (410 Gone).
+
+=cut
+
+sub _is_retired_grok_model {
+    my ($self, $id) = @_;
+    return 0 unless $id;
+    return 1 if $id =~ /^grok-build/i;
+    return 1 if $id eq 'grok-code-fast-1';
+    return 0;
+}
+
+=head2 _grok_external_models_for_user
+
+Build filtered xAI model list for editor/chat pickers.
+
+=cut
+
+sub _grok_external_models_for_user {
+    my ($self, $c, $user_id, $can_select_model) = @_;
+    my @ext_models;
+    return \@ext_models unless $user_id;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $grok_key = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id, service => 'grok', is_active => '1' }
+        )->first;
+        if (!$grok_key && $can_select_model) {
+            $grok_key = $schema->resultset('UserApiKeys')->search(
+                { service => 'grok', is_active => '1' }
+            )->first;
+        }
+        return \@ext_models unless $grok_key && $grok_key->api_key_encrypted;
+
+        my $meta   = $grok_key->get_metadata() || {};
+        my $synced = $meta->{available_models};
+        if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
+            my %seen;
+            foreach my $m (@$synced) {
+                my $id = $m->{id} || $m->{name} || '';
+                next unless $id;
+                next if $id =~ /^(grok-imagine|grok-.*video)/i;
+                next if $self->_is_retired_grok_model($id);
+                next if $seen{$id}++;
+                (my $label = $id) =~ s/-/ /g;
+                $label = ucfirst($label) . ' (xAI)';
+                push @ext_models, { name => $id, provider => 'grok', label => $label };
+            }
+        }
+        unless (@ext_models) {
+            push @ext_models, (
+                { name => 'grok-2',      provider => 'grok', label => 'Grok 2 (xAI)' },
+                { name => 'grok-2-mini', provider => 'grok', label => 'Grok 2 Mini (xAI)' },
+                { name => 'grok-beta',   provider => 'grok', label => 'Grok Beta (xAI)' },
+            );
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_grok_external_models_for_user', "Failed: $_");
+    };
+
+    return \@ext_models;
+}
+
 =head2 _prefer_local_ollama
 
 True when Comserv runs on the dev workstation (Ollama is on localhost).
@@ -8244,10 +8269,19 @@ sub get_user_providers :Local :Args(0) {
                     ];
                 }
 
-                # Filter image/video models for non-admins
+                # Filter image/video and retired grok-build models
                 my @filtered = grep {
-                    $is_admin || !$_->{id} || $_->{id} !~ /imagine|video/i
+                    my $id = $_->{id} || '';
+                    ($is_admin || !$id || $id !~ /imagine|video/i)
+                    && !$self->_is_retired_grok_model($id)
                 } @$models;
+                if ($key->service eq 'grok' && !@filtered) {
+                    @filtered = (
+                        { id => 'grok-2' },
+                        { id => 'grok-2-mini' },
+                        { id => 'grok-beta' },
+                    );
+                }
 
                 push @providers, {
                     service  => $key->service,
@@ -8266,10 +8300,21 @@ sub get_user_providers :Local :Args(0) {
                     next if $seen{$key->service}++;
                     my $meta   = $key->get_metadata() || {};
                     my $models = $meta->{available_models} || [];
+                    my @filtered = grep {
+                        my $id = $_->{id} || '';
+                        !$self->_is_retired_grok_model($id)
+                    } @$models;
+                    if ($key->service eq 'grok' && !@filtered) {
+                        @filtered = (
+                            { id => 'grok-2' },
+                            { id => 'grok-2-mini' },
+                            { id => 'grok-beta' },
+                        );
+                    }
                     push @providers, {
                         service => $key->service,
                         name    => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
-                        models  => $models,
+                        models  => \@filtered,
                     };
                 }
             }
@@ -11483,8 +11528,11 @@ END_PROMPT
 sub _is_shanta_editor {
     my ($self, $c) = @_;
     my $username = $c->session->{username} || ($c->user ? $c->user->username : '') || '';
-    my $host = $c->req->uri->host || '';
-    return 1 if lc($username) eq 'shanta' && $host eq '172.30.131.126';
+    return 0 unless lc($username) eq 'shanta';
+    my $host = lc($c->req->uri->host || '');
+    return 1 if $host eq '172.30.131.126';
+    return 1 if $host =~ /^(127\.0\.0\.1|localhost|workstation\.local|workstation\.zero)$/;
+    return 1 if $self->_is_dev_mode($c);
     return 0;
 }
 
