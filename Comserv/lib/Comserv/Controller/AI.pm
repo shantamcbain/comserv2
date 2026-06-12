@@ -2136,26 +2136,28 @@ sub generate :Local :Args(0) {
                 }
             }
 
-            # ── Tier 1 query ─────────────────────────────────────────────────
+            # ── Tier 1 query (with multi-host failover) ───────────────────────
             my $query_start = time();
-            if (@$history_items || $system) {
-                push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
-                    $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                    'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
-                # Flush trace to progress file before blocking call so JS poller can read it
+            push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
+                $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
+            $self->_flush_progress($gen_progress_file, \@trace, 0);
+            my ($gen_resp, $gen_host, $gen_err) = $self->_ollama_chat_with_failover(
+                $c, $ollama, \@ollama_msgs, {
+                    port       => $current_port || 11434,
+                    model      => $use_model,
+                    timeout    => $timeout_secs,
+                    start_host => $current_host,
+                    trace      => \@trace,
+                    save_host  => $can_select_model ? 1 : 0,
+                });
+            $response = $gen_resp;
+            if ($gen_host && $gen_host ne $current_host) {
+                $current_host = $gen_host;
+                $active_ollama_host = $gen_host;
+                push @trace, "🔀 Ollama host switched to $gen_host";
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
-                $response = $ollama->chat(messages => \@ollama_msgs);
-            } else {
-                push @trace, sprintf("📡 Tier-1 /api/generate to %s — model=%s single-turn",
-                    $current_host, $use_model);
-                # Flush trace to progress file before blocking call so JS poller can read it
-                $self->_flush_progress($gen_progress_file, \@trace, 0);
-                $response = $ollama->query(
-                    prompt => $prompt,
-                    format => $format eq 'json' ? 'json' : undef,
-                    system => $system || undef
-                );
             }
             my $query_elapsed = time() - $query_start;
 
@@ -8795,10 +8797,19 @@ sub quick_chat :Local :Args(0) {
         return;
     }
 
-    my $json_data;
+    my $json_data = {};
     try {
-        my $raw = $c->request->body;
-        $json_data = $raw ? decode_json($raw) : {};
+        my $raw_body;
+        if ($c->req->can('content')) {
+            $raw_body = $c->req->content;
+        } else {
+            $raw_body = $c->request->body;
+            if (ref($raw_body)) {
+                seek($raw_body, 0, 0);
+                $raw_body = do { local $/; <$raw_body> };
+            }
+        }
+        $json_data = decode_json($raw_body) if $raw_body && length($raw_body);
     } catch {
         $c->response->status(400);
         $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON' }));
