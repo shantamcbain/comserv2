@@ -12087,6 +12087,36 @@ sub _remove_from_index_internal {
     }
 }
 
+sub _load_file_index {
+    my ($self, $c) = @_;
+    my $index_file = $self->_file_index_path($c);
+    my $files = [];
+
+    if (-f $index_file && open(my $fh, '<:utf8', $index_file)) {
+        local $/;
+        my $json_text = <$fh>;
+        close $fh;
+        try { $files = decode_json($json_text); } catch { $files = []; };
+    }
+
+    if (!@$files || $self->_editor_index_is_stale($files)) {
+        $files = $self->_rebuild_index_internal($c);
+    }
+    return $files;
+}
+
+sub _score_file_search {
+    my ($path, $query) = @_;
+    my $lower = lc($path // '');
+    my $q     = lc($query // '');
+    return 0 unless $q && $lower =~ /\Q$q\E/;
+    my ($name) = $lower =~ m{([^/]+)$};
+    return 100 if defined $name && $name eq $q;
+    return 80  if defined $name && CORE::index($name, $q) == 0;
+    return 60  if defined $name && CORE::index($name, $q) >= 0;
+    return 40;
+}
+
 =head2 get_file_index
 
 GET /ai/get_file_index - Get complete list of indexed files
@@ -12102,30 +12132,53 @@ sub get_file_index :Local :Args(0) {
         return;
     }
 
-    my $index_file = $self->_file_index_path($c);
-    my $files = [];
-
-    if (-f $index_file) {
-        if (open(my $fh, '<:utf8', $index_file)) {
-            local $/;
-            my $json_text = <$fh>;
-            close $fh;
-            try {
-                $files = decode_json($json_text);
-            } catch {
-                $files = [];
-            };
-        }
-    }
-
-    if (!@$files || $self->_editor_index_is_stale($files)) {
-        $files = $self->_rebuild_index_internal($c);
-    }
+    my $files = $self->_load_file_index($c);
 
     $c->response->body(encode_json({
         success => JSON::true,
         files   => $files,
         count   => scalar(@$files),
+    }));
+}
+
+=head2 search_files
+
+GET /ai/search_files?q=DailyPlan.tt - Lightweight server-side file search (no full index download).
+
+=cut
+
+sub search_files :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $query = $c->request->params->{q} // '';
+    $query =~ s/^\s+|\s+$//g;
+    unless ($query) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'q parameter required' }));
+        return;
+    }
+
+    my $files = $self->_load_file_index($c);
+    my @matched = grep { _score_file_search($_, $query) > 0 } @$files;
+    @matched = sort {
+        _score_file_search($b, $query) <=> _score_file_search($a, $query)
+            || lc($a) cmp lc($b)
+    } @matched;
+    my $limit = int($c->request->params->{limit} || 50);
+    $limit = 100 if $limit > 100;
+    splice @matched, $limit if @matched > $limit;
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        query   => $query,
+        files   => \@matched,
+        count   => scalar(@matched),
+        total_indexed => scalar(@$files),
     }));
 }
 

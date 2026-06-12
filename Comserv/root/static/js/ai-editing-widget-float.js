@@ -39,7 +39,21 @@
     function fetchJson(url, opts) {
         opts = opts || {};
         opts.credentials = 'include';
-        return fetch(url, opts).then(function(r) { return r.json(); });
+        return fetch(url, opts).then(function(r) {
+            if (!r.ok) {
+                return r.text().then(function(body) {
+                    var msg = 'HTTP ' + r.status;
+                    try {
+                        var parsed = JSON.parse(body);
+                        if (parsed.error) msg += ': ' + parsed.error;
+                    } catch (e) {
+                        if (body && body.length < 200) msg += ': ' + body;
+                    }
+                    throw new Error(msg);
+                });
+            }
+            return r.json();
+        });
     }
 
     function escapeHtml(s) {
@@ -923,6 +937,12 @@
         }
     }
 
+    function searchFilesRemote(query, limit) {
+        var url = '/ai/search_files?q=' + encodeURIComponent(query);
+        if (limit) url += '&limit=' + encodeURIComponent(limit);
+        return fetchJson(url);
+    }
+
     function loadFileIndex() {
         if (state.fileIndexLoading) {
             return Promise.resolve({ success: true, files: state.fileIndex });
@@ -942,12 +962,81 @@
             })
             .catch(function(err) {
                 console.error("Failed to load file index:", err);
-                setStatus('File index load failed', 'err');
+                setStatus('File index load failed — use search box or chat "find filename"', 'err');
+                return { success: false, error: String(err) };
             })
             .finally(function() {
                 state.fileIndexLoading = false;
                 applySearchIfActive();
             });
+    }
+
+    function extractFileFindQuery(text) {
+        var m = String(text || '').match(/^(?:find|locate|search(?:\s+for)?|where\s+is|open|show)\s+(.+)$/i);
+        return m ? m[1].trim() : '';
+    }
+
+    function formatFileFindReply(query, files) {
+        if (!files || !files.length) {
+            return 'No files matching "' + query + '" in the project index.\n'
+                + 'Try the **Search files** box above the tree, or check spelling (e.g. DailyPlan.tt).';
+        }
+        var lines = ['Found ' + files.length + ' match(es) for "' + query + '":', ''];
+        files.forEach(function(path, i) {
+            lines.push((i + 1) + '. ' + path);
+        });
+        lines.push('', 'Click a path in the file tree search box, or say: open ' + files[0]);
+        return lines.join('\n');
+    }
+
+    function tryLocalFileFind(userText) {
+        var query = extractFileFindQuery(userText);
+        if (!query) return null;
+        var qLower = query.toLowerCase();
+
+        function renderResults(files) {
+            var reply = formatFileFindReply(query, files);
+            addMsg(reply, 'ai');
+            state.chatHistory.push({ role: 'assistant', content: reply });
+            updateHistoryDropdown();
+            setStatus('Found ' + files.length + ' file(s) locally (no AI call)', 'ok');
+            if (files.length === 1) {
+                var searchInput = q('#aew-tree-search');
+                if (searchInput) {
+                    searchInput.value = files[0].split('/').pop();
+                    filterTree();
+                }
+            }
+        }
+
+        if (state.fileIndex && state.fileIndex.length) {
+            var local = state.fileIndex
+                .map(function(path) { return { path: path, score: scoreFileMatch(path, qLower) }; })
+                .filter(function(item) { return item.score > 0; })
+                .sort(function(a, b) { return b.score - a.score || a.path.localeCompare(b.path); })
+                .map(function(item) { return item.path; })
+                .slice(0, 50);
+            renderResults(local);
+            return Promise.resolve(true);
+        }
+
+        setStatus('Searching files for "' + query + '"…');
+        return searchFilesRemote(query, 50).then(function(data) {
+            if (!data.success) {
+                addMsg('File search failed: ' + (data.error || 'unknown'), 'system');
+                setStatus(data.error || 'search failed', 'err');
+                return true;
+            }
+            if (data.files && data.files.length) {
+                state.fileIndex = state.fileIndex.length ? state.fileIndex : data.files;
+            }
+            renderResults(data.files || []);
+            return true;
+        }).catch(function(err) {
+            addMsg('File search error: ' + err + '\nUse the Search files box above the tree.', 'system');
+            setStatus(String(err), 'err');
+            return true;
+        });
     }
 
     function scoreFileMatch(path, query) {
@@ -980,12 +1069,25 @@
             loading.style.padding = '0.5rem';
             loading.style.color = '#888';
             loading.style.fontSize = '0.72rem';
-            loading.textContent = 'Loading file index...';
+            loading.textContent = 'Searching...';
             root.appendChild(loading);
-            loadFileIndex().then(function() {
-                if (searchInput && searchInput.value.trim()) {
+            searchFilesRemote(query, 80).then(function(data) {
+                if (data.success && data.files && data.files.length) {
+                    state.fileIndex = data.files;
                     filterTree();
+                    return;
                 }
+                return loadFileIndex().then(function() {
+                    if (searchInput && searchInput.value.trim()) {
+                        filterTree();
+                    }
+                });
+            }).catch(function() {
+                return loadFileIndex().then(function() {
+                    if (searchInput && searchInput.value.trim()) {
+                        filterTree();
+                    }
+                });
             });
             return;
         }
@@ -1401,6 +1503,19 @@
         }
         addMsg(userText, 'user');
         state.chatHistory.push({ role: 'user', content: userText });
+
+        var fileFind = tryLocalFileFind(userText);
+        if (fileFind) {
+            fileFind.then(function(handled) {
+                if (handled) return;
+                sendChatToBackend(userText);
+            });
+            return;
+        }
+        sendChatToBackend(userText);
+    }
+
+    function sendChatToBackend(userText) {
         var full = state.backend === 'comserv' ? buildPrompt(userText) : buildGrokCliPrompt(userText);
         var req = state.backend === 'comserv' ? sendChatComserv(full) : sendChatGrokCli(full);
         req.then(function(data) {
@@ -1438,8 +1553,17 @@
             var fix = parseFixBlock(reply);
             if (fix) showFixPanel(fix);
         }).catch(function(e) {
-            addMsg('Network error: ' + e, 'system');
-            setStatus(String(e), 'err');
+            var errMsg = String(e);
+            var hint = '';
+            if (/NetworkError|Failed to fetch|fetch resource/i.test(errMsg)) {
+                hint = '\n\nTip: For finding files, use the Search files box (above the tree) '
+                    + 'or type "find DailyPlan.tt" — that uses local index, not Grok CLI.';
+                if (state.backend === 'grok_cli') {
+                    hint += '\nRemote? Switch backend to "Comserv AI" or ensure SSH tunnel stays open for long Grok CLI calls.';
+                }
+            }
+            addMsg('Network error: ' + errMsg + hint, 'system');
+            setStatus(errMsg, 'err');
         });
     }
 
