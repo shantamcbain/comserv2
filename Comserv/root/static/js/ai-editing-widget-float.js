@@ -1639,6 +1639,19 @@
         .finally(function() { q('#aew-send-btn').disabled = false; });
     }
 
+    function isErrorDiagnosisRequest(text) {
+        return /\[(?:Error|ERROR|WARN)\]|AI query failed|Grok query failed|Grok chat failed|\.pm:\d+\]|\.pm line \d+|generate -|chat -|410 Gone|no longer available|Automatic error todo/i.test(String(text || ''));
+    }
+
+    function pickEditorModel(userText) {
+        var modelEl = q('#aew-model');
+        var selected = modelEl ? modelEl.value : '';
+        if (state.ollamaReachable && (isErrorDiagnosisRequest(userText) || /^grok/i.test(selected))) {
+            return state.modelTiers.large || state.modelTiers.small || selected;
+        }
+        return selected;
+    }
+
     function classifyEditorQuery(msg) {
         var m = String(msg || '').trim();
         if (!m) return 'simple';
@@ -1646,6 +1659,7 @@
         if (/^\/[a-z]/i.test(m) || /\b(route|template).*(for|return|serves?)\b/i.test(m)) return 'local';
         if (/\b(?:open|show|load)\s+(?:the\s+)?(?:daily\s*plan|planning)\b/i.test(m)) return 'local';
         if (/\bDailyPlan\.tt\b/i.test(m)) return 'local';
+        if (isErrorDiagnosisRequest(m)) return 'complex';
         var words = m.split(/\s+/);
         if (/\b(refactor|implement|fix bug|debug|write code|explain in detail|compare|analyze|architect)\b/i.test(m)) {
             return 'complex';
@@ -1689,12 +1703,27 @@
         })
         .then(function(r) {
             return r.text().then(function(text) {
+                if (!text || !text.trim()) {
+                    throw new Error('Empty response from server (HTTP ' + r.status + ')');
+                }
                 try {
-                    return JSON.parse(text);
+                    var data = JSON.parse(text);
+                    if (!r.ok && data && !data.success && !data.error) {
+                        data.success = false;
+                        data.error = 'HTTP ' + r.status;
+                    }
+                    return data;
                 } catch (e) {
-                    throw new Error('Server returned non-JSON (HTTP ' + r.status + ')');
+                    throw new Error('Server returned non-JSON (HTTP ' + r.status + '): '
+                        + text.slice(0, 300));
                 }
             });
+        })
+        .catch(function(err) {
+            if (err && err.name === 'AbortError') {
+                throw new Error('Request timed out — try Ollama model or a shorter prompt.');
+            }
+            throw err;
         })
         .finally(function() {
             clearTimeout(abortTimer);
@@ -1724,16 +1753,15 @@
     function sendChatComserv(prompt, userText) {
         setStatus('Comserv AI…');
         q('#aew-send-btn').disabled = true;
-        var modelEl = q('#aew-model');
-        var selectedModel = modelEl ? modelEl.value : '';
+        var selectedModel = pickEditorModel(userText || prompt);
         var tier = classifyEditorQuery(userText || prompt);
-        if (tier === 'simple' && state.ollamaReachable) {
+        if (tier === 'simple' && state.ollamaReachable && !isErrorDiagnosisRequest(userText || prompt)) {
             return sendChatQuick(userText || prompt);
         }
         return fetchAiJson('/ai/chat', {
             prompt: prompt,
             agent_id: 'coding',
-            model: selectedModel,
+            model: selectedModel || undefined,
             history: state.chatHistory.slice(-20),
             page_path: window.location.pathname,
             conversation_id: state.conversationId || undefined,
@@ -1776,8 +1804,9 @@
         var tier = classifyEditorQuery(userText);
         var useComserv = state.backend === 'comserv'
             || tier === 'simple'
+            || isErrorDiagnosisRequest(userText)
             || (tier === 'medium' && state.ollamaReachable && !/grok/i.test((q('#aew-model') || {}).value || ''));
-        if (tier === 'simple' && state.ollamaReachable) {
+        if ((tier === 'simple' || isErrorDiagnosisRequest(userText)) && state.ollamaReachable) {
             useComserv = true;
         }
         var full = useComserv ? buildPrompt(userText) : buildGrokCliPrompt(userText);
@@ -1826,11 +1855,13 @@
         }).catch(function(e) {
             var errMsg = String(e);
             var hint = '';
-            if (/NetworkError|Failed to fetch|fetch resource|aborted/i.test(errMsg)) {
-                hint = '\n\nTip: For finding files, use the Search files box (above the tree) '
-                    + 'or type "find DailyPlan.tt" — that uses local index, not Grok CLI.';
+            if (/NetworkError|Failed to fetch|fetch resource|aborted|timed out/i.test(errMsg)) {
+                hint = '\n\nTip: For error diagnosis, use backend "Comserv AI" with an Ollama model selected.';
+                if (/grok/i.test((q('#aew-model') || {}).value || '')) {
+                    hint += '\nGrok model grok-build-0.1 is retired — switch to llama3.2 or gemma in the model dropdown.';
+                }
                 if (state.ollamaReachable) {
-                    hint += '\nSimple questions use free Ollama via /ai/quick_chat on the workstation.';
+                    hint += '\nOllama is available on this workstation — paste errors with Comserv AI backend.';
                 } else if (state.backend === 'grok_cli') {
                     hint += '\nRemote? Switch backend to "Comserv AI" or open the editor on 172.30.131.126:3001.';
                 }
