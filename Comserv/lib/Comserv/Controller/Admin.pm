@@ -2566,7 +2566,8 @@ sub get_database_comparison {
             table_count => 0,
             connection_status => 'unknown',
             error => undef,
-            table_comparisons => []
+            table_comparisons => [],
+            results_without_tables => [],
         },
         forager => {
             name => 'forager',
@@ -2575,14 +2576,16 @@ sub get_database_comparison {
             table_count => 0,
             connection_status => 'unknown',
             error => undef,
-            table_comparisons => []
+            table_comparisons => [],
+            results_without_tables => [],
         },
         migration_mysql => {
             name => 'migration_mysql',
-            display_name => 'New Server — MySQL Docker (192.168.1.20:3307)',
+            display_name => 'Migration Target — MySQL Server',
             connection_status => 'unknown',
             error => undef,
-            databases => []
+            databases => [],
+            ency_schema => undef,
         },
         migration_postgres => {
             name => 'migration_postgres',
@@ -2604,42 +2607,20 @@ sub get_database_comparison {
     # Get Ency database tables and compare with result files
     try {
         my $ency_tables = $self->get_ency_database_tables($c);
-        @$ency_tables = sort { lc($a) cmp lc($b) } @$ency_tables; # Alphabetical sort
+        @$ency_tables = sort { lc($a) cmp lc($b) } @$ency_tables;
+        my $ency_comp = $self->build_schema_comparison_data($c, 'ency', $ency_tables);
+
         $comparison->{ency}->{tables} = $ency_tables;
         $comparison->{ency}->{table_count} = scalar(@$ency_tables);
         $comparison->{ency}->{connection_status} = 'connected';
         $comparison->{summary}->{connected_databases}++;
         $comparison->{summary}->{total_tables} += scalar(@$ency_tables);
-        
-        # Build comprehensive mapping of result files to their actual table names
-        my $result_table_mapping = $self->build_result_table_mapping($c, 'ency');
-        
-        # Compare each table with its result file
-        my @tables_with_results = ();
-        my @tables_without_results = ();
-        
-        foreach my $table_name (@$ency_tables) {
-            my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'ency', $result_table_mapping);
-            
-            if ($table_comparison->{has_result_file}) {
-                push @tables_with_results, $table_comparison;
-                $comparison->{summary}->{tables_with_results}++;
-            } else {
-                push @tables_without_results, $table_comparison;
-                $comparison->{summary}->{tables_without_results}++;
-            }
-        }
-        
-        # Find result files without corresponding tables
-        my @results_without_tables = sort { lc($a->{result_name}) cmp lc($b->{result_name}) } $self->find_orphaned_result_files_v2($c, 'ency', $ency_tables, $result_table_mapping);
-        $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
-        
-        # Sort comparisons alphabetically
-        @tables_with_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
-        @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
-        $comparison->{ency}->{table_comparisons} = [@tables_with_results, @tables_without_results];
-        $comparison->{ency}->{results_without_tables} = \@results_without_tables;
-        
+        $comparison->{summary}->{tables_with_results}    += $ency_comp->{tables_with_results_count};
+        $comparison->{summary}->{tables_without_results} += $ency_comp->{tables_without_results_count};
+        $comparison->{summary}->{results_without_tables} += $ency_comp->{results_without_tables_count};
+        $comparison->{ency}->{table_comparisons}      = $ency_comp->{table_comparisons};
+        $comparison->{ency}->{results_without_tables} = $ency_comp->{results_without_tables};
+
     } catch {
         my $error = "Error connecting to ency database: $_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $error);
@@ -2650,48 +2631,26 @@ sub get_database_comparison {
     # Get Forager database tables and compare with result files
     try {
         my $forager_tables = $self->get_forager_database_tables($c);
-        @$forager_tables = sort { lc($a) cmp lc($b) } @$forager_tables; # Alphabetical sort
+        @$forager_tables = sort { lc($a) cmp lc($b) } @$forager_tables;
+        my $forager_comp = $self->build_schema_comparison_data($c, 'forager', $forager_tables);
+
         $comparison->{forager}->{tables} = $forager_tables;
         $comparison->{forager}->{table_count} = scalar(@$forager_tables);
         $comparison->{forager}->{connection_status} = 'connected';
         $comparison->{summary}->{connected_databases}++;
         $comparison->{summary}->{total_tables} += scalar(@$forager_tables);
-        
-        # Build comprehensive mapping of result files to their actual table names
-        my $result_table_mapping = $self->build_result_table_mapping($c, 'forager');
-        
-        # Compare each table with its result file
-        my @tables_with_results = ();
-        my @tables_without_results = ();
-        
-        foreach my $table_name (@$forager_tables) {
-            my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'forager', $result_table_mapping);
-            
-            if ($table_comparison->{has_result_file}) {
-                push @tables_with_results, $table_comparison;
-                $comparison->{summary}->{tables_with_results}++;
-            } else {
-                push @tables_without_results, $table_comparison;
-                $comparison->{summary}->{tables_without_results}++;
-            }
-        }
-        
-        # Find result files without corresponding tables
-        my @results_without_tables = sort { lc($a->{result_name}) cmp lc($b->{result_name}) } $self->find_orphaned_result_files_v2($c, 'forager', $forager_tables, $result_table_mapping);
-        $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
-        
-        # Sort comparisons alphabetically
-        @tables_with_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
-        @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
-        $comparison->{forager}->{table_comparisons} = [@tables_with_results, @tables_without_results];
-        $comparison->{forager}->{results_without_tables} = \@results_without_tables;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-            "Found " . scalar(@$forager_tables) . " tables in forager database, " . 
-            scalar(@tables_with_results) . " with results, " . 
-            scalar(@tables_without_results) . " without results, " . 
-            scalar(@results_without_tables) . " orphaned results");
-            
+        $comparison->{summary}->{tables_with_results}    += $forager_comp->{tables_with_results_count};
+        $comparison->{summary}->{tables_without_results} += $forager_comp->{tables_without_results_count};
+        $comparison->{summary}->{results_without_tables} += $forager_comp->{results_without_tables_count};
+        $comparison->{forager}->{table_comparisons}      = $forager_comp->{table_comparisons};
+        $comparison->{forager}->{results_without_tables} = $forager_comp->{results_without_tables};
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison',
+            "Forager: " . scalar(@$forager_tables) . " tables, "
+            . $forager_comp->{tables_with_results_count} . " with results, "
+            . $forager_comp->{tables_without_results_count} . " without results, "
+            . $forager_comp->{results_without_tables_count} . " orphaned results");
+
     } catch {
         my $error = "Error connecting to forager database: $_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $error);
@@ -2705,8 +2664,28 @@ sub get_database_comparison {
     $comparison->{migration_mysql}->{error}             = $mysql_info->{error};
     $comparison->{migration_mysql}->{databases}         = $mysql_info->{databases} // [];
     $comparison->{migration_mysql}->{host}              = $mysql_info->{host};
+    if ($mysql_info->{host}) {
+        $comparison->{migration_mysql}->{display_name} = 'Migration Target — MySQL (' . $mysql_info->{host} . ')';
+    }
     if ($mysql_info->{connection_status} eq 'connected') {
         $comparison->{summary}->{connected_databases}++;
+
+        # Compare migration server's ency database against local Result files
+        my ($ency_db) = grep { lc($_->{name}) eq 'ency' } @{ $mysql_info->{databases} // [] };
+        if ($ency_db && $ency_db->{tables}) {
+            my @migration_ency_tables = map { $_->{name} } @{ $ency_db->{tables} };
+            @migration_ency_tables = sort { lc($a) cmp lc($b) } @migration_ency_tables;
+            my $mig_comp = $self->build_schema_comparison_data($c, 'ency', \@migration_ency_tables);
+            $comparison->{migration_mysql}->{ency_schema} = {
+                database_name              => $ency_db->{name},
+                table_count                => scalar(@migration_ency_tables),
+                table_comparisons          => $mig_comp->{table_comparisons},
+                results_without_tables     => $mig_comp->{results_without_tables},
+                tables_with_results_count  => $mig_comp->{tables_with_results_count},
+                tables_without_results_count => $mig_comp->{tables_without_results_count},
+                results_without_tables_count => $mig_comp->{results_without_tables_count},
+            };
+        }
     }
 
     # Get migration target PostgreSQL server info
@@ -2959,6 +2938,41 @@ sub extract_table_name_from_result_file {
     }
     
     return undef;
+}
+
+# Build the three-group schema comparison data for a table list + Result files
+sub build_schema_comparison_data {
+    my ($self, $c, $database, $table_names_ref) = @_;
+
+    my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+    my @tables_with_results;
+    my @tables_without_results;
+
+    foreach my $table_name (@$table_names_ref) {
+        my $table_comparison = $self->compare_table_with_result_file_v2(
+            $c, $table_name, $database, $result_table_mapping
+        );
+        if ($table_comparison->{has_result_file}) {
+            push @tables_with_results, $table_comparison;
+        } else {
+            push @tables_without_results, $table_comparison;
+        }
+    }
+
+    my @results_without_tables = sort {
+        lc($a->{result_name}) cmp lc($b->{result_name})
+    } $self->find_orphaned_result_files_v2($c, $database, $table_names_ref, $result_table_mapping);
+
+    @tables_with_results    = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
+    @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
+
+    return {
+        table_comparisons            => [ @tables_with_results, @tables_without_results ],
+        results_without_tables       => \@results_without_tables,
+        tables_with_results_count    => scalar(@tables_with_results),
+        tables_without_results_count => scalar(@tables_without_results),
+        results_without_tables_count => scalar(@results_without_tables),
+    };
 }
 
 # Build comprehensive mapping of result files to their actual table names

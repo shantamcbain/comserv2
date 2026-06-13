@@ -29,6 +29,19 @@ can_ok('Comserv::Controller::AI', 'editor_config');
     ok($controller->can('quick_chat'), 'quick_chat method is available');
     ok($controller->can('_ollama_hosts_to_probe'), '_ollama_hosts_to_probe is available');
     ok($controller->can('_ollama_chat_with_failover'), '_ollama_chat_with_failover is available');
+    ok($controller->can('_find_reachable_ollama_host'), '_find_reachable_ollama_host is available');
+    ok($controller->can('_is_member_or_above'), '_is_member_or_above is available');
+    ok($controller->can('_is_lightweight_ollama_request'), '_is_lightweight_ollama_request is available');
+}
+
+{
+    my $controller = bless {}, 'Comserv::Controller::AI';
+    ok($controller->_is_lightweight_ollama_request('helpdesk', 'How do I submit a ticket?'),
+        'helpdesk agent is lightweight');
+    ok($controller->_is_lightweight_ollama_request('general', 'take me to HelpDesk'),
+        'navigation prompt is lightweight');
+    ok(!$controller->_is_lightweight_ollama_request('planning', 'audit all project names'),
+        'planning audit is not lightweight');
 }
 
 {

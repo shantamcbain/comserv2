@@ -444,7 +444,12 @@ sub _initialize_ai_chat_schema {
     if ($@) {
         warn "Warning: Could not ensure ai_usage_logs table: $@\n";
     }
-    
+
+    eval { $class->_ensure_ai_navigation_shortcuts_table(); };
+    if ($@) {
+        warn "Warning: Could not ensure ai_navigation_shortcuts table: $@\n";
+    }
+
     return 1;
 }
 
@@ -543,6 +548,65 @@ sub _ensure_ai_usage_log_table {
     };
     if ($@) {
         warn "Failed to ensure ai_usage_logs schema: $@\n";
+    }
+    return 1;
+}
+
+=head2 _ensure_ai_navigation_shortcuts_table
+
+Creates ai_navigation_shortcuts (if missing) for DB-driven AI navigation and trigger phrases.
+=cut
+
+sub _ensure_ai_navigation_shortcuts_table {
+    my $class = shift;
+
+    eval {
+        use Comserv::Util::Logging;
+        my $log = Comserv::Util::Logging->instance;
+
+        my $schema = $class->model('DBEncy');
+        return unless $schema && $schema->storage && $schema->storage->dbh;
+
+        my $dbh = $schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW TABLES LIKE 'ai_navigation_shortcuts'");
+        $sth->execute();
+        my $exists = $sth->fetchrow_arrayref();
+
+        if (!$exists) {
+            $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_ensure_ai_navigation_shortcuts_table',
+                "Creating ai_navigation_shortcuts table...");
+
+            my $sql = q{
+                CREATE TABLE `ai_navigation_shortcuts` (
+                    `id` INT(11) NOT NULL AUTO_INCREMENT,
+                    `label` VARCHAR(100) NOT NULL,
+                    `url` VARCHAR(512) NOT NULL,
+                    `trigger_phrases` TEXT DEFAULT NULL,
+                    `category` VARCHAR(50) DEFAULT NULL,
+                    `sitename` VARCHAR(50) NOT NULL DEFAULT 'All',
+                    `is_private` TINYINT(1) NOT NULL DEFAULT 0,
+                    `owner_username` VARCHAR(100) DEFAULT NULL,
+                    `min_role` VARCHAR(20) NOT NULL DEFAULT 'user',
+                    `link_order` INT(11) DEFAULT 0,
+                    `status` TINYINT(1) NOT NULL DEFAULT 1,
+                    `source` VARCHAR(30) DEFAULT 'manual',
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_ai_nav_shortcut_site` (`sitename`),
+                    KEY `idx_ai_nav_shortcut_owner` (`owner_username`),
+                    KEY `idx_ai_nav_shortcut_private` (`is_private`),
+                    KEY `idx_ai_nav_shortcut_status` (`status`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            };
+
+            $dbh->do($sql);
+            $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_ensure_ai_navigation_shortcuts_table',
+                "ai_navigation_shortcuts table created successfully.");
+        }
+    };
+    if ($@) {
+        warn "Failed to ensure ai_navigation_shortcuts schema: $@\n";
     }
     return 1;
 }

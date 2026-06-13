@@ -56,7 +56,7 @@
     [% END %]
 
     <!-- Base CSS with variables -->
-    [% cv = c.stash.css_v || '20260412' %]
+    [% cv = c.stash.css_v || '20260613' %]
     <link rel="stylesheet" type="text/css" href="/static/css/base.css?v=[% cv %]">
 
     <!-- Theme CSS - using JSON-based theme system -->
@@ -107,6 +107,9 @@
     <!-- Menu CSS (part of theme system) -->
     <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css?v=[% cv %]">
 
+    <!-- Navigation dropdown/submenu component styles (after menu-theme) -->
+    <link rel="stylesheet" type="text/css" href="/static/css/components/navigation.css?v=[% cv %]">
+
     <!-- Site-specific CSS (background images, site branding) -->
     [% IF css_view_name %]
     <link rel="stylesheet" type="text/css" href="[% css_view_name %]?v=[% cv %]">
@@ -131,7 +134,7 @@
     [% END %]
 
     [% IF c.stash.template.match('membership/') %]
-    <link rel="stylesheet" type="text/css" href="/static/css/membership.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/membership.css?v=[% cv %]">
     [% END %]
 
     [% IF c.stash.template.match('ENCY/') %]

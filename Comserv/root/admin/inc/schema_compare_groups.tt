@@ -1,0 +1,152 @@
+[%# Shared partial: always show all three schema compare groups.
+    Args: database_key, table_comparisons, results_without_tables, read_only (optional) %]
+[% SET read_only = read_only ? 1 : 0 %]
+[% tables_with_results = [] %]
+[% tables_without_results = [] %]
+[% FOREACH table_comparison IN table_comparisons %]
+    [% IF table_comparison.has_result_file %]
+        [% tables_with_results.push(table_comparison) %]
+    [% ELSE %]
+        [% tables_without_results.push(table_comparison) %]
+    [% END %]
+[% END %]
+[% results_without_tables = results_without_tables || [] %]
+
+<!-- Group 1: Tables with Result files (always visible) -->
+<div class="table-group">
+    <div class="table-group-header" onclick="toggleTableGroup(this)">
+        <span>
+            <i class="fas fa-check-circle"></i> Tables with Result Files
+            <span class="group-count">[% tables_with_results.size %]</span>
+        </span>
+        <i class="fas fa-chevron-right group-toggle-icon"></i>
+    </div>
+    <div class="table-group-content">
+    [% IF tables_with_results.size > 0 %]
+        [% FOREACH table_comparison IN tables_with_results %]
+            <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="[% database_key | html %]">
+                <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                    <div class="table-comparison-title">
+                        <i class="fas fa-table"></i>
+                        <h4>[% table_comparison.table_name | html %]</h4>
+                        [% IF table_comparison.sync_status == 'synchronized' %]
+                            <span class="difference-indicator same" title="Synchronized"></span>
+                        [% ELSE %]
+                            <span class="difference-indicator different" title="Needs sync"></span>
+                        [% END %]
+                    </div>
+                    <div class="table-comparison-actions">
+                        [% UNLESS read_only %]
+                            [% IF table_comparison.sync_status == 'needs_sync' %]
+                                <button class="sync-btn" onclick="syncTable('[% table_comparison.table_name | html %]', '[% database_key | html %]'); event.stopPropagation();">
+                                    <i class="fas fa-sync"></i> Sync Fields
+                                </button>
+                                <button class="recreate-btn" title="Drop and recreate table from Result file (empty tables only)" style="background:#fd7e14;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;" onclick="recreateTableFromResult('[% table_comparison.result_name || table_comparison.table_name | html %]', '[% database_key | html %]'); event.stopPropagation();">
+                                    <i class="fas fa-redo"></i> Recreate
+                                </button>
+                            [% END %]
+                        [% END %]
+                        <i class="fas fa-chevron-right expand-icon"></i>
+                    </div>
+                </div>
+                <div class="field-comparison-content">
+                    <div class="loading-indicator">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Loading field comparison...</span>
+                    </div>
+                </div>
+            </div>
+        [% END %]
+    [% ELSE %]
+        <p class="schema-group-empty"><i class="fas fa-info-circle"></i> No tables with matching Result files.</p>
+    [% END %]
+    </div>
+</div>
+
+<!-- Group 2: Result files without Tables (always visible) -->
+<div class="table-group">
+    <div class="table-group-header" onclick="toggleTableGroup(this)">
+        <span>
+            <i class="fas fa-file-alt"></i> Result Files without Tables
+            <span class="group-count">[% results_without_tables.size %]</span>
+        </span>
+        <i class="fas fa-chevron-right group-toggle-icon"></i>
+    </div>
+    <div class="table-group-content">
+    [% IF results_without_tables.size > 0 %]
+        [% FOREACH result_file IN results_without_tables %]
+            <div class="table-comparison-card" data-table="[% result_file.actual_table_name | html %]" data-database="[% database_key | html %]">
+                <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                    <div class="table-comparison-title">
+                        <i class="fas fa-file-alt"></i>
+                        <h4>[% result_file.result_name | html %] (Result only)</h4>
+                        <span class="difference-indicator missing" title="No corresponding table"></span>
+                    </div>
+                    <div class="table-comparison-actions">
+                        [% UNLESS read_only %]
+                            <button class="create-btn" onclick="createTableFromResult('[% result_file.result_name | html %]', '[% database_key | html %]'); event.stopPropagation();">
+                                <i class="fas fa-plus"></i> Create Table
+                            </button>
+                        [% ELSE %]
+                            <span class="read-only-badge" title="Migration target is read-only">Read-only</span>
+                        [% END %]
+                        <i class="fas fa-chevron-right expand-icon"></i>
+                    </div>
+                </div>
+                <div class="field-comparison-content">
+                    <div class="loading-indicator">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Loading result schema...</span>
+                    </div>
+                </div>
+            </div>
+        [% END %]
+    [% ELSE %]
+        <p class="schema-group-empty"><i class="fas fa-check"></i> Every Result file has a matching table.</p>
+    [% END %]
+    </div>
+</div>
+
+<!-- Group 3: Tables without Result files (always visible) -->
+<div class="table-group">
+    <div class="table-group-header" onclick="toggleTableGroup(this)">
+        <span>
+            <i class="fas fa-plus-square"></i> Tables without Result Files
+            <span class="group-count">[% tables_without_results.size %]</span>
+        </span>
+        <i class="fas fa-chevron-right group-toggle-icon"></i>
+    </div>
+    <div class="table-group-content">
+    [% IF tables_without_results.size > 0 %]
+        [% FOREACH table_comparison IN tables_without_results %]
+            <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="[% database_key | html %]">
+                <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                    <div class="table-comparison-title">
+                        <i class="fas fa-table"></i>
+                        <h4>[% table_comparison.table_name | html %] (Table only)</h4>
+                        <span class="difference-indicator missing" title="No result file"></span>
+                    </div>
+                    <div class="table-comparison-actions">
+                        [% UNLESS read_only %]
+                            <button class="create-btn" onclick="createResultFromTable('[% table_comparison.table_name | html %]', '[% database_key | html %]'); event.stopPropagation();">
+                                <i class="fas fa-plus"></i> Create Result
+                            </button>
+                        [% ELSE %]
+                            <span class="read-only-badge" title="Migration target is read-only">Read-only</span>
+                        [% END %]
+                        <i class="fas fa-chevron-right expand-icon"></i>
+                    </div>
+                </div>
+                <div class="field-comparison-content">
+                    <div class="loading-indicator">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Loading table schema...</span>
+                    </div>
+                </div>
+            </div>
+        [% END %]
+    [% ELSE %]
+        <p class="schema-group-empty"><i class="fas fa-check"></i> Every table has a matching Result file.</p>
+    [% END %]
+    </div>
+</div>

@@ -1011,3 +1011,29 @@
         padding: 8px;
     }
 }
+
+.schema-group-empty {
+    padding: 12px 16px;
+    margin: 0;
+    color: var(--text-muted, #6c757d);
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.read-only-badge {
+    font-size: 0.75rem;
+    color: var(--text-muted, #6c757d);
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+
+.migration-schema-note {
+    padding: 10px 14px;
+    margin: 0 0 12px 0;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}

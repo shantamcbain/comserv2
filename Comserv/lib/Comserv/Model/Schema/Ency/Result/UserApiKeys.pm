@@ -72,10 +72,16 @@ sub get_metadata {
     my $self = shift;
     my $metadata = $self->metadata;
     return {} unless $metadata;
+    return $metadata if ref($metadata) eq 'HASH';
+    my $parsed;
     eval {
-        return decode_json($metadata);
+        $parsed = decode_json($metadata);
     };
-    return {};
+    if ($@) {
+        warn "UserApiKeys get_metadata decode failed for id=" . ($self->id || '?') . ": $@";
+        return {};
+    }
+    return ref($parsed) eq 'HASH' ? $parsed : {};
 }
 
 sub set_metadata {

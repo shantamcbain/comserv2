@@ -209,7 +209,72 @@ sub _apply_safe_restart_defaults {
     return @args;
 }
 
-@ARGV = _apply_safe_restart_defaults(@ARGV);
+sub _strip_twiggy_flag {
+    my @args = @_;
+    my $twiggy = ($ENV{COMSERV_TWIGGY} // '') eq '1';
+
+    my @remaining;
+    for my $arg (@args) {
+        if ($arg eq '--twiggy' || $arg eq '-w') {
+            $twiggy = 1;
+        } else {
+            push @remaining, $arg;
+        }
+    }
+
+    return ($twiggy, @remaining);
+}
+
+sub _parse_port_and_reload {
+    my @args = @_;
+    my $port   = 3000;
+    my $reload = 0;
+
+    for (my $i = 0; $i < @args; $i++) {
+        my $arg = $args[$i];
+
+        if ($arg eq '-p' || $arg eq '--port') {
+            $port = $args[++$i] if $i < @args;
+        } elsif ($arg =~ /^--port=(.+)$/) {
+            $port = $1;
+        } elsif ($arg =~ /^-p(\d+)$/) {
+            $port = $1;
+        } elsif ($arg eq '-r' || $arg eq '--restart') {
+            $reload = 1;
+        }
+    }
+
+    return ($port, $reload);
+}
+
+sub _run_twiggy_server {
+    my ($port, $reload) = @_;
+
+    my $root = $ENV{CATALYST_HOME} || "$FindBin::Bin/..";
+    my $plackup = -x "$root/local/bin/plackup" ? "$root/local/bin/plackup" : 'plackup';
+
+    my @cmd = (
+        $plackup,
+        '-s', 'Twiggy',
+        '--host', '0.0.0.0',
+        '-p', $port,
+        '-E', 'development',
+        '-I', 'lib',
+        '-I', 'local/lib/perl5',
+        '-a', 'script/comserv_server.psgi',
+    );
+    push @cmd, '-R', 'lib,root' if $reload;
+
+    print "Starting Comserv with Twiggy (WebSocket support) on port $port...\n";
+    print "Press Ctrl+C to stop\n" if $ENV{CATALYST_DEBUG};
+
+    chdir $root or die "Cannot chdir to $root: $!";
+    exec @cmd;
+    die "Failed to exec $plackup: $!";
+}
+
+my ($use_twiggy, @argv_without_twiggy) = _strip_twiggy_flag(@ARGV);
+@ARGV = _apply_safe_restart_defaults($use_twiggy ? @argv_without_twiggy : @ARGV);
 
 # =========================================================================
 # Health Evaluation Daemon
@@ -541,6 +606,11 @@ sub _run_link_audit {
 my $_is_dev_worktree = ($FindBin::Bin =~ m{\.zenflow[\\/]worktrees[\\/]});
 _start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
 
+if ($use_twiggy) {
+    my ($port, $reload) = _parse_port_and_reload(@ARGV);
+    _run_twiggy_server($port, $reload);
+}
+
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 
 1;
@@ -562,6 +632,8 @@ comserv_server.pl [options]
    -k --keepalive       enable keep-alive connections
    -r --restart         restart when files get modified
                         (defaults to false)
+   -w --twiggy          use Twiggy via plackup for WebSocket support
+                        (e.g. coding CLI terminal on port 3001)
    -rd --restart_delay  delay between file checks
                         (ignored if you have Linux::Inotify2 installed)
    -rr --restart_regex  regex match files that trigger

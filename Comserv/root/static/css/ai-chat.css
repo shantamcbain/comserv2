@@ -307,6 +307,23 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
     border-left: 3px solid var(--nav-bg, #ccffff);
 }
 
+.ai-message .lc-nav-choice,
+.ai-message a.lc-nav-choice {
+    color: var(--link-color, #1a73e8);
+    text-decoration: underline;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ai-message .lc-nav-choices {
+    margin: 0.4em 0 0 1.2em;
+    padding: 0;
+}
+
+.ai-message .lc-nav-choices li {
+    margin: 0.35em 0;
+}
+
 .ai-message.loading {
     color: var(--text-muted-color, #888);
     font-style: italic;
@@ -627,5 +644,75 @@ body.ai-widget-popup .chat-header {
         max-height: calc(100vh - 38px) !important;
         border-radius: 0 !important;
     }
+}
+
+/* Voice / photo / audio accessibility toolbar (widget popup + mobile) */
+.chat-a11y-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 6px 0 4px;
+    border-bottom: 1px solid var(--border-color, #ddd);
+    margin-bottom: 4px;
+}
+
+.chat-a11y-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 6px 10px;
+    cursor: pointer;
+    background: var(--button-bg, #f0f0f0);
+    color: var(--button-text, #000);
+    border: 1px solid var(--button-border, #ccc);
+    border-radius: 6px;
+    font-size: 0.9em;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+}
+
+.chat-a11y-btn:active {
+    opacity: 0.85;
+}
+
+.chat-auto-send-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82em;
+    cursor: pointer;
+    min-height: 44px;
+    user-select: none;
+    color: var(--text-color, #333);
+}
+
+/* Android-safe hidden file inputs (avoid display:none — breaks some WebViews) */
+.chat-file-input-hidden {
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+}
+
+body.ai-widget-popup .chat-a11y-toolbar {
+    padding: 8px 0 6px;
+}
+
+body.ai-widget-popup #message-input,
+body.ai-widget-popup #send-message {
+    min-height: 44px;
+    font-size: 16px;
+}
+
+body.ai-widget-popup .chat-a11y-label {
+    font-weight: 600;
 }
 

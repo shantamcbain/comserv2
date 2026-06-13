@@ -25,6 +25,7 @@ __PACKAGE__->register_class('User', 'Comserv::Model::Schema::Ency::Result::User'
 __PACKAGE__->register_class('AiConversation', 'Comserv::Model::Schema::Ency::Result::AiConversation');
 __PACKAGE__->register_class('AiMessage', 'Comserv::Model::Schema::Ency::Result::AiMessage');
 __PACKAGE__->register_class('AiUsageLog', 'Comserv::Model::Schema::Ency::Result::AiUsageLog');
+__PACKAGE__->register_class('AiNavigationShortcut', 'Comserv::Model::Schema::Ency::Result::AiNavigationShortcut');
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 __PACKAGE__->register_class('UserApiKeys', 'Comserv::Model::Schema::Ency::Result::UserApiKeys');

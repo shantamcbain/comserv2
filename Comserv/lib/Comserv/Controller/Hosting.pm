@@ -94,7 +94,7 @@ sub hosted_dashboard :Path('/hosted') :Args(0) {
 
     my $schema   = $c->model('DBEncy');
     my $sitename = $c->session->{SiteName} || 'CSC';
-    my $is_admin = $c->session->{is_admin} || 0;
+    my $is_admin = $c->stash->{is_admin} || $c->session->{is_admin} || 0;
 
     my $acct = eval { $schema->resultset('Accounting::HostingAccount')->find({ sitename => $sitename }) };
 
@@ -109,13 +109,25 @@ sub hosted_dashboard :Path('/hosted') :Args(0) {
         { slug => 'hosting-subdomain', name => 'Subdomain + cPanel', sku => 'HOST-CPANEL', monthly => ($cost_cfg ? sprintf('%.2f', $cost_cfg->unit_price * 1.5) : 15.00) },
     ];
 
+    my $hosted_catalog = [];
+    if ( lc($sitename) eq 'csc' ) {
+        my $nav = $c->controller('Navigation');
+        if ($nav) {
+            eval { $hosted_catalog = $nav->get_hosted_sites_catalog($c) || [] };
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'hosted_dashboard',
+                "Could not load hosted catalogue: $@") if $@;
+        }
+    }
+
     $c->stash(
-        template  => 'hosting/hosted_dashboard.tt',
-        acct      => $acct,
-        cost_cfg  => $cost_cfg,
-        all_plans => $all_plans,
-        sitename  => $sitename,
-        is_admin  => $is_admin,
+        template        => 'hosting/hosted_dashboard.tt',
+        acct            => $acct,
+        cost_cfg        => $cost_cfg,
+        all_plans       => $all_plans,
+        sitename        => $sitename,
+        is_admin        => $is_admin,
+        hosted_catalog  => $hosted_catalog,
+        show_hosted_hub => ( lc($sitename) eq 'csc' ),
     );
 }
 

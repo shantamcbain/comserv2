@@ -105,6 +105,26 @@ body.theme-ve7tit .dropdown-content a {
     color: var(--nav-link-color, var(--text-color)) !important;
 }
 
+/* Submenu flyouts — theme variables (dropdown lists were missing these) */
+body[class*="theme-"] .submenu {
+    background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+}
+
+body[class*="theme-"] .submenu a,
+body[class*="theme-"] .submenu-header,
+body[class*="theme-"] .submenu-header-link {
+    color: var(--nav-link-color, var(--text-color)) !important;
+}
+
+body[class*="theme-"] .submenu a:hover {
+    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1)) !important;
+}
+
+body[class*="theme-"] .submenu a.submenu-add-link {
+    color: var(--accent-color, var(--link-color, var(--text-color))) !important;
+    border-top: 1px solid var(--border-color) !important;
+}
+
 /* Debug footer styling */
 .debug-footer {
     margin-top: 20px;

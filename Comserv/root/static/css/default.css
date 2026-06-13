@@ -34,7 +34,7 @@ nav {
 
 .dropbtn {
     display: inline-block;
-    color: black;
+    color: var(--nav-text, var(--text-color));
     text-align: center;
     padding: 14px 16px;
     text-decoration: none;

@@ -26,6 +26,8 @@
         modelTiers: { small: '', large: '' },
         ollamaReachable: false,
         ollamaHost: '',
+        codingTerminalAllowed: false,
+        codingTerminalWs: '/coding/terminal_ws',
         currentAbortCtrl: null,
     };
 
@@ -105,6 +107,7 @@
         panel.innerHTML =
             '<div id="aew-panel-header">' +
               '<span id="aew-drag-handle" title="Drag">⠿</span>' +
+              '<button type="button" class="aew-btn" id="aew-toggle-files" title="Show/hide file tree (Ctrl+B)">📁</button>' +
               '<span id="aew-panel-title">AI Code Editor</span>' +
               '<span id="aew-panel-sub">Local CLI · floating</span>' +
               '<select id="aew-backend" title="AI backend" style="font-size:0.72rem;margin-left:6px;">' +
@@ -122,7 +125,7 @@
               '<button type="button" class="aew-btn" id="aew-close">✕</button>' +
             '</div>' +
             '<div id="aew-panel-body" class="aew-panel-body">' +
-              '<aside class="aew-files">' +
+              '<aside class="aew-files" id="aew-files-pane">' +
                 '<div style="padding:0.3rem;display:flex;gap:0.25rem;align-items:center;">' +
                   '<button type="button" class="aew-btn" id="aew-refresh-tree" title="Refresh tree and load index">↻</button>' +
                   '<button type="button" class="aew-btn" id="aew-new-file-btn" title="Create a new file" style="font-weight:bold;">+</button>' +
@@ -136,10 +139,12 @@
                 '</div>' +
                 '<div class="aew-tree" id="aew-tree"></div>' +
               '</aside>' +
+              '<div class="aew-splitter aew-splitter-v" id="aew-split-files" title="Drag to resize file tree"></div>' +
               '<section class="aew-editor-pane">' +
                 '<div style="padding:0.25rem 0.4rem;font-size:0.72rem;color:#9cdcfe;" id="aew-editor-path">—</div>' +
                 '<textarea class="aew-editor" id="aew-editor" spellcheck="false"></textarea>' +
               '</section>' +
+              '<div class="aew-splitter aew-splitter-v" id="aew-split-chat" title="Drag to resize chat panel"></div>' +
               '<aside class="aew-chat-pane" id="aew-aside-pane">' +
                 '<div class="aew-tabs-header">' +
                   '<button type="button" class="aew-tab-btn active" id="aew-tab-chat">💬 Chat</button>' +
@@ -196,18 +201,30 @@
                 '</div>' +
                 '<div id="aew-tab-cli-content" class="aew-tab-content">' +
                   '<div class="aew-cli-panel">' +
-                    '<div class="aew-cli-history-container">' +
-                      '<pre class="aew-cli-output" id="aew-cli-output">Ready to execute commands...</pre>' +
+                    '<div class="aew-cli-header">' +
+                      '<span id="aew-cli-status">Workstation terminal</span>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-reconnect" title="Reconnect shell">Reconnect</button>' +
                     '</div>' +
-                    '<div class="aew-cli-input-row">' +
-                      '<input type="text" id="aew-cli-input" placeholder="Type safe command (e.g. ls -la, grok status)...">' +
-                      '<button type="button" class="aew-btn aew-btn-primary" id="aew-btn-cli-run">Run</button>' +
+                    '<div class="aew-cli-help" id="aew-cli-help">' +
+                      '<strong>Dev server required:</strong> CLI needs Twiggy WebSockets. ' +
+                      'Run on the workstation: ' +
+                      '<code id="aew-cli-cmd">cd Comserv &amp;&amp; CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r</code> ' +
+                      '<button type="button" class="aew-btn" id="aew-cli-copy-cmd" title="Copy start command">Copy</button>' +
+                      '<span class="aew-cli-help-note"> · Open <code>http://172.30.131.126:3001</code> as Shanta</span>' +
+                    '</div>' +
+                    '<div class="aew-cli-terminal-wrap" id="aew-cli-terminal-wrap">' +
+                      '<div id="aew-cli-terminal"></div>' +
+                    '</div>' +
+                    '<div class="aew-cli-denied" id="aew-cli-denied" style="display:none;">' +
+                      'Coding terminal is only available to Shanta at <strong>http://172.30.131.126:PORT/</strong>.' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
               '</aside>' +
             '</div>' +
-            '<div id="aew-resize-handle" title="Resize"></div>';
+            '<div id="aew-resize-edge-right" title="Resize width"></div>' +
+            '<div id="aew-resize-edge-bottom" title="Resize height"></div>' +
+            '<div id="aew-resize-handle" title="Resize (drag corner)"></div>';
 
         document.body.appendChild(wrap);
         document.body.appendChild(panel);
@@ -312,6 +329,300 @@
             q('#aew-tab-cli-content').classList.remove('active-tab');
         };
 
+        var cliTerminal = null;
+        var cliFitAddon = null;
+        var cliWebSocket = null;
+        var cliScriptsLoaded = false;
+
+        function getFitAddonCtor() {
+            if (window.FitAddon && window.FitAddon.FitAddon) return window.FitAddon.FitAddon;
+            if (typeof window.FitAddon === 'function') return window.FitAddon;
+            return null;
+        }
+
+        function loadCliScripts(cb) {
+            if (cliScriptsLoaded && window.Terminal && getFitAddonCtor()) {
+                cb();
+                return;
+            }
+            var pending = 0;
+            function done() {
+                pending--;
+                if (pending <= 0) {
+                    cliScriptsLoaded = !!(window.Terminal && getFitAddonCtor());
+                    cb();
+                }
+            }
+            function addCss(href) {
+                if (document.querySelector('link[href="' + href + '"]')) return;
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = href;
+                document.head.appendChild(link);
+            }
+            function addScript(src, onload) {
+                if (document.querySelector('script[src="' + src + '"]')) {
+                    onload();
+                    return;
+                }
+                pending++;
+                var s = document.createElement('script');
+                s.src = src;
+                s.onload = function() { done(); onload(); };
+                s.onerror = function() { done(); onload(); };
+                document.head.appendChild(s);
+            }
+            addCss('https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css');
+            addScript('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js', function() {});
+            addScript('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js', function() {});
+            if (pending === 0) {
+                cliScriptsLoaded = !!(window.Terminal && getFitAddonCtor());
+                cb();
+            }
+        }
+
+        function focusCliTerminal() {
+            if (!cliTerminal) return;
+            try {
+                cliTerminal.focus();
+                var ta = q('#aew-cli-terminal .xterm-helper-textarea');
+                if (ta) ta.focus();
+            } catch (e) {}
+        }
+
+        function fitCliTerminal() {
+            if (!cliFitAddon || !cliTerminal) return;
+            try {
+                cliFitAddon.fit();
+                if (cliTerminal.cols < 2 || cliTerminal.rows < 2) {
+                    var wrap = q('#aew-cli-terminal-wrap');
+                    if (wrap && wrap.clientHeight > 0) {
+                        cliFitAddon.fit();
+                    }
+                }
+                cliTerminal.refresh(0, cliTerminal.rows - 1);
+                sendCliResize();
+            } catch (e) {}
+        }
+
+        function setCliStatus(text, color) {
+            var el = q('#aew-cli-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color || '#9cdcfe';
+        }
+
+        function showCliHelp(show) {
+            var help = q('#aew-cli-help');
+            if (!help) return;
+            help.style.display = show ? 'block' : 'none';
+        }
+
+        function copyCliStartCmd() {
+            var cmdEl = q('#aew-cli-cmd');
+            var text = cmdEl ? cmdEl.textContent : 'cd Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r';
+            function done(ok) {
+                var btn = q('#aew-cli-copy-cmd');
+                if (!btn) return;
+                var prev = btn.textContent;
+                btn.textContent = ok ? 'Copied!' : 'Copy failed';
+                setTimeout(function() { btn.textContent = prev; }, 1500);
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() { done(true); }).catch(function() { done(false); });
+                return;
+            }
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                done(true);
+            } catch (e) {
+                done(false);
+            }
+        }
+
+        function disconnectCliTerminal() {
+            if (cliWebSocket) {
+                try { cliWebSocket.close(); } catch (e) {}
+                cliWebSocket = null;
+            }
+            setCliStatus('Disconnected', '#888');
+        }
+
+        function sendCliResize() {
+            if (!cliWebSocket || cliWebSocket.readyState !== WebSocket.OPEN || !cliTerminal) return;
+            if (cliTerminal.cols < 2 || cliTerminal.rows < 2) return;
+            var payload = JSON.stringify({
+                type: 'resize',
+                cols: cliTerminal.cols,
+                rows: cliTerminal.rows
+            });
+            cliWebSocket.send('\x01' + payload);
+        }
+
+        function writeCliOutput(data) {
+            if (!cliTerminal || data == null) return;
+            if (data instanceof ArrayBuffer) {
+                cliTerminal.write(new Uint8Array(data));
+            } else if (data instanceof Blob) {
+                data.arrayBuffer().then(function(buffer) {
+                    cliTerminal.write(new Uint8Array(buffer));
+                });
+            } else {
+                cliTerminal.write(data);
+            }
+        }
+
+        function bindCliSocketHandlers(ws) {
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = function() {
+                setCliStatus('Connected — click terminal, then type', '#39ff14');
+                showCliHelp(false);
+                setTimeout(function() {
+                    fitCliTerminal();
+                    sendCliResize();
+                    focusCliTerminal();
+                }, 150);
+            };
+
+            ws.onmessage = function(event) {
+                writeCliOutput(event.data);
+            };
+
+            ws.onerror = function() {
+                setCliStatus('Connection error — start Twiggy dev server', '#ff6b6b');
+                showCliHelp(true);
+                if (cliTerminal) cliTerminal.writeln('\r\n\x1b[31m✗ Terminal connection error\x1b[0m');
+            };
+
+            ws.onclose = function(ev) {
+                var reason = (ev && ev.code) ? (' (' + ev.code + (ev.reason ? ': ' + ev.reason : '') + ')') : '';
+                setCliStatus('Disconnected' + reason, '#888');
+                showCliHelp(true);
+                cliWebSocket = null;
+            };
+        }
+
+        function connectCliTerminal() {
+            if (!state.codingTerminalAllowed) {
+                setCliStatus('Not available on this host', '#ff6b6b');
+                return;
+            }
+            if (cliWebSocket && (cliWebSocket.readyState === WebSocket.OPEN || cliWebSocket.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+            if (cliWebSocket) {
+                try { cliWebSocket.close(); } catch (e) {}
+                cliWebSocket = null;
+            }
+            setCliStatus('Connecting…', '#ffc107');
+
+            var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var wsPath = (state.codingTerminalWs || '/coding/terminal_ws');
+            var wsUrl = protocol + '//' + window.location.host + wsPath;
+
+            try {
+                cliWebSocket = new WebSocket(wsUrl);
+                bindCliSocketHandlers(cliWebSocket);
+            } catch (e) {
+                setCliStatus('WebSocket failed: ' + e, '#ff6b6b');
+            }
+        }
+
+        function initCliTerminal() {
+            var wrap = q('#aew-cli-terminal-wrap');
+            var denied = q('#aew-cli-denied');
+            if (!wrap) return;
+
+            if (!state.codingTerminalAllowed) {
+                wrap.style.display = 'none';
+                if (denied) denied.style.display = 'block';
+                setCliStatus('Shanta @ 172.30.131.126 only', '#ff6b6b');
+                showCliHelp(true);
+                return;
+            }
+
+            if (denied) denied.style.display = 'none';
+            wrap.style.display = 'flex';
+            showCliHelp(true);
+
+            loadCliScripts(function() {
+                var FitAddonCtor = getFitAddonCtor();
+                if (!window.Terminal || !FitAddonCtor) {
+                    setCliStatus('xterm.js failed to load', '#ff6b6b');
+                    return;
+                }
+
+                if (!cliTerminal) {
+                    cliTerminal = new Terminal({
+                        cursorBlink: true,
+                        disableStdin: false,
+                        fontSize: 12,
+                        fontFamily: 'Consolas, Menlo, Monaco, "Courier New", monospace',
+                        theme: {
+                            background: '#000000',
+                            foreground: '#39ff14',
+                            cursor: '#39ff14'
+                        },
+                        scrollback: 5000
+                    });
+                    cliFitAddon = new FitAddonCtor();
+                    cliTerminal.loadAddon(cliFitAddon);
+                    cliTerminal.onData(function(data) {
+                        if (cliWebSocket && cliWebSocket.readyState === WebSocket.OPEN) {
+                            cliWebSocket.send(data);
+                        }
+                    });
+                    cliTerminal.onResize(function(size) {
+                        if (cliWebSocket && cliWebSocket.readyState === WebSocket.OPEN) {
+                            var payload = JSON.stringify({
+                                type: 'resize',
+                                cols: size.cols,
+                                rows: size.rows
+                            });
+                            cliWebSocket.send('\x01' + payload);
+                        }
+                    });
+                    cliTerminal.attachCustomKeyEventHandler(function() {
+                        return true;
+                    });
+                    var container = q('#aew-cli-terminal');
+                    if (container) {
+                        cliTerminal.open(container);
+                        container.addEventListener('mousedown', function(e) {
+                            e.stopPropagation();
+                            focusCliTerminal();
+                        });
+                        container.addEventListener('click', function() {
+                            focusCliTerminal();
+                        });
+                    }
+                    var wrap = q('#aew-cli-terminal-wrap');
+                    if (wrap) {
+                        wrap.addEventListener('mousedown', function(e) {
+                            e.stopPropagation();
+                            focusCliTerminal();
+                        });
+                    }
+                }
+
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        fitCliTerminal();
+                        connectCliTerminal();
+                        focusCliTerminal();
+                    });
+                });
+            });
+        }
+
         q('#aew-tab-cli').onclick = function() {
             q('#aew-tab-cli').classList.add('active');
             q('#aew-tab-chat').classList.remove('active');
@@ -319,58 +630,39 @@
             q('#aew-tab-cli-content').classList.add('active-tab');
             q('#aew-tab-chat-content').classList.remove('active-tab');
             q('#aew-tab-deploy-content').classList.remove('active-tab');
+            setTimeout(function() {
+                initCliTerminal();
+            }, 50);
         };
 
-        function runCliCommand() {
-            var inputEl = q('#aew-cli-input');
-            var runBtn = q('#aew-btn-cli-run');
-            var outputEl = q('#aew-cli-output');
-            if (!inputEl || !runBtn || !outputEl) return;
+        q('#aew-cli-copy-cmd').onclick = copyCliStartCmd;
 
-            var cmd = (inputEl.value || '').trim();
-            if (!cmd) return;
-
-            inputEl.disabled = true;
-            runBtn.disabled = true;
-
-            outputEl.textContent += '\n$ ' + cmd + '\nExecuting...\n';
-            outputEl.scrollTop = outputEl.scrollHeight;
-
-            fetch('/ai/run_command', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'command=' + encodeURIComponent(cmd)
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    outputEl.textContent += data.output + '\n[Exit Code: ' + data.exit_code + ']\n';
-                } else {
-                    outputEl.textContent += 'Error: ' + (data.error || 'Unknown error') + '\n';
-                }
-                outputEl.scrollTop = outputEl.scrollHeight;
-                inputEl.disabled = false;
-                runBtn.disabled = false;
-                inputEl.value = '';
-                inputEl.focus();
-            })
-            .catch(function(e) {
-                outputEl.textContent += 'Network Error: ' + e + '\n';
-                outputEl.scrollTop = outputEl.scrollHeight;
-                inputEl.disabled = false;
-                runBtn.disabled = false;
-                inputEl.focus();
-            });
-        }
-
-        q('#aew-btn-cli-run').onclick = runCliCommand;
-        q('#aew-cli-input').onkeydown = function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                runCliCommand();
+        q('#aew-cli-reconnect').onclick = function() {
+            if (!state.codingTerminalAllowed) {
+                fetch('/coding/terminal_status', { credentials: 'include' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        state.codingTerminalAllowed = !!data.allowed;
+                        if (!data.allowed) {
+                            setCliStatus('Denied: open http://172.30.131.126:' + (window.location.port || '3001'), '#ff6b6b');
+                            return;
+                        }
+                        initCliTerminal();
+                    })
+                    .catch(function() { initCliTerminal(); });
+                return;
             }
+            disconnectCliTerminal();
+            setTimeout(function() {
+                initCliTerminal();
+            }, 100);
         };
+
+        window.addEventListener('resize', function() {
+            if (q('#aew-tab-cli-content') && q('#aew-tab-cli-content').classList.contains('active-tab')) {
+                fitCliTerminal();
+            }
+        });
 
         q('#aew-terminal-clear').onclick = function() {
             var consoleEl = q('#aew-terminal-console');
@@ -662,6 +954,7 @@
 
         initDrag(panel);
         initResize(panel);
+        initSplitters(panel);
     }
 
     function populateModels(cfg) {
@@ -692,7 +985,6 @@
             var extGrp = document.createElement('optgroup');
             extGrp.label = 'xAI (Grok)';
             cfg.external_models.forEach(function(m) {
-                if (/^grok-build/i.test(m.name || '')) return;
                 var opt = document.createElement('option');
                 opt.value = m.name;
                 opt.textContent = m.label;
@@ -742,22 +1034,224 @@
         document.addEventListener('mouseup', function() { dragging = false; });
     }
 
-    function initResize(panel) {
-        var rh = q('#aew-resize-handle');
-        var resizing = false, sx, sy, sw, sh;
-        rh.addEventListener('mousedown', function(e) {
-            e.stopPropagation();
-            resizing = true;
-            sx = e.clientX; sy = e.clientY;
-            sw = panel.offsetWidth; sh = panel.offsetHeight;
+    function anchorPanelTopLeft(panel) {
+        var r = panel.getBoundingClientRect();
+        panel.style.bottom = 'auto';
+        panel.style.right = 'auto';
+        panel.style.top = r.top + 'px';
+        panel.style.left = r.left + 'px';
+        return { top: r.top, left: r.left };
+    }
+
+    function applyPanelSize(panel, w, h) {
+        var minW = 400, minH = 280;
+        var maxW = window.innerWidth - 20;
+        var maxH = window.innerHeight - 20;
+        var left = parseFloat(panel.style.left);
+        if (!isFinite(left)) left = panel.getBoundingClientRect().left;
+        var top = parseFloat(panel.style.top);
+        if (!isFinite(top)) top = panel.getBoundingClientRect().top;
+        maxW = Math.max(minW, Math.min(maxW, window.innerWidth - left - 8));
+        maxH = Math.max(minH, Math.min(maxH, window.innerHeight - top - 8));
+        panel.style.width = Math.max(minW, Math.min(maxW, w)) + 'px';
+        panel.style.height = Math.max(minH, Math.min(maxH, h)) + 'px';
+    }
+
+    function persistPanelSize(panel) {
+        try {
+            sessionStorage.setItem('aew_panel_size', JSON.stringify({
+                w: panel.offsetWidth,
+                h: panel.offsetHeight
+            }));
+        } catch (err) { /* ignore */ }
+    }
+
+    function restorePanelSize(panel) {
+        if (window.AEW_POPUP_MODE) return;
+        try {
+            var raw = sessionStorage.getItem('aew_panel_size');
+            if (!raw) return;
+            var sz = JSON.parse(raw);
+            if (sz && sz.w && sz.h) {
+                anchorPanelTopLeft(panel);
+                applyPanelSize(panel, sz.w, sz.h);
+            }
+        } catch (err) { /* ignore */ }
+    }
+
+    function initSplitters(panel) {
+        var filesPane = q('#aew-files-pane');
+        var chatPane = q('#aew-aside-pane');
+        var splitFiles = q('#aew-split-files');
+        var splitChat = q('#aew-split-chat');
+        var toggleBtn = q('#aew-toggle-files');
+
+        function setLayoutVar(name, px) {
+            panel.style.setProperty(name, Math.round(px) + 'px');
+        }
+
+        function readLayoutVar(name, fallback) {
+            var raw = panel.style.getPropertyValue(name);
+            if (!raw) return fallback;
+            var n = parseFloat(raw);
+            return isFinite(n) ? n : fallback;
+        }
+
+        function persistLayout() {
+            try {
+                sessionStorage.setItem('aew_panel_layout', JSON.stringify({
+                    filesW: readLayoutVar('--aew-files-width', filesPane ? filesPane.offsetWidth : 200),
+                    chatW: readLayoutVar('--aew-chat-width', chatPane ? chatPane.offsetWidth : 300),
+                    filesCollapsed: panel.classList.contains('aew-files-collapsed')
+                }));
+            } catch (err) { /* ignore */ }
+        }
+
+        function restoreLayout() {
+            try {
+                var raw = sessionStorage.getItem('aew_panel_layout');
+                if (!raw) return;
+                var layout = JSON.parse(raw);
+                if (layout.filesW) setLayoutVar('--aew-files-width', layout.filesW);
+                if (layout.chatW) setLayoutVar('--aew-chat-width', layout.chatW);
+                if (layout.filesCollapsed) {
+                    panel.classList.add('aew-files-collapsed');
+                    if (toggleBtn) {
+                        toggleBtn.textContent = '📂';
+                        toggleBtn.title = 'Show file tree (Ctrl+B)';
+                    }
+                }
+            } catch (err) { /* ignore */ }
+        }
+
+        function updateFilesToggleUi() {
+            if (!toggleBtn) return;
+            var collapsed = panel.classList.contains('aew-files-collapsed');
+            toggleBtn.textContent = collapsed ? '📂' : '📁';
+            toggleBtn.title = (collapsed ? 'Show' : 'Hide') + ' file tree (Ctrl+B)';
+            toggleBtn.classList.toggle('aew-btn-active', !collapsed);
+        }
+
+        function toggleFilesPane() {
+            panel.classList.toggle('aew-files-collapsed');
+            updateFilesToggleUi();
+            persistLayout();
+        }
+
+        if (toggleBtn) {
+            toggleBtn.onclick = function(e) {
+                e.stopPropagation();
+                toggleFilesPane();
+            };
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (!(e.ctrlKey || e.metaKey) || String(e.key).toLowerCase() !== 'b') return;
+            var p = q('#aew-panel');
+            if (!p || (!p.classList.contains('open') && !window.AEW_POPUP_MODE)) return;
+            if (e.target && e.target.closest && !e.target.closest('#aew-panel')) return;
             e.preventDefault();
+            toggleFilesPane();
         });
-        document.addEventListener('mousemove', function(e) {
+
+        function bindSplitter(handle, mode) {
+            if (!handle) return;
+            var dragging = false;
+            var sx = 0;
+            var startW = 0;
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dragging = true;
+                sx = e.clientX;
+                handle.classList.add('aew-splitter-active');
+                document.body.classList.add('aew-resizing', 'aew-resizing-col');
+                if (mode === 'files') {
+                    startW = readLayoutVar('--aew-files-width', filesPane.offsetWidth || 200);
+                } else {
+                    startW = readLayoutVar('--aew-chat-width', chatPane.offsetWidth || 300);
+                }
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!dragging) return;
+                if (mode === 'files') {
+                    if (panel.classList.contains('aew-files-collapsed')) return;
+                    setLayoutVar('--aew-files-width', Math.max(120, Math.min(520, startW + e.clientX - sx)));
+                } else {
+                    setLayoutVar('--aew-chat-width', Math.max(200, Math.min(640, startW - (e.clientX - sx))));
+                }
+            });
+            document.addEventListener('mouseup', function() {
+                if (!dragging) return;
+                dragging = false;
+                handle.classList.remove('aew-splitter-active');
+                document.body.classList.remove('aew-resizing', 'aew-resizing-col');
+                persistLayout();
+            });
+        }
+
+        restoreLayout();
+        updateFilesToggleUi();
+        bindSplitter(splitFiles, 'files');
+        bindSplitter(splitChat, 'chat');
+    }
+
+    function initResize(panel) {
+        if (window.AEW_POPUP_MODE) return;
+        var rh = q('#aew-resize-handle');
+        var edgeR = q('#aew-resize-edge-right');
+        var edgeB = q('#aew-resize-edge-bottom');
+        var resizing = false, mode = 'both', sx, sy, sw, sh;
+
+        function startResize(e, resizeMode) {
+            e.stopPropagation();
+            e.preventDefault();
+            anchorPanelTopLeft(panel);
+            resizing = true;
+            mode = resizeMode || 'both';
+            sx = e.clientX;
+            sy = e.clientY;
+            sw = panel.offsetWidth;
+            sh = panel.offsetHeight;
+            document.body.style.userSelect = 'none';
+            document.body.classList.add('aew-resizing');
+        }
+
+        function onMove(e) {
             if (!resizing) return;
-            panel.style.width = Math.max(520, sw + e.clientX - sx) + 'px';
-            panel.style.height = Math.max(360, sh + e.clientY - sy) + 'px';
-        });
-        document.addEventListener('mouseup', function() { resizing = false; });
+            var nw = sw + (mode === 'height' ? 0 : e.clientX - sx);
+            var nh = sh + (mode === 'width' ? 0 : e.clientY - sy);
+            applyPanelSize(panel, nw, nh);
+        }
+
+        function endResize() {
+            if (!resizing) return;
+            resizing = false;
+            document.body.style.userSelect = '';
+            document.body.classList.remove('aew-resizing');
+            persistPanelSize(panel);
+        }
+
+        if (rh) {
+            rh.addEventListener('mousedown', function(e) { startResize(e, 'both'); });
+            rh.addEventListener('touchstart', function(e) {
+                if (!e.touches || !e.touches[0]) return;
+                startResize(e.touches[0], 'both');
+            }, { passive: false });
+        }
+        if (edgeR) {
+            edgeR.addEventListener('mousedown', function(e) { startResize(e, 'width'); });
+        }
+        if (edgeB) {
+            edgeB.addEventListener('mousedown', function(e) { startResize(e, 'height'); });
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', endResize);
+        document.addEventListener('touchmove', function(e) {
+            if (!resizing || !e.touches || !e.touches[0]) return;
+            onMove(e.touches[0]);
+        }, { passive: false });
+        document.addEventListener('touchend', endResize);
     }
 
     function formatMessageHtml(text) {
@@ -1658,9 +2152,6 @@
     function pickEditorModel(userText) {
         var modelEl = q('#aew-model');
         var selected = modelEl ? modelEl.value : '';
-        if (/^grok-build/i.test(selected)) {
-            return 'grok-2';
-        }
         if (state.ollamaReachable && isErrorDiagnosisRequest(userText)) {
             return state.modelTiers.large || state.modelTiers.small || selected;
         }
@@ -1873,7 +2364,7 @@
             if (/NetworkError|Failed to fetch|fetch resource|aborted|timed out/i.test(errMsg)) {
                 hint = '\n\nTip: For error diagnosis, use backend "Comserv AI" with an Ollama model selected.';
                 if (/grok/i.test((q('#aew-model') || {}).value || '')) {
-                    hint += '\nGrok model grok-build-0.1 is retired — switch to llama3.2 or gemma in the model dropdown.';
+                    hint += '\nGrok request failed — sync models at /ai/models or switch to an Ollama model in the dropdown.';
                 }
                 if (state.ollamaReachable) {
                     hint += '\nOllama is available on this workstation — paste errors with Comserv AI backend.';
@@ -1902,6 +2393,7 @@
         ensureOnBody();
         var panel = q('#aew-panel');
         panel.classList.add('open');
+        restorePanelSize(panel);
         state.open = true;
         state.inline = true;
         document.body.classList.add('aew-inline-open');
@@ -1988,6 +2480,8 @@
         state.enabled = true;
         state.ollamaReachable = !!cfg.ollama_reachable;
         state.ollamaHost = cfg.ollama_host || '';
+        state.codingTerminalAllowed = !!cfg.coding_terminal_allowed;
+        state.codingTerminalWs = cfg.coding_terminal_ws || '/coding/terminal_ws';
         if (cfg.model_tiers) {
             state.modelTiers.small = cfg.model_tiers.small || '';
             state.modelTiers.large = cfg.model_tiers.large || '';
