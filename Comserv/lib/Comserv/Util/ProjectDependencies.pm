@@ -95,17 +95,25 @@ sub active_cross_blocker_count {
     return $count;
 }
 
-# Returns (\@project_deps, $auto_resolved_count, $auto_detected_count)
+# Returns { deps => \@hashrefs, auto_resolved => N, auto_detected => N }
 sub sync_dependencies {
     my ($c, $sitename, $is_csc, $detect_new) = @_;
     my (@project_deps, $auto_resolved, $auto_detected) = ((), 0, 0);
 
-    return (\@project_deps, 0, 0) unless $c && $c->can('model');
+    my $result = sub {
+        return {
+            deps          => \@project_deps,
+            auto_resolved => $auto_resolved,
+            auto_detected => $auto_detected,
+        };
+    };
+
+    return $result->() unless $c && $c->can('model');
 
     my $prs     = eval { $c->model('DBEncy')->resultset('Project') };
     my $tdrs    = eval { $c->model('DBEncy')->resultset('Todo') };
     my $deps_rs = eval { $c->model('DBEncy')->resultset('ProjectDependency') };
-    return (\@project_deps, 0, 0) unless $prs && $tdrs && $deps_rs;
+    return $result->() unless $prs && $tdrs && $deps_rs;
 
     my @done = done_statuses();
 
@@ -174,7 +182,7 @@ sub sync_dependencies {
         push @project_deps, \%d;
     }
 
-    return (\@project_deps, $auto_resolved, $auto_detected);
+    return $result->();
 }
 
 1;
