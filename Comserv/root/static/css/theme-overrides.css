@@ -215,34 +215,33 @@ body[class*="theme-"] .dropbtn {
 
 body[class*="theme-"] .dropdown-content {
   background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9)) !important;
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
 }
 
-body[class*="theme-"] .horizontal-dropdown:hover .dropdown-content {
-  display: block !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-body[class*="theme-"] .dropdown-content a {
+body[class*="theme-"] .dropdown-content a,
+body[class*="theme-"] .dropdown-content .menu-item,
+body[class*="theme-"] .submenu a,
+body[class*="theme-"] .submenu-header,
+body[class*="theme-"] .submenu-header-link {
   color: var(--nav-link-color, var(--text-color, #000000)) !important;
+}
+
+body[class*="theme-"] .dropdown-content a:hover,
+body[class*="theme-"] .dropdown-content .menu-item:hover,
+body[class*="theme-"] .submenu a:hover {
+  background-color: var(--nav-hover-bg) !important;
 }
 
 body[class*="theme-"] .submenu {
   background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9)) !important;
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
 }
 
-body[class*="theme-"] .submenu-item:hover .submenu {
-  display: block !important;
-  opacity: 1 !important;
-  visibility: visible !important;
+body[class*="theme-"] .submenu a.submenu-add-link {
+  color: var(--accent-color, var(--link-color, var(--text-color))) !important;
+  font-weight: 600;
+  border-top-color: var(--border-color) !important;
 }
 
-body[class*="theme-"] .submenu a {
-  color: var(--nav-link-color, var(--text-color, #000000)) !important;
+body[class*="theme-"] .submenu a.submenu-add-link:hover {
+  background-color: var(--nav-hover-bg) !important;
+  color: var(--link-hover-color, var(--accent-color, var(--text-color))) !important;
 }

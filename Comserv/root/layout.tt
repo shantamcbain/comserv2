@@ -26,6 +26,7 @@
     [% content %]
     [%- SET cv = c.stash.css_v || '1' -%]
     <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% cv %]">
+    <script src="/static/js/ai-common.js?v=[% cv %]"></script>
     <script src="/static/js/local-chat.js?v=[% cv %]"></script>
 [% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
@@ -56,10 +57,11 @@
         siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
     };
     </script>
+    <script src="/static/js/ai-common.js?v=[% cv %]"></script>
     <script src="/static/js/local-chat.js?v=[% cv %]"></script>
     [% IF (c.session.username == 'Shanta' || c.session.username == 'shanta') && c.req.uri.host == '172.30.131.126' %]
     <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
-    <script src="/static/js/ai-editing-widget-float.js?v=20260611g"></script>
+    <script src="/static/js/ai-editing-widget-float.js?v=20260612i"></script>
     [% END %]
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->

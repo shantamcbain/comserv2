@@ -6,7 +6,7 @@
     <title>AI Chat</title>
     <link rel="stylesheet" href="/static/css/themes/[% theme_name || 'default' %].css">
     <link rel="stylesheet" href="/static/css/theme-overrides.css">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=20260611g">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=20260612j">
     <style>
         html, body {
             margin: 0;
@@ -231,7 +231,8 @@
             }
         })();
     </script>
-    <script src="/static/js/local-chat.js?v=20260611f"></script>
+    <script src="/static/js/ai-common.js?v=20260612a"></script>
+    <script src="/static/js/local-chat.js?v=20260612j"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Note: local-chat.js auto-opens the chat panel when AI_WIDGET_POPUP is true.

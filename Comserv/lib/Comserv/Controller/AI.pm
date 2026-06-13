@@ -434,9 +434,15 @@ sub editor_config :Local :Args(0) {
     my $ssh_line_named = "ssh -N $ssh_alias";
     my $editor_popup = "/ai/editing_widget_popup";
 
+    require Comserv::Util::CodingAccess;
+    my $coding_terminal_allowed = Comserv::Util::CodingAccess::workstation_allowed($c) ? 1 : 0;
+
     $c->response->body(encode_json({
         success     => JSON::true,
         enabled     => $enabled,
+        coding_terminal_allowed => $coding_terminal_allowed ? JSON::true : JSON::false,
+        coding_terminal_ws      => '/coding/terminal_ws',
+        coding_terminal_status  => '/coding/terminal_status',
         grok_cli     => $enabled ? $self->_find_grok_binary() : undef,
         grok_home    => $enabled ? $self->_grok_home() : undef,
         project_root => $self->_project_root_path($c),
@@ -457,7 +463,7 @@ sub editor_config :Local :Args(0) {
         prefer_local_ollama => $self->_prefer_local_ollama($c) ? JSON::true : JSON::false,
         grok_api_available  => (@ext_models ? JSON::true : JSON::false),
         grok_sync_hint      => @ext_models
-            ? 'xAI models loaded. Retired grok-build-* models are hidden.'
+            ? 'xAI models loaded from your API key (sync at /ai/models to refresh).'
             : 'No xAI models — add Grok API key at /ai/manage_api_keys then Sync at /ai/models',
         ssh_host    => $ssh_host,
         ssh_user    => $ssh_user,
@@ -954,7 +960,7 @@ sub _grok_cli_via_api {
     }
 
     $grok->api_key($api_key);
-    my $model = $model_override || $c->config->{grok_cli_model} || 'grok-beta';
+    my $model = $model_override || $c->config->{grok_cli_model} || 'grok-4.3';
     $grok->model($model);
 
     my $system = $self->_build_coding_system_prompt($c);
@@ -1827,6 +1833,10 @@ sub generate :Local :Args(0) {
             }
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
             $active_ollama_host = $current_host;
+
+            my $member_plus = $self->_is_member_or_above($c, $user_id, $user_roles, $is_guest);
+            my $lightweight = $member_plus
+                && $self->_is_lightweight_ollama_request($normalized_agent_type, $prompt);
             
             # ── 3-Tier model selection: start small, escalate if needed ─────────
             # Tier 1 = tier_small (fastest / lightest installed model)
@@ -1834,14 +1844,36 @@ sub generate :Local :Args(0) {
             my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
                 $installed_models, $current_model, $agent_id, $page_context);
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
-            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
-            my $force_large = (!$is_guest && !$manual_model &&
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier.
+            # Member+ helpdesk/navigation requests stay on the small tier for reliability.
+            my $force_large = (!$is_guest && !$manual_model && !$lightweight &&
                 $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
             my $use_model = $manual_model || ($force_large ? $tier_large : $tier_small);
 
             push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large, $use_model,
-                $manual_model ? " (manual override)" : ($force_large ? " (agent forced large)" : ""));
+                $manual_model ? " (manual override)"
+                : ($lightweight ? " (member nav/helpdesk)" : ($force_large ? " (agent forced large)" : "")));
+
+            # Probe all candidate hosts — config primary may be down while workstation Ollama is up
+            my ($reachable_host, $fast_check) = $self->_find_reachable_ollama_host($c, {
+                port       => $current_port || 11434,
+                start_host => $current_host,
+            });
+            unless ($reachable_host) {
+                die "Ollama is not reachable. Please select an external AI model (Grok) or try again later.";
+            }
+            if ($reachable_host ne $current_host) {
+                push @trace, sprintf("🔀 Ollama reachable at %s (config had %s)", $reachable_host, $current_host);
+                $current_host = $reachable_host;
+                $active_ollama_host = $reachable_host;
+                my $reachable_ollama = Comserv::Model::Ollama->new(
+                    host => $reachable_host, port => $current_port || 11434, timeout => 3);
+                if ($reachable_ollama && $reachable_ollama->check_connection()) {
+                    my $models = $reachable_ollama->list_models();
+                    $installed_models = $models if $models && ref($models) eq 'ARRAY' && @$models;
+                }
+            }
 
             $ollama->host($current_host);
             $ollama->port($current_port) if $current_port;
@@ -1849,13 +1881,7 @@ sub generate :Local :Args(0) {
             $ollama->clear_endpoint;
 
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'generate', "Ollama Tier-1 host=$current_host model=$use_model agent=$agent_id");
-
-            # Fast availability check (3-second timeout) before committing
-            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
-            unless ($fast_check && $fast_check->check_connection()) {
-                die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
-            }
+                'generate', "Ollama Tier-1 host=$current_host model=$use_model agent=$agent_id member_plus=$member_plus lightweight=$lightweight");
 
             # ── Prefer in-memory models to avoid cold-start delays ──────────────
             # If the selected tier_small is NOT already loaded but another installed
@@ -1927,7 +1953,7 @@ sub generate :Local :Args(0) {
                     push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
                     my $fb_grok = $c->model('Grok');
                     $fb_grok->api_key($fallback_key);
-                    $fb_grok->model('grok-beta');
+                    $fb_grok->model('grok-4.3');
                     my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
                     push @fb_msgs, { role => 'user', content => $prompt };
                     my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
@@ -1938,7 +1964,7 @@ sub generate :Local :Args(0) {
                         $c->res->body(encode_json({
                             success        => 1,
                             response       => $fb_resp,
-                            model          => 'grok-beta (cold-start fallback)',
+                            model          => 'grok-4.3 (cold-start fallback)',
                             provider       => 'grok',
                             trace          => $trace_txt,
                             thinking_trace => \@trace,
@@ -1950,10 +1976,12 @@ sub generate :Local :Args(0) {
                 push @trace, sprintf("🧊 Cold start — no Grok fallback available; proceeding with %s (may be slow)", $use_model);
             }
 
-            my $timeout_secs = $is_cold_start ? 600 : 480;
-            push @trace, $is_cold_start
-                ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
-                : "🔥 Model warm — timeout ${timeout_secs}s";
+            my $timeout_secs = $lightweight ? 120 : ($is_cold_start ? 600 : 480);
+            push @trace, $lightweight
+                ? "⚡ Member nav/helpdesk — timeout ${timeout_secs}s on small model"
+                : ($is_cold_start
+                    ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
+                    : "🔥 Model warm — timeout ${timeout_secs}s");
             $ollama->timeout($timeout_secs);
 
             # ── Pre-call: create conversation + save user prompt BEFORE Ollama ─
@@ -3156,8 +3184,22 @@ sub chat :Local :Args(0) {
 
     # Always try to pull previously learned / dynamically observed links (from this or prior sessions)
     # and inject them so the AI gradually knows about new features without manual prompt edits.
-    my $learned_additions = $self->_get_learned_navigation_additions($c, 10);
+    my $chat_is_admin = grep { /^(admin|developer|editor)$/i } @$user_roles_chat;
+    my $chat_role_tier = $chat_is_admin ? 'admin' : ($is_guest ? 'guest' : 'user');
+    my $learned_additions = $self->_get_learned_navigation_additions($c, 10, $chat_role_tier);
     push @system_parts, $learned_additions if $learned_additions;
+
+    eval {
+        my $nav_ctrl = $c->controller('Navigation');
+        if ($nav_ctrl) {
+            my $chat_base = $c->uri_for('/') . '';
+            $chat_base =~ s{/$}{};
+            my $shortcut_section = $nav_ctrl->build_ai_shortcut_navigation_section($c, $chat_role_tier, $chat_base);
+            push @system_parts, $shortcut_section if $shortcut_section;
+            my $menu_links_section = $nav_ctrl->build_internal_links_navigation_section($c, $chat_role_tier, $chat_base);
+            push @system_parts, $menu_links_section if $menu_links_section;
+        }
+    };
 
     my $combined_system_prompt = join("\n\n", @system_parts);
 
@@ -3379,10 +3421,26 @@ sub chat :Local :Args(0) {
 
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model_perm);
 
-            # Quick availability check before committing to a long request
-            my $avail_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
-            unless ($avail_check && $avail_check->check_connection()) {
-                die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
+            my $chat_member_plus = $self->_is_member_or_above($c, $user_id, $user_roles_chat, $is_guest);
+            my $chat_lightweight = $chat_member_plus
+                && $self->_is_lightweight_ollama_request($chat_agent_id, $prompt);
+
+            my ($reachable_host, $avail_check) = $self->_find_reachable_ollama_host($c, {
+                port       => $current_port || 11434,
+                start_host => $current_host,
+            });
+            unless ($reachable_host) {
+                die "Ollama is not reachable. Please select an external AI model (Grok) or try again later.";
+            }
+            if ($reachable_host ne $current_host) {
+                push @chat_trace, sprintf("🔀 Ollama reachable at %s (config had %s)", $reachable_host, $current_host);
+                $current_host = $reachable_host;
+                my $reachable_ollama = Comserv::Model::Ollama->new(
+                    host => $reachable_host, port => $current_port || 11434, timeout => 3);
+                if ($reachable_ollama && $reachable_ollama->check_connection()) {
+                    my $models = $reachable_ollama->list_models();
+                    $installed_models = $models if $models && ref($models) eq 'ARRAY' && @$models;
+                }
             }
 
             $ollama->set_host($current_host);
@@ -3395,14 +3453,16 @@ sub chat :Local :Args(0) {
 
             # If user manually picked a model (admin override), skip escalation logic
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
-            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
-            my $chat_force_large = (!$is_guest && !$manual_model &&
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier.
+            # Member+ helpdesk/navigation requests stay on the small tier for reliability.
+            my $chat_force_large = (!$is_guest && !$manual_model && !$chat_lightweight &&
                 $chat_agent_id =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
 
             push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large,
                 $manual_model || ($chat_force_large ? $tier_large : $tier_small),
-                $manual_model ? ' (manual override)' : ($chat_force_large ? ' (agent forced large)' : ''));
+                $manual_model ? ' (manual override)'
+                : ($chat_lightweight ? ' (member nav/helpdesk)' : ($chat_force_large ? ' (agent forced large)' : '')));
 
             # ── Prefer in-memory models to avoid cold-start delays ──────────────
             my $chat_use_model = $manual_model || ($chat_force_large ? $tier_large : $tier_small);
@@ -3436,10 +3496,12 @@ sub chat :Local :Args(0) {
             # Use a longer timeout for cold starts (model not in memory)
             my $chat_running = eval { $avail_check->get_running_models() } || [];
             my $chat_cold = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $chat_use_model } @$chat_running;
-            my $chat_timeout = $chat_cold ? 600 : 480;
-            push @chat_trace, $chat_cold
-                ? "🧊 Cold start — timeout extended to ${chat_timeout}s"
-                : "🔥 Model warm — timeout ${chat_timeout}s";
+            my $chat_timeout = $chat_lightweight ? 120 : ($chat_cold ? 600 : 480);
+            push @chat_trace, $chat_lightweight
+                ? "⚡ Member nav/helpdesk — timeout ${chat_timeout}s on small model"
+                : ($chat_cold
+                    ? "🧊 Cold start — timeout extended to ${chat_timeout}s"
+                    : "🔥 Model warm — timeout ${chat_timeout}s");
             $ollama->timeout($chat_timeout);
 
             # Prepend combined system prompt for Ollama
@@ -4129,6 +4191,29 @@ sub models :Local :Args(0) {
         $is_csc_admin = ($username eq 'shanta' || grep { $_ =~ /^admin$/i } @$user_roles) ? 1 : 0;
     };
 
+    my $grok_sync_message;
+    if ($can_select_model && $c->session->{user_id}) {
+        my $grok_key = $self->_find_active_grok_api_key($c, $c->session->{user_id}, $can_select_model);
+        if ($grok_key) {
+            my $meta   = $grok_key->get_metadata() || {};
+            my $synced = $meta->{available_models} || [];
+            my $force  = $c->request->param('sync_grok') ? 1 : 0;
+            if ($force || !@$synced) {
+                my ($ok, $err, $count) = $self->_sync_grok_key_models($c, $grok_key,
+                    $force ? 'models_manual_sync' : 'models_auto_sync');
+                if ($ok) {
+                    eval { $grok_key->discard_changes; $grok_key->reload; };
+                    $grok_sync_message = "Synced $count models from xAI.";
+                } else {
+                    $grok_sync_message = "xAI sync failed: $err";
+                }
+            }
+        }
+    }
+
+    my $grok_info = $self->_grok_models_page_info($c, $c->session->{user_id}, $can_select_model);
+    $grok_info->{sync_message} = $grok_sync_message if $grok_sync_message;
+
     # Set template variables
     $c->stash(
         template => 'ai/models.tt',
@@ -4138,7 +4223,9 @@ sub models :Local :Args(0) {
         can_select_model => $can_select_model,
         is_csc_admin => $is_csc_admin,
         servers_json => encode_json($servers || []),
-        user_api_keys => \@user_api_keys
+        user_api_keys => \@user_api_keys,
+        grok_provider => $grok_info,
+        grok_provider_json => encode_json($grok_info || {}),
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -6105,9 +6192,18 @@ sub _build_role_system_prompt {
 
     # NEW: learned links + auto .tt discovery so new pages (e.g. freshly added ai/usage.tt or admin tools)
     # are findable by users in the chat ("open ai usage") and via links without manual code changes here.
-    $nav_guide .= $self->_get_learned_navigation_additions($c, 8);
+    $nav_guide .= $self->_get_learned_navigation_additions($c, 8, $role_tier);
 
-    my $tt_pages = $self->_get_auto_discovered_tt_pages($base_url);
+    # DB-driven shortcuts + user/site menu links (Option B)
+    eval {
+        my $nav_ctrl = $c->controller('Navigation');
+        if ($nav_ctrl) {
+            $nav_guide .= $nav_ctrl->build_ai_shortcut_navigation_section($c, $role_tier, $base_url);
+            $nav_guide .= $nav_ctrl->build_internal_links_navigation_section($c, $role_tier, $base_url);
+        }
+    };
+
+    my $tt_pages = $self->_get_auto_discovered_tt_pages($base_url, $role_tier);
     if ($tt_pages && @$tt_pages) {
         $nav_guide .= "\nAuto-discovered pages (new .tt templates become available here automatically):\n";
         my $count = 0;
@@ -6239,9 +6335,24 @@ New pages like the AI usage monitor will appear automatically without editing th
     my $cache_time = 0;
     my $CACHE_TTL = 300;  # 5 minutes
 
+    sub _nav_path_admin_only {
+        my ($self, $path) = @_;
+        return 0 unless defined $path && length $path;
+        return 1 if $path =~ m{^/admin(?:/|$)}i;
+        return 1 if $path =~ m{^/file/}i;
+        return 1 if $path =~ m{^/site(?:/|$)}i;
+        return 1 if $path =~ m{^/themeadmin}i;
+        return 1 if $path =~ m{^/log$}i;
+        return 1 if $path =~ m{^/chat/admin}i;
+        return 1 if $path =~ m{^/ai/models}i;
+        return 1 if $path =~ m{^/navigation/manage_links}i;
+        return 0;
+    }
+
     sub _get_auto_discovered_tt_pages {
-        my ($self, $base_url) = @_;
+        my ($self, $base_url, $role_tier) = @_;
         $base_url //= '';
+        $role_tier //= 'guest';
 
         my $now = time();
         if ($cached_tt_links && ($now - $cache_time) < $CACHE_TTL) {
@@ -6297,6 +6408,9 @@ New pages like the AI usage monitor will appear automatically without editing th
         # De-dup + sort (ai/ first)
         my %dedup;
         my @unique = grep { !$dedup{$_->[1]}++ } @found;
+        if ($role_tier ne 'admin') {
+            @unique = grep { !$self->_nav_path_admin_only($_->[1]) } @unique;
+        }
         @unique = sort {
             ($a->[1] =~ m{^/ai/} ? 0 : 1) <=> ($b->[1] =~ m{^/ai/} ? 0 : 1)
             || $a->[1] cmp $b->[1]
@@ -6618,8 +6732,9 @@ These survive prompt budget stripping better if we keep the list small.
 =cut
 
 sub _get_learned_navigation_additions {
-    my ($self, $c, $max) = @_;
+    my ($self, $c, $max, $role_tier) = @_;
     $max //= 8;
+    $role_tier //= 'guest';
     return '' unless $c;
 
     my $out = '';
@@ -6637,6 +6752,7 @@ sub _get_learned_navigation_additions {
             my $w = $r->word || '';
             $w =~ s/^ai_link://;
             next unless $w =~ /^\//;
+            next if $role_tier ne 'admin' && $self->_nav_path_admin_only($w);
             my $f = $r->frequency || 1;
             push @items, "  - (observed $f×) $w";
         }
@@ -6886,21 +7002,133 @@ Replace retired xAI model IDs (410 Gone) before any API call.
 
 =cut
 
+sub _fetch_xai_models {
+    my ($self, $api_key, $timeout) = @_;
+    return ([], 'API key missing') unless $api_key;
+    $timeout ||= 25;
+    require LWP::UserAgent;
+    require HTTP::Request;
+    my $ua = LWP::UserAgent->new(timeout => $timeout);
+    $ua->agent('Comserv/1.0');
+    my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
+    $req->header('Authorization' => "Bearer $api_key");
+    $req->header('Content-Type'  => 'application/json');
+    my $resp = $ua->request($req);
+    unless ($resp->is_success) {
+        my $detail = $resp->status_line;
+        if ($resp->content && length($resp->content) < 500) {
+            $detail .= ' — ' . $resp->content;
+        }
+        return ([], "xAI API error: $detail");
+    }
+    my $data = eval { decode_json($resp->content) };
+    return ([], 'Invalid JSON from xAI') if $@;
+    my @models;
+    foreach my $m (@{ $data->{data} || [] }) {
+        next unless $m->{id};
+        push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
+    }
+    @models = sort { $a->{id} cmp $b->{id} } @models;
+    return (\@models, undef);
+}
+
+sub _sync_grok_key_models {
+    my ($self, $c, $key_obj, $ctx) = @_;
+    $ctx ||= 'sync_grok_key_models';
+    unless ($key_obj && $key_obj->api_key_encrypted) {
+        return (0, 'No active Grok API key found.', 0);
+    }
+    my $api_key = $key_obj->get_api_key() || '';
+    unless ($api_key) {
+        return (0, 'Failed to decrypt Grok API key. Re-save it at /ai/manage_api_keys.', 0);
+    }
+    my ($models, $err) = $self->_fetch_xai_models($api_key);
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, $ctx, $err);
+        eval {
+            my $meta = $key_obj->get_metadata() || {};
+            $meta->{last_sync_error} = $err;
+            $meta->{last_sync_error_at} = time();
+            $key_obj->set_metadata($meta);
+            $key_obj->update;
+        };
+        return (0, $err, 0);
+    }
+    my $existing_meta = $key_obj->get_metadata() || {};
+    $existing_meta->{available_models} = $models;
+    $existing_meta->{models_synced_at} = time();
+    delete $existing_meta->{last_sync_error};
+    delete $existing_meta->{last_sync_error_at};
+    $key_obj->set_metadata($existing_meta);
+    eval { $key_obj->update };
+    if ($@) {
+        my $err = "Failed to save synced models to database: $@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, $ctx, $err);
+        return (0, $err, 0);
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        $ctx, 'Synced ' . scalar(@$models) . ' Grok models from xAI');
+    return (1, undef, scalar @$models);
+}
+
+sub _grok_default_model_id {
+    return 'grok-4.3';
+}
+
+sub _grok_fallback_model_ids {
+    return qw(grok-4.3 grok-build-0.1);
+}
+
+sub _grok_model_id_from_entry {
+    my ($self, $m) = @_;
+    return '' unless defined $m;
+    return $m if !ref($m) && $m ne '';
+    return '' unless ref($m) eq 'HASH';
+    return $m->{id} || $m->{name} || '';
+}
+
+sub _grok_is_media_model {
+    my ($self, $id) = @_;
+    return $id && $id =~ /imagine|video/i ? 1 : 0;
+}
+
+sub _grok_synced_model_ids {
+    my ($self, $meta, $key_obj) = @_;
+    $meta ||= {};
+    my $synced = $meta->{available_models};
+    if ((!$synced || ref($synced) ne 'ARRAY' || !@$synced) && $key_obj) {
+        my $raw = $key_obj->metadata;
+        if ($raw && !ref($raw)) {
+            my $parsed = eval { decode_json($raw) } || {};
+            $synced = $parsed->{available_models} if ref($parsed) eq 'HASH';
+        }
+    }
+    return [] unless $synced && ref($synced) eq 'ARRAY';
+    my @ids;
+    my %seen;
+    foreach my $m (@$synced) {
+        my $id = $self->_grok_model_id_from_entry($m);
+        next unless $id;
+        next if $seen{$id}++;
+        push @ids, $id;
+    }
+    return \@ids;
+}
+
+sub _grok_label_for_id {
+    my ($self, $id) = @_;
+    return '' unless $id;
+    (my $label = $id) =~ s/-/ /g;
+    $label =~ s/\b(\w)/\u$1/g;
+    return "$label (xAI)";
+}
+
 sub _substitute_dead_grok_model {
     my ($self, $c, $model, $ctx) = @_;
     return $model unless $model;
-    my %dead = (
-        'grok-code-fast-1' => 'grok-2',
-        'grok-build-0.1'   => 'grok-2',
-        'grok-build'       => 'grok-2',
-    );
-    my $replacement;
-    if ($dead{$model}) {
-        $replacement = $dead{$model};
-    } elsif ($model =~ /^grok-build/i) {
-        $replacement = 'grok-2';
-    }
-    if ($replacement && $replacement ne $model) {
+    return $model unless $self->_is_retired_grok_model($model);
+    my $replacement = $model =~ /^grok-code-fast/i ? 'grok-build-0.1' : $self->_grok_default_model_id();
+    if ($replacement ne $model) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             $ctx || '_substitute_dead_grok_model',
             "Model '$model' is retired; substituting '$replacement'");
@@ -6911,16 +7139,145 @@ sub _substitute_dead_grok_model {
 
 =head2 _is_retired_grok_model
 
-True for xAI model IDs that should not appear in pickers (410 Gone).
+True for legacy xAI model IDs that should not appear in pickers (410 Gone).
 
 =cut
 
 sub _is_retired_grok_model {
     my ($self, $id) = @_;
     return 0 unless $id;
-    return 1 if $id =~ /^grok-build/i;
+    return 1 if $id eq 'grok-beta';
+    return 1 if $id =~ /^grok-2(?:-|$)/i;
     return 1 if $id eq 'grok-code-fast-1';
     return 0;
+}
+
+sub _grok_model_visible_in_picker {
+    my ($self, $id, $include_media) = @_;
+    return 0 unless $id;
+    return 0 if $self->_is_retired_grok_model($id);
+    return 0 if $self->_grok_is_media_model($id) && !$include_media;
+    return 1;
+}
+
+sub _find_active_grok_api_key {
+    my ($self, $c, $user_id, $can_select_model) = @_;
+    return unless $user_id;
+    my $schema = $c->model('DBEncy')->schema;
+    my $grok_key = $schema->resultset('UserApiKeys')->search(
+        { user_id => $user_id, service => 'grok', is_active => '1' }
+    )->first;
+    if (!$grok_key && $can_select_model) {
+        $grok_key = $schema->resultset('UserApiKeys')->search(
+            { service => 'grok', is_active => '1' }
+        )->first;
+    }
+    return $grok_key if $grok_key && $grok_key->api_key_encrypted;
+    return;
+}
+
+sub _grok_chat_model_ids_from_meta {
+    my ($self, $meta, $include_media, $key_obj) = @_;
+    $meta ||= {};
+    my @ids;
+    my $synced_ids = $self->_grok_synced_model_ids($meta, $key_obj);
+    if (@$synced_ids) {
+        foreach my $id (@$synced_ids) {
+            next unless $self->_grok_model_visible_in_picker($id, $include_media);
+            push @ids, $id;
+        }
+    }
+    # Only use hardcoded defaults when nothing has ever been synced
+    unless (@ids) {
+        unless ($meta->{models_synced_at}) {
+            @ids = $self->_grok_fallback_model_ids();
+        }
+    }
+    return @ids;
+}
+
+sub _grok_models_page_info {
+    my ($self, $c, $user_id, $can_select_model) = @_;
+    my %info = (
+        configured       => 0,
+        models           => [],
+        synced_models    => [],
+        synced_at        => undef,
+        synced_at_human  => undef,
+        total_synced     => 0,
+        chat_model_count => 0,
+        can_sync         => $can_select_model ? 1 : 0,
+        note             => 'Add an xAI API key at /ai/manage_api_keys, then Sync to load models from your account.',
+    );
+    return \%info unless $user_id;
+
+    try {
+        my $grok_key = $self->_find_active_grok_api_key($c, $user_id, $can_select_model);
+        unless ($grok_key) {
+            return \%info;
+        }
+        $info{configured} = 1;
+        my $meta = $grok_key->get_metadata() || {};
+        my $synced_ids = $self->_grok_synced_model_ids($meta, $grok_key);
+        $info{total_synced} = scalar @$synced_ids;
+        my $text_count  = 0;
+        my $media_count = 0;
+        foreach my $id (@$synced_ids) {
+            if ($self->_grok_is_media_model($id)) { $media_count++ }
+            elsif (!$self->_is_retired_grok_model($id)) { $text_count++ }
+            push @{ $info{synced_models} }, {
+                id        => $id,
+                retired   => $self->_is_retired_grok_model($id) ? 1 : 0,
+                media     => $self->_grok_is_media_model($id) ? 1 : 0,
+                in_picker => $self->_grok_model_visible_in_picker($id, $can_select_model) ? 1 : 0,
+            };
+        }
+        if ($meta->{models_synced_at}) {
+            $info{synced_at} = 0 + $meta->{models_synced_at};
+            $info{synced_at_human} = scalar localtime($info{synced_at});
+        }
+        my @text_ids = $self->_grok_chat_model_ids_from_meta($meta, 0, $grok_key);
+        my @admin_ids = $can_select_model
+            ? $self->_grok_chat_model_ids_from_meta($meta, 1, $grok_key)
+            : @text_ids;
+        $info{text_model_count}  = scalar @text_ids;
+        $info{media_model_count} = $media_count;
+        $info{chat_model_count}  = scalar @text_ids;
+        $info{models} = [
+            map { { id => $_, label => $self->_grok_label_for_id($_), kind => 'text' } } @text_ids
+        ];
+        if ($can_select_model && $media_count) {
+            push @{ $info{models} },
+                map { { id => $_, label => $self->_grok_label_for_id($_), kind => 'media' } }
+                grep { $self->_grok_is_media_model($_) && $self->_grok_model_visible_in_picker($_, 1) } @$synced_ids;
+        }
+        if ($info{total_synced}) {
+            $info{note} = sprintf(
+                'Your xAI API key has %d models (%d text/chat, %d image/video). Text models appear in chat/editor; admins also see media models below.',
+                $info{total_synced}, $text_count, $media_count
+            );
+            $info{using_fallbacks} = 0;
+        } elsif ($info{configured}) {
+            my $meta = {};
+            eval {
+                my $grok_key = $self->_find_active_grok_api_key($c, $user_id, $can_select_model);
+                $meta = $grok_key ? ($grok_key->get_metadata() || {}) : {};
+            };
+            if ($meta->{last_sync_error}) {
+                $info{error} = $meta->{last_sync_error};
+                $info{note} = 'Grok API key is configured but the last xAI sync failed. Check the error below or use Sync via page reload.';
+            } else {
+                $info{note} = 'Grok API key is configured but models have not been synced yet. Reload this page to auto-sync, or click Sync Models.';
+            }
+            $info{using_fallbacks} = 1;
+        }
+    } catch {
+        $info{error} = "$_";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_grok_models_page_info', "Failed: $_");
+    };
+
+    return \%info;
 }
 
 =head2 _grok_external_models_for_user
@@ -6935,38 +7292,16 @@ sub _grok_external_models_for_user {
     return \@ext_models unless $user_id;
 
     try {
-        my $schema = $c->model('DBEncy')->schema;
-        my $grok_key = $schema->resultset('UserApiKeys')->search(
-            { user_id => $user_id, service => 'grok', is_active => '1' }
-        )->first;
-        if (!$grok_key && $can_select_model) {
-            $grok_key = $schema->resultset('UserApiKeys')->search(
-                { service => 'grok', is_active => '1' }
-            )->first;
-        }
-        return \@ext_models unless $grok_key && $grok_key->api_key_encrypted;
+        my $grok_key = $self->_find_active_grok_api_key($c, $user_id, $can_select_model);
+        return \@ext_models unless $grok_key;
 
-        my $meta   = $grok_key->get_metadata() || {};
-        my $synced = $meta->{available_models};
-        if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
-            my %seen;
-            foreach my $m (@$synced) {
-                my $id = $m->{id} || $m->{name} || '';
-                next unless $id;
-                next if $id =~ /^(grok-imagine|grok-.*video)/i;
-                next if $self->_is_retired_grok_model($id);
-                next if $seen{$id}++;
-                (my $label = $id) =~ s/-/ /g;
-                $label = ucfirst($label) . ' (xAI)';
-                push @ext_models, { name => $id, provider => 'grok', label => $label };
-            }
-        }
-        unless (@ext_models) {
-            push @ext_models, (
-                { name => 'grok-2',      provider => 'grok', label => 'Grok 2 (xAI)' },
-                { name => 'grok-2-mini', provider => 'grok', label => 'Grok 2 Mini (xAI)' },
-                { name => 'grok-beta',   provider => 'grok', label => 'Grok Beta (xAI)' },
-            );
+        my $meta = $grok_key->get_metadata() || {};
+        foreach my $id ($self->_grok_chat_model_ids_from_meta($meta, $can_select_model, $grok_key)) {
+            push @ext_models, {
+                name     => $id,
+                provider => 'grok',
+                label    => $self->_grok_label_for_id($id),
+            };
         }
     } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -6999,6 +7334,72 @@ sub _prefer_local_ollama {
 Ordered list of Ollama hosts to try. On the workstation, localhost is probed first.
 
 =cut
+
+=head2 _is_member_or_above
+
+True for logged-in users with member role, admin/developer/editor, or active site membership.
+
+=cut
+
+sub _is_member_or_above {
+    my ($self, $c, $user_id, $roles, $is_guest) = @_;
+    return 0 if $is_guest || !$user_id || $user_id == 199;
+
+    $roles //= $c->session->{roles} || [];
+    $roles = [split(/\s*,\s*/, $roles)] unless ref($roles) eq 'ARRAY';
+    return 1 if grep { /^(admin|developer|editor|member)$/i } @$roles;
+
+    my $site_id = $c->session->{SiteID};
+    return 0 unless $site_id;
+
+    my $membership = eval { $c->model('Membership')->get_active_plan($c, $user_id, $site_id) };
+    return $membership ? 1 : 0;
+}
+
+=head2 _is_lightweight_ollama_request
+
+Navigation, helpdesk, and general support queries that work well on small local models.
+
+=cut
+
+sub _is_lightweight_ollama_request {
+    my ($self, $agent_id, $prompt) = @_;
+    $agent_id //= '';
+    $prompt   //= '';
+
+    return 1 if $agent_id =~ /^(helpdesk|documentation|general)$/i;
+    return 1 if $prompt =~ /^\s*(take\s+me\s+to|go\s+to|open|show\s+me|navigate\s+to|where\s+(?:is|are|can\s+i\s+find)|how\s+do\s+i\s+(?:get\s+to|find|access|open))\b/i;
+    return 1 if $prompt =~ /\b(helpdesk|help\s+desk|support\s+ticket|submit\s+(?:a\s+)?ticket|navigation|navigate)\b/i;
+    return 0;
+}
+
+=head2 _find_reachable_ollama_host
+
+Probe the ordered host list and return the first reachable Ollama endpoint.
+
+Returns: ($host, $probe_client) or (undef, undef)
+
+=cut
+
+sub _find_reachable_ollama_host {
+    my ($self, $c, $opts) = @_;
+    $opts ||= {};
+    my $port  = $opts->{port} || ($c->config->{Ollama} || {})->{port} || 11434;
+    my $start = $opts->{start_host};
+
+    my @hosts = $self->_ollama_hosts_to_probe($c);
+    if ($start) {
+        @hosts = ($start, grep { $_ ne $start } @hosts);
+    }
+
+    for my $host (@hosts) {
+        my $probe = Comserv::Model::Ollama->new(host => $host, port => $port, timeout => 3);
+        next unless $probe && $probe->check_connection();
+        return ($host, $probe);
+    }
+
+    return (undef, undef);
+}
 
 sub _ollama_hosts_to_probe {
     my ($self, $c) = @_;
@@ -8183,10 +8584,11 @@ sub get_user_providers :Local :Args(0) {
     my $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
     my $is_admin     = $can_select_model || $is_csc_admin;
     my $is_guest     = (!$user_id || $user_id == 199) ? 1 : 0;
+    my $is_member_or_above = $self->_is_member_or_above($c, $user_id, $user_roles, $is_guest);
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
         'get_user_providers',
-        "User $username (id=" . ($user_id||'none') . ") can_select=$can_select_model is_admin=$is_admin is_guest=$is_guest");
+        "User $username (id=" . ($user_id||'none') . ") can_select=$can_select_model is_admin=$is_admin is_guest=$is_guest member_plus=$is_member_or_above");
 
     my @providers;
 
@@ -8230,11 +8632,17 @@ sub get_user_providers :Local :Args(0) {
             }
         }
 
+        my ($reachable_host) = $self->_find_reachable_ollama_host($c, {
+            port       => $active_port || 11434,
+            start_host => $active_host,
+        });
+
         push @providers, {
             service     => 'ollama',
             name        => 'Ollama (Local AI)',
             is_local    => JSON::true,
-            active_host => $active_host,
+            active_host => $reachable_host || $active_host,
+            reachable   => $reachable_host ? JSON::true : JSON::false,
             servers     => \@servers,
             models      => [ map { { id => $_->{name} } } @chat_models ],
         };
@@ -8242,7 +8650,7 @@ sub get_user_providers :Local :Args(0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'get_user_providers', "Ollama list failed: $_");
         push @providers, { service => 'ollama', name => 'Ollama (Local AI)', is_local => JSON::true,
-                           active_host => '', servers => [], models => [] };
+                           active_host => '', reachable => JSON::false, servers => [], models => [] };
     };
 
     # 2. External API keys — authenticated users only
@@ -8259,28 +8667,22 @@ sub get_user_providers :Local :Args(0) {
             foreach my $key ($own_keys->all) {
                 next if $seen{$key->service}++;
                 my $meta   = $key->get_metadata() || {};
-                my $models = $meta->{available_models} || [];
-
-                # Fallback to hardcoded Grok models if none stored in metadata
-                if (!@$models && $key->service eq 'grok') {
-                    $models = [
-                        { id => 'grok-2' },
-                        { id => 'grok-beta' },
-                    ];
-                }
-
-                # Filter image/video and retired grok-build models
-                my @filtered = grep {
-                    my $id = $_->{id} || '';
-                    ($is_admin || !$id || $id !~ /imagine|video/i)
-                    && !$self->_is_retired_grok_model($id)
-                } @$models;
-                if ($key->service eq 'grok' && !@filtered) {
-                    @filtered = (
-                        { id => 'grok-2' },
-                        { id => 'grok-2-mini' },
-                        { id => 'grok-beta' },
-                    );
+                my @filtered;
+                if ($key->service eq 'grok') {
+                    my $synced = $meta->{available_models} || [];
+                    if (!@$synced) {
+                        $self->_sync_grok_key_models($c, $key, 'get_user_providers_auto_sync');
+                        eval { $key->discard_changes; $key->reload; };
+                        $meta = $key->get_metadata() || {};
+                    }
+                    @filtered = map { { id => $_ } }
+                        $self->_grok_chat_model_ids_from_meta($meta, $is_admin, $key);
+                } else {
+                    my $models = $meta->{available_models} || [];
+                    @filtered = grep {
+                        my $id = $_->{id} || '';
+                        $is_admin || !$id || $id !~ /imagine|video/i
+                    } @$models;
                 }
 
                 push @providers, {
@@ -8299,17 +8701,16 @@ sub get_user_providers :Local :Args(0) {
                 foreach my $key ($any_keys->all) {
                     next if $seen{$key->service}++;
                     my $meta   = $key->get_metadata() || {};
-                    my $models = $meta->{available_models} || [];
-                    my @filtered = grep {
-                        my $id = $_->{id} || '';
-                        !$self->_is_retired_grok_model($id)
-                    } @$models;
-                    if ($key->service eq 'grok' && !@filtered) {
-                        @filtered = (
-                            { id => 'grok-2' },
-                            { id => 'grok-2-mini' },
-                            { id => 'grok-beta' },
-                        );
+                    my @filtered;
+                    if ($key->service eq 'grok') {
+                        @filtered = map { { id => $_ } }
+                            $self->_grok_chat_model_ids_from_meta($meta, 1, $key);
+                    } else {
+                        my $models = $meta->{available_models} || [];
+                        @filtered = grep {
+                            my $id = $_->{id} || '';
+                            $id && $id !~ /imagine|video/i
+                        } @$models;
                     }
                     push @providers, {
                         service => $key->service,
@@ -8327,6 +8728,11 @@ sub get_user_providers :Local :Args(0) {
         };
     }
 
+    my $ollama_reachable = 0;
+    if (my $ollama_provider = (grep { ($_->{service} || '') eq 'ollama' } @providers)[0]) {
+        $ollama_reachable = $ollama_provider->{reachable} ? 1 : 0;
+    }
+
     $c->response->body(encode_json({
         success            => JSON::true,
         providers          => \@providers,
@@ -8334,6 +8740,8 @@ sub get_user_providers :Local :Args(0) {
         user_id            => $user_id  || 0,
         is_guest           => $is_guest  ? JSON::true : JSON::false,
         is_admin           => $is_admin  ? JSON::true : JSON::false,
+        is_member_or_above => $is_member_or_above ? JSON::true : JSON::false,
+        ollama_reachable   => $ollama_reachable ? JSON::true : JSON::false,
         can_access_history => $is_admin  ? JSON::true : JSON::false,
         is_dev             => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
@@ -8382,12 +8790,13 @@ sub sync_models :Local :Args(0) {
     if (!ref($user_roles_sync)) {
         $user_roles_sync = [split(/\s*,\s*/, $user_roles_sync)] if $user_roles_sync;
     }
-    my $is_admin_sync = ref($user_roles_sync) eq 'ARRAY'
-        ? grep { $_ =~ /^(admin|developer)$/i } @$user_roles_sync : 0;
+    my $can_sync = ref($user_roles_sync) eq 'ARRAY'
+        ? (grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_sync) ? 1 : 0
+        : 0;
 
-    unless ($is_admin_sync) {
+    unless ($can_sync) {
         $c->response->status(403);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin/developer access required' }));
         return;
     }
 
@@ -8412,21 +8821,27 @@ sub sync_models :Local :Args(0) {
             return;
         }
 
-        my $api_key = $key_obj->get_api_key() || '';
-        unless ($api_key) {
+        if (lc($service) eq 'grok') {
+            my ($ok, $err, $count) = $self->_sync_grok_key_models($c, $key_obj, 'sync_models');
+            unless ($ok) {
+                $c->response->body(encode_json({ success => JSON::false, error => $err }));
+                return;
+            }
+            my $meta   = $key_obj->get_metadata() || {};
+            my $models = $meta->{available_models} || [];
             $c->response->body(encode_json({
-                success => JSON::false,
-                error   => "Failed to decrypt $service API key. Please re-save it."
+                success => JSON::true,
+                service => $service,
+                models  => $models,
+                count   => $count,
             }));
             return;
         }
 
-        # Provider endpoint map
+        # OpenAI and other providers
         my %models_endpoint = (
-            grok    => 'https://api.x.ai/v1/models',
             openai  => 'https://api.openai.com/v1/models',
         );
-
         my $endpoint = $models_endpoint{lc($service)};
         unless ($endpoint) {
             $c->response->body(encode_json({
@@ -8436,60 +8851,51 @@ sub sync_models :Local :Args(0) {
             return;
         }
 
-        # Fetch models from the provider
+        my $api_key = $key_obj->get_api_key() || '';
+        unless ($api_key) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Failed to decrypt $service API key. Please re-save it."
+            }));
+            return;
+        }
+
         require LWP::UserAgent;
         require HTTP::Request;
-        my $ua = LWP::UserAgent->new(timeout => 15);
+        my $ua = LWP::UserAgent->new(timeout => 25);
         $ua->agent('Comserv/1.0');
         my $req = HTTP::Request->new(GET => $endpoint);
         $req->header('Authorization' => "Bearer $api_key");
         $req->header('Content-Type'  => 'application/json');
-
         my $resp = $ua->request($req);
-
         unless ($resp->is_success) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-                'sync_models', "Failed to fetch models from $service: " . $resp->status_line);
             $c->response->body(encode_json({
                 success => JSON::false,
                 error   => "Provider returned error: " . $resp->status_line
             }));
             return;
         }
-
         my $data = eval { decode_json($resp->content) };
         if ($@) {
-            $c->response->body(encode_json({ success => JSON::false, error => "Invalid JSON from provider" }));
+            $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON from provider' }));
             return;
         }
-
-        # Extract model list (OpenAI-compatible format: data[].id)
         my @models;
-        if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
-            foreach my $m (@{$data->{data}}) {
-                next unless $m->{id};
-                push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
-            }
+        foreach my $m (@{ $data->{data} || [] }) {
+            next unless $m->{id};
+            push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
         }
-
-        # Sort models alphabetically
         @models = sort { $a->{id} cmp $b->{id} } @models;
-
-        # Store model list in metadata of the key record
         my $existing_meta = $key_obj->get_metadata() || {};
         $existing_meta->{available_models} = \@models;
         $existing_meta->{models_synced_at} = time();
         $key_obj->set_metadata($existing_meta);
         $key_obj->update;
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-            'sync_models', "Synced " . scalar(@models) . " models for service $service");
-
         $c->response->body(encode_json({
             success => JSON::true,
             service => $service,
             models  => \@models,
-            count   => scalar(@models)
+            count   => scalar(@models),
         }));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -11787,7 +12193,7 @@ sub _apply_response_file_actions {
                     my $cleaned_search = $search;
                     $cleaned_search =~ s/^\s+|\s+$//g;
                     
-                    if ($cleaned_search && index($file_content, $cleaned_search) >= 0) {
+                    if ($cleaned_search && CORE::index($file_content, $cleaned_search) >= 0) {
                         $file_content =~ s/\Q$cleaned_search\E/$replace/;
                         $applied_count++;
                     } else {
@@ -11799,7 +12205,7 @@ sub _apply_response_file_actions {
                         my $norm_content = $file_content;
                         $norm_content =~ s/\s+/ /g;
                         
-                        if ($norm_search && index($norm_content, $norm_search) >= 0) {
+                        if ($norm_search && CORE::index($norm_content, $norm_search) >= 0) {
                             # Attempt to replace by escaping special chars or using relaxed regex
                             # Let's fallback to search string matching
                             $failed_count++;
@@ -13993,6 +14399,15 @@ sub run_command :Local :Args(0) {
 
     unless ($self->_editor_enabled($c)) {
         $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    require Comserv::Util::CodingAccess;
+    unless (Comserv::Util::CodingAccess::workstation_allowed($c)) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Coding commands require Shanta on http://172.30.131.126:PORT/',
+        }));
         return;
     }
 

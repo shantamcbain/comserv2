@@ -32,7 +32,7 @@
   </h2>
   <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem">
     <tr><td style="padding:5px 10px;color:var(--text-muted-color)">Plan</td><td style="padding:5px 10px"><strong>[% acct.plan_slug | html %]</strong></td></tr>
-    <tr><td style="padding:5px 10px;color:var(--text-muted-color)">Domain</td><td style="padding:5px 10px">[% acct.domain | html %] [% IF acct.domain_type %]<small style="color:var(--text-muted-color)">([% acct.domain_type | html %])</small>[% END %]</td></tr>
+    <tr><td style="padding:5px 10px;color:var(--text-muted-color)">Domain</td><td style="padding:5px 10px">[% acct.resolved_hostname || acct.domain | html %] [% IF acct.domain_type %]<small style="color:var(--text-muted-color)">([% acct.domain_type | html %])</small>[% END %]</td></tr>
     <tr><td style="padding:5px 10px;color:var(--text-muted-color)">Monthly Cost</td><td style="padding:5px 10px">CAD [% acct.monthly_cost || '0.00' %]</td></tr>
     [% IF acct.next_renewal_date %]
     <tr><td style="padding:5px 10px;color:var(--text-muted-color)">Next Renewal</td><td style="padding:5px 10px">[% acct.next_renewal_date %]</td></tr>
@@ -56,6 +56,40 @@
     <strong>[% sitename | html %]</strong> is not yet registered with CSC Hosting.
   </p>
   <a href="/hosting_signup" style="padding:8px 22px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;text-decoration:none;font-family:var(--body-font)">Apply for Hosting</a>
+</div>
+[% END %]
+
+[% IF show_hosted_hub && hosted_catalog.size %]
+<h2 style="font-family:var(--header-font);color:var(--text-color);margin:0 0 0.8em 0;font-size:1.1rem">&#127760; Sites We Host</h2>
+<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:0;margin-bottom:1.5em;overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border-color)">
+        <th style="padding:8px 12px;text-align:left;color:var(--text-muted-color)">SiteName</th>
+        <th style="padding:8px 12px;text-align:left;color:var(--text-muted-color)">Domain</th>
+        <th style="padding:8px 12px;text-align:left;color:var(--text-muted-color)">Plan</th>
+        <th style="padding:8px 12px;text-align:left;color:var(--text-muted-color)">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH site IN hosted_catalog %]
+      <tr style="border-bottom:1px solid var(--border-color)">
+        <td style="padding:8px 12px"><strong>[% site.sitename | html %]</strong></td>
+        <td style="padding:8px 12px">
+          <a href="[% site.url %]" target="_blank" rel="noopener" style="color:var(--primary-color)">[% site.hostname | html %]</a>
+        </td>
+        <td style="padding:8px 12px">[% site.plan_slug | html %]</td>
+        <td style="padding:8px 12px">
+          <span style="color:[% IF site.status == 'active' %]#2e7d32[% ELSIF site.status == 'pending' %]#e65100[% ELSE %]#b71c1c[% END %]">[% site.status | html %]</span>
+        </td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+</div>
+[% ELSIF show_hosted_hub %]
+<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:1.2em;margin-bottom:1.5em">
+  <p style="font-family:var(--body-font);color:var(--text-muted-color);margin:0">No active hosted sites with public domains are listed yet.</p>
 </div>
 [% END %]
 

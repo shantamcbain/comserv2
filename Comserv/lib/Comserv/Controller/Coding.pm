@@ -1,0 +1,374 @@
+package Comserv::Controller::Coding;
+
+use Moose;
+use namespace::autoclean;
+use Comserv::Util::Logging;
+use Comserv::Util::CodingAccess;
+use JSON qw(decode_json encode_json);
+use Try::Tiny;
+
+
+BEGIN { extends 'Catalyst::Controller'; }
+
+sub logging {
+    my ($self) = @_;
+    return $self->{_logging} ||= Comserv::Util::Logging->new();
+}
+
+sub _coding_workstation_allowed {
+    my ($self, $c) = @_;
+    return Comserv::Util::CodingAccess::workstation_allowed($c);
+}
+
+sub _deny_json {
+    my ($self, $c, $status, $error) = @_;
+    $c->response->status($status || 403);
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({ success => JSON::false, error => $error }));
+}
+
+sub _ai_ctrl {
+    my ($self, $c) = @_;
+    return $c->controller('AI');
+}
+
+=head2 terminal_status
+
+GET /coding/terminal_status — whether the interactive coding terminal is available.
+
+=cut
+
+sub terminal_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $allowed = $self->_coding_workstation_allowed($c);
+    my $ai = $self->_ai_ctrl($c);
+    my $root = $ai ? $ai->_project_root_path($c) : '';
+
+    $c->response->body(encode_json({
+        success          => JSON::true,
+        allowed          => $allowed ? JSON::true : JSON::false,
+        username         => $c->session->{username} || '',
+        host             => $c->req->uri->host || '',
+        project_root     => $root,
+        terminal_ws_path => '/coding/terminal_ws',
+        hint             => $allowed
+            ? 'Interactive shell — run grok, ollama, git, prove, etc.'
+            : 'Coding terminal is only available to Shanta at http://172.30.131.126:PORT/',
+    }));
+}
+
+=head2 run_command
+
+POST /coding/run_command — one-shot command in project root (non-interactive fallback).
+
+=cut
+
+sub run_command :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_coding_workstation_allowed($c)) {
+        $self->_deny_json($c, 403, 'Coding commands require Shanta on http://172.30.131.126:PORT/');
+        return;
+    }
+
+    my $cmd = $c->request->params->{command} || '';
+    unless ($cmd =~ /\S/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Command is required' }));
+        return;
+    }
+
+    if ($cmd =~ /rm\s+-rf\s+\/|mkfs|dd\s+if=/i) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Command blocked for safety' }));
+        return;
+    }
+
+    my $ai = $self->_ai_ctrl($c);
+    unless ($ai) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'AI controller unavailable' }));
+        return;
+    }
+
+    my $root = $ai->_project_root_path($c);
+    chdir $root or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
+        return;
+    };
+
+    my $api_key = $ai->_grok_cli_api_key($c);
+    my $home    = $ai->_grok_home();
+
+    local $ENV{XAI_API_KEY} = $api_key if $api_key;
+    local $ENV{GROK_API_KEY} = $api_key if $api_key;
+    local $ENV{HOME}     = $home || $ENV{HOME};
+    local $ENV{USER}     = 'shanta';
+    local $ENV{LOGNAME}  = 'shanta';
+    local $ENV{PATH}     = join ':', grep { $_ && -d $_ }
+        ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin');
+    local $ENV{TERM}     = 'xterm-256color';
+    local $ENV{LANG}     = $ENV{LANG} || 'en_US.UTF-8';
+    local $ENV{LC_ALL}   = $ENV{LC_ALL} || 'en_US.UTF-8';
+
+    my $output = qx($cmd 2>&1) // '';
+    my $exit_val = ($? == -1) ? -1 : ($? >> 8);
+
+    $c->response->body(encode_json({
+        success   => JSON::true,
+        output    => $output,
+        exit_code => $exit_val,
+    }));
+}
+
+sub _pty_resize {
+    my ($pty, $cols, $rows) = @_;
+    return unless defined $cols && defined $rows && $cols > 0 && $rows > 0;
+    eval {
+        require IO::Tty;
+        IO::Tty::set_winsize($pty, $rows, $cols);
+    };
+    if ($@) {
+        eval {
+            require 'sys/ioctl.ph';
+            ioctl($pty, &TIOCSWINSZ, pack('S4', $rows, $cols, 0, 0));
+        };
+    }
+}
+
+sub _coding_shell_env {
+    my ($self, $c) = @_;
+    my $ai = $self->_ai_ctrl($c);
+    return {
+        root    => $ai ? $ai->_project_root_path($c) : '/home/shanta/PycharmProjects/comserv2',
+        home    => $ai ? $ai->_grok_home() : '/home/shanta',
+        api_key => $ai ? $ai->_grok_cli_api_key($c) : undef,
+    };
+}
+
+sub _spawn_coding_shell {
+    my ($self, $pty, $env) = @_;
+    $env ||= {};
+    my $root = $env->{root} || '/home/shanta/PycharmProjects/comserv2';
+    my $home = $env->{home} || '/home/shanta';
+    my $api_key = $env->{api_key};
+
+    my $path = join ':', grep { $_ && -d $_ }
+        ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin');
+
+    my $shell = -x '/bin/bash' ? '/bin/bash' : ($ENV{SHELL} || '/bin/sh');
+
+    my $pid = fork();
+    die "fork failed: $!" unless defined $pid;
+
+    if ($pid == 0) {
+        $pty->make_slave_controlling_terminal();
+        my $slave = $pty->slave();
+
+        close STDIN;
+        close STDOUT;
+        close STDERR;
+
+        open STDIN,  '<&', $slave->fileno() or die "Can't redirect STDIN: $!";
+        open STDOUT, '>&', $slave->fileno() or die "Can't redirect STDOUT: $!";
+        open STDERR, '>&', $slave->fileno() or die "Can't redirect STDERR: $!";
+
+        $ENV{HOME}        = $home;
+        $ENV{USER}        = 'shanta';
+        $ENV{LOGNAME}     = 'shanta';
+        $ENV{PATH}        = $path;
+        $ENV{TERM}        = 'xterm-256color';
+        $ENV{LANG}        = $ENV{LANG} || 'en_US.UTF-8';
+        $ENV{LC_ALL}      = $ENV{LC_ALL} || 'en_US.UTF-8';
+        $ENV{PS1}         = '\[\033[01;32m\]\u@workstation\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ ';
+        $ENV{XAI_API_KEY} = $api_key if $api_key;
+        $ENV{GROK_API_KEY} = $api_key if $api_key;
+
+        chdir $root or chdir $home or die "chdir failed: $!";
+
+        if ($shell =~ /bash/) {
+            exec($shell, '--noprofile', '--norc', '-i') or exec($shell, '-i') or exec($shell) or die "Can't exec shell: $!";
+        }
+        exec($shell) or die "Can't exec shell: $!";
+    }
+
+    return $pid;
+}
+
+sub _terminal_relay_child {
+    my ($self, $io, $env) = @_;
+    $env ||= {};
+
+    require AnyEvent;
+    require AnyEvent::Handle;
+    require IO::Pty;
+    require Protocol::WebSocket::Frame;
+
+    my $handle = AnyEvent::Handle->new(
+        fh => $io,
+        on_error => sub {
+            my ($hdl, $fatal, $msg) = @_;
+            warn "coding terminal WebSocket error: $msg\n";
+            $hdl->destroy;
+        }
+    );
+
+    my $pty = IO::Pty->new;
+    my $pid = eval { $self->_spawn_coding_shell($pty, $env) };
+    if ($@ || !defined $pid) {
+        warn "coding terminal failed to spawn shell: " . ($@ || 'unknown') . "\n";
+        return;
+    }
+
+    warn "coding terminal shell started pid=$pid\n";
+
+    $pty->close_slave();
+    $pty->set_raw();
+    $self->_pty_resize($pty, 120, 30);
+
+    my $frame = Protocol::WebSocket::Frame->new;
+    my $pty_watcher;
+
+    $pty_watcher = AnyEvent->io(
+        fh => $pty,
+        poll => 'r',
+        cb => sub {
+            my $buf;
+            my $n = sysread($pty, $buf, 4096);
+            if ($n) {
+                my $ws_frame = Protocol::WebSocket::Frame->new(buffer => $buf, type => 'binary');
+                $handle->push_write($ws_frame->to_bytes);
+            } elsif (defined $n) {
+                $handle->destroy;
+                undef $pty_watcher;
+                waitpid($pid, 0);
+            }
+        }
+    );
+
+    $handle->on_read(sub {
+        my ($hdl) = @_;
+        $frame->append(delete $hdl->{rbuf});
+        while (my $message = $frame->next_bytes) {
+            next unless defined $message && length $message;
+            if (substr($message, 0, 1) eq "\x01") {
+                my $ctrl = eval { decode_json(substr($message, 1)) };
+                if ($ctrl && ref $ctrl eq 'HASH' && ($ctrl->{type} || '') eq 'resize') {
+                    $self->_pty_resize($pty, $ctrl->{cols}, $ctrl->{rows});
+                }
+                next;
+            }
+            my $offset = 0;
+            my $len = length($message);
+            while ($offset < $len) {
+                my $w = syswrite($pty, $message, $len - $offset, $offset);
+                last unless defined $w && $w > 0;
+                $offset += $w;
+            }
+        }
+    });
+
+    my $cv = AnyEvent->condvar;
+    my $cleanup = sub {
+        my ($why) = @_;
+        warn "coding terminal relay cleanup: $why\n";
+        undef $pty_watcher;
+        $handle->destroy if $handle;
+        kill 'TERM', $pid if $pid;
+        waitpid($pid, 0) if $pid;
+        $cv->send;
+    };
+
+    $handle->on_eof(sub { $cleanup->('websocket eof') });
+
+    AnyEvent->child(
+        pid => $pid,
+        cb => sub { $cleanup->('shell exited') },
+    );
+
+    $cv->recv;
+}
+
+=head2 terminal_ws
+
+WebSocket PTY terminal at /coding/terminal_ws — interactive grok/ollama shell on the workstation.
+
+=cut
+
+sub terminal_ws :Path('/coding/terminal_ws') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $req_host = lc($c->req->uri->host || '');
+    $req_host =~ s/:\d+\z//;
+
+    unless ($self->_coding_workstation_allowed($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'terminal_ws', "Coding terminal denied for host=$req_host user="
+                . ($c->session->{username} || ''));
+        $c->response->status(403);
+        $c->response->body('Access denied: Shanta on 172.30.131.126 only');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'terminal_ws', "Coding terminal WebSocket upgrade host=$req_host");
+
+    my $upgrade = $c->req->header('Upgrade') || '';
+    my $connection = $c->req->header('Connection') || '';
+
+    unless ($upgrade eq 'websocket' && $connection =~ /Upgrade/i) {
+        $c->response->status(400);
+        $c->response->body('WebSocket upgrade required');
+        return;
+    }
+
+    require Protocol::WebSocket::Handshake::Server;
+    require AnyEvent;
+    require AnyEvent::Handle;
+    require IO::Pty;
+
+    my $io = $c->req->io_fh;
+    my $hs = Protocol::WebSocket::Handshake::Server->new;
+    my $env = $c->req->env;
+    my $handshake_request =
+        "GET " . $env->{REQUEST_URI} . " HTTP/1.1\r\n" .
+        "Host: " . $env->{HTTP_HOST} . "\r\n" .
+        "Upgrade: " . ($env->{HTTP_UPGRADE} || 'websocket') . "\r\n" .
+        "Connection: " . ($env->{HTTP_CONNECTION} || 'Upgrade') . "\r\n" .
+        "Sec-WebSocket-Key: " . ($env->{HTTP_SEC_WEBSOCKET_KEY} || '') . "\r\n" .
+        "Sec-WebSocket-Version: " . ($env->{HTTP_SEC_WEBSOCKET_VERSION} || '13') . "\r\n" .
+        "\r\n";
+
+    $hs->parse($handshake_request);
+    unless ($hs->is_done) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'terminal_ws', 'WebSocket handshake failed to complete');
+        $c->response->status(400);
+        $c->response->body('WebSocket handshake failed');
+        return;
+    }
+
+    print $io $hs->to_string;
+    $io->flush if $io->can('flush');
+    $c->detach();
+
+    my $shell_env = $self->_coding_shell_env($c);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'terminal_ws', 'Terminal relay started (same process)');
+    $self->_terminal_relay_child($io, $shell_env);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'terminal_ws', 'Terminal relay ended');
+}
+
+sub end : Private {
+    my ($self, $c) = @_;
+    return if $c->req->path =~ m{/coding/terminal_ws};
+    my $status = $c->response->status || 0;
+    return if $status >= 300 && $status < 400;
+    return if $status == 204;
+    $c->forward($c->view('TT')) unless $c->response->body;
+}
+
+__PACKAGE__->meta->make_immutable;
+
+1;

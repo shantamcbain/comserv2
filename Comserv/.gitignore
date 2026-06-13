@@ -21,3 +21,6 @@ workspace.xml
 # AI session history and working files (not tracked)
 root/Documentation/session_history/
 *.md
+
+# Dev workstation TLS certs (never commit private keys)
+config/dev_tls/

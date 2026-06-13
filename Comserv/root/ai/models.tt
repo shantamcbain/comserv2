@@ -2,14 +2,14 @@
     title = "AI Models Management"
     category = "AI"
     roles = "admin,developer,user"
-    page_version = "1.06"
-    last_updated = "Fri Mar 27 2026"
-    description = "Manage Ollama models across servers, including pull/test/remove and start buttons."
+    page_version = "1.07"
+    last_updated = "Thu Jun 11 2026"
+    description = "Manage Ollama models and xAI Grok models from your API account."
     keywords = "Ollama, models, pull, test, remove"
     author = "Comserv Team"
 %]
 
-[% PageVersion = 'ai/models.tt,v 1.06 2026/03/27 - Theme compliance, no jQuery, fix remove/pull JSON'; %]
+[% PageVersion = 'ai/models.tt,v 1.07 2026/06/11 - xAI Grok model list + sync from API key'; %]
 
 [% IF c.debug %]
     <div class="models-debug-info">
@@ -231,6 +231,7 @@ h6.section-subhead {
             [% FOREACH server IN servers %]
             <li><a href="#server-[% loop.index %]">[% server.name %]</a></li>
             [% END %]
+            <li><a href="#xai-grok">xAI Grok Models</a></li>
             <li><a href="#user-api-keys">Your API Keys</a></li>
             <li><a href="#troubleshooting">Troubleshooting</a></li>
         </ul>
@@ -239,7 +240,7 @@ h6.section-subhead {
     <!-- Overview -->
     <section id="overview">
         <h1>AI Models Management</h1>
-        <p>Hello, [% username %]. View and manage Ollama models per server. Use buttons to start servers and pull/test models (admin/developer only).</p>
+        <p>Hello, [% username %]. View and manage Ollama models per server and xAI Grok models from your API key. Ollama pull/test/remove requires admin/developer role; Grok models sync from <code>GET https://api.x.ai/v1/models</code> (not the SuperGrok X app subscription).</p>
 
         [% IF error %]
         <div class="models-alert-error">
@@ -355,6 +356,98 @@ h6.section-subhead {
         </div>
         [% END %]
     </div>
+
+    <!-- xAI Grok -->
+    <section id="xai-grok" style="margin: 20px 0;">
+        <div class="models-card">
+            <div class="models-card-header">
+                <h5>xAI Grok (API models)</h5>
+                [% IF grok_provider.configured %]
+                <span class="models-badge badge-connected">API key configured</span>
+                [% ELSE %]
+                <span class="models-badge badge-disconnected">No API key</span>
+                [% END %]
+            </div>
+            <div class="models-card-body">
+                [% IF grok_provider.sync_message %]
+                <div class="models-alert-info">[% grok_provider.sync_message %]</div>
+                [% END %]
+
+                [% IF grok_provider.error %]
+                <div class="models-alert-error">[% grok_provider.error %]</div>
+                [% END %]
+
+                [% IF grok_provider.using_fallbacks %]
+                <div class="models-alert-error">
+                    <strong>Showing defaults only.</strong> The list below (grok-4.3, grok-build-0.1) is a short fallback — not your full x.ai account. Reload this page to sync from xAI server-side.
+                </div>
+                [% END %]
+
+                <p class="color-muted" style="font-size:0.9em;">[% grok_provider.note %]</p>
+
+                [% IF grok_provider.synced_at_human %]
+                <p style="font-size:0.85em;">Last synced: <strong>[% grok_provider.synced_at_human %]</strong>
+                    — [% grok_provider.total_synced %] total
+                    ([% grok_provider.text_model_count %] text/chat, [% grok_provider.media_model_count %] image/video)</p>
+                [% END %]
+
+                [% IF can_select_model %]
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <button id="sync-grok-btn" class="btn btn-primary" type="button"
+                            onclick="syncGrokModels()"
+                            [% UNLESS grok_provider.configured %]disabled title="Add a Grok API key first"[% END %]>
+                        ↻ Sync Grok Models (AJAX)
+                    </button>
+                    [% IF grok_provider.configured %]
+                    <a href="/ai/models?sync_grok=1#xai-grok" class="btn btn-secondary"
+                       title="Server-side sync — works when AJAX fails with NetworkError">
+                        ↻ Sync via page reload
+                    </a>
+                    [% END %]
+                </div>
+                <div id="grok-sync-log" class="server-message"></div>
+                [% END %]
+
+                <h6 class="section-subhead">Models in chat / editor pickers</h6>
+                <ul class="models-list" id="grok-chat-models">
+                    [% IF grok_provider.models.size %]
+                    [% FOREACH m IN grok_provider.models %]
+                    <li>
+                        <span class="model-name">[% m.id %]</span>
+                        [% IF m.kind == 'media' %]
+                        <span class="models-badge badge-size">image/video</span>
+                        [% ELSE %]
+                        <span class="models-badge badge-connected">text/chat</span>
+                        [% END %]
+                    </li>
+                    [% END %]
+                    [% ELSE %]
+                    <li><span class="color-muted">No chat models — sync from xAI or add API key</span></li>
+                    [% END %]
+                </ul>
+
+                [% IF grok_provider.synced_models.size %]
+                <h6 class="section-subhead">Full list from last xAI sync</h6>
+                <ul class="models-list">
+                    [% FOREACH m IN grok_provider.synced_models %]
+                    <li>
+                        <span class="model-name">[% m.id %]</span>
+                        [% IF m.in_picker %]
+                        <span class="models-badge badge-connected">chat</span>
+                        [% ELSIF m.retired %]
+                        <span class="models-badge badge-disconnected">retired</span>
+                        [% ELSIF m.media %]
+                        <span class="models-badge badge-size">media</span>
+                        [% ELSE %]
+                        <span class="models-badge badge-size">other</span>
+                        [% END %]
+                    </li>
+                    [% END %]
+                </ul>
+                [% END %]
+            </div>
+        </div>
+    </section>
 
     <!-- User API Keys -->
     <section id="user-api-keys" style="margin: 20px 0;">
@@ -627,6 +720,53 @@ function upgradeOllama() {
         btn.disabled = false;
         btn.textContent = '\u2b06 Upgrade Ollama';
         log.textContent += 'Request failed: ' + err + '\n';
+    });
+}
+
+function syncGrokModels() {
+    var btn = document.getElementById('sync-grok-btn');
+    var log = document.getElementById('grok-sync-log');
+    if (!btn || !log) return;
+    btn.disabled = true;
+    btn.textContent = '⏳ Syncing from xAI…';
+    log.innerHTML = '<span class="color-info">Comserv is calling xAI /v1/models (may take up to 25s)…</span>';
+    var ctrl = new AbortController();
+    var timer = setTimeout(function() { ctrl.abort(); }, 45000);
+    fetch('/ai/sync_models?service=grok', {
+        method: 'GET',
+        credentials: 'include',
+        signal: ctrl.signal,
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(function(r) {
+        if (!r.ok) {
+            return r.text().then(function(t) {
+                throw new Error('HTTP ' + r.status + (t ? ': ' + t.substring(0, 200) : ''));
+            });
+        }
+        return r.json();
+    })
+    .then(function(data) {
+        clearTimeout(timer);
+        btn.disabled = false;
+        btn.textContent = '↻ Sync Grok Models (AJAX)';
+        if (!data.success) {
+            log.innerHTML = '<span class="color-danger">Sync failed: ' + (data.error || 'unknown')
+                + '. Try <a href="/ai/models?sync_grok=1#xai-grok">Sync via page reload</a>.</span>';
+            return;
+        }
+        log.innerHTML = '<span class="color-success">Synced ' + (data.count || 0) + ' models. Reloading…</span>';
+        setTimeout(function() { location.reload(); }, 1500);
+    })
+    .catch(function(err) {
+        clearTimeout(timer);
+        btn.disabled = false;
+        btn.textContent = '↻ Sync Grok Models (AJAX)';
+        var msg = (err && err.name === 'AbortError')
+            ? 'Timed out waiting for Comserv (server may be busy).'
+            : String(err);
+        log.innerHTML = '<span class="color-danger">Request failed: ' + msg
+            + ' Use <a href="/ai/models?sync_grok=1#xai-grok">Sync via page reload</a> — that runs on the server and does not need AJAX.</span>';
     });
 }
 
