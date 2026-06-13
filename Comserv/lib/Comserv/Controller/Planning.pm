@@ -1158,12 +1158,18 @@ sub _run_audit_scan {
             next if $msg =~ /DBI Connection failed|Can't connect to (?:MySQL|server)/i;
 
             $sub =~ s/^Comserv:://;
-            push @{ $groups{$sub} }, {
+            my $meta = Comserv::Util::Logging::error_audit_meta(
+                $sub, $e->file || '', $e->line || 0, $msg, $c
+            );
+            my $group_key = $meta->{controller_action} || $sub;
+            push @{ $groups{$group_key} }, {
                 level   => uc($e->level),
                 ts      => $e->timestamp,
                 message => substr($msg, 0, 500),
                 file    => $e->file || '',
                 line    => $e->line || '',
+                summary => $meta->{error_summary} || '',
+                path    => $meta->{path} || '',
             };
         }
     };

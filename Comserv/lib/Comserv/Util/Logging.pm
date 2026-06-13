@@ -422,6 +422,97 @@ sub instance {
     return $class->new();
 }
 
+# Build a human-readable label + stable fingerprint for Application Error Audit todos.
+# Unwraps Catalyst "Caught exception in Controller->action" messages so subjects
+# name the real failing code instead of generic wrappers like "end" or "view".
+sub error_audit_meta {
+    my ($subroutine, $file, $line, $message, $c) = @_;
+    $subroutine //= 'unknown';
+    $message    //= '';
+    $file       //= '';
+
+    my ($ctrl_action, $inner_err) = ('', '');
+    my $probe = $message;
+    if ($probe =~ /Caught exception in\s+(?:Comserv::Controller::)?(\w+)->(\w+)\s+"([^"]+)"/) {
+        $ctrl_action = "$1::$2";
+        $inner_err   = $3;
+    }
+    elsif ($probe =~ /\[GLOBAL ERROR\]\s*Unhandled exception:\s*(.+)/) {
+        my $rest = $1;
+        if ($rest =~ /Caught exception in\s+(?:Comserv::Controller::)?(\w+)->(\w+)\s+"([^"]+)"/) {
+            $ctrl_action = "$1::$2";
+            $inner_err   = $3;
+        }
+        else {
+            $inner_err = $rest;
+        }
+    }
+    elsif ($probe =~ /Unhandled application error:\s*(.+)/) {
+        my $rest = $1;
+        if ($rest =~ /Caught exception in\s+(?:Comserv::Controller::)?(\w+)->(\w+)\s+"([^"]+)"/) {
+            $ctrl_action = "$1::$2";
+            $inner_err   = $3;
+        }
+        else {
+            $inner_err = $rest;
+        }
+    }
+
+    if (!$ctrl_action && $file =~ m{Controller/(\w+)\.pm}) {
+        $ctrl_action = $1;
+        if ($subroutine && $subroutine !~ /^(end|global_error_handler|auto|view|unknown)$/i) {
+            $ctrl_action .= "::$subroutine";
+        }
+    }
+
+    if (!$ctrl_action) {
+        my $sub = $subroutine;
+        $sub =~ s/^Comserv:://;
+        $ctrl_action = $sub unless $sub =~ /^(end|global_error_handler|auto|unknown)$/i;
+    }
+    $ctrl_action ||= $subroutine;
+    $ctrl_action =~ s/^Comserv:://;
+    $ctrl_action =~ s/^Controller:://;
+
+    my $err_short = $inner_err || $message;
+    $err_short =~ s/^\[[^\]]+\]\s*//;
+    $err_short =~ s/^\[GLOBAL ERROR\]\s*Unhandled exception:\s*//;
+    $err_short =~ s/^Unhandled application error:\s*//;
+    $err_short =~ s/^Caught exception in\s+\S+\s+//;
+    $err_short =~ s/^"//;
+    $err_short =~ s/"\s*$//;
+    $err_short =~ s/\s+/ /g;
+    $err_short = substr($err_short, 0, 90);
+
+    my $fp_err = $inner_err || $message;
+    $fp_err =~ s/\d+/N/g;
+    $fp_err =~ s/\s+/ /g;
+    $fp_err = substr(lc($fp_err), 0, 120);
+
+    my $path = '';
+    if ($c && blessed($c) && $c->can('req') && $c->req) {
+        $path = $c->req->path // '';
+    }
+
+    my $subject = "[Error] $ctrl_action";
+    $subject .= " — $err_short" if $err_short && $err_short !~ /^\Q$ctrl_action\E/i;
+    $subject = substr($subject, 0, 200);
+
+    my $src_file = $file;
+    $src_file =~ s{.*/Comserv/}{Comserv/};
+
+    return {
+        fingerprint       => lc("$ctrl_action|$fp_err"),
+        subject           => $subject,
+        controller_action => $ctrl_action,
+        error_summary     => $err_short,
+        path              => $path,
+        source_file       => $src_file,
+        source_line       => $line // 0,
+        log_subroutine    => $subroutine,
+    };
+}
+
 # Log a message with detailed context (file, line, subroutine, etc.)
 sub log_with_details {
     my ($self, $c, $level, $file, $line, $subroutine, $message) = @_;
@@ -524,27 +615,43 @@ sub log_with_details {
         && !$_in_todo_create) {
         $_in_todo_create = 1;
         eval {
+            # Root::end logs the same Catalyst exception right after global_error_handler.
+            my $_skip_dup_end = ($subroutine // '') eq 'end'
+                && $message =~ /Unhandled application error:.*Caught exception in/i;
+            unless ($_skip_dup_end) {
             my $now_date = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-            my $sub_name = $subroutine // 'unknown';
+            my $meta     = error_audit_meta($subroutine, $file, $line, $message, $c);
+            my $sub_name = $meta->{controller_action} || ($subroutine // 'unknown');
             $sub_name =~ s/^Comserv:://;
-            my $sub_short    = substr($sub_name, 0, 80);
-            my $todo_subject = "[Error] $sub_short ($now_date)";
+            my $todo_subject = $meta->{subject};
             my $sitename     = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
             my $username     = ($c->can('session') && $c->session) ? ($c->session->{username} || 'system') : 'system';
             my $uid          = ($c->can('session') && $c->session) ? ($c->session->{user_id}  || undef)    : undef;
             my $top_level    = uc($level);
             my $todo_priority = ($top_level eq 'CRITICAL') ? 1 : ($top_level eq 'ERROR') ? 2 : 3;
+            my $fp_tag       = "Fingerprint: $meta->{fingerprint}";
 
-            # One open audit todo per subroutine — refresh on repeat instead of a new row per day.
+            # One open audit todo per error fingerprint — refresh on repeat.
             my $existing = $c->model('DBEncy')->resultset('Todo')->search(
-                { subject => { -like => "[Error] $sub_short%" },
-                  status  => { -not_in => [3, 4, 'done', 'Done', 'DONE', 'completed', 'Completed', 'Closed', 'closed'] } },
+                { -or => [
+                    { comments => { -like => "%$fp_tag%" } },
+                    { subject  => { -like => $todo_subject . '%' } },
+                  ],
+                  status => { -not_in => [3, 4, 'done', 'Done', 'DONE', 'completed', 'Completed', 'Closed', 'closed'] } },
                 { order_by => { -desc => 'last_mod_date' }, rows => 1 }
             )->first;
 
+            my $audit_header = "Automatic error todo from system log (level: $top_level).\n"
+                . "Area: $meta->{controller_action}\n"
+                . ($meta->{path} ? "Path: $meta->{path}\n" : '')
+                . ($meta->{source_file} ? "Source: $meta->{source_file}:$meta->{source_line}\n" : '')
+                . ($meta->{error_summary} ? "Summary: $meta->{error_summary}\n" : '')
+                . "\n";
+
             if ($existing) {
-                my $new_desc = "Automatic error todo from system log (level: $top_level).\n\n$log_message";
+                my $new_desc = $audit_header . $log_message;
                 my %upd = (
+                    subject       => $todo_subject,
                     description   => $new_desc,
                     last_mod_date => $now_date,
                     last_mod_by   => $username,
@@ -572,7 +679,11 @@ sub log_with_details {
                 };
                 eval {
                     my $search_term;
-                    if ($sub_name =~ /Controller::(\w+)/) {
+                    if ($sub_name =~ /^(\w+)::/) {
+                        $search_term = $1;
+                    } elsif ($sub_name =~ /Controller::(\w+)/) {
+                        $search_term = $1;
+                    } elsif ($file && $file =~ m{Controller/(\w+)\.pm$}i) {
                         $search_term = $1;
                     } elsif ($file && $file =~ m{/(\w+)\.pm$}i) {
                         $search_term = $1;
@@ -604,19 +715,19 @@ sub log_with_details {
                 } elsif ($file && $file =~ m{/worktrees/([^/]+)/}) {
                     $src_branch = $1;
                 }
-                if ($file) {
-                    ($src_file = $file) =~ s{.*/Comserv/}{Comserv/};
-                    $src_file .= ":$line" if $line;
-                }
-                my $source_comment = '';
+                $src_file = $meta->{source_file} || '';
+                $src_file .= ":$line" if $src_file && $line;
+                my $source_comment = "$fp_tag\n";
                 $source_comment .= "Server: $src_server\n"  if $src_server;
                 $source_comment .= "Branch: $src_branch\n"  if $src_branch;
+                $source_comment .= "Path:   $meta->{path}\n" if $meta->{path};
                 $source_comment .= "File:   $src_file\n"    if $src_file;
-                $source_comment .= "Function: $sub_name\n"  if $sub_name;
+                $source_comment .= "Area:   $meta->{controller_action}\n";
+                $source_comment .= "Logged via: $subroutine\n" if $subroutine;
 
                 my %create_args = (
                     subject             => $todo_subject,
-                    description         => "Automatic error todo from system log (level: $top_level).\n\n$log_message",
+                    description         => $audit_header . $log_message,
                     status              => 1,
                     priority            => $todo_priority,
                     is_blocking         => 0,
@@ -640,6 +751,7 @@ sub log_with_details {
                 );
                 $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
             }
+            } # unless $_skip_dup_end
         };
         $_in_todo_create = 0;
     }
