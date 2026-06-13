@@ -2038,6 +2038,8 @@ sub begin :Private {
     }
 
     eval {
+        my $nav = $c->controller('Navigation');
+        $nav->_ensure_hosting_list_publicly_column($c) if $nav;
         my @ha = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
             { status => 'active' },
             { order_by => 'sitename' }
