@@ -535,14 +535,26 @@ sub log_with_details {
             my $top_level    = uc($level);
             my $todo_priority = ($top_level eq 'CRITICAL') ? 1 : ($top_level eq 'ERROR') ? 2 : 3;
 
+            # One open audit todo per subroutine — refresh on repeat instead of a new row per day.
             my $existing = $c->model('DBEncy')->resultset('Todo')->search(
-                { subject    => { -like => "[Error] $sub_short%" },
-                  start_date => $now_date,
-                  status     => { -not_in => [3, 'done', 'Done', 'DONE', 'completed', 'Completed'] } },
-                { rows => 1 }
+                { subject => { -like => "[Error] $sub_short%" },
+                  status  => { -not_in => [3, 4, 'done', 'Done', 'DONE', 'completed', 'Completed', 'Closed', 'closed'] } },
+                { order_by => { -desc => 'last_mod_date' }, rows => 1 }
             )->first;
 
-            unless ($existing) {
+            if ($existing) {
+                my $new_desc = "Automatic error todo from system log (level: $top_level).\n\n$log_message";
+                my %upd = (
+                    description   => $new_desc,
+                    last_mod_date => $now_date,
+                    last_mod_by   => $username,
+                    due_date      => $now_date,
+                );
+                $upd{priority} = $todo_priority
+                    if ($todo_priority // 99) < (eval { $existing->priority } // 99);
+                eval { $existing->update(\%upd) };
+            }
+            else {
                 # Try to match the error's file/subroutine to a project.
                 # The file path (e.g. "Comserv/Controller/Todo.pm") and
                 # subroutine (e.g. "Comserv::Controller::Todo::modify_todo")
