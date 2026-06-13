@@ -21,6 +21,8 @@ BEGIN { extends 'Catalyst::Controller'; }
 __PACKAGE__->config(namespace => 'Documentation');
 
 # In-app helpers for safe, atomic JSON read/write
+our $LAST_ATOMIC_WRITE_ERROR;
+
 sub _load_json_file {
     my ($path) = @_;
     return unless defined $path && -e $path;
@@ -31,16 +33,66 @@ sub _load_json_file {
     return JSON->new->utf8->decode($content);
 }
 
+# Production Docker mounts root/Documentation read-only; runtime config writes go here.
+sub _documentation_writable_config_dir {
+    my ($c) = @_;
+    if (my $env_dir = $ENV{COMSERV_DOC_CONFIG_DIR}) {
+        make_path($env_dir) unless -d $env_dir;
+        return $env_dir if -d $env_dir && -w $env_dir;
+    }
+    my $dir = $c && $c->can('path_to')
+        ? $c->path_to('root', 'session', 'documentation_config')
+        : File::Spec->catdir($FindBin::Bin, '..', 'root', 'session', 'documentation_config');
+    make_path($dir) unless -d $dir;
+    return $dir;
+}
+
+sub _documentation_config_shipped_path {
+    my ($c) = @_;
+    return $c && $c->can('path_to')
+        ? $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json')
+        : File::Spec->catfile($FindBin::Bin, '..', 'root', 'Documentation', 'config', 'DocumentationConfig.json');
+}
+
+sub _documentation_config_read_path {
+    my ($c) = @_;
+    my $writable = File::Spec->catfile(_documentation_writable_config_dir($c), 'DocumentationConfig.json');
+    my $shipped  = _documentation_config_shipped_path($c);
+    return (-e $writable) ? $writable : $shipped;
+}
+
+sub _documentation_config_write_path {
+    my ($c) = @_;
+    return File::Spec->catfile(_documentation_writable_config_dir($c), 'DocumentationConfig.json');
+}
+
+sub _documentation_scan_state_path {
+    my ($c) = @_;
+    return File::Spec->catfile(_documentation_writable_config_dir($c), 'scan_state.json');
+}
+
 sub _atomic_write_json {
     my ($path, $data) = @_;
+    $LAST_ATOMIC_WRITE_ERROR = undef;
     return 0 unless defined $path;
+    my $dir = File::Basename::dirname($path);
+    eval { make_path($dir) unless -d $dir; 1 } or do {
+        $LAST_ATOMIC_WRITE_ERROR = "mkdir $dir failed: $@";
+        return 0;
+    };
     my $tmp = $path . '.tmp';
     {
-        open my $fh, '>:encoding(UTF-8)', $tmp or return 0;
+        open my $fh, '>:encoding(UTF-8)', $tmp or do {
+            $LAST_ATOMIC_WRITE_ERROR = "open $tmp failed: $!";
+            return 0;
+        };
         print $fh JSON->new->utf8->pretty->encode($data);
         close $fh;
     }
-    rename $tmp, $path or return 0;
+    rename $tmp, $path or do {
+        $LAST_ATOMIC_WRITE_ERROR = "rename $tmp -> $path failed: $!";
+        return 0;
+    };
     return 1;
 }
 
@@ -114,8 +166,7 @@ sub BUILD {
 sub _load_categories_from_config {
     my ($self) = @_;
     
-    # Path to the JSON config file
-    my $config_file = $FindBin::Bin . '/../root/Documentation/config/DocumentationConfig.json';
+    my $config_file = _documentation_config_read_path();
     
     # Initialize with empty hash
     %{$self->documentation_categories} = ();
@@ -301,7 +352,7 @@ sub _ensure_scanned {
     my ($self, $c) = @_;
     # If we already have pages, we still want to auto-rescan if fingerprint changed
     my $docs_root = _compute_and_get_docs_root($c);
-    my $state_path = File::Spec->catfile($docs_root, 'config', 'scan_state.json');
+    my $state_path = _documentation_scan_state_path($c);
 
     my $current_fp = $self->_fingerprint_fs($docs_root);
     my $stored_fp  = _read_stored_fingerprint($state_path);
@@ -1054,7 +1105,7 @@ sub manage_config :Path('/Documentation/manage_config') :Args {
     }
 
     # Load the full JSON config
-    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_file = _documentation_config_read_path($c);
     my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
 
     # Available roles in the system
@@ -1260,7 +1311,7 @@ sub save_config :Path('/Documentation/save_config') :Args(0) {
         return;
     }
 
-    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_file = _documentation_config_read_path($c);
     my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
 
     # Get the action type
@@ -1381,11 +1432,14 @@ sub save_config :Path('/Documentation/save_config') :Args(0) {
         };
     }
 
-    # Save the updated config
+    # Save the updated config (writable overlay — shipped config is read-only in prod Docker)
+    my $write_path = _documentation_config_write_path($c);
     my $clean_config = $self->_clean_for_json($config);
-    if (_atomic_write_json($config_file, $clean_config)) {
+    if (_atomic_write_json($write_path, $clean_config)) {
         $c->response->redirect($c->uri_for('/Documentation/manage_config') . '?msg=saved');
     } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'manage_config',
+            "Failed to save documentation config to $write_path: " . ($LAST_ATOMIC_WRITE_ERROR || 'unknown'));
         $c->response->redirect($c->uri_for('/Documentation/manage_config') . '?msg=error');
     }
 }
@@ -1408,7 +1462,7 @@ sub edit_category_form :Path('/Documentation/edit_category') :Args(1) {
     my @available_roles = qw(normal user editor admin developer);
 
     # Load current categories from config
-    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_file = _documentation_config_read_path($c);
     my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
     my $categories = $config->{categories} || {};
 
@@ -1448,7 +1502,7 @@ sub add_category_form :Path('/Documentation/add_category') :Args(0) {
     my @available_roles = qw(normal user editor admin developer);
 
     # Load current categories from config
-    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_file = _documentation_config_read_path($c);
     my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
     my $existing_categories = $config->{categories} || {};
 
@@ -1497,7 +1551,7 @@ sub export_config :Path('/Documentation/Config/export') :Args(0) {
     }
 
     # Load the current config
-    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_file = _documentation_config_read_path($c);
     my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
 
     # Set response headers for JSON download
@@ -1623,8 +1677,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
             "Error updating page metadata: $@");
     }
     
-    # Load the documentation configuration
-    my $config_path = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_path = _documentation_config_read_path($c);
     my $role_config = {};  # Using a different variable name to avoid any conflicts
     
     if (-e $config_path) {
@@ -1704,21 +1757,12 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         };
     }
     
-    # Save the updated configuration atomically
+    # Save the updated configuration atomically (writable overlay for read-only prod mounts)
     eval {
-        # Ensure the config directory exists
-        my $config_dir = $c->path_to('root', 'Documentation', 'config');
-        unless (-d $config_dir) {
-            require File::Path;
-            File::Path::make_path($config_dir, { mode => 0755 });
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_roles',
-                "Created config directory: $config_dir");
-        }
-        
-        # Clean the role_config structure to remove any blessed objects before JSON encoding
         my $clean_config = $self->_clean_for_json($role_config);
-        my $config_path  = $config_dir . '/DocumentationConfig.json';
-        _atomic_write_json($config_path, $clean_config) or die "Atomic write failed";
+        my $write_path   = _documentation_config_write_path($c);
+        _atomic_write_json($write_path, $clean_config)
+            or die "Atomic write failed: " . ($LAST_ATOMIC_WRITE_ERROR || 'unknown');
     };
     
     if ($@) {
@@ -2008,10 +2052,11 @@ sub search :Path('/documentation/search') :Args(0) {
 sub _update_json_config_with_scanned_files {
     my ($self, $c) = @_;
 
-    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_file = _documentation_config_read_path($c);
+    my $write_path  = _documentation_config_write_path($c);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
-        "Updating JSON config with scanned files at: $config_file");
+        "Updating JSON config with scanned files (read=$config_file write=$write_path)");
 
     # Load existing config
     my $config = {};
@@ -2072,18 +2117,18 @@ sub _update_json_config_with_scanned_files {
 
     # Save updated config
     my $clean_config = $self->_clean_for_json($config);
-    if (_atomic_write_json($config_file, $clean_config)) {
+    if (_atomic_write_json($write_path, $clean_config)) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
             "Successfully updated JSON config: $new_count new pages, $update_count updated pages");
     } else {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
-            "Failed to write JSON config file");
+            "Failed to write JSON config file to $write_path: " . ($LAST_ATOMIC_WRITE_ERROR || 'unknown'));
     }
 }
 
 sub _apply_json_roles_to_memory {
     my ($self, $c) = @_;
-    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config_file = _documentation_config_read_path($c);
     return unless -e $config_file;
     my $config = _load_json_file($config_file) || {};
     my $json_pages = $config->{pages} || {};
