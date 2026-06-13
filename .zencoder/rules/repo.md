@@ -85,7 +85,7 @@ Comserv is a Perl-based web application framework using Catalyst, serving as a m
 - **db_config.json**: DB connections (multi-site).
 - **comserv.conf**: App settings (debug, plugins).
 - **cloudflare_config.json**: API auth.
-- **theme_definitions.json**: Site themes.
+- **static/config/theme_definitions.json**: Theme variables + `site_themes` mapping (canonical; CSS generated to `static/css/themes/`).
 - **supervisord.conf**: Docker process mgmt.
 
 ## Development Workflow
@@ -154,10 +154,11 @@ Comserv is a Perl-based web application framework using Catalyst, serving as a m
    - Deploy: Run `script/deploy_schema.pl` or in-app `/admin/migrate_schema`.
    - Compare: `/admin/compare_schema`.
 
-3. **Update Theme**:
-   - Edit `root/static/css/themes/<name>.css`.
-   - JSON: `theme_definitions.json`.
-   - Apply: `/admin/theme/edit` or DB insert.
+3. **Create or update a theme**:
+   - Edit `Comserv/root/static/config/theme_definitions.json` (`themes.{id}.variables`, `site_themes.{site}`).
+   - Regenerate CSS: `/admin/theme` save actions or `ThemeConfig->generate_all_theme_css`.
+   - Output: `Comserv/root/static/css/themes/<id>.css` (generated — do not treat as source of truth).
+   - Map site → theme in `site_themes`; verify at `/admin/theme`.
 
 4. **Backup/Restore**:
    - Create: `/admin/backup/create`.
@@ -179,7 +180,7 @@ Comserv is a Perl-based web application framework using Catalyst, serving as a m
 ### Common Issues
 - **DB Errors**: Verify `db_config.json`; run `script/initialize_db.pl`. Solution: Check MariaDB logs.
 - **Starman Crashes**: Port conflict (5000). Solution: `pkill starman; starman -p 5001 ...`; use `/admin/restart_starman`.
-- **Theme Mismatch**: Cache issue. Solution: Hard refresh; check `SiteTheme` table.
+- **Theme Mismatch**: Wrong `site_themes` mapping or stale CSS. Solution: Hard refresh; verify `static/config/theme_definitions.json`; run `generate_all_theme_css`.
 - **Docker Volume Lost**: Data persistence. Solution: Mount volumes in compose; backup DB.
 - **API Fail (Proxmox/Cloudflare)**: Invalid tokens. Solution: Update configs; test endpoints.
 - **Auth Bypass**: Role checks fail. Solution: Verify `Util/AdminAuth.pm`; add logs.

@@ -13,8 +13,12 @@
     [% PageVersion %]
 [% END %]
 [%#
-  THEME COMPLIANCE CHECKLIST (humans + AI — fix opportunistically when editing .tt files)
-  See: .zencoder/rules/template-standards.md
+  TWO THEME GOALS (do not conflate):
+  A) Author a theme → edit static/config/theme_definitions.json (ThemeConfig → static/css/themes/*.css)
+  B) Template compliance → this checklist (fix opportunistically when editing .tt files)
+  See: .zencoder/rules/template-standards.md and /Documentation/CssThemes
+
+  GOAL B CHECKLIST:
   1. Use app-container / content-container / app-form / data-table / btn btn-*
   2. No hardcoded #colours — use var(--text-color), var(--border-color), etc. (canonical list below)
   3. has-bg-image: no overflow:hidden or backdrop-filter on page wrappers; no background-attachment:fixed
@@ -347,6 +351,27 @@ $c->stash->{
     </div>
 
     <div class="app-section">
+        <h2>Theme System — Two Goals</h2>
+        <p>
+            <strong>Goal A — Theme authoring:</strong> Colours and fonts come from
+            <code>static/config/theme_definitions.json</code>. Each theme's <code>variables</code> block
+            (keys like <code>primary-color</code>, no <code>--</code> prefix) is compiled to
+            <code>static/css/themes/{theme_id}.css</code> by <code>ThemeConfig</code>.
+            Map sites in <code>site_themes</code>. Manage via <a href="/admin/theme">Admin → Theme Management</a>
+            or edit JSON directly, then regenerate CSS.
+        </p>
+        <p>
+            <strong>Goal B — Template compliance (this template):</strong> Application pages use canonical
+            CSS variables and container classes so every mapped theme renders correctly. Do not hardcode
+            colours or invent new variable names — see sections below.
+        </p>
+        <p>
+            See also: <a href="/Documentation/CssThemes">CSS Theme System — Admin Guide</a>,
+            <a href="/Documentation/ThemeConfig">ThemeConfig model</a>.
+        </p>
+    </div>
+
+    <div class="app-section">
         <h2>Theme Background Image Compliance</h2>
         <p>
             Themes may define a <code>--background-image</code> CSS variable (e.g. the BMaster honeycomb pattern).
@@ -371,7 +396,7 @@ $c->stash->{
             <ul>
                 <li><strong>Never use <code>overflow: hidden</code></strong> on full-page section containers — it clips the background image display</li>
                 <li><strong>Never use <code>backdrop-filter</code></strong> on main structural wrappers — creates stacking context issues</li>
-                <li><strong>Never hardcode <code>background-color: rgba(255,255,255,0.88)</code></strong> — use <code>rgba(255,255,255,0.88)</code> instead</li>
+                <li><strong>Never use opaque backgrounds on full-page wrappers</strong> — no <code>#fff</code>, <code>white</code>, or <code>rgba(255,255,255,0.88)</code> on <code>.app-container</code> / <code>.content-container</code>; reserve 0.88 opacity for small readable cards only</li>
                 <li><strong>Never use <code>background-attachment: fixed</code></strong> — breaks on mobile browsers and any ancestor with overflow/transform</li>
                 <li><strong>Never use <code>var(--secondary-color)</code> for large area backgrounds</strong> — the secondary colour varies per theme and may be very dark (e.g. <code>#4A4A4A</code> for the apis/BMaster theme)</li>
             </ul>
@@ -402,9 +427,9 @@ $c->stash->{
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-/* WRONG — blocks background image */
-.bad-wrapper {
-    background-color: rgba(255,255,255,0.88);           /* use rgba(255,255,255,0.88) instead */
+/* WRONG — opaque page wrapper blocks background image */
+.bad-page-wrapper {
+    background-color: #ffffff;         /* use transparent or rgba(255,255,255,0.12) */
     background-attachment: fixed;      /* use scroll instead */
     overflow: hidden;                  /* remove from page-level containers */
     backdrop-filter: blur(4px);        /* remove from structural wrappers */

@@ -44,15 +44,20 @@ Before closing Application Error Audit todos or assuming a fix is live on produc
 
 Morning Audit scan uses the latest **Docker Hub Deploy** log entry as its window (see `Planning.pm` `_run_audit_scan`).
 
-## Theme compliance (opportunistic — same pattern as logging)
+## Themes — two goals (do not conflate)
 
-When creating or editing `.tt` files, improve theme compliance **in that file** — do not sweep the whole repo.
+| Goal | Task | Where |
+|------|------|-------|
+| **A — Theme authoring** | Create/change site appearance or mapping | `Comserv/root/static/config/theme_definitions.json` → `ThemeConfig` regenerates `static/css/themes/*.css` |
+| **B — Template compliance** | Make `.tt` pages work on every theme | Edit the `.tt` file; use `var(--*)` from `base.css` |
 
-1. **Pick the right base template**
-   - Application UI → `Comserv/root/Documentation/ApplicationTtTemplate.tt` (or `/Documentation/ApplicationTtTemplate`)
-   - Documentation → `Comserv/root/Documentation/DocumentationTtTemplate.tt`
+- **Authoring:** Add/edit `themes.{id}.variables`, map site in `site_themes`, save via `/admin/theme` or `ThemeConfig`. Do **not** treat hand-edited CSS as source of truth. Legacy DB `Model::Theme` is deprecated.
+- **Compliance (opportunistic — same pattern as logging):** When creating or editing `.tt` files, improve theme compliance **in that file** — do not sweep the whole repo.
+
+Template compliance steps:
+1. **Pick the right base template** — Application UI → `/Documentation/ApplicationTtTemplate`; Documentation → `/Documentation/DocumentationTtTemplate`
 2. **Follow** [template-standards.md](./.zencoder/rules/template-standards.md) checklist (variables, containers, `has-bg-image` rules)
-3. **Replace while editing**: hardcoded colours → `var(--*)`, custom buttons → `btn btn-*`, opaque page wrappers → transparent/semi-transparent where needed
+3. **Replace while editing:** hardcoded colours → `var(--*)`, custom buttons → `btn btn-*`, opaque page wrappers → transparent/semi-transparent where needed
 4. **Verify mentally** across site themes (CSC, USBM, apis/BMaster) — variables adapt; literals do not
 
-Each edit should leave the touched page more consistent site-to-site and theme-to-theme.
+Each `.tt` edit should leave the touched page more consistent site-to-site and theme-to-theme.

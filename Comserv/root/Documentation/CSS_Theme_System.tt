@@ -9,6 +9,14 @@
 
 <div class="markdown-content">
 
+<div style="padding: 1rem; margin-bottom: 1.5rem; border-left: 4px solid var(--warning-color); background-color: rgba(255,255,255,0.12);">
+<strong>Outdated sections below.</strong> Canonical guidance is now at
+<a href="/Documentation/CssThemes">CSS Theme System — Admin Guide</a> and
+<a href="/Documentation/ThemeConfig">ThemeConfig</a>.
+Source of truth: <code>static/config/theme_definitions.json</code> (not under <code>static/css/themes/</code>).
+Generated CSS: <code>static/css/themes/{theme_id}.css</code>.
+</div>
+
 # CSS Theme System Documentation
 
 ## Overview
@@ -19,27 +27,27 @@ The Comserv CSS Theme System provides a unified approach to styling across all m
 
 ### Theme Directory Structure
 ```
+/static/config/
+└── theme_definitions.json   # Canonical theme variables + site_themes mapping
+
 /static/css/themes/
-├── theme_definitions.json    # Theme variable definitions
-├── base-containers.css      # Universal container components
-├── documentation.css        # Documentation-specific styles
-├── default.css             # Default theme
-├── apis.css               # Site-specific themes
+├── default.css               # Generated from JSON
+├── apis.css
 ├── csc.css
 ├── usbm.css
-└── [other theme files]
+└── [other generated theme files]
 ```
 
 ### Theme Loading Process
-1. **Controller sets theme** via stash or site detection
-2. **Wrapper.tt loads theme CSS** from `/static/css/themes/{theme_name}.css`
-3. **Additional CSS loaded** via `additional_css` stash parameter
-4. **CSS variables applied** from theme_definitions.json
+1. **Root controller** resolves site → theme via `site_themes` in `theme_definitions.json`
+2. **Layout loads** `base.css`, then `/static/css/themes/{theme_name}.css`
+3. **Additional CSS** via `additional_css` stash parameter when needed
+4. **CSS variables** come from generated theme CSS (`--primary-color`, etc.)
 
 ## Theme Definitions
 
 ### JSON Structure
-**File**: `/static/css/themes/theme_definitions.json`
+**File**: `static/config/theme_definitions.json`
 
 ```json
 {

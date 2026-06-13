@@ -14,11 +14,15 @@
     [% PageVersion %]
 [% END %]
 [%#
-  THEME COMPLIANCE CHECKLIST (humans + AI — fix opportunistically when editing .tt files)
+  TWO THEME GOALS (do not conflate):
+  A) Author a theme → static/config/theme_definitions.json (see /Documentation/CssThemes)
+  B) Template compliance → this checklist (fix opportunistically when editing .tt files)
   See: .zencoder/rules/template-standards.md
+
+  GOAL B CHECKLIST:
   1. container / row / col-* grid; inline styles must use var(--*) only
   2. Doc links: /Documentation/FILENAME (no subdirs, no .tt)
-  3. has-bg-image: rgba(255,255,255,0.12) sections, 0.88 for readable cards
+  3. has-bg-image: rgba(255,255,255,0.12) sections, 0.88 for small readable cards only
   4. Fix the file/section you touch; do not repo-wide sweep unless asked
 %]
 
@@ -288,20 +292,26 @@ This template is fully theme-compliant using the actual Comserv theme system:
 
 4. **Responsive Design**: Layout automatically adapts on mobile using layout.css media queries
 
-5. **Theme Variables Available**:
-   From theme_definitions.json, any site can override:
+5. **Theme authoring vs template compliance** (two goals):
+   - Goal A (authoring): Edit static/config/theme_definitions.json — themes.{id}.variables + site_themes mapping.
+     ThemeConfig generates static/css/themes/{id}.css. See /Documentation/CssThemes.
+   - Goal B (this template): Use canonical var(--*) names from base.css so pages work on every theme.
+     Templates do NOT define theme colours; they consume variables themes override.
+
+6. **Theme Variables Available** (from static/config/theme_definitions.json):
+   JSON keys (no -- prefix) become CSS variables (--primary-color, etc.):
    - Colors: primary-color, secondary-color, accent-color, text-color, etc.
    - Typography: header-font, body-font, font-size-base, font-size-large, etc.
    - UI Elements: button-bg, nav-bg, table-header-bg, border-color, etc.
 
-6. **Cross-Theme Compatibility**: Works correctly with:
+7. **Cross-Theme Compatibility**: Works correctly with:
    - Default theme (standard blue/white)
    - CSC theme (cyan backgrounds)  
    - USBM theme (green accent colors)
    - APIS theme (yellow/orange beekeeping theme)
-   - Any future themes added to theme_definitions.json
+   - Any future themes added to static/config/theme_definitions.json
 
-7. **Navigation Features** (NEW in v0.05):
+8. **Navigation Features** (NEW in v0.05):
    - Table of Contents (id="toc") with quick-jump navigation buttons
    - Anchor links (id attributes) on all major sections (1-8)
    - Subsection anchors for Getting Started (4.1-4.3), Advanced Usage (5.1-5.2), Troubleshooting (6.1-6.2)
@@ -309,7 +319,7 @@ This template is fully theme-compliant using the actual Comserv theme system:
    - All navigation uses CSS variables for theme consistency
    - Self-contained: Works standalone or via template inclusion directive (no relative paths)
 
-8. **DOCUMENTATION LINK FORMAT** (CRITICAL - See .zencoder/rules/DOCUMENTATION_LINK_STANDARDS.md):
+9. **DOCUMENTATION LINK FORMAT** (CRITICAL - See .zencoder/rules/DOCUMENTATION_LINK_STANDARDS.md):
    - CORRECT: <a href="/Documentation/FILENAME">Link Text</a>
    - WRONG: <a href="/Documentation/system/FILENAME.tt">...</a> (DO NOT include subdirectory or .tt extension)
    - Documentation system uses flat namespace: strip .tt extension, ignore subdirectories
