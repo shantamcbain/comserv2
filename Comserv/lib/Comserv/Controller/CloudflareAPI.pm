@@ -67,6 +67,19 @@ sub _can_manage_zone {
     return grep { $_ eq $zone_name } @$allowed;
 }
 
+# Legacy routes from pre-refactor Cloudflare controller (production bookmarks).
+sub dns_records :Path('dns_records') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for($self->action_for('index')));
+}
+
+sub dns :Path('dns') :Args(1) {
+    my ($self, $c, $domain) = @_;
+    $domain =~ s/[^A-Za-z0-9._-]//g;
+    return $c->response->redirect($c->uri_for($self->action_for('index'))) unless $domain;
+    $c->response->redirect($c->uri_for('/cloudflareapi/zone/' . $domain));
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
