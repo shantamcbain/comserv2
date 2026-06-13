@@ -1,15 +1,32 @@
 package Comserv::Util::Logging;
 
-# IMPORTANT: Always use this logging system throughout the application.
-# Do NOT create new logging methods or use direct print statements.
-# The preferred logging format is:
-#   $self->logging->log_with_details($c, 'level', __FILE__, __LINE__, 'method_name', "Message");
-# Where level can be: 'info', 'debug', 'warn', 'error', etc.
-# This ensures consistent logging with file, line number, and method context.
+# =============================================================================
+# LOGGING CHECKLIST (humans + AI — keep Comserv/Util/Logging.pm as single source)
+# =============================================================================
 #
-# NOTE: This logging system has been updated to prevent recursion issues.
-# It no longer calls Catalyst's logging methods directly, but instead logs to a file
-# and adds messages to the debug_errors array in the stash.
+# 1. USE log_with_details for operational messages (especially warn/error/critical):
+#      $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+#          'meaningful_action_name', "What failed and key context: $detail");
+#
+# 2. SUBROUTINE (5th arg) must name the REAL code area — never generic wrappers:
+#      Good: 'dns_records', 'modify_todo', 'docker_deploy_to_production'
+#      Bad:  'end', 'view', 'auto' (Catalyst wrappers; audit todos become useless)
+#
+# 3. MESSAGE must be self-contained: what, where, identifiers (todo_id, user, path).
+#      Unhandled Catalyst exceptions are OK in the message; error_audit_meta unwraps them.
+#
+# 4. DO NOT use bare warn/print/$c->log->error for production failures — they skip:
+#      - system_log table, email alerts, Application Error Audit auto-todos
+#
+# 5. LEVEL guide: debug/info = file only; warn+ = DB; error+ = email + audit todo
+#
+# 6. After fixing a bug seen in Application Error Audit: deploy, then close the todo.
+#      Read Comserv/DEPLOY_STATUS.json + version.json before assuming prod is current.
+#
+# 7. See also: .zencoder/rules/logging-standards.md and AGENTS.md (deploy awareness)
+#
+# NOTE: Recursion guard $_in_todo_create prevents infinite loops during auto-todo create.
+# =============================================================================
 
 use strict;
 use warnings;
