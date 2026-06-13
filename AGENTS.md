@@ -11,6 +11,7 @@ This file is a reference for AI agents working on the Comserv project.
 - **Naming Standards**: [./.zencoder/rules/naming-standards.md](./.zencoder/rules/naming-standards.md)
 - **SQL Standards**: [./.zencoder/rules/sql-standards.md](./.zencoder/rules/sql-standards.md)
 - **Logging Standards**: [./.zencoder/rules/logging-standards.md](./.zencoder/rules/logging-standards.md)
+- **Template / Theme Standards**: [./.zencoder/rules/template-standards.md](./.zencoder/rules/template-standards.md)
 - **Workflow Standards**: [./.zencoder/rules/workflow-standards.md](./.zencoder/rules/workflow-standards.md)
 - **Access Standards**: [./.zencoder/rules/application-access-standards.md](./.zencoder/rules/application-access-standards.md)
 - **Config Standards**: [./.zencoder/rules/config-location.md](./.zencoder/rules/config-location.md)
@@ -42,3 +43,16 @@ Before closing Application Error Audit todos or assuming a fix is live on produc
 - Production `script/deploy.sh` on successful container health (also copied to NFS logs dir when configured)
 
 Morning Audit scan uses the latest **Docker Hub Deploy** log entry as its window (see `Planning.pm` `_run_audit_scan`).
+
+## Theme compliance (opportunistic — same pattern as logging)
+
+When creating or editing `.tt` files, improve theme compliance **in that file** — do not sweep the whole repo.
+
+1. **Pick the right base template**
+   - Application UI → `Comserv/root/Documentation/ApplicationTtTemplate.tt` (or `/Documentation/ApplicationTtTemplate`)
+   - Documentation → `Comserv/root/Documentation/DocumentationTtTemplate.tt`
+2. **Follow** [template-standards.md](./.zencoder/rules/template-standards.md) checklist (variables, containers, `has-bg-image` rules)
+3. **Replace while editing**: hardcoded colours → `var(--*)`, custom buttons → `btn btn-*`, opaque page wrappers → transparent/semi-transparent where needed
+4. **Verify mentally** across site themes (CSC, USBM, apis/BMaster) — variables adapt; literals do not
+
+Each edit should leave the touched page more consistent site-to-site and theme-to-theme.
