@@ -691,13 +691,16 @@ sub daily :Path('/planning/daily') :Args {
         || $c->session->{planning_sync_deps};
     delete $c->session->{planning_sync_deps};
 
-    my $project_deps_ref;
     eval {
-        ($project_deps_ref, $auto_resolved_count, $auto_detected_count)
-            = Comserv::Util::ProjectDependencies::sync_dependencies(
-                $c, $sitename, $is_csc, $run_dep_detect ? 1 : 0
-            );
-        @project_deps = @{ $project_deps_ref || [] };
+        my $dep_sync = Comserv::Util::ProjectDependencies::sync_dependencies(
+            $c, $sitename, $is_csc, $run_dep_detect ? 1 : 0
+        );
+        if (ref($dep_sync) eq 'HASH') {
+            my $deps = $dep_sync->{deps};
+            @project_deps = (ref($deps) eq 'ARRAY') ? @$deps : ();
+            $auto_resolved_count = $dep_sync->{auto_resolved} // 0;
+            $auto_detected_count = $dep_sync->{auto_detected} // 0;
+        }
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch/process project dependencies: $@") if $@;
@@ -744,7 +747,13 @@ sub daily :Path('/planning/daily') :Args {
         todos_for_today   => $todos_for_today,
         active_priorities => \@active_priorities,
         project_deps      => \@project_deps,
-        active_blockers   => [ grep { $_->{dependency_type} eq 'blocks' && $_->{status} eq 'active' } @project_deps ],
+        active_blockers   => [
+            grep {
+                ref($_) eq 'HASH'
+                && ($_->{dependency_type} // '') eq 'blocks'
+                && ($_->{status} // '') eq 'active'
+            } @project_deps
+        ],
         dep_auto_resolved => $auto_resolved_count,
         dep_auto_detected => $auto_detected_count,
 
