@@ -691,11 +691,13 @@ sub daily :Path('/planning/daily') :Args {
         || $c->session->{planning_sync_deps};
     delete $c->session->{planning_sync_deps};
 
+    my $project_deps_ref;
     eval {
-        (@project_deps, $auto_resolved_count, $auto_detected_count)
+        ($project_deps_ref, $auto_resolved_count, $auto_detected_count)
             = Comserv::Util::ProjectDependencies::sync_dependencies(
                 $c, $sitename, $is_csc, $run_dep_detect ? 1 : 0
             );
+        @project_deps = @{ $project_deps_ref || [] };
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch/process project dependencies: $@") if $@;
