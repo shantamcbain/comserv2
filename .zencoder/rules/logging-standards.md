@@ -29,3 +29,6 @@ $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
 
 ## Deploy awareness
 Read `Comserv/DEPLOY_STATUS.json` and `Comserv/version.json` at session start when debugging production vs dev.
+
+## Related: theme compliance
+When editing the same feature's `.tt` file, also apply the opportunistic checklist in `template-standards.md`.

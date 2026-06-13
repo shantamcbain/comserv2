@@ -8,10 +8,18 @@
    last_updated = "Tue Apr 22 2026"
 %]
 
-[% PageVersion  = 'Documantation/application_tt_template.tt,v 0.01 2025/10/15 09:31:09 Shanta Exp shanta'; %]
+[% PageVersion  = 'Documentation/ApplicationTtTemplate.tt,v 0.04 2026/06/13 Shanta Exp shanta'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
+[%#
+  THEME COMPLIANCE CHECKLIST (humans + AI — fix opportunistically when editing .tt files)
+  See: .zencoder/rules/template-standards.md
+  1. Use app-container / content-container / app-form / data-table / btn btn-*
+  2. No hardcoded #colours — use var(--text-color), var(--border-color), etc. (canonical list below)
+  3. has-bg-image: no overflow:hidden or backdrop-filter on page wrappers; no background-attachment:fixed
+  4. Fix the file/section you touch; do not repo-wide sweep unless asked
+%]
 
 <div class="app-page">
     <h1>Application Template Toolkit (.tt) Template</h1>

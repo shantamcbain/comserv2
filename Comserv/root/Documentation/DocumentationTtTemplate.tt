@@ -9,10 +9,18 @@
    site_specific = "false"
 %]
 # all links must be Documentation/DocumentationTemplate format
-[% PageVersion = 'Documentation/documentation_tt_template.tt,v 0.05 2025/12/18 shanta Exp shanta - Added comprehensive TOC navigation system with section anchors' %]
+[% PageVersion = 'Documentation/DocumentationTtTemplate.tt,v 0.08 2026/06/13 shanta Exp shanta - Theme opportunistic checklist ref' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
+[%#
+  THEME COMPLIANCE CHECKLIST (humans + AI — fix opportunistically when editing .tt files)
+  See: .zencoder/rules/template-standards.md
+  1. container / row / col-* grid; inline styles must use var(--*) only
+  2. Doc links: /Documentation/FILENAME (no subdirs, no .tt)
+  3. has-bg-image: rgba(255,255,255,0.12) sections, 0.88 for readable cards
+  4. Fix the file/section you touch; do not repo-wide sweep unless asked
+%]
 
 <div class="container">
     <h1 style="color: var(--text-color); font-family: var(--header-font);">Documentation Page Title</h1>
