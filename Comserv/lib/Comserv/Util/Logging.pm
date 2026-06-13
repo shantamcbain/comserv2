@@ -23,7 +23,7 @@ package Comserv::Util::Logging;
 # 6. After fixing a bug seen in Application Error Audit: deploy, then close the todo.
 #      Read Comserv/DEPLOY_STATUS.json + version.json before assuming prod is current.
 #
-# 7. See also: .zencoder/rules/logging-standards.md and AGENTS.md (deploy awareness)
+# 7. See also: /Documentation/logging_best_practices, /Documentation/DevelopmentStandards, AGENTS.md
 #
 # NOTE: Recursion guard $_in_todo_create prevents infinite loops during auto-todo create.
 # =============================================================================

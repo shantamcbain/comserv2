@@ -179,7 +179,7 @@
             <li>✅ Create <code>tt_file_standardization_guide.tt</code></li>
             <li>🔄 Create <code>application_tt_template.tt</code></li>
             <li>🔄 Enhance <code>documentation_tt_template.tt</code></li>
-            <li>🔄 Update <code>.zencoder/rules/repo.md</code> with template links</li>
+            <li>✅ Canonical standards index at <code>/Documentation/DevelopmentStandards</code></li>
         </ul>
         
         <h3>Phase 2: Audit and Categorize (Week 2)</h3>
@@ -229,7 +229,7 @@
             <li>631+ application .tt files throughout <code>/Comserv/root/</code> directories</li>
             <li>Documentation .tt template (<code>documentation_tt_template.tt</code>) - partially complete</li>
             <li>Working copies (.md files) with PageVersion headers</li>
-            <li>Established workflow in <code>.zencoder/rules/repo.md</code></li>
+            <li>Established workflow in <code>/Documentation/DevelopmentStandards</code></li>
         </ul>
         
         <h3>What's Missing:</h3>
@@ -276,9 +276,10 @@ Comserv/root/
     <div class="doc-section">
         <h2>Related Documents</h2>
         <ul>
-            <li><a href="documentation_tt_template.tt">Documentation Template (.tt format)</a></li>
-            <li><a href="../.zencoder/rules/repo.md">.tt File Editing Workflow</a></li>
-            <li><a href="AI_Guidelines.tt">AI Development Guidelines</a></li>
+            <li><a href="/Documentation/DocumentationTtTemplate">Documentation Template</a></li>
+            <li><a href="/Documentation/ApplicationTtTemplate">Application Template</a></li>
+            <li><a href="/Documentation/DevelopmentStandards">Development Standards (canonical index)</a></li>
+            <li><a href="/Documentation/AI_DEVELOPMENT_GUIDELINES">AI Development Guidelines</a></li>
         </ul>
     </div>
     

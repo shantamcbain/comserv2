@@ -17,7 +17,7 @@
   TWO THEME GOALS (do not conflate):
   A) Author a theme → static/config/theme_definitions.json (see /Documentation/CssThemes)
   B) Template compliance → this checklist (fix opportunistically when editing .tt files)
-  See: .zencoder/rules/template-standards.md
+  Canonical index: /Documentation/DevelopmentStandards
 
   GOAL B CHECKLIST:
   1. container / row / col-* grid; inline styles must use var(--*) only
@@ -319,13 +319,12 @@ This template is fully theme-compliant using the actual Comserv theme system:
    - All navigation uses CSS variables for theme consistency
    - Self-contained: Works standalone or via template inclusion directive (no relative paths)
 
-9. **DOCUMENTATION LINK FORMAT** (CRITICAL - See .zencoder/rules/DOCUMENTATION_LINK_STANDARDS.md):
+9. **DOCUMENTATION LINK FORMAT** (CRITICAL — also in /Documentation/DevelopmentStandards):
    - CORRECT: <a href="/Documentation/FILENAME">Link Text</a>
    - WRONG: <a href="/Documentation/system/FILENAME.tt">...</a> (DO NOT include subdirectory or .tt extension)
    - Documentation system uses flat namespace: strip .tt extension, ignore subdirectories
    - Example: /Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt → /Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY
    - For non-documentation links (admin, todo, etc.) use full path as-is: <a href="/admin">Admin</a>
-   - See .zencoder/rules/DOCUMENTATION_LINK_STANDARDS.md for authoritative reference and routing details
 
 Usage: Replace placeholder content but maintain the CSS variable usage patterns and section anchors. When adding links to other documentation, use /Documentation/FILENAME format (no subdirectories, no .tt extension).
 -->

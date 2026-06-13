@@ -1,27 +1,42 @@
 # Comserv Agent Guidelines
 
-This file is a reference for AI agents working on the Comserv project. 
+Entry point for AI assistants (Cursor, Continue, Zencoder, etc.) working on this repository.
 
-**STRICT ADHERENCE REQUIRED**: All AI agents MUST read and follow the rules defined in the `.zencoder/rules/` directory. These rules are the single source of truth for project standards, workflows, and behavior.
+## Canonical standards (read these — not IDE-specific folders)
 
-## Core Rules Reference
-- **Repo Overview**: [./.zencoder/rules/repo.md](./.zencoder/rules/repo.md)
-- **AI Behavior**: [./.zencoder/rules/ai-behavior.md](./.zencoder/rules/ai-behavior.md)
-- **Documentation Standards**: [./.zencoder/rules/documentation-standards.md](./.zencoder/rules/documentation-standards.md)
-- **Naming Standards**: [./.zencoder/rules/naming-standards.md](./.zencoder/rules/naming-standards.md)
-- **SQL Standards**: [./.zencoder/rules/sql-standards.md](./.zencoder/rules/sql-standards.md)
-- **Logging Standards**: [./.zencoder/rules/logging-standards.md](./.zencoder/rules/logging-standards.md)
-- **Template / Theme Standards**: [./.zencoder/rules/template-standards.md](./.zencoder/rules/template-standards.md)
-- **Workflow Standards**: [./.zencoder/rules/workflow-standards.md](./.zencoder/rules/workflow-standards.md)
-- **Access Standards**: [./.zencoder/rules/application-access-standards.md](./.zencoder/rules/application-access-standards.md)
-- **Config Standards**: [./.zencoder/rules/config-location.md](./.zencoder/rules/config-location.md)
+**Primary index:** `/Documentation/DevelopmentStandards` (in-app) — themes, templates, logging, doc links, file hierarchy.
 
-## Quick Summary
+| Topic | Canonical source |
+|-------|------------------|
+| **Standards hub** | `/Documentation/DevelopmentStandards` |
+| **Theme authoring** | `Comserv/root/static/config/theme_definitions.json`, `/Documentation/CssThemes`, `/Documentation/ThemeConfig` |
+| **Template compliance** | `/Documentation/ApplicationTtTemplate`, `/Documentation/DocumentationTtTemplate` |
+| **Logging** | `Comserv/lib/Comserv/Util/Logging.pm` (checklist), `/Documentation/logging_best_practices` |
+| **YAML consolidation** | `Comserv/root/coding-standards-comserv.yaml` |
+| **Repo layout & tasks** | `.zencoder/rules/repo.md` (project overview; defers to in-app docs for TT/theme/logging detail) |
+
+**`.zencoder/rules/*.md`** are thin **Zencoder adapters** (`globs`, `alwaysApply`) that point to the sources above. They are not canonical — workstations without Zencoder/PyCharm should use `AGENTS.md` + in-app documentation only.
+
+## Zencoder adapter index (optional — if your IDE loads `.zencoder/rules/`)
+
+- Repo overview: [./.zencoder/rules/repo.md](./.zencoder/rules/repo.md)
+- AI behavior: [./.zencoder/rules/ai-behavior.md](./.zencoder/rules/ai-behavior.md)
+- Documentation: [./.zencoder/rules/documentation-standards.md](./.zencoder/rules/documentation-standards.md)
+- Naming: [./.zencoder/rules/naming-standards.md](./.zencoder/rules/naming-standards.md)
+- SQL: [./.zencoder/rules/sql-standards.md](./.zencoder/rules/sql-standards.md)
+- Templates/themes: [./.zencoder/rules/template-standards.md](./.zencoder/rules/template-standards.md) → `/Documentation/DevelopmentStandards`
+- Logging: [./.zencoder/rules/logging-standards.md](./.zencoder/rules/logging-standards.md) → `Logging.pm`
+- Workflow: [./.zencoder/rules/workflow-standards.md](./.zencoder/rules/workflow-standards.md)
+- Access: [./.zencoder/rules/application-access-standards.md](./.zencoder/rules/application-access-standards.md)
+- Config paths: [./.zencoder/rules/config-location.md](./.zencoder/rules/config-location.md)
+
+## Quick summary
+
 - **Language**: Perl (Catalyst Framework)
 - **Database**: MySQL (DBIx::Class ORM)
 - **Templates**: Template Toolkit (.tt)
 - **Primary Access**: workstation.local:3001
-- **Workflow**: Analyze -> Plan -> Diff -> Apply (Approval required at each step)
+- **Workflow**: Analyze → Plan → Diff → Apply (approval required at each step)
 
 ## Deploy awareness (read at session start for prod/debug work)
 
@@ -51,12 +66,14 @@ Morning Audit scan uses the latest **Docker Hub Deploy** log entry as its window
 | **A — Theme authoring** | Create/change site appearance or mapping | `Comserv/root/static/config/theme_definitions.json` → `ThemeConfig` regenerates `static/css/themes/*.css` |
 | **B — Template compliance** | Make `.tt` pages work on every theme | Edit the `.tt` file; use `var(--*)` from `base.css` |
 
+Full detail: **`/Documentation/DevelopmentStandards`** and **`/Documentation/CssThemes`**.
+
 - **Authoring:** Add/edit `themes.{id}.variables`, map site in `site_themes`, save via `/admin/theme` or `ThemeConfig`. Do **not** treat hand-edited CSS as source of truth. Legacy DB `Model::Theme` is deprecated.
-- **Compliance (opportunistic — same pattern as logging):** When creating or editing `.tt` files, improve theme compliance **in that file** — do not sweep the whole repo.
+- **Compliance (opportunistic):** When creating or editing `.tt` files, improve theme compliance **in that file** — do not sweep the whole repo.
 
 Template compliance steps:
 1. **Pick the right base template** — Application UI → `/Documentation/ApplicationTtTemplate`; Documentation → `/Documentation/DocumentationTtTemplate`
-2. **Follow** [template-standards.md](./.zencoder/rules/template-standards.md) checklist (variables, containers, `has-bg-image` rules)
+2. **Follow** the checklist in those templates and `/Documentation/DevelopmentStandards`
 3. **Replace while editing:** hardcoded colours → `var(--*)`, custom buttons → `btn btn-*`, opaque page wrappers → transparent/semi-transparent where needed
 4. **Verify mentally** across site themes (CSC, USBM, apis/BMaster) — variables adapt; literals do not
 

@@ -8838,19 +8838,33 @@
             "editor"
          ]
       },
+      "DevelopmentStandards" : {
+        "title" : "Development Standards — Canonical Index",
+        "description" : "Single index for Comserv coding standards. In-app documentation is canonical; IDE-specific rule files are adapters only.",
+        "path" : "Documentation/DevelopmentStandards.tt",
+        "format" : "template",
+        "category" : "documentation,standards,developer-guide",
+        "site" : "all",
+        "last_scanned" : "Sat Jun 13 00:00:00 2026",
+        "roles" : [
+            "admin",
+            "developer",
+            "editor"
+        ]
+      },
       "DocumentManagement" : {
-         "roles" : [
+        "roles" : [
             "editor",
             "admin",
             "developer"
-         ],
-         "format" : "template",
-         "description" : null,
-         "path" : "Documentation/DocumentManagement.tt",
-         "category" : "admin_guides",
-         "site" : "all",
-         "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "title" : "DocumentManagement"
+        ],
+        "format" : "template",
+        "description" : null,
+        "path" : "Documentation/DocumentManagement.tt",
+        "category" : "admin_guides",
+        "site" : "all",
+        "last_scanned" : "Tue Jun  9 07:48:24 2026",
+        "title" : "DocumentManagement"
       },
       "Mail" : {
          "title" : "Mail System Documentation",
