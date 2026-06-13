@@ -80,7 +80,7 @@
                 <input type="submit" value="Edit" class="btn btn-sm btn-primary">
             </form>
             [% IF site_domain.is_on_cloudflare %]
-                <a href="[% c.uri_for('/cloudflareapi/dns/' _ site_domain.domain) %]" class="btn btn-sm btn-info">Manage DNS</a>
+                <a href="[% c.uri_for('/cloudflareapi/zone/' _ site_domain.domain) %]" class="btn btn-sm btn-info">Manage DNS</a>
             [% END %]
         </div>
     </li>
