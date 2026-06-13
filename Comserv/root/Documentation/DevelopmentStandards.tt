@@ -1,0 +1,167 @@
+[% META
+   title = "Development Standards — Canonical Index"
+   description = "Single index for Comserv coding standards. In-app documentation is canonical; tool-specific rule files are adapters only."
+   roles = "admin,developer,editor"
+   TemplateType = "Documentation"
+   category = "documentation,standards,developer-guide"
+   page_version = "1.0"
+   last_updated = "Sat Jun 13 2026"
+%]
+[% PageVersion = 'Documentation/DevelopmentStandards.tt,v 1.00 2026/06/13 shanta Exp shanta - Canonical standards index' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Development Standards</h1>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-06-13 | Version: 1.0 | Canonical index for all developers and AI assistants
+    </div>
+
+    <div id="overview" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); margin-top: 0;">Source-of-truth hierarchy</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Standards live in the <strong>repository and in-app documentation</strong> — not in IDE-specific folders.
+                Anyone on any editor (PyCharm, VS Code, Cursor, vim) should use this page and the linked docs below.
+            </p>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>This page</strong> — index and quick rules</li>
+                <li><strong>In-app <code>/Documentation/*</code></strong> — detailed guides (templates, themes, logging)</li>
+                <li><strong><code>Comserv/root/coding-standards-comserv.yaml</code></strong> — machine-readable consolidation</li>
+                <li><strong><code>AGENTS.md</code></strong> (repo root) — AI session entry point; links here</li>
+                <li><strong><code>.zencoder/rules/*</code></strong> — Zencoder-only adapters (pointers + <code>globs</code>); not canonical</li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="themes" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Themes — two goals (do not conflate)</h2>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <thead>
+                    <tr style="background-color: var(--table-header-bg);">
+                        <th style="padding: 8px; border: 1px solid var(--border-color); text-align: left;">Goal</th>
+                        <th style="padding: 8px; border: 1px solid var(--border-color); text-align: left;">Task</th>
+                        <th style="padding: 8px; border: 1px solid var(--border-color); text-align: left;">Where</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><strong>A — Authoring</strong></td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Define colours, fonts, site → theme mapping</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>static/config/theme_definitions.json</code> → <code>ThemeConfig</code> → <code>static/css/themes/*.css</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><strong>B — Compliance</strong></td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Make <code>.tt</code> pages work on every theme</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Use <code>var(--*)</code> from <code>base.css</code>; fix opportunistically when editing templates</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                <strong>Authoring:</strong> Edit JSON <code>themes.{id}.variables</code> and <code>site_themes</code>; regenerate via
+                <a href="/admin/theme" style="color: var(--link-color);">Admin → Theme Management</a>.
+                Do not treat hand-edited CSS as source of truth. Legacy <code>Model::Theme</code> (DB) is deprecated.
+            </p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Further reading:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><a href="/Documentation/CssThemes" style="color: var(--link-color);">CSS Theme System — Admin Guide</a> (Goal A)</li>
+                <li><a href="/Documentation/ThemeConfig" style="color: var(--link-color);">ThemeConfig model</a></li>
+                <li><a href="/Documentation/ApplicationTtTemplate" style="color: var(--link-color);">Application TT template</a> (Goal B)</li>
+                <li><a href="/Documentation/DocumentationTtTemplate" style="color: var(--link-color);">Documentation TT template</a> (Goal B)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="templates" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Template Toolkit (.tt) compliance</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                <strong>Policy:</strong> When you edit a <code>.tt</code> file, improve theme/structure compliance in that file only — no repo-wide sweeps unless asked.
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Application UI → base on <a href="/Documentation/ApplicationTtTemplate" style="color: var(--link-color);">ApplicationTtTemplate</a> (<code>app-container</code>, <code>data-table</code>, <code>btn btn-*</code>)</li>
+                <li>Documentation → base on <a href="/Documentation/DocumentationTtTemplate" style="color: var(--link-color);">DocumentationTtTemplate</a> (<code>container</code> / <code>row</code> / <code>col-*</code>)</li>
+                <li>No hardcoded colours — use canonical variables listed in ApplicationTtTemplate § Canonical CSS Variable Reference</li>
+                <li>Background-image themes: transparent or <code>rgba(255,255,255,0.12)</code> on page wrappers; <code>0.88</code> on small cards only</li>
+                <li><a href="/Documentation/TtFileStandardizationGuide" style="color: var(--link-color);">TT file standardization guide</a> — PageVersion, META blocks</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="doc-links" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Documentation link format</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Documentation uses a <strong>flat namespace</strong>:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Correct:</strong> <code>&lt;a href="/Documentation/FILENAME"&gt;</code> — no subdirectories, no <code>.tt</code> extension</li>
+                <li><strong>Wrong:</strong> <code>/Documentation/system/FILENAME.tt</code></li>
+                <li>Non-doc links (admin, todo) use full paths: <code>/admin/theme</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="logging" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Application logging</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Use <code>log_with_details</code> for operational messages. Checklist lives in
+                <code>Comserv/lib/Comserv/Util/Logging.pm</code> (header comment).
+                Fix logging opportunistically when editing controllers — same pattern as theme compliance.
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><a href="/Documentation/logging_best_practices" style="color: var(--link-color);">Logging best practices</a></li>
+                <li>Deploy awareness: read <code>Comserv/DEPLOY_STATUS.json</code> before closing Application Error Audit todos (<code>AGENTS.md</code>)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="repo-files" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key repo files</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background-color: var(--table-header-bg);">
+                        <th style="padding: 8px; border: 1px solid var(--border-color); text-align: left;">File</th>
+                        <th style="padding: 8px; border: 1px solid var(--border-color); text-align: left;">Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>AGENTS.md</code></td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">AI assistants — session entry; links to this page</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>Comserv/root/coding-standards-comserv.yaml</code></td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">YAML consolidation of TT/Perl/SQL standards</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>Comserv/root/static/css/base.css</code></td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Default CSS variable names (themes override)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>Comserv/root/static/config/theme_definitions.json</code></td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Theme variables + site_themes mapping</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>.zencoder/rules/*.md</code></td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Zencoder IDE adapters only — thin pointers to docs above</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>See also:</strong>
+                    <a href="/Documentation/ComservDocumentation" style="color: var(--link-color);">Comserv Documentation index</a> |
+                    <a href="/Documentation/controller_routing_guidelines" style="color: var(--link-color);">Controller routing guidelines</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

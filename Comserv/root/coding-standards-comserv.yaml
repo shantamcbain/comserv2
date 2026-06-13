@@ -12,9 +12,11 @@
 #   - coding-standards-comserv.yaml v1.0 (136 lines - DEPRECATED)
 # **TOTAL CONSOLIDATED**: 915+ lines merged into single authoritative source
 #
-# **PURPOSE**: Single source of truth for all Comserv development standards
+# **PURPOSE**: Machine-readable consolidation of Comserv development standards
 # **AUDIENCE**: Developers, AI assistants, code reviewers, new team members
 # **USAGE**: Reference for all development work; enforce via pre-commit hooks
+# **CANONICAL HUB (humans)**: /Documentation/DevelopmentStandards (in-app)
+# **AI ENTRY**: AGENTS.md (repo root) — links to in-app docs; .zencoder/rules/ are adapters only
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -28,9 +30,13 @@ metadata:
     "1.0": "Initial partial standards (deprecated 2025-12-06)"
   consolidation_status: "Complete - all scattered guidelines merged"
   related_files:
-    zencoder_standards: "/.zencoder/coding-standards.yaml (Zencoder IDE integration, agents, execution protocol)"
-    comserv_standards: "This file (Comserv development, Perl/TT/SQL, project-specific)"
-    templates: "/Comserv/root/Documentation/[application|documentation]_tt_template.tt"
+    canonical_index: "/Documentation/DevelopmentStandards (in-app — start here)"
+    agents_entry: "/AGENTS.md (AI session entry point)"
+    zencoder_adapters: "/.zencoder/rules/*.md (Zencoder-only thin pointers — not canonical)"
+    zencoder_standards: "/.zencoder/coding-standards.yaml (Zencoder IDE agents, execution protocol)"
+    comserv_standards: "This file (Comserv development, Perl/TT/SQL, project-specific YAML)"
+    templates: "/Comserv/root/Documentation/ApplicationTtTemplate.tt and DocumentationTtTemplate.tt"
+    theme_authoring: "/Documentation/CssThemes, static/config/theme_definitions.json"
     deprecated: "/Comserv/root/coding-standards-comserv-v1-deprecated.yaml (archived)"
 
 ---
@@ -277,8 +283,23 @@ template_standards:
     
     debug_display: "Include conditional display of PageVersion for debugging: `[% IF c.session.debug_mode == 1 %] [% PageVersion %] [% END %]`"
   
+  theme_system:
+    two_goals:
+      goal_a_authoring:
+        description: "Create or change site appearance — JSON + ThemeConfig"
+        canonical_json: "Comserv/root/static/config/theme_definitions.json"
+        generated_css: "Comserv/root/static/css/themes/{theme_id}.css"
+        in_app_docs: "/Documentation/CssThemes, /Documentation/ThemeConfig"
+        admin_ui: "/admin/theme"
+      goal_b_compliance:
+        description: "Make .tt templates work on every theme — opportunistic fixes when editing"
+        in_app_docs: "/Documentation/ApplicationTtTemplate, /Documentation/DocumentationTtTemplate"
+        variable_defaults: "Comserv/root/static/css/base.css"
+        policy: "Fix the file you touch; no repo-wide sweeps unless requested"
+
   theme_compliance:
     [CONSOLIDATED_FROM]: "documentation_tt_template.tt theme compliance notes"
+    canonical_index: "/Documentation/DevelopmentStandards"
     
     css_variables:
       description: "ALL styling MUST use CSS custom properties - NEVER hardcode colors or fonts"
@@ -321,7 +342,7 @@ template_standards:
         - "CSC theme (cyan backgrounds)"
         - "USBM theme (green accent colors)"
         - "APIS theme (yellow/orange beekeeping theme)"
-        - "Future themes (added via theme_definitions.json)"
+        - "Future themes (added via static/config/theme_definitions.json)"
       verification: "Test with multiple themes to ensure variable-based styling works everywhere"
   
   application_templates:

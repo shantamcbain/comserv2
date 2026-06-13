@@ -6,6 +6,10 @@ alwaysApply: true
 
 # Comserv Project Guide
 
+> **Standards canonical index:** `/Documentation/DevelopmentStandards` (in-app).  
+> TT/theme/logging detail lives in in-app docs and `coding-standards-comserv.yaml` — not duplicated here.  
+> This file is project overview + common tasks; `.zencoder/rules/` entries are Zencoder adapters.
+
 ## Project Overview
 
 Comserv is a Perl-based web application framework using Catalyst, serving as a multi-site management system. It handles various modules like task tracking (Todo), user authentication, documentation management, network mapping, bee apiary tracking (BMaster), herbal database (ENCY), and integrations with Proxmox for VM management, Cloudflare for DNS, and Ollama for AI queries. The app supports role-based access (admin, developer, user) and is designed for deployment in containerized environments.

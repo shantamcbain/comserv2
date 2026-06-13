@@ -1,10 +1,18 @@
 ---
-description: "Documentation editing and Template Toolkit (.tt) standards"
+description: "Zencoder adapter — documentation editing (canonical docs in-app)"
 globs: ["Comserv/root/Documentation/**"]
 alwaysApply: false
 ---
 
-# Documentation Standards
+# Documentation Standards (Zencoder adapter)
+
+**Canonical sources (all editors):**
+- `/Documentation/DevelopmentStandards` — standards index
+- `/Documentation/DocumentationTtTemplate` — layout, theme variables, doc link format
+- `/Documentation/TtFileStandardizationGuide` — PageVersion, META, file workflow
+- `Comserv/root/coding-standards-comserv.yaml` — YAML consolidation
+
+This file adds Zencoder-specific workflow notes. Do not treat it as the only standards source.
 
 ## Required PageVersion Header Format
 All .tt files must include this exact format:

@@ -1,34 +1,25 @@
 ---
-description: "Application logging standards"
+description: "Zencoder adapter — application logging (canonical docs in repo)"
 globs: ["**/*.pm"]
 alwaysApply: false
 ---
 
-# Logging Protocol
+# Logging Standards (Zencoder adapter)
 
-**Standard**: Use `log_with_details` for all operational logging (see checklist in `Comserv/lib/Comserv/Util/Logging.pm`).
+**Canonical source:** `Comserv/lib/Comserv/Util/Logging.pm` (header checklist) and `/Documentation/logging_best_practices`.
 
-## Required format
+This file is a Zencoder pointer only. Do not treat it as the authoritative logging spec.
+
+## Quick reminder
+
 ```perl
 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
     'meaningful_action_name',
     "What failed with context: $detail");
 ```
 
-## Checklist (summary)
-1. Use `log_with_details` — not bare `warn`, `print`, or `$c->log->error` for failures
-2. 5th argument = real action name (`dns_records`, `modify_todo`) — not `end` / `view` / `auto`
-3. Message = self-contained (what, ids, path)
-4. `error`+ creates Application Error Audit todos via `error_audit_meta`
-5. After fixing audit todos: deploy, then close — check `Comserv/DEPLOY_STATUS.json`
+- 5th arg = real action name (not `end` / `view` / `auto`)
+- `error`+ → Application Error Audit todos; check `Comserv/DEPLOY_STATUS.json` before closing
+- Fix logging opportunistically when editing the controller you touch
 
-## Log locations
-- `Comserv/logs/application.log`
-- `system_log` table (WARN+)
-- Application Error Audit panel on Planning → Daily Priorities (ERROR+)
-
-## Deploy awareness
-Read `Comserv/DEPLOY_STATUS.json` and `Comserv/version.json` at session start when debugging production vs dev.
-
-## Related: theme compliance
-When editing the same feature's `.tt` file, also apply the opportunistic checklist in `template-standards.md`.
+See also: `AGENTS.md` (deploy awareness), `/Documentation/DevelopmentStandards`

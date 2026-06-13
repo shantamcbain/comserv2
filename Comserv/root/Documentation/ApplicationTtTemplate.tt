@@ -16,7 +16,8 @@
   TWO THEME GOALS (do not conflate):
   A) Author a theme → edit static/config/theme_definitions.json (ThemeConfig → static/css/themes/*.css)
   B) Template compliance → this checklist (fix opportunistically when editing .tt files)
-  See: .zencoder/rules/template-standards.md and /Documentation/CssThemes
+  Canonical index: /Documentation/DevelopmentStandards
+  Theme authoring: /Documentation/CssThemes
 
   GOAL B CHECKLIST:
   1. Use app-container / content-container / app-form / data-table / btn btn-*
@@ -366,7 +367,8 @@ $c->stash->{
             colours or invent new variable names — see sections below.
         </p>
         <p>
-            See also: <a href="/Documentation/CssThemes">CSS Theme System — Admin Guide</a>,
+            See also: <a href="/Documentation/DevelopmentStandards">Development Standards (canonical index)</a>,
+            <a href="/Documentation/CssThemes">CSS Theme System — Admin Guide</a>,
             <a href="/Documentation/ThemeConfig">ThemeConfig model</a>.
         </p>
     </div>
