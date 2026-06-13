@@ -405,8 +405,15 @@ sub create_custom_theme :Path('create_custom_theme') :Args(0) {
         }
     };
 
-    # Create the theme using our JSON-based theme manager
-    my $result = $self->theme_manager->create_theme($c, $theme_data);
+    my $theme_name = lc($site_name) . '_custom';
+    $theme_data->{name}         = $theme_name;
+    $theme_data->{display_name} = "Custom Theme for " . ucfirst($site_name);
+
+    my $result = $c->model('ThemeConfig')->create_theme($c, $theme_data);
+    if ($result) {
+        $c->model('ThemeConfig')->set_site_theme($c, $site_name, $theme_name);
+        $c->model('ThemeConfig')->generate_all_theme_css($c);
+    }
 
     # Redirect back to theme index
     $c->response->redirect($c->uri_for($self->action_for('index')));
@@ -425,8 +432,8 @@ sub edit_theme_css :Path('edit_theme_css') :Args(1) {
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest') . ", proceeding anyway for debugging");
     }
 
-    my $css_file = $c->path_to('root', 'static', 'css', "$theme_name.css");
-    my $json_file = $c->path_to('root', 'static', 'css', 'themes', 'theme_definitions.json');
+    my $theme_dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
+    my $css_file  = "$theme_dir/$theme_name.css";
 
     if ($c->req->method eq 'POST') {
         my $css_content = $c->req->params->{css_content};
@@ -442,16 +449,11 @@ sub edit_theme_css :Path('edit_theme_css') :Args(1) {
 
     my $css_content = -f $css_file ? read_file($css_file) : '';
 
-    my $css_variables = {};
-    try {
-        my $json_text = read_file($json_file);
-        my $theme_definitions = decode_json($json_text);
-        $css_variables = $theme_definitions->{$theme_name}->{variables} || {};
-    } catch {
-        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme_css',
-            "Error reading JSON file: $_");
-        $css_variables = { error => 'Error reading JSON file' };
-    };
+    my $theme_data    = $c->model('ThemeConfig')->get_theme($c, $theme_name);
+    my $css_variables = $theme_data->{variables} || {};
+    if (!%$css_variables) {
+        $css_variables = { error => "No theme variables found for theme '$theme_name'" };
+    }
 
     $self->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_theme_css',
         "CSS Variables: " . encode_json($css_variables));
@@ -485,8 +487,7 @@ sub wysiwyg_editor :Path('wysiwyg_editor') :Args(1) {
         # return;
     }
 
-    # Get the theme data from theme_definitions.json
-    my $theme = $self->theme_manager->get_theme($c, $theme_name);
+    my $theme = $c->model('ThemeConfig')->get_theme($c, $theme_name);
 
     # Pass data to template
     $c->stash->{theme_name} = $theme_name;
@@ -553,26 +554,25 @@ sub update_theme_with_variables {
     $self->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
         "Updating theme $theme_name with variables");
 
-    # Get the current theme data
-    my $themes = $self->theme_manager->get_all_themes($c);
+    my $theme_config = $c->model('ThemeConfig');
+    my $themes       = $theme_config->get_all_themes($c);
 
-    # Check if theme exists
-    if (!exists $themes->{$theme_name}) {
+    unless (exists $themes->{$theme_name}) {
         $self->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme_with_variables',
             "Theme not found: $theme_name");
         $c->flash->{error} = "Theme not found: $theme_name";
         return 0;
     }
 
-    # Update theme variables
-    $themes->{$theme_name}->{variables} = $variables;
+    my $theme_data = $themes->{$theme_name};
+    $theme_data->{variables} = $variables;
 
-    # Save updated themes to JSON file
-    my $theme_defs_path = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
     try {
-        require JSON;
-        my $json = JSON::encode_json($themes);
-        File::Slurp::write_file($theme_defs_path, $json);
+        my $result = $theme_config->save_theme($c, $theme_name, $theme_data);
+        unless ($result) {
+            $c->flash->{error} = "Error saving theme: $theme_name";
+            return 0;
+        }
 
         $self->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
             "Successfully updated theme definitions JSON");
@@ -581,53 +581,7 @@ sub update_theme_with_variables {
         $self->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
             "Regenerating CSS for theme: $theme_name");
 
-        # Generate CSS content
-        my $theme_data = $themes->{$theme_name};
-        my $css = "/* Theme: $theme_name */\n:root {\n";
-
-        # Add variables
-        foreach my $var_name (sort keys %{$theme_data->{variables}}) {
-            $css .= "  --$var_name: " . $theme_data->{variables}{$var_name} . ";\n";
-        }
-
-        $css .= "}\n\n";
-
-        # Add special styles if they exist
-        if ($theme_data->{special_styles}) {
-            $self->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
-                "Adding special styles for theme: $theme_name");
-
-            foreach my $selector (keys %{$theme_data->{special_styles}}) {
-                $css .= "$selector {\n";
-                $css .= "  " . $theme_data->{special_styles}{$selector} . "\n";
-                $css .= "}\n\n";
-            }
-        }
-
-        # Write CSS file
-        my $theme_dir = $c->path_to('root', 'static', 'css', 'themes');
-        my $css_file = "$theme_dir/$theme_name.css";
-
-        # Create theme directory if it doesn't exist
-        unless (-d $theme_dir) {
-            File::Path::make_path($theme_dir) or do {
-                $self->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme_with_variables',
-                    "Failed to create themes directory: $!");
-                $c->flash->{error} = "Failed to create themes directory: $!";
-                return 0;
-            };
-        }
-
-        # Write the CSS file
-        File::Slurp::write_file($css_file, $css);
-
-        # Also update the main CSS file for backward compatibility
-        my $main_css_file = $c->path_to('root', 'static', 'css', "$theme_name.css");
-        if (-f $main_css_file) {
-            $self->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
-                "Updating main CSS file for backward compatibility: $main_css_file");
-            File::Slurp::write_file($main_css_file, $css);
-        }
+        $theme_config->_write_theme_css($c, $theme_name, $theme_data);
 
         $self->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
             "Successfully regenerated CSS for theme: $theme_name");
