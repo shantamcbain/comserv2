@@ -341,12 +341,21 @@
                 </div>
             </details>
 
-            [%# ── CURRENT ACTIVE PRIORITIES ── %]
+            [%# ── TODAY'S FOCUS QUEUE (top 20 actionable todos) ── %]
             <div style="margin-bottom:24px;">
                 <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                    <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
-                    [% IF active_priorities && active_priorities.size %]
-                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;"><span id="ap-visible-count">[% active_priorities.size %]</span> of [% active_priorities.size %] todo[% IF active_priorities.size != 1 %]s[% END %]</span>
+                    <h3 style="margin:0;font-size:1.1em;">🎯 Today's Focus Queue</h3>
+                    [% SET ap_total = active_priorities_total || active_priorities.size %]
+                    [% IF ap_total %]
+                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;">
+                        <span id="ap-visible-count">[% active_priorities.size %]</span> of <span id="ap-total-count">[% ap_total %]</span> todo[% IF ap_total != 1 %]s[% END %]
+                        [% IF focus_queue_limit && ap_total > focus_queue_limit %]
+                        <span style="color:var(--text-muted-color);">(showing top [% focus_queue_limit %])</span>
+                        [% END %]
+                    </span>
+                    [% IF active_priorities_backlog %]
+                    <a href="/todo" style="font-size:0.78em;color:var(--primary-color);text-decoration:none;margin-left:4px;">+ [% active_priorities_backlog %] more in backlog →</a>
+                    [% END %]
                     [% END %]
 
                 </div>
@@ -501,6 +510,36 @@
             </div>
 
             <script>
+            function _updateFocusQueueCounts() {
+                var list = document.getElementById('priorities-list');
+                var totalEl = document.getElementById('ap-total-count');
+                var visibleEl = document.getElementById('ap-visible-count');
+                if (!list || !totalEl || !visibleEl) return;
+                var cards = list.querySelectorAll('div[id^="ap-row-"]');
+                var visible = 0;
+                cards.forEach(function(card) {
+                    if (card.style.display !== 'none') visible++;
+                });
+                visibleEl.textContent = visible;
+                var total = parseInt(totalEl.textContent, 10);
+                if (!isNaN(total) && total > 0) {
+                    totalEl.textContent = Math.max(0, total - 1);
+                }
+            }
+            function _updateCrossBlockerBanner(count) {
+                var banner = document.getElementById('cross-blocker-banner');
+                if (!banner) return;
+                if (!count) {
+                    banner.style.display = 'none';
+                    return;
+                }
+                banner.style.display = '';
+                var label = banner.querySelector('span:nth-child(2)');
+                if (label) {
+                    label.textContent = count + ' Cross-Project Blocker' + (count !== 1 ? 's' : '')
+                        + ' — Resolve first to unblock other projects';
+                }
+            }
             function quickClose(recordId) {
                 if (!confirm('Mark todo #' + recordId + ' as Done and create a log entry?')) return;
                 fetch('/todo/quick_close', {
@@ -511,7 +550,25 @@
                     if (d.ok) {
                         var row = document.getElementById('ap-row-' + recordId);
                         if (row) { row.style.opacity = '0.4'; row.style.textDecoration = 'line-through'; }
-                        setTimeout(function(){ if (row) row.remove(); }, 1200);
+                        setTimeout(function(){
+                            if (row) row.remove();
+                            _updateFocusQueueCounts();
+                            if (typeof d.cross_blocker_count === 'number') {
+                                _updateCrossBlockerBanner(d.cross_blocker_count);
+                            }
+                            if (d.deps_resolved > 0) {
+                                var note = document.getElementById('focus-success-note');
+                                if (!note) {
+                                    note = document.createElement('div');
+                                    note.id = 'focus-success-note';
+                                    note.style.cssText = 'background:color-mix(in srgb,#28a745 12%,var(--bg-color));border:1px solid #28a745;border-radius:4px;padding:6px 10px;margin-bottom:8px;font-size:0.88em;color:#28a745;';
+                                    var list = document.getElementById('priorities-list');
+                                    if (list && list.parentNode) list.parentNode.insertBefore(note, list);
+                                }
+                                note.textContent = '✓ Unblocked ' + d.deps_resolved + ' project(s) — nice work!';
+                                note.style.display = '';
+                            }
+                        }, 1200);
                     } else {
                         alert('Could not close: ' + (d.error || 'unknown error'));
                     }

@@ -9,6 +9,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
+use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoTypes qw(recurring_matches_date);
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -2593,6 +2594,7 @@ sub quick_close :Path('quick_close') :Args(0) {
     my $now_dt     = DateTime->now(time_zone => 'local');
     my $today      = $now_dt->ymd;
     my $now_hms    = $now_dt->strftime('%H:%M:%S');
+    my ($deps_resolved, $cross_blocker_count);
     eval {
         my $dbh  = $c->model('DBEncy')->storage->dbh;
         my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
@@ -2603,6 +2605,13 @@ sub quick_close :Path('quick_close') :Args(0) {
             last_mod_by   => $username,
             last_mod_date => $today,
         });
+
+        $deps_resolved = Comserv::Util::ProjectDependencies::resolve_for_closed_todo($c, $todo);
+        my $sitename_val_cb = eval { $todo->sitename } || $c->session->{SiteName} || '';
+        my $is_csc_cb = (($c->session->{SiteName} // '') eq 'CSC' || $sitename_val_cb eq 'CSC') ? 1 : 0;
+        $cross_blocker_count = Comserv::Util::ProjectDependencies::active_cross_blocker_count(
+            $c, $sitename_val_cb, $is_csc_cb
+        );
 
         my $proj_code = '';
         if ($todo->project_id) {
@@ -2657,8 +2666,13 @@ sub quick_close :Path('quick_close') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'quick_close',
-        "Todo $record_id quick-closed by $username");
-    $c->response->body('{"ok":1}');
+        "Todo $record_id quick-closed by $username"
+        . ($deps_resolved ? " ($deps_resolved cross-project dep(s) resolved)" : ''));
+    $c->response->body(encode_json({
+        ok                  => 1,
+        deps_resolved       => $deps_resolved // 0,
+        cross_blocker_count => $cross_blocker_count // 0,
+    }));
 }
 
 sub quick_priority :Path('quick_priority') :Args(0) {
@@ -3120,6 +3134,8 @@ sub reschedule :Path('reschedule') :Args(0) {
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
     }
+
+    $c->session->{planning_sync_deps} = 1;
 
     require JSON;
     my ($count, $errors, $today) = eval { $self->_do_reschedule($c) };

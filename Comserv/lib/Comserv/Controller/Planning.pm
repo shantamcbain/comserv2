@@ -2,6 +2,7 @@ package Comserv::Controller::Planning;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoTypes qw(recurring_matches_date);
 use Comserv::Model::Ollama;
 use JSON;
@@ -459,6 +460,7 @@ sub daily :Path('/planning/daily') :Args {
         if (@dep_rows_ap) {
             my %ids_needed;
             for my $dr (@dep_rows_ap) {
+                next unless Comserv::Util::ProjectDependencies::cross_project_block_still_active($c, $dr);
                 push @{ $cross_blocker_projects{$dr->depends_on_id} }, $dr->project_id;
                 $ids_needed{$dr->project_id}    = 1;
                 $ids_needed{$dr->depends_on_id} = 1;
@@ -501,6 +503,9 @@ sub daily :Path('/planning/daily') :Args {
         for my $todo (@rows) {
             my %h = $todo->get_columns;
 
+            next if Comserv::Util::ProjectDependencies::is_audit_panel_todo(
+                $h{subject}, $h{parent_id}
+            );
             next if ($h{todo_type} // '') =~ /^(appointment|meeting|event|reminder)$/i;
             next if ($h{is_recurring} // 0);
 
@@ -583,10 +588,20 @@ sub daily :Path('/planning/daily') :Args {
             @all_sorted = grep { ($_->{project_id} // '') eq $filter_project } @all_sorted;
         }
 
-        @active_priorities = @all_sorted;
+        my $focus_total = scalar @all_sorted;
+        my $cross_blocker_count = scalar grep { $_->{is_cross_blocker} } @all_sorted;
+        $c->stash->{cross_blocker_count}       = $cross_blocker_count;
+        $c->stash->{active_priorities_total}   = $focus_total;
+        $c->stash->{focus_queue_limit}         = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_LIMIT;
 
-        my $cross_blocker_count = scalar grep { $_->{is_cross_blocker} } @active_priorities;
-        $c->stash->{cross_blocker_count} = $cross_blocker_count;
+        my $limit = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_LIMIT;
+        if ($focus_total > $limit) {
+            @active_priorities = @all_sorted[0 .. $limit - 1];
+            $c->stash->{active_priorities_backlog} = $focus_total - $limit;
+        } else {
+            @active_priorities = @all_sorted;
+            $c->stash->{active_priorities_backlog} = 0;
+        }
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
@@ -669,87 +684,18 @@ sub daily :Path('/planning/daily') :Args {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch active priorities: $@") if $@;
 
-    # Project dependencies
+    # Project dependencies — auto-detect only on Start Day / Refresh Audit / Reschedule
     my @project_deps;
     my ($auto_resolved_count, $auto_detected_count) = (0, 0);
-    my @done_statuses_dep = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my $run_dep_detect = $c->req->param('sync_deps')
+        || $c->session->{planning_sync_deps};
+    delete $c->session->{planning_sync_deps};
 
     eval {
-        my $prs  = $c->model('DBEncy')->resultset('Project');
-        my $tdrs = $c->model('DBEncy')->resultset('Todo');
-
-        my %bt_cond = (
-            'me.blocked_by_todo_id' => { '!=' => undef },
-            'me.status'             => { -not_in => \@done_statuses_dep },
-            'me.project_id'         => { '!=' => undef },
-        );
-        $bt_cond{'me.sitename'} = $sitename unless $is_csc;
-        my @blocked_todos = $tdrs->search(\%bt_cond)->all;
-
-        for my $blocked (@blocked_todos) {
-            my $blocker_todo_id = $blocked->blocked_by_todo_id // next;
-            my $blocker = eval { $tdrs->find($blocker_todo_id) };
-            next unless $blocker && $blocker->project_id;
-            next if $blocker->project_id == $blocked->project_id;
-
-            my $bs = $blocker->status // 0;
-            next if ($bs == 3 || $bs == 4 || $bs =~ /^(done|completed|closed)$/i);
-
-            my $existing = eval {
-                $c->model('DBEncy')->resultset('ProjectDependency')->find({
-                    project_id    => $blocked->project_id,
-                    depends_on_id => $blocker->project_id,
-                })
-            };
-            unless ($existing) {
-                eval {
-                    $c->model('DBEncy')->resultset('ProjectDependency')->create({
-                        project_id      => $blocked->project_id,
-                        depends_on_id   => $blocker->project_id,
-                        dependency_type => 'blocks',
-                        status          => 'active',
-                        sitename        => $sitename,
-                        created_by      => 'auto-detect',
-                        description     => "Auto-detected: '"
-                            . ($blocked->subject // '?') . "' blocked by '"
-                            . ($blocker->subject // '?') . "'",
-                    });
-                    $auto_detected_count++;
-                };
-            }
-        }
-
-        my %dep_search = (status => 'active');
-        $dep_search{sitename} = $sitename unless $is_csc;
-        my @dep_rows = $c->model('DBEncy')->resultset('ProjectDependency')->search(
-            \%dep_search, { order_by => { -asc => 'project_id' } })->all;
-
-        my %proj_name_cache;
-        for my $dep (@dep_rows) {
-            my %open_cond = (
-                project_id => $dep->depends_on_id,
-                status     => { -not_in => \@done_statuses_dep },
+        (@project_deps, $auto_resolved_count, $auto_detected_count)
+            = Comserv::Util::ProjectDependencies::sync_dependencies(
+                $c, $sitename, $is_csc, $run_dep_detect ? 1 : 0
             );
-            $open_cond{is_blocking} = 1 if ($dep->created_by // '') eq 'auto-detect';
-            my $open_count = eval { $tdrs->search(\%open_cond)->count } // 1;
-
-            if (defined $open_count && $open_count == 0) {
-                eval { $dep->update({ status => 'resolved', resolved_at => \'NOW()' }) };
-                $auto_resolved_count++;
-                next;
-            }
-
-            my %d = $dep->get_columns;
-            for my $fid ($d{project_id}, $d{depends_on_id}) {
-                unless (exists $proj_name_cache{$fid}) {
-                    my $p = eval { $prs->find($fid) };
-                    $proj_name_cache{$fid} = $p ? $p->name : "Project #$fid";
-                }
-            }
-            $d{project_name}    = $proj_name_cache{$d{project_id}};
-            $d{depends_on_name} = $proj_name_cache{$d{depends_on_id}};
-            push @project_deps, \%d;
-        }
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch/process project dependencies: $@") if $@;
@@ -1053,6 +999,7 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     }
 
     my $result = $self->_run_audit_scan($c, $schema, $sitename, $username, $user_id, $today);
+    $c->session->{planning_sync_deps} = 1;
 
     my $hd_count = 0;
     eval {
@@ -1504,6 +1451,7 @@ sub _daily_log_action {
 
         # ── Audit: scan system_log and create todos ──
         my $audit = $self->_run_audit_scan($c, $schema, $sitename, $username, $user_id, $today);
+        $c->session->{planning_sync_deps} = 1;
         my $error_count          = $audit->{error_count};
         my $todo_created         = $audit->{todo_created};
         my @audit_todo_subjects  = @{ $audit->{subjects} };
