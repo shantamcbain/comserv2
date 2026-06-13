@@ -5,6 +5,7 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::DeployStatus;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
 use Comserv::Util::BackupManager;
@@ -7083,6 +7084,8 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
     my $git_commit = `cd '$repo_dir' && git rev-parse --short HEAD 2>/dev/null`; chomp $git_commit;
     my $git_branch = `cd '$repo_dir' && git rev-parse --abbrev-ref HEAD 2>/dev/null`; chomp $git_branch;
+    my $git_subject = `cd '$repo_dir' && git log -1 --pretty=%s 2>/dev/null`; chomp $git_subject;
+    my $deploy_user = $c->session->{username} || 'system';
     my @t = gmtime(); my $build_date = sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ',
         $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
     my $build_host = `hostname 2>/dev/null`; chomp $build_host;
@@ -7097,6 +7100,21 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print $vf encode_json($version_data);
         close $vf;
     }
+
+    Comserv::Util::DeployStatus::write_record(
+        comserv_home     => $comserv_dir,
+        status           => 'build_started',
+        commit           => $git_commit,
+        branch           => $git_branch,
+        commit_subject   => $git_subject,
+        deployed_by      => $deploy_user,
+        target_host      => $ssh_host,
+        method           => 'docker_hub',
+        build_host       => $build_host,
+        image            => $hub_image,
+        log_file         => $log_file,
+        notes            => 'Image build/push started from admin docker deploy',
+    );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
         "Starting deploy: commit=$git_commit branch=$git_branch image=$hub_image target=$ssh_target log=$log_file");
@@ -7314,6 +7332,25 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
         unlink $latest_link if -l $latest_link;
         symlink $log_file, $latest_link;
+
+        my $deploy_status = ($ssh_exit != 0) ? 'trigger_failed' : 'success';
+        Comserv::Util::DeployStatus::write_record(
+            comserv_home     => $comserv_dir,
+            status           => $deploy_status,
+            commit           => $git_commit,
+            branch           => $git_branch,
+            commit_subject   => $git_subject,
+            deployed_by      => $deploy_user,
+            target_host      => $ssh_host,
+            method           => 'docker_hub',
+            build_host       => $build_host,
+            image            => $hub_image,
+            log_file         => $log_file,
+            notes            => $deploy_status eq 'success'
+                ? 'Production deploy.sh completed on remote host'
+                : 'Remote deploy.sh trigger failed — cron may deploy within 10 minutes',
+        );
+        print "Deploy status written: $comserv_dir/DEPLOY_STATUS.json ($deploy_status, commit $git_commit)\n";
 
         $child_exit->($ssh_exit != 0 ? 2 : 0);
     }

@@ -1048,10 +1048,42 @@ echo "Disk after deploy: $DISK_FINAL"
 
 docker ps --filter "name=$CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
+write_deploy_status_json() {
+    local status="$1"
+    local dest_dir="${2:-/opt/comserv/Comserv}"
+    local dest="$dest_dir/DEPLOY_STATUS.json"
+    local at_utc
+    at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%S)
+    local commit="" branch="" build_host="" build_date=""
+    if command -v python3 >/dev/null 2>&1 && [ -n "$VERSION_INFO" ]; then
+        eval "$(printf '%s' "$VERSION_INFO" | python3 -c "
+import json,sys
+try:
+    v=json.load(sys.stdin)
+except Exception:
+    v={}
+print('commit=%s' % repr(v.get('commit','')))
+print('branch=%s' % repr(v.get('branch','')))
+print('build_host=%s' % repr(v.get('build_host','')))
+print('build_date=%s' % repr(v.get('build_date','')))
+" 2>/dev/null)"
+    fi
+    mkdir -p "$(dirname "$dest")" 2>/dev/null || true
+    cat > "$dest" <<EOF
+{"updated_at_utc":"$at_utc","last_deploy":{"status":"$status","at_utc":"$at_utc","commit":"$commit","branch":"$branch","commit_subject":"","deployed_by":"deploy.sh","target_host":"$HOSTNAME_VAL","method":"docker_compose_pull","build_host":"$build_host","image":"$IMAGE","log_file":"$DEPLOY_LOG","notes":"Container health: $status"},"for_ai":"At session start: read this file and Comserv/version.json. Compare last_deploy.commit to git rev-parse HEAD. If HEAD is ahead, production errors may be fixed locally but not deployed yet."}
+EOF
+    echo "Deploy status written: $dest ($status commit=${commit:-unknown})"
+    if [ -n "$NFS_LOG_DIR" ] && [ -d "$NFS_LOG_DIR" ]; then
+        cp -f "$dest" "$NFS_LOG_DIR/DEPLOY_STATUS.json" 2>/dev/null && \
+            echo "Deploy status copied to NFS: $NFS_LOG_DIR/DEPLOY_STATUS.json" || true
+    fi
+}
+
 DIAGNOSTICS_REPORT=""
 if [ $HEALTHY -eq 1 ]; then
     echo "=== Deployment Successful at $(date) ==="
     STATUS_MSG="SUCCESS"
+    write_deploy_status_json "success" "${GLOBAL_HOST_APP_DIR:-/opt/comserv/Comserv}"
     SUBJECT="✅ Comserv Production Updated Successfully"
 else
     echo "❌ ERROR: Container did not reach healthy state within 120s"
@@ -1087,6 +1119,7 @@ else
     if [ $FALLBACK_HEALTHY -eq 1 ]; then
         echo "   ✅ [Fallback] Successfully rolled back to backup-1! Container is healthy."
         STATUS_MSG="ROLLBACK_SUCCESS (backup-1 image)"
+        write_deploy_status_json "rollback_success" "${GLOBAL_HOST_APP_DIR:-/opt/comserv/Comserv}"
         SUBJECT="⚠ Comserv Production Rolled Back to Backup-1 Image"
     else
         echo "   ❌ [Fallback] Rollback image failed or was not available."
