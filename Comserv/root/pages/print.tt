@@ -1,0 +1,92 @@
+[%# Print-friendly page view — no site nav, header, or footer. %]
+[% SET cv = c.stash.css_v || '20260619' %]
+[% SET th = print_theme || 'default' %]
+[% SET _title = page_title || page.title %]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>[% _title %] — Print</title>
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/base.css') %]?v=[% cv %]">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/themes', th _ '.css') %]?v=[% cv %]">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/theme-overrides.css') %]?v=[% cv %]">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/page-containers.css') %]?v=[% cv %]">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/svg-icons.css') %]">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/page-print.css') %]?v=[% cv %]">
+</head>
+<body class="page-print-body print-density-compact theme-[% th %]">
+    <div class="page-print-toolbar no-print" role="toolbar" aria-label="Print controls">
+        <button type="button" class="page-print-btn page-print-btn-primary" id="page-print-trigger">
+            <span aria-hidden="true">&#128424;</span> Print
+        </button>
+        <a href="[% print_back_url %]" class="page-print-btn page-print-btn-secondary">Back to page</a>
+        <div class="page-print-toolbar-options">
+            <label for="page-print-density">Text size</label>
+            <select id="page-print-density" class="page-print-density-select" title="Compact uses smaller text and tighter spacing for fewer pages">
+                <option value="compact" selected>Compact (fewer pages)</option>
+                <option value="normal">Normal</option>
+            </select>
+            <label title="Listing every link URL uses a lot of extra pages">
+                <input type="checkbox" id="page-print-show-urls"> Show link URLs
+            </label>
+        </div>
+    </div>
+
+    <article class="page-print-document">
+        <header class="page-print-header">
+            [% IF !rendered_body.match('(?i)<h1') %]
+            <h1 class="page-print-title">[% _title %]</h1>
+            [% END %]
+            [% IF print_sitename %]
+            <p class="page-print-meta">[% print_sitename %]</p>
+            [% END %]
+        </header>
+
+        <div class="page-body page-print-body-content">
+            [% rendered_body || page.body %]
+        </div>
+
+        <footer class="page-print-footer">
+            <span class="page-print-footer-line">Printed from [% c.req.uri.host %]</span>
+        </footer>
+    </article>
+
+    <script>
+    (function() {
+        var body = document.body;
+        var density = document.getElementById('page-print-density');
+        var showUrls = document.getElementById('page-print-show-urls');
+        var storageKey = 'comserv-page-print-opts';
+
+        function applyOpts() {
+            var mode = (density && density.value) || 'compact';
+            body.classList.remove('print-density-compact', 'print-density-normal');
+            body.classList.add(mode === 'normal' ? 'print-density-normal' : 'print-density-compact');
+            if (showUrls && showUrls.checked) body.classList.add('print-show-urls');
+            else body.classList.remove('print-show-urls');
+            try {
+                localStorage.setItem(storageKey, JSON.stringify({
+                    density: mode,
+                    showUrls: !!(showUrls && showUrls.checked)
+                }));
+            } catch (e) { /* ignore */ }
+        }
+
+        try {
+            var saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+            if (density && saved.density) density.value = saved.density;
+            if (showUrls && saved.showUrls) showUrls.checked = true;
+        } catch (e) { /* ignore */ }
+
+        applyOpts();
+        if (density) density.addEventListener('change', applyOpts);
+        if (showUrls) showUrls.addEventListener('change', applyOpts);
+
+        var btn = document.getElementById('page-print-trigger');
+        if (btn) btn.addEventListener('click', function() { window.print(); });
+        [% IF print_autoprint %]window.addEventListener('load', function() { window.print(); });[% END %]
+    })();
+    </script>
+</body>
+</html>
