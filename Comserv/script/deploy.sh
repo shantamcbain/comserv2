@@ -163,6 +163,50 @@ safe_pkill_f() {
     done
 }
 
+# Sync host git checkout lib/ into the running prod container and restart so
+# Starman workers reload Perl modules (Docker image alone does not include git pull).
+sync_host_app_lib() {
+    local HOST_LIB="${GLOBAL_HOST_APP_DIR:-/opt/comserv/Comserv}/lib"
+    if [ ! -d "$HOST_LIB" ]; then
+        echo "   ⚠ lib sync skipped: $HOST_LIB not found"
+        return 0
+    fi
+    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
+        echo "   ⚠ lib sync skipped: container $CONTAINER not running"
+        return 0
+    fi
+
+    if docker inspect "$CONTAINER" --format '{{range .Mounts}}{{println .Destination}}{{end}}' 2>/dev/null \
+        | grep -qx '/opt/comserv/lib'; then
+        echo "   ✓ Application lib mounted from host ($HOST_LIB)"
+    else
+        echo "   Syncing lib from host into $CONTAINER (no lib volume mount yet)..."
+        docker cp "$HOST_LIB/." "${CONTAINER}:/opt/comserv/lib/" || {
+            echo "   ⚠ docker cp lib failed"
+            return 1
+        }
+    fi
+
+    echo "   Restarting $CONTAINER to load updated Perl modules..."
+    docker restart "$CONTAINER" >/dev/null 2>&1 \
+        || docker compose -f "$COMPOSE_FILE" restart web-prod >/dev/null 2>&1 \
+        || true
+
+    local attempt=0
+    while [ $attempt -lt 30 ]; do
+        sleep 2
+        attempt=$((attempt + 1))
+        local status
+        status=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
+        if [ "$status" = "healthy" ]; then
+            echo "   ✓ $CONTAINER healthy after lib sync"
+            return 0
+        fi
+    done
+    echo "   ⚠ $CONTAINER restarted but health check not confirmed yet"
+    return 0
+}
+
 # ── Non-interactive Deploy Mode ──────────────────────────────────────────────
 if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
     echo "Non-interactive Deploy Mode requested: $DEPLOY_MODE"
@@ -831,6 +875,8 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
 fi
 
 if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
+    echo "Syncing host lib into container (monitor mode)..."
+    sync_host_app_lib || true
     echo "Viability check completed in monitor mode."
     exit 0
 fi
@@ -850,8 +896,10 @@ else
     echo "  Remote: ${REMOTE_DIGEST:0:72}..."
 
     if [ "$FORCE" != "1" ] && [ "$LOCAL_DIGEST" = "$REMOTE_DIGEST" ] && [ "$LOCAL_DIGEST" != "none" ]; then
+        echo "No new Docker image — syncing host lib/ into container..."
+        sync_host_app_lib || true
         DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
-        echo "No new version. Disk: $DISK_FINAL"
+        echo "No new image. Host lib synced. Disk: $DISK_FINAL"
         echo "=== Finished at $(date) ==="
         exit 0
     fi
@@ -974,11 +1022,14 @@ fi
 echo "3. Starting new container..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
 
-echo "3a. Verifying container storage mounts..."
+echo "3a. Syncing host lib into container..."
+sync_host_app_lib || true
+
+echo "3b. Verifying container storage mounts..."
 CONTAINER_STORAGE_DF=$(docker exec "$CONTAINER" df -h /data/nfs 2>/dev/null || true)
 echo "$CONTAINER_STORAGE_DF"
 
-echo "3b. Ensuring SearXNG container is running..."
+echo "3c. Ensuring SearXNG container is running..."
 SEARXNG_CONFIG_DIR="/opt/comserv/searxng-config"
 if ! docker ps --format '{{.Names}}' | grep -q '^searxng$'; then
     echo "  SearXNG not running — starting..."
