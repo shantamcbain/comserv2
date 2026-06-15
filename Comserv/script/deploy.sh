@@ -9,6 +9,11 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 pre_build_git_sync() {
     local SCRIPT_DIR REPO_ROOT BRANCH DEPLOYER AT_UTC MSG unpushed
 
+    if [ "${COMSERV_SKIP_PRE_BUILD_GIT_SYNC:-0}" = "1" ]; then
+        echo "Skipping pre-build git sync (COMSERV_SKIP_PRE_BUILD_GIT_SYNC=1)"
+        return 0
+    fi
+
     SCRIPT_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
     REPO_ROOT="${COMSERV_GIT_REPO_ROOT:-}"
     if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/.git" ]; then
