@@ -153,12 +153,16 @@ sub zone :Path('zone') :Args(1) {
         $cf_error = $_;
     };
 
+    my $highlight_host = $c->req->params->{host} || '';
+    $highlight_host =~ s/[^A-Za-z0-9._-]//g;
+
     $c->stash(
-        template  => 'cloudflare/zone.tt',
-        zone_name => $zone_name,
-        zone_id   => $zone_id,
-        records   => \@records,
-        cf_error  => $cf_error,
+        template       => 'cloudflare/zone.tt',
+        zone_name      => $zone_name,
+        zone_id        => $zone_id,
+        records        => \@records,
+        cf_error       => $cf_error,
+        highlight_host => $highlight_host,
     );
 }
 

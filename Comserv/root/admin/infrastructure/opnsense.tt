@@ -23,9 +23,15 @@
 .badge-ok  { background: #d4edda; color: #155724; }
 .badge-err { background: #f8d7da; color: #721c24; }
 .badge-warn{ background: #fff3cd; color: #856404; }
-table.data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-table.data-table th { background: var(--header-bg, #f0f0f0); padding: 8px 10px; text-align: left; }
-table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-color, #eee); }
+.opn-table-wrap {
+    overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-color, #eee); border-radius: 4px; margin: 8px 0;
+}
+table.data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; min-width: 640px; }
+table.data-table.opn-plan-table { min-width: 900px; font-size: 0.85em; }
+table.data-table th { background: var(--header-bg, #f0f0f0); padding: 8px 10px; text-align: left; white-space: nowrap; }
+table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-color, #eee); vertical-align: top; }
+table.data-table td code { word-break: break-all; }
 .config-form label { display: block; margin-bottom: 4px; font-weight: bold; }
 .config-form input[type=text], .config-form input[type=number], .config-form input[type=password] {
     width: 100%; padding: 7px 10px; border: 1px solid var(--border-color, #ccc);
@@ -79,6 +85,31 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
     padding: 12px 14px; margin: 12px 0; font-size: 0.92em; line-height: 1.5;
 }
 .opn-dns-callout .btn { margin-top: 8px; margin-right: 8px; }
+.opn-guidelines {
+    background: #e8f5e9; border: 1px solid #81c784; border-radius: 6px;
+    padding: 14px 18px; margin-bottom: 16px; font-size: 0.92em; line-height: 1.55;
+}
+.opn-guidelines h4 { margin: 0 0 8px; font-size: 1.05em; }
+.opn-guidelines ul { margin: 8px 0 0 18px; padding: 0; }
+.opn-guidelines li { margin-bottom: 6px; }
+.opn-doc-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.opn-doc-links a {
+    padding: 6px 12px; border-radius: 4px; font-size: 0.88em; text-decoration: none;
+    background: var(--header-bg, #f0f0f0); border: 1px solid var(--border-color, #ddd);
+    color: var(--text-color, #333);
+}
+.opn-doc-links a:hover { background: #2196f3; color: #fff; border-color: #1976d2; }
+.badge-planned { background: #fff3cd; color: #856404; }
+.badge-drift   { background: #f8d7da; color: #721c24; }
+.badge-external{ background: #e3f2fd; color: #1565c0; }
+.badge-na      { background: #eee; color: #666; }
+.opn-warnings { margin-bottom: 16px; }
+.opn-warning-item {
+    border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; font-size: 0.9em; line-height: 1.45;
+}
+.opn-warning-error { background: #ffebee; border: 1px solid #ef9a9a; }
+.opn-warning-warn  { background: #fff8e1; border: 1px solid #ffcc80; }
+.opn-warning-item .fix { margin-top: 8px; font-size: 0.88em; color: #333; }
 .opn-nav-btn { margin-left: auto; }
 .collapsible-header { cursor: pointer; user-select: none; }
 .collapsible-header:hover { filter: brightness(0.97); }
@@ -97,6 +128,9 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
     [% IF c.flash.success_msg %]
     <div class="success-banner">[% c.flash.success_msg | html %]</div>
     [% END %]
+    [% IF c.flash.error_msg %]
+    <div class="error-banner"><strong>Action failed:</strong> [% c.flash.error_msg | html %]</div>
+    [% END %]
 
     [% IF opnsense_error %]
     <div class="error-banner"><strong>Notice:</strong> [% opnsense_error | html %]</div>
@@ -104,6 +138,7 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
 
     <nav class="opn-top-nav" aria-label="OPNsense page sections">
         <span class="opn-nav-label"><i class="fas fa-bars"></i> Jump to:</span>
+        <a href="#opn-section-plan" data-opn="opn-section-plan">Gateway plan</a>
         [% IF dev_access %]
         <a href="#opn-section-dev" data-opn="opn-section-dev">Dev / Prod</a>
         [% END %]
@@ -125,6 +160,221 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
         [% END %]
         <button type="button" class="btn btn-secondary opn-nav-btn" onclick="refreshStatus()">Refresh all</button>
     </nav>
+
+    [%# ── Gateway plan & guidelines ────────────────────────────────── %]
+    <div class="panel opn-section" id="opn-wrap-plan">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-plan')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-plan"></i>
+                <i class="fas fa-route"></i> Gateway Plan &amp; Guidelines
+            </h3>
+            <span class="opn-header-meta">
+                [% IF gateway_plan.drift_count %]
+                <span class="badge badge-drift">[% gateway_plan.drift_count %] drift</span>
+                [% ELSE %]
+                <span class="badge badge-ok">v[% gateway_plan.version | html %]</span>
+                [% END %]
+            </span>
+        </div>
+        <div id="opn-section-plan" class="panel-body collapsible-content expanded">
+
+            [% IF gateway_audit && gateway_audit.warnings.size %]
+            <div class="opn-warnings">
+                <h4 style="margin:0 0 10px;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Gateway audit
+                    [% IF gateway_audit.error_count %]
+                    <span class="badge badge-drift">[% gateway_audit.error_count %] error</span>
+                    [% END %]
+                    [% IF gateway_audit.warn_count %]
+                    <span class="badge badge-warn">[% gateway_audit.warn_count %] warn</span>
+                    [% END %]
+                </h4>
+                [% FOREACH w IN gateway_audit.warnings %]
+                <div class="opn-warning-item opn-warning-[% w.severity == 'error' ? 'error' : 'warn' %]">
+                    <strong>[% w.title | html %]</strong>
+                    [% IF w.fqdn %]<br><code>[% w.fqdn | html %]</code>[% END %]
+                    <p style="margin:6px 0 0;">[% w.detail | html %]</p>
+                    [% IF w.fix %]
+                    <div class="fix"><strong>Fix:</strong> [% w.fix | html %]
+                        [% IF (w.fix_action == 'fix_dev_gateway' || w.fix_action == 'fix_dev_unbound') && w.fix_domain %]
+                        <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" style="display:inline;margin-left:8px;">
+                            <input type="hidden" name="action" value="[% w.fix_action == 'fix_dev_gateway' ? 'fix_dev_gateway' : 'fix_dev_unbound' %]">
+                            <input type="hidden" name="domain" value="[% w.fix_domain | html %]">
+                            <button type="submit" class="btn btn-primary" style="padding:4px 10px;font-size:0.85em;">
+                                [% IF w.fix_action == 'fix_dev_gateway' %]Enable dev.csc → workstation :3001 (HTTP)[% ELSE %]Apply dev.[% w.fix_domain | html %] override[% END %]
+                            </button>
+                        </form>
+                        [% END %]
+                    </div>
+                    [% END %]
+                </div>
+                [% END %]
+            </div>
+            [% ELSIF gateway_audit %]
+            <p style="color:#2e7d32;margin:0 0 12px;"><i class="fas fa-check-circle"></i> No gateway routing problems detected.</p>
+            [% END %]
+
+            [% IF gateway_audit.diagnostics %]
+            [% d = gateway_audit.diagnostics %]
+            <div class="opn-dns-callout" style="background:#f3e5f5;border-color:#ce93d8;margin-bottom:14px;">
+                <strong><i class="fas fa-stethoscope"></i> dev.csc — gateway or workstation?</strong>
+                <table class="data-table" style="min-width:0;margin-top:8px;font-size:0.88em;">
+                    <tr>
+                        <td>Workstation Starman</td>
+                        <td>
+                            [% IF d.workstation_ok %]<span class="badge badge-ok">up</span>[% ELSE %]<span class="badge badge-err">down</span>[% END %]
+                            <code>[% d.workstation_health_url | html %]</code> — [% d.workstation_detail | html %]
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Unbound LAN (OPNsense)</td>
+                        <td>
+                            [% IF d.unbound_dev_csc_ok %]<span class="badge badge-ok">ok</span>[% ELSE %]<span class="badge badge-drift">fix LAN DNS</span>[% END %]
+                            dev.csc → <code>[% d.unbound_dev_csc | html %]</code> (want gateway <code>[% d.unbound_dev_csc_want | html %]</code>)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>HAProxy (gateway :80 → :3001)</td>
+                        <td>
+                            [% IF d.haproxy_dev_csc_ok %]<span class="badge badge-ok">configured</span>[% ELSE %]<span class="badge badge-drift">missing</span>[% END %]
+                            [% d.haproxy_dev_csc_detail | html %]
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>LAN dev.csc (no port)</td>
+                        <td>
+                            [% IF d.gateway_proxy_ok %]<span class="badge badge-ok">up</span>[% ELSE %]<span class="badge badge-err">down</span>[% END %]
+                            <a href="[% d.gateway_dev_url %]" target="_blank"><code>[% d.gateway_dev_url | html %]</code></a>
+                            — [% d.gateway_proxy_detail | html %]
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Public DNS (Cloudflare)</td>
+                        <td>
+                            [% IF d.public_dev_csc_ips.size %]
+                            [% FOREACH ip IN d.public_dev_csc_ips %]<code>[% ip | html %]</code> [% END %]
+                            [% ELSE %]unknown[% END %]
+                            — not the workstation; <code>https://dev.csc</code> uses this path
+                        </td>
+                    </tr>
+                </table>
+                <p style="margin:8px 0 0;font-size:0.88em;">[% d.note | html %]</p>
+                <p style="margin:6px 0 0;font-size:0.88em;">
+                    <strong>LAN dev (portless):</strong> <a href="[% d.lan_dev_url %]" target="_blank"><code>[% d.lan_dev_url | html %]</code></a>
+                    via gateway HAProxy.
+                    <strong>Direct Starman:</strong> <a href="[% d.direct_dev_url %]" target="_blank"><code>[% d.direct_dev_url | html %]</code></a>
+                </p>
+            </div>
+            [% END %]
+
+            <div class="opn-guidelines">
+                <h4><i class="fas fa-lightbulb"></i> Why <code>zero.{domain}</code> on each site — not one <code>zero</code> on the gateway?</h4>
+                <p style="margin:0 0 8px;">
+                    A hostname like <code>zero.computersystemconsulting.ca</code> is a <strong>service entry point</strong>
+                    for that domain’s production stack (today: production1 at <code>172.30.50.206:5000</code>).
+                    It is <em>not</em> the OPNsense gateway (<code>192.168.1.1</code> / <code>172.30.117.133</code>).
+                </p>
+                <ul>
+                    <li><strong>Per-domain routing</strong> — <code>zero.beemaster.ca</code> and <code>zero.computersystemconsulting.ca</code> can point at different backends without sharing one IP.</li>
+                    <li><strong>SSL &amp; cookies</strong> — Certificates and session cookies stay scoped to the correct domain; a single gateway <code>zero</code> would break multi-site hosting.</li>
+                    <li><strong>Dev vs prod</strong> — Change <code>zero.csc</code> in Cloudflare for remote prod; use <code>dev.csc</code> or <code>workstation.zero</code> for dev without touching the firewall LAN IP.</li>
+                    <li><strong>Split horizon</strong> — LAN clients use OPNsense Unbound (<code>192.168.1.x</code>); remote clients use Cloudflare (<code>172.30.x.x</code> ZT). Same name, right path per network.</li>
+                    <li><strong>Gateway role</strong> — OPNsense routes and filters; it should not be the canonical app hostname for every customer domain.</li>
+                </ul>
+                <p style="margin:10px 0 0;font-size:0.9em;color:#2e7d32;">
+                    Pattern: <code>[% gateway_plan.zero_naming.pattern | html %]</code>
+                    (e.g. <code>[% gateway_plan.zero_naming.example | html %]</code>).
+                    Config: <code>config/infrastructure/gateway_plan.json</code>
+                </p>
+            </div>
+
+            <p style="margin:0 0 10px;font-size:0.9em;color:#666;">
+                <strong>Dynamic rules:</strong> active <code>hosting_accounts</code> with <strong>public</strong> domains (forager.ca, weaverbeck.com, etc.) appear here with sync <span class="badge badge-ok">ok</span> when Unbound/Cloudflare matches.
+                Internal names like <code>3d.3d.lan</code> are <em>hidden</em> — they are local SiteName entries, not internet gateway routes.
+                <strong>Enable dev.csc → workstation :3001</strong> configures Unbound (dev → gateway), HAProxy (:80 → :3001), and firewall rules. It does not change Cloudflare.
+            </p>
+
+            <div class="opn-dns-callout" style="background:#e3f2fd;border-color:#90caf9;">
+                <strong><i class="fas fa-sort-amount-down"></i> Wildcard <code>*</code> vs <code>dev</code> — does <code>dev</code> win?</strong>
+                <p style="margin:6px 0 0;">
+                    <strong>On OPNsense Unbound:</strong> yes — a specific host override (<code>dev.domain</code>) beats the wildcard
+                    (<code>*.domain</code>). Comserv drift checks each rule separately; it does <em>not</em> auto-apply overrides yet (Phase 4).
+                </p>
+                <p style="margin:6px 0 0;">
+                    <strong>New subdomain (e.g. <code>coop.computersystemconsulting.ca</code>):</strong> Site Provisioning creates the
+                    <strong>Cloudflare A record</strong> only today. Unbound, NAT, HAProxy, and NPM are still manual or planned — see
+                    <a href="[% c.uri_for('/Documentation/system/GatewayPlan') %]#new-domain">new-domain checklist</a>.
+                </p>
+                <p style="margin:6px 0 0;font-size:0.9em;">
+                    <strong>ZeroTier:</strong> not required to open Comserv admin pages on <code>workstation.local:3001</code>.
+                    ZT is for remote reachability (<code>172.30.131.126</code>). Optional local <code>/etc/hosts</code> entries help
+                    LAN dev names only — they do not replace Cloudflare (public) or Unbound (office LAN).
+                </p>
+            </div>
+
+            [% IF gateway_plan.summary %]
+            <p style="margin:0 0 12px;color:var(--text-muted-color,#666);">[% gateway_plan.summary | html %]</p>
+            [% END %]
+
+            <div class="opn-table-wrap">
+            <table class="data-table opn-plan-table">
+                <thead>
+                    <tr>
+                        <th>Rule</th><th>FQDN</th><th>LAN</th><th>ZeroTier</th><th>Port</th>
+                        <th>DNS</th><th>SSL</th><th>Phase</th><th>Live sync</th>
+                    </tr>
+                </thead>
+                <tbody>
+                [% FOREACH rule IN gateway_plan.routing_rules %]
+                <tr>
+                    <td><strong>[% rule.label | html %]</strong>
+                        [% IF rule.source == 'hosting_account' %]<br><span class="badge badge-external" style="font-size:0.75em;">hosting</span>[% END %]
+                        [% IF rule.notes %]<br><span style="font-size:0.82em;color:#666;">[% rule.notes | html %]</span>[% END %]
+                    </td>
+                    <td><code>[% rule.fqdn | html %]</code></td>
+                    <td>[% IF rule.lan_ip %]<code>[% rule.lan_ip | html %]</code>[% ELSE %]—[% END %]</td>
+                    <td>[% IF rule.zt_ip %]<code>[% rule.zt_ip | html %]</code>[% ELSE %]—[% END %]</td>
+                    <td>[% rule.port | html %]</td>
+                    <td>[% rule.dns_layer | html %]</td>
+                    <td>[% rule.ssl | html %]</td>
+                    <td><span class="badge [% rule.phase == 'active' ? 'badge-ok' : 'badge-planned' %]">[% rule.phase | html %]</span></td>
+                    <td>
+                        <span class="badge [% rule.sync_status == 'ok' ? 'badge-ok' : (rule.sync_status == 'drift' || rule.sync_status == 'missing' ? 'badge-drift' : (rule.sync_status == 'external' ? 'badge-external' : 'badge-planned')) %]">
+                            [% rule.sync_status | html %]
+                        </span>
+                        [% IF rule.sync_detail %]<br><span style="font-size:0.8em;">[% rule.sync_detail | html %]</span>[% END %]
+                    </td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+            </div>
+
+            [% IF gateway_plan.tool_roles.size %]
+            <h4 style="margin:18px 0 8px;font-size:1em;">Best tool per function</h4>
+            <div class="opn-table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Tool</th><th>Role</th></tr></thead>
+                <tbody>
+                [% FOREACH tr IN gateway_plan.tool_roles %]
+                <tr><td><strong>[% tr.tool | html %]</strong></td><td>[% tr.role | html %]</td></tr>
+                [% END %]
+                </tbody>
+            </table>
+            </div>
+            [% END %]
+
+            [% IF gateway_doc_links.size %]
+            <h4 style="margin:18px 0 8px;font-size:1em;">Detailed documentation</h4>
+            <div class="opn-doc-links">
+                [% FOREACH link IN gateway_doc_links %]
+                <a href="[% link.uri %]"><i class="fas [% link.icon %]"></i> [% link.title | html %]</a>
+                [% END %]
+            </div>
+            [% END %]
+        </div>
+    </div>
 
     [% IF dev_access %]
     <div class="panel opn-section" id="opn-wrap-dev">
@@ -150,6 +400,7 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
                 <a href="[% dev_access.dns_dashboard_url %]" class="btn btn-secondary">All DNS zones</a>
                 <a href="[% dev_access.dns_zone_url %]" class="btn btn-secondary">Zone [% dev_access.cf_zone | html %]</a>
             </div>
+            <div class="opn-table-wrap">
             <table class="data-table">
                 <thead><tr><th>Target</th><th>Hostname</th><th>ZeroTier IP</th><th>Port</th><th>Use for</th></tr></thead>
                 <tbody>
@@ -174,6 +425,7 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
                 </tr>
                 </tbody>
             </table>
+            </div>
             <p>AI editor: <a href="[% dev_access.dev_url %]" target="_blank"><code>[% dev_access.dev_url | html %]</code></a></p>
         </div>
     </div>
@@ -405,6 +657,7 @@ secret=anotherLongRandomString...</pre>
             [% IF ifaces.error %]
                 <p style="color:#c62828;">[% ifaces.error | html %]</p>
             [% ELSIF ifaces.rows.size %]
+            <div class="opn-table-wrap">
             <table class="data-table">
                 <thead><tr><th>Interface</th><th>Name</th><th>IPv4</th><th>IPv6</th><th>Status</th></tr></thead>
                 <tbody>
@@ -420,6 +673,7 @@ secret=anotherLongRandomString...</pre>
                 [% END %]
                 </tbody>
             </table>
+            </div>
             [% ELSE %]
                 <p style="color:#888;">No interface data available.</p>
             [% END %]
@@ -444,6 +698,7 @@ secret=anotherLongRandomString...</pre>
             [% IF dhcp.error %]
                 <p style="color:#c62828;">[% dhcp.error | html %]</p>
             [% ELSIF dhcp.rows.size %]
+            <div class="opn-table-wrap">
             <table class="data-table">
                 <thead><tr><th>Hostname</th><th>IP Address</th><th>MAC Address</th><th>Expires</th></tr></thead>
                 <tbody>
@@ -457,6 +712,7 @@ secret=anotherLongRandomString...</pre>
                 [% END %]
                 </tbody>
             </table>
+            </div>
             [% ELSE %]
                 <p style="color:#888;">No active DHCP leases found.</p>
             [% END %]
@@ -481,6 +737,7 @@ secret=anotherLongRandomString...</pre>
             [% IF nat.error %]
                 <p style="color:#c62828;">[% nat.error | html %]</p>
             [% ELSIF nat.rows.size %]
+            <div class="opn-table-wrap">
             <table class="data-table">
                 <thead><tr><th>Description</th><th>Interface</th><th>Proto</th><th>Dest port</th><th>Target</th><th>Local port</th><th>On</th><th></th></tr></thead>
                 <tbody>
@@ -509,6 +766,7 @@ secret=anotherLongRandomString...</pre>
                 [% END %]
                 </tbody>
             </table>
+            </div>
             [% ELSE %]
                 <p style="color:#888;">No NAT rules returned.</p>
             [% END %]
@@ -550,6 +808,7 @@ secret=anotherLongRandomString...</pre>
             [% IF dns_hosts.error %]
                 <p style="color:#c62828;">[% dns_hosts.error | html %]</p>
             [% ELSIF dns_hosts.rows.size %]
+            <div class="opn-table-wrap">
             <table class="data-table">
                 <thead><tr><th>Host</th><th>Domain</th><th>IP</th><th>Description</th></tr></thead>
                 <tbody>
@@ -563,6 +822,7 @@ secret=anotherLongRandomString...</pre>
                 [% END %]
                 </tbody>
             </table>
+            </div>
             [% END %]
             <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" class="config-form" style="margin-top:12px;">
                 <input type="hidden" name="action" value="add_dns">
@@ -598,6 +858,7 @@ secret=anotherLongRandomString...</pre>
             [% IF fw_rules.error %]
                 <p style="color:#c62828;">[% fw_rules.error | html %]</p>
             [% ELSIF fw_rules.rows.size %]
+            <div class="opn-table-wrap">
             <table class="data-table">
                 <thead><tr><th>Description</th><th>Interface</th><th>Protocol</th><th>Source</th><th>Destination</th><th>Action</th></tr></thead>
                 <tbody>
@@ -614,6 +875,7 @@ secret=anotherLongRandomString...</pre>
                 [% END %]
                 </tbody>
             </table>
+            </div>
             [% ELSE %]
                 <p style="color:#888;">No firewall rules returned.</p>
             [% END %]
@@ -710,6 +972,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     [% UNLESS opnsense_config.host %]
     toggleOpnSection('opn-section-config', true);
+    [% ELSE %]
+    toggleOpnSection('opn-section-plan', true);
     [% END %]
 
     var hash = (location.hash || '').replace(/^#/, '');

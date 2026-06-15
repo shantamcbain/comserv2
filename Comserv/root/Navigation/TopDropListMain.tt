@@ -81,7 +81,7 @@
             <span class="submenu-header"><i class="icon-globe"></i>Public Links</span>
             <div class="submenu">
                 <!-- Dynamic Page-based links for Main menu from new page system -->
-                [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'main' AND (status = 'active' OR status = '2' OR status = 2)) AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'main' AND (status = 'active' OR status = '2' OR status = 2)) AND (sitename = '$SiteName' OR LOWER(sitename) = LOWER('$SiteName') OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
                     [% INCLUDE 'Navigation/inc/submenu_link_row.tt'
                         row_href = '/page/' _ link.page_code
                         row_label = link.title

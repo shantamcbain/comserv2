@@ -9528,6 +9528,8 @@ sub pages :Path('/admin/pages') :Args(0) {
     my $show_form = undef;
     my $page_item = {};
     
+    my $pages_ctrl = $c->controller('Pages');
+
     if ($action eq 'create') {
         $show_form = 'create';
         my $clone_id = $c->req->param('clone_id');
@@ -9573,12 +9575,22 @@ sub pages :Path('/admin/pages') :Args(0) {
         }
     }
     elsif ($action eq 'save') {
+        $pages_ctrl->ensure_page_submenu_column($c) if $pages_ctrl;
         my $params = $c->req->params;
         my $id = $params->{id};
         
-        # Site isolation check: non-CSC admins can only assign to their own site
+        my $allowed_sites = $pages_ctrl
+            ? $pages_ctrl->admin_available_sites($c)
+            : [ $current_sitename ];
+        my %allowed_site = map { $_ => 1 } @$allowed_sites;
+
         my $target_sitename = $params->{sitename} || $current_sitename;
-        if ($current_sitename ne 'CSC' && $target_sitename ne $current_sitename) {
+        unless ($allowed_site{$target_sitename}) {
+            $c->stash(error_msg => "Invalid site '$target_sitename'. Choose a site you have access to.");
+            $show_form = $id ? 'edit' : 'create';
+            $page_item = $params;
+        }
+        elsif ($current_sitename ne 'CSC' && $target_sitename ne $current_sitename) {
             $c->stash(error_msg => "Access denied: You can only save pages belonging to your own site.");
             $show_form = $id ? 'edit' : 'create';
             $page_item = $params;
@@ -9586,6 +9598,7 @@ sub pages :Path('/admin/pages') :Args(0) {
             my $page_data = {
                 sitename => $target_sitename,
                 menu => $params->{menu} || 'Main',
+                submenu => $params->{submenu} || '',
                 page_code => $params->{page_code},
                 title => $params->{title},
                 body => $params->{body} || '',
@@ -9689,6 +9702,16 @@ sub pages :Path('/admin/pages') :Args(0) {
             push @sites_list, $s->name;
         }
     };
+
+    my $available_sites = $pages_ctrl
+        ? $pages_ctrl->admin_available_sites($c)
+        : [ $current_sitename ];
+
+    my $form_sitename = ref($page_item) ? $page_item->sitename : ($page_item->{sitename} || $current_sitename);
+    my %form_extras;
+    if ($show_form && $pages_ctrl) {
+        %form_extras = %{ $pages_ctrl->admin_page_form_extras($c, $form_sitename) };
+    }
     
     $c->stash(
         pages => \@pages,
@@ -9696,7 +9719,11 @@ sub pages :Path('/admin/pages') :Args(0) {
         page_item => $page_item,
         current_site => $current_sitename,
         available_roles => \@available_roles,
+        available_sites => $available_sites,
+        all_sites => \@sites_list,
         sites_list => \@sites_list,
+        is_csc => (lc($current_sitename) eq 'csc'),
+        %form_extras,
         template => 'admin/pages.tt'
     );
 }

@@ -6232,6 +6232,19 @@
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "Server Room IP Registry"
       },
+      "GatewayPlan" : {
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "format" : "template",
+         "description" : "CSC gateway routing policy: zero.{domain} naming, OPNsense/Cloudflare/HAProxy/NPM roles, phases, and drift detection",
+         "category" : "Infrastructure",
+         "path" : "Documentation/system/GatewayPlan.tt",
+         "site" : "all",
+         "last_scanned" : "Mon Jun 15 2026",
+         "title" : "CSC Gateway Plan"
+      },
       "2025-01-15-mailing-list-phase1" : {
          "title" : "Mailing List System - Phase 1 Implementation",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
