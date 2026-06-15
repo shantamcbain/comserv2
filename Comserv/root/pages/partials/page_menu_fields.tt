@@ -1,0 +1,98 @@
+[%#
+  Menu + submenu pickers for page admin forms.
+  Requires stash: available_menus, menus_by_site_json, submenu_catalog_json,
+                 submenu_defaults_json, menu_to_category_json
+%]
+<div class="col-md-4">
+    <div class="form-group">
+        <label for="menu">Menu Section <span class="text-danger">*</span>
+            [% PROCESS 'pages/partials/field_hint.tt' hint = 'Top navigation menu where this page link appears (Main, Member, Admin, etc.). Pick the menu your audience uses.' %]
+        </label>
+        <select name="menu" id="menu" class="form-control" required>
+            [% FOREACH m IN available_menus %]
+            <option value="[% m.menu %]"
+                    data-category="[% m.category %]"
+                    data-placement="[% m.placement | html %]"
+                    [% IF (page_item.menu || 'Main') == m.menu %]selected[% END %]>
+                [% m.label %]
+            </option>
+            [% END %]
+        </select>
+        <span id="menu-placement-hint" class="help-block text-muted"></span>
+    </div>
+</div>
+<div class="col-md-4">
+    <div class="form-group">
+        <label for="submenu">Submenu Section
+            [% PROCESS 'pages/partials/field_hint.tt' hint = 'Dropdown group inside the menu (e.g. CMS Pages under Admin). Save as Active for the link to appear on the live site.' %]
+        </label>
+        <select name="submenu" id="submenu" class="form-control">
+            <option value="">— default for this menu —</option>
+        </select>
+        <span class="help-block">Where the link appears inside the menu dropdown. Save as <strong>Active</strong> to show on the site menu.</span>
+    </div>
+</div>
+
+<script>
+(function() {
+    var menusBySite = [% menus_by_site_json || '{}' %];
+    var submenuCatalog = [% submenu_catalog_json || '{}' %];
+    var submenuDefaults = [% submenu_defaults_json || '{}' %];
+    var menuToCategory = [% menu_to_category_json || '{}' %];
+
+    var menuSel = document.getElementById('menu');
+    var subSel = document.getElementById('submenu');
+    var siteSel = document.getElementById('sitename');
+    var hintEl = document.getElementById('menu-placement-hint');
+    if (!menuSel || !subSel) return;
+
+    var currentSubmenu = '[% page_item.submenu || '' %]';
+
+    function rebuildMenuOptions(site) {
+        var list = menusBySite[site] || menusBySite[Object.keys(menusBySite)[0]] || [];
+        var prev = menuSel.value;
+        menuSel.innerHTML = '';
+        list.forEach(function(m) {
+            var opt = document.createElement('option');
+            opt.value = m.menu;
+            opt.textContent = m.label;
+            opt.setAttribute('data-category', m.category || '');
+            opt.setAttribute('data-placement', m.placement || '');
+            if (m.menu === prev) opt.selected = true;
+            menuSel.appendChild(opt);
+        });
+        updateSubmenus();
+    }
+
+    function updateSubmenus() {
+        var opt = menuSel.options[menuSel.selectedIndex];
+        var category = opt ? opt.getAttribute('data-category') : '';
+        var placement = opt ? opt.getAttribute('data-placement') : '';
+        if (hintEl) hintEl.textContent = placement ? ('Appears in: ' + placement) : '';
+
+        var subs = submenuCatalog[category] || [];
+        var prev = subSel.value || currentSubmenu;
+        subSel.innerHTML = '';
+        var defOpt = document.createElement('option');
+        defOpt.value = submenuDefaults[category] || '';
+        defOpt.textContent = '— default (' + (submenuDefaults[category] || 'auto') + ') —';
+        subSel.appendChild(defOpt);
+        subs.forEach(function(s) {
+            var o = document.createElement('option');
+            o.value = s.id;
+            o.textContent = s.label;
+            if (s.id === prev) o.selected = true;
+            subSel.appendChild(o);
+        });
+        currentSubmenu = '';
+    }
+
+    menuSel.addEventListener('change', updateSubmenus);
+    if (siteSel && siteSel.tagName === 'SELECT') {
+        siteSel.addEventListener('change', function() {
+            rebuildMenuOptions(siteSel.value);
+        });
+    }
+    updateSubmenus();
+})();
+</script>

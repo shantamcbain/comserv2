@@ -558,7 +558,12 @@ sub auto :Private {
             my $mod_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
             my %enabled;
             my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search(
-                { sitename => $mod_site },
+                { -or => [
+                    { sitename => $mod_site },
+                    { sitename => lc($mod_site) },
+                    { sitename => uc($mod_site) },
+                    \[ 'LOWER(sitename) = ?', lc($mod_site) ],
+                ] },
                 { columns  => [qw(module_name enabled)] }
             )->all;
             for my $row (@site_mods) {
@@ -568,9 +573,10 @@ sub auto :Private {
             # Check hosting account for subscribed addons to enable them by default
             my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
                 -or => [
-                    sitename => $mod_site,
-                    sitename => lc($mod_site),
-                    sitename => uc($mod_site),
+                    { sitename => $mod_site },
+                    { sitename => lc($mod_site) },
+                    { sitename => uc($mod_site) },
+                    \[ 'LOWER(sitename) = ?', lc($mod_site) ],
                 ]
             }, { rows => 1 })->single;
             if ($hosting && $hosting->requested_addons) {
@@ -588,6 +594,10 @@ sub auto :Private {
                     }
                     if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
                         $enabled{'brew'} = 1 unless exists $enabled{'brew'};
+                    }
+                    if ($lc_addon eq 'beekeeping' || $lc_addon eq 'apiary' || $lc_addon eq 'bmaster') {
+                        $enabled{'beekeeping'} = 1 unless exists $enabled{'beekeeping'};
+                        $enabled{'apiary'}     = 1 unless exists $enabled{'apiary'};
                     }
                 }
             }
@@ -662,6 +672,20 @@ sub auto :Private {
             }
         }
         $c->stash->{can_plan} = $can_plan;
+
+        # Beekeeping nav — site addon (hosting/site_modules), BMaster site, or per-user grant.
+        # Admin role alone does not enable the menu (unlike the old TopDropListBeekeeping bypass).
+        my $can_beekeep = 0;
+        my $bee_site    = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        my $em_bee      = $c->stash->{enabled_modules};
+        $em_bee = {} unless ref($em_bee) eq 'HASH';
+        if ($bee_site eq 'BMaster') {
+            $can_beekeep = 1;
+        }
+        elsif ($em_bee->{beekeeping} || $em_bee->{apiary}) {
+            $can_beekeep = 1;
+        }
+        $c->stash->{can_beekeep} = $can_beekeep;
 
         # Check if current site has active priced inventory items (for Shop nav visibility)
         eval {
@@ -2356,11 +2380,12 @@ sub end : ActionClass('RenderView') {
         $c->res->headers->header(
             'Content-Security-Policy' => 
                 "default-src 'self'; " .
-                "script-src 'self' 'unsafe-inline'; " .
+                "script-src 'self' 'unsafe-inline' https://cdn.ckeditor.com; " .
                 "style-src 'self' 'unsafe-inline'; " .
                 "img-src 'self' data: https:; " .
                 "font-src 'self'; " .
-                "frame-src 'none'; " .
+                "connect-src 'self' https://*.grammarly.com https://*.grammarly.io wss://*.grammarly.com wss://*.grammarly.io; " .
+                "frame-src 'self'; " .
                 "object-src 'none'; " .
                 "base-uri 'self'; " .
                 "form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com;"

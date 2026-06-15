@@ -44,15 +44,21 @@
             <small>Page code cannot be changed after creation</small>
         </div>
         
+        [% PROCESS 'pages/partials/insert_chars_assets.tt' %]
         <div class="form-group">
-            <label for="title">Title:</label>
-            <input type="text" name="title" id="title" value="[% page.title %]" required>
+            <div class="label-with-insert">
+                <label for="title">Title:</label>
+                [% PROCESS 'pages/partials/insert_chars_button.tt' target_id = 'title' allow_html = 0 %]
+            </div>
+            <input type="text" name="title" id="title" value="[% page.title | html %]" required>
         </div>
         
-        <div class="form-group">
-            <label for="body">Content:</label>
-            <textarea name="body" id="body" rows="10" required>[% page.body %]</textarea>
-        </div>
+        [% PROCESS 'pages/partials/html_editor.tt'
+           body_content  = page.body
+           body_label    = 'Page Content'
+           body_required = 1
+           preview_url   = c.uri_for('/page', page.page_code)
+        %]
         
         <div class="form-group">
             <label for="description">Meta Description:</label>

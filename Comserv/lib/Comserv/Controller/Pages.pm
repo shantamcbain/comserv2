@@ -14,99 +14,12 @@ BEGIN { extends 'Catalyst::Controller'; }
 # Display a page by page_code
 sub view :Path('/page') :Args(1) {
     my ($self, $c, $page_code) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Viewing page: $page_code");
-    
-    # Get current site and user roles
-    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $user_roles = $c->session->{roles} || 'public';
-    
-    # Find the page for the active site so each site can have its own "home" page.
-    my $page = $c->model('DBEncy')->resultset('Page')->search(
-        {
-            sitename   => $sitename,
-            page_code  => $page_code,
-        },
-        { rows => 1 }
-    )->single;
 
-    if (!$page) {
-        # Fallback to shared pages or CSC pages
-        $page = $c->model('DBEncy')->resultset('Page')->search(
-            {
-                page_code => $page_code,
-                '-or' => [
-                    { sitename => 'CSC' },
-                    { share_with => 'all' },
-                    { share_with => { 'like' => "%$sitename%" } }
-                ]
-            },
-            { rows => 1 }
-        )->single;
-    }
-    
-    unless ($page) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view', "Page not found: $page_code");
-        $c->response->status(404);
-        $c->stash(
-            error_msg => "Page not found: $page_code",
-            template => 'error.tt'
-        );
-        return;
-    }
-    
-    # Check site access: CSC can view any page, others only their own site's pages, unless shared
-    my $is_shared = 0;
-    if ($page->can('share_with') && $page->share_with) {
-        my $shared_str = $page->share_with;
-        if ($shared_str eq 'all' || grep { $_ eq $sitename } split(/\s*,\s*/, $shared_str)) {
-            $is_shared = 1;
-        }
-    }
-    
-    if ($sitename ne 'CSC' && $page->sitename ne $sitename && !$is_shared) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view', 
-            "Site access denied: User from site '$sitename' trying to access page from site '" . $page->sitename . "'");
-        $c->response->status(403);
-        $c->stash(
-            error_msg => "Access denied: Page belongs to a different site",
-            template => 'error.tt'
-        );
-        return;
-    }
-    
-    # Check if user has access to this page based on roles
-    unless ($self->_check_page_access($c, $page, $user_roles)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view', "Role access denied to page: $page_code for roles: $user_roles");
-        $c->response->status(403);
-        $c->stash(
-            error_msg => "Access denied to page: " . $page->title,
-            template => 'error.tt'
-        );
-        return;
-    }
-    
-    my $body = $page->body || '';
-    my $title = $page->title;
-    
-    if ($body =~ m{<html}i) {
-        if ($body =~ m{<title>(.*?)</title>}is) {
-            my $extracted_title = $1;
-            $extracted_title =~ s/<[^>]*>//g;
-            $extracted_title =~ s/^\s+|\s+$//g;
-            if ($extracted_title && (!$title || $title eq $page->page_code)) {
-                $title = $extracted_title;
-            }
-        }
-        
-        if ($body =~ m{<body[^>]*>(.*?)</body>}is) {
-            $body = $1;
-        } else {
-            $body =~ s{<html[^>]*>}{}gi;
-            $body =~ s{</html>}{}gi;
-            $body =~ s{<head[^>]*>.*?</head>}{}gis;
-        }
-    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Viewing page: $page_code");
+
+    my $resolved = $self->_resolve_public_page($c, $page_code, 'view');
+    return unless $resolved;
+    my ($page, $body, $title) = @$resolved;
 
     my $is_pub = (($page->page_type // '') eq 'newsletter_pub');
     my $is_newsletter = !$is_pub && (
@@ -132,6 +45,34 @@ sub view :Path('/page') :Args(1) {
         nl_meta => $nl_meta,
         nl_can_send => $nl_can_send,
         template => $is_newsletter ? 'pages/newsletter_view.tt' : 'pages/view.tt',
+    );
+}
+
+# Print-friendly page view (no site nav/header/footer).
+sub print_view :Path('/page/print') :Args(1) {
+    my ($self, $c, $page_code) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_view', "Printing page: $page_code");
+
+    my $resolved = $self->_resolve_public_page($c, $page_code, 'print_view');
+    return unless $resolved;
+    my ($page, $body, $title) = @$resolved;
+
+    my $theme_name = 'default';
+    eval {
+        $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $page->sitename) || 'default';
+    };
+
+    $c->stash(
+        page             => $page,
+        rendered_body    => $body,
+        page_title       => $title,
+        print_theme      => $theme_name,
+        print_sitename   => $page->sitename,
+        print_back_url   => $c->uri_for('/page', $page_code),
+        print_autoprint  => ($c->req->param('autoprint') ? 1 : 0),
+        no_wrapper       => 1,
+        template         => 'pages/print.tt',
     );
 }
 
@@ -449,17 +390,159 @@ sub _check_admin_access {
     return 0;
 }
 
+# Normalize session/stash roles to a lowercase list.
+sub _user_role_list {
+    my ($self, $c, $user_roles) = @_;
+
+    $user_roles = $c->stash->{user_roles} if !defined $user_roles || $user_roles eq '';
+    $user_roles = $c->session->{roles} if !defined $user_roles || $user_roles eq '';
+
+    my @roles;
+    if (ref($user_roles) eq 'ARRAY') {
+        @roles = @$user_roles;
+    }
+    elsif (defined $user_roles && !ref($user_roles) && $user_roles ne '') {
+        @roles = split /\s*,\s*/, $user_roles;
+    }
+
+    if ($c->session->{is_admin} || $c->stash->{is_admin}) {
+        push @roles, 'admin' unless grep { lc($_) eq 'admin' } @roles;
+    }
+
+    return [ map { lc($_) } grep { defined $_ && $_ ne '' } @roles ];
+}
+
+sub _user_has_role {
+    my ($self, $c, $required, $user_roles) = @_;
+    return 0 unless defined $required && $required ne '';
+    my $list = $self->_user_role_list($c, $user_roles);
+    my $req_lc = lc($required);
+    return 1 if grep { $_ eq $req_lc } @$list;
+    return 0;
+}
+
+# Resolve a page for public view/print: returns [ $page, $body, $title ] or sets error and returns undef.
+sub _resolve_public_page {
+    my ($self, $c, $page_code, $log_action) = @_;
+    $log_action //= 'view';
+
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || 'public';
+
+    my $page = $c->model('DBEncy')->resultset('Page')->search(
+        {
+            page_code => $page_code,
+            -or => [
+                { sitename => $sitename },
+                \[ 'LOWER(sitename) = ?', lc($sitename) ],
+            ],
+        },
+        { rows => 1 }
+    )->single;
+
+    if (!$page) {
+        $page = $c->model('DBEncy')->resultset('Page')->search(
+            {
+                page_code => $page_code,
+                '-or' => [
+                    { sitename => 'CSC' },
+                    { share_with => 'all' },
+                    { share_with => { 'like' => "%$sitename%" } }
+                ]
+            },
+            { rows => 1 }
+        )->single;
+    }
+
+    unless ($page) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $log_action, "Page not found: $page_code");
+        $c->response->status(404);
+        $c->stash(
+            error_msg => "Page not found: $page_code",
+            template  => 'error.tt',
+        );
+        return;
+    }
+
+    my $is_shared = 0;
+    if ($page->can('share_with') && $page->share_with) {
+        my $shared_str = $page->share_with;
+        if ($shared_str eq 'all' || grep { $_ eq $sitename } split(/\s*,\s*/, $shared_str)) {
+            $is_shared = 1;
+        }
+    }
+
+    my $page_site_lc   = lc( $page->sitename || '' );
+    my $active_site_lc = lc($sitename);
+    if ($active_site_lc ne 'csc' && $page_site_lc ne $active_site_lc && !$is_shared) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $log_action,
+            "Site access denied: User from site '$sitename' trying to access page from site '" . $page->sitename . "'");
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied: Page belongs to a different site",
+            template  => 'error.tt',
+        );
+        return;
+    }
+
+    unless ($self->_check_page_access($c, $page, $user_roles)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $log_action,
+            "Role access denied to page: $page_code for roles: $user_roles");
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied to page: " . $page->title,
+            template  => 'error.tt',
+        );
+        return;
+    }
+
+    my ($body, $title) = $self->_extract_page_body_and_title($page);
+    return [ $page, $body, $title ];
+}
+
+sub _extract_page_body_and_title {
+    my ($self, $page) = @_;
+
+    my $body  = $page->body || '';
+    my $title = $page->title;
+
+    if ($body =~ m{<html}i) {
+        if ($body =~ m{<title>(.*?)</title>}is) {
+            my $extracted_title = $1;
+            $extracted_title =~ s/<[^>]*>//g;
+            $extracted_title =~ s/^\s+|\s+$//g;
+            if ($extracted_title && (!$title || $title eq $page->page_code)) {
+                $title = $extracted_title;
+            }
+        }
+
+        if ($body =~ m{<body[^>]*>(.*?)</body>}is) {
+            $body = $1;
+        } else {
+            $body =~ s{<html[^>]*>}{}gi;
+            $body =~ s{</html>}{}gi;
+            $body =~ s{<head[^>]*>.*?</head>}{}gis;
+        }
+    }
+
+    return ($body, $title);
+}
+
 # Check if user has access to page based on roles
 sub _check_page_access {
     my ($self, $c, $page, $user_roles) = @_;
-    
+
     my $page_roles = $page->roles || 'public';
-    
-    # Public pages are accessible to everyone
-    return 1 if $page_roles eq 'public';
-    
-    # Check if user has required role
-    return $user_roles && $user_roles =~ /$page_roles/;
+    return 1 if lc($page_roles) eq 'public';
+
+    my $list = $self->_user_role_list($c, $user_roles);
+
+    for my $req (split /\s*,\s*/, $page_roles) {
+        next unless defined $req && $req ne '';
+        return 1 if grep { $_ eq lc($req) } @$list;
+    }
+
+    return 0;
 }
 
 # Action to migrate legacy pages from Forager to Ency
@@ -736,6 +819,239 @@ sub hide_forager_page :Path('/admin/hide_forager_page') :Args(0) {
     $c->response->redirect($c->uri_for('/admin/migrate_pages'));
 }
 
+# Ensure page.submenu column exists (optional placement within a menu dropdown).
+sub ensure_page_submenu_column {
+    my ($self, $c) = @_;
+    return 1 if $self->{_page_submenu_col};
+    my $nav = $c->controller('Navigation');
+    return 0 unless $nav && $nav->can('column_exists');
+    $self->{_page_submenu_col} = $nav->column_exists($c, 'page', 'submenu') ? 1 : 0;
+    unless ($self->{_page_submenu_col}) {
+        eval {
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            $dbh->do("ALTER TABLE page ADD COLUMN submenu varchar(64) DEFAULT '' AFTER menu");
+            $self->{_page_submenu_col} = 1;
+        };
+    }
+    return $self->{_page_submenu_col};
+}
+
+sub _load_enabled_modules_for_site {
+    my ($self, $c, $sitename) = @_;
+    my %enabled;
+    eval {
+        my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search(
+            { -or => [
+                { sitename => $sitename },
+                \[ 'LOWER(sitename) = ?', lc($sitename) ],
+            ] },
+            { columns => [qw(module_name enabled)] }
+        )->all;
+        for my $row (@site_mods) {
+            $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+        }
+        my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+            -or => [
+                { sitename => $sitename },
+                \[ 'LOWER(sitename) = ?', lc($sitename) ],
+            ],
+        }, { rows => 1 })->single;
+        if ($hosting && $hosting->requested_addons) {
+            for my $a (split /\s*,\s*/, $hosting->requested_addons) {
+                my $lc = lc($a);
+                $enabled{$lc} = 1;
+                $enabled{printing_3d} = $enabled{'3d'} = 1 if $lc eq 'printing_3d' || $lc eq '3d';
+                $enabled{workshop} = $enabled{workshops} = 1 if $lc eq 'workshops' || $lc eq 'workshop';
+                $enabled{brew} = 1 if $lc eq 'brew' || $lc eq 'brewhouse';
+                if ($lc =~ /^(?:beekeeping|apiary|bmaster)$/) {
+                    $enabled{beekeeping} = $enabled{apiary} = 1;
+                }
+            }
+        }
+    };
+    return \%enabled;
+}
+
+sub _menu_placement_hint {
+    my ($self, $menu) = @_;
+    my %hints = (
+        Main       => 'Main menu → Public Links section',
+        Admin      => 'Admin menu → top-level links (and Admin Links submenu)',
+        Member     => 'Member menu → Member Pages section',
+        HelpDesk   => 'HelpDesk menu → HelpDesk Pages section',
+        Hosted     => 'Hosted menu → Guides section',
+        Weather    => 'Weather menu → pages section',
+        Workshop   => 'Workshops menu',
+        Planning   => 'Planning menu',
+        ENCY       => 'Encyclopedia menu',
+        Beekeeping => 'Beekeeping menu',
+        Brew       => 'Brew menu',
+        Shop       => 'Shop menu',
+    );
+    $hints{'3d'} = '3D Printing menu';
+    return $hints{$menu} || ($menu . ' menu');
+}
+
+# Active top-level menus for a site (matches navigation TopDropList*.tt).
+sub admin_menus_for_site {
+    my ($self, $c, $sitename) = @_;
+    $sitename ||= $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+    my $nav = $c->controller('Navigation');
+    return [] unless $nav;
+
+    my $saved_site = $c->stash->{SiteName};
+    my $saved_mods = $c->stash->{enabled_modules};
+    $c->stash->{SiteName}       = $sitename;
+    $c->stash->{enabled_modules} = $self->_load_enabled_modules_for_site($c, $sitename);
+
+    my $catalog = $nav->can('nav_menu_catalog') ? $nav->nav_menu_catalog() : [];
+    my @menus;
+    for my $entry (@$catalog) {
+        next if $entry->{legacy};
+        next if $entry->{admin_only};    # admin form is admin-only; always offer Admin
+        next unless $nav->_nav_menu_visible($c, $entry);
+        push @menus, {
+            menu      => $entry->{menu},
+            label     => $entry->{label},
+            category  => $entry->{category},
+            placement => $self->_menu_placement_hint($entry->{menu}),
+        };
+    }
+    push @menus, {
+        menu      => 'Admin',
+        label     => 'Admin',
+        category  => 'Admin_links',
+        placement => $self->_menu_placement_hint('Admin'),
+    } unless grep { $_->{menu} eq 'Admin' } @menus;
+
+    $c->stash->{SiteName}         = $saved_site;
+    $c->stash->{enabled_modules}  = $saved_mods;
+
+    return [ sort { lc($a->{label}) cmp lc($b->{label}) } @menus ];
+}
+
+sub admin_submenus_for_menu {
+    my ($self, $c, $menu) = @_;
+    my $nav = $c ? $c->controller('Navigation') : undef;
+    my $mtc = ($nav && $nav->can('nav_menu_to_category')) ? $nav->nav_menu_to_category() : {};
+    my $sub = ($nav && $nav->can('nav_submenu_catalog')) ? $nav->nav_submenu_catalog() : {};
+    my $cat = $mtc->{$menu} // '';
+    return $sub->{$cat} || [];
+}
+
+sub admin_page_form_extras {
+    my ($self, $c, $sitename) = @_;
+    $sitename ||= $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+    my $theme_name = 'default';
+    eval {
+        $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $sitename) || 'default';
+    };
+
+    my $icons_json = '[]';
+    eval {
+        my $path = $c->path_to('root', 'static', 'config', 'site_icons.json');
+        if (-r $path) {
+            open my $fh, '<:encoding(UTF-8)', $path or die $!;
+            local $/;
+            $icons_json = <$fh>;
+            close $fh;
+        }
+    };
+
+    require JSON::MaybeXS;
+    my $json = JSON::MaybeXS->new->utf8(0);
+
+    my %menus_by_site;
+    for my $site (@{ $self->admin_available_sites($c) }) {
+        $menus_by_site{$site} = $self->admin_menus_for_site($c, $site);
+    }
+
+    my $nav = $c->controller('Navigation');
+    my $submenu_catalog  = ($nav && $nav->can('nav_submenu_catalog'))  ? $nav->nav_submenu_catalog()  : {};
+    my $submenu_defaults = ($nav && $nav->can('nav_submenu_defaults')) ? $nav->nav_submenu_defaults() : {};
+    my $menu_to_category = ($nav && $nav->can('nav_menu_to_category')) ? $nav->nav_menu_to_category() : {};
+
+    return {
+        page_editor_theme   => $theme_name,
+        site_icons_json     => $icons_json,
+        menus_by_site_json  => $json->encode(\%menus_by_site),
+        submenu_catalog_json => $json->encode($submenu_catalog),
+        submenu_defaults_json => $json->encode($submenu_defaults),
+        menu_to_category_json => $json->encode($menu_to_category),
+        available_menus     => $self->admin_menus_for_site($c, $sitename),
+    };
+}
+
+# Live HTML preview for page editor (renders like /page/ view with theme CSS).
+sub preview_body :Path('/admin/pages/preview') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'pages')) {
+        $c->response->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+
+    my $body     = $c->req->param('body')     // '';
+    my $sitename = $c->req->param('sitename')  || $c->session->{SiteName} || 'CSC';
+    my $theme_name = 'default';
+    eval {
+        $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $sitename) || 'default';
+    };
+
+    $c->stash(
+        preview_body     => $body,
+        preview_theme    => $theme_name,
+        preview_sitename => $sitename,
+        no_wrapper       => 1,
+        template         => 'pages/preview_frame.tt',
+    );
+}
+
+# Sites the current admin may assign pages to (dropdown in /admin/pages).
+sub admin_available_sites {
+    my ($self, $c) = @_;
+    my $current = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+    if (lc($current) eq 'csc') {
+        my @names;
+        eval {
+            my @sites = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name' }
+            )->all;
+            @names = map { $_->name } @sites;
+        };
+        return \@names if @names;
+        return ['CSC'];
+    }
+
+    my %seen;
+    my @names;
+    my $user_id = $c->session->{user_id};
+    if ($user_id) {
+        eval {
+            my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                user_id   => $user_id,
+                is_active => 1,
+                role      => 'admin',
+            })->all;
+            for my $sr (@rows) {
+                my $site = eval { $sr->site };
+                next unless $site && $site->name;
+                next if $seen{ $site->name }++;
+                push @names, $site->name;
+            }
+        };
+    }
+    unless ($seen{$current}) {
+        push @names, $current;
+    }
+    return \@names;
+}
+
 # Action to manage/administer pages in the page table
 sub pages :Path('/admin/pages') :Args(0) {
     my ($self, $c) = @_;
@@ -808,19 +1124,18 @@ sub pages :Path('/admin/pages') :Args(0) {
     }
     $c->stash(all_sites => \@site_names_all);
     
-    # Determine available sites for this admin
-    my @available_sites_list;
-    if ($current_sitename eq 'CSC') {
-        @available_sites_list = @site_names_all;
-    } else {
-        @available_sites_list = ($current_sitename);
-    }
-    $c->stash(available_sites => \@available_sites_list);
+    my $available_sites_list = $self->admin_available_sites($c);
+    $c->stash(
+        available_sites => $available_sites_list,
+        is_csc          => (lc($current_sitename) eq 'csc'),
+    );
     
     if ($action eq 'create') {
+        my $extras = $self->admin_page_form_extras($c, $current_sitename);
         $c->stash(
             show_form => 'create',
-            page_item => { sitename => $current_sitename },
+            page_item => { sitename => $current_sitename, menu => 'Main', submenu => '' },
+            %$extras,
         );
     }
     elsif ($action eq 'edit') {
@@ -837,9 +1152,11 @@ sub pages :Path('/admin/pages') :Args(0) {
                 $seen_roles{$page_role} = 1;
                 push @available_roles, $page_role;
             }
+            my $extras = $self->admin_page_form_extras($c, $page_item->sitename);
             $c->stash(
                 show_form => 'edit',
                 page_item => $page_item,
+                %$extras,
             );
         } else {
             $c->flash->{error_msg} = "Page not found.";
@@ -848,9 +1165,11 @@ sub pages :Path('/admin/pages') :Args(0) {
         }
     }
     elsif ($action eq 'save') {
+        $self->ensure_page_submenu_column($c);
         my $id = $c->req->param('id');
         my $sitename = $c->req->param('sitename') || 'CSC';
         my $menu = $c->req->param('menu') || 'main';
+        my $submenu = $c->req->param('submenu') || '';
         my $page_code = $c->req->param('page_code') || '';
         my $title = $c->req->param('title') || '';
         my $body = $c->req->param('body') || '';
@@ -861,9 +1180,11 @@ sub pages :Path('/admin/pages') :Args(0) {
         my $roles = $c->req->param('roles') || 'public';
         my $share_with = $c->req->param('share_with') || '';
         
-        # Enforce current site if not CSC
-        if ($current_sitename ne 'CSC') {
-            $sitename = $current_sitename;
+        # Sitename must be one the admin has access to
+        my %allowed_site = map { $_ => 1 } @{ $self->admin_available_sites($c) };
+        unless ($allowed_site{$sitename}) {
+            $error_msg = "Invalid site '$sitename'. Choose a site you have access to.";
+            $sitename  = $current_sitename;
         }
         
         if ($page_code eq '' || $title eq '' || $body eq '') {
@@ -872,6 +1193,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                 id => $id,
                 sitename => $sitename,
                 menu => $menu,
+                submenu => $submenu,
                 page_code => $page_code,
                 title => $title,
                 body => $body,
@@ -882,10 +1204,12 @@ sub pages :Path('/admin/pages') :Args(0) {
                 roles => $roles,
                 share_with => $share_with,
             };
+            my $extras = $self->admin_page_form_extras($c, $sitename);
             $c->stash(
                 show_form => $id ? 'edit' : 'create',
                 page_item => $page_data,
                 error_msg => $error_msg,
+                %$extras,
             );
         }
         else {
@@ -903,6 +1227,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                     id => $id,
                     sitename => $sitename,
                     menu => $menu,
+                    submenu => $submenu,
                     page_code => $page_code,
                     title => $title,
                     body => $body,
@@ -913,10 +1238,12 @@ sub pages :Path('/admin/pages') :Args(0) {
                     roles => $roles,
                     share_with => $share_with,
                 };
+                my $extras = $self->admin_page_form_extras($c, $sitename);
                 $c->stash(
                     show_form => $id ? 'edit' : 'create',
                     page_item => $page_data,
                     error_msg => $error_msg,
+                    %$extras,
                 );
             }
             else {
@@ -926,7 +1253,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                         if ($current_sitename ne 'CSC' && $page_item->sitename ne $current_sitename) {
                             die "Access denied: cannot edit page belonging to another site.";
                         }
-                        $page_item->update({
+                        my %upd = (
                             sitename    => $sitename,
                             menu        => $menu,
                             page_code   => $page_code,
@@ -938,11 +1265,13 @@ sub pages :Path('/admin/pages') :Args(0) {
                             status      => $status,
                             roles       => $roles,
                             share_with  => $share_with,
-                        });
+                        );
+                        $upd{submenu} = $submenu if $self->ensure_page_submenu_column($c);
+                        $page_item->update(\%upd);
                         $c->flash->{success_msg} = "Page updated successfully.";
                     } else {
                         my $current_user = $c->session->{username} || 'admin';
-                        $db_ency->resultset('Page')->create({
+                        my %create = (
                             sitename    => $sitename,
                             menu        => $menu,
                             page_code   => $page_code,
@@ -955,7 +1284,9 @@ sub pages :Path('/admin/pages') :Args(0) {
                             roles       => $roles,
                             share_with  => $share_with,
                             created_by  => $current_user,
-                        });
+                        );
+                        $create{submenu} = $submenu if $self->ensure_page_submenu_column($c);
+                        $db_ency->resultset('Page')->create(\%create);
                         $c->flash->{success_msg} = "Page created successfully.";
                     }
                 };
@@ -965,6 +1296,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                         id => $id,
                         sitename => $sitename,
                         menu => $menu,
+                        submenu => $submenu,
                         page_code => $page_code,
                         title => $title,
                         body => $body,
@@ -975,10 +1307,12 @@ sub pages :Path('/admin/pages') :Args(0) {
                         roles => $roles,
                         share_with => $share_with,
                     };
+                    my $extras = $self->admin_page_form_extras($c, $sitename);
                     $c->stash(
                         show_form => $id ? 'edit' : 'create',
                         page_item => $page_data,
                         error_msg => $error_msg,
+                        %$extras,
                     );
                 } else {
                     $c->response->redirect($c->uri_for('/admin/pages'));

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "hero",
+    "label": "Hero banner",
+    "category": "Layout",
+    "html": "<div class=\"bm-hero\"><h1>Page title</h1><p class=\"bm-subtitle\">Short subtitle for this page</p><p class=\"bm-meta\">Optional date or context</p></div>"
+  },
+  {
+    "id": "section",
+    "label": "Section",
+    "category": "Layout",
+    "html": "<div class=\"bm-section\"><h2>Section heading</h2><p>Write your section content here. Click to edit text after inserting.</p></div>"
+  },
+  {
+    "id": "card",
+    "label": "Card",
+    "category": "Content",
+    "html": "<div class=\"bm-card\"><h3>Card title</h3><p>Card body text. Add bullets or paragraphs as needed.</p></div>"
+  },
+  {
+    "id": "feature",
+    "label": "Feature box",
+    "category": "Content",
+    "html": "<div class=\"bm-feature\"><h4>Feature name</h4><p>Brief description of this feature or benefit.</p></div>"
+  },
+  {
+    "id": "callout",
+    "label": "Callout",
+    "category": "Content",
+    "html": "<div class=\"bm-callout\"><strong>Note:</strong> Highlight important information here.</div>"
+  },
+  {
+    "id": "tagline",
+    "label": "Quote / tagline",
+    "category": "Content",
+    "html": "<p class=\"bm-tagline\">&ldquo;An inspiring quote or key message for your audience.&rdquo;</p>"
+  },
+  {
+    "id": "grid-2-cards",
+    "label": "2-column cards",
+    "category": "Grids",
+    "html": "<div class=\"bm-grid\"><div class=\"bm-card\"><h3>Left card</h3><p>Content for the first column.</p></div><div class=\"bm-card\"><h3>Right card</h3><p>Content for the second column.</p></div></div>"
+  },
+  {
+    "id": "grid-3-features",
+    "label": "3 feature row",
+    "category": "Grids",
+    "html": "<div class=\"bm-feature-grid\"><div class=\"bm-feature\"><h4>Feature one</h4><p>Description.</p></div><div class=\"bm-feature\"><h4>Feature two</h4><p>Description.</p></div><div class=\"bm-feature\"><h4>Feature three</h4><p>Description.</p></div></div>"
+  },
+  {
+    "id": "helpdesk-section",
+    "label": "HelpDesk highlight",
+    "category": "Highlights",
+    "html": "<div class=\"bm-section\"><h2>HelpDesk System</h2><p>Built-in support portal: submit tickets, track status, knowledge base, and contact forms. Included with hosting &mdash; a key selling point for your organization.</p><div class=\"bm-grid\"><div class=\"bm-card\"><h3>For members</h3><ul><li>Submit and track support tickets</li><li>Browse knowledge base and FAQs</li><li>Contact form for inquiries</li></ul></div><div class=\"bm-card\"><h3>For admins</h3><ul><li>Ticket dashboard and categories</li><li>KB articles and email templates</li><li>Staff permissions per site</li></ul></div></div><div class=\"bm-callout\"><strong>Tip:</strong> Link to <em>HelpDesk</em> in your site menu so visitors can find it easily.</div></div>"
+  },
+  {
+    "id": "info-box",
+    "label": "Info box",
+    "category": "Highlights",
+    "html": "<div class=\"bm-security\"><h2>Information</h2><p>Use this highlighted box for security notes, governance, or key policies.</p></div>"
+  },
+  {
+    "id": "simple-box",
+    "label": "Simple box",
+    "category": "Layout",
+    "html": "<div class=\"pe-box\"><h3>Box heading</h3><p>Generic bordered content area.</p></div>"
+  },
+  {
+    "id": "two-columns",
+    "label": "Two columns",
+    "category": "Grids",
+    "html": "<div class=\"pe-cols-2\"><div class=\"pe-box\"><h4>Column 1</h4><p>Left column content.</p></div><div class=\"pe-box\"><h4>Column 2</h4><p>Right column content.</p></div></div>"
+  }
+]

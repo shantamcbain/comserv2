@@ -1,0 +1,12 @@
+[%#
+  insert_chars_button.tt — "Insert symbol" control for a form field.
+
+  Args:
+    target_id  - element id (required), e.g. title, body, description
+    allow_html - 1/0, show HTML icon tags (default: 1 for body, 0 otherwise)
+%]
+[% SET _target = target_id %]
+[% SET _allow_html = allow_html.defined ? allow_html : (_target == 'body' ? 1 : 0) %]
+<span class="insert-chars-wrap" data-insert-target="[% _target %]" data-allow-html="[% _allow_html %]">
+    <button type="button" class="insert-chars-toggle" aria-expanded="false" title="Insert symbol or icon at cursor">Insert &#8230;</button>
+</span>

@@ -3,31 +3,40 @@
     [% PageVersion %]
 [% END %]
 
+[% SET current_site = SiteName || c.stash.SiteName || c.session.SiteName || 'CSC' %]
+[% SET page_site_lc = page.sitename | lower %]
+[% SET current_site_lc = current_site | lower %]
+[% SET can_edit_on_site = (current_site == 'CSC' or page.sitename == current_site or page_site_lc == current_site_lc) ? 1 : 0 %]
+[% SET show_editor_controls = (c.stash.is_admin or c.session.is_admin or c.session.roles.grep('admin').size or c.session.roles.grep('editor').size) ? 1 : 0 %]
+[% SET cv = c.stash.css_v || '20260615' %]
+<link rel="stylesheet" href="[% c.uri_for('/static/css/page-containers.css') %]?v=[% cv %]">
+
 <div class="page-content">
+    [% SET print_url = c.uri_for('/page/print', page.page_code) %]
     [% IF !page.body.match('(?i)<h1') %]
         <h1>[% page.title %]
-            [% IF c.stash.is_admin || c.session.is_admin || c.session.roles.grep('admin').size || c.session.roles.grep('editor').size %]
-                [% SET current_site = SiteName || c.stash.SiteName || c.session.SiteName || 'CSC' %]
-                [% IF current_site == 'CSC' || page.sitename == current_site %]
-                    <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default" style="margin-left: 10px; vertical-align: middle;"><i class="fa fa-edit"></i> Edit</a>
+            <span class="page-view-actions" style="margin-left: 10px; vertical-align: middle; white-space: nowrap;">
+                <a href="[% print_url %]" target="_blank" rel="noopener" class="btn btn-xs btn-default" title="Open print-friendly version"><i class="fa fa-print"></i> Print</a>
+                [% IF show_editor_controls %]
+                [% IF can_edit_on_site %]
+                    <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default"><i class="fa fa-edit"></i> Edit</a>
                 [% ELSE %]
-                    <span class="badge bg-secondary text-dark" style="margin-left: 10px; font-size: 0.75rem; vertical-align: middle; font-weight: normal;" title="This page is shared from [% page.sitename %] and is read-only on this site."><i class="fa fa-lock"></i> Shared (Read-Only)</span>
+                    <span class="badge bg-secondary text-dark" style="font-size: 0.75rem; font-weight: normal;" title="This page is shared from [% page.sitename %] and is read-only on this site."><i class="fa fa-lock"></i> Shared (Read-Only)</span>
                 [% END %]
-            [% END %]
+                [% END %]
+            </span>
         </h1>
     [% ELSE %]
-        [% IF c.stash.is_admin || c.session.is_admin || c.session.roles.grep('admin').size || c.session.roles.grep('editor').size %]
-            [% SET current_site = SiteName || c.stash.SiteName || c.session.SiteName || 'CSC' %]
-            [% IF current_site == 'CSC' || page.sitename == current_site %]
-                <div style="float: right; margin-top: 10px; margin-bottom: 10px;">
-                    <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default" style="vertical-align: middle;"><i class="fa fa-edit"></i> Edit</a>
-                </div>
+        <div class="page-view-actions" style="float: right; margin-top: 10px; margin-bottom: 10px;">
+            <a href="[% print_url %]" target="_blank" rel="noopener" class="btn btn-xs btn-default" title="Open print-friendly version"><i class="fa fa-print"></i> Print</a>
+            [% IF show_editor_controls %]
+            [% IF can_edit_on_site %]
+                <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default"><i class="fa fa-edit"></i> Edit</a>
             [% ELSE %]
-                <div style="float: right; margin-top: 10px; margin-bottom: 10px;">
-                    <span class="badge bg-secondary text-dark" style="font-size: 0.75rem; vertical-align: middle; font-weight: normal;" title="This page is shared from [% page.sitename %] and is read-only on this site."><i class="fa fa-lock"></i> Shared (Read-Only)</span>
-                </div>
+                <span class="badge bg-secondary text-dark" style="font-size: 0.75rem; font-weight: normal;" title="This page is shared from [% page.sitename %] and is read-only on this site."><i class="fa fa-lock"></i> Shared (Read-Only)</span>
             [% END %]
-        [% END %]
+            [% END %]
+        </div>
     [% END %]
     
     <div class="page-body">

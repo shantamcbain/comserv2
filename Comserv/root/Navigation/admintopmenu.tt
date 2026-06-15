@@ -15,9 +15,15 @@
 <li class="horizontal-dropdown">
     <a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a>
     <div class="dropdown-content">
+        [%# CMS pages for this site — top of Admin dropdown %]
+        [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE LOWER(menu) = 'admin' AND status = 'active' AND (sitename = '$SiteName' OR LOWER(sitename) = LOWER('$SiteName') OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+        <a href="/page/[% link.page_code %]" title="[% link.title | html %]"><i class="icon-documentation"></i>[% link.title | html %]</a>
+        [% END %]
+
         [% IF c.session.username %]
         <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
         [% END %]
+        <div class="dropdown-divider"></div>
         
         <div class="submenu-item">
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
@@ -393,7 +399,7 @@
                 <div class="submenu-section">
                     <span class="submenu-section-title">Admin Links</span>
                     <!-- Dynamic Page-based links for Admin menu from new page system -->
-                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'admin' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE LOWER(menu) = 'admin' AND status = 'active' AND (sitename = '$SiteName' OR LOWER(sitename) = LOWER('$SiteName') OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
                         <a href="/page/[% link.page_code %]" name="Contact" target="_self" title="[% link.title | html %]">[% link.title | html %]</a>
                     [% END %]
                     
