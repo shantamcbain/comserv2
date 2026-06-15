@@ -261,6 +261,12 @@ if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
             fi
             exit 0
             ;;
+        "lib_sync")
+            echo "Syncing host lib/ into container (Perl-only; skips image pull and NFS checks)..."
+            sync_host_app_lib || true
+            echo "=== lib_sync complete at $(date) ==="
+            exit 0
+            ;;
         "manual_server")
             echo "Starting Emergency Manual Server on port 5000..."
             HOST_APP_DIR=""
