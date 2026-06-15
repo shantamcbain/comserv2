@@ -609,6 +609,47 @@ if [ -n "$NFS_MOUNT_DIR" ]; then
     fi
 else
     echo "ERROR: NFS is not mounted at any expected path: $NFS_MOUNT_CANDIDATES" >&2
+    NFS_SETUP_SCRIPT=""
+    for candidate in \
+        "${GLOBAL_HOST_APP_DIR}/script/production1_nfs_setup.sh" \
+        "/opt/comserv/Comserv/script/production1_nfs_setup.sh" \
+        "$(dirname "$(readlink -f "$0")")/production1_nfs_setup.sh"; do
+        if [ -f "$candidate" ]; then
+            NFS_SETUP_SCRIPT="$candidate"
+            break
+        fi
+    done
+    if [ -n "$NFS_SETUP_SCRIPT" ] && [ "${COMSERV_SKIP_NFS_SETUP:-0}" != "1" ]; then
+        echo "Attempting automatic NFS setup via $NFS_SETUP_SCRIPT ..." >&2
+        if [ "$(id -u)" -eq 0 ]; then
+            bash "$NFS_SETUP_SCRIPT" && NFS_MOUNT_DIR="" && \
+            for candidate in $NFS_MOUNT_CANDIDATES; do
+                if mount | grep -Eq " on ${candidate} type nfs4? "; then
+                    NFS_MOUNT_DIR="$candidate"
+                    break
+                fi
+            done
+        elif sudo -n true 2>/dev/null; then
+            sudo bash "$NFS_SETUP_SCRIPT" && NFS_MOUNT_DIR="" && \
+            for candidate in $NFS_MOUNT_CANDIDATES; do
+                if mount | grep -Eq " on ${candidate} type nfs4? "; then
+                    NFS_MOUNT_DIR="$candidate"
+                    break
+                fi
+            done
+        else
+            echo "NFS setup script found but sudo not available non-interactively." >&2
+        fi
+    fi
+    if [ -n "$NFS_MOUNT_DIR" ]; then
+        echo "NFS auto-setup succeeded at $NFS_MOUNT_DIR"
+        COMSERV_LOGS_DIR="$HOME/comserv-logs"
+        NFS_DATA_DIR="$NFS_MOUNT_DIR"
+        WORKSHOP_LOCAL_DIR="$NFS_MOUNT_DIR/comserv-workshop"
+        mkdir -p "$COMSERV_LOGS_DIR" "$WORKSHOP_LOCAL_DIR" 2>/dev/null || true
+        echo "   Container logs: $COMSERV_LOGS_DIR (local)"
+        echo "   Routing workshop/NFS storage to: $WORKSHOP_LOCAL_DIR"
+    else
     echo "Refusing to deploy with local root-disk storage for /data/nfs." >&2
     echo "Set ALLOW_LOCAL_STORAGE_FALLBACK=1 only for emergency/manual recovery." >&2
     if [ "$ALLOW_LOCAL_STORAGE_FALLBACK" != "1" ]; then
@@ -623,6 +664,7 @@ else
     NFS_DATA_DIR="/var/lib/comserv/data"
     WORKSHOP_LOCAL_DIR="/home/ubuntu/comserv-workshop"
     mkdir -p "$COMSERV_LOGS_DIR" "$NFS_DATA_DIR" "$WORKSHOP_LOCAL_DIR" 2>/dev/null || true
+    fi
 fi
 
 # ── Export environment variables for docker-compose ──────────────────────────
