@@ -22,6 +22,12 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 0,
     },
+    submenu => {
+        data_type     => 'varchar',
+        size          => 64,
+        is_nullable   => 1,
+        default_value => '',
+    },
     page_code => {
         data_type   => 'varchar',
         size        => 255,

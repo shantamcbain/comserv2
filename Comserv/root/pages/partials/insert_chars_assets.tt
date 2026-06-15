@@ -1,0 +1,10 @@
+[%# Must load before insert buttons. Icons from inline stash or static JSON. %]
+<link rel="stylesheet" href="[% c.uri_for('/static/css/components/navigation.css') %]">
+<link rel="stylesheet" href="[% c.uri_for('/static/css/svg-icons.css') %]">
+<link rel="stylesheet" href="[% c.uri_for('/static/css/insert-chars.css') %]">
+<span id="insert-chars-config" hidden
+      data-icons-url="[% c.uri_for('/static/config/site_icons.json') %]"></span>
+[% IF site_icons_json && site_icons_json != '[]' %]
+<script type="application/json" id="insert-chars-icons-data">[% site_icons_json %]</script>
+[% END %]
+<script src="[% c.uri_for('/static/js/insert-chars.js') %]?v=[% c.stash.css_v || '20260615' %]"></script>

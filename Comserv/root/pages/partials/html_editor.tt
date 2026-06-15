@@ -1,0 +1,424 @@
+[%#
+  pages/partials/html_editor.tt — Visual page editor: click the preview to edit, see changes live.
+
+  Args:
+    body_content, body_label, body_required, show_preview, help_text,
+    preview_url, print_url, editor_theme, preview_sitename
+%]
+[% SET _body_label    = body_label    || 'Page Body' %]
+[% SET _body_required = body_required.defined ? body_required : 1 %]
+[% SET _show_preview  = show_preview.defined  ? show_preview  : 1 %]
+[% SET _help_text     = help_text || 'Click text to edit (Grammarly and spellcheck work here). Drag Container onto the page and drop where the mouse is — choose Left, Right, or Inside when you drop on a block.' %]
+[% SET _theme         = editor_theme || c.stash.page_editor_theme || c.stash.theme_name || 'default' %]
+[% SET _preview_site  = preview_sitename || c.stash.SiteName || 'CSC' %]
+[% SET cv = c.stash.css_v || '20260618' %]
+
+<div class="form-group page-html-editor-wrap"
+     id="page-html-editor-config"
+     data-theme="[% _theme %]"
+     data-cv="[% cv %]"
+     data-preview-url="[% c.uri_for('/admin/pages/preview') %]"
+     data-sitename="[% _preview_site %]">
+
+    <div class="page-editor-toolbar">
+        <label for="body" class="page-editor-label">[% _body_label %]
+            [% IF _body_required %]<span class="page-editor-required">*</span>[% END %]
+            [% PROCESS 'pages/partials/field_hint.tt' hint = 'Main page content visitors see. Click text in the preview to edit. Drag Container from the toolbar onto the page, or use + Containers for more block types.' %]
+        </label>
+        <div class="page-editor-toolbar-actions">
+            [% PROCESS 'pages/partials/insert_chars_button.tt' target_id = 'body' allow_html = 1 %]
+            <button type="button" class="btn btn-secondary btn-sm page-editor-toggle-btn page-container-toggle" aria-expanded="false" title="Drag containers onto the page or insert at cursor">
+                + Containers
+            </button>
+            <span id="wysiwyg-status-badge" class="page-editor-mode-badge page-editor-mode-rich">Visual edit</span>
+            <button type="button" id="toggle-editor-mode" class="btn btn-secondary btn-sm page-editor-toggle-btn">
+                HTML source
+            </button>
+            [% IF preview_url %]
+            <a href="[% preview_url %]" target="_blank" rel="noopener" class="btn btn-secondary btn-sm page-editor-toggle-btn page-editor-live-link">
+                Open live page
+            </a>
+            [% END %]
+            [% IF print_url %]
+            <a href="[% print_url %]" target="_blank" rel="noopener" class="btn btn-secondary btn-sm page-editor-toggle-btn page-editor-print-link" title="Print-friendly page (no site menu)">
+                Print page
+            </a>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="page-container-panel" id="page-container-panel">
+        <div class="page-container-panel-head">
+            <span>Layout containers</span>
+            <span class="page-container-panel-hint">Drag onto page &middot; drop on a block to pick Left / Right / Inside</span>
+        </div>
+        <div class="page-container-categories"></div>
+    </div>
+
+    <div id="page-visual-format-bar" class="page-visual-format-bar">
+        <button type="button" class="page-fmt-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+        <button type="button" class="page-fmt-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+        <button type="button" class="page-fmt-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+        <span class="page-fmt-sep"></span>
+        <button type="button" class="page-fmt-btn" data-cmd="h2" title="Heading 2">H2</button>
+        <button type="button" class="page-fmt-btn" data-cmd="h3" title="Heading 3">H3</button>
+        <button type="button" class="page-fmt-btn" data-cmd="p" title="Paragraph">P</button>
+        <span class="page-fmt-sep"></span>
+        <button type="button" class="page-fmt-btn" data-cmd="insertUnorderedList" title="Bullet list">&#8226; List</button>
+        <button type="button" class="page-fmt-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+        <button type="button" class="page-fmt-btn" data-cmd="createLink" title="Insert hyperlink">Link</button>
+        <span class="page-fmt-sep"></span>
+        <div class="page-fmt-container-wrap" id="page-fmt-container-wrap">
+            <button type="button" class="page-fmt-btn page-fmt-container-drag" id="page-fmt-container-drag" draggable="true"
+                    title="Drag this container icon onto the page where you want the block">
+                <span class="page-fmt-container-glyph" aria-hidden="true">&#9638;</span>
+                <span class="page-fmt-container-label">Container</span>
+            </button>
+            <button type="button" class="page-fmt-btn page-fmt-container-picker" id="page-fmt-container-picker"
+                    title="Choose container type (Section, Card, HelpDesk, etc.)" aria-haspopup="true" aria-expanded="false">&#9662;</button>
+            <div class="page-fmt-container-menu" id="page-fmt-container-menu" role="menu" hidden></div>
+        </div>
+        <span class="page-fmt-sep"></span>
+        <button type="button" class="page-fmt-btn" data-cmd="undo" title="Undo">Undo</button>
+        <button type="button" class="page-fmt-btn" data-cmd="redo" title="Redo">Redo</button>
+    </div>
+
+    <div class="page-editor-layout page-editor-layout-visual">
+        <div class="page-editor-pane page-editor-visual-pane" id="page-editor-visual-pane">
+            <div class="page-editor-preview-label">
+                Page body only — click text to edit
+                <span class="page-editor-preview-hint">(theme: [% _theme %]; no site menu or header)</span>
+            </div>
+            <div id="page-editor-surface" class="page-editor-surface" title="Visual page editor"></div>
+        </div>
+        <div class="page-editor-pane page-editor-source-pane" id="page-editor-source-pane" style="display:none;">
+            <div class="page-editor-preview-label">HTML source</div>
+            <textarea name="body" id="body" rows="18" [% IF _body_required %]required[% END %]
+                      class="form-control page-editor-textarea"
+                      placeholder="Page HTML content…">[% body_content | html %]</textarea>
+        </div>
+    </div>
+    <small class="page-editor-help">[% _help_text %]</small>
+</div>
+
+<style>
+.page-html-editor-wrap { font-family: var(--body-font, Verdana, sans-serif); color: var(--text-color, #333); }
+.page-editor-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.page-editor-label { margin: 0; font-weight: bold; }
+.page-editor-required { color: var(--warning-color, #c00); margin-left: 2px; }
+.page-editor-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.page-editor-mode-badge { font-size: 0.85em; padding: 3px 8px; border-radius: 4px; }
+.page-editor-mode-rich { background: var(--success-color, #339933); color: #fff; }
+.page-editor-mode-html { background: var(--warning-color, #e6a817); color: #333; }
+.page-editor-toggle-btn { font-size: 0.85em; padding: 4px 10px; text-decoration: none; display: inline-block; }
+.page-editor-layout-visual { display: block; }
+.page-visual-format-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+    padding: 6px 8px; margin-bottom: 8px;
+    border: 1px solid var(--border-color, #ccc); border-radius: 6px;
+    background: var(--secondary-color, #f5f5f5);
+}
+.page-visual-format-bar.is-hidden { display: none; }
+.page-fmt-btn {
+    font-size: 0.82em; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--border-color, #ccc); background: #fff;
+    color: var(--text-color, #333); font-family: var(--body-font, Verdana, sans-serif);
+}
+.page-fmt-btn:hover { background: var(--primary-color, #ccffff); border-color: var(--accent-color, #0066cc); }
+.page-fmt-sep { width: 1px; height: 20px; background: var(--border-color, #ccc); margin: 0 4px; }
+.page-fmt-container-wrap { position: relative; display: inline-flex; align-items: stretch; gap: 0; }
+.page-fmt-container-drag { display: inline-flex; align-items: center; gap: 4px; cursor: grab; min-width: 88px; }
+.page-fmt-container-drag:active { cursor: grabbing; }
+.page-fmt-container-glyph { font-size: 1.15em; line-height: 1; color: var(--primary-color, #0066cc); }
+.page-fmt-container-label { font-size: 0.9em; }
+.page-fmt-container-picker { padding: 4px 6px; min-width: 24px; }
+.page-fmt-container-menu {
+    position: absolute; top: 100%; left: 0; z-index: 10060; margin-top: 2px;
+    min-width: 200px; max-height: 280px; overflow-y: auto;
+    border: 1px solid var(--border-color, #ccc); border-radius: 6px;
+    background: #fff; box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+}
+.page-fmt-container-menu-item {
+    display: block; width: 100%; text-align: left; padding: 7px 12px;
+    border: none; background: transparent; cursor: pointer;
+    font-size: 0.85em; color: var(--text-color, #333);
+    font-family: var(--body-font, Verdana, sans-serif);
+}
+.page-fmt-container-menu-item:hover,
+.page-fmt-container-menu-item.is-selected { background: var(--primary-color, #ccffff); }
+.page-fmt-container-menu-item.is-selected { font-weight: bold; }
+.page-editor-textarea {
+    width: 100%; font-family: ui-monospace, monospace; font-size: 0.85em;
+    min-height: 520px; color: var(--text-color, #333); background: var(--background-color, #fff);
+    border: 1px solid var(--border-color, #ccc); border-radius: 4px; padding: 8px;
+}
+.page-editor-preview-label { font-size: 0.8em; color: var(--text-muted-color, #666); margin-bottom: 4px; font-weight: bold; }
+.page-editor-preview-hint { font-weight: normal; opacity: 0.85; }
+.page-editor-surface {
+    width: 100%; min-height: 520px; height: 65vh; overflow: auto;
+    border: 2px solid var(--primary-color, #0066cc); border-radius: 6px; background: #fff;
+}
+.page-editor-surface .page-body[contenteditable="true"] {
+    outline: none; min-height: 400px;
+}
+.page-editor-help { display: block; margin-top: 6px; color: var(--text-muted-color, #666); }
+</style>
+
+<span id="page-containers-config" hidden data-url="[% c.uri_for('/static/config/page_containers.json') %]"></span>
+<link rel="stylesheet" href="[% c.uri_for('/static/css/page-containers.css') %]?v=[% cv %]">
+<script src="[% c.uri_for('/static/js/page-containers.js') %]?v=[% cv %]"></script>
+
+<script>
+(function() {
+    var bodyTextarea   = document.getElementById('body');
+    var editorSurface  = document.getElementById('page-editor-surface');
+    var configEl       = document.getElementById('page-html-editor-config');
+    var toggleBtn      = document.getElementById('toggle-editor-mode');
+    var badge          = document.getElementById('wysiwyg-status-badge');
+    var visualPane     = document.getElementById('page-editor-visual-pane');
+    var sourcePane     = document.getElementById('page-editor-source-pane');
+    var formatBar      = document.getElementById('page-visual-format-bar');
+    if (!bodyTextarea || !editorSurface) return;
+
+    var isVisualMode = true;
+    var previewTimer = null;
+    var syncTimer    = null;
+    var lastSyncValue = bodyTextarea.value;
+    var surfaceReady  = false;
+
+    function cfg(name) {
+        return configEl ? (configEl.getAttribute('data-' + name) || '') : '';
+    }
+
+    function editableRoot() {
+        return editorSurface ? editorSurface.querySelector('.page-body') : null;
+    }
+
+    function setModeBadge(visual) {
+        if (!badge) return;
+        if (visual) {
+            badge.textContent = 'Visual edit';
+            badge.className = 'page-editor-mode-badge page-editor-mode-rich';
+        } else {
+            badge.textContent = 'HTML source';
+            badge.className = 'page-editor-mode-badge page-editor-mode-html';
+        }
+    }
+
+    function setToggleLabel(visual) {
+        if (!toggleBtn) return;
+        toggleBtn.textContent = visual ? 'HTML source' : 'Back to visual edit';
+    }
+
+    function cleanHtmlForSave(root) {
+        var clone = root.cloneNode(true);
+        clone.querySelectorAll('.pe-drag-handle,.pe-drag-bar').forEach(function (h) { h.parentNode.removeChild(h); });
+        clone.querySelectorAll('.pe-container-target,.pe-drop-before,.pe-drop-after,.pe-drop-active,.pe-drop-on,.pe-is-dragging').forEach(function (n) {
+            n.classList.remove('pe-container-target', 'pe-drop-before', 'pe-drop-after', 'pe-drop-active', 'pe-drop-on', 'pe-is-dragging');
+        });
+        return clone.innerHTML;
+    }
+
+    function syncFromSurface() {
+        var root = editableRoot();
+        if (!root) return;
+        var html = cleanHtmlForSave(root);
+        if (bodyTextarea.value !== html) {
+            bodyTextarea.value = html;
+            lastSyncValue = html;
+            bodyTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+
+    function notifyGrammarly(root) {
+        if (!root) return;
+        root.setAttribute('data-gramm', 'true');
+        root.setAttribute('data-gramm_editor', 'true');
+        root.setAttribute('data-enable-grammarly', 'true');
+        root.setAttribute('data-gramm_id', 'page-body-editor');
+        root.classList.add('grammarly-field');
+        window.setTimeout(function() {
+            root.dispatchEvent(new Event('focus', { bubbles: true }));
+            root.dispatchEvent(new Event('input', { bubbles: true }));
+        }, 150);
+    }
+
+    function enableVisualEditing() {
+        var root = editableRoot();
+        if (!root) return;
+        root.contentEditable = 'true';
+        root.spellcheck = true;
+        root.setAttribute('lang', 'en');
+        root.setAttribute('data-visual-edit', '1');
+        notifyGrammarly(root);
+
+        if (!root.dataset.editBound) {
+            root.dataset.editBound = '1';
+            root.addEventListener('input', function() {
+                clearTimeout(syncTimer);
+                syncTimer = setTimeout(syncFromSurface, 120);
+            });
+            root.addEventListener('blur', syncFromSurface);
+        }
+        if (window.ComservPageContainers) {
+            if (window.ComservPageContainers.rebindDrop) window.ComservPageContainers.rebindDrop();
+            if (window.ComservPageContainers.decorate) window.ComservPageContainers.decorate();
+        }
+        surfaceReady = true;
+    }
+
+    function loadVisualPreview() {
+        var body = bodyTextarea.value || '';
+        var sitename = cfg('sitename');
+        var previewUrl = cfg('preview-url');
+        if (!previewUrl) return;
+
+        surfaceReady = false;
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(function() {
+            var fd = new FormData();
+            fd.append('body', body);
+            fd.append('sitename', sitename);
+            fetch(previewUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    editorSurface.innerHTML = html;
+                    if (isVisualMode) enableVisualEditing();
+                })
+                .catch(function() {
+                    editorSurface.innerHTML = '<p style="padding:16px;color:#c00;">Preview unavailable — check you are logged in as admin.</p>';
+                });
+        }, isVisualMode ? 80 : 280);
+    }
+
+    function showVisualMode() {
+        isVisualMode = true;
+        if (visualPane) visualPane.style.display = '';
+        if (sourcePane) sourcePane.style.display = 'none';
+        if (formatBar) formatBar.classList.remove('is-hidden');
+        setModeBadge(true);
+        setToggleLabel(true);
+        loadVisualPreview();
+    }
+
+    function showSourceMode() {
+        syncFromSurface();
+        isVisualMode = false;
+        if (visualPane) visualPane.style.display = 'none';
+        if (sourcePane) sourcePane.style.display = '';
+        if (formatBar) formatBar.classList.add('is-hidden');
+        var cp = document.getElementById('page-container-panel');
+        if (cp) cp.classList.remove('is-open');
+        setModeBadge(false);
+        setToggleLabel(false);
+    }
+
+    function applyFormat(cmd) {
+        if (!isVisualMode) return;
+        var root = editableRoot();
+        if (!root) return;
+        root.focus();
+
+        if (cmd === 'h2' || cmd === 'h3' || cmd === 'p') {
+            if (document.queryCommandSupported('formatBlock')) {
+                document.execCommand('formatBlock', false, '<' + cmd + '>');
+            }
+        } else if (cmd === 'createLink') {
+            var url = window.prompt('Link URL:', 'https://');
+            if (url) document.execCommand('createLink', false, url);
+        } else if (document.queryCommandSupported(cmd)) {
+            document.execCommand(cmd, false, null);
+        }
+        syncFromSurface();
+    }
+
+    if (formatBar) {
+        formatBar.querySelectorAll('.page-fmt-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                applyFormat(btn.getAttribute('data-cmd'));
+            });
+        });
+    }
+
+    bodyTextarea.addEventListener('input', function() {
+        lastSyncValue = bodyTextarea.value;
+        if (!isVisualMode) loadVisualPreview();
+    });
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (isVisualMode) showSourceMode();
+            else {
+                bodyTextarea.value = bodyTextarea.value;
+                lastSyncValue = bodyTextarea.value;
+                showVisualMode();
+            }
+        });
+    }
+
+    var form = bodyTextarea.closest('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            if (isVisualMode) syncFromSurface();
+        });
+    }
+
+    setInterval(function() {
+        if (!isVisualMode) return;
+        if (bodyTextarea.value === lastSyncValue) return;
+        lastSyncValue = bodyTextarea.value;
+        loadVisualPreview();
+    }, 600);
+
+    window.pageEditorEditableRoot = function() {
+        return editableRoot();
+    };
+
+    window.pageEditorSync = function() {
+        syncFromSurface();
+    };
+
+    window.pageEditorGetSurface = function() {
+        return editorSurface;
+    };
+
+    window.pageEditorInsertHtml = function(html) {
+        if (!html || !isVisualMode) return false;
+        var root = editableRoot();
+        if (!root) return false;
+        root.insertAdjacentHTML('beforeend', html);
+        if (window.ComservPageContainers && window.ComservPageContainers.decorate) {
+            window.ComservPageContainers.decorate();
+        }
+        syncFromSurface();
+        return true;
+    };
+
+    window.pageEditorInsertState = function() {
+        return {
+            editor: null,
+            isWysiwyg: isVisualMode,
+            textarea: bodyTextarea,
+            preferHtmlSource: !isVisualMode
+        };
+    };
+
+    window.pageEditorSetBody = function(html) {
+        if (!html) return;
+        bodyTextarea.value = html;
+        lastSyncValue = html;
+        if (isVisualMode) loadVisualPreview();
+    };
+
+    showVisualMode();
+
+    if (window.ComservInsertChars && window.ComservInsertChars.init) {
+        window.ComservInsertChars.init(document.querySelector('.page-html-editor-wrap'));
+    }
+    if (window.ComservPageContainers && window.ComservPageContainers.init) {
+        window.ComservPageContainers.init(document.querySelector('.page-html-editor-wrap'));
+    }
+})();
+</script>

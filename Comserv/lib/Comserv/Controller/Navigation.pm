@@ -55,8 +55,8 @@ our @NAV_MENU_CATALOG = (
     { menu => 'Workshop',   category => 'Workshop_links',   label => 'Workshops' },
     { menu => 'Weather',    category => 'Weather_links',    label => 'Weather' },
     { menu => 'ENCY',       category => 'ENCY_links',       label => 'Encyclopedia' },
-    { menu => 'Beekeeping', category => 'Beekeeping_links', label => 'Beekeeping' },
-    { menu => 'Brew',       category => 'Brew_links',       label => 'Brew' },
+    { menu => 'Beekeeping', category => 'Beekeeping_links', label => 'Beekeeping', requires_module => 'beekeeping' },
+    { menu => 'Brew',       category => 'Brew_links',       label => 'Brew', requires_module => 'brew' },
     { menu => '3d',         category => '3d_links',         label => '3D Printing', requires_module => 'printing_3d' },
     { menu => 'Admin',      category => 'Admin_links',      label => 'Admin', admin_only => 1 },
     # Legacy categories (discontinued top-level menus; kept for existing DB rows)
@@ -95,7 +95,13 @@ our %NAV_SUBMENU_CATALOG = (
     ],
     Member_links => [
         { id => 'member_services', label => 'Member Services' },
+        { id => 'member_pages',   label => 'Member Pages' },
         { id => 'top',             label => 'Top of menu (main list)' },
+    ],
+    Admin_links => [
+        { id => 'cms_pages', label => 'CMS Site Pages (top of Admin menu)' },
+        { id => 'admin_links', label => 'Admin Links submenu' },
+        { id => 'top', label => 'Top of Admin menu' },
     ],
     Private_links => [
         { id => 'login_dropdown', label => 'My Links (login dropdown)' },
@@ -107,6 +113,7 @@ our %NAV_SUBMENU_DEFAULTS = (
     HelpDesk_links => 'resources',
     Main_links     => 'join_services',
     Member_links   => 'member_services',
+    Admin_links    => 'cms_pages',
     Private_links  => 'login_dropdown',
 );
 
@@ -120,9 +127,17 @@ our %NAV_SUBMENU_LABELS = (
     public_links     => 'Public Links',
     member_services  => 'Member Services',
     login_dropdown   => 'My Links (login dropdown)',
+    member_pages     => 'Member Pages',
+    cms_pages        => 'CMS Site Pages (top of Admin menu)',
+    admin_links      => 'Admin Links submenu',
     top              => 'Top of menu',
     main             => 'Default section',
 );
+
+sub nav_menu_catalog        { \@NAV_MENU_CATALOG }
+sub nav_submenu_catalog     { \%NAV_SUBMENU_CATALOG }
+sub nav_submenu_defaults    { \%NAV_SUBMENU_DEFAULTS }
+sub nav_menu_to_category    { \%MENU_TO_CATEGORY }
 
 sub _menu_param_to_category {
     my ($self, $menu) = @_;
@@ -140,7 +155,13 @@ sub _nav_menu_visible {
     }
     if ($entry->{requires_module}) {
         my $mods = $c->stash->{enabled_modules} || {};
-        return 0 unless $mods->{ $entry->{requires_module} };
+        my $mod  = $entry->{requires_module};
+        if ($mod eq 'beekeeping') {
+            return 0 unless ( $mods->{beekeeping} || $mods->{apiary} || $mods->{bmaster} );
+        }
+        else {
+            return 0 unless $mods->{$mod};
+        }
     }
     if ($entry->{requires_shop}) {
         my $mods = $c->stash->{enabled_modules} || {};

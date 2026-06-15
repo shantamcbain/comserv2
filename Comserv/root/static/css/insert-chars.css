@@ -1,0 +1,123 @@
+/* Insert symbols / icons at cursor — theme-compliant */
+.insert-chars-wrap {
+    display: inline-block;
+    position: relative;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+.insert-chars-toggle {
+    font-size: 0.8em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #ccc);
+    background: var(--button-bg, #f2f2f2);
+    color: var(--button-text, #333);
+    cursor: pointer;
+    font-family: var(--body-font, Verdana, sans-serif);
+    line-height: 1.4;
+}
+.insert-chars-toggle:hover,
+.insert-chars-toggle[aria-expanded="true"] {
+    background: var(--button-hover-bg, #e8e8e8);
+    border-color: var(--primary-color, #0066cc);
+}
+.insert-chars-panel {
+    display: none;
+    position: fixed;
+    z-index: 10050;
+    min-width: 300px;
+    max-width: 420px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
+    background: var(--background-color, #fff);
+    color: var(--text-color, #333);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    font-family: var(--body-font, Verdana, sans-serif);
+}
+.insert-chars-panel.is-open {
+    display: block;
+}
+.insert-chars-group {
+    margin-bottom: 10px;
+}
+.insert-chars-group:last-child {
+    margin-bottom: 0;
+}
+.insert-chars-group-label {
+    display: block;
+    font-size: 0.72em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted-color, #666);
+    margin-bottom: 6px;
+}
+.insert-chars-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.insert-chars-grid-icons {
+    gap: 6px;
+}
+.insert-chars-item {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: var(--secondary-color, #f9f9f9);
+    color: var(--text-color, #333);
+    cursor: pointer;
+    font-size: 1.1em;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.insert-chars-item:hover {
+    background: var(--primary-color, #ccffff);
+    border-color: var(--accent-color, var(--primary-color, #0066cc));
+}
+.insert-chars-item-site-icon {
+    flex-direction: column;
+    min-width: 56px;
+    height: auto;
+    min-height: 52px;
+    padding: 6px 4px;
+    font-size: 1em;
+    gap: 2px;
+}
+.insert-chars-item-site-icon .icon {
+    margin-right: 0;
+    width: 1.25em;
+    height: 1.25em;
+}
+.insert-chars-icon-name {
+    font-size: 0.55em;
+    line-height: 1.1;
+    text-align: center;
+    max-width: 52px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted-color, #666);
+}
+.insert-chars-loading {
+    font-size: 0.85em;
+    color: var(--text-muted-color, #666);
+    padding: 8px 4px;
+    font-style: italic;
+}
+.label-with-insert {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.label-with-insert label {
+    margin-bottom: 0;
+}

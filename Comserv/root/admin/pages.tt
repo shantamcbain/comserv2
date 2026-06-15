@@ -59,6 +59,7 @@
                         </h3>
                     </div>
                     <div class="panel-body">
+                        [% PROCESS 'pages/partials/insert_chars_assets.tt' %]
                         <form method="post" action="[% c.uri_for('/admin/pages') %]">
                             <input type="hidden" name="action" value="save">
                             [% IF page_item.id %]
@@ -69,13 +70,19 @@
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label for="sitename">Site Name <span class="text-danger">*</span></label>
-                                        <input type="text" name="sitename" id="sitename" class="form-group form-control" value="[% page_item.sitename || 'CSC' %]" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="menu">Menu Section <span class="text-danger">*</span></label>
-                                        <input type="text" name="menu" id="menu" class="form-group form-control" value="[% page_item.menu || 'main' %]" required>
+                                        [% IF available_sites.size > 1 %]
+                                        <select name="sitename" id="sitename" class="form-group form-control" required>
+                                            [% FOREACH site IN available_sites %]
+                                            <option value="[% site %]" [% IF (page_item.sitename || current_site) == site %]selected[% END %]>[% site_display_map.${site} || site %]</option>
+                                            [% END %]
+                                        </select>
+                                        <span class="help-block">Sites you have admin access to.</span>
+                                        [% ELSIF available_sites.size == 1 %]
+                                        <input type="hidden" name="sitename" id="sitename" value="[% available_sites.0 %]">
+                                        <input type="text" class="form-group form-control" value="[% site_display_map.${available_sites.0} || available_sites.0 %]" disabled>
+                                        [% ELSE %]
+                                        <input type="text" name="sitename" id="sitename" class="form-group form-control" value="[% page_item.sitename || current_site || 'CSC' %]" required>
+                                        [% END %]
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -88,36 +95,69 @@
                             </div>
 
                             <div class="row">
+                                [% PROCESS 'pages/partials/page_menu_fields.tt' %]
+                            </div>
+
+                            <div class="row">
                                 <div class="col-md-8">
-                                    <div class="form-group">
-                                        <label for="title">Page Title <span class="text-danger">*</span></label>
-                                        <input type="text" name="title" id="title" class="form-group form-control" value="[% page_item.title %]" placeholder="Enter friendly title for page" required>
+                                    <div class="form-group page-title-field">
+                                        <div class="label-with-insert">
+                                            <label for="title">Page Title <span class="text-danger">*</span>
+                                                [% PROCESS 'pages/partials/field_hint.tt' hint = 'Friendly name shown in the browser tab and at the top of the page (unless the body has its own H1). Plain text only — use Insert for em dashes, quotes, and symbols; not for HTML or icons.' %]
+                                            </label>
+                                            [% PROCESS 'pages/partials/insert_chars_button.tt' target_id = 'title' allow_html = 0 %]
+                                        </div>
+                                        <input type="text" name="title" id="title" class="form-control page-title-input"
+                                               value="[% page_item.title | html %]"
+                                               placeholder="e.g. Board and IT Meeting - Platform Overview"
+                                               title="Friendly page name for visitors and search results (plain text)"
+                                               required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="link_order">Link/Sort Order</label>
-                                        <input type="number" name="link_order" id="link_order" class="form-group form-control" value="[% page_item.link_order || 0 %]">
+                                        <label for="link_order">Link/Sort Order
+                                            [% PROCESS 'pages/partials/field_hint.tt' hint = 'Sort order within the menu dropdown. Lower numbers appear first. Use 0 or leave default for automatic ordering.' %]
+                                        </label>
+                                        <input type="number" name="link_order" id="link_order" class="form-control"
+                                               value="[% page_item.link_order || 0 %]"
+                                               title="Position in the site menu list (lower = higher)">
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="form-group">
-                                <label for="body">Page Body (HTML/Text) <span class="text-danger">*</span></label>
-                                <textarea name="body" id="body" rows="12" class="form-group form-control" placeholder="Enter HTML or text content for the page" required>[% page_item.body %]</textarea>
-                            </div>
+                            [% SET _preview_url = (show_form == 'edit' && page_item.page_code) ? c.uri_for('/page', page_item.page_code) : '' %]
+                            [% SET _print_url = (show_form == 'edit' && page_item.page_code) ? c.uri_for('/page/print', page_item.page_code) : '' %]
+                            [% PROCESS 'pages/partials/html_editor.tt'
+                               body_content  = page_item.body
+                               body_label    = 'Page Body'
+                               body_required = 1
+                               show_preview  = 1
+                               preview_url   = _preview_url
+                               print_url     = _print_url
+                               editor_theme  = page_editor_theme
+                               preview_sitename = page_item.sitename || current_site
+                            %]
 
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="description">SEO Description</label>
+                                        <div class="label-with-insert">
+                                            <label for="description">SEO Description</label>
+                                            [% PROCESS 'pages/partials/insert_chars_button.tt' target_id = 'description' allow_html = 0 %]
+                                        </div>
                                         <textarea name="description" id="description" rows="3" class="form-group form-control" placeholder="Meta description for search engines">[% page_item.description %]</textarea>
+                                        <span class="help-block">Plain text for search engines. Typography and emoji symbols are fine; site icon HTML tags belong in the page body only.</span>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="keywords">SEO Keywords</label>
-                                        <input type="text" name="keywords" id="keywords" class="form-group form-control" value="[% page_item.keywords %]" placeholder="comma, separated, keywords">
+                                        <div class="label-with-insert">
+                                            <label for="keywords">SEO Keywords</label>
+                                            [% PROCESS 'pages/partials/insert_chars_button.tt' target_id = 'keywords' allow_html = 0 %]
+                                        </div>
+                                        <input type="text" name="keywords" id="keywords" class="form-group form-control" value="[% page_item.keywords | html %]" placeholder="comma, separated, keywords">
+                                        <span class="help-block">Comma-separated plain text. No HTML or icon tags.</span>
                                     </div>
                                 </div>
                             </div>
@@ -267,7 +307,9 @@
                                                 <a href="[% c.uri_for('/page', page.page_code) %]" class="btn btn-xs btn-info" target="_blank" title="View Page">
                                                     <i class="fa fa-eye"></i> View
                                                 </a>
-                                                [% IF current_site == 'CSC' || page.sitename == current_site %]
+                                                [% SET page_site_lc = page.sitename | lower %]
+                                                [% SET current_site_lc = current_site | lower %]
+                                                [% IF current_site == 'CSC' || page.sitename == current_site || page_site_lc == current_site_lc %]
                                                     <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-primary" title="Edit Page">
                                                         <i class="fa fa-edit"></i> Edit
                                                     </a>
@@ -304,23 +346,17 @@
 </div>
 
 [% IF show_form %]
-<!-- CKEditor 5 Classic Build CDN -->
-<script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
-
 <style>
-    /* Ensure the WYSIWYG editor is sufficiently tall */
-    .ck-editor__editable_inline {
-        min-height: 350px !important;
-    }
-    /* AI Assistant styling */
+    .page-title-field .label-with-insert { width: 100%; }
+    .page-title-input { width: 100%; min-width: 0; text-indent: 0; padding-left: 10px; }
+    .page-field-hint { font-size: 0.95em; vertical-align: middle; cursor: help; margin-left: 4px; }
     .btn-purple {
-        background-color: #6f42c1 !important;
-        border-color: #6f42c1 !important;
+        background-color: var(--accent-color, #6f42c1) !important;
+        border-color: var(--accent-color, #6f42c1) !important;
         color: #fff !important;
     }
     .btn-purple:hover, .btn-purple:focus, .btn-purple:active {
-        background-color: #59359a !important;
-        border-color: #59359a !important;
+        filter: brightness(0.9);
         color: #fff !important;
     }
 </style>
@@ -395,104 +431,8 @@
             chk.addEventListener('change', updateShareWith);
         });
 
-        let editorInstance = null;
-        const bodyTextarea = document.getElementById('body');
-        const toggleBtn = document.getElementById('toggle-editor-mode');
-        const statusBadge = document.getElementById('wysiwyg-status-badge');
-
-        if (bodyTextarea) {
-            let lastSyncValue = bodyTextarea.value;
-            let isWysiwygMode = true;
-
-            // Function to initialize CKEditor 5 Classic
-            function initCKEditor() {
-                if (editorInstance) return Promise.resolve(editorInstance);
-
-                return ClassicEditor
-                    .create(bodyTextarea, {
-                        toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
-                    })
-                    .then(editor => {
-                        editorInstance = editor;
-
-                        // Keep textarea value perfectly in sync with CKEditor in real-time
-                        editor.model.document.on('change:data', () => {
-                            const data = editor.getData();
-                            bodyTextarea.value = data;
-                            lastSyncValue = data; // Prevent loop
-                        });
-
-                        return editor;
-                    })
-                    .catch(error => {
-                        console.error('CKEditor 5 initialization error:', error);
-                    });
-            }
-
-            // Initial load starts in WYSIWYG mode
-            initCKEditor();
-
-            // Poller to detect external programmatic updates (e.g. from standard AI Form Fill)
-            setInterval(function() {
-                const currentVal = bodyTextarea.value;
-                if (currentVal !== lastSyncValue) {
-                    lastSyncValue = currentVal;
-                    if (editorInstance && isWysiwygMode) {
-                        editorInstance.setData(currentVal);
-                    }
-                }
-            }, 300);
-
-            // Handle Toggle button click by toggling container visibility (extremely fast and bulletproof)
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const ckEditorContainer = bodyTextarea.parentNode.querySelector('.ck-editor') || bodyTextarea.nextElementSibling;
-                    if (isWysiwygMode) {
-                        // Switch from WYSIWYG to Raw HTML
-                        if (editorInstance) {
-                            bodyTextarea.value = editorInstance.getData();
-                            lastSyncValue = bodyTextarea.value;
-                        }
-                        if (ckEditorContainer) {
-                            ckEditorContainer.style.display = 'none';
-                        }
-                        bodyTextarea.style.display = 'block';
-                        isWysiwygMode = false;
-
-                        if (statusBadge) {
-                            statusBadge.textContent = 'Source HTML Mode';
-                            statusBadge.className = 'label label-warning';
-                        }
-                    } else {
-                        // Switch from Raw HTML to WYSIWYG
-                        if (editorInstance) {
-                            editorInstance.setData(bodyTextarea.value);
-                            lastSyncValue = bodyTextarea.value;
-                        }
-                        bodyTextarea.style.display = 'none';
-                        if (ckEditorContainer) {
-                            ckEditorContainer.style.display = 'block';
-                        }
-                        isWysiwygMode = true;
-
-                        if (statusBadge) {
-                            statusBadge.textContent = 'Rich Text Mode';
-                            statusBadge.className = 'label label-success';
-                        }
-                    }
-                });
-            }
-
-            // Form submit helper to ensure editor state is saved on submit
-            const form = bodyTextarea.closest('form');
-            if (form) {
-                form.addEventListener('submit', function() {
-                    if (editorInstance && isWysiwygMode) {
-                        bodyTextarea.value = editorInstance.getData();
-                    }
-                });
-            }
+        if (window.ComservInsertChars && window.ComservInsertChars.init) {
+            window.ComservInsertChars.init();
         }
     });
 </script>

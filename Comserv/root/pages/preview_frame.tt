@@ -1,0 +1,24 @@
+[%# Body-only preview fragment for the page editor iframe (no site nav/header/footer). %]
+[% SET cv = c.stash.css_v || '20260615' %]
+[% SET th = preview_theme || 'default' %]
+<link rel="stylesheet" href="[% c.uri_for('/static/css/base.css') %]?v=[% cv %]">
+<link rel="stylesheet" href="[% c.uri_for('/static/css/themes', th _ '.css') %]?v=[% cv %]">
+<link rel="stylesheet" href="[% c.uri_for('/static/css/theme-overrides.css') %]?v=[% cv %]">
+<link rel="stylesheet" href="[% c.uri_for('/static/css/page-containers.css') %]?v=[% cv %]">
+<link rel="stylesheet" href="[% c.uri_for('/static/css/svg-icons.css') %]">
+<style>
+    .page-body {
+        margin: 0;
+        padding: 12px;
+        font-family: var(--body-font, Verdana, Helvetica, sans-serif);
+        color: var(--text-color, #333);
+        background: var(--background-color, #fff);
+        line-height: 1.55;
+        min-height: 360px;
+        outline: none;
+    }
+</style>
+<div class="page-body theme-[% th %] grammarly-field" data-editor-body-only="1" lang="en" spellcheck="true"
+     data-gramm="true" data-gramm_editor="true" data-enable-grammarly="true" data-gramm_id="page-body-editor">
+    [% preview_body %]
+</div>
