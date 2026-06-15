@@ -4,8 +4,9 @@ set -e
 # Ensure standard system bin paths are included in PATH (critical for non-interactive SSH)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
-# Commit and push local changes before workstation image build (Auto Deploy Step 0a).
-# Production servers never call this — they only git pull.
+# Auto-commit and push before deploy (Auto Deploy Step 0a).
+# Developers may edit code without manually committing; deploy must never ship
+# un-pushed changes. Production servers only git pull — they never auto-commit.
 pre_build_git_sync() {
     local SCRIPT_DIR REPO_ROOT BRANCH DEPLOYER AT_UTC MSG unpushed
 

@@ -36,6 +36,7 @@
 </div>
 
 <pre id="console"><span class="info">Initialising deploy log…</span>
+<span class="dim">Step 0a: any uncommitted workstation changes will be auto-committed and pushed before production is updated.</span>
 </pre>
 
 <div id="footer">
