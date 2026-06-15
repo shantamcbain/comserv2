@@ -612,6 +612,10 @@ else
     echo "Refusing to deploy with local root-disk storage for /data/nfs." >&2
     echo "Set ALLOW_LOCAL_STORAGE_FALLBACK=1 only for emergency/manual recovery." >&2
     if [ "$ALLOW_LOCAL_STORAGE_FALLBACK" != "1" ]; then
+        echo "Attempting Perl lib sync anyway (git pull already ran on host)..." >&2
+        sync_host_app_lib || true
+        echo "Perl lib sync finished. Full image recreate still blocked until NFS is mounted" >&2
+        echo "or ALLOW_LOCAL_STORAGE_FALLBACK=1 is set." >&2
         exit 1
     fi
     echo "WARNING: ALLOW_LOCAL_STORAGE_FALLBACK=1 set — using local fallback paths"
