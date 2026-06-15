@@ -8680,8 +8680,21 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $ssh_exit >>= 8;
         if ($ssh_exit != 0) {
             print "\n⚠️  SSH TRIGGER FAILED (exit $ssh_exit)\n";
-            print "Production cron will auto-deploy within 10 minutes anyway.\n";
-            print "Manual: ssh $ssh_target '/opt/comserv/Comserv/deploy.sh'\n";
+            print "Retrying with DEPLOY_MODE=lib_sync (git pull + docker cp lib + restart)...\n";
+            my $lib_sync_cmd = "echo '$escaped_password' | sudo -S DEPLOY_MODE=lib_sync /opt/comserv/Comserv/deploy.sh";
+            my $lib_sync_exit = system('sshpass', '-e', 'ssh',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=/dev/null',
+                $ssh_target,
+                $lib_sync_cmd);
+            $lib_sync_exit >>= 8;
+            if ($lib_sync_exit == 0) {
+                print "\n✅ Production Perl lib synced via lib_sync fallback\n";
+                $ssh_exit = 0;
+            } else {
+                print "\n❌ lib_sync fallback also failed (exit $lib_sync_exit)\n";
+                print "Manual: ssh $ssh_target 'sudo DEPLOY_MODE=lib_sync /opt/comserv/Comserv/deploy.sh'\n";
+            }
         } else {
             print "\n✅ Production server deploy triggered successfully\n";
         }
