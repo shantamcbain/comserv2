@@ -9,6 +9,9 @@ use Comserv::Util::DeployStatus;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
 use Comserv::Util::BackupManager;
+use Comserv::Util::DiskStats;
+use Comserv::Util::HardwareAgent;
+use Comserv::Util::CodingAccess;
 use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
@@ -124,68 +127,803 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
 }
 
 # Admin dashboard
+
+sub ssh_terminal :Path('/admin/ssh_terminal') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ssh_terminal',
+        "Starting SSH terminal action for user: " . ($c->session->{username} // 'Guest'));
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ssh_terminal')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $start_result;
+    if ($c->request->params->{start_ttyd}) {
+        $start_result = $self->_start_comserv_ttyd($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ssh_terminal',
+            'start_ttyd requested: ' . ($start_result->{success} ? 'ok' : ($start_result->{error} // 'failed')));
+    }
+
+    my $ttyd = $self->_ttyd_resolve_endpoint($c);
+    $c->stash(
+        template                => 'admin/ssh_terminal.tt',
+        show_code_editor_widget => 0,
+        ttyd_url                => $ttyd->{url},
+        ttyd_direct_url         => $self->_ttyd_direct_client_url($c, $ttyd->{port}),
+        ttyd_proxied            => 1,
+        ttyd_local_url          => $ttyd->{local_url},
+        ttyd_port               => $ttyd->{port},
+        ttyd_reachable          => $ttyd->{reachable},
+        ttyd_writable           => $ttyd->{writable},
+        ttyd_host_mode          => $ttyd->{host_mode} ? 1 : 0,
+        ttyd_start_cmd          => 'script/ttyd_comserv_start.sh',
+        ttyd_watcher_cmd        => 'script/ttyd_host_watcher.sh',
+        ttyd_start_url          => $c->uri_for('/admin/ssh_terminal', { start_ttyd => 1 }),
+        ttyd_start_result       => $start_result,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ssh_terminal',
+        "Completed SSH terminal action");
+}
+
+sub _is_docker_container {
+    my ($self) = @_;
+    return 1 if -f '/.dockerenv';
+    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /docker|workstation-dev/i;
+    return 0;
+}
+
+sub _ttyd_port_reachable_on {
+    my ($self, $host, $port) = @_;
+    return 0 unless $host && $port;
+    return 0 unless eval { require IO::Socket::INET; 1 };
+    my $sock = IO::Socket::INET->new(
+        PeerAddr => $host,
+        PeerPort => $port,
+        Proto    => 'tcp',
+        Timeout  => 1,
+    );
+    return $sock ? do { close $sock; 1 } : 0;
+}
+
+sub _ttyd_port_reachable {
+    my ($self, $port) = @_;
+    return $self->_ttyd_port_reachable_on('127.0.0.1', $port);
+}
+
+sub _ttyd_status_from_host_log {
+    my ($self, $home) = @_;
+    $home ||= '.';
+    my $logf = "$home/var/ttyd-comserv.log";
+    return unless -f $logf;
+
+    open my $fh, '<', $logf or return;
+    my @lines = <$fh>;
+    close $fh;
+    return unless @lines;
+
+    my $tail = join '', @lines[-60 .. -1];
+    return unless $tail =~ /Listening on port:\s*7682/;
+    my $writable = ($tail !~ /readonly mode/i) ? 1 : 0;
+    return { reachable => 1, writable => $writable };
+}
+
+sub _ttyd_process_flags {
+    my ($self, $port) = @_;
+    $port //= 7681;
+    my %flags = (
+        writable     => 0,
+        check_origin => 0,
+        command      => '',
+        port         => $port,
+    );
+    open my $ps, '-|', 'ps', 'aux' or return \%flags;
+    while (my $line = <$ps>) {
+        next unless $line =~ m{/usr/bin/ttyd\b|(?:^|\s)ttyd\s};
+        next unless $line =~ /(?:^|\s)-p\s+\Q$port\E(?:\s|$)/;
+        $flags{writable}     = 1 if $line =~ /(?:^|\s)-W(?:\s|$)/;
+        $flags{check_origin} = 1 if $line =~ /(?:^|\s)-O(?:\s|$)/;
+        if ($line =~ /ttyd\s+(.*)$/) {
+            my $args = $1;
+            if ($args =~ /(?:^|\s)(\S+)\s*$/) {
+                my $cmd = $1;
+                $flags{command} = $cmd unless $cmd =~ /^-/;
+            }
+        }
+        last;
+    }
+    close $ps;
+    return \%flags;
+}
+
+sub _ttyd_client_url {
+    my ($self, $c, $port) = @_;
+    $port //= 7682;
+
+    # Native dev: browser talks to ttyd on :7682 directly (no Perl WS proxy needed).
+    # Docker dev: same-origin proxy on Comserv port 3000 (laptop cannot reach :7682).
+    unless ($self->_is_docker_container) {
+        return $self->_ttyd_direct_client_url($c, $port)
+            if $self->_ttyd_port_reachable($port);
+    }
+
+    if ($c && eval { $c->uri_for }) {
+        my $proxy = eval { $c->uri_for('/admin/ttyd-proxy') };
+        if ($proxy) {
+            my $url = $proxy->as_string;
+            $url =~ s{/+\z}{};
+            return $url;
+        }
+    }
+    return $self->_ttyd_direct_client_url($c, $port);
+}
+
+sub _ttyd_direct_client_url {
+    my ($self, $c, $port) = @_;
+    $port //= 7682;
+    my $host = '127.0.0.1';
+    if ($c && eval { $c->req }) {
+        my $uri_host = $c->req->uri ? ($c->req->uri->host || '') : '';
+        if ($uri_host =~ /\S/) {
+            $host = $uri_host;
+            $host =~ s/:\d+\z//;
+        }
+    }
+    return "http://$host:$port/admin/ttyd-proxy";
+}
+
+sub _ttyd_resolve_endpoint {
+    my ($self, $c) = @_;
+    my $home         = $self->_comserv_home($c);
+    my $default_port = 7682;
+    my $client_url   = $self->_ttyd_client_url($c, $default_port);
+
+    if ($self->_is_docker_container) {
+        my $log_status = $self->_ttyd_status_from_host_log($home) || {};
+        return {
+            port           => $default_port,
+            url            => $client_url,
+            local_url      => "http://127.0.0.1:$default_port",
+            ws_url         => ($client_url =~ s/^http/ws/r),
+            reachable      => $log_status->{reachable} ? 1 : 0,
+            writable       => $log_status->{writable} ? 1 : 0,
+            check_origin   => 0,
+            command        => 'bash -l (host)',
+            using_fallback => 0,
+            host_mode      => 1,
+        };
+    }
+
+    my @ports = (7682, 7681);
+    my $fallback;
+    for my $port (@ports) {
+        next unless $self->_ttyd_port_reachable($port);
+        my $flags = $self->_ttyd_process_flags($port);
+        my $url   = $self->_ttyd_client_url($c, $port);
+        my $ep = {
+            port            => $port,
+            url             => $url,
+            local_url       => "http://127.0.0.1:$port",
+            ws_url          => ($url =~ s/^http/ws/r),
+            reachable       => 1,
+            writable        => $flags->{writable} ? 1 : 0,
+            check_origin    => $flags->{check_origin} ? 1 : 0,
+            command         => $flags->{command} || '',
+            using_fallback  => 0,
+            host_mode       => 0,
+        };
+        return $ep if $flags->{writable};
+        $fallback //= $ep;
+    }
+    return $fallback if $fallback;
+
+    return {
+        port           => $default_port,
+        url            => $client_url,
+        local_url      => "http://127.0.0.1:$default_port",
+        ws_url         => ($client_url =~ s/^http/ws/r),
+        reachable      => 0,
+        writable       => 0,
+        check_origin   => 0,
+        command        => '',
+        using_fallback => 0,
+        host_mode      => 0,
+    };
+}
+
+sub _comserv_home {
+    my ($self, $c) = @_;
+    return $c->config->{home} if $c && $c->config->{home};
+    my $p = __FILE__;
+    $p =~ s{/lib/Comserv.*}{};
+    return $p;
+}
+
+sub _request_host_ttyd_start {
+    my ($self, $home) = @_;
+    require File::Path;
+    File::Path::make_path("$home/var");
+    my $req = "$home/var/ttyd-start.request";
+    open my $fh, '>', $req or return "Cannot write $req: $!";
+    print $fh time(), "\n";
+    close $fh;
+    return;
+}
+
+sub _start_comserv_ttyd {
+    my ($self, $c) = @_;
+    my $home    = $self->_comserv_home($c);
+    my $starter = "$home/script/ttyd_comserv_start.sh";
+
+    if ($self->_is_docker_container) {
+        my $log_status = $self->_ttyd_status_from_host_log($home) || {};
+        if ($log_status->{reachable} && $log_status->{writable}) {
+            return {
+                success         => 1,
+                already_running => 1,
+                output          => "Host ttyd already running (port 7682, seen in var/ttyd-comserv.log)\n",
+                exit_code       => 0,
+            };
+        }
+        my $err = $self->_request_host_ttyd_start($home);
+        return { success => 0, error => $err } if $err;
+        sleep 3;
+        $log_status = $self->_ttyd_status_from_host_log($home) || {};
+        my $ready  = $log_status->{reachable} && $log_status->{writable};
+        return {
+            success         => $ready ? 1 : 0,
+            already_running => 0,
+            output          => "Requested host ttyd start via var/ttyd-start.request.\n"
+                . "On the workstation host, keep this running once:\n"
+                . "  script/ttyd_host_watcher.sh\n"
+                . "Or run manually:\n"
+                . "  script/ttyd_comserv_start.sh\n",
+            exit_code       => $ready ? 0 : 1,
+            error           => $ready ? undef : 'Host watcher did not start ttyd yet (run ttyd_host_watcher.sh on host)',
+        };
+    }
+
+    if ($self->_ttyd_port_reachable(7682) && $self->_ttyd_process_flags(7682)->{writable}) {
+        return {
+            success         => 1,
+            already_running => 1,
+            output          => "Writable ttyd already running on port 7682\n",
+            exit_code       => 0,
+        };
+    }
+
+    unless (-e $starter) {
+        return { success => 0, error => "Start script not found: $starter" };
+    }
+    unless (-x $starter) {
+        return { success => 0, error => "Start script is not executable: $starter" };
+    }
+
+    my $output = qx($starter 2>&1);
+    my $exit   = ($? == -1) ? -1 : ($? >> 8);
+    my $ttyd   = $self->_ttyd_resolve_endpoint($c);
+    my $ready  = $ttyd->{reachable} && $ttyd->{writable};
+
+    return {
+        success         => $ready ? 1 : 0,
+        already_running => 0,
+        output          => $output // '',
+        exit_code       => $exit,
+        error           => $ready ? undef : ($output =~ /\S/ ? $output : 'ttyd failed to start'),
+        ttyd_url        => $ttyd->{url},
+        ttyd_reachable  => $ttyd->{reachable} ? 1 : 0,
+        ttyd_writable   => $ttyd->{writable} ? 1 : 0,
+    };
+}
+
+sub _ensure_comserv_ttyd {
+    my ($self, $c) = @_;
+    return if $self->_ttyd_port_reachable(7682) && $self->_ttyd_process_flags(7682)->{writable};
+    return if $self->{_comserv_ttyd_start_attempted}++;
+    my $result = $self->_start_comserv_ttyd($c);
+    warn "ttyd_comserv_start.sh failed: " . ($result->{error} // $result->{output} // 'unknown') . "\n"
+        unless $result->{success};
+}
+
+sub shell_run_command :Path('/admin/shell_run_command') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'shell_run_command')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin required' }));
+        return;
+    }
+
+    my $cmd = $c->request->params->{command} || '';
+    unless ($cmd =~ /\S/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Command is required' }));
+        return;
+    }
+
+    if ($cmd =~ /rm\s+-rf\s+\/|mkfs|dd\s+if=/i) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Command blocked for safety' }));
+        return;
+    }
+
+    require Comserv::Controller::AI;
+    my $ai = $c->controller('AI');
+    unless ($ai) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'AI controller unavailable' }));
+        return;
+    }
+
+    my $root = $ai->_project_root_path($c);
+    chdir $root or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
+        return;
+    };
+
+    my $api_key = $ai->_grok_cli_api_key($c);
+    local $ENV{XAI_API_KEY}  = $api_key if $api_key;
+    local $ENV{GROK_API_KEY}  = $api_key if $api_key;
+    local $ENV{HOME}          = $ai->_grok_home() || $ENV{HOME};
+    local $ENV{USER}          = 'shanta';
+    local $ENV{LOGNAME}       = 'shanta';
+    local $ENV{PATH}          = join ':', grep { $_ && -d $_ }
+        ("$ENV{HOME}/.local/bin", "$ENV{HOME}/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin');
+    local $ENV{TERM}          = 'xterm-256color';
+    local $ENV{LANG}          = $ENV{LANG} || 'en_US.UTF-8';
+    local $ENV{LC_ALL}        = $ENV{LC_ALL} || 'en_US.UTF-8';
+
+    my $output   = qx($cmd 2>&1) // '';
+    my $exit_val = ($? == -1) ? -1 : ($? >> 8);
+
+    $c->response->body(encode_json({
+        success   => JSON::true,
+        output    => $output,
+        exit_code => $exit_val,
+    }));
+}
+
+sub _interactive_ws_available {
+    my ($self, $c) = @_;
+    return 1 if ($ENV{COMSERV_TWIGGY} // '') eq '1';
+    return 1 if ($ENV{PLACK_SERVER_SOFTWARE} // '') =~ /Twiggy/i;
+    if ($c && eval { $c->req }) {
+        my $env = $c->req->env || {};
+        my $sw  = join ' ', grep { $_ }
+            ($env->{SERVER_SOFTWARE} // ''),
+            ($env->{'psgi.server_software'} // '');
+        return 1 if $sw =~ /Twiggy/i;
+    }
+    my $home = $c && $c->config->{home} ? $c->config->{home} : undef;
+    return 1 if $home && -f "$home/var/twiggy.enabled";
+    return 1 if $c && $c->config->{interactive_terminal};
+    return 0;
+}
+
+sub _ssh_terminal_start_ttyd_json {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ssh_terminal_start_ttyd',
+        'Starting writable ttyd via script/ttyd_comserv_start.sh');
+
+    my $result = $self->_start_comserv_ttyd($c);
+    my $ttyd   = $self->_ttyd_resolve_endpoint($c);
+    my $ready  = $ttyd->{reachable} && $ttyd->{writable};
+
+    $c->response->body(encode_json({
+        success                  => $ready ? JSON::true : JSON::false,
+        already_running          => $result->{already_running} ? JSON::true : JSON::false,
+        output                   => $result->{output} // '',
+        exit_code                => $result->{exit_code},
+        error                    => $result->{error},
+        interactive_ws_available => $ready ? JSON::true : JSON::false,
+        ttyd_url                 => $ttyd->{url},
+        ttyd_port                => $ttyd->{port},
+        ttyd_reachable           => $ttyd->{reachable} ? JSON::true : JSON::false,
+        ttyd_writable            => $ttyd->{writable} ? JSON::true : JSON::false,
+        shell_run_path           => '/admin/shell_run_command',
+        hint                     => $ready
+            ? 'Interactive shell via ttyd on ' . $ttyd->{url}
+            : 'Restart writable ttyd: script/ttyd_comserv_start.sh (needs -W flag)',
+    }));
+}
+
+sub ssh_terminal_start_ttyd :Path('/admin/ssh_terminal_start_ttyd') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ssh_terminal_start_ttyd')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'admin required' }));
+        return;
+    }
+
+    $self->_ssh_terminal_start_ttyd_json($c);
+}
+
+sub ssh_terminal_status :Path('/admin/ssh_terminal_status') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ssh_terminal_status')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'admin required' }));
+        return;
+    }
+
+    my $method = lc($c->req->method || 'get');
+    my $action = $c->request->params->{action} // '';
+    if ($method eq 'post' && $action eq 'start') {
+        $self->_ssh_terminal_start_ttyd_json($c);
+        return;
+    }
+
+    my $ttyd = $self->_ttyd_resolve_endpoint($c);
+    my $ready = $ttyd->{reachable} && $ttyd->{writable};
+    $c->response->body(encode_json({
+        success                  => JSON::true,
+        interactive_ws_available => $ready ? JSON::true : JSON::false,
+        ttyd_url                 => $ttyd->{url},
+        ttyd_port                => $ttyd->{port},
+        ttyd_reachable           => $ttyd->{reachable} ? JSON::true : JSON::false,
+        ttyd_writable            => $ttyd->{writable} ? JSON::true : JSON::false,
+        shell_run_path           => '/admin/shell_run_command',
+        hint                     => $ready
+            ? 'Interactive shell via ttyd on ' . $ttyd->{url}
+            : 'Restart writable ttyd: script/ttyd_comserv_start.sh (needs -W flag)',
+    }));
+}
+
+# Same-origin reverse proxy to host ttyd (HTTP + WebSocket). Docker/laptop uses
+# /admin/ttyd-proxy on the Comserv port instead of direct :7682.
+sub ttyd_proxy :Path('/admin/ttyd-proxy') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_ttyd_proxy_dispatch($c);
+}
+
+sub ttyd_proxy_slash :Path('/admin/ttyd-proxy/') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_ttyd_proxy_dispatch($c);
+}
+
+sub ttyd_proxy_ws :Path('/admin/ttyd-proxy/ws') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_ttyd_proxy_dispatch($c);
+}
+
+sub ttyd_proxy_token :Path('/admin/ttyd-proxy/token') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_ttyd_proxy_dispatch($c);
+}
+
+sub _ttyd_upstream_sock_path {
+    my ($self, $c) = @_;
+    my $home = $self->_comserv_home($c);
+    return "$home/var/ttyd-proxy.sock";
+}
+
+sub _ttyd_upstream_open {
+    my ($self, $c) = @_;
+    my $home = $self->_comserv_home($c);
+    my $port = $ENV{TTYD_HOST_PORT} || 7682;
+
+    if ($self->_is_docker_container) {
+        my $sock_path = $self->_ttyd_upstream_sock_path($c);
+        if (-S $sock_path) {
+            require IO::Socket::UNIX;
+            my $sock = IO::Socket::UNIX->new(Peer => $sock_path);
+            return $sock if $sock;
+        }
+        for my $host (qw(host.docker.internal 172.20.0.1 172.17.0.1)) {
+            next unless $self->_ttyd_port_reachable_on($host, $port);
+            require IO::Socket::INET;
+            my $sock = IO::Socket::INET->new(
+                PeerAddr => $host,
+                PeerPort => $port,
+                Proto    => 'tcp',
+                Timeout  => 2,
+            );
+            return $sock if $sock;
+        }
+        return;
+    }
+
+    require IO::Socket::INET;
+    return IO::Socket::INET->new(
+        PeerAddr => '127.0.0.1',
+        PeerPort => $port,
+        Proto    => 'tcp',
+        Timeout  => 2,
+    );
+}
+
+sub _ttyd_proxy_hop_by_hop {
+    return map { lc($_) => 1 } qw(
+        connection keep-alive proxy-authentication proxy-connection
+        proxy-authorization te trailers transfer-encoding upgrade
+    );
+}
+
+sub _ttyd_proxy_dispatch {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ttyd_proxy')) {
+        $c->response->status(403);
+        $c->response->body('Access denied: admin required');
+        return;
+    }
+
+    my $upgrade = lc($c->req->header('Upgrade') || '');
+    if ($upgrade eq 'websocket') {
+        $self->_ttyd_proxy_websocket($c);
+        return;
+    }
+
+    my $upstream = $self->_ttyd_upstream_open($c);
+    unless ($upstream) {
+        $c->response->status(502);
+        $c->response->content_type('text/plain');
+        $c->response->body(
+            "Cannot reach host ttyd. On the workstation host run: script/ttyd_comserv_start.sh\n"
+        );
+        return;
+    }
+
+    my $env     = $c->req->env || {};
+    my $method  = $c->req->method || 'GET';
+    my $uri     = $env->{REQUEST_URI} || '/admin/ttyd-proxy/';
+    my %skip    = $self->_ttyd_proxy_hop_by_hop;
+    my $req     = "$method $uri HTTP/1.1\r\n";
+
+    for my $key (sort keys %$env) {
+        next unless $key =~ /^HTTP_(.+)$/;
+        my $name = $1;
+        $name =~ s/_/-/g;
+        next if $skip{ lc $name };
+        next if lc $name eq 'host';
+        my $val = $env->{$key};
+        next unless defined $val && $val ne '';
+        $req .= "$name: $val\r\n";
+    }
+    $req .= 'Host: 127.0.0.1:' . ($ENV{TTYD_HOST_PORT} || 7682) . "\r\n";
+    $req .= "Connection: close\r\n";
+
+    my $body = $c->req->body;
+    if (defined $body && length $body) {
+        $req .= 'Content-Length: ' . length($body) . "\r\n";
+    }
+    $req .= "\r\n";
+    $req .= $body if defined $body && length $body;
+
+    print {$upstream} $req;
+    $upstream->flush if $upstream->can('flush');
+
+    my $header = '';
+    while (my $line = <$upstream>) {
+        $header .= $line;
+        last if $header =~ /\r\n\r\n/;
+    }
+
+    unless ($header =~ /^HTTP\/[\d.]+ (\d+)/) {
+        $c->response->status(502);
+        $c->response->body('Invalid response from ttyd');
+        close $upstream;
+        return;
+    }
+    $c->response->status($1);
+
+    my ($hdr_block) = $header =~ /\AHTTP\/[\d.]+\s+\d+\s[^\r\n]*\r\n(.*)\r\n\r\n/s;
+    my %resp_skip = $self->_ttyd_proxy_hop_by_hop;
+    if ($hdr_block) {
+        for my $line (split /\r\n/, $hdr_block) {
+            my ($name, $val) = split /:\s*/, $line, 2;
+            next unless defined $name && defined $val;
+            next if $resp_skip{ lc $name };
+            $c->response->header($name => $val);
+        }
+    }
+
+    my $resp_body = '';
+    if ($header =~ /\r\n\r\n/s) {
+        ($resp_body) = $header =~ /\r\n\r\n(.*)/s;
+    }
+    my $buf;
+    while (my $n = read($upstream, $buf, 65536)) {
+        $resp_body .= $buf;
+    }
+    close $upstream;
+
+    $c->response->body($resp_body);
+    $c->detach();
+}
+
+sub _ttyd_proxy_websocket {
+    my ($self, $c) = @_;
+
+    my $upstream = $self->_ttyd_upstream_open($c);
+    unless ($upstream) {
+        $c->response->status(502);
+        $c->response->body('Cannot reach host ttyd for WebSocket');
+        return;
+    }
+
+    my $env = $c->req->env || {};
+    my $uri = $env->{REQUEST_URI} || '/admin/ttyd-proxy/ws';
+    my %skip = $self->_ttyd_proxy_hop_by_hop;
+    my $req  = "GET $uri HTTP/1.1\r\n";
+
+    for my $key (sort keys %$env) {
+        next unless $key =~ /^HTTP_(.+)$/;
+        my $name = $1;
+        $name =~ s/_/-/g;
+        next if $skip{ lc $name };
+        next if lc $name eq 'host';
+        my $val = $env->{$key};
+        next unless defined $val && $val ne '';
+        $req .= "$name: $val\r\n";
+    }
+    $req .= 'Host: 127.0.0.1:' . ($ENV{TTYD_HOST_PORT} || 7682) . "\r\n";
+    $req .= "Connection: Upgrade\r\n\r\n";
+
+    print {$upstream} $req;
+    $upstream->flush if $upstream->can('flush');
+
+    my $io = $c->req->io_fh;
+    my $upstream_resp = '';
+    my $start = time;
+    while ($upstream_resp !~ /\r\n\r\n/ && (time - $start) < 5) {
+        my $buf;
+        my $n = sysread($upstream, $buf, 4096);
+        last unless defined $n && $n > 0;
+        $upstream_resp .= $buf;
+    }
+
+    unless ($upstream_resp =~ /^HTTP\/[\d.]+ 101/) {
+        $c->response->status(502);
+        $c->response->body('ttyd WebSocket upgrade failed');
+        close $upstream;
+        return;
+    }
+
+    my ($hdr_part, $ws_extra) = $upstream_resp =~ /\A(HTTP\/[\d.]+ 101[^\r\n]*\r\n(?:(?:[^\r\n]+\r\n)*)\r\n)(.*)/s;
+    print $io ($hdr_part // $upstream_resp);
+    print $io $ws_extra if defined $ws_extra && length $ws_extra;
+    $io->flush if $io->can('flush');
+
+    $self->_ttyd_socket_keepalive($io);
+    $self->_ttyd_socket_keepalive($upstream);
+
+    # Hand off to AnyEvent before Catalyst/Plack applies HTTP idle timeouts
+    $c->detach();
+
+    require AnyEvent;
+    require AnyEvent::Handle;
+
+    my $closed = 0;
+    my ($client, $server);
+    my $cv = AnyEvent->condvar;
+
+    my $cleanup = sub {
+        return if $closed++;
+        $client->destroy if $client;
+        $server->destroy if $server;
+        close $upstream if $upstream;
+        $cv->send;
+    };
+
+    $client = AnyEvent::Handle->new(
+        fh       => $io,
+        on_error => sub { $cleanup->() },
+    );
+    $server = AnyEvent::Handle->new(
+        fh       => $upstream,
+        on_error => sub { $cleanup->() },
+    );
+
+    $client->on_read(sub {
+        my ($hdl) = @_;
+        return if $closed;
+        return unless $server && $server->fh;
+        $server->push_write(delete $hdl->{rbuf});
+    });
+    $server->on_read(sub {
+        my ($hdl) = @_;
+        return if $closed;
+        return unless $client && $client->fh;
+        $client->push_write(delete $hdl->{rbuf});
+    });
+
+    $client->on_eof($cleanup);
+    $server->on_eof($cleanup);
+
+    $cv->recv;
+}
+
+sub _ttyd_socket_keepalive {
+    my ($self, $fh) = @_;
+    return unless $fh;
+    eval {
+        require Socket;
+        my $fd = fileno($fh);
+        return unless defined $fd;
+        setsockopt($fh, Socket::SOL_SOCKET(), Socket::SO_KEEPALIVE(), pack('i', 1));
+    };
+}
+
+# WebSocket PTY — same-origin interactive shell (replaces cross-origin ttyd iframe).
+sub system_shell_terminal :Path('/admin/system-shell-terminal') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'system_shell_terminal')) {
+        $c->response->status(403);
+        $c->response->body('Access denied: admin required');
+        return;
+    }
+
+    my $upgrade    = $c->req->header('Upgrade')    || '';
+    my $connection = $c->req->header('Connection') || '';
+    unless ($upgrade eq 'websocket' && $connection =~ /Upgrade/i) {
+        $c->response->status(400);
+        $c->response->body('WebSocket upgrade required');
+        return;
+    }
+
+    require Protocol::WebSocket::Handshake::Server;
+
+    my $io = $c->req->io_fh;
+    my $hs = Protocol::WebSocket::Handshake::Server->new;
+    my $env = $c->req->env;
+    my $handshake_request =
+        "GET " . $env->{REQUEST_URI} . " HTTP/1.1\r\n" .
+        "Host: " . $env->{HTTP_HOST} . "\r\n" .
+        "Upgrade: " . ($env->{HTTP_UPGRADE} || 'websocket') . "\r\n" .
+        "Connection: " . ($env->{HTTP_CONNECTION} || 'Upgrade') . "\r\n" .
+        "Sec-WebSocket-Key: " . ($env->{HTTP_SEC_WEBSOCKET_KEY} || '') . "\r\n" .
+        "Sec-WebSocket-Version: " . ($env->{HTTP_SEC_WEBSOCKET_VERSION} || '13') . "\r\n" .
+        "\r\n";
+
+    $hs->parse($handshake_request);
+    unless ($hs->is_done) {
+        $c->response->status(400);
+        $c->response->body('WebSocket handshake failed');
+        return;
+    }
+
+    print $io $hs->to_string;
+    $io->flush if $io->can('flush');
+    $c->detach();
+
+    unless ($self->_interactive_ws_available($c)) {
+        $c->response->status(503);
+        $c->response->body('WebSocket terminal requires Twiggy. Start with: perl script/comserv_server.pl --twiggy -p PORT -r');
+        return;
+    }
+
+    require Comserv::Controller::Coding;
+    my $coding = $c->controller('Coding');
+    unless ($coding && $coding->can('_terminal_relay_child')) {
+        warn "system_shell_terminal: Coding controller relay unavailable\n";
+        return;
+    }
+
+    my $shell_env = $coding->can('_coding_shell_env')
+        ? $coding->_coding_shell_env($c) : {};
+    $shell_env->{login_shell} = 1;
+    $coding->_terminal_relay_child($io, $shell_env);
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "Starting Admin index action");
-    
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-            "Admin access granted to user Shanta (bypass role check)");
-        # Continue with the admin page
-    }
-    else {
-        # Check if the user has admin role
-        my $has_admin_role = 0;
-        
-        # First check if user exists
-        if ($c->user_exists) {
-            # Get roles from session
-            my $roles = $c->session->{roles};
-            
-            # Log the roles for debugging
-            my $roles_debug = 'none';
-            if (defined $roles) {
-                if (ref($roles) eq 'ARRAY') {
-                    $roles_debug = join(', ', @$roles);
-                    
-                    # Check if 'admin' is in the roles array
-                    foreach my $role (@$roles) {
-                        if (lc($role) eq 'admin') {
-                            $has_admin_role = 1;
-                            last;
-                        }
-                    }
-                } elsif (!ref($roles)) {
-                    $roles_debug = $roles;
-                    # Check if roles string contains 'admin'
-                    if ($roles =~ /\badmin\b/i) {
-                        $has_admin_role = 1;
-                    }
-                }
-            }
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
-        }
-        
-        unless ($has_admin_role) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
-                "Access denied: User does not have admin role");
-            
-            # Set error message in flash
-            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-            
-            # Redirect to login page with destination parameter
-            $c->response->redirect($c->uri_for('/user/login', {
-                destination => $c->req->uri
-            }));
-            return;
-        }
-    }
-    
+    # Report this server's metrics (throttled) so infrastructure cards populate
+    eval { Comserv::Util::HardwareAgent->report_if_due($c, 300) };
+
     # Get system stats
     my $stats = $self->get_system_stats($c);
 
@@ -362,34 +1100,28 @@ sub get_system_stats {
     };
 
     eval {
-        my $df = `df -P -BM . 2>/dev/null | tail -1`;
-        if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
-            my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
-            $stats->{disk_pct}   = $pct;
-            $stats->{disk_used}  = $used >= 1024 ? sprintf('%.1f GB', $used/1024) : "${used} MB";
-            $stats->{disk_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
-            $stats->{disk_usage} = "$pct%";
-            $stats->{disk_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+        my $disk = Comserv::Util::DiskStats->app_disk_stats($c);
+        if ($disk) {
+            $stats->{disk_pct}   = $disk->{pct};
+            $stats->{disk_used}  = $disk->{used_fmt};
+            $stats->{disk_total} = $disk->{total_fmt};
+            $stats->{disk_usage} = $disk->{usage};
+            $stats->{disk_level} = $disk->{level};
         }
     };
 
     eval {
-        my $nfs_root = $ENV{NFS_DATA_PATH} // $ENV{NFS_ROOT} // '/data/nfs';
-        if (-d $nfs_root) {
-            my @app_dev = stat('.');
-            my @nfs_dev = stat($nfs_root);
-            if (@app_dev && @nfs_dev && $app_dev[0] != $nfs_dev[0]) {
-                my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
-                if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
-                    my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
-                    $stats->{nfs_pct}   = $pct;
-                    $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
-                    $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
-                    $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
-                }
-            } elsif (@app_dev && @nfs_dev && $app_dev[0] == $nfs_dev[0]) {
-                $stats->{nfs_same_device} = 1;
-            }
+        my $nfs = Comserv::Util::DiskStats->separated_nfs_stats($c);
+        if ($nfs->{blended}) {
+            $stats->{nfs_blended} = 1;
+        } elsif ($nfs->{same_device}) {
+            $stats->{nfs_same_device} = 1;
+        } elsif ($nfs->{pct}) {
+            $stats->{nfs_pct}   = $nfs->{pct};
+            $stats->{nfs_used}  = $nfs->{used_fmt};
+            $stats->{nfs_total} = $nfs->{total_fmt};
+            $stats->{nfs_level} = $nfs->{level};
+            $stats->{nfs_source} = $nfs->{source} if $nfs->{source};
         }
     };
 
@@ -406,11 +1138,123 @@ sub get_system_stats {
 }
 
 my @MONITORED_SERVERS = (
-    { names => ['db-production', 'db-01', '192.168.1.20'], ip => '192.168.1.20', label => 'DB Server 1 (192.168.1.20)'   },
-    { names => ['db-02', '192.168.1.21'],                  ip => '192.168.1.21', label => 'DB Server 2 (192.168.1.21)'   },
-    { names => ['prod-01', 'prod1', '192.168.1.126'],      ip => '192.168.1.126', label => 'Prod Catalyst 1 (192.168.1.126)' },
-    { names => ['prod-02', 'prod2', '192.168.1.127'],      ip => '192.168.1.127', label => 'Prod Catalyst 2 (192.168.1.127)' },
+    { names => ['db-production', 'db-01', 'db01', '192.168.1.20'], ip => '192.168.1.20',
+      label => 'DB Server 1 (192.168.1.20)', hostname_override => 'db-production',
+      ssh_user => 'ubuntu', ssh_alias => 'db1',
+      ingest_url => undef },
+    { names => ['db-02', 'db02', '192.168.1.21'], ip => '192.168.1.21',
+      label => 'DB Server 2 (192.168.1.21)', hostname_override => 'db-02',
+      ssh_user => 'ubuntu', ssh_alias => 'db2',
+      ingest_url => undef },
+    { names => ['comservproduction1', 'comservproduction', 'prod-01', 'prod1', 'production1', '192.168.1.126'],
+      ip => '192.168.1.126', label => 'Prod Catalyst 1 (192.168.1.126)',
+      hostname_override => 'comservproduction1', ssh_user => 'ubuntu', ssh_alias => 'production1',
+      ingest_url => 'http://127.0.0.1:5000/admin/hardware_monitor/ingest' },
+    { names => ['comservproduction2', 'prod-02', 'prod2', 'production2', '192.168.1.127'],
+      ip => '192.168.1.127', label => 'Prod Catalyst 2 (192.168.1.127)',
+      hostname_override => 'comservproduction2', ssh_user => 'ubuntu', ssh_alias => 'production2',
+      ingest_url => 'http://127.0.0.1:5000/admin/hardware_monitor/ingest' },
 );
+
+sub _monitored_server_by_ip {
+    my ($ip) = @_;
+    return unless defined $ip && length $ip;
+    for my $srv (@MONITORED_SERVERS) {
+        return $srv if $srv->{ip} eq $ip;
+    }
+    return;
+}
+
+sub _hw_ingest_url {
+    my ($self, $c) = @_;
+    return "$ENV{HW_INGEST_BASE_URL}/admin/hardware_monitor/ingest"
+        if $ENV{HW_INGEST_BASE_URL};
+    my $lan_ip = do {
+        my $ip = '';
+        eval {
+            require Socket;
+            my $sock;
+            if (Socket::inet_aton('192.168.1.1')) {
+                socket($sock, Socket::PF_INET(), Socket::SOCK_DGRAM(), 0);
+                connect($sock, Socket::pack_sockaddr_in(80, Socket::inet_aton('192.168.1.1')));
+                $ip = Socket::inet_ntoa((Socket::unpack_sockaddr_in(getsockname($sock)))[1]);
+                close $sock;
+            }
+        };
+        $ip || '127.0.0.1';
+    };
+    my $port = $c->req->uri->port // 3001;
+    return "http://${lan_ip}:${port}/admin/hardware_monitor/ingest";
+}
+
+sub _ssh_credentials_paths {
+    my @paths;
+    push @paths, "$ENV{HOME}/.comserv/secrets/ssh_credentials.json" if $ENV{HOME};
+    push @paths, '/home/shanta/.comserv/secrets/ssh_credentials.json';
+    my %seen;
+    return grep { $_ && -f $_ && !$seen{$_}++ } @paths;
+}
+
+sub _load_ssh_credentials {
+    my ($self) = @_;
+    for my $path ($self->_ssh_credentials_paths()) {
+        open my $cf, '<', $path or next;
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        return $creds if $creds && ref $creds eq 'HASH';
+    }
+    return {};
+}
+
+sub _resolve_ssh_target {
+    my ($self, $target) = @_;
+    $target = lc($target // '');
+    return (undef, undef, 22, '') if $target eq '' || $target eq 'workstation';
+
+    my ($ssh_host, $ssh_user, $ssh_port, $ssh_password) = ('', 'ubuntu', 22, '');
+    my %alias = (
+        production1 => '192.168.1.126', prod1 => '192.168.1.126', prod_01 => '192.168.1.126',
+        production2 => '192.168.1.127', prod2 => '192.168.1.127', prod_02 => '192.168.1.127',
+        db1 => '192.168.1.20', db_01 => '192.168.1.20', db01 => '192.168.1.20',
+        db2 => '192.168.1.21', db_02 => '192.168.1.21', db02 => '192.168.1.21',
+    );
+    if ($alias{$target}) {
+        $ssh_host = $alias{$target};
+    } elsif ($target =~ /^\d{1,3}(?:\.\d{1,3}){3}$/) {
+        $ssh_host = $target;
+    } elsif ($target =~ /^[a-z0-9._-]+$/i) {
+        $ssh_host = $target;
+    } else {
+        return (undef, undef, 22, '');
+    }
+
+    for my $srv (@MONITORED_SERVERS) {
+        next unless $srv->{ip} eq $ssh_host;
+        $ssh_user = $srv->{ssh_user} if $srv->{ssh_user};
+        last;
+    }
+
+    my $creds = $self->_load_ssh_credentials();
+    if (%$creds) {
+        $ssh_password = $creds->{ssh_password} || '';
+        $ssh_port     = $creds->{ssh_port}     || 22;
+        if ($creds->{ssh_target} && $creds->{ssh_target} =~ /^([^@]+)\@(.+)$/) {
+            $ssh_user = $1 unless $ssh_host =~ /^192\.168\.1\.(?:20|21)$/;
+        }
+        if ($creds->{hosts} && ref $creds->{hosts} eq 'HASH' && $creds->{hosts}{$ssh_host}) {
+            my $hc = $creds->{hosts}{$ssh_host};
+            $ssh_user     = $hc->{user}     if $hc->{user};
+            $ssh_password = $hc->{password} if $hc->{password};
+            $ssh_port     = $hc->{port}     if $hc->{port};
+        }
+    }
+
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+    return ($ssh_host, $ssh_user, $ssh_port, $ssh_password);
+}
 
 sub get_remote_server_stats {
     my ($self, $c) = @_;
@@ -418,11 +1262,18 @@ sub get_remote_server_stats {
     eval {
         my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
         for my $srv (@MONITORED_SERVERS) {
+            my @names = @{ $srv->{names} };
+            push @names, $srv->{ip} if $srv->{ip};
             my %latest;
             my @rows = $rs->search(
-                { hostname  => { -in => $srv->{names} },
-                  timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL 2 HOUR)" } },
-                { order_by => { -desc => 'timestamp' } }
+                {
+                    -or => [
+                        { hostname => { -in => \@names } },
+                        { system_identifier => { -like => $srv->{ip} . '%' } },
+                    ],
+                    timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL 24 HOUR)" },
+                },
+                { order_by => { -desc => 'timestamp' }, rows => 500 },
             )->all;
             for my $row (@rows) {
                 my $mn = $row->metric_name;
@@ -437,6 +1288,16 @@ sub get_remote_server_stats {
             }
             my $reported_hostname = @rows ? $rows[0]->hostname : undef;
             my $last_seen         = @rows ? $rows[0]->timestamp : undef;
+            my $fresh_count = $rs->search(
+                {
+                    -or => [
+                        { hostname => { -in => \@names } },
+                        { system_identifier => { -like => $srv->{ip} . '%' } },
+                    ],
+                    timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL 2 HOUR)" },
+                },
+                { rows => 1 },
+            )->count;
             push @servers, {
                 name      => $srv->{ip},
                 ip        => $srv->{ip},
@@ -445,10 +1306,255 @@ sub get_remote_server_stats {
                 metrics   => \%latest,
                 last_seen => $last_seen,
                 online    => scalar(@rows) ? 1 : 0,
+                stale     => (scalar(@rows) && !$fresh_count) ? 1 : 0,
             };
         }
     };
     return \@servers;
+}
+
+my @HW_GRAPH_METRICS = qw(
+    cpu_load_pct mem_used_pct swap_used_pct
+    ipmi_power_consumption ipmi_inlet_temp
+    ipmi_ps1_current ipmi_ps2_current
+);
+
+sub _local_monitor_hostnames {
+    my ($self) = @_;
+    my %seen;
+    my @names;
+    for my $n (qw(workstation workstation.local 192.168.1.199 localhost), $ENV{HW_HOSTNAME_OVERRIDE}) {
+        next unless defined $n && $n ne '';
+        push @names, $n unless $seen{$n}++;
+    }
+    for my $cmd ('hostname -s 2>/dev/null', 'hostname -f 2>/dev/null', 'hostname 2>/dev/null') {
+        my $h = `$cmd`;
+        chomp $h if defined $h;
+        next unless $h;
+        push @names, $h unless $seen{$h}++;
+    }
+    return \@names;
+}
+
+sub _hardware_metrics_host_search {
+    my ($self, $c, $target) = @_;
+    my @conds;
+    my %seen;
+
+    if ($target && ref $target eq 'HASH' && ($target->{ip} || $target->{names})) {
+        my $srv = ($target->{ip} ? _monitored_server_by_ip($target->{ip}) : undef) || $target;
+        my @names;
+        for my $n (
+            @{ $srv->{names} || [] },
+            $srv->{ip},
+            $srv->{hostname_override},
+            $target->{hostname},
+            $srv->{hostname},
+        ) {
+            next unless defined $n && $n ne '';
+            push @names, $n unless $seen{$n}++;
+        }
+        push @conds, { hostname => { -in => \@names } } if @names;
+        if ($srv->{ip}) {
+            push @conds, { system_identifier => { -like => $srv->{ip} . '%' } };
+        }
+    } else {
+        my @names = @{ $self->_local_monitor_hostnames() };
+        my $discovered = $self->_discover_local_agent_hostname($c);
+        push @names, $discovered if $discovered;
+        my %ns;
+        @names = grep { defined $_ && length $_ && !$ns{$_}++ } @names;
+        push @conds, { hostname => { -in => \@names } } if @names;
+    }
+
+    return @conds ? { -or => \@conds } : undef;
+}
+
+sub _discover_local_agent_hostname {
+    my ($self, $c) = @_;
+    return unless $c && eval { $c->model('DBEncy') };
+    my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+    my $row = eval {
+        $rs->search(
+            {
+                system_identifier => { -like => '%:agent' },
+                timestamp         => { '>=' => \"DATE_SUB(NOW(), INTERVAL 7 DAY)" },
+            },
+            { order_by => { -desc => 'timestamp' }, rows => 1 },
+        )->single;
+    };
+    return $row ? $row->hostname : undef;
+}
+
+sub _perl_loaded_modules {
+    my @modules;
+    for my $module (sort keys %INC) {
+        next unless $module =~ /\.pm$/;
+        (my $name = $module) =~ s/\//::/g;
+        $name =~ s/\.pm$//;
+        my $version = eval "\$${name}::VERSION" || 'Unknown'; ## no critic
+        push @modules, { name => $name, version => $version };
+    }
+    return \@modules;
+}
+
+sub _perl_installed_modules {
+    my ($perl_bin) = @_;
+    return [] unless defined $perl_bin && length $perl_bin && -x $perl_bin;
+    my $oneliner = 'use ExtUtils::Installed; my $inst=ExtUtils::Installed->new; '
+                 . 'for my $m (sort $inst->modules) { my $v=$inst->version($m)||""; print $m,"\t",$v,"\n" }';
+    my $cmd = $perl_bin . ' -MExtUtils::Installed -e ' . "'" . $oneliner . "'";
+    my @modules;
+    my $output = `$cmd 2>/dev/null`;
+    for my $line (split /\n/, $output // '') {
+        my ($name, $version) = split /\t/, $line, 2;
+        next unless defined $name && length $name;
+        push @modules, { name => $name, version => ($version // '') || 'Unknown' };
+    }
+    return \@modules;
+}
+
+sub _perl_environments {
+    my ($self) = @_;
+    my @envs;
+    my $runtime = $^X || 'perl';
+    push @envs, {
+        label   => 'Catalyst process (loaded now)',
+        path    => $runtime,
+        version => $],
+        kind    => 'loaded',
+        modules => _perl_loaded_modules(),
+        note    => 'Modules already loaded by this running app — not the full install list.',
+    };
+
+    if ($runtime =~ /perlbrew/) {
+        push @envs, {
+            label   => 'Perlbrew Perl (installed)',
+            path    => $runtime,
+            version => $],
+            kind    => 'installed',
+            modules => _perl_installed_modules($runtime),
+            note    => 'Site modules installed under the active perlbrew Perl.',
+        };
+    }
+
+    for my $sys (qw(/usr/bin/perl /bin/perl)) {
+        next unless -x $sys;
+        next if $sys eq $runtime;
+        my $ver = `$sys -e 'print $]' 2>/dev/null`;
+        chomp $ver;
+        push @envs, {
+            label   => 'System Perl (installed)',
+            path    => $sys,
+            version => ($ver || 'Unknown'),
+            kind    => 'installed',
+            modules => _perl_installed_modules($sys),
+            note    => 'Distribution/system Perl module list.',
+        };
+        last;
+    }
+    return \@envs;
+}
+
+sub get_hardware_metrics_history {
+    my ($self, $c, $target, $hours) = @_;
+    $hours = int($hours || 24);
+    $hours = 1   if $hours < 1;
+    $hours = 168 if $hours > 168;
+
+    my $result = {
+        hours           => $hours,
+        chart_data_json => '[]',
+        metrics         => [],
+        history_count   => 0,
+        db_error        => '',
+        search_label    => '',
+    };
+    return $result unless $c && eval { $c->model('DBEncy') };
+
+    my $host_search = $self->_hardware_metrics_host_search($c, $target);
+    return $result unless $host_search;
+
+    my @metrics;
+    my %chart_data;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+        my %search = (
+            %$host_search,
+            timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL $hours HOUR)" },
+        );
+
+        my @rows = $rs->search(
+            \%search,
+            { order_by => { -desc => 'timestamp' } },
+        );
+        @metrics = map { {
+            timestamp         => $_->timestamp,
+            hostname          => $_->hostname,
+            metric_name       => $_->metric_name,
+            metric_value      => $_->metric_value,
+            metric_text       => $_->metric_text,
+            unit              => $_->unit,
+            level             => $_->level,
+            message           => $_->message,
+        } } @rows;
+
+        my @disk_pct_metrics = $rs->search(
+            { metric_name => { -like => 'disk_used_pct%' }, %search },
+            { columns => ['metric_name'], distinct => 1 },
+        )->get_column('metric_name')->all;
+
+        my @graph_metric_names = (@HW_GRAPH_METRICS, @disk_pct_metrics, $rs->search(
+            { metric_name => { -like => '%_temp' }, %search },
+            { columns => ['metric_name'], distinct => 1 },
+        )->get_column('metric_name')->all);
+
+        my %graph_search = (%search, metric_name => { -in => \@graph_metric_names });
+        my @chart_rows = $rs->search(
+            \%graph_search,
+            { order_by => { -asc => 'timestamp' } },
+        );
+
+        my %_seen_slot;
+        for my $row (@chart_rows) {
+            my $mn = $row->metric_name;
+            next unless defined $row->metric_value;
+            my $ts = $row->timestamp;
+            if ($ts =~ /^(\d{4}-\d{2}-\d{2} \d{2}):(\d{2})/) {
+                my $slot_min = int($2 / 5) * 5;
+                $ts = sprintf('%s:%02d:00', $1, $slot_min);
+            }
+            my $slot_key = "$mn|" . $row->hostname . "|$ts";
+            next if $_seen_slot{$slot_key}++;
+            push @{ $chart_data{$mn}{ $row->hostname } },
+                [ $ts, $row->metric_value + 0 ];
+        }
+        for my $mn (keys %chart_data) {
+            for my $h (keys %{ $chart_data{$mn} }) {
+                $chart_data{$mn}{$h} = [ sort { $a->[0] cmp $b->[0] } @{ $chart_data{$mn}{$h} } ];
+            }
+        }
+    };
+    if ($@) {
+        $result->{db_error} = "$@";
+        return $result;
+    }
+
+    my %in_order = map { $_ => 1 } @HW_GRAPH_METRICS;
+    my @ordered  = grep { exists $chart_data{$_} } @HW_GRAPH_METRICS;
+    push @ordered, grep {
+        /^disk_used_pct/ && !$in_order{$_} && exists $chart_data{$_} && do {
+            (my $mnt = $_) =~ s/^disk_used_pct//;
+            $mnt =~ s{^_}{/}; $mnt =~ s{_}{/}g;
+            $mnt !~ m{^(/sys|/proc|/run/|/dev/pts|/snap/)};
+        }
+    } sort keys %chart_data;
+    push @ordered, grep { /_temp$/ && !$in_order{$_} } sort keys %chart_data;
+
+    $result->{metrics}         = \@metrics;
+    $result->{history_count}   = scalar @metrics;
+    $result->{chart_data_json} = encode_json([ map { { metric => $_, hosts => $chart_data{$_} } } @ordered ]);
+    return $result;
 }
 
 # Get recent user activity for the admin dashboard
@@ -526,21 +1632,20 @@ sub get_system_notifications {
         }
     };
     
-    # Check for low disk space
+    # Check for low disk space (app server disk only)
     eval {
-        my $df_output = `df -h . | tail -1`;
-        if ($df_output =~ /(\d+)%/ && $1 > 90) {
+        my $disk = Comserv::Util::DiskStats->app_disk_stats($c);
+        if ($disk && $disk->{pct} >= 90) {
             push @notifications, {
-                type => 'danger',
-                message => "Disk space is critically low ($1% used)",
-                link => undef
+                type    => 'danger',
+                message => "App server disk critically low ($disk->{pct}% — $disk->{used_fmt} / $disk->{total_fmt})",
+                link    => $c->uri_for('/admin/hardware_monitor/disk_health'),
             };
-        }
-        elsif ($df_output =~ /(\d+)%/ && $1 > 80) {
+        } elsif ($disk && $disk->{pct} >= 80) {
             push @notifications, {
-                type => 'warning',
-                message => "Disk space is running low ($1% used)",
-                link => undef
+                type    => 'warning',
+                message => "App server disk running low ($disk->{pct}%)",
+                link    => $c->uri_for('/admin/hardware_monitor/disk_health'),
             };
         }
     };
@@ -1325,23 +2430,123 @@ sub system_info :Path('/admin/system_info') :Args(0) {
         return;
     }
     
-    # Get system information
+    my $host_ip = $c->req->param('host') // '';
+    my $filter_hours = int($c->req->param('hours') || 24);
+    $filter_hours = 1   if $filter_hours < 1;
+    $filter_hours = 168 if $filter_hours > 168;
+
     my $system_info = $self->get_detailed_system_info($c);
-    
-    # Use the standard debug message system
+    my $remote_servers = $self->get_remote_server_stats($c);
+    my $selected_server;
+    if ($host_ip) {
+        ($selected_server) = grep { $_->{ip} eq $host_ip } @$remote_servers;
+    }
+
+    my $hw_target  = $selected_server || 'local';
+    my $hw_history = $self->get_hardware_metrics_history($c, $hw_target, $filter_hours);
+    my $view_label = $selected_server
+        ? ($selected_server->{label} // $host_ip)
+        : 'This host';
+
+    my $app_disk = eval { Comserv::Util::DiskStats->app_disk_stats($c) };
+    my $nfs_disk = eval { Comserv::Util::DiskStats->nfs_disk_stats($c) };
+    my $perl_envs = $self->_perl_environments();
+
     if ($c->session->{debug_mode}) {
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller system_info view - Template: admin/system_info.tt";
     }
     
-    # Pass data to the template
     $c->stash(
-        template => 'admin/system_info.tt',
-        system_info => $system_info
+        template          => 'admin/system_info.tt',
+        system_info       => $system_info,
+        remote_servers    => $remote_servers,
+        selected_server   => $selected_server,
+        selected_host_ip  => $host_ip,
+        app_disk          => $app_disk,
+        nfs_disk          => $nfs_disk,
+        ingest_url        => $self->_hw_ingest_url($c),
+        ingest_token      => ($ENV{HW_INGEST_TOKEN} // 'changeme'),
+        filter_hours      => $filter_hours,
+        view_label        => $view_label,
+        chart_data_json   => ($hw_history->{chart_data_json} || '[]'),
+        history_metrics   => ($hw_history->{metrics} || []),
+        history_count     => ($hw_history->{history_count} || 0),
+        hw_db_error       => ($hw_history->{db_error} || ''),
+        perl_envs         => $perl_envs,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_info', 
         "Completed system_info action");
+}
+
+# POST/GET /admin/install_hardware_agent?ip=192.168.1.20
+sub install_hardware_agent :Path('/admin/install_hardware_agent') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'install_hardware_agent')) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => \0, error => 'Access denied' }));
+        return;
+    }
+
+    my $ip = $c->req->param('ip') || '';
+    my $srv = _monitored_server_by_ip($ip);
+    unless ($srv) {
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => \0, error => "Unknown server IP: $ip" }));
+        return;
+    }
+
+    my $script = File::Spec->catfile($c->config->{home}, '..', 'script', 'device_agent.sh');
+    $script = File::Spec->catfile($c->config->{home}, 'script', 'device_agent.sh') unless -f $script;
+    unless (-f $script) {
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => \0, error => 'device_agent.sh not found' }));
+        return;
+    }
+
+    open my $sf, '<', $script or do {
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => \0, error => "Cannot read $script" }));
+        return;
+    };
+    local $/;
+    my $script_body = <$sf>;
+    close $sf;
+    my $b64 = MIME::Base64::encode_base64($script_body, '');
+
+    my $ingest_url = $srv->{ingest_url} || $self->_hw_ingest_url($c);
+    my $ingest_token = $ENV{HW_INGEST_TOKEN} // 'changeme';
+    my $hostname_override = $srv->{hostname_override} || $srv->{ip};
+    my $ssh_target = $srv->{ssh_alias} || $srv->{ip};
+    my ($ssh_host, $ssh_user) = $self->_resolve_ssh_target($ssh_target);
+    my @users = grep { defined && length } ($srv->{ssh_user}, $ssh_user, 'ubuntu', 'root');
+    my %seen_u;
+    @users = grep { !$seen_u{$_}++ } @users;
+
+    my ($output, $exit, $ssh_user_used) = ('', 1, '');
+    for my $try_user (@users) {
+        ($output, $exit) = $self->_install_device_agent_via_ssh(
+            $ssh_host, $try_user, $b64, $ingest_url, $ingest_token, $hostname_override,
+        );
+        $ssh_user_used = $try_user;
+        last if $exit == 0;
+        last unless $output =~ /Permission denied \(publickey|Authentication failed|Could not authenticate|sshpass:.*(denied|incorrect|failure)/i;
+    }
+
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({
+        success           => $exit == 0 ? \1 : \0,
+        output            => $output,
+        exit_code         => $exit,
+        ip                => $ip,
+        ssh_user          => $ssh_user_used,
+        hostname_override => $hostname_override,
+        ingest_url        => $ingest_url,
+    }));
 }
 
 # Get detailed system information
@@ -1421,20 +2626,11 @@ sub get_detailed_system_info {
         $info->{database_info} = "$db_info version $db_version";
     };
     
-    # Get installed Perl modules
-    eval {
-        my @modules = ();
-        foreach my $module (sort keys %INC) {
-            next unless $module =~ /\.pm$/;
-            $module =~ s/\//::/g;
-            $module =~ s/\.pm$//;
-            
-            my $version = eval "\$${module}::VERSION" || 'Unknown';
-            push @modules, { name => $module, version => $version };
-        }
-        $info->{installed_modules} = \@modules;
-    };
-    
+    $info->{perl_executable} = $^X || 'perl';
+    my @loaded = @{ _perl_loaded_modules() };
+    $info->{loaded_modules}    = \@loaded;
+    $info->{installed_modules} = \@loaded;    # legacy stash key
+
     return $info;
 }
 
@@ -5708,6 +6904,130 @@ sub _docker_bin {
     return 'docker';
 }
 
+sub _ssh_auth_is_failure {
+    my ($output) = @_;
+    return 1 if $output =~ /Permission denied \(publickey|Authentication failed|Could not authenticate|sshpass:.*(denied|incorrect|failure)/i;
+    return 0;
+}
+
+sub _run_ssh_cmd {
+    my ($self, $c, $host_cmd, $ssh_host, $ssh_user) = @_;
+    return ('ERROR: SSH host not specified', 1) unless $ssh_host;
+
+    my ($resolved_host, $default_user, $ssh_port, $ssh_password) = $self->_resolve_ssh_target($ssh_host);
+    $ssh_host   = $resolved_host || $ssh_host;
+    $ssh_user ||= $default_user || 'ubuntu';
+    $ssh_port   = int($ssh_port || 22);
+    $ssh_port   = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+
+    unless ($ssh_host =~ /^[a-zA-Z0-9_\-\.]+$/) {
+        return ("ERROR: Invalid host format", 1);
+    }
+
+    my @ssh_opts = ('-p', $ssh_port, '-o', 'ConnectTimeout=12', '-o', 'StrictHostKeyChecking=no');
+    my $escaped_cmd = $host_cmd;
+    $escaped_cmd =~ s/'/'\\''/g;
+
+    # Try SSH key first (no password in command line)
+    my $key_out = `ssh @ssh_opts -o BatchMode=yes -o IdentitiesOnly=yes $ssh_user\@$ssh_host '$escaped_cmd' 2>&1`;
+    my $key_exit = $? >> 8;
+    return ($key_out, $key_exit) if $key_exit == 0;
+    return ($key_out, $key_exit) unless _ssh_auth_is_failure($key_out);
+
+    if (!$ssh_password) {
+        return ("ERROR: SSH auth failed for $ssh_user\@$ssh_host and no password in ~/.comserv/secrets/ssh_credentials.json\n$key_out", 1);
+    }
+
+    local $ENV{SSHPASS} = $ssh_password;
+    my $pw_out = `sshpass -e ssh @ssh_opts $ssh_user\@$ssh_host '$escaped_cmd' 2>&1`;
+    my $pw_exit = $? >> 8;
+    return ($pw_out, $pw_exit);
+}
+
+sub _run_ssh_stdin_cmd {
+    my ($self, $ssh_host, $ssh_user, $remote_cmd, $stdin) = @_;
+    return ('ERROR: SSH host not specified', 1) unless $ssh_host;
+
+    my ($resolved_host, $default_user, $ssh_port, $ssh_password) = $self->_resolve_ssh_target($ssh_host);
+    $ssh_host   = $resolved_host || $ssh_host;
+    $ssh_user ||= $default_user || 'ubuntu';
+    $ssh_port   = int($ssh_port || 22);
+    $ssh_port   = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+
+    unless ($ssh_host =~ /^[a-zA-Z0-9_\-\.]+$/) {
+        return ("ERROR: Invalid host format", 1);
+    }
+
+    my $escaped_cmd = $remote_cmd;
+    $escaped_cmd =~ s/'/'\\''/g;
+    my @ssh_base = ('-p', $ssh_port, '-o', 'ConnectTimeout=12', '-o', 'StrictHostKeyChecking=no');
+
+    my $run = sub {
+        my ($use_pass) = @_;
+        my @cmd = $use_pass
+            ? ('sshpass', '-e', 'ssh', @ssh_base, "$ssh_user\@$ssh_host", $remote_cmd)
+            : ('ssh', @ssh_base, '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes', "$ssh_user\@$ssh_host", $remote_cmd);
+        local $ENV{SSHPASS} = $ssh_password if $use_pass;
+        open my $pipe, '|-', @cmd or return ("ERROR: cannot open ssh pipe: $!", 1);
+        if (defined $stdin && length $stdin) {
+            print $pipe $stdin;
+        }
+        close $pipe;
+        my $exit = $? >> 8;
+        return ('', $exit);
+    };
+
+    my ($out, $exit) = $run->(0);
+    return ($out, $exit) if $exit == 0;
+
+    return ("ERROR: SSH auth failed for $ssh_user\@$ssh_host (key-based)", $exit)
+        unless $ssh_password;
+
+    return $run->(1);
+}
+
+sub _install_device_agent_via_ssh {
+    my ($self, $ssh_host, $ssh_user, $b64, $ingest_url, $ingest_token, $hostname_override) = @_;
+    $b64 =~ s/\s+//g;
+
+    my ($bin, $log, $upload_cmd);
+    if ($ssh_user && $ssh_user eq 'root') {
+        $bin = '/usr/local/bin/device_agent.sh';
+        $log = '/var/log/comserv_device_agent.log';
+        $upload_cmd = "mkdir -p /usr/local/bin && base64 -d > $bin && chmod +x $bin && echo Uploaded";
+    } else {
+        $bin = '$HOME/bin/device_agent.sh';
+        $log = '$HOME/comserv_device_agent.log';
+        $upload_cmd = 'mkdir -p "$HOME/bin" && base64 -d > "$HOME/bin/device_agent.sh" && chmod +x "$HOME/bin/device_agent.sh" && echo Uploaded';
+    }
+
+    my ($out1, $exit1) = $self->_run_ssh_stdin_cmd($ssh_host, $ssh_user, $upload_cmd, $b64);
+    return ("SSH upload failed (exit $exit1). Check SSH credentials for $ssh_user\@$ssh_host.", $exit1) if $exit1 != 0;
+
+    my $cron_line = sprintf(
+        '*/5 * * * * INGEST_URL=%s INGEST_TOKEN=%s HOSTNAME_OVERRIDE=%s %s >> %s 2>&1',
+        $ingest_url, $ingest_token, $hostname_override, $bin, $log,
+    );
+    $cron_line =~ s/'/'\\''/g;
+
+    my $cron_cmd = join(' && ',
+        "(crontab -l 2>/dev/null | grep -v device_agent.sh; echo '$cron_line') | crontab -",
+        'echo "Cron installed"',
+    );
+    my ($out2, $exit2) = $self->_run_ssh_cmd(undef, $cron_cmd, $ssh_host, $ssh_user);
+    return (join("\n", grep { defined && length } ($out1, $out2)), $exit2) if $exit2 != 0;
+
+    my $test_cmd = "INGEST_URL='$ingest_url' INGEST_TOKEN='$ingest_token' HOSTNAME_OVERRIDE='$hostname_override' $bin || echo 'WARN: test run failed (cron will retry every 5 min)'";
+    my ($out3, $exit3) = $self->_run_ssh_cmd(undef, $test_cmd, $ssh_host, $ssh_user);
+    my $output = join("\n", grep { defined && length } ($out1, $out2, $out3));
+    $output .= "\nInstalled on $ssh_user\@$ssh_host — agent cron active (every 5 min)."
+        if $exit2 == 0;
+    if ($exit3 != 0) {
+        $output .= "\nNote: immediate test ingest failed; verify $ingest_url is reachable from $ssh_host.";
+    }
+    return ($output, 0);
+}
+
 sub _run_host_cmd_on_target {
     my ($self, $c, $host_cmd, $target) = @_;
     
@@ -5719,53 +7039,26 @@ sub _run_host_cmd_on_target {
         my $exit_code = $? >> 8;
         return ($output, $exit_code);
     }
-    
-    # Remote target via SSH
-    my $ssh_host = '';
-    my $ssh_user = 'ubuntu';
-    my $ssh_port = 22;
-    if ($target eq 'production2') {
-        $ssh_host = '192.168.1.127';
-    } else {
-        # Default to production1
-        $ssh_host = '192.168.1.126';
+
+    my ($ssh_host, $ssh_user, $ssh_port, $ssh_password) = $self->_resolve_ssh_target($target);
+    unless ($ssh_host) {
+        return ("ERROR: Unknown target '$target'", 1);
     }
-    
-    # Load SSH password from file
-    my $ssh_password = '';
-    my $home = $ENV{HOME} || '/home/shanta';
-    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
-    if (-f $creds_file && open my $cf, '<', $creds_file) {
-        local $/;
-        my $json = <$cf>;
-        close $cf;
-        my $creds = eval { decode_json($json) };
-        if ($creds) {
-            $ssh_password = $creds->{ssh_password} || '';
-            $ssh_port = $creds->{ssh_port} || 22;
-        }
-    }
-    
     if (!$ssh_password) {
         return ("ERROR: SSH password required. Use Test Connection to save credentials first.", 1);
     }
-    
-    # Validate SSH parameters
     unless ($ssh_host =~ /^[a-zA-Z0-9_\-\.]+$/) {
         return ("ERROR: Invalid host format", 1);
     }
-    $ssh_port = int($ssh_port);
-    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
-    
-    # Escape single quotes in host_cmd
+
     my $escaped_cmd = $host_cmd;
     $escaped_cmd =~ s/'/'\\''/g;
-    
+
     local $ENV{SSHPASS} = $ssh_password;
     my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host '$escaped_cmd' 2>&1);
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
-    
+
     return ($output, $exit_code);
 }
 
@@ -6446,6 +7739,50 @@ sub docker_rebuild_status :Path('/admin/docker-rebuild-status') :Args(1) {
         done      => $done ? \1 : \0,
         exit_code => $exit_val + 0,
         output    => $output,
+    }));
+}
+
+sub production_disk_cleanup :Path('/admin/production-disk-cleanup') :Args(0) {
+    my ($self, $c) = @_;
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'production_disk_cleanup')) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => \0, error => 'Access denied' }));
+        return;
+    }
+
+    my $target = $c->req->params->{target} || 'production1';
+    my $script = File::Spec->catfile($c->config->{home}, '..', 'script', 'production-disk-cleanup.sh');
+    $script = File::Spec->catfile($c->config->{home}, 'script', 'production-disk-cleanup.sh')
+        unless -f $script;
+    unless (-f $script) {
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => \0, error => 'production-disk-cleanup.sh not found' }));
+        return;
+    }
+
+    open my $sf, '<', $script or do {
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ success => \0, error => "Cannot read $script" }));
+        return;
+    };
+    local $/;
+    my $script_body = <$sf>;
+    close $sf;
+    my $b64 = MIME::Base64::encode_base64($script_body, '');
+
+    my ($output, $exit) = $self->_run_host_cmd_on_target($c,
+        "echo '$b64' | base64 -d > /tmp/comserv-disk-cleanup.sh && chmod +x /tmp/comserv-disk-cleanup.sh && /tmp/comserv-disk-cleanup.sh",
+        $target,
+    );
+
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({
+        success   => $exit == 0 ? \1 : \0,
+        output    => $output,
+        exit_code => $exit,
+        target    => $target,
     }));
 }
 
@@ -7149,6 +8486,29 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print "Mode      : " . ($quick_deploy ? "QUICK DEPLOY (Skip build/push)" : "FULL DEPLOY (Build + Push + Deploy)") . "\n";
         print "=" x 60 . "\n\n";
 
+        print "--- Step 0a: Auto-commit and push local changes ---\n";
+        local $ENV{COMSERV_GIT_REPO_ROOT} = $repo_dir;
+        local $ENV{COMSERV_DEPLOY_USER}   = $deploy_user;
+        my $git_sync_exit = system('bash', "$comserv_dir/script/deploy.sh", '--pre-build-git-sync');
+        $git_sync_exit >>= 8;
+        if ($git_sync_exit != 0) {
+            print "\n❌ PRE-BUILD GIT SYNC FAILED (exit $git_sync_exit)\n";
+            print "Resolve git commit/push errors, then re-run Auto Deploy.\n";
+            $child_exit->(1);
+        }
+        $git_commit  = `git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null`; chomp $git_commit;
+        $git_subject  = `git -C "$repo_dir" log -1 --pretty=%s 2>/dev/null`; chomp $git_subject;
+        print "Building/deploying from commit: $git_commit ($git_subject)\n\n";
+        if (open my $vf, '>', "$comserv_dir/version.json") {
+            print $vf encode_json({
+                commit     => $git_commit || 'unknown',
+                branch     => $git_branch || 'unknown',
+                build_date => $build_date,
+                build_host => $build_host || 'workstation',
+            });
+            close $vf;
+        }
+
         unless ($quick_deploy) {
             print "--- Pre-flight: Checking Docker Hub credentials ---\n";
 
@@ -7672,7 +9032,10 @@ sub end : Private {
     my ($self, $c) = @_;
     
     # Skip template rendering for WebSocket endpoints
-    if ($c->req->path =~ m{/admin/docker-ssh-terminal}) {
+    if ($c->req->path =~ m{/admin/(?:docker-ssh-terminal|system-shell-terminal|ssh_terminal_status|ssh_terminal_start_ttyd|shell_run_command|ttyd-proxy)} ) {
+        return;
+    }
+    if ($c->action && ($c->action->name || '') =~ /^ttyd_proxy/) {
         return;
     }
     

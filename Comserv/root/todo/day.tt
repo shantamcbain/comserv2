@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt, v  0.12 2026/02/09 shanta Exp shanta - Made overdue todos draggable with drag handles for week/month view rescheduling. Added data attributes and todo-item-shared class.' %]
+[% PageVersion = 'todo/day.tt, v  0.28 2026/06/13 shanta Exp shanta - User prefs DB sync for calendar colours and lane width.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -121,9 +121,22 @@
     margin-left: auto;
 }
 
-.gcal-sites-bar {
+.gcal-sites-bar, .gcal-legend-bar {
     display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
     padding: 5px 0 5px; border-bottom: 1px solid #e8e8e8; margin-bottom: 0;
+}
+.gcal-legend-bar { font-size: 0.77em; color: #5f6368; padding: 4px 0 6px; }
+.gcal-legend-label { font-weight: 600; color: #3c4043; margin-right: 2px; white-space: nowrap; }
+.gcal-legend-sep { color: #dadce0; margin: 0 4px; }
+.gcal-user-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 8px 1px 5px; border-radius: 10px;
+    background: #f8f9fa; border: 1px solid #dadce0; font-size: 0.95em;
+}
+.gcal-user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.gcal-fixed-legend-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 8px; border-radius: 10px; background: #5f6368; color: #fff; font-size: 0.95em;
 }
 .gcal-site-chip {
     display: inline-flex; align-items: center; gap: 4px;
@@ -134,6 +147,18 @@
 .gcal-site-chip:hover { opacity: 0.8; }
 .gcal-site-chip.hidden-site { opacity: 0.35; }
 .gcal-site-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.gcal-color-swatch {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    flex-shrink: 0; cursor: pointer; border: 1px solid rgba(0,0,0,0.2);
+    position: relative; overflow: hidden; vertical-align: middle;
+}
+.gcal-color-swatch .gcal-color-input {
+    position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%;
+    cursor: pointer; border: none; padding: 0; margin: 0;
+}
+.gcal-legend-hint {
+    font-size: 0.72em; color: #9aa0a6; margin-left: 6px; white-space: nowrap;
+}
 
 .gcal-grid-outer {
     display: flex; overflow-y: auto; max-height: 68vh;
@@ -151,6 +176,22 @@
 }
 .gcal-events-area {
     flex: 1; position: relative; min-width: 0;
+    --gcal-fixed-pct: 15%;
+}
+.gcal-events-area::before {
+    content: '';
+    position: absolute; left: var(--gcal-fixed-pct, 15%); top: 0; bottom: 0; width: 1px;
+    background: #c5c9ce; z-index: 2; pointer-events: none;
+}
+.gcal-lane-resizer {
+    position: absolute;
+    left: calc(var(--gcal-fixed-pct, 15%) - 3px);
+    top: 0; bottom: 0; width: 6px;
+    cursor: col-resize; z-index: 9;
+    background: transparent;
+}
+.gcal-lane-resizer:hover, .gcal-lane-resizer.dragging {
+    background: rgba(26, 115, 232, 0.25);
 }
 .gcal-hour-rule {
     position: absolute; left: 0; right: 0; height: 1px; background: #e0e0e0; z-index: 0;
@@ -159,7 +200,7 @@
     position: absolute; left: 0; right: 0; height: 1px; background: #f1f1f1; z-index: 0;
 }
 .gcal-now-line {
-    position: absolute; left: 0; right: 0; height: 2px; background: #ea4335; z-index: 6; pointer-events: none;
+    position: absolute; left: 0; right: 0; height: 2px; background: #ea4335; z-index: 12; pointer-events: none;
 }
 .gcal-now-dot {
     position: absolute; left: -5px; top: -5px;
@@ -177,7 +218,18 @@
     cursor: pointer; z-index: 3; transition: box-shadow 0.12s, opacity 0.12s;
     min-height: 18px;
 }
-.gcal-ev:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.35); z-index: 10; overflow: visible; }
+.gcal-ev:hover, .gcal-ev.gcal-ev-active {
+    box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+    z-index: 50 !important; overflow: visible;
+}
+.gcal-ev.is-fixed-ev {
+    font-size: 0.72em; z-index: 3;
+    background: #5f6368 !important; border-left-color: #3c4043 !important;
+}
+.gcal-ev.is-fixed-ev .gcal-ev-site,
+.gcal-ev.is-fixed-ev .gcal-ev-user { display: none; }
+.gcal-ev.is-fixed-ev .gcal-ev-actions { flex-wrap: wrap; }
+
 .gcal-ev.is-done { opacity: 0.45 !important; }
 .gcal-ev.dragging { opacity: 0.35; cursor: grabbing; }
 .gcal-ev-row {
@@ -212,9 +264,29 @@
 }
 .gcal-add-click {
     position: absolute; left: 0; right: 0; height: 60px; cursor: cell; z-index: 1;
-    background: transparent;
+    background: transparent; pointer-events: auto;
 }
 .gcal-add-click:hover { background: rgba(26,115,232,0.06); }
+.todo-popup {
+    display: none; position: fixed; z-index: 99999;
+    background: var(--background-color, #fff);
+    border: 2px solid var(--primary-color, #4CAF50);
+    border-radius: 8px; padding: 6px 10px 8px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+    min-width: 300px; max-width: 420px;
+    white-space: normal; pointer-events: auto;
+    color: var(--text-color, #333);
+}
+.todo-popup .popup-details {
+    font-size: 0.85em; color: #666; line-height: 1.35;
+    border-top: none; padding-top: 0; margin-top: 0;
+}
+.todo-popup .popup-details div { margin-bottom: 1px; }
+.todo-popup .popup-details div:empty { display: none; }
+.todo-popup .popup-details .popup-line-desc {
+    max-height: 72px; overflow-y: auto; word-break: break-word;
+}
+.todo-popup .popup-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 </style>
 
 [% UNLESS include_mode %]
@@ -426,9 +498,9 @@
         background: var(--background-color, white);
         border: 2px solid var(--primary-color, #4CAF50);
         border-radius: 8px;
-        padding: 12px;
+        padding: 6px 10px 8px;
         box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-        z-index: 10000;
+        z-index: 99999;
         min-width: 300px;
         max-width: 400px;
         white-space: normal;
@@ -439,29 +511,19 @@
         z-index: 100;
     }
 
-    .todo-popup .popup-subject {
-        font-size: 1.2em;
-        font-weight: bold;
-        margin-bottom: 8px;
-        color: var(--primary-color, #4CAF50);
-    }
-
-    .todo-popup .popup-description {
-        font-size: 0.95em;
-        margin-bottom: 8px;
-        color: var(--text-color, #333);
-        line-height: 1.5;
-    }
-
     .todo-popup .popup-details {
         font-size: 0.85em;
         color: var(--secondary-text, #666);
-        border-top: 1px solid var(--border-color, #ddd);
-        padding-top: 8px;
+        border-top: none;
+        padding-top: 0;
+        margin-top: 0;
     }
 
     .todo-popup .popup-details div {
-        margin-bottom: 4px;
+        margin-bottom: 1px;
+    }
+    .todo-popup .popup-details div:empty {
+        display: none;
     }
 
     .gcal-ev .todo-popup {
@@ -470,9 +532,9 @@
         background: var(--background-color, #fff);
         border: 2px solid var(--primary-color, #4CAF50);
         border-radius: 8px;
-        padding: 12px;
+        padding: 6px 10px 8px;
         box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-        z-index: 10000;
+        z-index: 99999;
         min-width: 300px;
         max-width: 420px;
         white-space: normal;
@@ -847,8 +909,28 @@ function _updateDaySiteSummary() {
 /* ── Google Calendar layout helpers ── */
 
 var GCAL_PALETTE = [];
-var _gcalSiteColors = {};
-var _gcalColorIdx = 0;
+var GCAL_COLOR_OVERRIDES = null;
+var GCAL_LS_COLOR_KEY = 'gcal_site_color_overrides';
+var GCAL_PREF_COLORS  = 'calendar.site_colors';
+var GCAL_PREF_LANE    = 'calendar.fixed_lane_pct';
+
+function _gcalPrefGet(key) {
+    if (window.ComservUserPrefs) return ComservUserPrefs.get(key);
+    return undefined;
+}
+
+function _gcalPrefSet(key, value) {
+    if (window.ComservUserPrefs) {
+        ComservUserPrefs.set(key, value);
+        return;
+    }
+    if (key === GCAL_PREF_COLORS) {
+        try { localStorage.setItem(GCAL_LS_COLOR_KEY, JSON.stringify(value || {})); } catch (e) {}
+    } else if (key === GCAL_PREF_LANE) {
+        try { localStorage.setItem('gcal_fixed_lane_pct', String(value)); } catch (e) {}
+    }
+}
+
 function _buildGcalPalette() {
     var s = getComputedStyle(document.documentElement);
     var accent  = s.getPropertyValue('--accent-color').trim()  || '#FB8C00';
@@ -856,18 +938,88 @@ function _buildGcalPalette() {
     var success = s.getPropertyValue('--success-color').trim() || '#43A047';
     return [info, accent, success, '#8e24aa', '#e53935', '#1565c0', '#6d4c41', '#558b2f', '#c62828', '#00838f', '#4527a0'];
 }
-function gcalSiteColor(site) {
-    if (!GCAL_PALETTE.length) GCAL_PALETTE = _buildGcalPalette();
-    if (!site) return '#757575';
-    if (!_gcalSiteColors[site]) {
-        _gcalSiteColors[site] = GCAL_PALETTE[_gcalColorIdx % GCAL_PALETTE.length];
-        _gcalColorIdx++;
+
+function gcalLoadColorOverrides() {
+    if (GCAL_COLOR_OVERRIDES !== null) return;
+    GCAL_COLOR_OVERRIDES = {};
+    var fromPrefs = _gcalPrefGet(GCAL_PREF_COLORS);
+    if (fromPrefs && typeof fromPrefs === 'object') {
+        GCAL_COLOR_OVERRIDES = fromPrefs;
+        return;
     }
-    return _gcalSiteColors[site];
+    try {
+        var raw = localStorage.getItem(GCAL_LS_COLOR_KEY);
+        if (raw) GCAL_COLOR_OVERRIDES = JSON.parse(raw) || {};
+    } catch (e) { GCAL_COLOR_OVERRIDES = {}; }
+}
+
+/* Stable default from site name — same site always gets the same color on every visit. */
+function gcalStableDefaultColor(site) {
+    if (!GCAL_PALETTE.length) GCAL_PALETTE = _buildGcalPalette();
+    var h = 0;
+    for (var i = 0; i < site.length; i++) {
+        h = ((h << 5) - h + site.charCodeAt(i)) | 0;
+    }
+    return GCAL_PALETTE[Math.abs(h) % GCAL_PALETTE.length];
+}
+
+function gcalSiteColor(site) {
+    if (!site) return '#757575';
+    gcalLoadColorOverrides();
+    if (GCAL_COLOR_OVERRIDES[site]) return GCAL_COLOR_OVERRIDES[site];
+    return gcalStableDefaultColor(site);
+}
+
+function gcalSetSiteColor(site, color) {
+    if (!site || !color) return;
+    gcalLoadColorOverrides();
+    GCAL_COLOR_OVERRIDES[site] = color;
+    _gcalPrefSet(GCAL_PREF_COLORS, Object.assign({}, GCAL_COLOR_OVERRIDES));
+    gcalColorizeEvents();
+    gcalLayoutEvents();
+    gcalBuildLegend();
+}
+
+function gcalResetSiteColor(site) {
+    if (!site) return;
+    gcalLoadColorOverrides();
+    delete GCAL_COLOR_OVERRIDES[site];
+    _gcalPrefSet(GCAL_PREF_COLORS, Object.assign({}, GCAL_COLOR_OVERRIDES));
+    gcalColorizeEvents();
+    gcalLayoutEvents();
+    gcalBuildLegend();
+}
+
+function gcalMakeSiteColorSwatch(site) {
+    var label = document.createElement('label');
+    label.className = 'gcal-color-swatch';
+    label.style.background = gcalSiteColor(site);
+    label.title = 'Change calendar color for ' + site + ': click to open the color picker. '
+        + 'Saved to your account (offline: cached in this browser). Shift+click to restore default.';
+    var picker = document.createElement('input');
+    picker.type = 'color';
+    picker.className = 'gcal-color-input';
+    picker.value = gcalSiteColor(site);
+    picker.title = label.title;
+    picker.setAttribute('aria-label', 'Color for site ' + site);
+    picker.addEventListener('input', function() {
+        gcalSetSiteColor(site, picker.value);
+        label.style.background = picker.value;
+    });
+    label.addEventListener('click', function(e) {
+        if (e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            gcalResetSiteColor(site);
+        }
+    });
+    label.appendChild(picker);
+    return label;
 }
 
 function gcalColorizeEvents() {
     document.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
+        if (_gcalIsFixed(el)) return;
         var site = el.getAttribute('data-site') || '';
         var col = gcalSiteColor(site);
         el.style.background = col;
@@ -878,76 +1030,320 @@ function gcalColorizeEvents() {
     });
 }
 
-function gcalLayoutEvents() {
-    var area = document.getElementById('gcal-events-area');
+var GCAL_GRID_START = 300;   /* 5:00 AM */
+var GCAL_GRID_END   = 23 * 60; /* through 11 PM — matches visible day grid */
+var gcalFixedLanePct = 15;
+var GCAL_FIXED_LANE = { left: 0.3, width: 14.2 };
+var GCAL_TODO_ZONE  = { left: 15.5, width: 83.8 };
+
+function gcalSyncLaneWidths() {
+    GCAL_FIXED_LANE = { left: 0.3, width: Math.max(6, gcalFixedLanePct - 0.5) };
+    GCAL_TODO_ZONE  = { left: gcalFixedLanePct + 0.5, width: Math.max(20, 99.2 - gcalFixedLanePct) };
+}
+
+function gcalApplyLaneCss(area) {
+    area = area || document.getElementById('gcal-events-area');
     if (!area) return;
-    var evs = Array.from(area.querySelectorAll('.gcal-ev'));
+    area.style.setProperty('--gcal-fixed-pct', gcalFixedLanePct + '%');
+    var resizer = document.getElementById('gcal-lane-resizer');
+    if (resizer) resizer.style.left = 'calc(' + gcalFixedLanePct + '% - 3px)';
+}
+
+function gcalLoadLanePct() {
+    var v = _gcalPrefGet(GCAL_PREF_LANE);
+    if (v === undefined) {
+        try { v = parseFloat(localStorage.getItem('gcal_fixed_lane_pct')); } catch (e) {}
+    }
+    v = parseFloat(v);
+    if (!isNaN(v) && v >= 8 && v <= 45) gcalFixedLanePct = v;
+    gcalSyncLaneWidths();
+}
+
+function gcalInitLaneResizer() {
+    var area = document.getElementById('gcal-events-area');
+    var handle = document.getElementById('gcal-lane-resizer');
+    if (!area || !handle || handle._gcalInit) return;
+    handle._gcalInit = 1;
+    var dragging = false;
+    function onMove(clientX) {
+        var rect = area.getBoundingClientRect();
+        var pct = ((clientX - rect.left) / rect.width) * 100;
+        pct = Math.max(8, Math.min(45, pct));
+        gcalFixedLanePct = Math.round(pct * 10) / 10;
+        gcalSyncLaneWidths();
+        gcalApplyLaneCss(area);
+        gcalLayoutEvents();
+    }
+    handle.addEventListener('mousedown', function(e) {
+        dragging = true;
+        handle.classList.add('dragging');
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        onMove(e.clientX);
+    });
+    document.addEventListener('mouseup', function() {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        _gcalPrefSet(GCAL_PREF_LANE, gcalFixedLanePct);
+    });
+}
+
+function _gcalIsFixed(el) {
+    if (el.getAttribute('data-is-recurring') === '1') return true;
+    if (el.getAttribute('data-is-fixed') === '1') return true;
+    var t = el.getAttribute('data-todo-type') || 'task';
+    return t === 'appointment' || t === 'meeting' || t === 'event' || t === 'reminder';
+}
+
+function _gcalEndMin(el) {
+    var end = parseInt(el.getAttribute('data-end-min'), 10);
+    if (!isNaN(end) && end > 0) return end;
+    var start = parseInt(el.getAttribute('data-start-min'), 10) || GCAL_GRID_START;
+    var dur   = parseInt(el.getAttribute('data-dur-min'), 10) || 30;
+    return start + dur;
+}
+
+function _gcalClearSegments(el) {
+    el.querySelectorAll('.gcal-ev-segment').forEach(function(s) { s.remove(); });
+    el.classList.remove('gcal-segmented');
+}
+
+/* One bar per todo at its start time — work duration only (no split bars around lunch). */
+function _gcalApplyTodoLayout(el, siteColor) {
+    var start = parseInt(el.getAttribute('data-start-min'), 10) || GCAL_GRID_START;
+    var dur   = parseInt(el.getAttribute('data-dur-min'), 10) || 30;
+    _gcalClearSegments(el);
+    var col = siteColor || el.style.background || gcalSiteColor(el.getAttribute('data-site') || '');
+    el.style.top = (start - GCAL_GRID_START) + 'px';
+    el.style.height = Math.max(15, dur) + 'px';
+    el.style.background = col;
+    el.style.borderLeft = '3px solid ' + col;
+}
+
+/* Fixed breaks/appointments in a narrow left lane; site todos in the right zone — never overlap. */
+function _gcalLayoutArea(area) {
+    if (!area) return;
+    var evs = Array.from(area.querySelectorAll('.gcal-ev')).filter(function(el) {
+        return el.style.display !== 'none';
+    });
     if (!evs.length) return;
 
-    var parsed = evs.map(function(el) {
-        var startMin = parseInt(el.getAttribute('data-start-min')) || 300;
-        var durMin   = Math.max(1, parseInt(el.getAttribute('data-dur-min')) || 30);
-        return { el: el, start: startMin, end: startMin + durMin, col: 0, numCols: 1 };
+    var fixed = [], todos = [];
+    evs.forEach(function(el) {
+        if (_gcalIsFixed(el)) fixed.push(el);
+        else todos.push(el);
     });
 
-    parsed.sort(function(a,b){ return a.start - b.start || a.end - b.end; });
-
-    var colEnds = [];
-    parsed.forEach(function(ev) {
-        var placed = false;
-        for (var c = 0; c < colEnds.length; c++) {
-            if (colEnds[c] <= ev.start) {
-                ev.col = c;
-                colEnds[c] = ev.end;
-                placed = true;
-                break;
-            }
-        }
-        if (!placed) {
-            ev.col = colEnds.length;
-            colEnds.push(ev.end);
-        }
+    fixed.forEach(function(el) {
+        var start = parseInt(el.getAttribute('data-start-min'), 10) || GCAL_GRID_START;
+        var end   = _gcalEndMin(el);
+        el.style.top = (start - GCAL_GRID_START) + 'px';
+        el.style.height = Math.max(15, end - start) + 'px';
+        el.style.left = GCAL_FIXED_LANE.left + '%';
+        el.style.width = GCAL_FIXED_LANE.width + '%';
+        el.style.zIndex = '3';
+        el.classList.add('is-fixed-ev');
+        _gcalClearSegments(el);
     });
 
-    parsed.forEach(function(ev) {
-        var maxCol = ev.col;
-        for (var i = 0; i < parsed.length; i++) {
-            var other = parsed[i];
-            if (other !== ev && other.start < ev.end && other.end > ev.start) {
-                if (other.col > maxCol) maxCol = other.col;
-            }
-        }
-        ev.numCols = maxCol + 1;
+    var bySite = {};
+    todos.forEach(function(el) {
+        el.classList.remove('is-fixed-ev');
+        var site = el.getAttribute('data-site') || '_none';
+        if (!bySite[site]) bySite[site] = [];
+        bySite[site].push(el);
     });
 
-    parsed.forEach(function(ev) {
-        var pct = 100 / ev.numCols;
-        ev.el.style.left  = (ev.col * pct + 0.3) + '%';
-        ev.el.style.width = (pct - 0.6) + '%';
-        ev.el.style.right = '';
+    var sites = Object.keys(bySite).sort();
+    var numCols = sites.length || 1;
+    var colW = GCAL_TODO_ZONE.width / numCols;
+
+    sites.forEach(function(site, idx) {
+        var left = GCAL_TODO_ZONE.left + (idx * colW);
+        var width = colW - 0.5;
+        var col = gcalSiteColor(site === '_none' ? '' : site);
+        bySite[site].forEach(function(el) {
+            el.style.left = left + '%';
+            el.style.width = width + '%';
+            el.style.zIndex = '3';
+            _gcalApplyTodoLayout(el, col);
+        });
     });
+}
+
+function gcalLayoutEvents() {
+    _gcalLayoutArea(document.getElementById('gcal-events-area'));
+}
+
+function gcalBuildLegend() {
+    var bar = document.getElementById('gcal-legend-bar');
+    var area = document.getElementById('gcal-events-area');
+    if (!bar || !area) return;
+    var sites = {}, users = {};
+    area.querySelectorAll('.gcal-ev').forEach(function(el) {
+        if (el.style.display === 'none') return;
+        if (_gcalIsFixed(el)) return;
+        var s = el.getAttribute('data-site') || '';
+        var u = el.getAttribute('data-user') || '';
+        if (s) sites[s] = 1;
+        if (u) users[u] = s || users[u] || '';
+    });
+    bar.innerHTML = '';
+    var fixedChip = document.createElement('span');
+    fixedChip.className = 'gcal-fixed-legend-chip';
+    fixedChip.textContent = '\u2615 Fixed (breaks / appointments)';
+    fixedChip.title = 'Gray column on the left \u2014 drag divider to resize';
+    bar.appendChild(fixedChip);
+
+    var siteKeys = Object.keys(sites).sort();
+    if (siteKeys.length) {
+        var sep = document.createElement('span');
+        sep.className = 'gcal-legend-sep';
+        sep.textContent = '|';
+        bar.appendChild(sep);
+        var sl = document.createElement('span');
+        sl.className = 'gcal-legend-label';
+        sl.textContent = 'Sites:';
+        bar.appendChild(sl);
+        siteKeys.forEach(function(site) {
+            var chip = document.createElement('span');
+            chip.className = 'gcal-site-chip';
+            chip.appendChild(gcalMakeSiteColorSwatch(site));
+            chip.appendChild(document.createTextNode(site));
+            bar.appendChild(chip);
+        });
+        var hint = document.createElement('span');
+        hint.className = 'gcal-legend-hint';
+        hint.textContent = 'Click \u25cf to set color';
+        hint.title = 'Calendar bar colors are per site. Click the colored dot next to a site name '
+            + 'to choose its color (saved to your account). Shift+click the dot to reset.';
+        bar.appendChild(hint);
+    }
+
+    var userKeys = Object.keys(users).sort();
+    if (userKeys.length) {
+        var sep2 = document.createElement('span');
+        sep2.className = 'gcal-legend-sep';
+        sep2.textContent = '|';
+        bar.appendChild(sep2);
+        var ul = document.createElement('span');
+        ul.className = 'gcal-legend-label';
+        ul.textContent = 'Users:';
+        bar.appendChild(ul);
+        userKeys.forEach(function(user) {
+            var chip = document.createElement('span');
+            chip.className = 'gcal-user-chip';
+            var dot = document.createElement('span');
+            dot.className = 'gcal-user-dot';
+            var site = users[user] || '';
+            dot.style.background = site ? gcalSiteColor(site) : '#9aa0a6';
+            chip.appendChild(dot);
+            chip.appendChild(document.createTextNode(user + (site ? ' (' + site + ')' : '')));
+            chip.title = 'Assigned user; dot matches site color';
+            bar.appendChild(chip);
+        });
+    }
+}
+
+function gcalTodayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 function gcalUpdateNowLine() {
     var line = document.getElementById('gcal-now-line');
     if (!line) return;
+    var area = document.getElementById('gcal-events-area');
+    if (!area) return;
+    var isToday = area.getAttribute('data-is-today') === '1'
+        || (area.getAttribute('data-date') || '') === gcalTodayStr();
+    if (!isToday) {
+        line.style.display = 'none';
+        return;
+    }
     var now = new Date();
     var totalMin = now.getHours() * 60 + now.getMinutes();
-    var gridStart = 5 * 60;
-    var gridEnd   = 22 * 60;
-    if (totalMin < gridStart || totalMin > gridEnd) { line.style.display = 'none'; return; }
+    if (totalMin < GCAL_GRID_START || totalMin > GCAL_GRID_END) {
+        line.style.display = 'none';
+        return;
+    }
     line.style.display = 'block';
-    line.style.top = (totalMin - gridStart) + 'px';
+    line.style.top = (totalMin - GCAL_GRID_START) + 'px';
 }
 
-function gcalPopulateUserFilter() {
-    var sel = document.getElementById('gcal-user-filter');
-    if (!sel) return;
-    var seen = {};
-    document.querySelectorAll('.gcal-ev[data-user]').forEach(function(el) {
-        var u = el.getAttribute('data-user') || '';
-        if (u && !seen[u]) { seen[u] = 1; var o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o); }
+function gcalRescheduleTodos(btn) {
+    var focusEl = document.getElementById('gcal-reschedule-focus');
+    var focus = focusEl ? focusEl.value : 'all';
+    var sites = [];
+    var siteEl = document.getElementById('gcal-site-filter');
+    if (siteEl && siteEl.value) sites.push(siteEl.value);
+    var userEl = document.getElementById('gcal-user-filter');
+    var user = userEl ? userEl.value : '';
+    var areaEl = document.querySelector('.gcal-events-area[data-date]');
+    var date = areaEl ? areaEl.getAttribute('data-date') : '';
+    var recordIds = [];
+    document.querySelectorAll('.gcal-ev[data-todo-id]').forEach(function(el) {
+        if (el.style.display === 'none') return;
+        if (el.getAttribute('data-is-fixed') === '1') return;
+        var rid = parseInt(el.getAttribute('data-todo-id'), 10);
+        if (rid) recordIds.push(rid);
     });
+    if (!recordIds.length) {
+        alert('No todos on the calendar to reschedule.');
+        return;
+    }
+    btn.disabled = true;
+    var origText = btn.textContent;
+    btn.textContent = 'Rescheduling...';
+    fetch('/todo/reschedule', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({
+            focus: focus, sites: sites, user: user, date: date,
+            scope: 'calendar', record_ids: recordIds
+        })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            var labels = { all: 'All', programming: 'Programming', accounting: 'Data Entry', errors: 'Errors Only' };
+            var msg = 'Rescheduled ' + d.count + ' of ' + recordIds.length + ' calendar todo'
+                    + (recordIds.length !== 1 ? 's' : '')
+                    + ' on ' + (d.date || date || 'today')
+                    + ' from now [' + (sites.join(', ') || 'All Sites')
+                    + ' / ' + (labels[d.focus] || d.focus || 'All') + '].';
+            if (d.count === 0) msg += '\n\nNo todos matched — check Focus filter or try Focus: All.';
+            if (d.error_count) {
+                msg += '\n' + d.error_count + ' update(s) failed.';
+                if (d.error_samples && d.error_samples.length) {
+                    msg += '\n\nFirst error:\n' + d.error_samples[0];
+                }
+            }
+            msg += '\n\nReloading page...';
+            alert(msg);
+            window.location.reload();
+        } else {
+            btn.disabled = false;
+            btn.textContent = origText;
+            alert('Error: ' + (d.error || 'unknown'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = origText;
+        alert('Error: ' + e);
+    });
+}
+
+function gcalSiteFilterChange(sel) {
+    var filterSite = sel ? sel.value : '';
+    fetch('/planning/set_filter', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site: filterSite, user: '' })
+    }).then(function() { window.location.reload(); }).catch(function() { window.location.reload(); });
 }
 
 function gcalApplyFilters() {
@@ -962,6 +1358,9 @@ function gcalApplyFilters() {
         var userOk = !filterUser || user === filterUser;
         el.style.display = (siteOk && userOk) ? '' : 'none';
     });
+    gcalLayoutEvents();
+    gcalBuildLegend();
+    gcalUpdateNowLine();
     if (window.self === window.top) {
         fetch('/planning/set_filter', {
             method: 'POST',
@@ -1080,88 +1479,145 @@ function initGcalDragDrop() {
 (function() {
     var _colDate = '[% date %]';
     function _initCol() {
+        GCAL_COLOR_OVERRIDES = null;
+        gcalLoadColorOverrides();
         var _colArea = document.querySelector('.gcal-events-area-col[data-date="' + _colDate + '"]');
         if (!_colArea) return;
         _colArea.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
             var c = gcalSiteColor(el.getAttribute('data-site'));
             el.style.background = c; el.style.borderLeft = '3px solid ' + c;
         });
-        var evs = Array.from(_colArea.querySelectorAll('.gcal-ev'));
-        var parsed = evs.map(function(el) {
-            var s = parseInt(el.getAttribute('data-start-min')) || 300;
-            var d = Math.max(1, parseInt(el.getAttribute('data-dur-min')) || 30);
-            return { el: el, start: s, end: s + d, col: 0 };
-        });
-        parsed.sort(function(a,b){ return a.start - b.start; });
-        var ends = [];
-        parsed.forEach(function(ev) {
-            var placed = false;
-            for (var c = 0; c < ends.length; c++) {
-                if (ends[c] <= ev.start) { ev.col = c; ends[c] = ev.end; placed = true; break; }
-            }
-            if (!placed) { ev.col = ends.length; ends.push(ev.end); }
-        });
-        var nc = ends.length || 1;
-        parsed.forEach(function(ev) {
-            var pct = 100 / nc;
-            ev.el.style.left  = (ev.col * pct + 0.3) + '%';
-            ev.el.style.width = (pct - 0.6) + '%';
-            ev.el.style.right = '';
-        });
+        _gcalLayoutArea(_colArea);
+    }
+    function _bootCol() {
+        if (window.ComservUserPrefs && typeof ComservUserPrefs.ready === 'function') {
+            ComservUserPrefs.ready().then(_initCol).catch(_initCol);
+        } else {
+            _initCol();
+        }
     }
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _initCol);
+        document.addEventListener('DOMContentLoaded', _bootCol);
     } else {
-        _initCol();
+        _bootCol();
     }
 })();
 [% ELSE %]
-document.addEventListener('DOMContentLoaded', function() {
+function _gcalInitDayView() {
+    GCAL_COLOR_OVERRIDES = null;
+    gcalLoadColorOverrides();
+    gcalLoadLanePct();
+    gcalApplyLaneCss();
+    gcalInitLaneResizer();
     gcalColorizeEvents();
     gcalLayoutEvents();
     gcalUpdateNowLine();
+    try { gcalBuildLegend(); } catch (e) { console.error('gcalBuildLegend:', e); }
     setInterval(gcalUpdateNowLine, 60000);
     initGcalDragDrop();
-    gcalPopulateUserFilter();
     gcalApplyFilters();
     if (typeof initDayViewDragAndDrop === 'function') {
         initDayViewDragAndDrop();
     }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.ComservUserPrefs && typeof ComservUserPrefs.ready === 'function') {
+        ComservUserPrefs.ready().then(_gcalInitDayView).catch(_gcalInitDayView);
+    } else {
+        _gcalInitDayView();
+    }
 });
 [% END %]
 
-// Position todo popups on hover — runs once per include; DOMContentLoaded used for standalone, immediate for component
+// Position todo popups on hover — delay before open so moving across items stays readable
 (function setupPopups() {
+    var GCAL_POPUP_SHOW_MS = 700;
+    var GCAL_POPUP_HIDE_MS = 250;
+
     function attachPopupListeners() {
         document.querySelectorAll('.todo-item-day:not([data-popup-init]), .gcal-ev:not([data-popup-init])').forEach(function(item) {
             item.setAttribute('data-popup-init', '1');
-            var _popupTimer = null;
-            item.addEventListener('mouseenter', function() {
-                if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
-                const popup = this.querySelector('.todo-popup');
-                if (!popup) return;
-                const rect = this.getBoundingClientRect();
-                const vw = window.innerWidth, vh = window.innerHeight;
-                const pw = 380, ph = 260;
-                let left = (rect.right + pw + 10 < vw) ? rect.right + 10
-                         : (rect.left - pw - 10 > 0)   ? rect.left - pw - 10
-                         : Math.max(10, (vw - pw) / 2);
-                let top = (rect.top + ph > vh) ? Math.max(10, vh - ph - 10) : rect.top;
-                popup.style.left = left + 'px';
-                popup.style.top  = top  + 'px';
+            var _showTimer = null;
+            var _hideTimer = null;
+
+            function cancelShow() {
+                if (_showTimer) { clearTimeout(_showTimer); _showTimer = null; }
+            }
+            function cancelHide() {
+                if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null; }
+            }
+            function hidePopup() {
+                item.classList.remove('gcal-ev-active');
+                var popup = item._gcalPopup;
+                if (popup) {
+                    popup.style.display = 'none';
+                    popup.style.maxHeight = '';
+                    popup.style.overflowY = '';
+                }
+            }
+            function _gcalPositionPopup(popup, anchorRect) {
+                var margin = 12;
+                var vw = window.innerWidth, vh = window.innerHeight;
+                popup.style.maxHeight = '';
+                popup.style.overflowY = '';
                 popup.style.display = 'block';
-                popup.addEventListener('mouseenter', function() {
-                    if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
-                }, { once: false });
-                popup.addEventListener('mouseleave', function() {
-                    _popupTimer = setTimeout(function() { popup.style.display = 'none'; }, 150);
-                }, { once: false });
+                popup.style.visibility = 'hidden';
+                popup.style.left = '0px';
+                popup.style.top = '0px';
+                var pw = popup.offsetWidth;
+                var ph = popup.offsetHeight;
+                var maxH = vh - margin * 2;
+                if (ph > maxH) {
+                    popup.style.maxHeight = maxH + 'px';
+                    popup.style.overflowY = 'auto';
+                    ph = maxH;
+                }
+                var left = (anchorRect.right + pw + margin < vw) ? anchorRect.right + margin
+                         : (anchorRect.left - pw - margin >= margin) ? anchorRect.left - pw - margin
+                         : Math.max(margin, (vw - pw) / 2);
+                var top = anchorRect.top;
+                if (top + ph > vh - margin) top = vh - ph - margin;
+                if (top < margin) top = margin;
+                popup.style.left = Math.round(left) + 'px';
+                popup.style.top = Math.round(top) + 'px';
+                popup.style.visibility = '';
+            }
+            function showPopup() {
+                cancelShow();
+                if (!item._gcalPopup) item._gcalPopup = item.querySelector('.todo-popup');
+                var popup = item._gcalPopup;
+                if (!popup) return;
+                if (popup.parentNode !== document.body) {
+                    document.body.appendChild(popup);
+                }
+                popup._gcalOwner = item;
+
+                item.classList.add('gcal-ev-active');
+                popup.style.zIndex = '99999';
+                _gcalPositionPopup(popup, item.getBoundingClientRect());
+            }
+
+            item.addEventListener('mouseenter', function() {
+                cancelHide();
+                cancelShow();
+                _showTimer = setTimeout(showPopup, GCAL_POPUP_SHOW_MS);
             });
             item.addEventListener('mouseleave', function() {
-                const popup = this.querySelector('.todo-popup');
-                if (!popup) return;
-                _popupTimer = setTimeout(function() { popup.style.display = 'none'; }, 150);
+                cancelShow();
+                cancelHide();
+                _hideTimer = setTimeout(hidePopup, GCAL_POPUP_HIDE_MS);
             });
+
+            if (!item._gcalPopup) item._gcalPopup = item.querySelector('.todo-popup');
+            if (item._gcalPopup && !item._gcalPopup._hoverBound) {
+                item._gcalPopup._hoverBound = 1;
+                item._gcalPopup.addEventListener('mouseenter', function() { cancelHide(); });
+                item._gcalPopup.addEventListener('mouseleave', function() {
+                    cancelHide();
+                    _hideTimer = setTimeout(hidePopup, GCAL_POPUP_HIDE_MS);
+                });
+            }
             item.addEventListener('click', function(e) {
                 if (e.target.closest('button, a, select, .gcal-ev-actions, .popup-actions')) return;
                 var rid = this.getAttribute('data-todo-id');
@@ -1244,11 +1700,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     <!-- Popup on hover -->
                     <div class="todo-popup">
-                        <div class="popup-subject">[% todo.subject %]</div>
-                        [% SET opd = todo.description | trim %][% IF opd %]
-                            <div class="popup-description">[% opd %]</div>
-                        [% END %]
                         <div class="popup-details">
+                            <div><strong>Subject:</strong> [% todo.subject %]</div>
+                        [% SET opd = todo.description | trim %][% IF opd %]
+                            <div class="popup-line-desc"><strong>Description:</strong> [% opd %]</div>
+                        [% END %]
                             [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
                             [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
                             [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
@@ -1304,7 +1760,7 @@ document.addEventListener('DOMContentLoaded', function() {
     [% END %]
     [% IF ap_all_sitenames.size > 0 %]
     <span style="font-size:0.82em;color:#70757a;white-space:nowrap;margin-left:8px;flex-shrink:0;">Site:</span>
-    <select id="gcal-site-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
+    <select id="gcal-site-filter" onchange="gcalSiteFilterChange(this)" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH sname IN ap_all_sitenames %]
         <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
@@ -1318,7 +1774,20 @@ document.addEventListener('DOMContentLoaded', function() {
         <option value="[% uname %]"[% IF cal_filter_user == uname %] selected[% END %]>[% uname %]</option>
         [% END %]
     </select>
+    [% IF c.stash.is_admin %]
+    <span style="font-size:0.82em;color:#70757a;white-space:nowrap;margin-left:8px;flex-shrink:0;">Focus:</span>
+    <select id="gcal-reschedule-focus" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
+        <option value="all" selected>All</option>
+        <option value="programming">Programming</option>
+        <option value="accounting">Data Entry</option>
+        <option value="errors">Errors Only</option>
+    </select>
+    <button type="button" class="gcal-nav-btn" onclick="gcalRescheduleTodos(this)" style="flex-shrink:0;white-space:nowrap;" title="Re-stack today's todos from the current time. Uses Site and User filters. Each user has their own timeline.">&#9851; Reschedule</button>
+    [% END %]
 </div>
+<div class="gcal-legend-bar" id="gcal-legend-bar"
+     title="Site colors are stable per site; click a colored dot in the legend to customize (saved in your browser)"
+     data-calendar-help="Daily Schedule calendar colors: todo bars are colored by Site. In the legend row below the filters, find Sites: and click the colored dot (●) next to a site name (e.g. CSC) to open a color picker. Colors are saved to your user account (cached offline in the browser). Shift+click the dot resets the default."></div>
 [% END %]
 
 <div class="gcal-grid-outer">
@@ -1330,7 +1799,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% END %]
     </div>
 
-    <div class="gcal-events-area[% IF include_mode %] gcal-events-area-col[% END %]"[% UNLESS include_mode %] id="gcal-events-area"[% END %] data-date="[% date %]" style="height:1020px;">
+    <div class="gcal-events-area[% IF include_mode %] gcal-events-area-col[% END %]"[% UNLESS include_mode %] id="gcal-events-area"[% END %] data-date="[% date %]" data-is-today="[% IF today AND date == today %]1[% ELSE %]0[% END %]" style="height:1020px;">
 
         [% FOREACH hr IN [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22] %]
         [% SET rule_top = (hr - 5) * 60 %]
@@ -1347,7 +1816,14 @@ document.addEventListener('DOMContentLoaded', function() {
              style="top:[% click_top %]px;" title="Click to add at [% dh %]:00"></div>
         [% END %]
 
+        [% UNLESS include_mode %]
+        <div class="gcal-lane-resizer" id="gcal-lane-resizer" title="Drag to resize fixed-items column"></div>
+        [% END %]
+        [% IF include_mode %]
+        <div class="gcal-now-line gcal-now-line-col" style="display:none;"><div class="gcal-now-dot"></div></div>
+        [% ELSE %]
         <div class="gcal-now-line" id="gcal-now-line" style="display:none;"><div class="gcal-now-dot"></div></div>
+        [% END %]
         <div class="gcal-drop-target-line" id="gcal-drop-line"></div>
 
         [% SET gcal_todos = (!include_mode AND todos_for_today.size > 0) ? todos_for_today : todos %]
@@ -1364,11 +1840,13 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET subjl    = todo.subject.lower %]
             [% SET isrec    = (todo.is_recurring OR subjl.match('lunch') OR subjl.match('break') OR subjl.match('standup')) ? '1' : '0' %]
             [% SET ttype    = todo.todo_type || 'task' %]
+            [% SET isfixed  = (todo.is_fixed OR ttype == 'appointment' OR ttype == 'meeting' OR isrec == '1') ? '1' : '0' %]
             [% IF todo.top_px.defined %]
             [% SET tpx      = todo.top_px %]
             [% SET tht      = todo.height %]
             [% SET stm      = todo.start_min %]
             [% SET test     = todo.est_mins %]
+            [% SET tenm     = todo.end_min || (stm + test) %]
             [% SET tlbl     = todo.time_lbl %]
             [% ELSE %]
             [% SET todstr   = todo.time_of_day _ '' %]
@@ -1376,12 +1854,27 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET tsh      = todp.0 * 1 OR 9 %]
             [% SET tsm      = todp.1 * 1 %]
             [% SET stm      = tsh * 60 + tsm %]
+            [% SET tenm     = stm + test %]
+            [% SET seraw    = todo.scheduled_end _ '' %]
+            [% IF seraw.size > 0 %]
+            [% SET setok    = seraw.split(' ') %]
+            [% SET setime   = setok.last %]
+            [% SET sep      = setime.split(':') %]
+            [% IF sep.size >= 2 %]
+            [% SET seabs    = (sep.0 * 1) * 60 + (sep.1 * 1) %]
+            [% IF seabs > stm %][% SET tenm = seabs %][% END %]
+            [% END %]
+            [% END %]
+            [% IF isfixed %]
+            [% SET test     = tenm - stm %]
+            [% IF test < 15 %][% SET test = 15 %][% END %]
+            [% END %]
             [% SET tpx      = stm - 300 %]
             [% IF tpx < 0 %][% SET tpx = 0 %][% END %]
             [% IF tpx > 1000 %][% SET tpx = 1000 %][% END %]
             [% SET tht      = test < 15 ? 15 : test %]
             [% IF tht > 900 %][% SET tht = 900 %][% END %]
-            [% SET tlbl     = todstr.substr(0, 5) %]
+            [% SET tlbl     = todstr.substr(0, 5) _ '-' _ sprintf('%02d:%02d', int(tenm / 60) % 24, tenm % 60) %]
             [% END %]
             [% SET tstat    = tdone ? 'Done' :
                                active_todos.${todo.record_id} ? 'Active' :
@@ -1390,11 +1883,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                todo.status %]
             <div class="gcal-ev[% IF tdone %] is-done[% END %]"
                  data-todo-id="[% todo.record_id %]"
+                 data-subject="[% todo.subject | html %]"
                  data-priority="[% tp %]"
                  data-site="[% ts %]"
                  data-user="[% tdev %]"
                  data-is-recurring="[% isrec %]"
+                 data-todo-type="[% ttype %]"
+                 data-is-fixed="[% isfixed %]"
                  data-start-min="[% stm %]"
+                 data-end-min="[% tenm %]"
                  data-dur-min="[% test %]"
                  data-date="[% date %]"
                  [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]"[% END %]
@@ -1432,10 +1929,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 <div class="todo-popup">
-                    <div class="popup-subject">[% todo.subject | html %]</div>
-                    [% SET pd = todo.description | trim %]
-                    [% IF pd %]<div class="popup-description" style="margin:4px 0;font-size:0.88em;color:#555;max-height:100px;overflow-y:auto;">[% pd | html %]</div>[% END %]
                     <div class="popup-details">
+                        <div><strong>Subject:</strong> [% todo.subject | html %]</div>
+                    [% SET pd = todo.description | trim %]
+                    [% IF pd %]<div class="popup-line-desc"><strong>Description:</strong> [% pd | html %]</div>[% END %]
                         <div><strong>Time:</strong> [% tlbl %]</div>
                         [% IF ts %]<div><strong>Site:</strong> [% ts %]</div>[% END %]
                         [% IF tproj %]<div><strong>Project:</strong> [% tproj %]</div>[% END %]

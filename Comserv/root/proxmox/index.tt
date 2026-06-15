@@ -68,6 +68,9 @@
             Open Proxmox Web UI
         </a>
         [% END %]
+        <a href="/Documentation/proxmox_disk_resize_guide" class="btn-action" style="background:#6f42c1;">
+            &#128214; Disk Resize How-To
+        </a>
     </div>
 </div>
 

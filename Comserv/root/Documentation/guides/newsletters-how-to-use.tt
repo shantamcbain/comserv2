@@ -1,0 +1,38 @@
+[% PageVersion = 'Documentation/guides/newsletters-how-to-use.tt,v 1.00 2026/06/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Newsletters: How to Read, Subscribe, and Publish' %]
+[% META description = 'Stable member guide — update this file in place when newsletter UI changes' %]
+[% META date = '2026-06-13' %]
+[% META newsletter_include = 'yes' %]
+[% META audience = 'member' %]
+[% META roles = 'guest,member,editor,admin' %]
+
+<section class="member-how-to">
+    <h2>For everyone — read past issues</h2>
+    <ol>
+        <li>Top nav <strong>Member → Newsletters</strong> or <a href="/newsletters">/newsletters</a>.</li>
+        <li>Click an issue to read at <code>/page/{slug}</code>.</li>
+    </ol>
+
+    <h2>Subscribe by email</h2>
+    <ol>
+        <li><a href="/mail/subscribe">/mail/subscribe</a> — Member → Join Mailing List.</li>
+        <li>Manage at <a href="/mail/my_subscriptions">/mail/my_subscriptions</a>.</li>
+    </ol>
+
+    <h2>For editors — create and send</h2>
+    <ol>
+        <li><a href="/mail/newsletters">/mail/newsletters</a> → Create → <a href="/mail/newsletter/create">/mail/newsletter/create</a>.</li>
+        <li>Tick guides under <strong>Include from feature guides</strong> → <strong>Insert into body</strong> (test links in preview).</li>
+        <li>Save draft → Send from edit screen.</li>
+    </ol>
+
+    <h2>Try these links</h2>
+    <ul>
+        <li><a href="/newsletters">Archive</a></li>
+        <li><a href="/mail/subscribe">Subscribe</a></li>
+        <li><a href="/mail/newsletters">Manage (editors)</a></li>
+        <li><a href="/mail/newsletter/create">Create (editors)</a></li>
+    </ul>
+</section>

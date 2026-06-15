@@ -436,6 +436,8 @@ sub editor_config :Local :Args(0) {
 
     require Comserv::Util::CodingAccess;
     my $coding_terminal_allowed = Comserv::Util::CodingAccess::workstation_allowed($c) ? 1 : 0;
+    my $interactive_ws = $self->_interactive_ws_available($c) ? 1 : 0;
+    my $cli_mode = $interactive_ws ? 'pty' : 'http';
 
     $c->response->body(encode_json({
         success     => JSON::true,
@@ -443,6 +445,9 @@ sub editor_config :Local :Args(0) {
         coding_terminal_allowed => $coding_terminal_allowed ? JSON::true : JSON::false,
         coding_terminal_ws      => '/coding/terminal_ws',
         coding_terminal_status  => '/coding/terminal_status',
+        cli_mode                => $cli_mode,
+        interactive_ws_available => $interactive_ws ? JSON::true : JSON::false,
+        cli_tools               => $enabled ? ['grok', 'ollama', 'shell'] : [],
         grok_cli     => $enabled ? $self->_find_grok_binary() : undef,
         grok_home    => $enabled ? $self->_grok_home() : undef,
         project_root => $self->_project_root_path($c),
@@ -1308,7 +1313,7 @@ sub generate :Local :Args(0) {
             $c->stash->{ai_image_data} = $image_data_b64;
             $c->stash->{ai_image_mime} = $image_mime;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search");
+                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', model='" . ($model || '') . "', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search, form_fill=" . ($json_data->{skip_role_prompt} ? 'yes' : 'no'));
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                 'generate', "JSON parsing resulted in no data or invalid hash");
@@ -1499,6 +1504,9 @@ sub generate :Local :Args(0) {
         $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
     }
 
+    # Form-fill requests ship a focused system prompt — skip nav guide / module dump / duplicate context.
+    my $is_form_fill = ($c->stash->{skip_role_prompt} || ($page_context && $page_context eq 'form_fill'));
+
     # Role-based capability injection into system prompt (skip when caller supplies a precise system prompt)
     unless ($c->stash->{skip_role_prompt}) {
         my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
@@ -1520,31 +1528,45 @@ sub generate :Local :Args(0) {
         $system .= "\n\n" . $schema_ctx;
     }
 
+    # Inject newsletter drafting context on newsletter admin pages (skip when client already loaded it)
+    if (!$is_form_fill && $page_path && $page_path =~ m{/mail/newsletter|/newsletters}i) {
+        eval {
+            my $nl = $c->controller('Newsletter');
+            if ($nl && $nl->can('build_ai_context')) {
+                my $nl_ctx = $nl->build_ai_context($c);
+                $system .= "\n\nNEWSLETTER DRAFTING DATA:\n" . $nl_ctx if $nl_ctx;
+            }
+        };
+    }
+
     # --- Live DB data injection (same as /ai/chat) ---
-    my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    # Planning agent already injects project list via _build_planning_system_prompt;
-    # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
-    my $inject_prompt = $prompt;
-    if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
-        $inject_prompt = "project todo $prompt";
-    }
-    if ($normalized_agent_type =~ /^accounting$/i) {
-        $inject_prompt = "inventory accounting gl coa invoice $prompt";
-    }
-    my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
-    if ($module_data_gen) {
-        # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
-        # planning agent gets less room because its own prompt already includes the project list.
-        my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
-        if (length($module_data_gen) > $inject_cap) {
-            $module_data_gen = substr($module_data_gen, 0, $inject_cap)
-                . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
+    my ($module_data_gen, $shared_hist_gen) = ('', '');
+    unless ($is_form_fill) {
+        my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        # Planning agent already injects project list via _build_planning_system_prompt;
+        # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
+        my $inject_prompt = $prompt;
+        if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
+            $inject_prompt = "project todo $prompt";
         }
-        $system .= "\n\n" . $module_data_gen;
-    }
-    my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
-    if ($shared_hist_gen) {
-        $system .= "\n\n" . $shared_hist_gen;
+        if ($normalized_agent_type =~ /^accounting$/i) {
+            $inject_prompt = "inventory accounting gl coa invoice $prompt";
+        }
+        my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
+        if ($module_data_gen) {
+            # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
+            # planning agent gets less room because its own prompt already includes the project list.
+            my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
+            if (length($module_data_gen) > $inject_cap) {
+                $module_data_gen = substr($module_data_gen, 0, $inject_cap)
+                    . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
+            }
+            $system .= "\n\n" . $module_data_gen;
+        }
+        my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
+        if ($shared_hist_gen) {
+            $system .= "\n\n" . $shared_hist_gen;
+        }
     }
 
     # --- Trace: initial context ---
@@ -3036,6 +3058,17 @@ sub chat :Local :Args(0) {
         $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '') . $schema_ctx;
     }
 
+    if ($chat_page_path && $chat_page_path =~ m{/mail/newsletter|/newsletters}i) {
+        eval {
+            my $nl = $c->controller('Newsletter');
+            if ($nl && $nl->can('build_ai_context')) {
+                my $nl_ctx = $nl->build_ai_context($c);
+                $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '')
+                    . "NEWSLETTER DRAFTING DATA:\n" . $nl_ctx if $nl_ctx;
+            }
+        };
+    }
+
     # Build messages array for chat API
     my @messages = ();
     
@@ -3139,6 +3172,9 @@ sub chat :Local :Args(0) {
     my @system_parts;
     push @system_parts, $chat_agent_system if $chat_agent_system;
     push @system_parts, $role_prompt_chat  if $role_prompt_chat;
+
+    my $page_ui_hints = $self->_build_page_ui_hints($chat_page_path, $prompt);
+    push @system_parts, $page_ui_hints if $page_ui_hints;
 
     # Fetch live module data — force inject for agents that always need project/todo data
     my $chat_inject_prompt = $prompt;
@@ -3564,6 +3600,10 @@ sub chat :Local :Args(0) {
                         $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS_CHAT);
                         $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
+                    }
+                    $self->_append_protected_page_ui_hints(\$ollama_messages[0]{content}, $page_ui_hints);
+                    if ($page_ui_hints && index($ollama_messages[0]{content}, '--- Current page UI:') >= 0) {
+                        push @chat_trace, '📌 Page UI hints preserved after context trim';
                     }
                 }
             }
@@ -5358,6 +5398,18 @@ sub _get_module_data {
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $today     = DateTime->today->ymd;
 
+    # --- Newsletter drafting data ---
+    if ($prompt =~ /newsletter|mailing\s*list|mailout|read\s+online/i
+        || ($agent_id && $agent_id =~ /newsletter|mail/i)) {
+        eval {
+            my $nl = $c->controller('Newsletter');
+            if ($nl && $nl->can('build_ai_context')) {
+                my $nl_ctx = $nl->build_ai_context($c);
+                push @sections, "NEWSLETTER DRAFTING DATA:\n" . $nl_ctx if $nl_ctx;
+            }
+        };
+    }
+
     # --- Workshop data ---
     if ($prompt =~ /workshop|class|course|session|seminar|event|beekeep/i) {
         eval {
@@ -6560,6 +6612,19 @@ sub _build_navigation_command_guide {
         [ 'Workshops (admin/leader)', 'admin', [
             [ 'Workshop resources',         '/workshop/resources'       ],
         ]],
+        [ 'Mail & Newsletters', 'guest', [
+            [ 'Newsletter archive (read issues)', '/newsletters'          ],
+            [ 'Subscribe to mailing list',        '/mail/subscribe'       ],
+            [ 'Mail dashboard',                   '/mail'                 ],
+        ]],
+        [ 'Mail & Newsletters (logged in)', 'user', [
+            [ 'My email subscriptions',           '/mail/my_subscriptions'],
+        ]],
+        [ 'Newsletters (admin/editor)', 'admin', [
+            [ 'Manage newsletters',               '/mail/newsletters'     ],
+            [ 'Create newsletter issue',          '/mail/newsletter/create'],
+            [ 'Member menu also has Newsletters link', '/newsletters'     ],
+        ]],
     );
 
     my %role_rank = ( guest => 0, user => 1, admin => 2 );
@@ -6913,6 +6978,25 @@ sub _build_page_navigation_hint {
             $hint .= "- Admin: manage AI models at $base_url/ai/models\n"
                    . "- Manage API keys at $base_url/ai/manage_api_keys\n";
         }
+    } elsif ($page_path =~ m{/newsletters?|/mail/newsletter}i) {
+        $hint .= "Navigation context — Newsletters:\n"
+               . "- Public archive (read all issues): $base_url/newsletters\n"
+               . "- Also in menus: Main → Mail Services → Newsletters, or Member → Newsletters\n"
+               . "- Subscribe to email updates: $base_url/mail/subscribe\n"
+               . "- Manage my subscriptions: $base_url/mail/my_subscriptions\n";
+        if ($role eq 'admin') {
+            $hint .= "- Admin/editor: manage at $base_url/mail/newsletters\n"
+                   . "- Create new issue: $base_url/mail/newsletter/create\n"
+                   . "- Each newsletter is a permanent page at /page/{page_code}; email sends a teaser + read-online link.\n"
+                   . "- On create/edit forms, use AI Form Assistant to draft from git changes, todos, and planning calendar.\n"
+                   . "- Example prompts: \"Summarize code changes since last newsletter\", \"What did we plan this week?\"\n";
+        }
+    } elsif ($page_path =~ m{/mail}i) {
+        $hint .= "Navigation context — Mail:\n"
+               . "- Mail home: $base_url/mail\n"
+               . "- Newsletters archive: $base_url/newsletters\n"
+               . "- Subscribe: $base_url/mail/subscribe\n";
+        $hint .= "- Manage newsletters (admin/editor): $base_url/mail/newsletters\n" if $role eq 'admin';
     }
 
     return $hint;
@@ -7370,7 +7454,53 @@ sub _is_lightweight_ollama_request {
     return 1 if $agent_id =~ /^(helpdesk|documentation|general)$/i;
     return 1 if $prompt =~ /^\s*(take\s+me\s+to|go\s+to|open|show\s+me|navigate\s+to|where\s+(?:is|are|can\s+i\s+find)|how\s+do\s+i\s+(?:get\s+to|find|access|open))\b/i;
     return 1 if $prompt =~ /\b(helpdesk|help\s+desk|support\s+ticket|submit\s+(?:a\s+)?ticket|navigation|navigate)\b/i;
+    return 1 if $prompt =~ /\b(colou?r|colour)\b/i && $prompt =~ /\b(calendar|schedule|site|legend)\b/i;
     return 0;
+}
+
+=head2 _build_page_ui_hints
+
+Compact, high-priority UI help for the user's current page. Injected even when
+full page_content is trimmed for token budget (unlike the large page scrape).
+
+=cut
+
+sub _build_page_ui_hints {
+    my ($self, $page_path, $prompt) = @_;
+    $page_path //= '';
+    $prompt    //= '';
+    my $norm = _normalize_editor_route($page_path);
+    return '' unless $norm;
+
+    if ($norm =~ m{^/planning/daily}) {
+        return <<'UI_HINT';
+--- Current page UI: /planning/daily (Daily Schedule calendar) ---
+CALENDAR COLORS (todo bar colors are per Site, NOT random):
+- In the legend bar under the date filters, find "Sites:" and the colored dot (●) next to each site name (e.g. CSC).
+- Click the dot to open the browser color picker; your choice is saved to your user account (offline: browser cache).
+- Shift+click the dot restores that site's default color. Hover the dot for a short tooltip.
+- Do NOT direct users to /ai/widget or /ai/advanced_settings for calendar colors — those pages are unrelated.
+
+RESCHEDULE: Use the "♻ Reschedule" button in the filter row (admins). It restacks today's visible todos from the current time (red line), per user.
+--- End page UI help ---
+UI_HINT
+    }
+
+    return '';
+}
+
+=head2 _append_protected_page_ui_hints
+
+Re-append compact page UI help after system-prompt truncation so small models still
+see in-page instructions (legend color picker, reschedule button, etc.).
+
+=cut
+
+sub _append_protected_page_ui_hints {
+    my ($self, $system_ref, $hints) = @_;
+    return unless $hints && $system_ref && ref $system_ref eq 'SCALAR' && length($$system_ref);
+    return if index($$system_ref, '--- Current page UI:') >= 0;
+    $$system_ref .= "\n\n" . $hints;
 }
 
 =head2 _find_reachable_ollama_host
@@ -12263,7 +12393,25 @@ sub _is_dev_mode {
     my $hostname = eval { require Comserv::Util::SystemInfo;
                           Comserv::Util::SystemInfo::get_server_hostname() } || '';
     return 1 if $hostname =~ /workstation|localhost/i;
-    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /^(dev|development|workstation)/i;
+    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /^(dev|development|workstation|docker-dev)/i;
+    return 0;
+}
+
+# Interactive WebSocket PTY (Twiggy) — not available under Starman/Docker.
+sub _interactive_ws_available {
+    my ($self, $c) = @_;
+    return 1 if ($ENV{COMSERV_TWIGGY} // '') eq '1';
+    return 1 if ($ENV{PLACK_SERVER_SOFTWARE} // '') =~ /Twiggy/i;
+    if ($c && eval { $c->req }) {
+        my $env = $c->req->env || {};
+        my $sw  = join ' ', grep { $_ }
+            ($env->{SERVER_SOFTWARE} // ''),
+            ($env->{'psgi.server_software'} // '');
+        return 1 if $sw =~ /Twiggy/i;
+    }
+    my $home = $c && $c->config->{home} ? $c->config->{home} : undef;
+    return 1 if $home && -f "$home/var/twiggy.enabled";
+    return 1 if $c->config->{interactive_terminal};
     return 0;
 }
 
@@ -12384,6 +12532,9 @@ YOUR ROLE:
 - Spot security issues: SQL injection, XSS, CSRF, auth gaps
 - When suggesting DB changes, always provide both Result class and migration SQL
 - Point out when something will break production before committing
+- For "how do I use this page?" questions (calendar colors, buttons, filters), answer from
+  "--- Current page UI:" hints in the system prompt — not from CSS files or /ai/widget settings
+  unless the user explicitly asks to change application source code
 
 ## ERROR ANALYSIS WORKFLOW
 When the user reports an error or a [PAGE ERROR DETECTED] block is present:
@@ -14399,15 +14550,6 @@ sub run_command :Local :Args(0) {
 
     unless ($self->_editor_enabled($c)) {
         $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
-        return;
-    }
-
-    require Comserv::Util::CodingAccess;
-    unless (Comserv::Util::CodingAccess::workstation_allowed($c)) {
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error   => 'Coding commands require Shanta on http://172.30.131.126:PORT/',
-        }));
         return;
     }
 

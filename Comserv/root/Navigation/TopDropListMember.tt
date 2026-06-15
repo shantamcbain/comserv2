@@ -12,10 +12,14 @@
         <!-- Core Membership Services -->
         <a href="/membership" class="menu-item"><i class="icon-info"></i>Membership Information</a>
         <a href="/membership/addons" class="menu-item"><i class="icon-addons"></i>Site Add-ons &amp; Modules</a>
+        <a href="/newsletters" class="menu-item"><i class="icon-mail"></i>Newsletters</a>
         [% IF c.session.user_id %]
         <a href="/mail/my_subscriptions" class="menu-item"><i class="icon-mail"></i>My Email Subscriptions</a>
         [% ELSE %]
         <a href="/mail/subscribe" class="menu-item"><i class="icon-mail"></i>Join Mailing List</a>
+        [% END %]
+        [% IF c.session.roles.grep('(?i)admin').size || c.session.roles.grep('(?i)editor').size %]
+        <a href="/mail/newsletters" class="menu-item"><i class="icon-edit"></i>Manage Newsletters</a>
         [% END %]
         
         [% IF c.session.username %]

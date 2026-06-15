@@ -1,0 +1,165 @@
+[% META title = 'Create Newsletter' %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Create Newsletter</h1>
+        <nav style="font-size:0.9em;color:var(--text-muted-color);">
+            <a href="[% c.uri_for('/mail/newsletters') %]">Newsletters</a> &rsaquo; New Publication
+        </nav>
+    </div>
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+
+    <div class="admin-card">
+        <p style="color:var(--text-muted-color);margin-bottom:16px;">
+            A <strong>newsletter</strong> is the named publication (e.g. <em>Hosting News</em>) with a description of who it is for.
+            After creating it, add <strong>issues</strong> underneath — each issue is one edition you can publish and email.
+        </p>
+
+        <form method="POST" action="[% c.uri_for('/mail/newsletter/publication/create') %]">
+            [% IF is_csc %]
+            <div class="form-group">
+                <label for="sitename">SiteName <span style="color:red">*</span></label>
+                <select name="sitename" id="sitename" required>
+                    [% FOREACH site IN available_sites %]
+                    <option value="[% site %]" [% IF form_data.sitename == site || (!form_data.sitename && site == sitename) %]selected[% END %]>[% site %]</option>
+                    [% END %]
+                </select>
+                <small>CSC admins can create newsletters for any SiteName.</small>
+            </div>
+            [% ELSE %]
+            <input type="hidden" name="sitename" value="[% sitename %]">
+            [% END %]
+
+            <div class="form-group">
+                <label for="title">Newsletter name <span style="color:red">*</span></label>
+                <input type="text" name="title" id="title" required class="form-control"
+                       value="[% form_data.title | html %]" placeholder="Hosting News">
+            </div>
+
+            <div class="form-group">
+                <label for="description">What is this newsletter about? <span style="color:red">*</span></label>
+                <textarea name="description" id="description" rows="4" required class="form-control"
+                          placeholder="Product updates and how-to guides for customers who host websites with us. Not a meta newsletter about newsletters.">[% form_data.description | html %]</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="nl_series">Category template</label>
+                <select name="nl_series" id="nl_series" class="form-control">
+                    [% FOREACH s IN newsletter_series %]
+                    <option value="[% s.key %]" [% IF form_data.nl_series == s.key || (!form_data.nl_series && s.key == 'hosting') %]selected[% END %]>
+                        [% s.label | html %] — [% s.audience | html %]
+                    </option>
+                    [% END %]
+                    <option value="custom" [% IF form_data.nl_series == 'custom' %]selected[% END %]>Custom…</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="nl-custom-wrap" style="display:none;">
+                <label for="nl_custom_label">Custom category name</label>
+                <input type="text" name="nl_custom_label" id="nl_custom_label" class="form-control"
+                       value="[% form_data.nl_custom_label | html %]">
+            </div>
+
+            <div class="form-group">
+                <label for="nl_visible_to">Who sees this in the newsletter list?</label>
+                <select name="nl_visible_to" id="nl_visible_to" class="form-control">
+                    <option value="hosting_members" [% IF form_data.nl_visible_to == 'hosting_members' || !form_data.nl_visible_to %]selected[% END %]>
+                        All hosting-member SiteNames
+                    </option>
+                    <option value="own_site" [% IF form_data.nl_visible_to == 'own_site' %]selected[% END %]>
+                        This SiteName only
+                    </option>
+                    <option value="all" [% IF form_data.nl_visible_to == 'all' %]selected[% END %]>
+                        Everyone (share_with all)
+                    </option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="share_with">Also share with SiteNames (optional)</label>
+                <input type="text" name="share_with" id="share_with" class="form-control"
+                       value="[% form_data.share_with | html %]" placeholder="3d, USBM or all">
+            </div>
+
+            <fieldset class="form-group" style="border:1px solid var(--border-color,#ddd);border-radius:8px;padding:14px 16px;">
+                <legend style="font-weight:bold;padding:0 6px;">Subscription mailing list</legend>
+                <p style="font-size:0.9em;color:var(--text-muted-color);margin:0 0 12px;">
+                    Public lists appear on <a href="[% c.uri_for('/mail/subscribe') %]">Subscribe</a>
+                    and <a href="[% c.uri_for('/mail/my_subscriptions') %]">My Subscriptions</a>.
+                    When you send an issue, this list is pre-selected.
+                </p>
+                [% IF mailing_lists && mailing_lists.size %]
+                <div class="form-group">
+                    <label for="nl_mailing_list_id">Use existing list</label>
+                    <select name="nl_mailing_list_id" id="nl_mailing_list_id" class="form-control">
+                        <option value="">— default for category —</option>
+                        [% FOREACH ml IN mailing_lists %]
+                        <option value="[% ml.id %]" [% IF form_data.nl_mailing_list_id == ml.id %]selected[% END %]>
+                            [% ml.name | html %][% IF ml.is_public %] (public)[% ELSE %] (private)[% END %]
+                        </option>
+                        [% END %]
+                    </select>
+                </div>
+                [% END %]
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="create_subscription_list" id="create_subscription_list" value="1"
+                               [% IF form_data.create_subscription_list || !form_data.nl_mailing_list_id %]checked[% END %]>
+                        Create a new public list for this newsletter
+                    </label>
+                    <small class="form-help">Recommended. A public list is created automatically if you leave this checked or if no matching list exists.</small>
+                </div>
+                <div class="form-group" id="subscription-list-name-wrap" style="display:none;">
+                    <label for="subscription_list_name">New list name</label>
+                    <input type="text" name="subscription_list_name" id="subscription_list_name" class="form-control"
+                           value="[% form_data.subscription_list_name | html %]"
+                           placeholder="Defaults to newsletter name above">
+                </div>
+                <p style="font-size:0.85em;color:var(--text-muted-color);margin:8px 0 0;">
+                    Or manage lists at <a href="[% c.uri_for('/mail/lists') %]">Mail &rarr; Mailing Lists</a>
+                    (check <strong>Public list</strong> when creating).
+                </p>
+            </fieldset>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create Newsletter</button>
+                <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function() {
+    var sel = document.getElementById('nl_series');
+    var wrap = document.getElementById('nl-custom-wrap');
+    if (sel && wrap) {
+        function toggleCustom() { wrap.style.display = sel.value === 'custom' ? 'block' : 'none'; }
+        sel.addEventListener('change', toggleCustom);
+        toggleCustom();
+    }
+    var createCb = document.getElementById('create_subscription_list');
+    var nameWrap = document.getElementById('subscription-list-name-wrap');
+    var titleInp = document.getElementById('title');
+    var nameInp = document.getElementById('subscription_list_name');
+    if (createCb && nameWrap) {
+        function toggleListName() {
+            nameWrap.style.display = createCb.checked ? 'block' : 'none';
+            if (createCb.checked && nameInp && titleInp && !nameInp.value) {
+                nameInp.placeholder = titleInp.value || 'Beekeeping News';
+            }
+        }
+        createCb.addEventListener('change', toggleListName);
+        if (titleInp && nameInp) {
+            titleInp.addEventListener('input', function() {
+                if (createCb.checked && !nameInp.value) {
+                    nameInp.placeholder = titleInp.value || 'Beekeeping News';
+                }
+            });
+        }
+        toggleListName();
+    }
+})();
+</script>

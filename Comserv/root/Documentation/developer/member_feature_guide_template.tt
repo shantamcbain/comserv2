@@ -1,0 +1,42 @@
+[% PageVersion = 'Documentation/developer/member_feature_guide_template.tt,v 1.00 2026/06/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Member Feature Guide Template (copy me)' %]
+[% META description = 'Copy this when shipping a feature — not for newsletters until filled in and dated' %]
+[% META author = 'your-name' %]
+[% META date = '2026-06-13' %]
+[% META newsletter_include = 'no' %]
+[% META audience = 'developer' %]
+[% META roles = 'admin,developer,editor' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Member Feature Guide Template</h1>
+        <p style="color:var(--text-muted-color);">Copy to <code>Documentation/guides/your-feature-how-to-use.tt</code> (stable name — update in place). Set <code>newsletter_include=yes</code>. Append code changes to <code>CHANGELOG.tt</code> only.</p>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary (example)</h2>
+        <p>Short member-facing overview (one paragraph).</p>
+    </section>
+
+    <section class="member-how-to">
+        <h2>How to use it (example)</h2>
+        <ol>
+            <li>Top navigation → <strong>Menu Name</strong> → <a href="/real/path">/real/path</a>.</li>
+            <li>Second step with a real button or tab name from the UI.</li>
+            <li>Third step — what success looks like.</li>
+        </ol>
+
+        <h2>Try these links now (example)</h2>
+        <ul>
+            <li><a href="/real/path">Primary link</a></li>
+            <li><a href="/related/path">Related link</a></li>
+        </ul>
+    </section>
+
+    <section class="changelog-details">
+        <h2>Technical Details (not included in newsletters)</h2>
+        <p>Developer notes, file paths, and implementation detail stay here.</p>
+    </section>
+</div>

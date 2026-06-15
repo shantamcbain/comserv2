@@ -471,10 +471,6 @@ document.addEventListener('DOMContentLoaded', function() {
     </script>
     [% END %]
 
-    [% IF is_admin && c.stash.debug_msg %]
-        [% FOREACH msg IN c.stash.debug_msg %]
-        <p class="debug">Debug: [% msg %]</p>
-        [% END %]
-    [% END %]
+    [% INCLUDE 'partials/debug_messages.tt' %]
 
 [% # Admin role check is now done at the top of the file %]

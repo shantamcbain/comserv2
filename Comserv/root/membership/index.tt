@@ -59,6 +59,8 @@
             <div class="benefit-card active">
                 <h3>Monthly Newsletter</h3>
                 <p>Stay updated with the latest news, updates, and exclusive member content.</p>
+                <p><a href="[% c.uri_for('/newsletters') %]">Read newsletters</a>
+                   · <a href="[% c.uri_for('/mail/subscribe') %]">Subscribe by email</a></p>
                 <span class="benefit-status">✓ Active</span>
             </div>
         </div>
@@ -122,6 +124,7 @@
                         <li>Industry insights and trends</li>
                         <li>Early announcements</li>
                     </ul>
+                    <p><a href="[% c.uri_for('/newsletters') %]">Browse newsletter archive</a></p>
                 </div>
             </div>
         </div>

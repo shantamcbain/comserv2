@@ -1,0 +1,96 @@
+[% PageVersion = 'pages/newsletter_view.tt,v 2.0 2026/06/13 newsletter issue view' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="page-content newsletter-issue">
+
+    [% IF nl_can_send %]
+    <div class="nl-admin-actions" style="margin:0 0 16px;padding:14px 18px;border:1px solid #c5d0e8;border-radius:8px;
+                background:#f0f4ff;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+            <strong>Editor actions</strong>
+            <span style="display:block;font-size:0.9em;color:var(--text-muted-color);margin-top:4px;">
+                [% IF page.status == 'draft' %]
+                    Draft — publish when ready, then email subscribers.
+                [% ELSE %]
+                    Published — send a teaser email with a link to this page.
+                [% END %]
+            </span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-primary">Send Newsletter →</a>
+            <a href="[% c.uri_for('/mail/newsletter/edit', page.page_code) %]" class="btn btn-secondary">Edit</a>
+            <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-secondary">Manage</a>
+        </div>
+    </div>
+    [% END %]
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+        <div>
+            [% IF nl_meta %]
+            <p style="margin:0 0 6px;font-size:0.85em;color:var(--text-muted-color);">
+                <span style="font-weight:bold;color:var(--primary-color,#1565c0);">[% nl_meta.pub_title || nl_meta.series_label | html %]</span>
+                &middot; Issue <strong>[% nl_meta.version %]</strong>
+                &middot; [% nl_meta.audience_label | html %]
+                &middot; [% page.sitename | html %]
+            </p>
+            [% ELSE %]
+            <p style="margin:0 0 4px;font-size:0.85em;color:var(--text-muted-color);">
+                Newsletter &middot; [% page.sitename | html %]
+            </p>
+            [% END %]
+            [% IF page.share_with %]
+            <p style="margin:0 0 6px;font-size:0.82em;color:var(--text-muted-color);">
+                Also shared with [% page.share_with | html %]
+            </p>
+            [% END %]
+            [% IF !page.body.match('(?i)<h1') %]
+                <h1 style="margin:0;">[% page.title | html %]</h1>
+            [% END %]
+            [% IF page.description %]
+            <p style="margin:8px 0 0;font-size:0.95em;color:var(--text-muted-color);max-width:52em;">
+                [% page.description | html %]
+            </p>
+            [% END %]
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="[% c.uri_for('/newsletters') %]" class="btn btn-secondary" style="font-size:0.9em;">All Newsletters</a>
+            [% UNLESS nl_can_send %]
+                [% IF c.session.roles.grep('(?i)^(admin|editor)$').size %]
+                <a href="[% c.uri_for('/mail/newsletter/edit', page.page_code) %]" class="btn btn-default" style="font-size:0.9em;">Edit</a>
+                [% END %]
+            [% END %]
+        </div>
+    </div>
+
+    <div class="page-body">
+        [% rendered_body || page.body %]
+    </div>
+
+    <div style="margin-top:32px;padding:20px;background:var(--bg-secondary,#f5f5f5);border-radius:8px;
+                border-top:3px solid var(--primary-color,#1565c0);">
+        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;">
+            <div>
+                <strong>Stay in the loop</strong>
+                <p style="margin:4px 0 0;font-size:0.9em;color:var(--text-muted-color);">
+                    [% IF nl_meta %]
+                        Subscribe to <em>[% nl_meta.series_label | html %]</em> for email updates
+                        ([% nl_meta.mailing_list | html %] list).
+                    [% ELSE %]
+                        Subscribe for email updates from [% page.sitename | html %].
+                    [% END %]
+                </p>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <a href="[% c.uri_for('/newsletters') %]" class="btn btn-secondary">Newsletter Archive</a>
+                <a href="[% c.uri_for('/mail/subscribe') %]" class="btn btn-primary">Subscribe</a>
+                [% IF c.session.user_id %]
+                    <a href="[% c.uri_for('/mail/my_subscriptions') %]" class="btn btn-secondary">My Subscriptions</a>
+                [% END %]
+            </div>
+        </div>
+    </div>
+
+    [% IF page.description %]
+    <meta name="description" content="[% page.description | html %]">
+    [% END %]
+</div>

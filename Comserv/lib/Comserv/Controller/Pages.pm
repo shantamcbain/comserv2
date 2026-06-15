@@ -108,12 +108,30 @@ sub view :Path('/page') :Args(1) {
         }
     }
 
+    my $is_pub = (($page->page_type // '') eq 'newsletter_pub');
+    my $is_newsletter = !$is_pub && (
+        (($page->page_type // '') eq 'newsletter')
+        || (($page->menu // '') eq 'newsletter')
+    );
+
+    my ($nl_meta, $nl_can_send) = (undef, 0);
+    if ($is_newsletter) {
+        my $nl = $c->controller('Newsletter');
+        if ($nl) {
+            $nl_meta     = $nl->_parse_newsletter_meta($page->keywords, $page->page_code, $page->title);
+            $nl_can_send = $nl->_has_newsletter_admin_role($c) ? 1 : 0;
+        }
+    }
+
     $c->stash(
         page => $page,
         rendered_body => $body,
         page_title => $title,
-        ScriptDisplayName => 'Page',
-        template => 'pages/view.tt'
+        ScriptDisplayName => $is_newsletter ? 'Newsletter' : 'Page',
+        is_newsletter => $is_newsletter,
+        nl_meta => $nl_meta,
+        nl_can_send => $nl_can_send,
+        template => $is_newsletter ? 'pages/newsletter_view.tt' : 'pages/view.tt',
     );
 }
 

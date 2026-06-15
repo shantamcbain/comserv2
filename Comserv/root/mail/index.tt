@@ -74,7 +74,13 @@
                         &#9993; Join Our Mailing List
                     </a>
                 [% END %]
+                <a href="/newsletters" class="btn btn-secondary">
+                    <i class="fas fa-newspaper"></i> Newsletter Archive
+                </a>
                 [% IF c.session.roles.match('admin') || c.check_user_roles('admin') %]
+                    <a href="/mail/newsletters" class="btn btn-secondary">
+                        <i class="fas fa-edit"></i> Manage Newsletters
+                    </a>
                     <a href="/mail/lists" class="btn btn-secondary">
                         <i class="fas fa-list"></i> Manage Lists
                     </a>

@@ -2879,6 +2879,19 @@
          "category" : "admin_guides",
          "site" : "all"
       },
+      "proxmox_disk_resize_guide" : {
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "description" : "How to grow a Proxmox QEMU VM disk from Comserv and expand Ubuntu/LVM inside the guest (VM 102 production example)",
+         "format" : "template",
+         "title" : "Proxmox VM Disk Resize (Admin How-To)",
+         "last_scanned" : "Sun Jun 14 06:47:00 2026",
+         "path" : "Documentation/roles/admin/proxmox_disk_resize_guide.tt",
+         "category" : "admin_guides,proxmox"
+      },
       "degradation_api_reference" : {
          "format" : "template",
          "roles" : [

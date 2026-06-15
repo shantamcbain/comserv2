@@ -114,6 +114,10 @@ details[open] .ml-chevron { transform: rotate(90deg); }
         </div>
         <div class="admin-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
             <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">+ Create Custom List</a>
+            <a href="[% c.uri_for('/mail/cpanel_settings') %]" class="btn btn-secondary">cPanel Settings</a>
+            [% IF cpanel_configured %]
+            <a href="[% c.uri_for('/mail/lists/cpanel_provision') %]" class="btn btn-secondary">Link cPanel List</a>
+            [% END %]
             <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-warning">&#9993; Send Mailout</a>
             <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">&#8592; Admin Dashboard</a>
         </div>
@@ -121,6 +125,14 @@ details[open] .ml-chevron { transform: rotate(90deg); }
 
     [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
     [% IF c.flash.error_msg   %]<div class="alert alert-danger">[% c.flash.error_msg   | html %]</div>[% END %]
+    [% IF lists_error %]<div class="alert alert-danger">[% lists_error | html %]</div>[% END %]
+
+    <p style="font-size:0.9em;color:var(--text-muted-color);margin:0 0 16px;">
+        Site: <strong>[% sitename | html %]</strong>
+        [% IF site_id %](site_id [% site_id %])[% END %]
+        &mdash; [% mailing_lists.size %] active list(s).
+        <span style="margin-left:8px;">Application lists are separate from cPanel mailboxes unless linked.</span>
+    </p>
 
     <!-- DEFAULT LISTS -->
     <div class="ml-section-title green">Default Lists &nbsp;<small style="font-weight:normal;font-size:0.8em;">(auto-synced from site data)</small></div>

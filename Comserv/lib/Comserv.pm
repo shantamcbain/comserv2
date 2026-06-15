@@ -401,13 +401,14 @@ sub _initialize_ai_chat_schema {
         $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_ai_chat_schema',
             'Checking AI Chat schema tables...');
         
+        # Names must match DBIx::Class Result ->table() values, not documentation labels.
         my @ai_chat_tables = (
-            'documentation_metadata_index',
-            'code_search_index',
-            'web_search_results',
+            'documentationmetadataindex',
+            'codesearchindex',
+            'websearchresult',
             'ai_model_config',
-            'documentation_role_access',
-            'ai_usage_logs'
+            'documentationroleaccess',
+            'ai_usage_logs',
         );
         
         foreach my $table (@ai_chat_tables) {
@@ -604,11 +605,101 @@ sub _ensure_ai_navigation_shortcuts_table {
             $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_ensure_ai_navigation_shortcuts_table',
                 "ai_navigation_shortcuts table created successfully.");
         }
+
+        $class->_seed_newsletter_ai_shortcuts($dbh);
     };
     if ($@) {
         warn "Failed to ensure ai_navigation_shortcuts schema: $@\n";
     }
     return 1;
+}
+
+sub _seed_newsletter_ai_shortcuts {
+    my ($class, $dbh) = @_;
+    return unless $dbh;
+
+    my @shortcuts = (
+        {
+            label => 'Newsletters',
+            url   => '/newsletters',
+            trigger_phrases => encode_json([
+                'newsletter', 'newsletters', 'read newsletter', 'newsletter archive',
+                'show newsletters', 'latest newsletter',
+            ]),
+            category  => 'Member_links',
+            sitename  => 'All',
+            min_role  => 'guest',
+            link_order => 5,
+        },
+        {
+            label => 'Subscribe to Newsletter',
+            url   => '/mail/subscribe',
+            trigger_phrases => encode_json([
+                'subscribe newsletter', 'join mailing list', 'email subscribe',
+                'newsletter signup',
+            ]),
+            category  => 'Member_links',
+            sitename  => 'All',
+            min_role  => 'guest',
+            link_order => 6,
+        },
+        {
+            label => 'Manage Newsletters',
+            url   => '/mail/newsletters',
+            trigger_phrases => encode_json([
+                'manage newsletters', 'create newsletter', 'send newsletter',
+                'newsletter admin', 'write newsletter',
+            ]),
+            category  => 'Main_links',
+            sitename  => 'All',
+            min_role  => 'admin',
+            link_order => 20,
+        },
+        {
+            label => 'Create Newsletter',
+            url   => '/mail/newsletter/create',
+            trigger_phrases => encode_json([
+                'new newsletter', 'draft newsletter', 'compose newsletter',
+            ]),
+            category  => 'Main_links',
+            sitename  => 'All',
+            min_role  => 'admin',
+            link_order => 21,
+        },
+        {
+            label => 'SSH Terminal',
+            url   => '/admin/ssh_terminal',
+            trigger_phrases => encode_json([
+                'terminal', 'ssh terminal', 'system terminal', 'shell',
+                'open terminal', 'command line', 'system shell',
+            ]),
+            category  => 'Admin_links',
+            sitename  => 'All',
+            min_role  => 'admin',
+            link_order => 10,
+        },
+    );
+
+    require JSON;
+    for my $sc (@shortcuts) {
+        eval {
+            my $check = $dbh->prepare(
+                'SELECT id FROM ai_navigation_shortcuts WHERE url = ? AND sitename = ? LIMIT 1'
+            );
+            $check->execute($sc->{url}, $sc->{sitename});
+            unless ($check->fetchrow_arrayref) {
+                $dbh->do(
+                    'INSERT INTO ai_navigation_shortcuts '
+                    . '(label, url, trigger_phrases, category, sitename, min_role, link_order, status, source) '
+                    . 'VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)',
+                    undef,
+                    $sc->{label}, $sc->{url}, $sc->{trigger_phrases},
+                    $sc->{category}, $sc->{sitename}, $sc->{min_role},
+                    $sc->{link_order}, 'seed_newsletter',
+                );
+            }
+        };
+    }
 }
 
 sub _initialize_session_schema {

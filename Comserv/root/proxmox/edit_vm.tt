@@ -84,8 +84,8 @@
             <h2>Disk Resize</h2>
             <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:0.9em;">
                 <strong>Note:</strong> Proxmox can only <strong>grow</strong> a disk, never shrink it.
-                After resizing you must also resize the partition inside the OS
-                (e.g. <code>growpart /dev/sda 1 &amp;&amp; resize2fs /dev/sda1</code>).
+                After resizing you must also resize the partition inside the OS.
+                <a href="/Documentation/proxmox_disk_resize_guide" style="font-weight:bold;">Full walkthrough (LVM, verify, VM 102 example) &#8594;</a>
             </div>
             <table class="config-table" style="margin-bottom:12px;">
                 <tr><th>Hard Disk (scsi0):</th><td><code>[% vm_config.scsi0 | html %]</code></td></tr>

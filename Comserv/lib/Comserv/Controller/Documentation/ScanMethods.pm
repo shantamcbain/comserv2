@@ -223,6 +223,8 @@ sub _scan_directories {
                                 @roles = ('admin', 'developer');
                             } elsif ($path =~ m{Documentation/session_history/}) {
                                 @roles = ('admin', 'developer', 'editor');
+                            } elsif ($path =~ m{Documentation/guides/}) {
+                                @roles = ('guest', 'member', 'editor', 'admin', 'developer');
                             } elsif ($path =~ m{Documentation/changelog/}) {
                                 @roles = ('admin', 'developer', 'editor');
                             } elsif ($path =~ m{Documentation/ai_workflows/}) {

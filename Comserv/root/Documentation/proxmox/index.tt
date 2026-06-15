@@ -10,6 +10,10 @@ This page provides access to comprehensive documentation for Proxmox VE, includi
 - [Proxmox Authentication Changes](/Documentation/proxmox/authentication) - Changes to the authentication system for Proxmox integration
 - [Proxmox Integration Overview](/Documentation/proxmox/integration) - Overview of the Proxmox integration in Comserv
 
+### Admin How-To Guides
+
+- [Proxmox VM Disk Resize (Admin How-To)](/Documentation/proxmox_disk_resize_guide) - Grow a VM disk from Comserv and expand Ubuntu/LVM inside the guest (includes VM 102 production example)
+
 ### Command Reference
 
 - [Proxmox Command Reference](commands.md) - Comprehensive list of CLI commands for managing Proxmox VE

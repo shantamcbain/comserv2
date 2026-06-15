@@ -13,17 +13,23 @@
         </div>
     </div>
 
-    [% IF debug_msg %]
-        <div class="alert alert-danger">[% debug_msg %]</div>
+    [% IF page_error %]
+        <div class="alert alert-danger">[% page_error | html %]</div>
     [% END %]
 
     <div class="admin-card">
+        <p style="color:var(--text-muted-color);margin:0 0 16px;line-height:1.5;">
+            This creates an <strong>application mailing list</strong> for [% sitename | html %] — used for
+            newsletter subscriptions, mailouts, and My Subscriptions.
+            It is <em>not</em> the same as a cPanel email mailbox unless you link one below.
+        </p>
+
         <form method="post" action="[% c.uri_for('/mail/lists/create') %]" class="admin-form">
             <div class="form-group">
                 <label for="name" class="required">List Name</label>
                 <input type="text" id="name" name="name" required 
-                       placeholder="e.g., Newsletter, Workshop Updates">
-                <small class="form-help">A descriptive name for your mailing list</small>
+                       placeholder="e.g., Beekeeping News, Newsletter">
+                <small class="form-help">Shown on Subscribe and My Subscriptions when marked public</small>
             </div>
 
             <div class="form-group">
@@ -36,21 +42,21 @@
             <div class="form-group">
                 <label for="list_email">List Email Address</label>
                 <input type="email" id="list_email" name="list_email" 
-                       placeholder="newsletter@yoursite.com">
-                <small class="form-help">Optional: Email address for the list (if using Virtualmin)</small>
+                       placeholder="newsletter@beemaster.ca">
+                <small class="form-help">Optional. For cPanel/Virtualmin lists, use Provision cPanel List after saving.</small>
             </div>
 
             <div class="form-group">
                 <label class="checkbox-label">
-                    <input type="checkbox" name="is_software_only" value="1" checked>
-                    Software-only list (no server-side mailing list)
+                    <input type="checkbox" name="is_software_only" value="1" checked id="is_software_only">
+                    Application-managed list (recommended)
                 </label>
-                <small class="form-help">Check this for application-managed lists. Uncheck if using Virtualmin server lists.</small>
+                <small class="form-help">Subscribers stored in this app. Outbound mail uses your site SMTP. Best for newsletters.</small>
             </div>
 
             <div class="form-group">
                 <label class="checkbox-label">
-                    <input type="checkbox" name="is_public" value="1">
+                    <input type="checkbox" name="is_public" value="1" checked>
                     Public list (visible on the subscribe page)
                 </label>
                 <small class="form-help">Public lists appear on <code>/mail/subscribe</code> so anyone can sign up. Private lists are managed by admins only.</small>
@@ -60,7 +66,8 @@
                 <label for="list_backend">List Backend</label>
                 <select id="list_backend" name="list_backend" class="form-input" onchange="updateBackendHint(this.value)">
                     <option value="local" selected>Local (application database)</option>
-                    <option value="virtualmin">Virtualmin (NFS mail server — announcement/send-only)</option>
+                    <option value="cpanel">cPanel (real list on WHC — sync subscribers)</option>
+                    <option value="virtualmin">Virtualmin (legacy NFS backup — send-only)</option>
                     <option value="mailserver">Mail Server (SMTP list)</option>
                     <option value="mailchimp">Mailchimp</option>
                 </select>
@@ -72,8 +79,15 @@
             <div class="form-group" id="backend_config_group" style="display:none;">
                 <label for="backend_config">Backend Configuration (JSON)</label>
                 <textarea id="backend_config" name="backend_config" rows="3"
-                          placeholder='e.g. {"api_key":"abc123","list_id":"xyz"}'></textarea>
-                <small class="form-help">JSON config for the chosen backend (API keys, list IDs, etc.).</small>
+                          placeholder='Mailchimp: {"api_key":"...","list_id":"..."}'></textarea>
+                <small class="form-help">Only for Mailchimp or custom SMTP backends — not for cPanel (use <a href="[% c.uri_for('/mail/cpanel_settings') %]">cPanel Settings</a>).</small>
+            </div>
+            <div class="form-group" id="cpanel_link_group" style="display:none;">
+                <p style="font-size:0.9em;color:var(--text-muted-color);margin:0;">
+                    cPanel API credentials are configured once in
+                    <a href="[% c.uri_for('/mail/cpanel_settings') %]">cPanel Settings</a>.
+                    After creating this list, use <a href="[% c.uri_for('/mail/lists/cpanel_provision') %]">Provision cPanel List</a> to link an address.
+                </p>
             </div>
 
             <div class="form-actions">
@@ -81,21 +95,32 @@
                 <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
+
+        <p style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-color,#ddd);font-size:0.9em;color:var(--text-muted-color);">
+            <strong>cPanel:</strong>
+            <a href="[% c.uri_for('/mail/cpanel_settings') %]">Set API credentials once</a>
+            [% IF cpanel_configured %]
+            &middot; <a href="[% c.uri_for('/mail/lists/cpanel_provision') %]">Provision cPanel mailing list</a>
+            [% END %]
+        </p>
     </div>
 </div>
 
 <script>
 var _backendHints = {
-    local:      'Subscriptions stored in this application\'s database. Best for most lists.',
-    virtualmin: 'Uses the Virtualmin mail server (NFS). Subscriptions tracked locally; outbound mail sent through the server\'s announcement list. Recipients cannot reply — send-only.',
-    mailserver: 'Delegates to an external SMTP mailing list server. Subscriptions managed externally.',
-    mailchimp:  'Syncs subscribers to a Mailchimp audience. Requires Mailchimp API key and list ID in the config below.'
+    local:      'Subscriptions stored in this application\'s database. Best for newsletters and My Subscriptions.',
+    cpanel:     'Links to a real cPanel list. API set in cPanel Settings; provision the @domain address after saving.',
+    virtualmin: 'Legacy Virtualmin/NFS mail server (backup). Send-only announcement lists.',
+    mailserver: 'Delegates to an external SMTP mailing list server.',
+    mailchimp:  'Syncs subscribers to a Mailchimp audience. Requires API key and list ID in config below.'
 };
 function updateBackendHint(val) {
     var hint = document.getElementById('backend_hint');
     var cfg  = document.getElementById('backend_config_group');
+    var cpl  = document.getElementById('cpanel_link_group');
     if (hint) hint.textContent = _backendHints[val] || '';
-    if (cfg)  cfg.style.display = (val !== 'local') ? '' : 'none';
+    if (cfg)  cfg.style.display = (val === 'mailchimp' || val === 'mailserver' || val === 'virtualmin') ? '' : 'none';
+    if (cpl)  cpl.style.display = (val === 'cpanel') ? '' : 'none';
 }
 (function(){
     var sel = document.getElementById('list_backend');

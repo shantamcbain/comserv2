@@ -10,6 +10,7 @@ use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
+use Comserv::Util::UserPreferences;
 
 use constant IS_DEV_WORKTREE => ($Bin =~ m{\.zenflow[\\/]worktrees[\\/]}) ? 1 : 0;
 
@@ -88,6 +89,33 @@ has '_theme_css_generated' => (
     default => 0
 );
 
+# True when any generated theme CSS under root/static/css/themes is absent.
+sub _theme_css_files_missing {
+    my ($self, $c) = @_;
+    my $theme_model = eval { $c->model('ThemeConfig') };
+    return 0 unless $theme_model;
+
+    my $defs_path = $theme_model->can('get_theme_definitions_path')
+        ? $theme_model->get_theme_definitions_path($c)
+        : undef;
+    return 0 unless $defs_path && -f $defs_path;
+
+    my $config_data = eval {
+        use File::Slurp qw(read_file);
+        JSON::decode_json(read_file($defs_path));
+    };
+    return 0 unless $config_data && ref $config_data->{themes} eq 'HASH';
+
+    my $theme_dir = $theme_model->can('get_theme_css_directory')
+        ? $theme_model->get_theme_css_directory($c)
+        : $c->path_to('root', 'static', 'css', 'themes');
+
+    for my $theme_name (keys %{ $config_data->{themes} }) {
+        return 1 unless -f "$theme_dir/$theme_name.css";
+    }
+    return 0;
+}
+
 BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
@@ -110,6 +138,36 @@ sub get_server_ip :Private {
     return $ip || 'unknown';
 }
 
+# Flatten debug_msg for templates. TT2 presents Perl arrayrefs as LIST, so
+# pagetop's "ref == 'ARRAY'" check fails and the template stringifies to ARRAY(0x...).
+sub _debug_msg_stringify {
+    my ($self, $item) = @_;
+    return '' unless defined $item;
+    return $item unless ref($item);
+    if (ref($item) eq 'ARRAY') {
+        return join('; ', grep { defined && $_ ne '' } map { $self->_debug_msg_stringify($_) } @$item);
+    }
+    if (ref($item) eq 'HASH') {
+        return eval { encode_json($item) } // Dumper($item);
+    }
+    return "$item";
+}
+
+sub _normalize_debug_msg {
+    my ($self, $c) = @_;
+    my $dm = $c->stash->{debug_msg};
+    return if !defined $dm;
+
+    my @raw = ref($dm) eq 'ARRAY' ? @$dm : ($dm);
+    my @flat = grep { defined $_ && $_ ne '' } map { $self->_debug_msg_stringify($_) } @raw;
+
+    if (@flat) {
+        $c->stash->{debug_msg} = \@flat;
+    } else {
+        delete $c->stash->{debug_msg};
+    }
+}
+
 # Auto method to set up common stash variables for all requests
 sub auto :Private {
     my ($self, $c) = @_;
@@ -118,6 +176,12 @@ sub auto :Private {
     # This prevents creating session files for Docker health checks
     if ($c->req->path =~ m{^/health(?:/|$)}) {
         return 1;
+    }
+
+    # ttyd reverse proxy (all subpaths: /ws, /token, static assets)
+    if ($c->req->path =~ m{^admin/ttyd-proxy(?:/|$)}) {
+        $c->go('Admin', 'ttyd_proxy');
+        return 0;
     }
 
     $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
@@ -241,6 +305,22 @@ sub auto :Private {
                 "Theme fetch timed out or failed: $@. Using default theme.");
             $c->stash->{theme_name} = 'default';
         }
+
+        # Per-user theme override (DB) — site theme remains the default when unset
+        if ($c->session->{user_id}) {
+            eval {
+                my $override = Comserv::Util::UserPreferences->new->get(
+                    $c, $c->session->{user_id}, 'ui.theme_override'
+                );
+                if (defined $override && $override ne '') {
+                    my $themes = $c->model('ThemeConfig')->get_all_themes($c) || {};
+                    if ($override eq 'default' || (ref $themes eq 'HASH' && exists $themes->{$override})) {
+                        $c->stash->{theme_name}         = $override;
+                        $c->stash->{user_theme_override} = 1;
+                    }
+                }
+            };
+        }
         
         # Set up user information for templates
         # Check both Catalyst auth system and session-based auth
@@ -329,7 +409,15 @@ sub auto :Private {
         $c->stash->{user_id} = $user_id;
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
+        $c->stash->{is_editor} = ($user_logged_in && grep { /^(admin|editor|developer)$/i } @$user_roles) ? 1 : 0;
         $c->stash->{user_logged_in} = $user_logged_in;
+
+        # AI Code Editor float widget — same gate as AI.pm _editor_enabled
+        eval {
+            my $ai = $c->controller('AI');
+            $c->stash->{show_code_editor_widget} = ($ai && $ai->_editor_enabled($c)) ? 1 : 0;
+        };
+        $c->stash->{show_code_editor_widget} //= 0;
 
         # Restore backward compatibility for c.stash.dbi
         $c->stash->{dbi} = Comserv::Util::LegacyDBIWrapper->new($c);
@@ -858,6 +946,8 @@ sub auto :Private {
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
             "Server info - DB Host: $db_host, Hostname: $display_hostname, IP: $display_ip");
+
+        $self->_normalize_debug_msg($c);
         
         return 1; # Continue processing
     };
@@ -1331,9 +1421,9 @@ sub track_application_start {
     my $path = $c->req->path;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: '$path'");
 
-    # Generate theme CSS files if they don't exist
-    # We only need to do this once per application start
-    if (!$self->_theme_css_generated) {
+    # Generate theme CSS files only when missing (avoids -r/--reload restart loops:
+    # writing root/static/css/themes/*.css was triggering dev server reload on first page).
+    if (!$self->_theme_css_generated && $self->_theme_css_files_missing($c)) {
         # Backward-compatible bulk generator (optional: only if the method exists)
         if (ref $c->model('ThemeConfig') && $c->model('ThemeConfig')->can('generate_all_theme_css')) {
             $c->model('ThemeConfig')->generate_all_theme_css($c);

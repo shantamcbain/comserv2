@@ -1,0 +1,162 @@
+[%#
+  newsletter/partials/html_editor.tt
+  WYSIWYG HTML editor + live preview for newsletter body (matches published /page/ view).
+%]
+<div class="form-group">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+        <label for="body" style="margin:0;">[% body_label || 'Newsletter content' %]
+            [% IF body_required %]<span style="color:red">*</span>[% END %]
+        </label>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span id="nl-wysiwyg-badge" class="label label-success" style="font-size:0.85em;">Rich Text</span>
+            <button type="button" id="nl-toggle-editor-mode" class="btn btn-secondary" style="font-size:0.85em;padding:4px 10px;">
+                View HTML source
+            </button>
+        </div>
+    </div>
+
+    <div class="nl-editor-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+        <div class="nl-editor-pane">
+            <textarea name="body" id="body" rows="18" [% IF body_required %]required[% END %]
+                      class="form-control" placeholder="Write newsletter content…">[% body_content %]</textarea>
+        </div>
+        <div class="nl-preview-pane">
+            <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:4px;font-weight:bold;">
+                Live preview (as readers will see it)
+            </div>
+            <div id="nl-body-preview" class="page-body newsletter-issue-preview"
+                 style="min-height:320px;padding:16px;border:1px solid var(--border-color,#ddd);
+                        border-radius:6px;background:#fff;overflow:auto;">
+            </div>
+        </div>
+    </div>
+    <small style="display:block;margin-top:6px;color:var(--text-muted-color);">
+        Edit visually on the left; preview updates on the right. Saved HTML is shown at
+        <code>/page/your-slug</code>. Email sends a short teaser linking to the full issue.
+    </small>
+</div>
+
+<style>
+    .ck-editor__editable_inline { min-height: 300px !important; }
+    @media (max-width: 900px) {
+        .nl-editor-layout { grid-template-columns: 1fr !important; }
+    }
+    .newsletter-issue-preview h2 { margin: 1.2em 0 0.5em; font-size: 1.35em; }
+    .newsletter-issue-preview h3 { margin: 1em 0 0.4em; font-size: 1.1em; }
+    .newsletter-issue-preview p { margin: 0.6em 0; line-height: 1.55; }
+    .newsletter-issue-preview ul, .newsletter-issue-preview ol { margin: 0.5em 0 0.8em 1.4em; }
+    .newsletter-issue-preview a { color: var(--primary-color, #1565c0); }
+</style>
+
+<script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+<script>
+(function() {
+    var bodyTextarea = document.getElementById('body');
+    var previewEl    = document.getElementById('nl-body-preview');
+    var toggleBtn    = document.getElementById('nl-toggle-editor-mode');
+    var badge        = document.getElementById('nl-wysiwyg-badge');
+    if (!bodyTextarea || !previewEl) return;
+
+    var editorInstance = null;
+    var isWysiwygMode  = true;
+    var lastSyncValue  = bodyTextarea.value;
+
+    function updatePreview(html) {
+        previewEl.innerHTML = html || '<p style="color:#888;font-style:italic;">Preview will appear here…</p>';
+    }
+
+    function currentBodyHtml() {
+        if (editorInstance && isWysiwygMode) return editorInstance.getData();
+        return bodyTextarea.value;
+    }
+
+    function syncTextareaFromEditor() {
+        if (editorInstance && isWysiwygMode) {
+            bodyTextarea.value = editorInstance.getData();
+            lastSyncValue = bodyTextarea.value;
+        }
+    }
+
+    updatePreview(bodyTextarea.value);
+
+    ClassicEditor.create(bodyTextarea, {
+        toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo']
+    }).then(function(editor) {
+        editorInstance = editor;
+        bodyTextarea.style.display = 'none';
+
+        editor.model.document.on('change:data', function() {
+            var data = editor.getData();
+            bodyTextarea.value = data;
+            lastSyncValue = data;
+            updatePreview(data);
+        });
+
+        updatePreview(editor.getData());
+    }).catch(function(err) {
+        console.warn('CKEditor unavailable, using plain textarea:', err);
+        bodyTextarea.style.display = 'block';
+        isWysiwygMode = false;
+        bodyTextarea.addEventListener('input', function() {
+            lastSyncValue = bodyTextarea.value;
+            updatePreview(bodyTextarea.value);
+        });
+    });
+
+    // Sync when AI Form Assistant fills the body field
+    setInterval(function() {
+        if (bodyTextarea.value === lastSyncValue) return;
+        lastSyncValue = bodyTextarea.value;
+        if (editorInstance && isWysiwygMode) {
+            editorInstance.setData(bodyTextarea.value);
+        }
+        updatePreview(bodyTextarea.value);
+    }, 300);
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var ckWrap = bodyTextarea.parentNode.querySelector('.ck-editor');
+            if (isWysiwygMode) {
+                syncTextareaFromEditor();
+                if (ckWrap) ckWrap.style.display = 'none';
+                bodyTextarea.style.display = 'block';
+                isWysiwygMode = false;
+                if (badge) { badge.textContent = 'HTML source'; badge.className = 'label label-warning'; }
+                toggleBtn.textContent = 'Back to rich text';
+                updatePreview(bodyTextarea.value);
+            } else {
+                if (editorInstance) {
+                    editorInstance.setData(bodyTextarea.value);
+                    lastSyncValue = bodyTextarea.value;
+                }
+                bodyTextarea.style.display = 'none';
+                if (ckWrap) ckWrap.style.display = 'block';
+                isWysiwygMode = true;
+                if (badge) { badge.textContent = 'Rich Text'; badge.className = 'label label-success'; }
+                toggleBtn.textContent = 'View HTML source';
+                updatePreview(currentBodyHtml());
+            }
+        });
+    }
+
+    var form = bodyTextarea.closest('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            syncTextareaFromEditor();
+        });
+    }
+
+    window.nlAppendToBody = function(html) {
+        if (!html) return;
+        var existing = currentBodyHtml();
+        var merged = existing ? (existing + '\n\n' + html) : html;
+        bodyTextarea.value = merged;
+        lastSyncValue = merged;
+        if (editorInstance && isWysiwygMode) {
+            editorInstance.setData(merged);
+        }
+        updatePreview(merged);
+    };
+})();
+</script>

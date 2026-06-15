@@ -4,6 +4,78 @@ set -e
 # Ensure standard system bin paths are included in PATH (critical for non-interactive SSH)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
+# Commit and push local changes before workstation image build (Auto Deploy Step 0a).
+# Production servers never call this — they only git pull.
+pre_build_git_sync() {
+    local SCRIPT_DIR REPO_ROOT BRANCH DEPLOYER AT_UTC MSG unpushed
+
+    SCRIPT_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+    REPO_ROOT="${COMSERV_GIT_REPO_ROOT:-}"
+    if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/.git" ]; then
+        REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
+    fi
+
+    if [ ! -d "$REPO_ROOT/.git" ]; then
+        echo "❌ pre_build_git_sync: no git repository at $REPO_ROOT" >&2
+        return 1
+    fi
+    if ! command -v git &>/dev/null; then
+        echo "❌ pre_build_git_sync: git not found" >&2
+        return 1
+    fi
+
+    echo "--- Pre-build: Commit and push local changes ---"
+    echo "Repository: $REPO_ROOT"
+
+    cd "$REPO_ROOT"
+    git fetch origin 2>/dev/null || true
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+    if [ -n "$(git status --porcelain)" ]; then
+        DEPLOYER="${COMSERV_DEPLOY_USER:-$(whoami)}"
+        AT_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        MSG="Auto-commit before production deploy ($AT_UTC by $DEPLOYER)"
+        echo "Uncommitted changes detected — staging and committing..."
+        git add -A
+        if ! git commit -m "$MSG"; then
+            echo "❌ git commit failed — deploy aborted" >&2
+            return 1
+        fi
+        echo "✅ Committed: $MSG"
+    else
+        echo "✓ Working tree clean (no new commit needed)"
+    fi
+
+    unpushed=0
+    if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
+        unpushed=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+    elif git rev-parse --verify "origin/$BRANCH" &>/dev/null; then
+        unpushed=$(git rev-list --count "origin/$BRANCH"..HEAD 2>/dev/null || echo 0)
+    else
+        unpushed=1
+    fi
+
+    if [ "${unpushed:-0}" -gt 0 ]; then
+        echo "Pushing $unpushed unpushed commit(s) to origin/$BRANCH..."
+        if ! git push origin "$BRANCH"; then
+            echo "❌ git push failed — deploy aborted" >&2
+            return 1
+        fi
+        echo "✅ Pushed to origin/$BRANCH"
+    else
+        echo "✓ Branch is up to date with remote"
+    fi
+
+    echo "Deploy will build from commit: $(git rev-parse --short HEAD) ($(git log -1 --pretty=%s))"
+    echo "--------------------------------------------"
+    return 0
+}
+
+if [ "${1:-}" = "--pre-build-git-sync" ] || [ "${DEPLOY_MODE:-}" = "pre_build_git_sync" ]; then
+    pre_build_git_sync
+    exit $?
+fi
+
 EMAIL="csc@computersystemconsulting.ca"
 # Detect correct compose file location (either root or script directory)
 if [ -f "/opt/comserv/Comserv/docker-compose.prod.yml" ]; then

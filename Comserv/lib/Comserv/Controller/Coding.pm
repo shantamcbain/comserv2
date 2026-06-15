@@ -6,6 +6,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::CodingAccess;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
+use POSIX qw(WNOHANG);
 
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -45,6 +46,8 @@ sub terminal_status :Local :Args(0) {
     my $allowed = $self->_coding_workstation_allowed($c);
     my $ai = $self->_ai_ctrl($c);
     my $root = $ai ? $ai->_project_root_path($c) : '';
+    my $interactive_ws = $ai && $ai->can('_interactive_ws_available')
+        ? ($ai->_interactive_ws_available($c) ? 1 : 0) : 0;
 
     $c->response->body(encode_json({
         success          => JSON::true,
@@ -53,9 +56,13 @@ sub terminal_status :Local :Args(0) {
         host             => $c->req->uri->host || '',
         project_root     => $root,
         terminal_ws_path => '/coding/terminal_ws',
+        cli_mode         => $interactive_ws ? 'pty' : 'http',
+        interactive_ws_available => $interactive_ws ? JSON::true : JSON::false,
         hint             => $allowed
-            ? 'Interactive shell — run grok, ollama, git, prove, etc.'
-            : 'Coding terminal is only available to Shanta at http://172.30.131.126:PORT/',
+            ? ($interactive_ws
+                ? 'Interactive PTY shell — run grok, ollama, git, prove, etc.'
+                : 'HTTP CLI tab — Grok, Ollama, and shell via /ai endpoints (works on :3000 Docker).')
+            : 'Coding CLI requires Shanta on workstation.local, workstation.zero, or 172.30.131.126',
     }));
 }
 
@@ -186,7 +193,10 @@ sub _spawn_coding_shell {
 
         chdir $root or chdir $home or die "chdir failed: $!";
 
-        if ($shell =~ /bash/) {
+        if ($env->{login_shell}) {
+            exec($shell, '-l') or exec($shell, '-i') or exec($shell) or die "Can't exec shell: $!";
+        }
+        elsif ($shell =~ /bash/) {
             exec($shell, '--noprofile', '--norc', '-i') or exec($shell, '-i') or exec($shell) or die "Can't exec shell: $!";
         }
         exec($shell) or die "Can't exec shell: $!";
@@ -239,9 +249,13 @@ sub _terminal_relay_child {
                 my $ws_frame = Protocol::WebSocket::Frame->new(buffer => $buf, type => 'binary');
                 $handle->push_write($ws_frame->to_bytes);
             } elsif (defined $n) {
-                $handle->destroy;
-                undef $pty_watcher;
-                waitpid($pid, 0);
+                # PTY EOF — confirm child exited before tearing down the socket
+                my $dead = waitpid($pid, WNOHANG);
+                if ($dead == $pid || $dead == -1) {
+                    $handle->destroy;
+                    undef $pty_watcher;
+                    waitpid($pid, 0) if $dead == $pid;
+                }
             }
         }
     );

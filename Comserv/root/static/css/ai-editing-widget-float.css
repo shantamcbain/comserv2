@@ -638,6 +638,76 @@ body.aew-resizing .aew-splitter-v.aew-splitter-active {
     line-height: 1.5;
 }
 
+#aew-panel .aew-cli-tool-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    color: #ccc;
+}
+
+#aew-panel .aew-cli-select {
+    font-size: 0.68rem;
+    background: #2d2d2d;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 0.1rem 0.25rem;
+    max-width: 9rem;
+}
+
+#aew-panel .aew-cli-history-container {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#aew-panel .aew-cli-output {
+    flex: 1;
+    margin: 0;
+    padding: 0.4rem 0.5rem;
+    overflow: auto;
+    background: #000;
+    color: #39ff14;
+    font-family: Consolas, Menlo, Monaco, "Courier New", monospace;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: text;
+}
+
+#aew-panel .aew-cli-input-row {
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.35rem 0.5rem;
+    background: #1e1e1e;
+    border-top: 1px solid #3c3c3c;
+    flex-shrink: 0;
+    align-items: stretch;
+}
+
+#aew-panel #aew-cli-input {
+    flex: 1;
+    resize: vertical;
+    min-height: 2.2rem;
+    max-height: 6rem;
+    background: #2d2d2d;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 0.3rem 0.4rem;
+    font-family: Consolas, Menlo, Monaco, monospace;
+    font-size: 0.72rem;
+}
+
+#aew-panel #aew-btn-cli-run {
+    align-self: flex-end;
+    flex-shrink: 0;
+}
+
 #aew-panel .aew-chat-history-bar {
     padding: 0.35rem 0.5rem;
     border-bottom: 1px solid #3c3c3c;

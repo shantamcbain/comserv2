@@ -173,4 +173,7 @@
     </script>
     <!-- AI utilities - loaded globally so the chat widget works on all pages -->
     <script src="/static/js/ai-common.js?v=[% cv %]"></script>
+    [% IF c.session.user_id %]
+    <script src="/static/js/user-prefs.js?v=[% cv %]"></script>
+    [% END %]
 </head>

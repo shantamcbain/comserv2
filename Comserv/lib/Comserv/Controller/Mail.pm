@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Util::CpanelConfig;
 use Digest::SHA qw(sha256_hex);
 use POSIX qw(strftime);
 BEGIN { extends 'Catalyst::Controller'; }
@@ -15,6 +16,8 @@ has 'logging' => (
 
 sub auto :Private {
     my ($self, $c) = @_;
+    # Root.pm leaves debug_msg as an arrayref — must not stringify on mail pages.
+    delete $c->stash->{debug_msg};
     return 1;
 }
 
@@ -929,55 +932,9 @@ sub _has_mail_role {
     return grep { /^(admin|editor|workshop_leader)$/ } @$roles;
 }
 
-sub newsletter_signup :Path('/mail/newsletter_signup') :Args(0) {
-    my ($self, $c) = @_;
-
-    my $email = $c->req->param('email') || '';
-    unless ($email =~ /\@/) {
-        $c->flash->{error_msg} = 'A valid email address is required.';
-        $c->res->redirect($c->req->referer || $c->uri_for('/'));
-        return;
-    }
-
-    my $site_id = $self->_get_site_id($c);
-    eval {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        my ($list_id) = $dbh->selectrow_array(
-            "SELECT id FROM mailing_lists WHERE site_id=? AND is_active=1 ORDER BY id LIMIT 1",
-            {}, $site_id
-        );
-        if ($list_id) {
-            my ($existing) = $dbh->selectrow_array(
-                "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=?",
-                {}, $list_id, lc $email
-            );
-            if ($existing) {
-                $dbh->do("UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?", {}, $existing);
-            } else {
-                $dbh->do(
-                    "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, subscription_source, is_active) VALUES (?,?,?,1)",
-                    {}, $list_id, lc($email), 'newsletter'
-                );
-            }
-            my ($list_email) = $dbh->selectrow_array(
-                "SELECT list_email FROM mailing_lists WHERE id=? AND is_software_only=0", {}, $list_id
-            );
-            if ($list_email) {
-                $c->model('Mail')->subscribe_cpanel_list($c, list_address => $list_email, email => lc $email);
-            }
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'newsletter_signup', "Error: $@");
-        $c->flash->{error_msg} = 'Could not subscribe — please try again.';
-    } else {
-        $c->flash->{success_msg} = 'Thank you for subscribing!';
-    }
-    $c->res->redirect($c->req->referer || $c->uri_for('/'));
-}
-
 sub lists :Local :Args(0) {
     my ($self, $c) = @_;
+    delete $c->stash->{debug_msg};
 
     my $site_id = $self->_get_site_id($c);
 
@@ -1073,17 +1030,202 @@ sub lists :Local :Args(0) {
     };
     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists', "DB error: $@") if $@;
 
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $lists_error;
+    unless ($site_id) {
+        $lists_error = "Could not determine site_id for SiteName '$sitename'. "
+            . "Lists are stored per site — try reloading after selecting the correct SiteName.";
+    }
+
     $c->stash(
         default_lists => \@default_lists,
         custom_lists  => \@custom_lists,
         mailing_lists => [@default_lists, @custom_lists],
-        template => 'mail/mailing_lists.tt',
+        sitename      => $sitename,
+        site_id       => $site_id,
+        lists_error   => $lists_error,
+        cpanel_configured => $self->_cpanel_configured($c),
+        template      => 'mail/mailing_lists.tt',
     );
     $c->forward($c->view('TT'));
 }
 
+sub cpanel_settings :Path('/mail/cpanel_settings') :Args(0) {
+    my ($self, $c) = @_;
+    delete $c->stash->{debug_msg};
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    my $site_id  = $self->_get_site_id($c);
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+
+    if ($c->req->method eq 'POST') {
+        my ($ok, $err) = Comserv::Util::CpanelConfig->save($c, $site_id, {
+            host           => $c->req->param('host'),
+            username       => $c->req->param('username'),
+            api_token      => $c->req->param('api_token'),
+            password       => $c->req->param('password'),
+            default_domain => $c->req->param('default_domain'),
+            port           => $c->req->param('port'),
+        });
+        if ($ok) {
+            $c->flash->{success_msg} = "cPanel API settings saved for $sitename. Used for all cPanel list actions on this site.";
+            $c->res->redirect($c->uri_for('/mail/cpanel_settings'));
+            return;
+        }
+        $c->stash(page_error => $err // 'Save failed');
+    }
+
+    my $full = Comserv::Util::CpanelConfig->get($c, $site_id);
+    my $cfg  = Comserv::Util::CpanelConfig->for_display($c, $site_id);
+    $c->stash(
+        cpanel_cfg        => $cfg,
+        cpanel_configured => $full->{configured} ? 1 : 0,
+        sitename         => $sitename,
+        site_id          => $site_id,
+        template         => 'mail/cpanel_settings.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub lists_cpanel_provision :Path('/mail/lists/cpanel_provision') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    my $site_id  = $self->_get_site_id($c);
+    my $cpanel   = Comserv::Util::CpanelConfig->get($c, $site_id);
+    unless ($cpanel->{configured}) {
+        $c->flash->{error_msg} = 'cPanel API not configured for this site. Set it once under Mail → cPanel Settings.';
+        $c->res->redirect($c->uri_for('/mail/cpanel_settings'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $list_id   = $c->req->param('list_id')   // '';
+        my $list_name = $c->req->param('list_name') // '';
+        my $domain    = $c->req->param('domain')    // $cpanel->{default_domain};
+        $list_name =~ s/^\s+|\s+$//g;
+        $domain    =~ s/^\s+|\s+$//g;
+
+        unless ($list_id =~ /^\d+$/ && $list_name && $domain) {
+            $c->flash->{error_msg} = 'Select a site list, cPanel list name, and domain.';
+            $c->res->redirect($c->uri_for('/mail/lists/cpanel_provision'));
+            return;
+        }
+
+        my $list = eval {
+            $c->model('DBEncy')->resultset('MailingList')->find({
+                id => $list_id, site_id => $site_id, is_active => 1,
+            });
+        };
+        unless ($list) {
+            $c->flash->{error_msg} = 'Site mailing list not found.';
+            $c->res->redirect($c->uri_for('/mail/lists/cpanel_provision'));
+            return;
+        }
+
+        my ($ok, $err) = $c->model('Mail')->create_cpanel_list(
+            $c, site_id => $site_id, list_name => $list_name, domain => $domain,
+        );
+        unless ($ok) {
+            $c->flash->{error_msg} = "cPanel error: " . ($err // 'unknown');
+            $c->res->redirect($c->uri_for('/mail/lists/cpanel_provision'));
+            return;
+        }
+
+        my $list_email = lc("$list_name\@$domain");
+        eval {
+            $list->update({
+                list_email       => $list_email,
+                list_backend     => 'cpanel',
+                backend_config   => encode_json({ domain => $domain, list_name => $list_name }),
+                is_software_only => 0,
+            });
+        };
+        $c->flash->{success_msg} = "cPanel list $list_email created and linked to \"$list->name\".";
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    my @lists;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('MailingList')->search(
+            { site_id => $site_id, is_active => 1 },
+            { order_by => 'name' },
+        );
+        while (my $l = $rs->next) {
+            push @lists, {
+                id         => $l->id,
+                name       => $l->name,
+                list_email => $l->list_email // '',
+            };
+        }
+    };
+
+    my $preselect_id = $c->req->param('list_id') // '';
+    $preselect_id = '' unless $preselect_id =~ /^\d+$/;
+
+    $c->stash(
+        lists            => \@lists,
+        preselect_list_id => $preselect_id,
+        sitename         => $c->stash->{SiteName} || $c->session->{SiteName} || '',
+        default_domain   => $cpanel->{default_domain},
+        cpanel_host      => $cpanel->{host},
+        cpanel_username  => $cpanel->{username},
+        template         => 'mail/cpanel_provision.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub _cpanel_configured {
+    my ($self, $c, $site_id) = @_;
+    $site_id //= $self->_get_site_id($c);
+    my $cfg = Comserv::Util::CpanelConfig->get($c, $site_id);
+    return $cfg->{configured} ? 1 : 0;
+}
+
+sub _sync_cpanel_subscription {
+    my ($self, $c, $list, $email, $action) = @_;
+    return unless $list && $email && $email =~ /\@/;
+    return unless ($list->list_backend // '') eq 'cpanel';
+
+    my $cpanel = Comserv::Util::CpanelConfig->get($c, $list->site_id);
+    my $addr   = Comserv::Util::CpanelConfig->list_address($list, $cpanel);
+    return unless $addr;
+
+    my $mail = $c->model('Mail');
+    my ($ok, $err);
+    if ($action eq 'subscribe') {
+        ($ok, $err) = $mail->subscribe_cpanel_list(
+            $c, site_id => $list->site_id, list_address => $addr, email => $email,
+        );
+    } else {
+        ($ok, $err) = $mail->unsubscribe_cpanel_list(
+            $c, site_id => $list->site_id, list_address => $addr, email => $email,
+        );
+    }
+    unless ($ok) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_cpanel_subscription',
+            "cPanel $action failed for $email on $addr: " . ($err // 'unknown'));
+    }
+}
+
 sub lists_create :Path('/mail/lists/create') :Args(0) {
     my ($self, $c) = @_;
+    delete $c->stash->{debug_msg};
 
     my $roles = $c->session->{roles} || [];
     $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
@@ -1096,20 +1238,37 @@ sub lists_create :Path('/mail/lists/create') :Args(0) {
     if ($c->req->method eq 'POST') {
         my $site_id = $self->_get_site_id($c);
         my $name    = $c->req->param('name') || '';
-        unless ($name) {
-            $c->stash(debug_msg => 'List name is required.', template => 'mail/create_list.tt');
+        unless ($site_id) {
+            $c->stash(
+                page_error => 'Could not determine site for this session. Select the correct SiteName and try again.',
+                sitename   => $c->stash->{SiteName} || $c->session->{SiteName} || '',
+                cpanel_configured => $self->_cpanel_configured($c),
+                template   => 'mail/create_list.tt',
+            );
             $c->forward($c->view('TT'));
             return;
         }
+        unless ($name) {
+            $c->stash(
+                page_error => 'List name is required.',
+                sitename   => $c->stash->{SiteName} || $c->session->{SiteName} || '',
+                cpanel_configured => $self->_cpanel_configured($c),
+                template   => 'mail/create_list.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+        my $list_backend = $c->req->param('list_backend') || 'local';
+        my $new_list;
         eval {
-            $c->model('DBEncy')->resultset('MailingList')->create({
+            $new_list = $c->model('DBEncy')->resultset('MailingList')->create({
                 site_id          => $site_id,
                 name             => $name,
                 description      => $c->req->param('description')    || '',
                 list_email       => $c->req->param('list_email')      || undef,
                 is_software_only => $c->req->param('is_software_only') ? 1 : 0,
                 is_public        => $c->req->param('is_public')        ? 1 : 0,
-                list_backend     => $c->req->param('list_backend')     || 'local',
+                list_backend     => $list_backend,
                 backend_config   => $c->req->param('backend_config')   || undef,
                 is_active        => 1,
                 created_by       => $c->session->{user_id} || 0,
@@ -1117,16 +1276,37 @@ sub lists_create :Path('/mail/lists/create') :Args(0) {
         };
         if ($@) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists_create', "Create failed: $@");
-            $c->stash(debug_msg => "Failed to create list: $@", template => 'mail/create_list.tt');
+            $c->stash(
+                page_error => "Failed to create list: $@",
+                sitename   => $c->stash->{SiteName} || $c->session->{SiteName} || '',
+                cpanel_configured => $self->_cpanel_configured($c),
+                template   => 'mail/create_list.tt',
+            );
             $c->forward($c->view('TT'));
             return;
         }
-        $c->flash->{success_msg} = "Mailing list '$name' created.";
+        my $is_public = $c->req->param('is_public') ? 1 : 0;
+        my $msg = "Mailing list '$name' created.";
+        $msg .= ' It is public — visible on Subscribe and My Subscriptions.' if $is_public;
+        if ($list_backend eq 'cpanel' && $new_list) {
+            if ($self->_cpanel_configured($c, $site_id)) {
+                $msg .= ' Next: create the list on cPanel and link the address.';
+                $c->flash->{success_msg} = $msg;
+                $c->res->redirect($c->uri_for('/mail/lists/cpanel_provision', { list_id => $new_list->id }));
+                return;
+            }
+            $msg .= ' Set cPanel API credentials under Mail → cPanel Settings, then use Provision cPanel List.';
+        }
+        $c->flash->{success_msg} = $msg;
         $c->res->redirect($c->uri_for('/mail/lists'));
         return;
     }
 
-    $c->stash(template => 'mail/create_list.tt');
+    $c->stash(
+        sitename          => $c->stash->{SiteName} || $c->session->{SiteName} || '',
+        cpanel_configured => $self->_cpanel_configured($c),
+        template          => 'mail/create_list.tt',
+    );
     $c->forward($c->view('TT'));
 }
 
@@ -1163,15 +1343,24 @@ sub lists_edit {
     }
 
     if ($c->req->method eq 'POST') {
+        my $list_backend   = $c->req->param('list_backend')   || $list->list_backend || 'local';
+        my $backend_config = $c->req->param('backend_config') // $list->backend_config;
+        my $list_email     = $c->req->param('list_email')     || undef;
+        if ($list_backend eq 'cpanel' && (!$list_email || $list_email !~ /\@/) && $backend_config && $backend_config =~ /^\s*\{/) {
+            my $meta = eval { decode_json($backend_config) } || {};
+            if (ref $meta eq 'HASH' && $meta->{list_name} && $meta->{domain}) {
+                $list_email = lc("$meta->{list_name}\@$meta->{domain}");
+            }
+        }
         eval {
             $list->update({
                 name             => $c->req->param('name')             || $list->name,
                 description      => $c->req->param('description')      // $list->description,
-                list_email       => $c->req->param('list_email')       || undef,
+                list_email       => $list_email,
                 is_software_only => $c->req->param('is_software_only') ? 1 : 0,
                 is_public        => $c->req->param('is_public')        ? 1 : 0,
-                list_backend     => $c->req->param('list_backend')     || $list->list_backend || 'local',
-                backend_config   => $c->req->param('backend_config')   // $list->backend_config,
+                list_backend     => $list_backend,
+                backend_config   => $backend_config,
             });
         };
         if ($@) {
@@ -2229,10 +2418,13 @@ sub subscribe :Local :Args(0) {
         };
     }
 
+    my $highlight = $c->req->param('highlight') // $c->req->param('list_id') // '';
+
     $c->stash(
         public_lists    => \@public_lists,
         subscribed_ids  => \%subscribed_ids,
         prefill         => $prefill,
+        highlight_list  => $highlight,
         template        => 'mail/Subscribe.tt',
     );
     $c->forward($c->view('TT'));
@@ -2312,6 +2504,7 @@ sub newsletter_signup :Local :Args(0) {
                 });
             }
             $subscribed++;
+            $self->_sync_cpanel_subscription($c, $list, $email, 'subscribe') unless $@;
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'newsletter_signup',
             "Error subscribing $email to list $list_id: $@") if $@;
@@ -2369,17 +2562,19 @@ sub my_subscriptions :Local :Args(0) {
                 )->single;
             };
 
+            my $user = $schema->resultset('User')->find($uid);
+            my $user_email = $user ? $user->email : undef;
+
             if ($checked{$lid}) {
                 if ($existing) {
                     $existing->update({ status => 'subscribed', is_active => 1, unsubscribed_at => undef })
                         unless $existing->status eq 'blocked';
                 } else {
-                    my $user = $schema->resultset('User')->find($uid);
                     eval {
                         $schema->resultset('MailingListSubscription')->create({
                             mailing_list_id     => $lid,
                             user_id             => $uid,
-                            email               => ($user ? $user->email : undef),
+                            email               => $user_email,
                             first_name          => ($user ? $user->first_name : undef),
                             last_name           => ($user ? $user->last_name  : undef),
                             status              => 'subscribed',
@@ -2389,6 +2584,7 @@ sub my_subscriptions :Local :Args(0) {
                         });
                     };
                 }
+                $self->_sync_cpanel_subscription($c, $list, $user_email, 'subscribe') if $user_email;
             } else {
                 if ($existing && $existing->status eq 'subscribed') {
                     $existing->update({
@@ -2396,6 +2592,8 @@ sub my_subscriptions :Local :Args(0) {
                         is_active       => 0,
                         unsubscribed_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
                     });
+                    my $em = $user_email || $existing->email;
+                    $self->_sync_cpanel_subscription($c, $list, $em, 'unsubscribe') if $em;
                 }
             }
         }
@@ -2426,8 +2624,14 @@ sub my_subscriptions :Local :Args(0) {
         }
     };
 
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+
     $c->stash(
         public_lists => \@public_lists,
+        is_admin     => $is_admin,
+        sitename     => $c->stash->{SiteName} || $c->session->{SiteName} || '',
         template     => 'mail/MySubscriptions.tt',
     );
     $c->forward($c->view('TT'));

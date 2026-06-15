@@ -64,8 +64,27 @@
                 </form>
 
             [% ELSE %]
-                <div class="info-box" style="padding:var(--spacing-large);text-align:center;color:var(--text-muted-color);">
-                    <p>There are no public mailing lists available for this site.</p>
+                <div class="info-box" style="padding:var(--spacing-large);color:var(--text-muted-color);max-width:42em;">
+                    <p style="text-align:center;margin-top:0;">
+                        <strong>No subscription lists are available on [% sitename | html %] yet.</strong>
+                    </p>
+                    <p>My Subscriptions only shows lists that a site admin has marked as <strong>public</strong>.
+                       Members cannot add new list types here — they choose from lists the admin has created.</p>
+                    [% IF is_admin %]
+                    <p><strong>Admin:</strong> create a public list, then link it to your newsletter:</p>
+                    <ol style="margin:12px 0;padding-left:1.4em;line-height:1.6;">
+                        <li><a href="[% c.uri_for('/mail/lists/create') %]">Create a mailing list</a> and check <strong>Public list</strong>, or</li>
+                        <li><a href="[% c.uri_for('/mail/newsletters') %]">Edit your newsletter</a> and use <strong>Create a new public list</strong> (saved automatically).</li>
+                    </ol>
+                    <p style="text-align:center;margin-bottom:0;">
+                        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">Create Public List</a>
+                        <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-secondary">Manage Newsletters</a>
+                    </p>
+                    [% ELSE %]
+                    <p style="text-align:center;margin-bottom:0;">
+                        Ask a site administrator to set up newsletter subscription lists.
+                    </p>
+                    [% END %]
                 </div>
             [% END %]
 

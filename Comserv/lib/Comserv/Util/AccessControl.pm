@@ -456,6 +456,67 @@ sub create_session_user_object {
     return $session_user;
 }
 
+=head2 active_usernames_for_site
+
+Return sorted usernames with an active UserSiteRole on the given site
+and user.status = active.
+
+=cut
+
+sub active_usernames_for_site {
+    my ($self, $c, $site_name) = @_;
+    return [] unless $site_name;
+
+    my @usernames;
+    eval {
+        my $site = $c->model('DBEncy')->resultset('Site')->search(
+            { name => $site_name },
+            { columns => ['id'], rows => 1 }
+        )->single;
+        return [] unless $site;
+
+        my @roles = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+            {
+                site_id   => $site->id,
+                is_active => 1,
+                -or       => [
+                    expires_at => undef,
+                    expires_at => { '>' => \'NOW()' },
+                ],
+            },
+            { columns => ['user_id'], distinct => 1 }
+        )->all;
+
+        my %seen;
+        for my $sr (@roles) {
+            my $uid = $sr->user_id // next;
+            my $user = $c->model('DBEncy')->resultset('User')->find($uid);
+            next unless $user;
+            my $st = eval { $user->status } // 'active';
+            next unless $st eq 'active';
+            my $un = eval { $user->username } // '';
+            push @usernames, $un if $un && !$seen{$un}++;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'active_usernames_for_site', "Error for site $site_name: $@");
+    }
+    return [ sort @usernames ];
+}
+
+sub active_usernames_for_sites {
+    my ($self, $c, $site_names) = @_;
+    my %seen;
+    $site_names = [] unless ref($site_names) eq 'ARRAY';
+    for my $sn (@$site_names) {
+        for my $u (@{ $self->active_usernames_for_site($c, $sn) }) {
+            $seen{$u} = 1;
+        }
+    }
+    return [ sort keys %seen ];
+}
+
 __PACKAGE__->meta->make_immutable;
 
 # Fallback SessionUser class for when database schema is incompatible

@@ -11,6 +11,8 @@ use Comserv::Util::UserVerification;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::PointSystem;
+use Comserv::Util::UserPreferences;
+use JSON qw(encode_json decode_json);
 use DateTime;
 use DateTime::Format::MySQL;
 
@@ -3815,6 +3817,73 @@ sub _load_available_roles {
         default_roles => \@default_roles,
         site_roles    => \@site_specific,
     };
+}
+
+=head2 prefs
+
+GET  /user/prefs — all preferences for the logged-in user (JSON).
+POST /user/prefs — merge { "prefs": { "calendar.site_colors": {...}, ... } }.
+
+User data is stored in MariaDB (user_preferences table), not in git.
+
+=cut
+
+sub prefs :Local {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ ok => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $up = Comserv::Util::UserPreferences->new;
+
+    if (($c->req->method || 'GET') eq 'GET') {
+        my $prefs = $up->get_all($c, $user_id);
+        $c->response->body(encode_json({
+            ok    => JSON::true,
+            prefs => $prefs,
+        }));
+        return;
+    }
+
+    if (($c->req->method || '') eq 'POST') {
+        my $body_fh = $c->req->body;
+        my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+        my $data;
+        eval { $data = decode_json($body) if $body };
+        $data //= {};
+
+        my $incoming = $data->{prefs};
+        $incoming = { $data->{key} => $data->{value} }
+            if !ref $incoming && $data->{key};
+
+        unless ($incoming && ref $incoming eq 'HASH' && keys %$incoming) {
+            $c->response->status(400);
+            $c->response->body(encode_json({
+                ok    => JSON::false,
+                error => 'Expected JSON { prefs: { key: value, ... } }',
+            }));
+            return;
+        }
+
+        my $result = $up->set_many($c, $user_id, $incoming);
+        if (!$result->{ok}) {
+            $c->response->status(400);
+        }
+        $c->response->body(encode_json({
+            ok    => $result->{ok} ? JSON::true : JSON::false,
+            prefs => $result->{prefs} // {},
+            ( $result->{error} ? (error => $result->{error}) : () ),
+        }));
+        return;
+    }
+
+    $c->response->status(405);
+    $c->response->body(encode_json({ ok => JSON::false, error => 'Method not allowed' }));
 }
 
 sub _public_reset_link {

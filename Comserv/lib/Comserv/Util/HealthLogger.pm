@@ -766,10 +766,12 @@ sub get_docker_health {
 
         for my $ct (@containers) {
             next unless $ct->{health} eq 'healthy' || $ct->{status_str} =~ /Up/i;
+            # Only Comserv app containers ship version.json; skip redis, config-db, etc.
+            next unless ($ct->{name} // '') =~ /comserv-web/i;
             eval {
                 local $SIG{CHLD} = 'DEFAULT';
                 open(my $vfh, '-|', 'timeout', '4', 'docker', 'exec',
-                    $ct->{name}, 'cat', '/opt/comserv/version.json') or die;
+                    $ct->{name}, 'sh', '-c', 'cat /opt/comserv/version.json 2>/dev/null') or die;
                 my $raw = do { local $/; <$vfh> };
                 close $vfh;
                 if ($raw && $raw =~ /^\{/) {

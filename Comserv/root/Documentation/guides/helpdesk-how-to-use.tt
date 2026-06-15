@@ -1,0 +1,63 @@
+[% PageVersion = 'Documentation/guides/helpdesk-how-to-use.tt,v 1.00 2026/06/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'HelpDesk: How to Submit a Support Ticket' %]
+[% META description = 'Stable member guide — web form, AI chat widget, check status; for newsletters and mailings' %]
+[% META date = '2026-06-13' %]
+[% META newsletter_include = 'yes' %]
+[% META audience = 'member' %]
+[% META roles = 'guest,member,editor,admin' %]
+
+<section class="member-how-to">
+    <h2>Quick links</h2>
+    <ul>
+        <li><a href="/HelpDesk">HelpDesk home</a></li>
+        <li><a href="/HelpDesk/ticket/new">Submit a ticket (web form + AI)</a></li>
+        <li><a href="/HelpDesk/ticket/status">Check ticket status</a></li>
+        <li><a href="/HelpDesk/kb">Knowledge base</a></li>
+        <li><a href="/HelpDesk/contact">Contact support</a></li>
+    </ul>
+
+    <h2>Option A — Web (recommended first stop)</h2>
+    <ol>
+        <li>Top navigation → <strong>HelpDesk</strong> → <strong>Submit a Ticket</strong>, or open <a href="/HelpDesk/ticket/new">/HelpDesk/ticket/new</a> directly.</li>
+        <li>On that page, click <strong>Ask AI Assistant</strong> — the <strong>Chat with AI</strong> widget opens and tries to solve your issue before you file a ticket.</li>
+        <li>If you still need a ticket, click <strong>Skip AI — Submit Ticket Directly</strong>, fill in subject, category, priority, and description, then <strong>Submit Ticket</strong>.</li>
+        <li>After submit, note your ticket number and track it at <a href="/HelpDesk/ticket/status">/HelpDesk/ticket/status</a>.</li>
+    </ol>
+
+    <h2>Option B — Chat with AI widget (any page)</h2>
+    <ol>
+        <li>Click <strong>Chat with AI</strong> (floating button, usually bottom-right on every page).</li>
+        <li>Describe your problem in plain language — for example: <em>“How do I submit a ticket?”</em>, <em>“I need help with login”</em>, or <em>“Report a bug on the planning page”</em>.</li>
+        <li>The assistant uses the <strong>helpdesk</strong> context for support questions and can guide you to <a href="/HelpDesk/ticket/new">/HelpDesk/ticket/new</a>.</li>
+        <li>If live support is offered in chat and a ticket is needed, use <strong>Create a support ticket</strong> in the chat — it opens the ticket form with your chat summary pre-filled (<code>from_chat=1</code>).</li>
+        <li>Review the pre-filled subject and description, adjust if needed, and submit.</li>
+    </ol>
+
+    <h2>What to include in your ticket</h2>
+    <ul>
+        <li>What you were trying to do</li>
+        <li>What happened instead (exact error text if any)</li>
+        <li>Page or menu path (e.g. Planning → Daily plan)</li>
+        <li>Your SiteName if you use more than one site</li>
+    </ul>
+
+    <h2>For newsletters and email mailings (personalization)</h2>
+    <p>This guide is stable at <a href="/Documentation/helpdesk-how-to-use">/Documentation/helpdesk-how-to-use</a> — use <strong>Insert into body</strong> on the newsletter create form, or link to <code>/page/your-issue</code> after publishing.</p>
+    <p><strong>Email teaser</strong> (Send Newsletter screen) supports subscriber tags — they are replaced per recipient:</p>
+    <ul>
+        <li><code>[FIRST_NAME]</code> — subscriber first name</li>
+        <li><code>[LAST_NAME]</code>, <code>[EMAIL]</code>, <code>[USERNAME]</code></li>
+    </ul>
+    <p>Example teaser line for a mailing:</p>
+    <p><em>Hi [FIRST_NAME], need help? Submit a ticket at /HelpDesk/ticket/new or use Chat with AI on any page.</em></p>
+    <p>The full newsletter page online is the same for all readers; personalization applies to the <strong>email teaser</strong> sent with each issue.</p>
+
+    <h2>Try these links now</h2>
+    <ul>
+        <li><a href="/HelpDesk/ticket/new">Open ticket form (AI pre-screen)</a></li>
+        <li><a href="/HelpDesk/ticket/status">My ticket status</a></li>
+        <li><a href="/HelpDesk">HelpDesk home</a></li>
+    </ul>
+</section>

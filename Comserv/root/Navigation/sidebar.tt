@@ -133,11 +133,19 @@
                 <p><strong>Template:</strong> [% template %]</p>
                 <p><strong>Controller:</strong> [% c.action.class %]</p>
                 <p><strong>Action:</strong> [% c.action.name %]</p>
-                [% IF c.session.debug_mode && debug_msg && debug_msg.size > 0 %]
+                [% IF c.session.debug_mode && debug_msg && debug_msg.size %]
                 <p><strong>Debug Messages:</strong></p>
                 <ul class="small">
                 [% FOREACH msg IN debug_msg %]
-                    <li>[% msg %]</li>
+                    <li>[% msg | html %]</li>
+                [% END %]
+                </ul>
+                [% END %]
+                [% IF c.session.debug_mode && debug_errors && debug_errors.size %]
+                <p><strong>Errors:</strong></p>
+                <ul class="small">
+                [% FOREACH err IN debug_errors %]
+                    <li class="text-danger">[% err | html %]</li>
                 [% END %]
                 </ul>
                 [% END %]

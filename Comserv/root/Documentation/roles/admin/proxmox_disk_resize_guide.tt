@@ -1,0 +1,179 @@
+[% PageVersion = 'Documentation/roles/admin/proxmox_disk_resize_guide.tt,v 1.00 2026/06/14 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Proxmox VM Disk Resize (Admin How-To)' %]
+[% META description = 'How to grow a Proxmox QEMU VM disk from Comserv and expand the partition inside Ubuntu/LVM' %]
+[% META roles = 'admin developer' %]
+
+<h1>Proxmox VM Disk Resize — Admin How-To</h1>
+<p><em>Last updated: June 14, 2026</em></p>
+
+<h2>Overview</h2>
+<p>
+Comserv can <strong>grow</strong> a Proxmox QEMU virtual disk through the Proxmox API.
+Growing the virtual disk is only <strong>step one</strong> — you must also expand the partition and filesystem
+<strong>inside the guest OS</strong> before the VM can use the new space.
+</p>
+
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:12px 16px;margin:16px 0;">
+    <strong>Important:</strong> Proxmox can only <strong>increase</strong> disk size. Shrinking is not supported.
+    Plan the new size carefully — you cannot undo it from the UI.
+</div>
+
+<hr>
+
+<h2>Table of Contents</h2>
+<ol>
+    <li><a href="#when">When to use this</a></li>
+    <li><a href="#prereqs">Prerequisites</a></li>
+    <li><a href="#step1">Step 1 — Grow the disk in Comserv</a></li>
+    <li><a href="#step2">Step 2 — Expand the partition inside the VM</a></li>
+    <li><a href="#step3">Step 3 — Verify</a></li>
+    <li><a href="#production">Example: ComservProduction (VM 102)</a></li>
+    <li><a href="#cli">CLI alternative</a></li>
+    <li><a href="#troubleshoot">Troubleshooting</a></li>
+</ol>
+
+<hr>
+
+<h2 id="when">1. When to use this</h2>
+<ul>
+    <li>Admin dashboard shows <strong>App Server Disk</strong> at 80–90%+ on a Proxmox-hosted VM</li>
+    <li>Docker images, session files, or logs are filling a small root volume (e.g. 30 GB)</li>
+    <li>You need more headroom without rebuilding the VM</li>
+</ul>
+<p>
+<strong>Not covered here:</strong> LXC container resize (<code>pct resize</code>) — use the
+<a href="/Documentation/proxmox/commands">Proxmox command reference</a> or the Proxmox Web UI.
+</p>
+
+<hr>
+
+<h2 id="prereqs">2. Prerequisites</h2>
+<ul>
+    <li><strong>CSC admin</strong> role in Comserv</li>
+    <li>Proxmox API credentials configured under <a href="/proxmox_servers">Proxmox Servers</a></li>
+    <li>Target VM uses a <strong>QEMU</strong> disk on <code>scsi0</code> (Comserv resize UI targets <code>scsi0</code>)</li>
+    <li>SSH access to the guest VM (for the in-OS partition step)</li>
+    <li>Enough free space on the Proxmox storage pool backing the VM</li>
+</ul>
+
+<hr>
+
+<h2 id="step1">3. Step 1 — Grow the disk in Comserv</h2>
+<ol>
+    <li>Open <a href="/proxmox">Proxmox VM Dashboard</a></li>
+    <li>Select the correct Proxmox host if you have more than one</li>
+    <li>Click <strong>Edit</strong> on the target VM (e.g. VM <strong>102</strong> ComservProduction)</li>
+    <li>Scroll to the <strong>Disk Resize</strong> section</li>
+    <li>Enter the new size in GB (must be <strong>larger</strong> than the current size)</li>
+    <li>Click <strong>Resize Disk</strong> and confirm</li>
+</ol>
+<p>
+On success, Proxmox has enlarged the virtual disk file. The guest OS still sees the old size until step 2.
+</p>
+
+<hr>
+
+<h2 id="step2">4. Step 2 — Expand the partition inside the VM</h2>
+<p>SSH into the VM and inspect the layout first:</p>
+<pre>lsblk
+df -h /
+sudo pvs
+sudo vgs
+sudo lvs</pre>
+
+<h3>Ubuntu with LVM (typical Comserv production layout)</h3>
+<p>
+Production (<code>comservproduction1</code> / <code>192.168.1.126</code>) uses
+<code>/dev/mapper/ubuntu--vg-ubuntu--lv</code> on a ~30 GB volume. After growing the Proxmox disk:
+</p>
+<ol>
+    <li><strong>Grow the partition</strong> (partition number may differ — check <code>lsblk</code>):</li>
+</ol>
+<pre>sudo growpart /dev/sda 3
+sudo pvresize /dev/sda3
+sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+sudo resize2fs /dev/ubuntu-vg/ubuntu-lv</pre>
+<p>If your disk is <code>/dev/vda</code> instead of <code>/dev/sda</code>, substitute accordingly.</p>
+
+<h3>Simple ext4 on a single partition (no LVM)</h3>
+<pre>sudo growpart /dev/sda 1
+sudo resize2fs /dev/sda1</pre>
+
+<h3>Reboot?</h3>
+<p>
+Usually not required. If <code>growpart</code> reports the partition is already max size, confirm step 1
+completed in Proxmox and that you resized the correct VM/disk.
+</p>
+
+<hr>
+
+<h2 id="step3">5. Step 3 — Verify</h2>
+<pre>df -h /
+lsblk</pre>
+<p>
+Reload the <a href="/admin">Admin Dashboard</a> — <strong>App Server Disk</strong> should show the new capacity
+after the hardware agent reports (within a few minutes), or immediately after you refresh disk stats on the host.
+</p>
+<p>
+Optional cleanup after resizing (sessions, old Docker images):
+<a href="/admin/hardware_monitor/disk_health">Disk Health &amp; Cleanup</a>.
+</p>
+
+<hr>
+
+<h2 id="production">6. Example: ComservProduction (VM 102)</h2>
+<table style="border-collapse:collapse;width:100%;max-width:640px;">
+    <tr><th style="text-align:left;padding:6px 10px;border:1px solid #ddd;">Item</th><th style="text-align:left;padding:6px 10px;border:1px solid #ddd;">Value</th></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Proxmox VMID</td><td style="padding:6px 10px;border:1px solid #ddd;"><strong>102</strong></td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Hostname</td><td style="padding:6px 10px;border:1px solid #ddd;">comservproduction1</td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ddd;">IP</td><td style="padding:6px 10px;border:1px solid #ddd;">192.168.1.126</td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Typical disk</td><td style="padding:6px 10px;border:1px solid #ddd;">scsi0, 30 GB → recommend <strong>60–80 GB</strong></td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ddd;">Guest layout</td><td style="padding:6px 10px;border:1px solid #ddd;">LVM: <code>ubuntu-vg/ubuntu-lv</code></td></tr>
+</table>
+<p>
+<a href="/proxmox/edit_vm/102">Edit VM 102 in Comserv</a> (requires CSC admin and working Proxmox auth).
+</p>
+
+<hr>
+
+<h2 id="cli">7. CLI alternative (on Proxmox host)</h2>
+<p>From the Proxmox node shell or SSH:</p>
+<pre>qm resize 102 scsi0 60G</pre>
+<p>Then perform <a href="#step2">Step 2</a> inside the guest. See also
+<a href="/Documentation/proxmox/commands">Proxmox Command Reference</a>.</p>
+
+<hr>
+
+<h2 id="troubleshoot">8. Troubleshooting</h2>
+
+<h3>Resize button returns an error</h3>
+<ul>
+    <li>Confirm Proxmox authentication under <a href="/proxmox_servers">Proxmox Servers</a></li>
+    <li>VM must be QEMU with <code>scsi0</code> defined</li>
+    <li>New size must be greater than current size</li>
+    <li>Check Proxmox storage pool has free space</li>
+</ul>
+
+<h3><code>df</code> still shows old size after resize</h3>
+<ul>
+    <li>Step 2 (growpart / LVM / resize2fs) was not run inside the guest</li>
+    <li>Wrong partition number in <code>growpart</code> — re-check <code>lsblk</code></li>
+</ul>
+
+<h3>Infrastructure servers show “No data” on admin dashboard</h3>
+<p>
+Install the hardware monitor agent on each server — see
+<a href="/admin/hardware_monitor">Hardware Monitor</a> setup instructions.
+</p>
+
+<hr>
+
+<h2>Related links</h2>
+<ul>
+    <li><a href="/proxmox">Proxmox VM Dashboard</a></li>
+    <li><a href="/proxmox_servers">Proxmox Servers (API credentials)</a></li>
+    <li><a href="/admin/hardware_monitor/disk_health">Disk Health &amp; Cleanup</a></li>
+    <li><a href="/Documentation/proxmox/commands">Proxmox CLI commands</a></li>
+</ul>

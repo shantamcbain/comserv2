@@ -1,94 +1,101 @@
 package Comserv::Model::Schema::Ency::Result::Page;
-
+use base 'DBIx::Class::Core';
 use strict;
 use warnings;
-use base 'DBIx::Class::Core';
 
-__PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp', 'EncodedColumn');
+__PACKAGE__->load_components(qw/InflateColumn::DateTime TimeStamp/);
 __PACKAGE__->table('page');
 
 __PACKAGE__->add_columns(
-    'id' => {
+    id => {
         data_type         => 'integer',
         is_auto_increment => 1,
         is_nullable       => 0,
     },
-    'sitename' => {
+    sitename => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 0,
     },
-    'menu' => {
+    menu => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 0,
     },
-    'page_code' => {
+    page_code => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 0,
     },
-    'title' => {
-        data_type => 'varchar',
-        size => 255,
+    title => {
+        data_type   => 'varchar',
+        size        => 255,
         is_nullable => 0,
     },
-    'body' => {
+    body => {
         data_type   => 'text',
         is_nullable => 0,
     },
-    'description' => {
-        data_type   => 'text',
-        is_nullable => 1,
-    },
-    'keywords' => {
+    description => {
         data_type   => 'text',
         is_nullable => 1,
     },
-    'link_order' => {
-        data_type   => 'integer',
-        is_nullable => 0,
+    keywords => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    link_order => {
+        data_type     => 'integer',
+        is_nullable   => 0,
         default_value => 0,
     },
-    'status' => {
-        data_type   => 'varchar',
-        size        => 50,
-        is_nullable => 0,
+    status => {
+        data_type     => 'varchar',
+        size          => 50,
+        is_nullable   => 0,
         default_value => 'active',
     },
-    'roles' => {
-        data_type   => 'varchar',
-        size        => 255,
-        is_nullable => 1,
+    roles => {
+        data_type     => 'varchar',
+        size          => 255,
+        is_nullable   => 1,
         default_value => 'public',
     },
-    'share_with' => {
+    share_with => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 1,
     },
-    'created_by' => {
-        data_type => 'varchar',
-        size => 255,
+    # Known values: standard, newsletter, feature_guide (member how-to for newsletter inclusion)
+    page_type => {
+        data_type     => 'varchar',
+        size          => 50,
+        is_nullable   => 0,
+        default_value => 'standard',
+    },
+    created_by => {
+        data_type   => 'varchar',
+        size        => 255,
         is_nullable => 0,
     },
-    'created_at' => {
-        data_type => 'datetime',
+    created_at => {
+        data_type     => 'datetime',
+        is_nullable   => 0,
         set_on_create => 1,
     },
-    'updated_at' => {
-        data_type => 'datetime',
+    updated_at => {
+        data_type     => 'datetime',
+        is_nullable   => 0,
         set_on_create => 1,
         set_on_update => 1,
     },
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint('unique_sitename_page_code' => ['sitename', 'page_code']);
+__PACKAGE__->add_unique_constraint(unique_sitename_page_code => [qw/sitename page_code/]);
 
-# Add indexes for common queries
 __PACKAGE__->resultset_attributes({
-    order_by => ['sitename', 'menu', 'link_order']
+    order_by => [qw/sitename menu link_order/],
 });
 
 1;

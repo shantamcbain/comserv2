@@ -1,0 +1,211 @@
+[% META title = 'Send Newsletter' %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Send Newsletter</h1>
+        <nav style="font-size:0.9em;color:var(--text-muted-color);">
+            <a href="[% c.uri_for('/mail/newsletters') %]">Newsletters</a> &rsaquo;
+            <a href="[% c.uri_for('/mail/newsletter/edit', page.page_code) %]">[% page.title | html %]</a> &rsaquo; Send
+        </nav>
+    </div>
+
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+    [% END %]
+
+    <div class="admin-card">
+        <p><strong>Online page:</strong> <a href="[% read_url %]" target="_blank">[% read_url %]</a></p>
+        <p style="color:var(--text-muted-color);">
+            Email includes your formatted teaser plus a <em>Read full newsletter online</em> button.
+        </p>
+
+        <form method="POST" action="[% c.uri_for('/mail/newsletter/send', page.id) %]" id="nl-send-form">
+
+            <div class="form-group">
+                <label for="mailing_list_id">Mailing list <span style="color:red">*</span></label>
+                [% IF mailing_lists && mailing_lists.size %]
+                <select name="mailing_list_id" id="mailing_list_id" required class="form-control">
+                    <optgroup label="Auto-synced lists (members, roles, workshops, hosting)">
+                    [% FOREACH ml IN mailing_lists %][% IF ml.is_default %]
+                    <option value="[% ml.id %]"
+                            data-sub-count="[% ml.sub_count %]"
+                            [% IF ml.id == selected_list_id %]selected[% END %]>
+                        [% ml.name | html %] — [% ml.sub_count %] subscriber[% IF ml.sub_count != 1 %]s[% END %]
+                        [% IF ml.description %]([% ml.description | html %])[% END %]
+                    </option>
+                    [% END %][% END %]
+                    </optgroup>
+                    <optgroup label="Custom lists">
+                    [% FOREACH ml IN mailing_lists %][% UNLESS ml.is_default %]
+                    <option value="[% ml.id %]"
+                            data-sub-count="[% ml.sub_count %]"
+                            [% IF ml.id == selected_list_id %]selected[% END %]>
+                        [% ml.name | html %] — [% ml.sub_count %] subscriber[% IF ml.sub_count != 1 %]s[% END %]
+                        [% IF ml.description %]([% ml.description | html %])[% END %]
+                    </option>
+                    [% END %][% END %]
+                    </optgroup>
+                </select>
+                <small>
+                    Includes all active lists for this site (hosting customers, role lists, workshop attendees, and custom lists).
+                    <a href="[% c.uri_for('/mail/lists') %]">Manage mailing lists</a>
+                    · <a href="[% c.uri_for('/mail/subscribe') %]">Subscribe page</a>
+                </small>
+                [% ELSE %]
+                <p style="color:#c00;">No mailing lists for this site.
+                    <a href="[% c.uri_for('/mail/lists') %]">Create a list</a> first.</p>
+                [% END %]
+            </div>
+
+            <div class="form-group">
+                <label for="subject">Email subject</label>
+                <input type="text" name="subject" id="subject" required class="form-control"
+                       value="[% page.title | html %]">
+            </div>
+
+            <div class="form-group">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+                    <label for="teaser" style="margin:0;">Email teaser <small>(HTML — shown in inbox)</small></label>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span id="nl-teaser-mode-badge" class="label label-success" style="font-size:0.85em;">Formatted HTML</span>
+                        <button type="button" id="nl-teaser-toggle-mode" class="btn btn-secondary" style="font-size:0.85em;padding:4px 10px;">
+                            Edit plain text
+                        </button>
+                    </div>
+                </div>
+                <div class="nl-teaser-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+                    <div>
+                        <textarea name="teaser" id="teaser" rows="10" required class="form-control"
+                                  style="font-family:monospace;font-size:0.9em;">[% teaser | html %]</textarea>
+                        <small style="display:block;margin-top:6px;color:var(--text-muted-color);">
+                            Personalization: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
+                            <code>[EMAIL]</code> <code>[USERNAME]</code>
+                        </small>
+                    </div>
+                    <div>
+                        <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:4px;font-weight:bold;">
+                            Preview (sample — tags not replaced until send)
+                        </div>
+                        <div id="nl-teaser-preview" class="newsletter-issue-preview"
+                             style="min-height:200px;padding:16px;border:1px solid var(--border-color,#ddd);
+                                    border-radius:6px;background:#fff;overflow:auto;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="nl-recipient-box" style="background:#f0f4ff;border:1px solid #c5d0e8;border-radius:6px;padding:12px;margin:16px 0;">
+                <strong>Recipients:</strong> <span id="nl-recipient-count">[% sub_count %]</span> active subscriber(s) on
+                <em id="nl-recipient-list-name">[% IF mailing_lists && mailing_lists.size %][% FOREACH ml IN mailing_lists %][% IF ml.id == selected_list_id %][% ml.name | html %][% END %][% END %][% ELSE %](no list)[% END %]</em>.
+                <span id="nl-recipient-warn" style="color:#c00;[% IF sub_count > 0 %]display:none;[% END %]">
+                    <br>No subscribers on this list — choose another list or add members first.
+                </span>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" id="nl-send-btn" class="btn btn-primary" [% IF !mailing_lists || !mailing_lists.size || sub_count == 0 %]disabled[% END %]>
+                    Send Newsletter
+                </button>
+                <a href="[% c.uri_for('/mail/newsletter/edit', page.page_code) %]" class="btn btn-secondary">Back to Edit</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .newsletter-issue-preview p { margin: 0.6em 0; line-height: 1.55; }
+    .newsletter-issue-preview a { color: var(--primary-color, #1565c0); }
+    @media (max-width: 900px) {
+        .nl-teaser-layout { grid-template-columns: 1fr !important; }
+    }
+</style>
+
+<script>
+(function() {
+    var teaserEl   = document.getElementById('teaser');
+    var previewEl  = document.getElementById('nl-teaser-preview');
+    var listSel    = document.getElementById('mailing_list_id');
+    var countEl    = document.getElementById('nl-recipient-count');
+    var listNameEl = document.getElementById('nl-recipient-list-name');
+    var warnEl     = document.getElementById('nl-recipient-warn');
+    var sendBtn    = document.getElementById('nl-send-btn');
+    var form       = document.getElementById('nl-send-form');
+    var toggleBtn  = document.getElementById('nl-teaser-toggle-mode');
+    var badge      = document.getElementById('nl-teaser-mode-badge');
+    var isHtmlMode = true;
+    var storedHtml = '';
+
+    function updatePreview() {
+        if (!previewEl || !teaserEl) return;
+        var html = isHtmlMode ? teaserEl.value : plainToHtml(teaserEl.value);
+        previewEl.innerHTML = html || '<p style="color:#888;font-style:italic;">Preview will appear here…</p>';
+    }
+
+    function htmlToPlain(html) {
+        var d = document.createElement('div');
+        d.innerHTML = html;
+        return (d.textContent || d.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function plainToHtml(text) {
+        if (!text) return '';
+        if (/<[a-z][^>]*>/i.test(text)) return text;
+        return text.split(/\n\s*\n/).map(function(p) {
+            p = p.replace(/\n/g, ' ').trim();
+            return p ? '<p>' + p.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' : '';
+        }).join('\n');
+    }
+
+    if (teaserEl) {
+        teaserEl.addEventListener('input', updatePreview);
+        updatePreview();
+    }
+
+    if (toggleBtn && teaserEl) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (isHtmlMode) {
+                storedHtml = teaserEl.value;
+                teaserEl.value = htmlToPlain(storedHtml);
+                isHtmlMode = false;
+                if (badge) { badge.textContent = 'Plain text'; badge.className = 'label label-warning'; }
+                toggleBtn.textContent = 'Back to formatted HTML';
+            } else {
+                teaserEl.value = plainToHtml(teaserEl.value) || storedHtml;
+                isHtmlMode = true;
+                if (badge) { badge.textContent = 'Formatted HTML'; badge.className = 'label label-success'; }
+                toggleBtn.textContent = 'Edit plain text';
+            }
+            updatePreview();
+        });
+    }
+
+    function refreshRecipients() {
+        if (!listSel) return;
+        var opt = listSel.options[listSel.selectedIndex];
+        if (!opt) return;
+        var n = parseInt(opt.getAttribute('data-sub-count') || '0', 10);
+        if (countEl) countEl.textContent = String(n);
+        if (listNameEl) listNameEl.textContent = opt.text.split(' — ')[0];
+        if (warnEl) warnEl.style.display = n > 0 ? 'none' : 'inline';
+        if (sendBtn) sendBtn.disabled = n <= 0;
+    }
+
+    if (listSel) {
+        listSel.addEventListener('change', refreshRecipients);
+        refreshRecipients();
+    }
+
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!isHtmlMode && teaserEl) {
+                teaserEl.value = plainToHtml(teaserEl.value);
+            }
+            var n = countEl ? parseInt(countEl.textContent || '0', 10) : 0;
+            var name = listNameEl ? listNameEl.textContent : 'this list';
+            if (!confirm('Send this newsletter to ' + n + ' subscriber(s) on “' + name + '”?')) {
+                e.preventDefault();
+            }
+        });
+    }
+})();
+</script>

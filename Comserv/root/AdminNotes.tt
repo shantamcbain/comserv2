@@ -41,12 +41,7 @@
 			       group    ==  'WW_admin' OR
 			       username == 'Shanta' OR
 			      group    == 'Demo_admin'
-			 %][% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb
-                                  WHERE  (status  = 2 AND
-                                         page_code = 'SiteAdminNotes' AND
-                                         sitename = '$SiteName' )
-                                  ORDER BY sitename
-                                  ") %]
+			 %][% FOREACH link = c.stash.dbi.query("SELECT sitename, title AS view_name, id AS record_id, body, status, page_code, keywords, description, updated_at AS lastupdate, '' AS news FROM page WHERE (status = 'active' OR status = '2' OR status = 2) AND page_code = 'SiteAdminNotes' AND sitename = '$SiteName' ORDER BY sitename") %]
 
      [% PROCESS 'CSC/pagefields.tt' %]
   [% END %]

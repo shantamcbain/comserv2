@@ -4,9 +4,9 @@ use Moose;
 use namespace::autoclean;
 use JSON;
 use Try::Tiny;
+use Data::Dumper;
 use Comserv::Util::Logging;
-use Comserv::Util::AdminAuth;
-use Comserv::Model::RemoteDB;
+use Catalyst::Utils;  # For path_to
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -15,364 +15,267 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-my @DB_TYPES = qw(mariadb mysql postgresql sqlite);
-my @ENVIRONMENTS = qw(production development staging backup);
-my @ROLES = qw(primary replica migration backup development);
-my @APP_DATABASES = qw(ency shanta_forager csc_accounting);
-
-sub _remote_db { Comserv::Model::RemoteDB->new() }
-
-sub _require_admin {
-    my ($self, $c) = @_;
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->is_csc_admin($c)) {
-        $c->flash->{error_msg} = 'You must be a CSC administrator to manage database servers.';
-        $c->response->redirect($c->uri_for('/user/login'));
-        $c->detach;
-    }
-}
-
+# Main page for remote database management
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
-    $self->_require_admin($c);
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-        'Accessing database server management');
-
-    my $remote_db = $self->_remote_db();
-    my $connections = $remote_db->get_all_connections();
-
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessing remote database management page");
+    
+    # Get list of configured remote connections
+    my $remote_db = $c->model('RemoteDB');
+    my $connections = $remote_db->connections;
+    
     $c->stash(
-        template    => 'remotedb/index.tt',
+        template => 'remotedb/index.tt',
         connections => $connections,
-        success_msg => $c->flash->{success_msg},
-        error_msg   => $c->flash->{error_msg},
     );
 }
 
+# Add a new remote database connection
 sub add_connection :Path('add') :Args(0) {
     my ($self, $c) = @_;
-    $self->_require_admin($c);
-
+    
     if ($c->req->method eq 'POST') {
-        my $p = $c->req->params;
-        my $conn_name = $p->{conn_name} // '';
-        $conn_name =~ s/\s+/_/g;
-        $conn_name = lc($conn_name);
-
-        my $remote_db_add = $self->_remote_db();
-        my $all_add = $remote_db_add->get_all_connections();
-
-        unless ($conn_name =~ /^[a-z0-9_]+$/) {
-            $c->stash(
-                error_msg    => 'Connection name must contain only letters, numbers, and underscores.',
-                form_data    => $p,
-                db_types     => \@DB_TYPES,
-                environments => \@ENVIRONMENTS,
-                roles        => \@ROLES,
-                connections  => $all_add,
-                app_databases => \@APP_DATABASES,
-                template     => 'remotedb/add.tt',
-            );
-            return;
+        my $params = $c->req->params;
+        
+        # Validate required parameters
+        my @required = qw(conn_name db_type host port database username password);
+        my @missing;
+        foreach my $field (@required) {
+            push @missing, $field unless defined $params->{$field} && length $params->{$field};
         }
-
-        my $conn_config = {
-            db_type     => $p->{db_type}     // 'mariadb',
-            host        => $p->{host}        // '',
-            port        => $p->{port}        // 3306,
-            database    => $p->{database}    // '',
-            username    => $p->{username}    // '',
-            password    => $p->{password}    // '',
-            description => $p->{description} // '',
-            priority    => $p->{priority}    // 5,
-            environment => $p->{environment} // 'production',
-            role        => $p->{role}        // 'primary',
-            localhost_override => ($p->{localhost_override} ? 1 : 0),
-        };
-
-        try {
-            $remote_db_add->save_connection($conn_name, $conn_config);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_connection',
-                "Added DB server: $conn_name at $conn_config->{host}:$conn_config->{port}");
-            $c->flash->{success_msg} = "Database server '$conn_name' added successfully.";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
-        } catch {
+        
+        if (@missing) {
             $c->stash(
-                error_msg    => "Failed to save connection: $_",
-                form_data    => $p,
-                db_types     => \@DB_TYPES,
-                environments => \@ENVIRONMENTS,
-                roles        => \@ROLES,
-                connections  => $all_add,
-                app_databases => \@APP_DATABASES,
-                template     => 'remotedb/add.tt',
+                error_msg => 'Missing required fields: ' . join(', ', @missing),
+                form_data => $params,
             );
-        };
-        return;
-    }
-
-    my $remote_db_add = $self->_remote_db();
-    $c->stash(
-        form_data     => {},
-        db_types      => \@DB_TYPES,
-        environments  => \@ENVIRONMENTS,
-        roles         => \@ROLES,
-        connections   => $remote_db_add->get_all_connections(),
-        app_databases => \@APP_DATABASES,
-        template      => 'remotedb/add.tt',
-    );
-}
-
-sub edit :Path('edit') :Args(1) {
-    my ($self, $c) = @_;
-    my $conn_name = $c->req->args->[0] // '';
-    $self->_require_admin($c);
-
-    my $remote_db = $self->_remote_db();
-    my $all = $remote_db->get_all_connections();
-
-    unless (exists $all->{$conn_name}) {
-        $c->flash->{error_msg} = "Connection '$conn_name' not found.";
-        $c->response->redirect($c->uri_for($self->action_for('index')));
-        return;
-    }
-
-    my $conn = $all->{$conn_name}{config};
-
-    if ($c->req->method eq 'POST') {
-        my $p = $c->req->params;
-        my $conn_config = {
-            db_type     => $p->{db_type}     // $conn->{db_type},
-            host        => $p->{host}        // $conn->{host},
-            port        => $p->{port}        // $conn->{port},
-            database    => $p->{database}    // $conn->{database},
-            username    => $p->{username}    // $conn->{username},
-            password    => (length($p->{password} // '') > 0 ? $p->{password} : $conn->{password}),
-            description => $p->{description} // $conn->{description},
-            priority    => $p->{priority}    // $conn->{priority},
-            environment => $p->{environment} // $conn->{environment},
-            role        => $p->{role}        // $conn->{role},
-            localhost_override => ($p->{localhost_override} ? 1 : 0),
-        };
-
-        try {
-            $remote_db->save_connection($conn_name, $conn_config);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
-                "Updated DB server: $conn_name");
-            $c->flash->{success_msg} = "Database server '$conn_name' updated.";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
-        } catch {
-            $c->stash(
-                error_msg     => "Failed to update connection: $_",
-                form_data     => { %$conn, conn_name => $conn_name },
-                conn_name     => $conn_name,
-                db_types      => \@DB_TYPES,
-                environments  => \@ENVIRONMENTS,
-                roles         => \@ROLES,
-                connections   => $all,
-                app_databases => \@APP_DATABASES,
-                is_edit       => 1,
-                template      => 'remotedb/add.tt',
-            );
-        };
-        return;
-    }
-
-    $c->stash(
-        form_data     => { %$conn, conn_name => $conn_name },
-        conn_name     => $conn_name,
-        db_types      => \@DB_TYPES,
-        environments  => \@ENVIRONMENTS,
-        roles         => \@ROLES,
-        connections   => $all,
-        app_databases => \@APP_DATABASES,
-        is_edit       => 1,
-        template      => 'remotedb/add.tt',
-    );
-}
-
-sub test_connection :Path('test') :Args(1) {
-    my ($self, $c) = @_;
-    my $conn_name = $c->req->args->[0] // '';
-    $self->_require_admin($c);
-
-    my $remote_db = $self->_remote_db();
-    my $status = $remote_db->check_database_status($conn_name);
-
-    if ($status->{ok}) {
-        my $db   = $status->{database};
-        my $tbls = $status->{table_count};
-        my $views = $status->{view_count};
-        if ($status->{empty}) {
-            $c->flash->{error_msg} =
-                "Connected to '$conn_name' ($db on $status->{host}:$status->{port}) — "
-                . "database exists but has NO TABLES. Run a migration to populate it.";
         } else {
-            $c->flash->{success_msg} =
-                "Connected to '$conn_name' — database '$db' on $status->{host}:$status->{port} "
-                . "has $tbls table(s) and $views view(s).";
+            # Create connection config
+            my $conn_config = {
+                db_type  => $params->{db_type},
+                host     => $params->{host},
+                port     => $params->{port},
+                database => $params->{database},
+                username => $params->{username},
+                password => $params->{password},
+            };
+            
+            # Test the connection
+            my $remote_db = $c->model('RemoteDB');
+            $remote_db->add_connection($params->{conn_name}, $conn_config);
+            
+            my $dbh = $remote_db->get_connection($c, $params->{conn_name});
+            
+            if ($dbh) {
+                # Connection successful, update the configuration file
+                $self->update_config_file($c, $params->{conn_name}, $conn_config);
+                
+                $c->flash->{success_msg} = "Successfully added remote database connection: " . $params->{conn_name};
+                $c->response->redirect($c->uri_for($self->action_for('index')));
+                return;
+            } else {
+                $c->stash(
+                    error_msg => "Failed to connect to the database. Please check your connection details.",
+                    form_data => $params,
+                );
+            }
         }
-    } else {
-        $c->flash->{error_msg} =
-            "Connection '$conn_name' failed: " . ($status->{error} || 'Unknown error');
     }
-    $c->response->redirect($c->uri_for($self->action_for('index')));
-}
-
-sub remove :Path('remove') :Args(1) {
-    my ($self, $c) = @_;
-    my $conn_name = $c->req->args->[0] // '';
-    $self->_require_admin($c);
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove',
-        "Removing DB server: $conn_name");
-
-    try {
-        my $remote_db = $self->_remote_db();
-        $remote_db->remove_connection($conn_name);
-        $c->flash->{success_msg} = "Database server '$conn_name' removed.";
-    } catch {
-        $c->flash->{error_msg} = "Failed to remove '$conn_name': $_";
-    };
-
-    $c->response->redirect($c->uri_for($self->action_for('index')));
-}
-
-sub detail :Path('detail') :Args(1) {
-    my ($self, $c) = @_;
-    my $conn_name = $c->req->args->[0] // '';
-    $self->_require_admin($c);
-
-    my $remote_db = $self->_remote_db();
-    my $all = $remote_db->get_all_connections();
-
-    unless (exists $all->{$conn_name}) {
-        $c->flash->{error_msg} = "Connection '$conn_name' not found.";
-        $c->response->redirect($c->uri_for($self->action_for('index')));
-        return;
-    }
-
+    
     $c->stash(
-        template  => 'remotedb/detail.tt',
-        conn_name => $conn_name,
-        conn      => $all->{$conn_name},
+        template => 'remotedb/add.tt',
+        db_types => ['mysql', 'Pg', 'SQLite', 'Oracle'],
     );
 }
 
+# View a remote database's tables and structure
 sub view :Path('view') :Args(1) {
-    my ($self, $c) = @_;
-    my $conn_name = $c->req->args->[0] // '';
-    $self->_require_admin($c);
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
-        "Viewing remote database: $conn_name");
-
-    my $remote_db = $self->_remote_db();
-    my $tables = $remote_db->list_tables($c, $conn_name);
-
-    unless (defined $tables) {
-        $c->flash->{error_msg} = "Failed to connect to '$conn_name' — check credentials and that the server is running.";
+    my ($self, $c, $conn_name) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Viewing remote database: $conn_name");
+    
+    my $remote_db = $c->model('RemoteDB');
+    
+    # Check if the connection exists
+    unless (exists $remote_db->connections->{$conn_name}) {
+        $c->flash->{error_msg} = "Remote connection '$conn_name' does not exist";
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
-    if (!@$tables) {
-        $c->flash->{error_msg} = "Connected to '$conn_name' but the database has no tables yet. Run a migration to populate it.";
-        $c->response->redirect($c->uri_for('/remotedb/migrate'));
+    
+    # Get the list of tables
+    my $tables = $remote_db->list_tables($c, $conn_name);
+    
+    unless (defined $tables) {
+        $c->flash->{error_msg} = "Failed to connect to remote database '$conn_name'";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
-
+    
     $c->stash(
-        template  => 'remotedb/view.tt',
+        template => 'remotedb/view.tt',
         conn_name => $conn_name,
-        tables    => $tables,
+        tables => $tables,
     );
 }
 
+# View a specific table in a remote database
+sub table :Path('table') :Args(2) {
+    my ($self, $c, $conn_name, $table_name) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'table', 
+        "Viewing table '$table_name' in remote database: $conn_name");
+    
+    my $remote_db = $c->model('RemoteDB');
+    
+    # Get the table schema
+    my $schema = $remote_db->get_table_schema($c, $conn_name, $table_name);
+    
+    unless (defined $schema) {
+        $c->flash->{error_msg} = "Failed to get schema for table '$table_name'";
+        $c->response->redirect($c->uri_for($self->action_for('view'), [$conn_name]));
+        return;
+    }
+    
+    # Get sample data (first 10 rows)
+    my $data = $remote_db->execute_query($c, $conn_name, "SELECT * FROM $table_name LIMIT 10", []);
+    
+    $c->stash(
+        template => 'remotedb/table.tt',
+        conn_name => $conn_name,
+        table_name => $table_name,
+        schema => $schema,
+        data => $data,
+    );
+}
+
+# Execute a custom SQL query
 sub query :Path('query') :Args(1) {
-    my ($self, $c) = @_;
-    my $conn_name = $c->req->args->[0] // '';
-    $self->_require_admin($c);
-
-    my $remote_db = $self->_remote_db();
-
+    my ($self, $c, $conn_name) = @_;
+    
+    my $remote_db = $c->model('RemoteDB');
+    
+    # Check if the connection exists
+    unless (exists $remote_db->connections->{$conn_name}) {
+        $c->flash->{error_msg} = "Remote connection '$conn_name' does not exist";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
     if ($c->req->method eq 'POST') {
         my $query = $c->req->param('query');
+        
         if (defined $query && length $query) {
             my $result = $remote_db->execute_query($c, $conn_name, $query, []);
+            
             if (ref $result eq 'ARRAY') {
-                $c->stash(query_result => $result, result_type => 'select');
+                $c->stash(
+                    query_result => $result,
+                    result_type => 'select',
+                );
             } elsif (ref $result eq 'HASH' && $result->{success}) {
-                $c->stash(query_result => $result, result_type => 'update');
+                $c->stash(
+                    query_result => $result,
+                    result_type => 'update',
+                );
             } else {
-                $c->stash(error_msg => "Query failed: " . ($result->{error} || 'Unknown error'));
+                $c->stash(
+                    error_msg => "Query execution failed: " . ($result->{error} || "Unknown error"),
+                );
             }
         } else {
             $c->stash(error_msg => "Query cannot be empty");
         }
     }
-
+    
     $c->stash(
-        template  => 'remotedb/query.tt',
+        template => 'remotedb/query.tt',
         conn_name => $conn_name,
     );
 }
 
-sub migrate :Path('migrate') :Args(0) {
-    my ($self, $c) = @_;
-    $self->_require_admin($c);
+# Remove a remote database connection
+sub remove :Path('remove') :Args(1) {
+    my ($self, $c, $conn_name) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove', 
+        "Removing remote database connection: $conn_name");
+    
+    # Remove from configuration file
+    $self->remove_from_config($c, $conn_name);
+    
+    $c->flash->{success_msg} = "Successfully removed remote database connection: $conn_name";
+    $c->response->redirect($c->uri_for($self->action_for('index')));
+}
 
-    my $remote_db   = $self->_remote_db();
-    my $connections = $remote_db->get_all_connections();
-    my @conn_keys   = sort keys %$connections;
+# Helper method to update the configuration file
+sub update_config_file {
+    my ($self, $c, $conn_name, $conn_config) = @_;
+    
+    try {
+        # Get the path to the config file
+        my $config_file = $c->path_to('db_config.json');
+        
+        # Read the current configuration
+        local $/;
+        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+        my $json_text = <$fh>;
+        close $fh;
+        
+        my $config = decode_json($json_text);
+        
+        # Initialize remote_connections if it doesn't exist
+        $config->{remote_connections} ||= {};
+        
+        # Add or update the connection
+        $config->{remote_connections}{$conn_name} = $conn_config;
+        
+        # Write the updated configuration back to the file
+        open $fh, ">", $config_file or die "Could not open $config_file for writing: $!";
+        print $fh encode_json($config);
+        close $fh;
+        
+        return 1;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_config_file', 
+            "Failed to update configuration file: $_");
+        return 0;
+    };
+}
 
-    if ($c->req->method eq 'POST') {
-        my $p           = $c->req->params;
-        my $source      = $p->{source}      // '';
-        my $target      = $p->{target}      // '';
-        my $schema_only = $p->{schema_only} ? 1 : 0;
-        my $truncate    = $p->{truncate}    ? 1 : 0;
-
-        unless ($source && $target) {
-            $c->stash(error_msg => 'Please select both a source and target connection.');
-        } elsif ($source eq $target) {
-            $c->stash(error_msg => 'Source and target must be different connections.');
-        } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate',
-                "Starting migration: $source -> $target (schema_only=$schema_only, truncate=$truncate)");
-
-            my ($ok, $results, $err) = $remote_db->migrate_database($source, $target, {
-                schema_only => $schema_only,
-                truncate    => $truncate,
-            });
-
-            if (!$ok) {
-                my @errs = grep { $_->{error} } @$results;
-                my $err_summary = $err || join('; ', map { "$_->{table}: $_->{error}" } @errs);
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'migrate',
-                    "Migration $source -> $target FAILED — " . scalar(@errs) . " table(s) had errors: $err_summary");
-            } else {
-                my $rows = 0; $rows += ($_->{rows} // 0) for @$results;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate',
-                    "Migration $source -> $target completed OK — " . scalar(@$results) . " objects, $rows rows total");
-            }
-
-            $c->stash(
-                migrate_done    => 1,
-                migrate_ok      => $ok,
-                migrate_results => $results,
-                migrate_error   => $err,
-                last_source     => $source,
-                last_target     => $target,
-            );
+# Helper method to remove a connection from the configuration file
+sub remove_from_config {
+    my ($self, $c, $conn_name) = @_;
+    
+    try {
+        # Get the path to the config file
+        my $config_file = $c->path_to('db_config.json');
+        
+        # Read the current configuration
+        local $/;
+        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+        my $json_text = <$fh>;
+        close $fh;
+        
+        my $config = decode_json($json_text);
+        
+        # Remove the connection if it exists
+        if ($config->{remote_connections} && exists $config->{remote_connections}{$conn_name}) {
+            delete $config->{remote_connections}{$conn_name};
         }
-    }
-
-    $c->stash(
-        template    => 'remotedb/migrate.tt',
-        connections => $connections,
-        conn_keys   => \@conn_keys,
-    );
+        
+        # Write the updated configuration back to the file
+        open $fh, ">", $config_file or die "Could not open $config_file for writing: $!";
+        print $fh encode_json($config);
+        close $fh;
+        
+        return 1;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'remove_from_config', 
+            "Failed to update configuration file: $_");
+        return 0;
+    };
 }
 
 __PACKAGE__->meta->make_immutable;

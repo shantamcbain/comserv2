@@ -1,0 +1,36 @@
+[% PageVersion = 'Documentation/guides/planning-how-to-use.tt,v 1.00 2026/06/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Planning &amp; Daily Calendar: How to Use' %]
+[% META description = 'Stable member guide — update this file in place when planning UI changes' %]
+[% META date = '2026-06-13' %]
+[% META newsletter_include = 'yes' %]
+[% META audience = 'member' %]
+[% META roles = 'guest,member,editor,admin' %]
+
+<section class="member-how-to">
+    <h2>Daily planning</h2>
+    <ol>
+        <li>Top nav <strong>Planning</strong> → <a href="/planning/daily">/planning/daily</a>.</li>
+        <li>Priorities: <a href="/planning/daily#today-work">/planning/daily#today-work</a>.</li>
+        <li>Schedule: <a href="/planning/daily#daily-schedule">/planning/daily#daily-schedule</a>.</li>
+    </ol>
+
+    <h2>Start / end day</h2>
+    <ol>
+        <li><strong>Start Day</strong> and <strong>View Log</strong> on the daily plan page.</li>
+        <li><strong>End Day</strong> when finished.</li>
+    </ol>
+
+    <h2>Todos</h2>
+    <ol>
+        <li><a href="/todo">/todo</a> or Planning → Todo List.</li>
+    </ol>
+
+    <h2>Try these links</h2>
+    <ul>
+        <li><a href="/planning/daily">Daily plan</a></li>
+        <li><a href="/planning/daily#today-work">Priorities</a></li>
+        <li><a href="/todo">Todo list</a></li>
+    </ul>
+</section>

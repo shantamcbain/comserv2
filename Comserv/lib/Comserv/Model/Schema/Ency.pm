@@ -109,12 +109,20 @@ __PACKAGE__->register_class('TicketMessage', 'Comserv::Model::Schema::Ency::Resu
 # Register schedule settings for time-block planner
 __PACKAGE__->register_class('UserScheduleSettings', 'Comserv::Model::Schema::Ency::Result::UserScheduleSettings');
 
+# Per-user UI preferences (calendar colours, theme override, etc.) — data lives in DB, not git
+__PACKAGE__->register_class('UserPreference', 'Comserv::Model::Schema::Ency::Result::UserPreference');
+
 # Register centralized app secrets (Cloudflare token, etc.)
 __PACKAGE__->register_class('AppSecret', 'Comserv::Model::Schema::Ency::Result::AppSecret');
 
 # Register Hosting / Site Provisioning classes
 __PACKAGE__->register_class('Accounting::HostingAccount', 'Comserv::Model::Schema::Ency::Result::Accounting::HostingAccount');
 __PACKAGE__->register_class('HostingAccount', 'Comserv::Model::Schema::Ency::Result::Accounting::HostingAccount');
+
+# Register mailing list / newsletter classes
+__PACKAGE__->register_class('MailingList', 'Comserv::Model::Schema::Ency::Result::MailingList');
+__PACKAGE__->register_class('MailingListSubscription', 'Comserv::Model::Schema::Ency::Result::MailingListSubscription');
+__PACKAGE__->register_class('MailingListCampaign', 'Comserv::Model::Schema::Ency::Result::MailingListCampaign');
 
 # Register Session store class
 __PACKAGE__->register_class('Session', 'Comserv::Model::Schema::Ency::Result::Session');

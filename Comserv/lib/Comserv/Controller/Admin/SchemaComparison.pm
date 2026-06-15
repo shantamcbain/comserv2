@@ -2152,8 +2152,8 @@ sub parse_result_file_columns {
 
     # Use balanced-brace extraction so nested hashes (e.g. extra => { list => [...] })
     # don't cut the column definition short.
-    while ($text =~ /\b(\w+)\s*=>\s*\{/g) {
-        my $col_name = $1;
+    while ($text =~ /(?:['"](\w+)['"]|(\w+))\s*=>\s*\{/g) {
+        my $col_name = $1 || $2;
         my $start    = pos($text);  # character position right after the opening '{'
 
         # Walk forward counting braces to find the matching '}'

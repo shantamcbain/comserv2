@@ -29,14 +29,14 @@
     [% IF debug_msg && c.session.debug_mode %]
         <div class="alert alert-info">
             <h4>Debug Information:</h4>
-            [% IF debug_msg.size %]
+            [% IF debug_msg.ref == 'ARRAY' %]
                 <ul>
                 [% FOREACH msg IN debug_msg %]
-                    <li>[% msg %]</li>
+                    <li>[% msg | html %]</li>
                 [% END %]
                 </ul>
             [% ELSE %]
-                <p>[% debug_msg %]</p>
+                <p>[% debug_msg | html %]</p>
             [% END %]
         </div>
     [% END %]

@@ -281,6 +281,12 @@ sub _write_theme_css {
     }
 
     my $css_file = "$theme_dir/$theme_name.css";
+    if (-f $css_file) {
+        my $existing = eval { read_file($css_file) };
+        if (defined $existing && $existing eq $css) {
+            return;
+        }
+    }
     write_file($css_file, $css);
 
     $self->log_with_details($c, 'info', __FILE__, __LINE__, '_write_theme_css',

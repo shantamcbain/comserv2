@@ -1,25 +1,18 @@
-[% META title = 'Changelog Entry Title' %]
-[% PageVersion = 'Documentation/changelog/changelog_template.tt,v 0.01 2025/10/20 Shanta Exp shanta ' %]
-[% # Set metadata for this changelog entry %]
-[% SET 
-   entry_date = '2025-10-20'
-   entry_author = 'Your Name'
-   entry_description = 'Brief description of the changes'
-%]
+[% META title = 'DEPRECATED — use CHANGELOG.tt' %]
+[% PageVersion = 'Documentation/changelog/changelog_template.tt,v 0.02 2026/06/13 shanta Exp' %]
+[% # As of 2026-06: append code changes to /Documentation/CHANGELOG only. %]
+[% # Member how-tos: Documentation/guides/feature-how-to-use.tt (stable). %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1>[% template.title %]</h1>
-<div class="changelog-meta">
-    <span class="date">[% entry_date.replace('-', '/') %]</span>
-    <span class="author">by [% entry_author %]</span>
-</div>
+<h1>Do not create new per-file changelog entries</h1>
+<p>Append to <a href="/Documentation/CHANGELOG">CHANGELOG.tt</a>. Member guides go in <code>Documentation/guides/</code>.</p>
 
-<div class="changelog-content">
-    <h2>Overview</h2>
-    <p>[% entry_description %]</p>
+<div class="changelog-content" style="display:none">
+    <h2>Overview (legacy template below)</h2>
+    <p>Deprecated.</p>
     
     <h2>Changes Made</h2>
     <ul>

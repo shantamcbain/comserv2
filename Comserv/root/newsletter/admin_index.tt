@@ -1,0 +1,158 @@
+[% META title = 'Newsletter Management' %]
+
+<div class="admin-content">
+    <div class="admin-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+            <h1>Newsletter Management</h1>
+            <nav style="font-size:0.9em;color:var(--text-muted-color);">
+                <a href="[% c.uri_for('/mail') %]">Mail</a> &rsaquo; Newsletters
+            </nav>
+            <p style="margin:6px 0 0;font-size:0.9em;color:var(--text-muted-color);">
+                Each row is a <strong>newsletter</strong> (e.g. Hosting News). Expand to see <strong>published issues</strong> only.
+                [% IF !is_csc %]Shared newsletters are hosted by CSC but appear here for [% sitename %].[% END %]
+            </p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            [% IF is_csc %]
+            <a href="[% c.uri_for('/mail/newsletter/publication/create') %]" class="btn btn-primary">+ New Newsletter</a>
+            [% END %]
+            <a href="[% c.uri_for('/newsletters') %]" class="btn btn-secondary">Public Archive</a>
+            <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-warning">Site Mailout</a>
+        </div>
+    </div>
+
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+    [% END %]
+
+    [% IF newsletter_tree && newsletter_tree.size %]
+    [% FOREACH pub IN newsletter_tree %]
+    <details class="nl-pub-container" style="margin:14px 0;border:1px solid var(--border-color,#c5d0e8);border-radius:8px;background:#fff;">
+        <summary style="cursor:pointer;list-style:none;padding:14px 18px;background:var(--bg-secondary,#f0f4ff);border-radius:8px;
+                         display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div style="flex:1;min-width:200px;">
+                <div style="font-size:0.78em;color:var(--text-muted-color);margin-bottom:2px;">
+                    Newsletter
+                    [% IF pub.is_shared %]
+                        &middot; hosted by <strong>[% pub.host_sitename | html %]</strong>
+                    [% ELSE %]
+                        &middot; [% pub.host_sitename | html %]
+                    [% END %]
+                    &middot; [% pub.issue_count %] published issue[% IF pub.issue_count != 1 %]s[% END %]
+                </div>
+                <strong style="font-size:1.1em;">[% pub.title | html %]</strong>
+                [% IF pub.description %]
+                <div style="font-size:0.88em;color:var(--text-muted-color);margin-top:4px;line-height:1.4;">
+                    [% pub.description | html %]
+                </div>
+                [% END %]
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;" onclick="event.stopPropagation();">
+                [% IF pub.can_manage %]
+                [% IF pub.page_code %]
+                <a href="[% c.uri_for('/mail/newsletter/publication/edit', pub.page_code) %]" class="btn btn-secondary btn-sm">Edit Newsletter</a>
+                [% END %]
+                <a href="[% c.uri_for('/mail/newsletter/issue/create', { pub => pub.id }) %]" class="btn btn-primary btn-sm">+ New Issue</a>
+                [% END %]
+                <span style="font-size:0.85em;color:var(--text-muted-color);">&#9662; expand</span>
+            </div>
+        </summary>
+
+        <div style="padding:12px 16px;border-top:1px solid var(--border-color,#e0e0e0);">
+            [% IF pub.issues && pub.issues.size %]
+            <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+                <thead>
+                    <tr style="background:#f8f9fc;">
+                        <th style="padding:8px 10px;text-align:left;">Issue</th>
+                        <th style="padding:8px 10px;">#</th>
+                        <th style="padding:8px 10px;">Visibility</th>
+                        <th style="padding:8px 10px;">Published</th>
+                        <th style="padding:8px 10px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    [% FOREACH issue IN pub.issues %]
+                    <tr style="border-bottom:1px solid #eee;">
+                        <td style="padding:8px 10px;">
+                            <strong>[% issue.display_label | html %]</strong>
+                            <br><small style="color:var(--text-muted-color);">/page/[% issue.page_code | html %]</small>
+                        </td>
+                        <td style="padding:8px 10px;text-align:center;">[% issue.nl_version %]</td>
+                        <td style="padding:8px 10px;text-align:center;font-size:0.85em;">
+                            [% IF issue.is_public %]Public[% ELSE %][% issue.roles | html %][% END %]
+                        </td>
+                        <td style="padding:8px 10px;text-align:center;font-size:0.85em;">[% issue.updated_at %]</td>
+                        <td style="padding:8px 10px;text-align:center;white-space:nowrap;">
+                            [% IF issue.can_manage %]
+                            <a href="[% c.uri_for('/mail/newsletter/edit', issue.page_code) %]" class="btn btn-secondary" style="font-size:0.82em;padding:3px 8px;">Edit</a>
+                            <a href="[% c.uri_for('/mail/newsletter/send', issue.id) %]" class="btn btn-primary" style="font-size:0.82em;padding:3px 8px;">Send</a>
+                            [% END %]
+                            <a href="[% c.uri_for('/page', issue.page_code) %]" class="btn btn-secondary" style="font-size:0.82em;padding:3px 8px;">View</a>
+                        </td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+            [% ELSE %]
+            <p style="margin:0;color:var(--text-muted-color);font-size:0.9em;">
+                No published issues yet.
+                [% IF pub.can_manage %]
+                <a href="[% c.uri_for('/mail/newsletter/issue/create', { pub => pub.id }) %]">Create the first issue</a>.
+                [% END %]
+            </p>
+            [% END %]
+        </div>
+    </details>
+    [% END %]
+    [% ELSE %]
+    <p style="padding:24px;text-align:center;border:2px dashed var(--border-color,#ddd);border-radius:6px;">
+        No newsletters available.
+        [% IF is_csc %]
+        <a href="[% c.uri_for('/mail/newsletter/publication/create') %]">Create a newsletter</a>.
+        [% END %]
+    </p>
+    [% END %]
+
+    <h2 style="margin-top:28px;">Send History</h2>
+    [% IF campaigns.size %]
+    <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+        <thead>
+            <tr style="background:var(--bg-secondary,#f5f5f5);">
+                <th style="padding:8px;text-align:left;">Subject</th>
+                <th style="padding:8px;">List</th>
+                <th style="padding:8px;">Sent</th>
+                <th style="padding:8px;">Results</th>
+                <th style="padding:8px;">Page</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH camp IN campaigns %]
+            <tr style="border-bottom:1px solid #eee;">
+                <td style="padding:8px;">[% camp.subject | html %]</td>
+                <td style="padding:8px;text-align:center;">[% camp.list_name | html %]</td>
+                <td style="padding:8px;text-align:center;font-size:0.85em;">[% camp.sent_at %]</td>
+                <td style="padding:8px;text-align:center;">
+                    [% camp.success_count %] ok / [% camp.fail_count %] failed
+                </td>
+                <td style="padding:8px;text-align:center;">
+                    [% IF camp.page_code %]
+                        <a href="[% c.uri_for('/page', camp.page_code) %]">[% camp.page_title | html %]</a>
+                    [% ELSE %]—[% END %]
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p style="color:var(--text-muted-color);">No campaigns sent yet.</p>
+    [% END %]
+</div>
+
+<style>
+    .nl-pub-container > summary::-webkit-details-marker { display: none; }
+    .nl-pub-container > summary::before { content: '▸ '; color: var(--primary-color,#1565c0); }
+    .nl-pub-container[open] > summary::before { content: '▾ '; }
+</style>

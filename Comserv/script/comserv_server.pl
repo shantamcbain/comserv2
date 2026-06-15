@@ -190,8 +190,13 @@ sub _apply_safe_restart_defaults {
     }
 
     if ($has_restart && !$has_restart_regex) {
+        # Exclude logs, generated theme CSS, and writable session/doc caches —
+        # those paths are updated during normal requests and must not trigger reload.
         my $safe_restart_regex =
-            '^(?!.*(?:^|[\\/])logs?(?:[\\/]|$)).*\\.(?:pm|pl|psgi|tt|tt2|tmpl|yml|yaml|conf|css|js)$';
+            '^(?!.*[\\/]static[\\/]css[\\/]themes[\\/])'
+            . '(?!.*[\\/]session[\\/])'
+            . '(?!.*(?:^|[\\/])logs?(?:[\\/]|$))'
+            . '.*\\.(?:pm|pl|psgi|tt|tt2|tmpl|yml|yaml|conf|css|js)$';
         push @args, ('--restart_regex', $safe_restart_regex);
     }
 
@@ -263,10 +268,21 @@ sub _run_twiggy_server {
         '-I', 'local/lib/perl5',
         '-a', 'script/comserv_server.psgi',
     );
-    push @cmd, '-R', 'lib,root' if $reload;
+    # Watch lib/ only: -R lib,root restarts when theme CSS is written under root/.
+    push @cmd, '-R', 'lib' if $reload;
 
     print "Starting Comserv with Twiggy (WebSocket support) on port $port...\n";
+    if ($reload) {
+        print "Twiggy reload watches lib/ only (.tt changes under root/ need a manual restart).\n";
+    }
     print "Press Ctrl+C to stop\n" if $ENV{CATALYST_DEBUG};
+
+    $ENV{COMSERV_TWIGGY}          = '1';
+    $ENV{PLACK_SERVER_SOFTWARE} = 'Twiggy';
+    require File::Path;
+    File::Path::make_path("$root/var");
+    open my $tf, '>', "$root/var/twiggy.enabled" or warn "Cannot write twiggy.enabled: $!";
+    close $tf if $tf;
 
     chdir $root or die "Cannot chdir to $root: $!";
     exec @cmd;
@@ -609,6 +625,13 @@ _start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || 
 if ($use_twiggy) {
     my ($port, $reload) = _parse_port_and_reload(@ARGV);
     _run_twiggy_server($port, $reload);
+}
+
+# Starman/dev server without Twiggy — WebSocket terminal disabled.
+{
+    my $root = $ENV{CATALYST_HOME} || "$FindBin::Bin/..";
+    my $flag = "$root/var/twiggy.enabled";
+    unlink $flag if -f $flag;
 }
 
 Catalyst::ScriptRunner->run('Comserv', 'Server');

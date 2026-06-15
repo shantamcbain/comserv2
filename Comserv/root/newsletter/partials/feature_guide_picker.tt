@@ -1,0 +1,149 @@
+[%#
+  newsletter/partials/feature_guide_picker.tt
+  Curated member how-to sources for newsletter body (pages + Documentation).
+%]
+<div class="nl-feature-guides" style="margin:20px 0;padding:16px;border:1px solid var(--border-color,#ddd);border-radius:8px;background:var(--bg-secondary,#f8f9fa);">
+    <h3 style="margin:0 0 8px;font-size:1.05em;">Include from feature guides</h3>
+    <p style="margin:0 0 12px;font-size:0.9em;color:var(--text-muted-color);">
+        Written when features ship (mandatory with every code change — same as theme/logging compliance).
+        <strong>Insert into body</strong> for testable links; AI only formats selected guides.
+        <a href="[% c.uri_for('/Documentation/newsletter_feature_guide_workflow') %]" target="_blank" rel="noopener">Workflow</a>
+        · <a href="[% c.uri_for('/Documentation/DevelopmentStandards') %]#doc-compliance" target="_blank" rel="noopener">Documentation compliance</a>
+    </p>
+
+    <div id="nl-feature-guide-list" style="max-height:280px;overflow:auto;margin-bottom:12px;">
+        [% IF feature_guides && feature_guides.size %]
+            [% FOREACH g IN feature_guides %]
+            <label class="nl-guide-row" style="display:block;margin:8px 0;padding:10px 12px;background:#fff;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <input type="checkbox" class="nl-guide-cb" value="[% g.id | html %]" style="margin-top:4px;"
+                           [% IF g.is_new_since_last_send %]checked[% END %]
+                           aria-label="[% g.title | html %]">
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:4px;">
+                            <strong style="font-size:1em;color:var(--text-color,#222);">[% g.title | html %]</strong>
+                            <span class="label label-default" style="font-size:0.72em;">[% g.source_label | html %]</span>
+                            [% IF g.is_new_since_last_send %]
+                            <span class="label label-info" style="font-size:0.72em;">new since last send</span>
+                            [% END %]
+                            [% IF g.sort_date %]
+                            <span style="font-size:0.78em;color:var(--text-muted-color);">[% g.sort_date | html %]</span>
+                            [% END %]
+                        </div>
+                        <div style="font-size:0.85em;color:var(--text-muted-color);margin-bottom:6px;">
+                            [% IF g.excerpt %][% g.excerpt | html %][% ELSE %]<em>No excerpt</em>[% END %]
+                        </div>
+                        <div style="font-size:0.82em;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                            <a href="[% g.url | html %]" target="_blank" rel="noopener" style="font-family:monospace;"
+                               onclick="event.stopPropagation();">[% g.url | html %]</a>
+                            [% IF g.link_count %]
+                            <span style="color:var(--text-muted-color);">[% g.link_count %] testable link[% IF g.link_count != 1 %]s[% END %]</span>
+                            [% END %]
+                            <span style="color:var(--text-muted-color);font-size:0.75em;">id: [% g.id | html %]</span>
+                        </div>
+                    </div>
+                </div>
+            </label>
+            [% END %]
+        [% ELSE %]
+            <p id="nl-feature-guide-empty" style="color:var(--text-muted-color);font-size:0.9em;">
+                No feature guides yet. Add <code>Documentation/guides/feature-how-to-use.tt</code>
+                or a <code>page_type=feature_guide</code> page — see
+                <a href="[% c.uri_for('/Documentation/newsletter_feature_guide_workflow') %]">where things go</a>.
+            </p>
+        [% END %]
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <button type="button" id="nl-insert-guides" class="btn btn-primary">Insert into body</button>
+        <button type="button" id="nl-reload-ai-context" class="btn btn-secondary">Reload AI context from selection</button>
+        <span id="nl-guide-status" style="font-size:0.85em;color:var(--text-muted-color);"></span>
+    </div>
+</div>
+
+<script>
+(function() {
+    function selectedGuideIds() {
+        var ids = [];
+        document.querySelectorAll('.nl-guide-cb:checked').forEach(function(cb) {
+            if (cb.value) ids.push(cb.value);
+        });
+        return ids;
+    }
+
+    function guidesQuery() {
+        return selectedGuideIds().map(function(id) {
+            return 'guides=' + encodeURIComponent(id);
+        }).join('&');
+    }
+
+    document.getElementById('nl-insert-guides') && document.getElementById('nl-insert-guides').addEventListener('click', function() {
+        var ids = selectedGuideIds();
+        var status = document.getElementById('nl-guide-status');
+        if (!ids.length) {
+            if (status) status.textContent = 'Select at least one guide.';
+            return;
+        }
+        if (status) status.textContent = 'Loading…';
+        var url = '[% c.uri_for('/mail/newsletter/feature_guide_body') %]?' + guidesQuery();
+        fetch(url, { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.ok || !data.html) {
+                    if (status) status.textContent = data.error || 'Could not load guides.';
+                    return;
+                }
+                if (typeof window.nlAppendToBody === 'function') {
+                    window.nlAppendToBody(data.html);
+                } else {
+                    var ta = document.getElementById('body');
+                    if (ta) ta.value = (ta.value ? ta.value + '\n\n' : '') + data.html;
+                }
+                var n = data.count != null ? data.count : ids.length;
+                if (status) status.textContent = 'Inserted ' + n + ' of ' + ids.length + ' guide(s) — use preview pane links to test.';
+                if (data.count != null && data.count < ids.length) {
+                    if (status) status.textContent += ' (some IDs not found — reload page)';
+                }
+            })
+            .catch(function() {
+                if (status) status.textContent = 'Request failed.';
+            });
+    });
+
+    document.getElementById('nl-reload-ai-context') && document.getElementById('nl-reload-ai-context').addEventListener('click', function() {
+        var ids = selectedGuideIds();
+        var status = document.getElementById('nl-guide-status');
+        var base = '[% c.uri_for('/mail/newsletter/ai_context') %]';
+        var url = ids.length ? base + '?' + guidesQuery() : base;
+        if (status) status.textContent = 'Reloading AI context…';
+        fetch(url, { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.ok || !data.context) {
+                    if (status) status.textContent = 'Could not reload context.';
+                    return;
+                }
+                var meta = document.getElementById('ai-form-meta');
+                if (meta) {
+                    var sys = (meta.getAttribute('data-system') || '').split('\n\nAPPLICATION DATA:')[0];
+                    meta.setAttribute('data-system', sys + '\n\nAPPLICATION DATA:\n' + data.context);
+                }
+                var hint = document.getElementById('ai-form-status');
+                if (hint) hint.textContent = ids.length
+                    ? 'AI context loaded for ' + ids.length + ' selected guide(s).'
+                    : 'AI context loaded (auto: new guides since last send).';
+                if (status) status.textContent = '';
+            })
+            .catch(function() {
+                if (status) status.textContent = 'Reload failed.';
+            });
+    });
+
+    document.querySelectorAll('.nl-guide-cb').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var hint = document.getElementById('ai-form-status');
+            if (hint) hint.textContent = 'Selection changed — click Reload AI context or Insert into body.';
+        });
+    });
+})();
+</script>

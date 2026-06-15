@@ -1,0 +1,11 @@
+[%# Admin/debug messages — debug_msg is normalized to a flat string list in Root auto %]
+[% IF is_admin && debug_msg && debug_msg.size %]
+    [% FOREACH msg IN debug_msg %]
+    <p class="debug">Debug: [% msg | html %]</p>
+    [% END %]
+[% END %]
+[% IF c.session.debug_mode && debug_errors && debug_errors.size %]
+    [% FOREACH err IN debug_errors %]
+    <p class="debug debug-error">Error: [% err | html %]</p>
+    [% END %]
+[% END %]

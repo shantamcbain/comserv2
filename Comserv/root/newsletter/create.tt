@@ -1,0 +1,228 @@
+[% META title = 'Create Newsletter' %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Create Issue</h1>
+        <nav style="font-size:0.9em;color:var(--text-muted-color);">
+            <a href="[% c.uri_for('/mail/newsletters') %]">Newsletters</a> &rsaquo; New Issue
+        </nav>
+    </div>
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+
+    <div class="admin-card">
+        <p style="color:var(--text-muted-color);margin-bottom:16px;">
+            An <strong>issue</strong> is one edition under a newsletter (e.g. Hosting News — June 2026, Issue 3).
+            Content is saved as a page — the permanent online record. After sending, subscribers get a link to read it.
+        </p>
+
+        [% UNLESS publications && publications.size %]
+        <div class="alert alert-warning">
+            No newsletters defined yet.
+            <a href="[% c.uri_for('/mail/newsletter/publication/create') %]">Create a newsletter first</a>
+            (name + description), then add issues.
+        </div>
+        [% END %]
+
+        <form method="POST" action="[% c.uri_for('/mail/newsletter/create') %]">
+            [% IF is_csc %]
+            <div class="form-group">
+                <label for="sitename">SiteName</label>
+                <select name="sitename" id="sitename" required>
+                    [% FOREACH site IN available_sites %]
+                    <option value="[% site %]" [% IF form_data.sitename == site || (!form_data.sitename && site == sitename) %]selected[% END %]>[% site %]</option>
+                    [% END %]
+                </select>
+            </div>
+            [% ELSE %]
+            <input type="hidden" name="sitename" value="[% sitename %]">
+            [% END %]
+
+            <div class="form-group">
+                <label for="nl_pub_id">Newsletter <span style="color:red">*</span></label>
+                <select name="nl_pub_id" id="nl_pub_id" required class="form-control" [% UNLESS publications && publications.size %]disabled[% END %]>
+                    <option value="">— Select newsletter —</option>
+                    [% FOREACH pub IN publications %]
+                    <option value="[% pub.id %]"
+                            data-sitename="[% pub.sitename | html %]"
+                            data-series="[% pub.nl_series | html %]"
+                            [% IF form_data.nl_pub_id == pub.id %]selected[% END %]>
+                        [% pub.title | html %] ([% pub.sitename | html %]) — [% pub.description | html %]
+                    </option>
+                    [% END %]
+                </select>
+                <small>Issues belong under a newsletter container — not as standalone “newsletters”.</small>
+            </div>
+            <input type="hidden" name="nl_series" id="nl_series" value="[% form_data.nl_series | html %]">
+
+            <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                    <label for="nl_version">Issue version</label>
+                    <input type="number" name="nl_version" id="nl_version" min="1" class="form-control"
+                           value="[% form_data.nl_version | html %]" placeholder="auto">
+                    <small>Leave blank to auto-increment for this series.</small>
+                </div>
+                <div>
+                    <label>Online URL</label>
+                    <input type="text" id="nl_url_preview" disabled class="form-control"
+                           value="/page/…" style="font-family:monospace;font-size:0.9em;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" name="title" id="title"
+                       value="[% form_data.title | html %]" class="form-control"
+                       placeholder="Hosting News — June 2026 (v3)">
+                <small>Auto-filled from series + version — edit if you prefer a different headline.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="page_code">URL slug (optional)</label>
+                <input type="text" name="page_code" id="page_code"
+                       value="[% form_data.page_code | html %]" class="form-control"
+                       placeholder="hosting-news-v3-2026-06">
+                <small>Becomes <code>/page/your-slug</code> — e.g. <code>hosting-news-v3-2026-06</code>, not <code>newsletter-news-letter-…</code>.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Summary (archive listing)</label>
+                <textarea name="description" id="description" rows="2" class="form-control">[% form_data.description | html %]</textarea>
+            </div>
+
+            [% PROCESS 'newsletter/partials/feature_guide_picker.tt' %]
+
+            [% PROCESS 'newsletter/partials/html_editor.tt'
+               body_label    = 'Newsletter content'
+               body_required = 1
+               body_content  = form_data.body
+            %]
+
+            <div class="form-group">
+                <label for="roles">Who can read online</label>
+                <select name="roles" id="roles">
+                    <option value="public" [% IF form_data.roles == 'public' || !form_data.roles %]selected[% END %]>Public — anyone</option>
+                    <option value="member" [% IF form_data.roles == 'member' %]selected[% END %]>Members only</option>
+                    <option value="admin"  [% IF form_data.roles == 'admin'  %]selected[% END %]>Admins only</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="share_with">Share with other SiteNames</label>
+                <input type="text" name="share_with" id="share_with" class="form-control"
+                       value="[% form_data.share_with | html %]"
+                       placeholder="3d, USBM or all">
+                <small>Comma-separated SiteNames, or <code>all</code>, to show this issue on their <a href="[% c.uri_for('/newsletters') %]">newsletter archive</a>.</small>
+            </div>
+
+            <div class="form-actions" style="margin-top:16px;">
+                <button type="submit" class="btn btn-primary">Save Draft</button>
+                <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+
+        [% SET nl_ai_system = 'You draft a Comserv newsletter for SITE OWNERS. Return ONLY raw JSON: title, description, body, page_code.
+PRIMARY SOURCE: FEATURE GUIDES section in APPLICATION DATA — copy/adapt member how-to HTML and keep every <a href> link.
+Do NOT invent features from git when guides are present. One h2 per included GUIDE; use steps and links from GUIDE BODY HTML.
+FORBIDDEN: Site Tools, Marketing, templates, schedule-send — not in this app.
+If no guides in context, write a short intro only — do not guess improvements.
+body = HTML. No git or file paths. description = one plain sentence.' %]
+
+        [% PROCESS 'ai/partials/ai_form_assistant.tt'
+           ai_form_entity_label = 'newsletter issue'
+           ai_form_context      = 'page-backed newsletter for SiteName — permanent online record + email teaser'
+           ai_form_fields       = 'title, description, body, page_code'
+           ai_form_system       = nl_ai_system
+        %]
+
+        <div style="margin-top:10px;font-size:0.85em;color:var(--text-muted-color);">
+            <strong>Try the AI Form Assistant:</strong>
+            <span class="nl-ai-prompt" role="button" tabindex="0"
+                  style="cursor:pointer;margin:0 6px;text-decoration:underline;"
+                  data-prompt="Format the selected FEATURE GUIDES from APPLICATION DATA into newsletter sections. Keep all links. Do not invent features.">format selected feature guides</span>
+            ·
+            <span class="nl-ai-prompt" role="button" tabindex="0"
+                  style="cursor:pointer;margin:0 6px;text-decoration:underline;"
+                  data-prompt="Write a section about Planning tab and calendar improvements: what members see at /planning/daily and how to use the daily log">planning &amp; calendar guide</span>
+            ·
+            <span class="nl-ai-prompt" role="button" tabindex="0"
+                  style="cursor:pointer;margin:0 6px;text-decoration:underline;"
+                  data-prompt="Write a section about the new Newsletters feature: reading at /newsletters, subscribing, creating issues, and using AI to draft — for site owners not developers">newsletters how-to</span>
+        </div>
+
+        <script>
+        (function() {
+            var pubEl = document.getElementById('nl_pub_id');
+            var seriesEl = document.getElementById('nl_series');
+            var titleEl = document.getElementById('title');
+            var descEl = document.getElementById('description');
+            var codeEl = document.getElementById('page_code');
+            var verEl = document.getElementById('nl_version');
+            var urlPreview = document.getElementById('nl_url_preview');
+            var sitenameEl = document.getElementById('sitename');
+
+            function refreshSeriesMeta() {
+                if (!pubEl || !pubEl.value) return;
+                var opt = pubEl.options[pubEl.selectedIndex];
+                if (seriesEl && opt) seriesEl.value = opt.getAttribute('data-series') || 'hosting';
+                var params = new URLSearchParams();
+                params.set('pub_id', pubEl.value);
+                if (sitenameEl) params.set('sitename', opt ? opt.getAttribute('data-sitename') : sitenameEl.value);
+                else if (opt) params.set('sitename', opt.getAttribute('data-sitename') || '');
+                fetch('[% c.uri_for('/mail/newsletter/series_meta') %]?' + params.toString(), { credentials: 'include' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data.ok) return;
+                        if (titleEl && !titleEl.dataset.userEdited) titleEl.value = data.title || '';
+                        if (descEl && !descEl.dataset.userEdited) descEl.value = data.description || '';
+                        if (codeEl && !codeEl.dataset.userEdited) codeEl.value = data.page_code || '';
+                        if (verEl && !verEl.value) verEl.placeholder = 'v' + (data.version || '');
+                        if (urlPreview) urlPreview.value = '/page/' + (data.page_code || '…');
+                    })
+                    .catch(function() {});
+            }
+
+            ['input', 'change'].forEach(function(ev) {
+                if (titleEl) titleEl.addEventListener(ev, function() { titleEl.dataset.userEdited = '1'; });
+                if (descEl) descEl.addEventListener(ev, function() { descEl.dataset.userEdited = '1'; });
+                if (codeEl) codeEl.addEventListener(ev, function() { codeEl.dataset.userEdited = '1'; });
+            });
+            if (pubEl) {
+                pubEl.addEventListener('change', refreshSeriesMeta);
+                if (pubEl.value) refreshSeriesMeta();
+            }
+            if (sitenameEl) sitenameEl.addEventListener('change', refreshSeriesMeta);
+
+            function guideQuery() {
+                var q = [];
+                document.querySelectorAll('.nl-guide-cb:checked').forEach(function(cb) {
+                    if (cb.value) q.push('guides=' + encodeURIComponent(cb.value));
+                });
+                return q.length ? '?' + q.join('&') : '';
+            }
+            fetch('[% c.uri_for('/mail/newsletter/ai_context') %]' + guideQuery(), { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.ok || !data.context) return;
+                    var meta = document.getElementById('ai-form-meta');
+                    if (!meta) return;
+                    var sys = meta.getAttribute('data-system') || '';
+                    meta.setAttribute('data-system', sys + '\n\nAPPLICATION DATA:\n' + data.context);
+                    var hint = document.getElementById('ai-form-status');
+                    if (hint && !hint.textContent) {
+                        hint.textContent = 'Guides loaded — Insert into body for testable links, or ask AI to format guides';
+                    }
+                })
+                .catch(function() {});
+            document.querySelectorAll('.nl-ai-prompt').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var inp = document.getElementById('ai-form-entity-name');
+                    if (inp) inp.value = el.getAttribute('data-prompt') || '';
+                });
+            });
+        })();
+        </script>
+    </div>
+</div>

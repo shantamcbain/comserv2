@@ -30,7 +30,8 @@ sub _load_json_file {
     open my $fh, '<:encoding(UTF-8)', $path or return;
     my $content = <$fh>;
     close $fh;
-    return JSON->new->utf8->decode($content);
+    # Filehandle already decodes UTF-8 to wide chars — do not use JSON->utf8->decode here.
+    return eval { JSON->new->decode($content) };
 }
 
 # Production Docker mounts root/Documentation read-only; runtime config writes go here.
@@ -86,7 +87,7 @@ sub _atomic_write_json {
             $LAST_ATOMIC_WRITE_ERROR = "open $tmp failed: $!";
             return 0;
         };
-        print $fh JSON->new->utf8->pretty->encode($data);
+        print $fh JSON->new->pretty->encode($data);
         close $fh;
     }
     rename $tmp, $path or do {
@@ -346,6 +347,30 @@ sub _compute_and_get_docs_root {
     # Resolve the Documentation root directory on disk
     my $docs_root = $c->path_to('root', 'Documentation');
     return $docs_root;
+}
+
+# Find Documentation/foo.tt anywhere under root/Documentation (flat URL namespace).
+sub _find_documentation_tt_rel_path {
+    my ($self, $c, $page) = @_;
+    return unless defined $page && $page ne '';
+    my $docs_root = $c->path_to('root', 'Documentation');
+    my $root_base  = $c->path_to('root');
+    my $found_abs;
+    my @search_roots = ($docs_root);
+    my $guides_dir = File::Spec->catdir($docs_root, 'guides');
+    push @search_roots, $guides_dir if -d $guides_dir;
+    find({
+        wanted => sub {
+            return unless -f $_;
+            return unless $File::Find::name =~ m{/\Q$page\E\.tt$}i;
+            $found_abs = $File::Find::name unless $found_abs;
+        },
+        no_chdir => 1,
+    }, @search_roots);
+    return unless $found_abs;
+    (my $rel = $found_abs) =~ s/^\Q$root_base\E\/?//;
+    $rel =~ s{\\}{/}g;
+    return $rel;
 }
 
 sub _ensure_scanned {
@@ -947,8 +972,8 @@ sub view :Path('/Documentation') :Args(1) {
         return;
     }
 
-    # Try to find it as a .tt file in the Documentation directory (unregistered)
-    my $tt_path = "Documentation/$page.tt";
+    # Try to find it as a .tt file under Documentation/ (unregistered; includes subdirs like changelog/)
+    my $tt_path      = $self->_find_documentation_tt_rel_path($c, $page) || "Documentation/$page.tt";
     my $tt_full_path = $c->path_to('root', $tt_path);
 
     if (-e $tt_full_path) {
@@ -1688,7 +1713,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
             if ($json_content && $json_content !~ /^\s*$/) {
                 my $decoded_data;
                 eval {
-                    $decoded_data = JSON->new->utf8->decode($json_content);
+                    $decoded_data = JSON->new->decode($json_content);
                 };
                 if ($@ || !defined $decoded_data) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_roles',
@@ -2134,16 +2159,36 @@ sub _apply_json_roles_to_memory {
     my $json_pages = $config->{pages} || {};
     my $memory_pages = $self->documentation_pages;
     my $synced = 0;
+    my $added  = 0;
     foreach my $page_name (keys %$json_pages) {
+        my $jp = $json_pages->{$page_name};
+        next unless ref $jp eq 'HASH';
+
         if (exists $memory_pages->{$page_name}) {
-            my $jp = $json_pages->{$page_name};
             $memory_pages->{$page_name}->{roles} = $jp->{roles} if ref $jp->{roles} eq 'ARRAY';
             $memory_pages->{$page_name}->{site}  = $jp->{site}  if defined $jp->{site};
             $synced++;
+            next;
         }
+
+        my $path = $jp->{path} or next;
+        my $full_path = $c->path_to('root', $path);
+        next unless -e $full_path;
+
+        $memory_pages->{$page_name} = {
+            path        => $path,
+            title       => $jp->{title}       || $page_name,
+            description => $jp->{description}  || '',
+            format      => $jp->{format}       || ($path =~ /\.md$/i ? 'markdown' : 'template'),
+            category    => $jp->{category}     || '',
+            roles       => (ref $jp->{roles} eq 'ARRAY' ? $jp->{roles} : []),
+            site        => $jp->{site}         || 'all',
+            last_scanned => $jp->{last_scanned} || '',
+        };
+        $added++;
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_json_roles_to_memory',
-        "Synced roles+site from JSON config into memory for $synced pages");
+        "Synced roles+site from JSON config into memory for $synced pages; registered $added JSON-only pages");
 }
 
 # Helper method to clean data structure for JSON encoding

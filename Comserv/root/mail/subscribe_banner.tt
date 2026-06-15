@@ -18,6 +18,10 @@
         </a>
     [% ELSE %]
         <span style="margin-right:12px;">&#9993; <strong>Stay in the loop</strong> — subscribe to updates from [% c.session.SiteName || 'us' %].</span>
+        <a href="/newsletters"
+           style="background:rgba(255,255,255,0.2);color:#fff;padding:4px 14px;border-radius:14px;font-weight:bold;text-decoration:none;font-size:0.9em;margin-right:6px;">
+            Newsletters
+        </a>
         <a href="/mail/subscribe"
            style="background:#fff;color:var(--primary-color,#1565c0);padding:4px 16px;border-radius:14px;font-weight:bold;text-decoration:none;font-size:0.95em;">
             Join Our Mailing List

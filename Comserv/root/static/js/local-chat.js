@@ -35,6 +35,7 @@
         isMemberOrAbove: false,
         ollamaReachable: false,
         isAdmin: false,
+        isEditor: false,
         isDevMode: false,           // true only on local development machine
         userModelOverride: false,   // true when user manually picks a model
         modelTiers: {
@@ -610,6 +611,15 @@
     // Extract visible text content from the current page for context
     function extractPageContent() {
         const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
+        var prefix = '';
+        var gcalLegend = document.getElementById('gcal-legend-bar');
+        if (gcalLegend) {
+            var calHelp = gcalLegend.getAttribute('data-calendar-help') || gcalLegend.getAttribute('title') || '';
+            var calText = (gcalLegend.textContent || '').replace(/\s+/g, ' ').trim();
+            if (calHelp || calText) {
+                prefix = '[Daily Schedule calendar UI] ' + calHelp + (calText ? (' Legend: ' + calText) : '') + ' ';
+            }
+        }
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article', '.container'];
         for (const sel of contentSelectors) {
             const el = document.querySelector(sel);
@@ -618,14 +628,14 @@
             clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
             const text = clone.textContent.replace(/\s+/g, ' ').trim();
             if (text.length > 200) {
-                return text.substring(0, 6000);
+                return (prefix + text).substring(0, 6000);
             }
         }
         // Fallback: body text
         const bodyClone = document.body.cloneNode(true);
         bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
         const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
-        return bodyText.substring(0, 4000);
+        return (prefix + bodyText).substring(0, 4000);
     }
 
     // Extract all meaningful links from the current page (nav menu + quick links + content links)
@@ -3594,6 +3604,20 @@
         { label: 'todos',                      url: '/todo' },
         { label: 'projects',                   url: '/project' },
         { label: 'daily plan',                 url: '/planning/daily' },
+        { label: 'newsletters',                url: '/newsletters' },
+        { label: 'newsletter',                 url: '/newsletters' },
+        { label: 'newsletter archive',         url: '/newsletters' },
+        { label: 'read newsletter',            url: '/newsletters' },
+        { label: 'mail',                       url: '/mail' },
+        { label: 'mail dashboard',             url: '/mail' },
+        { label: 'subscribe',                  url: '/mail/subscribe' },
+        { label: 'mailing list',               url: '/mail/subscribe' },
+        { label: 'join mailing list',          url: '/mail/subscribe' },
+        { label: 'my subscriptions',           url: '/mail/my_subscriptions' },
+        { label: 'email subscriptions',        url: '/mail/my_subscriptions' },
+        { label: 'manage newsletters',         url: '/mail/newsletters', adminOnly: true },
+        { label: 'create newsletter',          url: '/mail/newsletter/create', adminOnly: true },
+        { label: 'new newsletter',             url: '/mail/newsletter/create', adminOnly: true },
         { label: 'documentation',              url: '/Documentation' },
         { label: 'encyclopedia',               url: '/ENCY' },
         { label: 'ency',                       url: '/ENCY' },
@@ -3606,6 +3630,8 @@
         { label: 'admin logs',                 url: '/admin/logs', adminOnly: true },
         { label: 'logs',                       url: '/admin/logs', adminOnly: true },
         { label: 'system info',                url: '/admin/system_info', adminOnly: true },
+        { label: 'ssh terminal',               url: '/admin/ssh_terminal', adminOnly: true,
+          aliases: ['terminal', 'system terminal', 'shell', 'command line', 'system shell'] },
         { label: 'admin settings',             url: '/admin/settings', adminOnly: true },
         { label: 'settings',                   url: '/admin/settings', adminOnly: true },
         { label: 'docker containers',          url: '/admin/docker-containers', adminOnly: true },
@@ -3678,7 +3704,8 @@
         const map = [];
         STATIC_NAV
             .filter(function(e) {
-                return state.isAdmin || (!e.adminOnly && !isAdminOnlyNavUrl(e.url));
+                var canPrivilegedNav = state.isAdmin || state.isEditor;
+                return canPrivilegedNav || (!e.adminOnly && !isAdminOnlyNavUrl(e.url));
             })
             .forEach(function(e) {
                 const abs = origin + e.url;
@@ -5479,6 +5506,7 @@
             if (cfg.username) state.username = cfg.username;
             if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
             if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
+            if (cfg.isEditor !== undefined) state.isEditor = !!cfg.isEditor;
             if (cfg.siteName) state.siteName = cfg.siteName;
         }
 
