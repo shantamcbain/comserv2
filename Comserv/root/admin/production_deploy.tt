@@ -38,7 +38,7 @@
             [% IF deployment_status.has_uncommitted_changes %]
             <div class="status-item warning">
                 <label>Uncommitted Changes:</label>
-                <span class="changes-warning">Yes - Review before deployment</span>
+                <span class="changes-warning">Yes — will auto-commit and push when you deploy</span>
             </div>
             [% END %]
         </div>

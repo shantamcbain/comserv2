@@ -255,6 +255,15 @@
                         </div>
                     </div>
 
+                    <div style="margin-bottom: 8px; padding: 8px 10px; font-size: 11px; line-height: 1.45; background: #1a2a1a; border: 1px solid #2d6a2d; border-radius: 4px; color: #b8e0b8;">
+                        <strong style="color: #7dffb2;">Auto-commit before deploy:</strong>
+                        Auto Deploy and Quick Deploy always run <code style="color:#d4ffd4;">git add -A</code>,
+                        commit, and push <em>before</em> building or updating production.
+                        Developers do not need to commit manually — uncommitted workstation changes are included automatically
+                        so production <code style="color:#d4ffd4;">git pull</code> and the Docker image stay in sync.
+                        Set <code style="color:#d4ffd4;">COMSERV_SKIP_PRE_BUILD_GIT_SYNC=1</code> only to bypass intentionally.
+                    </div>
+
                     <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
                         <button onclick="openSSHTerminal()" class="compact-btn" style="background-color: #0066cc; color: white;">
                             <i class="fas fa-terminal"></i> Terminal
