@@ -1,0 +1,293 @@
+/* Print-friendly page layout */
+.page-print-body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--body-font, Verdana, Helvetica, sans-serif);
+    color: var(--text-color, #222);
+    background: #fff;
+    line-height: 1.4;
+    font-size: 11pt;
+}
+
+/* Default: compact density for fewer printed pages */
+.page-print-body.print-density-compact {
+    font-size: 9pt;
+    line-height: 1.3;
+}
+
+.page-print-body.print-density-normal {
+    font-size: 11pt;
+    line-height: 1.45;
+}
+
+.page-print-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #ddd;
+    background: #f5f5f5;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.page-print-toolbar-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: #444;
+}
+
+.page-print-toolbar-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    margin: 0;
+}
+
+.page-print-density-select {
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.page-print-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    background: #fff;
+    color: #333;
+}
+
+.page-print-btn-primary {
+    background: var(--primary-color, #0066cc);
+    border-color: var(--primary-color, #0066cc);
+    color: #fff;
+    font-weight: bold;
+}
+
+.page-print-btn-primary:hover {
+    filter: brightness(0.92);
+}
+
+.page-print-btn-secondary:hover {
+    background: var(--secondary-color, #eee);
+}
+
+.page-print-document {
+    max-width: 8.5in;
+    margin: 0 auto;
+    padding: 16px 14px 28px;
+}
+
+.page-print-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #ccc);
+}
+
+.page-print-title {
+    margin: 0 0 4px;
+    font-size: 1.35rem;
+    line-height: 1.2;
+}
+
+.print-density-compact .page-print-title {
+    font-size: 1.15rem;
+}
+
+.page-print-meta {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.page-print-body-content {
+    min-height: 0;
+}
+
+.page-print-body-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+.page-print-footer {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid #ddd;
+    font-size: 0.7rem;
+    color: #888;
+    text-align: center;
+}
+
+/* Screen: hide editor-only chrome if present */
+.page-print-body-content .pe-drag-bar,
+.page-print-body-content .pe-drag-handle {
+    display: none !important;
+}
+
+/* Compact spacing for layout blocks (screen + print) */
+.print-density-compact .page-print-body-content h1 { font-size: 1.25rem; margin: 0.6rem 0 0.35rem; }
+.print-density-compact .page-print-body-content h2 { font-size: 1.1rem; margin: 0.55rem 0 0.3rem; }
+.print-density-compact .page-print-body-content h3 { font-size: 1rem; margin: 0.45rem 0 0.25rem; }
+.print-density-compact .page-print-body-content h4 { font-size: 0.95rem; margin: 0.4rem 0 0.2rem; }
+.print-density-compact .page-print-body-content p,
+.print-density-compact .page-print-body-content li { margin: 0.2rem 0; }
+.print-density-compact .page-print-body-content ul,
+.print-density-compact .page-print-body-content ol { margin: 0.25rem 0; padding-left: 1.1rem; }
+
+.print-density-compact .page-print-body-content .bm-hero {
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0.65rem;
+    border-radius: 4px;
+}
+.print-density-compact .page-print-body-content .bm-hero h1 { font-size: 1.2rem; margin-bottom: 0.25rem; }
+.print-density-compact .page-print-body-content .bm-hero .bm-subtitle { font-size: 0.95rem; margin-bottom: 0.35rem; }
+.print-density-compact .page-print-body-content .bm-hero .bm-meta { font-size: 0.8rem; }
+
+.print-density-compact .page-print-body-content .bm-section { margin-bottom: 0.75rem; }
+.print-density-compact .page-print-body-content .bm-section h2 { padding-bottom: 0.2rem; }
+
+.print-density-compact .page-print-body-content .bm-card,
+.print-density-compact .page-print-body-content .bm-feature,
+.print-density-compact .page-print-body-content .bm-security,
+.print-density-compact .page-print-body-content .bm-callout,
+.print-density-compact .page-print-body-content .pe-box {
+    padding: 0.5rem 0.65rem;
+    margin: 0.35rem 0;
+    border-radius: 4px;
+    box-shadow: none;
+}
+
+.print-density-compact .page-print-body-content .bm-grid,
+.print-density-compact .page-print-body-content .bm-feature-grid,
+.print-density-compact .page-print-body-content .pe-cols-2 {
+    gap: 0.45rem;
+    margin-top: 0.35rem;
+}
+
+.print-density-compact .page-print-body-content .bm-tagline {
+    padding: 0.35rem 0.6rem;
+    margin: 0.4rem 0;
+}
+
+@media print {
+    @page {
+        margin: 0.45in 0.5in;
+        size: letter;
+    }
+
+    .no-print,
+    .page-print-toolbar {
+        display: none !important;
+    }
+
+    html, body {
+        background: #fff !important;
+    }
+
+    .page-print-body {
+        font-size: 9pt;
+        line-height: 1.28;
+    }
+
+    .page-print-body.print-density-normal {
+        font-size: 10pt;
+        line-height: 1.38;
+    }
+
+    .page-print-document {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .page-print-header {
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom-color: #999;
+    }
+
+    .page-print-title {
+        font-size: 13pt;
+    }
+
+    .print-density-normal .page-print-title {
+        font-size: 15pt;
+    }
+
+    .page-print-footer {
+        margin-top: 10px;
+        padding-top: 6px;
+    }
+
+    /* Allow blocks to split across pages — avoids huge blank gaps */
+    .page-print-body-content .bm-card,
+    .page-print-body-content .bm-feature,
+    .page-print-body-content .bm-section,
+    .page-print-body-content .bm-callout,
+    .page-print-body-content .bm-hero,
+    .page-print-body-content .bm-security,
+    .page-print-body-content .pe-box {
+        break-inside: auto;
+        page-break-inside: auto;
+        box-shadow: none !important;
+    }
+
+    /* Optional: show full URLs after links (off by default — saves many pages) */
+    .page-print-body.print-show-urls .page-print-body-content a[href]::after {
+        content: " (" attr(href) ")";
+        font-size: 0.75em;
+        color: #555;
+        word-break: break-all;
+    }
+
+    .page-print-body.print-show-urls .page-print-body-content a[href^="#"]::after,
+    .page-print-body.print-show-urls .page-print-body-content a[href^="javascript:"]::after {
+        content: "";
+    }
+
+    /* Compact print overrides for container blocks */
+    .print-density-compact .page-print-body-content .bm-hero {
+        padding: 0.45rem 0.7rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .print-density-compact .page-print-body-content .bm-section {
+        margin-bottom: 0.55rem !important;
+    }
+
+    .print-density-compact .page-print-body-content .bm-card,
+    .print-density-compact .page-print-body-content .bm-feature,
+    .print-density-compact .page-print-body-content .bm-security,
+    .print-density-compact .page-print-body-content .bm-callout,
+    .print-density-compact .page-print-body-content .pe-box {
+        padding: 0.4rem 0.55rem !important;
+        margin: 0.25rem 0 !important;
+    }
+
+    .print-density-compact .page-print-body-content h1 { font-size: 12pt !important; }
+    .print-density-compact .page-print-body-content h2 { font-size: 10.5pt !important; }
+    .print-density-compact .page-print-body-content h3 { font-size: 9.5pt !important; }
+    .print-density-compact .page-print-body-content h4 { font-size: 9pt !important; }
+
+    .print-density-compact .page-print-body-content p,
+    .print-density-compact .page-print-body-content li {
+        margin: 0.12rem 0 !important;
+    }
+}
