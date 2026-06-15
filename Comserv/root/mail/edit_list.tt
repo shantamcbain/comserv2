@@ -27,7 +27,7 @@
             <div class="form-group">
                 <label>
                     <input type="checkbox" name="is_software_only" value="1" [% list.is_software_only ? 'checked' : '' %]>
-                    Software-only list (no Virtualmin server list)
+                    Application-managed list (not a cPanel/Virtualmin server list)
                 </label>
             </div>
             <div class="form-group">
@@ -40,23 +40,25 @@
             <div class="form-group">
                 <label for="list_backend">List Backend</label>
                 <select id="list_backend" name="list_backend" class="form-input" onchange="updateBackendHint(this.value)">
-                    [% FOREACH be IN ['local','virtualmin','mailserver','mailchimp'] %]
-                    <option value="[% be %]" [% (list.list_backend == be) ? 'selected' : '' %]>
-                        [% IF be == 'local' %]Local (application database)
-                        [% ELSIF be == 'virtualmin' %]Virtualmin (NFS mail server — announcement/send-only)
-                        [% ELSIF be == 'mailserver' %]Mail Server (SMTP list)
-                        [% ELSIF be == 'mailchimp' %]Mailchimp
-                        [% END %]
-                    </option>
-                    [% END %]
+                    <option value="local" [% list.list_backend == 'local' ? 'selected' : '' %]>Local (application database)</option>
+                    <option value="cpanel" [% list.list_backend == 'cpanel' ? 'selected' : '' %]>cPanel (WHC mailing list)</option>
+                    <option value="virtualmin" [% list.list_backend == 'virtualmin' ? 'selected' : '' %]>Virtualmin (legacy NFS)</option>
+                    <option value="mailserver" [% list.list_backend == 'mailserver' ? 'selected' : '' %]>Mail Server (SMTP list)</option>
+                    <option value="mailchimp" [% list.list_backend == 'mailchimp' ? 'selected' : '' %]>Mailchimp</option>
                 </select>
                 <small id="backend_hint" class="form-help"></small>
             </div>
             <div class="form-group" id="backend_config_group">
                 <label for="backend_config">Backend Configuration (JSON)</label>
                 <textarea id="backend_config" name="backend_config" rows="3"
-                          placeholder='e.g. {"api_key":"abc123","list_id":"xyz"}'>[% list.backend_config | html %]</textarea>
-                <small class="form-help">JSON config for the chosen backend (API keys, list IDs, etc.).</small>
+                          placeholder='List-specific only (domain/list_name for cPanel)'>[% list.backend_config | html %]</textarea>
+                <small class="form-help">cPanel API keys: <a href="[% c.uri_for('/mail/cpanel_settings') %]">cPanel Settings</a> (once per site). This field holds list-specific data only.</small>
+            </div>
+            <div class="form-group" id="cpanel_link_group" style="display:none;">
+                <p style="font-size:0.9em;color:var(--text-muted-color);">
+                    <a href="[% c.uri_for('/mail/cpanel_settings') %]">cPanel Settings</a> &middot;
+                    <a href="[% c.uri_for('/mail/lists/cpanel_provision') %]">Provision / link cPanel list</a>
+                </p>
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -68,16 +70,19 @@
 
 <script>
 var _backendHints = {
-    local:      'Subscriptions stored in this application\'s database. Best for most lists.',
-    virtualmin: 'Uses the Virtualmin mail server (NFS). Subscriptions tracked locally; outbound mail sent through the server\'s announcement list. Recipients cannot reply — send-only.',
-    mailserver: 'Delegates to an external SMTP mailing list server. Subscriptions managed externally.',
-    mailchimp:  'Syncs subscribers to a Mailchimp audience. Requires Mailchimp API key and list ID in the config below.'
+    local:      'Subscriptions stored in this application\'s database. Best for newsletters.',
+    cpanel:     'Linked to a real cPanel mailing list address. Subscribers can sync to cPanel.',
+    virtualmin: 'Legacy Virtualmin/NFS mail server (backup). Send-only.',
+    mailserver: 'Delegates to an external SMTP mailing list server.',
+    mailchimp:  'Syncs subscribers to a Mailchimp audience.'
 };
 function updateBackendHint(val) {
     var hint = document.getElementById('backend_hint');
     var cfg  = document.getElementById('backend_config_group');
+    var cpl  = document.getElementById('cpanel_link_group');
     if (hint) hint.textContent = _backendHints[val] || '';
-    if (cfg)  cfg.style.display = (val !== 'local') ? '' : 'none';
+    if (cfg)  cfg.style.display = (val === 'mailchimp' || val === 'mailserver' || val === 'virtualmin' || val === 'cpanel') ? '' : 'none';
+    if (cpl)  cpl.style.display = (val === 'cpanel') ? '' : 'none';
 }
 (function(){
     var sel = document.getElementById('list_backend');

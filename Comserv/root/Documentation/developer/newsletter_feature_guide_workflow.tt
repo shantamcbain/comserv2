@@ -1,0 +1,52 @@
+[% META title = 'Documentation: Where Things Go' %]
+[% META description = 'Stable rules — changelog one file, guides stable, ad hoc .tt vs DB' %]
+[% META roles = 'admin,developer,editor' %]
+
+<h1>Documentation: Where Things Go</h1>
+
+<p>Keep it light. On each code change, update only what helps members, editors, or the next developer.</p>
+
+<h2>Three buckets</h2>
+<table class="table table-bordered" style="max-width:720px;">
+    <tr><th>What</th><th>Where</th><th>When to touch</th></tr>
+    <tr>
+        <td><strong>Code change log</strong></td>
+        <td><a href="/Documentation/CHANGELOG">CHANGELOG.tt</a> only</td>
+        <td>Every behaviour-changing commit — append a dated section</td>
+    </tr>
+    <tr>
+        <td><strong>Member how-to</strong> (newsletters, nav, workflows)</td>
+        <td><code>Documentation/guides/*.tt</code> <em>or</em> <code>page</code> with <code>page_type=feature_guide</code></td>
+        <td>When members/editors see something new — <strong>update existing guide in place</strong></td>
+    </tr>
+    <tr>
+        <td><strong>Developer / admin detail</strong></td>
+        <td><code>Documentation/developer/*</code> or other <code>.tt</code></td>
+        <td>When implementation detail matters for the team</td>
+    </tr>
+</table>
+
+<h2>Ad hoc: .tt, DB, or both?</h2>
+<p>Pick one primary home per topic; avoid duplicating unless there is a clear reason.</p>
+<table class="table table-bordered" style="max-width:720px;">
+    <tr><th>Choose</th><th>When</th></tr>
+    <tr><td><strong>.tt only</strong></td><td>Ships with code in git; dev/AI edits in Cursor; scanned at <code>/Documentation/FILENAME</code></td></tr>
+    <tr><td><strong>DB only</strong> (<code>feature_guide</code> page)</td><td>Site editors maintain copy; per-site <code>sitename</code>; URL <code>/page/{slug}</code></td></tr>
+    <tr><td><strong>Both</strong></td><td>Rare — e.g. git copy for compliance + DB mirror for editors. Link one canonical URL in CHANGELOG.</td></tr>
+</table>
+
+<h2>Do not</h2>
+<ul>
+    <li>Create new <code>changelog/YYYY-MM-DD-*.tt</code> files (archive only — see <a href="/Documentation/all_changelog">all_changelog</a>)</li>
+    <li>Copy a guide with today's date instead of editing <code>guides/feature-name.tt</code></li>
+    <li>Ask newsletter AI to invent features from git — use <strong>Insert into body</strong> from feature guides</li>
+</ul>
+
+<h2>Newsletters</h2>
+<ol>
+    <li><a href="/mail/newsletter/create">Create issue</a> → tick guides (e.g. <a href="/Documentation/helpdesk-how-to-use">helpdesk</a>) → <strong>Insert into body</strong></li>
+    <li>Email teaser: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code> <code>[EMAIL]</code> <code>[USERNAME]</code> per subscriber</li>
+</ol>
+
+<p><a href="/Documentation/DevelopmentStandards#doc-compliance">Development Standards</a> ·
+   <a href="/Documentation/member_feature_guide_template">Guide template</a></p>

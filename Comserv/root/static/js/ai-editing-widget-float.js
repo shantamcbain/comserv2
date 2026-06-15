@@ -28,6 +28,10 @@
         ollamaHost: '',
         codingTerminalAllowed: false,
         codingTerminalWs: '/coding/terminal_ws',
+        cliMode: 'http',
+        interactiveWsAvailable: false,
+        cliTool: 'grok',
+        editorConfig: null,
         currentAbortCtrl: null,
     };
 
@@ -200,23 +204,50 @@
                   '</div>' +
                 '</div>' +
                 '<div id="aew-tab-cli-content" class="aew-tab-content">' +
-                  '<div class="aew-cli-panel">' +
+                  '<div class="aew-cli-panel" id="aew-cli-http-panel">' +
                     '<div class="aew-cli-header">' +
-                      '<span id="aew-cli-status">Workstation terminal</span>' +
+                      '<span id="aew-cli-status">Remote CLI (HTTP)</span>' +
+                      '<label class="aew-cli-tool-label">Tool' +
+                        '<select id="aew-cli-tool" class="aew-cli-select">' +
+                          '<option value="grok">Grok CLI</option>' +
+                          '<option value="ollama">Ollama</option>' +
+                          '<option value="shell">Shell</option>' +
+                        '</select>' +
+                      '</label>' +
+                      '<select id="aew-cli-ollama-model" class="aew-cli-select" style="display:none;"></select>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-clear" title="Clear output">Clear</button>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-pty-switch" title="Interactive PTY (Twiggy :3001)" style="display:none;">PTY</button>' +
+                    '</div>' +
+                    '<div class="aew-cli-help" id="aew-cli-http-help">' +
+                      '<strong>HTTP CLI</strong> — Grok, Ollama, and shell over HTTPS. Works remotely on ' +
+                      '<code>workstation.local:3000</code> / <code>workstation.zero:3000</code>. ' +
+                      'Grok uses xAI API when the local binary is unavailable.' +
+                    '</div>' +
+                    '<div class="aew-cli-history-container">' +
+                      '<pre class="aew-cli-output" id="aew-cli-output">Ready. Pick Grok, Ollama, or Shell, then enter a prompt or command.</pre>' +
+                    '</div>' +
+                    '<div class="aew-cli-input-row">' +
+                      '<textarea id="aew-cli-input" rows="2" placeholder="Grok prompt, Ollama question, or shell command (e.g. ls -la lib)"></textarea>' +
+                      '<button type="button" class="aew-btn aew-btn-primary" id="aew-btn-cli-run">Run</button>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="aew-cli-panel" id="aew-cli-pty-panel" style="display:none;">' +
+                    '<div class="aew-cli-header">' +
+                      '<span id="aew-cli-pty-status">Workstation PTY</span>' +
                       '<button type="button" class="aew-btn" id="aew-cli-reconnect" title="Reconnect shell">Reconnect</button>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-http-switch" title="Back to HTTP CLI">HTTP</button>' +
                     '</div>' +
                     '<div class="aew-cli-help" id="aew-cli-help">' +
-                      '<strong>Dev server required:</strong> CLI needs Twiggy WebSockets. ' +
-                      'Run on the workstation: ' +
+                      '<strong>Twiggy required:</strong> Interactive PTY needs WebSockets. ' +
                       '<code id="aew-cli-cmd">cd Comserv &amp;&amp; CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r</code> ' +
                       '<button type="button" class="aew-btn" id="aew-cli-copy-cmd" title="Copy start command">Copy</button>' +
-                      '<span class="aew-cli-help-note"> · Open <code>http://172.30.131.126:3001</code> as Shanta</span>' +
+                      '<span class="aew-cli-help-note"> · Open <code>http://workstation.local:3001</code> as Shanta</span>' +
                     '</div>' +
                     '<div class="aew-cli-terminal-wrap" id="aew-cli-terminal-wrap">' +
                       '<div id="aew-cli-terminal"></div>' +
                     '</div>' +
                     '<div class="aew-cli-denied" id="aew-cli-denied" style="display:none;">' +
-                      'Coding terminal is only available to Shanta at <strong>http://172.30.131.126:PORT/</strong>.' +
+                      'PTY terminal requires Shanta on <strong>workstation.local</strong>, <strong>workstation.zero</strong>, or <strong>172.30.131.126</strong>.' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
@@ -333,6 +364,260 @@
         var cliFitAddon = null;
         var cliWebSocket = null;
         var cliScriptsLoaded = false;
+        var cliHttpInitialized = false;
+
+        function appendCliOutput(text) {
+            var outputEl = q('#aew-cli-output');
+            if (!outputEl) return;
+            outputEl.textContent += text;
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+
+        function setCliHttpStatus(text, color) {
+            var el = q('#aew-cli-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color || '#9cdcfe';
+        }
+
+        function updateCliToolUi() {
+            var toolEl = q('#aew-cli-tool');
+            var modelEl = q('#aew-cli-ollama-model');
+            if (!toolEl) return;
+            state.cliTool = toolEl.value || 'grok';
+            if (modelEl) {
+                modelEl.style.display = state.cliTool === 'ollama' ? 'inline-block' : 'none';
+            }
+            var inputEl = q('#aew-cli-input');
+            if (inputEl) {
+                if (state.cliTool === 'grok') {
+                    inputEl.placeholder = 'Grok prompt (uses xAI API or local grok binary)';
+                } else if (state.cliTool === 'ollama') {
+                    inputEl.placeholder = 'Question for Ollama (via Comserv AI backend)';
+                } else {
+                    inputEl.placeholder = 'Shell command in project root (e.g. ls -la lib, git status)';
+                }
+            }
+        }
+
+        function populateCliOllamaModels(cfg) {
+            var modelEl = q('#aew-cli-ollama-model');
+            if (!modelEl) return;
+            modelEl.innerHTML = '';
+            var models = (cfg && cfg.installed_models) || [];
+            if (!models.length && cfg && cfg.current_model) {
+                models = [cfg.current_model];
+            }
+            if (!models.length) {
+                var opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '(default model)';
+                modelEl.appendChild(opt);
+                return;
+            }
+            models.forEach(function(m) {
+                var name = (typeof m === 'string') ? m : (m.name || m.model || '');
+                if (!name) return;
+                var opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                if (cfg.current_model && name === cfg.current_model) opt.selected = true;
+                modelEl.appendChild(opt);
+            });
+        }
+
+        function switchCliPanel(mode) {
+            state.cliMode = mode === 'pty' ? 'pty' : 'http';
+            var httpPanel = q('#aew-cli-http-panel');
+            var ptyPanel = q('#aew-cli-pty-panel');
+            if (httpPanel) httpPanel.style.display = state.cliMode === 'http' ? 'flex' : 'none';
+            if (ptyPanel) ptyPanel.style.display = state.cliMode === 'pty' ? 'flex' : 'none';
+            if (state.cliMode === 'pty') {
+                setTimeout(function() { initCliPtyTerminal(); }, 50);
+            } else {
+                disconnectCliTerminal();
+                var inputEl = q('#aew-cli-input');
+                if (inputEl) inputEl.focus();
+            }
+        }
+
+        function runHttpCli() {
+            var inputEl = q('#aew-cli-input');
+            var runBtn = q('#aew-btn-cli-run');
+            if (!inputEl || !runBtn) return;
+            var text = (inputEl.value || '').trim();
+            if (!text) return;
+
+            inputEl.disabled = true;
+            runBtn.disabled = true;
+            var tool = state.cliTool || (q('#aew-cli-tool') || {}).value || 'grok';
+            var prefix = tool === 'grok' ? 'grok> ' : (tool === 'ollama' ? 'ollama> ' : '$ ');
+            appendCliOutput('\n' + prefix + text + '\n');
+            setCliHttpStatus('Running…', '#ffc107');
+
+            var done = function() {
+                inputEl.disabled = false;
+                runBtn.disabled = false;
+                inputEl.value = '';
+                inputEl.focus();
+                setCliHttpStatus('Remote CLI (HTTP)', '#9cdcfe');
+            };
+
+            if (tool === 'grok') {
+                var modelEl = q('#aew-model');
+                var selectedModel = modelEl ? modelEl.value : '';
+                var body = 'prompt=' + encodeURIComponent(text)
+                    + '&model=' + encodeURIComponent(selectedModel);
+                fetch('/ai/grok_cli', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body,
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        appendCliOutput((data.response || data.stdout || '(no output)') + '\n');
+                        if (data.backend) appendCliOutput('[backend: ' + data.backend + ']\n');
+                    } else {
+                        var err = data.error || 'Grok failed';
+                        if (data.hint) err += '\n' + data.hint;
+                        if (data.stderr) err += '\n' + data.stderr;
+                        appendCliOutput('Error: ' + err + '\n');
+                    }
+                })
+                .catch(function(e) {
+                    appendCliOutput('Network error: ' + e + '\n');
+                })
+                .finally(done);
+                return;
+            }
+
+            if (tool === 'ollama') {
+                var ollamaModelEl = q('#aew-cli-ollama-model');
+                var ollamaModel = ollamaModelEl ? ollamaModelEl.value : '';
+                if (!ollamaModel && state.modelTiers.small) ollamaModel = state.modelTiers.small;
+                fetch('/ai/generate', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: text,
+                        provider: 'ollama',
+                        model: ollamaModel || undefined,
+                        agent_id: 'coding',
+                    }),
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        appendCliOutput((data.response || data.text || '(no output)') + '\n');
+                        if (data.model) appendCliOutput('[model: ' + data.model + ']\n');
+                    } else {
+                        appendCliOutput('Error: ' + (data.error || 'Ollama request failed') + '\n');
+                    }
+                })
+                .catch(function(e) {
+                    appendCliOutput('Network error: ' + e + '\n');
+                })
+                .finally(done);
+                return;
+            }
+
+            fetch('/ai/run_command', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'command=' + encodeURIComponent(text),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    appendCliOutput((data.output || '(no output)') + '\n[exit ' + data.exit_code + ']\n');
+                } else {
+                    appendCliOutput('Error: ' + (data.error || 'Command failed') + '\n');
+                }
+            })
+            .catch(function(e) {
+                appendCliOutput('Network error: ' + e + '\n');
+            })
+            .finally(done);
+        }
+
+        function updateCliHttpHelp() {
+            var help = q('#aew-cli-http-help');
+            if (!help) return;
+            var cfg = state.editorConfig || {};
+            var parts = [
+                '<strong>HTTP CLI</strong> — Grok, Ollama, and shell over HTTPS. Works remotely on ',
+                '<code>workstation.local:3000</code> / <code>workstation.zero:3000</code>.'
+            ];
+            if (cfg.grok_mode === 'xai_api') {
+                parts.push(' Grok uses xAI API (no local binary needed).');
+            } else if (cfg.grok_cli) {
+                parts.push(' Grok uses local binary when available, else xAI API.');
+            }
+            if (cfg.ollama_reachable && cfg.ollama_host) {
+                parts.push(' Ollama: ' + escapeHtml(cfg.ollama_host) + ':' + (cfg.ollama_port || 11434) + '.');
+            } else {
+                parts.push(' Ollama via Comserv backend (host may be unreachable from Docker).');
+            }
+            if (!cfg.interactive_ws_available) {
+                parts.push(' Shell runs in the app container on :3000; use PTY on :3001 for host shell.');
+            }
+            help.innerHTML = parts.join('');
+        }
+
+        function initCliHttp() {
+            if (cliHttpInitialized) {
+                updateCliToolUi();
+                updateCliHttpHelp();
+                return;
+            }
+            cliHttpInitialized = true;
+            updateCliHttpHelp();
+            var toolEl = q('#aew-cli-tool');
+            if (toolEl) {
+                toolEl.onchange = updateCliToolUi;
+                toolEl.value = state.cliTool || 'grok';
+            }
+            updateCliToolUi();
+            var runBtn = q('#aew-btn-cli-run');
+            if (runBtn) runBtn.onclick = runHttpCli;
+            var inputEl = q('#aew-cli-input');
+            if (inputEl) {
+                inputEl.onkeydown = function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        runHttpCli();
+                    }
+                };
+            }
+            var clearBtn = q('#aew-cli-clear');
+            if (clearBtn) {
+                clearBtn.onclick = function() {
+                    var outputEl = q('#aew-cli-output');
+                    if (outputEl) outputEl.textContent = 'Ready.\n';
+                };
+            }
+            var ptySwitch = q('#aew-cli-pty-switch');
+            if (ptySwitch) {
+                ptySwitch.style.display = state.interactiveWsAvailable ? 'inline-block' : 'none';
+                ptySwitch.onclick = function() { switchCliPanel('pty'); };
+            }
+            var httpSwitch = q('#aew-cli-http-switch');
+            if (httpSwitch) httpSwitch.onclick = function() { switchCliPanel('http'); };
+        }
+
+        function initCliPanel() {
+            if (!state.enabled) return;
+            initCliHttp();
+            if (state.cliMode === 'pty' && state.interactiveWsAvailable) {
+                switchCliPanel('pty');
+            } else {
+                switchCliPanel('http');
+            }
+        }
 
         function getFitAddonCtor() {
             if (window.FitAddon && window.FitAddon.FitAddon) return window.FitAddon.FitAddon;
@@ -406,7 +691,7 @@
         }
 
         function setCliStatus(text, color) {
-            var el = q('#aew-cli-status');
+            var el = q('#aew-cli-pty-status') || q('#aew-cli-status');
             if (!el) return;
             el.textContent = text;
             el.style.color = color || '#9cdcfe';
@@ -536,7 +821,7 @@
             }
         }
 
-        function initCliTerminal() {
+        function initCliPtyTerminal() {
             var wrap = q('#aew-cli-terminal-wrap');
             var denied = q('#aew-cli-denied');
             if (!wrap) return;
@@ -544,7 +829,7 @@
             if (!state.codingTerminalAllowed) {
                 wrap.style.display = 'none';
                 if (denied) denied.style.display = 'block';
-                setCliStatus('Shanta @ 172.30.131.126 only', '#ff6b6b');
+                setCliStatus('Shanta @ workstation only', '#ff6b6b');
                 showCliHelp(true);
                 return;
             }
@@ -631,7 +916,7 @@
             q('#aew-tab-chat-content').classList.remove('active-tab');
             q('#aew-tab-deploy-content').classList.remove('active-tab');
             setTimeout(function() {
-                initCliTerminal();
+                initCliPanel();
             }, 50);
         };
 
@@ -643,18 +928,20 @@
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         state.codingTerminalAllowed = !!data.allowed;
+                        state.interactiveWsAvailable = !!data.interactive_ws_available;
+                        state.cliMode = data.cli_mode || state.cliMode;
                         if (!data.allowed) {
-                            setCliStatus('Denied: open http://172.30.131.126:' + (window.location.port || '3001'), '#ff6b6b');
+                            setCliStatus('Denied: use workstation.local or workstation.zero', '#ff6b6b');
                             return;
                         }
-                        initCliTerminal();
+                        initCliPtyTerminal();
                     })
-                    .catch(function() { initCliTerminal(); });
+                    .catch(function() { initCliPtyTerminal(); });
                 return;
             }
             disconnectCliTerminal();
             setTimeout(function() {
-                initCliTerminal();
+                initCliPtyTerminal();
             }, 100);
         };
 
@@ -2482,12 +2769,17 @@
         state.ollamaHost = cfg.ollama_host || '';
         state.codingTerminalAllowed = !!cfg.coding_terminal_allowed;
         state.codingTerminalWs = cfg.coding_terminal_ws || '/coding/terminal_ws';
+        state.editorConfig = cfg;
+        state.cliMode = cfg.cli_mode || (cfg.interactive_ws_available ? 'pty' : 'http');
+        state.interactiveWsAvailable = !!cfg.interactive_ws_available;
+        if (!state.interactiveWsAvailable) state.cliMode = 'http';
         if (cfg.model_tiers) {
             state.modelTiers.small = cfg.model_tiers.small || '';
             state.modelTiers.large = cfg.model_tiers.large || '';
         }
         buildDom();
         populateModels(cfg);
+        populateCliOllamaModels(cfg);
         loadPastConversations();
         var diagHtml = '<details style="font-size:0.75rem; color:#dcdcaa; cursor:pointer;">' +
             '<summary style="font-weight:bold; outline:none; color:#dcdcaa;">🔌 Remote Connection Info (Click to Expand)</summary>' +

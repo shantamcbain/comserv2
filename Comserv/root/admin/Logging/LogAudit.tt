@@ -265,7 +265,7 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
                     </td>
                     <td style="padding:6px 10px;border:1px solid #ddd;white-space:nowrap;font-size:0.88em;">
                         [% srv.last_seen | html %]
-                        [% IF srv.tz_offset %]<br><small style="color:#6c757d;" title="Timestamp is [% srv.tz_offset %] min ahead — server timezone differs from DB (likely UTC vs local)">⏱ UTC offset ~[% (srv.tz_offset / 60).int %]h</small>
+                        [% IF srv.tz_offset %][% SET tz_hours = srv.tz_offset / 60 %]<br><small style="color:#6c757d;" title="Timestamp is [% srv.tz_offset %] min ahead — server timezone differs from DB (likely UTC vs local)">⏱ UTC offset ~[% tz_hours.int %]h</small>
                         [% ELSIF srv.minutes_ago == 0 %]<br><small style="color:#28a745;">just now</small>
                         [% ELSIF srv.minutes_ago < 60 %]<br><small style="color:#666;">[% srv.minutes_ago %] min ago</small>
                         [% ELSE %]<br><small style="color:#888;">[% srv.minutes_ago %] min ago</small>

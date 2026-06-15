@@ -1,0 +1,84 @@
+[% META title = 'Newsletters' %]
+
+<div class="app-container">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+            <h1>Newsletters</h1>
+            <p style="color:var(--text-muted-color);margin:0.3em 0 0;">
+                Named publications and their issues for <strong>[% sitename %]</strong>
+            </p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            [% IF is_admin %]
+                <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-primary">Manage Newsletters</a>
+            [% END %]
+            <a href="[% c.uri_for('/mail/subscribe') %]" class="btn btn-secondary">Subscribe</a>
+        </div>
+    </div>
+
+    [% IF publication_tree && publication_tree.size %]
+    [% FOREACH pub IN publication_tree %]
+    <section class="nl-archive-pub" style="margin:28px 0;border:1px solid var(--border-color,#ddd);border-radius:10px;overflow:hidden;">
+        <div style="padding:18px 20px;background:var(--bg-secondary,#f0f4ff);border-bottom:1px solid var(--border-color,#c5d0e8);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div>
+                    <h2 style="margin:0 0 6px;font-size:1.2em;">[% pub.title | html %]</h2>
+                    [% IF pub.description %]
+                    <p style="margin:0;font-size:0.92em;color:var(--text-muted-color);max-width:52em;line-height:1.5;">
+                        [% pub.description | html %]
+                    </p>
+                    [% END %]
+                    <p style="margin:8px 0 0;font-size:0.82em;color:var(--text-muted-color);">
+                        [% pub.nl_audience | html %]
+                        [% IF pub.is_shared %]
+                        &middot; hosted by [% pub.host_sitename | html %]
+                        [% ELSE %]
+                        &middot; [% pub.sitename | html %]
+                        [% END %]
+                    </p>
+                </div>
+                <a href="[% pub.subscribe_url %]" class="btn btn-secondary" style="font-size:0.9em;">
+                    Subscribe
+                </a>
+            </div>
+        </div>
+
+        [% IF pub.issues && pub.issues.size %]
+        <div style="padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+            [% FOREACH issue IN pub.issues %]
+            <a href="[% c.uri_for('/page', issue.page_code) %]"
+               style="display:block;padding:14px;border:1px solid var(--border-color,#ddd);border-radius:8px;
+                      text-decoration:none;color:inherit;background:#fff;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                    <span style="font-size:0.78em;font-weight:bold;color:var(--primary-color,#1565c0);
+                                 background:#e8f0fe;padding:2px 8px;border-radius:10px;">
+                        Issue [% issue.nl_version %]
+                    </span>
+                    <span style="font-size:0.78em;color:var(--text-muted-color);">
+                        [% IF issue.is_public %]Public[% ELSE %]&#128274; [% issue.roles | html %][% END %]
+                    </span>
+                </div>
+                <strong style="display:block;line-height:1.35;">[% issue.display_label | html %]</strong>
+                [% IF issue.description %]
+                <p style="font-size:0.88em;color:var(--text-muted-color);margin:6px 0 0;">[% issue.description | html %]</p>
+                [% END %]
+                <span style="font-size:0.8em;color:var(--text-muted-color);">[% issue.updated_at %]</span>
+            </a>
+            [% END %]
+        </div>
+        [% ELSE %]
+        <p style="padding:16px;margin:0;color:var(--text-muted-color);font-size:0.9em;">No published issues yet.</p>
+        [% END %]
+    </section>
+    [% END %]
+    [% ELSE %]
+    <p style="color:var(--text-muted-color);padding:24px;border:1px dashed var(--border-color,#ddd);border-radius:6px;">
+        No newsletters available for [% sitename %] yet.
+    </p>
+    [% END %]
+
+    <div style="margin-top:28px;padding:16px;background:#e8f4fd;border-radius:6px;text-align:center;">
+        <p style="margin:0 0 10px;">Choose the publications you want — hosting news, DNS news, and more.</p>
+        <a href="[% c.uri_for('/mail/subscribe') %]" class="btn btn-primary">Browse Mailing Lists &amp; Subscribe</a>
+    </div>
+</div>

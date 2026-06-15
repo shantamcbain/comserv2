@@ -435,32 +435,35 @@ sub create_mail_account {
 }
 
 # ── cPanel mailing list API ───────────────────────────────────────────────────
-# Calls the cPanel UAPI /Email/add_list endpoint to create a real mailing list.
-# Config: comserv.conf <cPanel> block — host, username, api_token (or password)
+# Site credentials: site_config cpanel_api (set once in Mail → cPanel Settings).
+# Fallback: comserv.conf <cPanel> block.
 sub _cpanel_ua {
-    my ($self, $c) = @_;
-    my $cfg   = $c->config->{cPanel} || {};
-    my $host  = $cfg->{host}      || 'localhost';
+    my ($self, $c, $site_id) = @_;
+    require Comserv::Util::CpanelConfig;
+    my $cfg = Comserv::Util::CpanelConfig->get($c, $site_id);
+    my $host  = $cfg->{host}      || '';
     my $user  = $cfg->{username}  || '';
     my $token = $cfg->{api_token} || '';
     my $pass  = $cfg->{password}  || '';
+    my $port  = $cfg->{port}      || 2083;
 
     unless ($host && $user && ($token || $pass)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_cpanel_ua',
-            "cPanel credentials not configured in comserv.conf <cPanel> block");
-        return (undef, undef, undef, "cPanel credentials not configured");
+            "cPanel API not configured for site_id=" . ($site_id // 'undef'));
+        return (undef, undef, undef, undef, "cPanel API not configured — set Mail → cPanel Settings");
     }
 
     my $ua = LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 }, timeout => 15);
     my $auth = $token
         ? "cpanel $user:$token"
         : "Basic " . MIME::Base64::encode_base64("$user:$pass", '');
-    return ($ua, $host, $auth, undef);
+    return ($ua, $host, $auth, $port, undef);
 }
 
 sub create_cpanel_list {
     my ($self, $c, %args) = @_;
-    my ($ua, $host, $auth, $err) = $self->_cpanel_ua($c);
+    my $site_id = $args{site_id};
+    my ($ua, $host, $auth, $port, $err) = $self->_cpanel_ua($c, $site_id);
     return (0, $err) unless $ua;
 
     my $list_name = $args{list_name} or return (0, "list_name required");
@@ -469,7 +472,7 @@ sub create_cpanel_list {
     my $prefix    = $args{prefix}    || '';
 
     require URI;
-    my $url = URI->new("https://$host:2083/execute/Email/add_list");
+    my $url = URI->new("https://$host:$port/execute/Email/add_list");
     $url->query_form(
         list     => $list_name,
         domain   => $domain,
@@ -503,14 +506,14 @@ sub create_cpanel_list {
 
 sub subscribe_cpanel_list {
     my ($self, $c, %args) = @_;
-    my ($ua, $host, $auth, $err) = $self->_cpanel_ua($c);
+    my ($ua, $host, $auth, $port, $err) = $self->_cpanel_ua($c, $args{site_id});
     return (0, $err) unless $ua;
 
     my $list_address = $args{list_address} or return (0, "list_address required");
     my $subscriber   = $args{email}        or return (0, "email required");
 
     require URI;
-    my $url = URI->new("https://$host:2083/execute/Email/add_list_subscriber");
+    my $url = URI->new("https://$host:$port/execute/Email/add_list_subscriber");
     $url->query_form(list => $list_address, subscriber => $subscriber);
 
     my $req = HTTP::Request->new(GET => $url->as_string);
@@ -525,14 +528,14 @@ sub subscribe_cpanel_list {
 
 sub unsubscribe_cpanel_list {
     my ($self, $c, %args) = @_;
-    my ($ua, $host, $auth, $err) = $self->_cpanel_ua($c);
+    my ($ua, $host, $auth, $port, $err) = $self->_cpanel_ua($c, $args{site_id});
     return (0, $err) unless $ua;
 
     my $list_address = $args{list_address} or return (0, "list_address required");
     my $subscriber   = $args{email}        or return (0, "email required");
 
     require URI;
-    my $url = URI->new("https://$host:2083/execute/Email/delete_list_subscriber");
+    my $url = URI->new("https://$host:$port/execute/Email/delete_list_subscriber");
     $url->query_form(list => $list_address, subscriber => $subscriber);
 
     my $req = HTTP::Request->new(GET => $url->as_string);

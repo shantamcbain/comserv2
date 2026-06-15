@@ -31,7 +31,7 @@
     </select>
     <button onclick="rescheduleTodos(this)"
             style="padding:3px 8px;border:none;background:transparent;font-size:0.78em;color:#6f42c1;cursor:pointer;white-space:nowrap;"
-            title="Re-schedule todos starting from NOW for selected site(s) and focus">&#9851; Reschedule</button>
+            title="Re-schedule open todos from NOW onward. Each user gets their own timeline (same time OK across users).">&#9851; Reschedule</button>
 </span>
 
 <script>
@@ -39,24 +39,34 @@
     if (window._rescheduleTodosLoaded) return;
     window._rescheduleTodosLoaded = true;
 
-    window.rescheduleTodos = function(btn) {
-        var focusSel = document.getElementById('reschedule-focus');
-        var sitesSel = document.getElementById('reschedule-sites');
-        var focus = focusSel ? focusSel.value : 'all';
+    function _rescheduleSelectedSites() {
         var sites = [];
+        var sitesSel = document.getElementById('reschedule-sites');
         if (sitesSel) {
             var opts = sitesSel.options;
             for (var i = 0; i < opts.length; i++) {
                 if (opts[i].selected && opts[i].value) sites.push(opts[i].value);
             }
         }
+        if (!sites.length) {
+            var gcalSite = document.getElementById('gcal-site-filter');
+            if (gcalSite && gcalSite.value) sites.push(gcalSite.value);
+        }
+        return sites;
+    }
+
+    window.rescheduleTodos = function(btn) {
+        var focusSel = document.getElementById('reschedule-focus');
+        var focus = focusSel ? focusSel.value : 'all';
+        var sites = _rescheduleSelectedSites();
         btn.disabled = true;
         var origText = btn.textContent;
         btn.textContent = 'Rescheduling...';
         fetch('/todo/reschedule', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-            body: JSON.stringify({focus: focus, sites: sites})
+            body: JSON.stringify({focus: focus, sites: sites, scope: 'all'})
         }).then(function(r) { return r.json(); }).then(function(d) {
             if (d.ok) {
                 var labels = {
@@ -83,5 +93,16 @@
             alert('Error: ' + e);
         });
     };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var sitesSel = document.getElementById('reschedule-sites');
+        var gcalSite = document.getElementById('gcal-site-filter');
+        if (!sitesSel || !gcalSite || !gcalSite.value) return;
+        for (var i = 0; i < sitesSel.options.length; i++) {
+            if (sitesSel.options[i].value === gcalSite.value) {
+                sitesSel.options[i].selected = true;
+            }
+        }
+    });
 }());
 </script>

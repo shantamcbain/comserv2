@@ -70,10 +70,15 @@
                         </p>
 
                         [% FOREACH list IN public_lists %]
-                        <div style="border:1px solid var(--border-color);border-radius:6px;padding:var(--spacing-medium);margin-bottom:var(--spacing-small);display:flex;align-items:flex-start;gap:var(--spacing-medium);">
+                        [% SET is_highlight = highlight_list && highlight_list == list.id %]
+                        <div id="list_row_[% list.id %]"
+                             style="border:1px solid [% IF is_highlight %]var(--primary-color,#1565c0)[% ELSE %]var(--border-color)[% END %];
+                                    border-radius:6px;padding:var(--spacing-medium);margin-bottom:var(--spacing-small);
+                                    display:flex;align-items:flex-start;gap:var(--spacing-medium);
+                                    [% IF is_highlight %]background:#f0f4ff;[% END %]">
                             <input type="checkbox" name="list_ids[]" value="[% list.id %]"
                                    id="list_[% list.id %]"
-                                   [% IF subscribed_ids.${list.id} %]checked[% END %]
+                                   [% IF subscribed_ids.${list.id} || is_highlight %]checked[% END %]
                                    style="margin-top:3px;width:18px;height:18px;flex-shrink:0;">
                             <label for="list_[% list.id %]" style="cursor:pointer;">
                                 <strong>[% list.name | html %]</strong>
@@ -113,3 +118,11 @@
     </div>
 
 </div>
+[% IF highlight_list %]
+<script>
+(function() {
+    var row = document.getElementById('list_row_[% highlight_list %]');
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+})();
+</script>
+[% END %]

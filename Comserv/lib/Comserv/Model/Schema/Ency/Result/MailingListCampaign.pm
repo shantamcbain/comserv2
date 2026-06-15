@@ -41,6 +41,28 @@ __PACKAGE__->add_columns(
         data_type => 'integer',
         default_value => 0,
     },
+    page_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    email_teaser => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    status => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 0,
+        default_value => 'sent',
+    },
+    success_count => {
+        data_type     => 'integer',
+        default_value => 0,
+    },
+    fail_count => {
+        data_type     => 'integer',
+        default_value => 0,
+    },
     role_filter => {
         data_type => 'varchar',
         size => 255,
@@ -66,6 +88,11 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     sender => 'Comserv::Model::Schema::Ency::Result::User',
     { 'foreign.id' => 'self.sent_by' },
+);
+
+__PACKAGE__->belongs_to(
+    page => 'Comserv::Model::Schema::Ency::Result::Page',
+    { 'foreign.id' => 'self.page_id' },
 );
 
 1;

@@ -54,12 +54,13 @@
         username: '[% c.session.username || 'Guest' %]',
         isGuest:  [% (c.session.username && !c.session.username.match('^Guest-')) ? 'false' : 'true' %],
         isAdmin:  [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
+        isEditor: [% c.stash.is_editor ? 'true' : 'false' %],
         siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
     };
     </script>
     <script src="/static/js/ai-common.js?v=[% cv %]"></script>
     <script src="/static/js/local-chat.js?v=[% cv %]"></script>
-    [% IF (c.session.username == 'Shanta' || c.session.username == 'shanta') && c.req.uri.host == '172.30.131.126' %]
+    [% IF c.stash.show_code_editor_widget %]
     <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
     <script src="/static/js/ai-editing-widget-float.js?v=20260612i"></script>
     [% END %]

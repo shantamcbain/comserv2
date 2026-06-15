@@ -79,6 +79,7 @@ else
     --env "$PLACK_ENV" \
     --listen "0.0.0.0:$PORT" \
     --workers "$WORKERS" \
+    --timeout 0 \
     --max-requests 1000 \
     --max-requests-jitter 100 \
     "$PSGI_FILE"

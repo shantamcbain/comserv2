@@ -1,18 +1,1 @@
-{
-  "updated_at_utc": "2026-06-13T00:00:00Z",
-  "last_deploy": {
-    "status": "unknown",
-    "at_utc": "",
-    "commit": "c6c0d567",
-    "branch": "main",
-    "commit_subject": "Last known build stamp from version.json — update on next deploy",
-    "deployed_by": "",
-    "target_host": "comservproduction1",
-    "method": "",
-    "build_host": "workstation.computersystemconsulting.ca",
-    "image": "shantamcsbain/comserv-web-prod:latest",
-    "log_file": "",
-    "notes": "Written automatically by docker deploy and deploy.sh on success."
-  },
-  "for_ai": "At session start: read this file and Comserv/version.json. Compare last_deploy.commit to `git rev-parse HEAD`. If HEAD is ahead, production errors may be fixed locally but not deployed yet. Close Application Error Audit todos only after deploy confirms that commit is live."
-}
+{"for_ai":"At session start: read this file and Comserv/version.json. Compare last_deploy.commit to `git rev-parse HEAD`. If HEAD is ahead, production errors may be fixed locally but not deployed yet. Close Application Error Audit todos only after deploy confirms that commit is live.","updated_at_utc":"2026-06-15T02:36:42Z","last_deploy":{"method":"docker_hub","image":"shantamcsbain/comserv-web-prod:latest","target_host":"192.168.1.126","commit_subject":"Make in-app docs canonical; thin .zencoder rules to adapters","at_utc":"2026-06-15T02:36:42Z","commit":"3cd617a2","notes":"Remote deploy.sh trigger failed â cron may deploy within 10 minutes","build_host":"workstation.computersystemconsulting.ca","branch":"main","log_file":"/home/shanta/PycharmProjects/comserv2/deploy-logs/deploy-20260614-192500.log","status":"trigger_failed","deployed_by":"Shanta"}}

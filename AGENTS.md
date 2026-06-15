@@ -12,6 +12,7 @@ Entry point for AI assistants (Cursor, Continue, Zencoder, etc.) working on this
 | **Theme authoring** | `Comserv/root/static/config/theme_definitions.json`, `/Documentation/CssThemes`, `/Documentation/ThemeConfig` |
 | **Template compliance** | `/Documentation/ApplicationTtTemplate`, `/Documentation/DocumentationTtTemplate` |
 | **Logging** | `Comserv/lib/Comserv/Util/Logging.pm` (checklist), `/Documentation/logging_best_practices` |
+| **Documentation / feature guides** | `/Documentation/DevelopmentStandards#doc-compliance`, `/Documentation/newsletter_feature_guide_workflow` |
 | **YAML consolidation** | `Comserv/root/coding-standards-comserv.yaml` |
 | **Repo layout & tasks** | `.zencoder/rules/repo.md` (project overview; defers to in-app docs for TT/theme/logging detail) |
 
@@ -78,3 +79,11 @@ Template compliance steps:
 4. **Verify mentally** across site themes (CSC, USBM, apis/BMaster) — variables adapt; literals do not
 
 Each `.tt` edit should leave the touched page more consistent site-to-site and theme-to-theme.
+
+## Documentation compliance (lightweight)
+
+1. **Code changes** → append **`/Documentation/CHANGELOG`** (single file; no new `YYYY-MM-DD-*.tt`)
+2. **Member how-to** → edit stable **`Documentation/guides/*.tt`** in place, or `page_type=feature_guide`
+3. **.tt vs DB vs both** → decide ad hoc per topic (`/Documentation/newsletter_feature_guide_workflow`)
+
+Legacy per-file changelogs: `/Documentation/all_changelog` (read-only). Full rules: **`/Documentation/DevelopmentStandards#doc-compliance`**

@@ -2,6 +2,7 @@ package Comserv::Controller::Planning;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AccessControl;
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoTypes qw(recurring_matches_date);
 use Comserv::Model::Ollama;
@@ -289,6 +290,43 @@ sub daily :Path('/planning/daily') :Args {
         $todos_for_today = \@deduped_today;
     }
 
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        if ($schema) {
+            my %ensure_users;
+            my $me = $c->session->{username} // '';
+            $ensure_users{$me} = $c->session->{user_id} if $me && $c->session->{user_id};
+            for my $todo (@$todos_for_today) {
+                my $u = eval { $todo->username_of_poster } // eval { $todo->developer } // '';
+                next unless $u;
+                next if $ensure_users{$u};
+                my $user = $schema->resultset('User')->search(
+                    { username => $u }, { rows => 1 }
+                )->first;
+                $ensure_users{$u} = $user->id if $user;
+            }
+            for my $u (keys %ensure_users) {
+                my $uid = $ensure_users{$u};
+                next unless $uid;
+                $self->_ensure_break_todos($c, $schema, $u, $uid, $sitename, $selected_date);
+            }
+            my %seen_ids = map { $_->record_id => 1 } @$todos_for_today;
+            my %fixed_cond = ( start_date => $selected_date, is_fixed => 1 );
+            my $cal_site = $c->session->{cal_filter_site} // '';
+            if ($cal_site) {
+                $fixed_cond{sitename} = $cal_site;
+            } elsif (!$is_csc) {
+                $fixed_cond{sitename} = $sitename;
+            }
+            my @fixed_today = $schema->resultset('Todo')->search(\%fixed_cond)->all;
+            for my $ft (@fixed_today) {
+                next if $seen_ids{ $ft->record_id };
+                $seen_ids{ $ft->record_id } = 1;
+                push @$todos_for_today, $ft;
+            }
+        }
+    };
+
     # Convert todos_for_today to plain hashrefs with precomputed display fields.
     # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
     # column access, and lets us embed top_px/height/start_min/time_lbl directly.
@@ -303,19 +341,38 @@ sub daily :Path('/planning/daily') :Args {
         if ($tod =~ /^(\d{1,2}):(\d{2})/) { $h = int($1); $m = int($2); }
 
         my $start_min = $h * 60 + $m;
-        my $est_mins  = $row{estimated_man_hours} // 0;
-        $est_mins = 30 unless $est_mins > 0;
+        my $work_mins = $row{estimated_man_hours} // 0;
+        $work_mins = 30 unless $work_mins > 0;
+
+        my $is_fixed_item = ($row{is_fixed} // 0)
+            || ($row{is_recurring} // 0)
+            || ($row{todo_type} // '') =~ /^(appointment|meeting)$/;
+
+        my $lbl_end = $start_min + $work_mins;
+        my $se_raw = $row{scheduled_end} // '';
+        $se_raw = ref($se_raw) ? $se_raw->strftime('%Y-%m-%d %H:%M:%S') : "$se_raw";
+        if ($se_raw =~ /(?:\s|T)(\d{1,2}):(\d{2})/) {
+            my $sched_end = int($1) * 60 + int($2);
+            $lbl_end = $sched_end if $sched_end > $start_min;
+        } elsif ($se_raw =~ /^(\d{1,2}):(\d{2})/) {
+            my $sched_end = int($1) * 60 + int($2);
+            $lbl_end = $sched_end if $sched_end > $start_min;
+        }
+
+        my $est_mins = $is_fixed_item ? ($lbl_end - $start_min) : $work_mins;
+        $est_mins = 15 if $est_mins < 15;
+        my $end_min = $lbl_end;
 
         my $top_px = $start_min - $GRID_START_MIN;
         $top_px = 0    if $top_px < 0;
         $top_px = 1000 if $top_px > 1000;
         my $height = $est_mins < 15 ? 15 : $est_mins;
         $height = 900 if $height > 900;
-        my $end_min = $start_min + $est_mins;
 
         $row{top_px}    = $top_px;
         $row{height}    = $height;
         $row{start_min} = $start_min;
+        $row{end_min}   = $end_min;
         $row{est_mins}  = $est_mins;
         $row{time_lbl}  = sprintf('%02d:%02d-%02d:%02d', $h, $m,
                               int($end_min/60) % 24, $end_min % 60);
@@ -651,24 +708,11 @@ sub daily :Path('/planning/daily') :Args {
 
         my @ap_all_usernames;
         eval {
-            if ($is_csc) {
-                my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                    { roles => { '!=' => '', -not => undef } },
-                    { columns => ['username'], order_by => 'username' }
-                )->all;
-                my %seen;
-                for my $r (@urows) {
-                    my $u = eval { $r->username } // '';
-                    push @ap_all_usernames, $u if $u && !$seen{$u}++;
-                }
-            } else {
-                my %seen;
-                for my $todo (@all_sorted) {
-                    my $u = $todo->{developer} || $todo->{username_of_poster} || '';
-                    push @ap_all_usernames, $u if $u && !$seen{$u}++;
-                }
-                @ap_all_usernames = sort @ap_all_usernames;
-            }
+            my $filter_site = exists $c->session->{cal_filter_site}
+                ? ($c->session->{cal_filter_site} // '') : '';
+            my $site_for_users = $filter_site || $sitename;
+            my $ac = Comserv::Util::AccessControl->new();
+            @ap_all_usernames = @{ $ac->active_usernames_for_site($c, $site_for_users) };
         };
 
         $c->stash(
@@ -1603,18 +1647,6 @@ sub _daily_log_action {
 sub _ensure_break_todos {
     my ($self, $c, $schema, $username, $user_id, $sitename, $today) = @_;
 
-    my $existing_count = 0;
-    eval {
-        $existing_count = $schema->resultset('Todo')->search(
-            { sitename           => $sitename,
-              username_of_poster => $username,
-              start_date         => $today,
-              is_fixed           => 1,
-              subject            => [ { -like => '%Break%' }, { -like => '%Lunch%' } ] }
-        )->count;
-    };
-    return if $existing_count;
-
     my @breaks = (
         { subject => "\x{2615} Morning Break",   time_of_day => '10:00:00', dur => 15 },
         { subject => "\x{1F957} Lunch",           time_of_day => '12:00:00', dur => 60 },
@@ -1622,6 +1654,17 @@ sub _ensure_break_todos {
     );
 
     for my $brk (@breaks) {
+        my $already = 0;
+        eval {
+            $already = $schema->resultset('Todo')->search(
+                { sitename           => $sitename,
+                  username_of_poster => $username,
+                  start_date         => $today,
+                  is_fixed           => 1,
+                  time_of_day        => $brk->{time_of_day} }
+            )->count;
+        };
+        next if $already;
         my ($hh, $mm) = $brk->{time_of_day} =~ /^(\d+):(\d+)/;
         my $end_min = $hh * 60 + $mm + $brk->{dur};
         my $end_str = sprintf('%02d:%02d:00', int($end_min / 60), $end_min % 60);
@@ -1632,7 +1675,7 @@ sub _ensure_break_todos {
                 due_date             => $today,
                 subject              => $brk->{subject},
                 description          => 'Scheduled break',
-                estimated_man_hours  => 0,
+                estimated_man_hours  => $brk->{dur},
                 project_code         => 'daily',
                 project_id           => 1,
                 user_id              => $user_id,

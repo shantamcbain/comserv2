@@ -24,6 +24,13 @@ use lib $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
 use Comserv;
 use Plack::Builder;
 
+# Survives plackup -R restarts: marks Twiggy mode for WebSocket terminal detection.
+my $_app_root = $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
+if (-f "$_app_root/var/twiggy.enabled") {
+    $ENV{COMSERV_TWIGGY}         = '1';
+    $ENV{PLACK_SERVER_SOFTWARE} ||= 'Twiggy';
+}
+
 my $app = Comserv->psgi_app;
 
 my $wrapped = builder {

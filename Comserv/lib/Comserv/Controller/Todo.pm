@@ -6,6 +6,7 @@ use DateTime::Format::ISO8601;
 use Data::Dumper;
 use JSON::MaybeXS;
 use Comserv::Util::Logging;
+use Comserv::Util::AccessControl;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
@@ -1968,24 +1969,11 @@ sub day :Path('/todo/day') :Args {
 
     my @day_all_usernames;
     eval {
-        if ($day_is_csc) {
-            my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                { roles => { '!=' => '', -not => undef } },
-                { columns => ['username'], order_by => 'username' }
-            )->all;
-            my %seen;
-            for my $r (@urows) {
-                my $u = eval { $r->username } // '';
-                push @day_all_usernames, $u if $u && !$seen{$u}++;
-            }
-        } else {
-            my %seen;
-            for my $t (@today_todos, @overdue_todos) {
-                my $u = eval { $t->developer || $t->username_of_poster || '' };
-                push @day_all_usernames, $u if $u && !$seen{$u}++;
-            }
-            @day_all_usernames = sort @day_all_usernames;
-        }
+        my $filter_site = exists $c->session->{cal_filter_site}
+            ? ($c->session->{cal_filter_site} // '') : '';
+        my $site_for_users = $filter_site || ($c->session->{SiteName} // '');
+        my $ac = Comserv::Util::AccessControl->new();
+        @day_all_usernames = @{ $ac->active_usernames_for_site($c, $site_for_users) };
     };
 
     my %active_todos;
@@ -2131,24 +2119,11 @@ sub week :Path('/todo/week') :Args {
     my $week_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
     my @week_all_usernames;
     eval {
-        if ($week_is_csc) {
-            my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                { roles => { '!=' => '', -not => undef } },
-                { columns => ['username'], order_by => 'username' }
-            )->all;
-            my %seen;
-            for my $r (@urows) {
-                my $u = eval { $r->username } // '';
-                push @week_all_usernames, $u if $u && !$seen{$u}++;
-            }
-        } else {
-            my %seen;
-            for my $t (@sorted_todos) {
-                my $u = eval { $t->developer || $t->username_of_poster || '' };
-                push @week_all_usernames, $u if $u && !$seen{$u}++;
-            }
-            @week_all_usernames = sort @week_all_usernames;
-        }
+        my $filter_site = exists $c->session->{cal_filter_site}
+            ? ($c->session->{cal_filter_site} // '') : '';
+        my $site_for_users = $filter_site || ($c->session->{SiteName} // '');
+        my $ac = Comserv::Util::AccessControl->new();
+        @week_all_usernames = @{ $ac->active_usernames_for_site($c, $site_for_users) };
     };
 
     # Add the todos to the stash
@@ -2762,6 +2737,29 @@ sub _is_recurring {
     return ($subject // '') =~ /\b(lunch|break|standup|daily.standup|morning.break|afternoon.break|morning break|afternoon break)\b/i;
 }
 
+sub _fixed_event_duration_mins {
+    my ($fe) = @_;
+    my $est = $fe->estimated_man_hours // 0;
+    return $est if $est > 0;
+
+    my $ss = $fe->scheduled_start // '';
+    my $se = $fe->scheduled_end   // '';
+    $ss = ref($ss) ? $ss->strftime('%Y-%m-%d %H:%M:%S') : "$ss";
+    $se = ref($se) ? $se->strftime('%Y-%m-%d %H:%M:%S') : "$se";
+    if ($ss =~ /(\d{1,2}):(\d{2})/) {
+        my $start_abs = int($1) * 60 + int($2);
+        if ($se =~ /(\d{1,2}):(\d{2})/) {
+            my $diff = int($1) * 60 + int($2) - $start_abs;
+            return $diff if $diff > 0;
+        }
+    }
+
+    my $subj = lc($fe->subject // '');
+    return 60 if $subj =~ /\blunch\b/;
+    return 15 if $subj =~ /\bbreak\b/;
+    return 30;
+}
+
 sub _estimate_mins_heuristic {
     my ($subject) = @_;
     my $s = lc($subject // '');
@@ -2790,10 +2788,147 @@ sub _sched_work_end {
     return $cursor + $remaining;
 }
 
+sub _reschedule_classify_roles {
+    my ($project_name, $project_code, $subject) = @_;
+    my $text = lc(join(' ', grep { defined $_ && $_ ne '' }
+        $project_name // '', $project_code // '', $subject // ''));
+    my @roles;
+    push @roles, 'editor'
+        if $text =~ /\b(ency|encyclopedia|document|content|wiki|article|unresolved|constituent|glossary|editorial|text.?content|page.?content|data.?entry|accounting|invoice|ledger|payroll)\b/;
+    push @roles, 'admin'
+        if $text =~ /\b(helpdesk|help.desk|ticket|server.?health|health.?monitor|disk|security|backup|smtp|certificate|ssl|dns|network|deploy|docker|container|production.?server|prod.?server)\b/;
+    push @roles, 'developer'
+        if $text =~ /\b(catalyst|schema|database|db|migration|module|controller|api|script|perl|javascript|js|css|html|refactor|implement|debug|build|3d.?print|inventory|shop|workshop|membership|planning|points|comserv|infrastructure|upgrade|fix|test|code|system|json|endpoint|programming)\b/;
+    push @roles, 'general' unless @roles;
+    return join(',', @roles);
+}
+
+sub _reschedule_matches_focus {
+    my ($todo, $focus, $proj_info) = @_;
+    return 1 if !$focus || $focus eq 'all';
+    my $subj = $todo->subject // '';
+    if ($focus eq 'errors') {
+        return $subj =~ /^\[Error\]|Morning Audit/i;
+    }
+    my ($pname, $pcode) = ('', '');
+    if ($todo->project_id && $proj_info && ref($proj_info) eq 'HASH') {
+        my $p = $proj_info->{ $todo->project_id };
+        if ($p && ref($p) eq 'HASH') {
+            $pname = $p->{name}         // '';
+            $pcode = $p->{project_code} // '';
+        }
+    }
+    my $roles = _reschedule_classify_roles($pname, $pcode, $subj);
+    return $roles =~ /\bdeveloper\b/ if $focus eq 'programming';
+    return $roles =~ /\beditor\b/    if $focus eq 'accounting';
+    return 1;
+}
+
+sub _reschedule_date_ymd {
+    my ($val) = @_;
+    return '' unless defined $val && $val ne '';
+    $val = $val->ymd if ref $val && eval { $val->can('ymd') };
+    return length($val) >= 10 ? substr($val, 0, 10) : "$val";
+}
+
+sub _reschedule_time_min {
+    my ($todo) = @_;
+    my $tod = $todo->time_of_day // '';
+    $tod = ref($tod) ? sprintf('%02d:%02d', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+    return 9 * 60 unless $tod =~ /^(\d{1,2}):(\d{2})/;
+    return $1 * 60 + $2;
+}
+
+sub _reschedule_clamp_day_min {
+    my ($abs_min) = @_;
+    return 0    if !defined $abs_min || $abs_min < 0;
+    return 1439 if $abs_min >= 1440;    # 23:59 — MySQL rejects 24:00:00
+    return int($abs_min);
+}
+
+sub _reschedule_abs_to_time_str {
+    my ($abs_min) = @_;
+    $abs_min = _reschedule_clamp_day_min($abs_min);
+    return sprintf('%02d:%02d:00', int($abs_min / 60), $abs_min % 60);
+}
+
+sub _reschedule_abs_to_datetime {
+    my ($date, $abs_min) = @_;
+    $abs_min = _reschedule_clamp_day_min($abs_min);
+    return sprintf('%s %02d:%02d:00', $date, int($abs_min / 60), $abs_min % 60);
+}
+
+sub _reschedule_clamp_priority {
+    my ($p) = @_;
+    $p = 5 unless defined $p && $p =~ /^-?\d+$/;
+    $p = int($p);
+    $p = 9 if $p > 9;
+    $p = 1 if $p < 1;
+    return $p;
+}
+
+# Match Planning.pm rules for which todos appear on a given calendar day.
+sub _reschedule_on_calendar_date {
+    my ($todo, $view_date, $is_today) = @_;
+    return 0 unless $view_date;
+    my $sd = _reschedule_date_ymd($todo->start_date);
+    my $dd = _reschedule_date_ymd($todo->due_date);
+    return 1 if $sd && $sd eq $view_date;
+    return 1 if !$sd && $dd && $dd eq $view_date;
+    return 1 if $is_today && $sd && $sd lt $view_date;
+    return 1 if $is_today && !$sd && $dd && $dd lt $view_date;
+    return 1 if $is_today && !$sd && !$dd;
+    return 0;
+}
+
+sub _reschedule_request_opts {
+    my ($c) = @_;
+    my %opts = (
+        focus      => 'all',
+        scope      => 'all',
+        date       => '',
+        user       => '',
+        sites      => [],
+        record_ids => [],
+    );
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    if ($body && $body =~ /\S/) {
+        eval {
+            require JSON;
+            my $data = JSON::decode_json($body);
+            if (ref($data) eq 'HASH') {
+                $opts{focus} = $data->{focus} // 'all';
+                $opts{scope} = $data->{scope} // 'all';
+                $opts{date}  = $data->{date}  // '';
+                $opts{user}  = $data->{user}  // '';
+                if (ref($data->{sites}) eq 'ARRAY') {
+                    $opts{sites} = [grep { defined $_ && length $_ } @{ $data->{sites} }];
+                }
+                if (ref($data->{record_ids}) eq 'ARRAY') {
+                    $opts{record_ids} = [
+                        grep { defined $_ && $_ =~ /^\d+$/ }
+                        map  { 0 + $_ } @{ $data->{record_ids} }
+                    ];
+                }
+            }
+        };
+    }
+    return \%opts;
+}
+
 sub _do_reschedule {
     my ($self, $c) = @_;
 
     require POSIX;
+    my $req        = _reschedule_request_opts($c);
+    my $req_focus  = $req->{focus} // 'all';
+    my $req_scope  = $req->{scope} // 'all';
+    my $req_date   = $req->{date}  // '';
+    my $req_user   = $req->{user}  // '';
+    my @req_sites  = @{ $req->{sites} // [] };
+    my @req_ids    = @{ $req->{record_ids} // [] };
+    my $calendar_scope = ($req_scope eq 'calendar');
     my $username   = $c->session->{username} // '';
     my $sitename   = $c->session->{SiteName} // '';
     my $roles      = $c->session->{roles} || [];
@@ -2804,8 +2939,17 @@ sub _do_reschedule {
     my $now_epoch  = time();
     my $today_dt   = DateTime->now(time_zone => 'local');
     my $today      = $today_dt->ymd;
+    my $view_date  = ($req_date && $req_date =~ /^\d{4}-\d{2}-\d{2}$/) ? $req_date : $today;
     my $count      = 0;
     my @errors;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule.start',
+        sprintf(
+            'user=%s scope=%s view_date=%s today=%s focus=%s sites=[%s] user_filter=%s record_ids=%d csc=%s',
+            $username, $req_scope, $view_date, $today, $req_focus,
+            join(',', @req_sites), ($req_user || '-'), scalar(@req_ids),
+            $is_csc ? 'yes' : 'no'
+        ));
 
     eval {
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
@@ -2870,7 +3014,8 @@ sub _do_reschedule {
             {
                 columns => [qw(record_id start_date time_of_day
                                estimated_man_hours is_recurring
-                               todo_type recurrence_rule subject)],
+                               todo_type recurrence_rule subject
+                               scheduled_start scheduled_end)],
             }
         )->all;
 
@@ -2897,39 +3042,77 @@ sub _do_reschedule {
                 my $tod = $fe->time_of_day // '';
                 next unless $tod =~ /^(\d{1,2}):(\d{2})/;
                 my $abs_start = $1 * 60 + $2;
-                my $dur = ($fe->estimated_man_hours // 0) || 30;
+                my $dur = _fixed_event_duration_mins($fe);
                 push @intervals, [$abs_start, $abs_start + $dur];
             }
             $blocked_cache{$date_str} = [sort { $a->[0] <=> $b->[0] } @intervals];
             return $blocked_cache{$date_str};
         };
 
-        # Build project sort_order lookup
-        my %proj_sort;
+        # Build project sort_order + name lookup
+        my (%proj_sort, %proj_info);
         {
             my @pids = grep { defined $_ && $_ > 0 } map { $_->project_id } @rows;
             if (@pids) {
                 my @projs = $c->model('DBEncy')->resultset('Project')->search(
                     { id => { -in => \@pids } },
-                    { columns => [qw(id sort_order)] }
+                    { columns => [qw(id sort_order name project_code)] }
                 )->all;
-                %proj_sort = map { $_->id => ($_->sort_order // 9999) } @projs;
+                for my $p (@projs) {
+                    $proj_sort{ $p->id } = $p->sort_order // 9999;
+                    $proj_info{ $p->id } = {
+                        name         => $p->name         // '',
+                        project_code => $p->project_code // '',
+                    };
+                }
             }
         }
 
         # Deduplicate by record_id (OR queries can return same row twice)
         { my %seen; @rows = grep { !$seen{$_->record_id}++ } @rows; }
 
-        # Sort order: error-fixing first, then blocking, then project priority,
-        # then user-assigned priority, then due date.
-        @rows = sort {
-            (($b->subject // '') =~ /^\[Error\]|Morning Audit/i ? 1 : 0)
-                <=> (($a->subject // '') =~ /^\[Error\]|Morning Audit/i ? 1 : 0)
-            || ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
-            || ($proj_sort{ $a->project_id || 0 } // 9999) <=> ($proj_sort{ $b->project_id || 0 } // 9999)
-            || (($a->priority || 9) <=> ($b->priority || 9))
-            || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
-        } @rows;
+        if (@req_sites) {
+            my %site_ok = map { $_ => 1 } @req_sites;
+            @rows         = grep { $site_ok{ $_->sitename // '' } } @rows;
+            @fixed_events = grep { $site_ok{ $_->sitename // '' } } @fixed_events;
+        }
+
+        if ($req_focus && $req_focus ne 'all' && !@req_ids) {
+            @rows = grep { _reschedule_matches_focus($_, $req_focus, \%proj_info) } @rows;
+        }
+
+        if ($calendar_scope) {
+            if (@req_ids) {
+                my %id_ok = map { $_ => 1 } @req_ids;
+                @rows = grep { $id_ok{ $_->record_id } } @rows;
+            } else {
+                my $is_today = ($view_date eq $today);
+                @rows = grep { _reschedule_on_calendar_date($_, $view_date, $is_today) } @rows;
+            }
+            if ($req_user) {
+                @rows = grep {
+                    ($_->developer // '') eq $req_user
+                        || ($_->username_of_poster // '') eq $req_user
+                } @rows;
+            }
+        }
+
+        # Calendar: preserve on-screen time order. Global: priority sort.
+        if ($calendar_scope) {
+            @rows = sort {
+                _reschedule_time_min($a) <=> _reschedule_time_min($b)
+                    || ($a->record_id // 0) <=> ($b->record_id // 0)
+            } @rows;
+        } else {
+            @rows = sort {
+                (($b->subject // '') =~ /^\[Error\]|Morning Audit/i ? 1 : 0)
+                    <=> (($a->subject // '') =~ /^\[Error\]|Morning Audit/i ? 1 : 0)
+                || ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
+                || ($proj_sort{ $a->project_id || 0 } // 9999) <=> ($proj_sort{ $b->project_id || 0 } // 9999)
+                || (($a->priority || 9) <=> ($b->priority || 9))
+                || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
+            } @rows;
+        }
 
         # Pre-fetch average log durations per todo (in minutes)
         my %log_duration_mins;
@@ -2962,16 +3145,29 @@ sub _do_reschedule {
         # Work window: 05:00–22:00 (matches calendar grid)
         my $WORK_START_MIN = 5 * 60;   # 300
         my $WORK_END_MIN   = 22 * 60;  # 1320 — 10 PM (calendar spans 5 AM–10 PM)
-        my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
+        my $sched_end_min  = $calendar_scope ? (23 * 60 + 59) : $WORK_END_MIN;
+        my $sched_day_mins = $sched_end_min - $WORK_START_MIN;
 
-        my $init_dt = $today_dt->clone;
+        my $init_dt;
+        if ($calendar_scope) {
+            $init_dt = DateTime->new(
+                year      => substr($view_date, 0, 4),
+                month     => substr($view_date, 5, 2),
+                day       => substr($view_date, 8, 2),
+                time_zone => 'local',
+            );
+        } else {
+            $init_dt = $today_dt->clone;
+        }
 
         # For today, start from NOW (current minute within the day window).
-        # If before 5 AM, start from 5 AM. If past 10 PM, roll to next day at 5 AM.
+        # If before 5 AM, start from 5 AM. If past end, roll to next day at 5 AM.
         my $now_total_min = $today_dt->hour * 60 + $today_dt->minute;
         my $init_slot_min;
-        if ($now_total_min >= $WORK_END_MIN) {
-            $init_dt->add(days => 1);
+        if ($calendar_scope && $view_date ne $today) {
+            $init_slot_min = 0;
+        } elsif ($now_total_min >= $sched_end_min) {
+            $init_dt->add(days => 1) unless $calendar_scope;
             $init_slot_min = 0;
         } else {
             $init_slot_min = $now_total_min > $WORK_START_MIN
@@ -2979,9 +3175,9 @@ sub _do_reschedule {
                 : 0;
         }
 
-        # Group todos by site (skip fixed/recurring). Each site gets its own
-        # independent timeline so same-site todos never share a time slot.
-        my %todos_by_site;
+        # Group todos by site+assignee lane (skip fixed/recurring). Each user at a
+        # site gets an independent timeline so different users may share a slot.
+        my %todos_by_lane;
         for my $todo (@rows) {
             my $is_rec   = $todo->can('is_recurring') ? ($todo->is_recurring // 0) : 0;
             my $is_fixed = $todo->can('is_fixed')     ? ($todo->is_fixed     // 0) : 0;
@@ -2990,16 +3186,28 @@ sub _do_reschedule {
                  || $ttype eq 'appointment' || $ttype eq 'meeting';
             my $site = eval { $todo->sitename } // '';
             $site = '_none' unless defined $site && length $site;
-            push @{ $todos_by_site{$site} }, $todo;
+            my $user = $todo->developer // $todo->username_of_poster // '';
+            $user = '_unassigned' unless defined $user && length $user;
+            my $lane = $site . "\0" . $user;
+            push @{ $todos_by_lane{$lane} }, $todo;
         }
 
-        # Schedule each site independently — same starting cursor for every site
-        # so cross-site todos may share time slots but same-site todos never overlap.
-        for my $site (sort keys %todos_by_site) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule.queue',
+            sprintf(
+                'calendar=%s rows=%d lanes=%d init_slot_min=%d sched_end=%02d:%02d',
+                $calendar_scope ? 'yes' : 'no',
+                scalar(@rows),
+                scalar(keys %todos_by_lane),
+                $init_slot_min,
+                int($sched_end_min / 60), $sched_end_min % 60
+            ));
+
+        # Schedule each lane independently from the same NOW cursor.
+        for my $lane (sort keys %todos_by_lane) {
             my $cur_dt       = $init_dt->clone;
             my $cur_slot_min = $init_slot_min;
 
-            for my $todo (@{ $todos_by_site{$site} }) {
+            for my $todo (@{ $todos_by_lane{$lane} }) {
                 # Duration: prefer log avg > stored > heuristic, min 5 min
                 my $stored_mins    = $todo->estimated_man_hours // 0;
                 my $heuristic_mins = exists $log_duration_mins{ $todo->record_id }
@@ -3009,12 +3217,16 @@ sub _do_reschedule {
                 $est_mins = 5 if $est_mins < 5;
 
                 # Roll to next work day if cursor is at or past end of work day
-                if ($cur_slot_min >= $WORK_DAY_MINS) {
-                    $cur_dt->add(days => 1);
-                    $cur_slot_min = 0;
+                if ($cur_slot_min >= $sched_day_mins) {
+                    if ($calendar_scope) {
+                        $cur_slot_min = $sched_day_mins - 1;
+                    } else {
+                        $cur_dt->add(days => 1);
+                        $cur_slot_min = 0;
+                    }
                 }
 
-                my $new_start = $cur_dt->ymd;
+                my $new_start = $calendar_scope ? $view_date : $cur_dt->ymd;
                 my $blocked   = $get_blocked->($new_start);
 
                 # If cursor lands inside a fixed event (e.g. midway through lunch),
@@ -3033,44 +3245,57 @@ sub _do_reschedule {
                 }
 
                 # If advancing pushed us past end of day, roll to next day
-                if ($slot_abs >= $WORK_END_MIN) {
-                    $cur_dt->add(days => 1);
-                    $cur_slot_min = 0;
-                    $new_start = $cur_dt->ymd;
-                    $blocked   = $get_blocked->($new_start);
-                    $slot_abs  = $WORK_START_MIN;
+                if ($slot_abs >= $sched_end_min) {
+                    if ($calendar_scope) {
+                        $slot_abs = $sched_end_min - 1;
+                        $cur_slot_min = $slot_abs - $WORK_START_MIN;
+                    } else {
+                        $cur_dt->add(days => 1);
+                        $cur_slot_min = 0;
+                        $new_start = $cur_dt->ymd;
+                        $blocked   = $get_blocked->($new_start);
+                        $slot_abs  = $WORK_START_MIN;
+                    }
                 } else {
                     $cur_slot_min = $slot_abs - $WORK_START_MIN;
                 }
 
-                my $new_time_str = sprintf('%02d:%02d:00',
-                    int($slot_abs / 60), $slot_abs % 60);
+                $slot_abs = _reschedule_clamp_day_min($slot_abs);
+                my $new_time_str = _reschedule_abs_to_time_str($slot_abs);
 
                 # scheduled_end: work through any fixed events that fall within
                 # the work period (e.g. todo wrapping lunch gets +60 min gap).
                 my $end_abs_min  = _sched_work_end($slot_abs, $est_mins, $blocked);
-                my $end_capped   = $end_abs_min > $WORK_END_MIN ? $WORK_END_MIN : $end_abs_min;
-                my $end_time_str = sprintf('%02d:%02d:00',
-                    int($end_capped / 60), $end_capped % 60);
+                my $end_capped   = _reschedule_clamp_day_min(
+                    $end_abs_min > $sched_end_min ? $sched_end_min : $end_abs_min
+                );
+                $end_capped = $slot_abs if $end_capped < $slot_abs;
+                my $end_time_str = _reschedule_abs_to_time_str($end_capped);
 
                 # Next todo starts 1 min after this one's scheduled_end
-                if ($end_abs_min >= $WORK_END_MIN) {
-                    $cur_dt->add(days => 1);
-                    $cur_slot_min = 0;
+                if ($end_abs_min >= $sched_end_min) {
+                    if ($calendar_scope) {
+                        $cur_slot_min = $sched_day_mins - 1;
+                    } else {
+                        $cur_dt->add(days => 1);
+                        $cur_slot_min = 0;
+                    }
                 } else {
                     $cur_slot_min = $end_abs_min - $WORK_START_MIN + 1;
                 }
 
                 # Priority adjustments based on staleness and due date
-                my $new_priority = $todo->priority || 5;
-                my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
-                if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                my $new_priority = _reschedule_clamp_priority($todo->priority || 5);
+                my $activity_str = _reschedule_date_ymd($todo->last_mod_date)
+                    || ($todo->date_time_posted // '');
+                if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
                     my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
                     my $days_stale = int(($now_epoch - $act_epoch) / 86400);
-                    $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
+                    $new_priority  = ($new_priority + 2 <= 9) ? $new_priority + 2 : 9
                         if $days_stale > 180;
                 }
-                if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                my $due_ymd = _reschedule_date_ymd($todo->due_date);
+                if ($due_ymd =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
                     my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
                     my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
                     if ($days_until_due < 0) {
@@ -3081,6 +3306,7 @@ sub _do_reschedule {
                 }
                 $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1
                     if $todo->is_blocking;
+                $new_priority = _reschedule_clamp_priority($new_priority);
 
                 my $est_mins_int = int($est_mins + 0.5) || 5;
 
@@ -3091,21 +3317,48 @@ sub _do_reschedule {
                     my $d = $todo->due_date;
                     $d ? (ref($d) ? $d->ymd : substr("$d", 0, 10)) : '';
                 };
-                $new_start = $todo_due if $todo_due && $new_start gt $todo_due;
+                $new_start = $todo_due
+                    if !$calendar_scope && $todo_due && $new_start gt $todo_due;
 
-                my $ok = eval {
-                    $c->model('DBEncy')->storage->dbh->do(
+                my $sched_start_dt = _reschedule_abs_to_datetime($new_start, $slot_abs);
+                my $sched_end_dt   = _reschedule_abs_to_datetime($new_start, $end_capped);
+                my $rid            = $todo->record_id;
+                my ($rows_affected, $update_err);
+                eval {
+                    $rows_affected = $c->model('DBEncy')->storage->dbh->do(
                         'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?',
                         undef,
                         $new_start, $new_time_str,
-                        "$new_start $new_time_str", "$new_start $end_time_str",
+                        $sched_start_dt, $sched_end_dt,
                         $est_mins_int, $new_priority, 'reschedule', $today,
-                        $todo->record_id
+                        $rid
                     );
+                    die "no row updated" unless $rows_affected && $rows_affected > 0;
                     1;
                 };
-                if (!$ok || $@) {
-                    push @errors, "id=" . $todo->record_id . ": " . ($@ || 'unknown error');
+                if ($@) {
+                    $update_err = "$@";
+                    chomp $update_err;
+                }
+                if ($update_err) {
+                    my $subj = $todo->subject // '';
+                    $subj = substr($subj, 0, 80);
+                    my $detail = sprintf(
+                        'id=%d site=%s dev=%s subject="%s" start=%s time=%s end=%s pri=%s est=%s err=%s',
+                        $rid,
+                        $todo->sitename // '',
+                        $todo->developer // $todo->username_of_poster // '',
+                        $subj,
+                        $new_start,
+                        $new_time_str,
+                        $sched_end_dt,
+                        $new_priority,
+                        $est_mins_int,
+                        $update_err
+                    );
+                    push @errors, $detail;
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reschedule.update',
+                        "FAILED $detail");
                 } else {
                     $count++;
                 }
@@ -3114,10 +3367,19 @@ sub _do_reschedule {
     };
     die $@ if $@;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
-        "Reschedule by $username: $count todos scheduled, " . scalar(@errors) . " errors, from $today forward");
+    my $err_total = scalar @errors;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule.done',
+        sprintf(
+            'user=%s ok=%d failed=%d scope=%s view_date=%s focus=%s',
+            $username, $count, $err_total, $req_scope, $view_date, $req_focus
+        ));
+    if ($err_total) {
+        my $sample = join(' | ', @errors[0 .. ($err_total > 5 ? 4 : $err_total - 1)]);
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'reschedule.errors',
+            "sample_errors: $sample" . ($err_total > 5 ? " | ...and " . ($err_total - 5) . " more" : ''));
+    }
 
-    return ($count, \@errors, $today);
+    return ($count, \@errors, $today, $req_focus, \@req_sites, $req_scope, $view_date);
 }
 
 sub reschedule :Path('reschedule') :Args(0) {
@@ -3138,14 +3400,29 @@ sub reschedule :Path('reschedule') :Args(0) {
     $c->session->{planning_sync_deps} = 1;
 
     require JSON;
-    my ($count, $errors, $today) = eval { $self->_do_reschedule($c) };
+    my ($count, $errors, $today, $focus, $sites, $scope, $view_date) = eval { $self->_do_reschedule($c) };
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reschedule', "Error: $@");
-        $c->response->body('{"ok":0,"error":' . JSON::encode_json("$@") . '}');
+        my $fatal = "$@";
+        chomp $fatal;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reschedule.fatal',
+            "Reschedule aborted for $username: $fatal");
+        $c->response->body('{"ok":0,"error":' . JSON::encode_json($fatal) . '}');
         return;
     }
 
-    $c->response->body('{"ok":1,"count":' . ($count // 0) . ',"error_count":' . scalar(@{$errors // []}) . ',"today":"' . ($today // '') . '","errors":' . JSON::encode_json($errors // []) . '}');
+    my @err_list = @{ $errors // [] };
+    $c->response->body(JSON::encode_json({
+        ok            => JSON::true,
+        count         => $count // 0,
+        error_count   => scalar(@err_list),
+        today         => $today // '',
+        focus         => $focus // 'all',
+        scope         => $scope // 'all',
+        date          => $view_date // '',
+        sites         => $sites // [],
+        errors        => \@err_list,
+        error_samples => [ @err_list[0 .. ($#err_list > 4 ? 4 : $#err_list)] ],
+    }));
 }
 
 sub open_log :Path('open_log') :Args(0) {

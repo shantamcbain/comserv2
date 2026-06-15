@@ -19,6 +19,7 @@ services:
       CATALYST_SERVER_IP: "${CATALYST_SERVER_IP}"
       # NFS resource library path. Dev: local dir; Prod: /data/apis (NFS mount)
       NFS_DATA_PATH: "${NFS_DATA_PATH:-/opt/comserv/workshop_resources}"
+      TTYD_HOST_PORT: "7682"
       # Database credentials from K8s Secrets or .env file (gitignored)
       # Load from: kubernetes secrets -> environment variables -> .env file (local dev)
       # Never use hardcoded defaults in this file - require explicit configuration
@@ -32,6 +33,8 @@ services:
       COMSERV_DB_PRODUCTION_FORAGER_USERNAME: "${COMSERV_DB_PRODUCTION_FORAGER_USERNAME}"
       COMSERV_DB_PRODUCTION_FORAGER_PASSWORD: "${COMSERV_DB_PRODUCTION_FORAGER_PASSWORD}"
       COMSERV_DB_PRODUCTION_FORAGER_DATABASE: "${COMSERV_DB_PRODUCTION_FORAGER_DATABASE:-shanta_forager}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Source code for hot reload during development
       - ./lib:/opt/comserv/lib:delegated
@@ -39,6 +42,8 @@ services:
       - ./root:/opt/comserv/root:delegated
       - ./config:/opt/comserv/config:delegated
       - ./t:/opt/comserv/t:delegated
+      # Shared with host for ttyd start requests + log status (Docker cannot see host :7682)
+      - ./var:/opt/comserv/var:delegated
       # Config (read-only)
       - ./db_config.json:/opt/comserv/db_config.json:ro
       # Override entrypoint to fix permission errors without rebuild

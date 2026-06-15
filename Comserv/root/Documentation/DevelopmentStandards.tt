@@ -103,6 +103,41 @@
         </div>
     </div>
 
+    <div id="doc-compliance" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Documentation compliance (lightweight)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                With every code change: append <a href="/Documentation/CHANGELOG" style="color: var(--link-color);">CHANGELOG</a> (one file).
+                If members/editors see new behaviour, update the stable guide or <code>feature_guide</code> page — same priority as theme/logging fixes when you touch the area.
+            </p>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <thead>
+                    <tr style="background-color: var(--table-header-bg);">
+                        <th style="padding: 8px; border: 1px solid var(--border-color);">Topic</th>
+                        <th style="padding: 8px; border: 1px solid var(--border-color);">Primary location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Code / behaviour change</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>changelog/CHANGELOG.tt</code> — append only; no new dated files</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Member how-to</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);"><code>guides/*.tt</code> (edit in place) or <code>page_type=feature_guide</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">.tt vs DB vs both</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color);">Decide ad hoc — <a href="/Documentation/newsletter_feature_guide_workflow" style="color: var(--link-color);">decision guide</a></td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Legacy per-file changelogs: <a href="/Documentation/all_changelog" style="color: var(--link-color);">all_changelog</a> (read-only archive).
+            </p>
+        </div>
+    </div>
+
     <div id="logging" class="row">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Application logging</h2>

@@ -1,0 +1,142 @@
+[% META title = 'Edit Newsletter' %]
+
+<div class="admin-content">
+    <div class="admin-header" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+            <h1>Edit Newsletter: [% publication.title | html %]</h1>
+            <nav style="font-size:0.9em;color:var(--text-muted-color);">
+                <a href="[% c.uri_for('/mail/newsletters') %]">Newsletters</a> &rsaquo; Edit Publication
+            </nav>
+        </div>
+        <a href="[% c.uri_for('/mail/newsletter/issue/create', { pub => publication.id }) %]" class="btn btn-primary">+ New Issue</a>
+    </div>
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+
+    <div class="admin-card">
+        <form method="POST" action="[% c.uri_for('/mail/newsletter/publication/edit', publication.page_code) %]">
+            <div class="form-group">
+                <label>SiteName</label>
+                <input type="text" disabled class="form-control" value="[% publication.sitename | html %]">
+            </div>
+
+            <div class="form-group">
+                <label for="title">Newsletter name</label>
+                <input type="text" name="title" id="title" required class="form-control"
+                       value="[% publication.title | html %]">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea name="description" id="description" rows="4" required class="form-control">[% publication.description | html %]</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="nl_series">Category</label>
+                <select name="nl_series" id="nl_series" class="form-control">
+                    [% FOREACH s IN newsletter_series %]
+                    <option value="[% s.key %]" [% IF pub_meta.series == s.key %]selected[% END %]>[% s.label | html %]</option>
+                    [% END %]
+                    <option value="custom" [% IF pub_meta.series == 'custom' %]selected[% END %]>Custom</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="nl_visible_to">Visibility</label>
+                <select name="nl_visible_to" id="nl_visible_to" class="form-control">
+                    <option value="hosting_members" [% IF pub_meta.visible_to == 'hosting_members' %]selected[% END %]>Hosting-member SiteNames</option>
+                    <option value="own_site" [% IF pub_meta.visible_to == 'own_site' %]selected[% END %]>This SiteName only</option>
+                    <option value="all" [% IF pub_meta.visible_to == 'all' %]selected[% END %]>Everyone</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="share_with">Share with SiteNames</label>
+                <input type="text" name="share_with" id="share_with" class="form-control"
+                       value="[% publication.share_with | html %]">
+            </div>
+
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select name="status" id="status">
+                    <option value="active" [% IF publication.status == 'active' %]selected[% END %]>Active</option>
+                    <option value="inactive" [% IF publication.status == 'inactive' %]selected[% END %]>Archived</option>
+                </select>
+            </div>
+
+            <fieldset class="form-group" style="border:1px solid var(--border-color,#ddd);border-radius:8px;padding:14px 16px;">
+                <legend style="font-weight:bold;padding:0 6px;">Subscription mailing list</legend>
+                [% IF mailing_list_link.linked %]
+                <div style="margin-bottom:12px;padding:10px 12px;border-radius:6px;
+                    [% IF mailing_list_link.is_public %]background:#e8f5e9;border:1px solid #a5d6a7;
+                    [% ELSE %]background:#fff8e1;border:1px solid #ffe082;[% END %]">
+                    <strong>Linked:</strong> [% mailing_list_link.name | html %]
+                    (id [% mailing_list_link.id %])
+                    [% IF mailing_list_link.is_public %]
+                        &mdash; visible on Subscribe and My Subscriptions
+                    [% ELSE %]
+                        &mdash; <span style="color:#b45309;">not public</span>
+                    [% END %]
+                </div>
+                [% ELSIF mailing_list_link.message %]
+                <div class="alert alert-warning" style="margin-bottom:12px;">[% mailing_list_link.message | html %]</div>
+                [% END %]
+                [% IF !mailing_lists || !mailing_lists.size %]
+                <p style="font-size:0.9em;color:var(--text-muted-color);margin:0 0 12px;">
+                    No mailing lists on [% publication.sitename | html %] yet. Check
+                    <strong>Create a new public list</strong> below and save — it will appear on My Subscriptions.
+                </p>
+                [% END %]
+                [% IF mailing_lists && mailing_lists.size %]
+                <div class="form-group">
+                    <label for="nl_mailing_list_id">Mailing list for this newsletter</label>
+                    <select name="nl_mailing_list_id" id="nl_mailing_list_id" class="form-control">
+                        <option value="">— keep category default ([% pub_meta.mailing_list | html %]) —</option>
+                        [% FOREACH ml IN mailing_lists %]
+                        <option value="[% ml.id %]"
+                            [% IF (pub_meta.mailing_list_id && pub_meta.mailing_list_id == ml.id)
+                                || (!pub_meta.mailing_list_id && pub_meta.mailing_list == ml.name) %]selected[% END %]>
+                            [% ml.name | html %][% IF ml.is_public %] (public)[% ELSE %] (private)[% END %]
+                        </option>
+                        [% END %]
+                    </select>
+                </div>
+                [% END %]
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="create_subscription_list" id="create_subscription_list" value="1">
+                        Create a new public list and link it
+                    </label>
+                </div>
+                <div class="form-group" id="subscription-list-name-wrap" style="display:none;">
+                    <label for="subscription_list_name">New list name</label>
+                    <input type="text" name="subscription_list_name" id="subscription_list_name" class="form-control"
+                           value="[% publication.title | html %]">
+                </div>
+                <p style="font-size:0.85em;color:var(--text-muted-color);margin:8px 0 0;">
+                    <a href="[% c.uri_for('/mail/lists') %]">Manage mailing lists</a>
+                    &middot;
+                    <a href="[% c.uri_for('/mail/subscribe') %]">Preview subscribe page</a>
+                </p>
+            </fieldset>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-secondary">Back</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function() {
+    var createCb = document.getElementById('create_subscription_list');
+    var nameWrap = document.getElementById('subscription-list-name-wrap');
+    if (createCb && nameWrap) {
+        function toggleListName() { nameWrap.style.display = createCb.checked ? 'block' : 'none'; }
+        createCb.addEventListener('change', toggleListName);
+        toggleListName();
+    }
+})();
+</script>

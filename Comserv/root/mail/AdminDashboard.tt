@@ -20,7 +20,8 @@
         </nav>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">+ New Mailing List</a>
+        <a href="[% c.uri_for('/mail/newsletter/create') %]" class="btn btn-primary">+ New Newsletter</a>
+        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-secondary">+ Mailing List</a>
         <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-warning">&#9993; Send Mailout</a>
         <a href="[% c.uri_for('/mail') %]" class="btn btn-secondary">&#8592; Mail Home</a>
     </div>
@@ -77,6 +78,18 @@
         <strong>Send Mailout</strong>
         <div style="font-size:0.85em;color:var(--text-muted-color);">Email members or custom lists</div>
     </a>
+    <a href="[% c.uri_for('/mail/newsletters') %]"
+       style="display:block;padding:14px;background:#e8f5e9;border:1px solid #43a047;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#128240;</div>
+        <strong>Newsletters</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">Create, send &amp; archive page-backed issues</div>
+    </a>
+    <a href="[% c.uri_for('/newsletters') %]"
+       style="display:block;padding:14px;background:#f3e8ff;border:1px solid #9b59b6;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#128214;</div>
+        <strong>Public Archive</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">All newsletters for this site</div>
+    </a>
     <a href="[% c.uri_for('/mail/subscribe') %]"
        style="display:block;padding:14px;background:#f3e8ff;border:1px solid #9b59b6;border-radius:6px;text-decoration:none;color:inherit;">
         <div style="font-size:1.4em;">&#128100;</div>
@@ -88,6 +101,12 @@
         <div style="font-size:1.4em;">&#9881;</div>
         <strong>SMTP Config</strong>
         <div style="font-size:0.85em;color:var(--text-muted-color);">Outbound mail server settings</div>
+    </a>
+    <a href="[% c.uri_for('/mail/cpanel_settings') %]"
+       style="display:block;padding:14px;background:#fff3e0;border:1px solid #ff9800;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#128231;</div>
+        <strong>cPanel API</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">Set once — mailing lists &amp; subscribers</div>
     </a>
     <a href="[% c.uri_for('/user/admin_user_list') %]"
        style="display:block;padding:14px;background:#e8f0fe;border:1px solid #4a90d9;border-radius:6px;text-decoration:none;color:inherit;">

@@ -1,0 +1,265 @@
+[% META title = 'System Information' %]
+[% PageVersion = 'admin/system_info.tt,v 1.10 2026/06/14 shanta Exp' %]
+<script src="/static/js/chart.umd.min.js"></script>
+<script src="/static/js/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<style>
+.si-nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.si-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+.si-card { border:1px solid var(--border-color,#ddd); border-radius:8px; background:var(--card-bg,rgba(255,255,255,.9)); overflow:hidden; }
+.si-card-h { padding:10px 14px; font-weight:600; font-size:.9rem; background:var(--primary-color,#1976d2); color:#fff; }
+.si-card-b { padding:12px 14px; font-size:.85rem; }
+.si-kv { display:grid; grid-template-columns:140px 1fr; gap:4px 12px; margin-bottom:6px; }
+.si-kv dt { color:var(--text-muted-color,#666); font-weight:600; }
+.si-kv dd { margin:0; word-break:break-word; }
+.si-pre { background:#f5f5f5; border:1px solid #e0e0e0; border-radius:4px; padding:8px 10px; font-size:.78rem; overflow-x:auto; white-space:pre-wrap; }
+.si-server-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.si-server-tab { padding:6px 12px; border-radius:4px; border:1px solid #ccc; text-decoration:none; font-size:.82rem; color:inherit; }
+.si-server-tab.active { border-color:var(--primary-color,#1976d2); background:#e3f2fd; font-weight:600; }
+.si-server-tab.offline { opacity:.65; }
+.si-metric-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #eee; }
+.si-level-warn { color:#e65100; }
+.si-level-critical { color:#b71c1c; font-weight:600; }
+.si-install-btn { font-size:.75rem; padding:3px 8px; cursor:pointer; }
+.si-hours-form { display:flex; gap:8px; align-items:center; margin-bottom:12px; font-size:.85rem; }
+.hw-charts-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(520px,1fr)); gap:20px; margin:12px 0 20px; }
+.hw-chart-box { background:var(--card-bg,rgba(255,255,255,.88)); border:1px solid #ddd; border-radius:6px; padding:14px; height:260px; display:flex; flex-direction:column; }
+.hw-chart-box h4 { margin:0 0 6px; font-size:.95em; flex-shrink:0; }
+.hw-chart-wrap { position:relative; flex:1; min-height:0; }
+.log-scroll { max-height:360px; overflow-y:auto; }
+.nowrap { white-space:nowrap; }
+.badge-info { background:#e8f5e9; color:#2e7d32; padding:2px 6px; border-radius:3px; font-size:.8em; }
+.badge-warn { background:#fff3e0; color:#e65100; padding:2px 6px; border-radius:3px; font-size:.8em; }
+.badge-critical { background:#b71c1c; color:#fff; padding:2px 6px; border-radius:3px; font-size:.8em; }
+</style>
+
+<div class="admin-dashboard">
+    <div class="si-nav">
+        <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">&larr; Admin Dashboard</a>
+        <a href="[% c.uri_for('/admin/hardware_monitor') %]" class="btn btn-sm btn-primary">Hardware Monitor</a>
+        <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]" class="btn btn-sm btn-secondary">Disk Health</a>
+    </div>
+
+    <h1 style="margin:0 0 4px">System Information</h1>
+    <p style="color:var(--text-muted-color,#666);font-size:.9rem;margin:0 0 16px">
+        Hardware history, latest metrics, and Catalyst runtime details.
+    </p>
+
+    [% IF error_msg %]
+    <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+
+    [% IF remote_servers.size %]
+    <h2 style="font-size:1rem;margin:0 0 8px">Infrastructure Servers</h2>
+    <div class="si-server-tabs">
+        <a href="[% c.uri_for('/admin/system_info') %]?hours=[% filter_hours || 24 %]"
+           class="si-server-tab[% UNLESS selected_host_ip %] active[% END %]">This host</a>
+        [% FOR srv IN remote_servers %]
+        <a href="[% c.uri_for('/admin/system_info') %]?host=[% srv.ip | uri %]&amp;hours=[% filter_hours || 24 %]"
+           class="si-server-tab[% IF selected_host_ip == srv.ip %] active[% END %][% UNLESS srv.online %] offline[% END %]">
+            [% srv.label %]
+        </a>
+        [% END %]
+    </div>
+    [% END %]
+
+    <form method="get" action="[% c.uri_for('/admin/system_info') %]" class="si-hours-form">
+        [% IF selected_host_ip %]<input type="hidden" name="host" value="[% selected_host_ip | html %]">[% END %]
+        <label>History window:
+            <select name="hours" onchange="this.form.submit()">
+                <option value="2"[% IF filter_hours == 2 %] selected[% END %]>2 hours</option>
+                <option value="6"[% IF filter_hours == 6 %] selected[% END %]>6 hours</option>
+                <option value="24"[% IF filter_hours == 24 %] selected[% END %]>24 hours</option>
+                <option value="72"[% IF filter_hours == 72 %] selected[% END %]>3 days</option>
+                <option value="168"[% IF filter_hours == 168 %] selected[% END %]>7 days</option>
+            </select>
+        </label>
+        <span style="color:#888">Viewing: <strong>[% view_label | html %]</strong></span>
+    </form>
+
+    [% IF hw_db_error %]
+    <div class="alert alert-warning">Hardware metrics DB error: [% hw_db_error | html %]</div>
+    [% END %]
+
+    <h2 style="font-size:1rem;margin:0 0 8px">Metric history — [% view_label || 'This host' | html %]</h2>
+    [% IF history_count %]
+    <p style="font-size:.8rem;color:#666;margin:0 0 8px">[% history_count %] samples in the last [% filter_hours || 24 %]h</p>
+    [% ELSE %]
+    <p style="font-size:.8rem;color:#888;margin:0 0 8px">No samples in the last [% filter_hours || 24 %]h for this host. Check the hardware agent or widen the time window.</p>
+    [% END %]
+    <div id="charts-container" class="hw-charts-grid">
+        <p class="muted">Loading charts&hellip;</p>
+    </div>
+
+    [% IF selected_server %]
+    <div class="si-card" style="margin-bottom:20px">
+        <div class="si-card-h">[% selected_server.label | html %] — latest snapshot</div>
+        <div class="si-card-b">
+            [% IF selected_server.online %]
+            <dl class="si-kv">
+                <dt>Status</dt>
+                <dd>[% IF selected_server.stale %]<span class="si-level-warn">Stale (&gt;2h)</span>[% ELSE %]Online[% END %]</dd>
+                [% IF selected_server.hostname %]
+                <dt>Reported hostname</dt>
+                <dd>[% selected_server.hostname | html %]</dd>
+                [% END %]
+                [% IF selected_server.last_seen %]
+                <dt>Last seen</dt>
+                <dd>[% selected_server.last_seen %]</dd>
+                [% END %]
+            </dl>
+            [% IF selected_server.metrics.size %]
+            [% FOREACH mk IN selected_server.metrics.sort %]
+            [% SET m = selected_server.metrics.$mk %]
+            <div class="si-metric-row">
+                <span>[% mk %][% IF m.text %] <small style="color:#888">([% m.text | html %])</small>[% END %]</span>
+                <span class="[% IF m.level == 'critical' %]si-level-critical[% ELSIF m.level == 'warn' %]si-level-warn[% END %]">
+                    <strong>[% m.value %]</strong>[% IF m.unit %] [% m.unit %][% END %]
+                </span>
+            </div>
+            [% END %]
+            [% ELSE %]
+            <p class="muted">No latest metrics in the last 24h.</p>
+            [% END %]
+            <p style="margin-top:12px;font-size:.8rem">
+                <a href="[% c.uri_for('/admin/hardware_monitor') %]?filter_host=[% (selected_server.hostname || selected_server.ip) | uri %]">
+                    Open full Hardware Monitor &rarr;
+                </a>
+            </p>
+            [% ELSE %]
+            <p>No agent data in the last 24 hours.</p>
+            <button type="button" class="btn btn-sm btn-primary si-install-btn"
+                    data-ip="[% selected_server.ip %]" onclick="installAgent(this)">
+                Install hardware agent on [% selected_server.ip %]
+            </button>
+            <pre id="install-output" class="si-pre" style="display:none;margin-top:8px"></pre>
+            [% END %]
+        </div>
+    </div>
+    [% END %]
+
+    <details open style="margin-bottom:20px">
+        <summary style="cursor:pointer;font-weight:600;font-size:.95rem">
+            History log ([% history_count || 0 %] records, [% filter_hours || 24 %]h)
+        </summary>
+        [% IF history_count %]
+        <div class="log-scroll" style="margin-top:8px">
+        <table class="data-table">
+            <thead>
+                <tr><th>Timestamp</th><th>Host</th><th>Metric</th><th>Value</th><th>Level</th></tr>
+            </thead>
+            <tbody>
+            [% FOR m IN history_metrics %]
+            <tr>
+                <td class="nowrap">[% m.timestamp | html %]</td>
+                <td>[% m.hostname | html %]</td>
+                <td>[% m.metric_name | html %]</td>
+                <td>[% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %] [% m.unit | html %][% END %]
+                    [% ELSIF m.metric_text %][% m.metric_text | html %][% ELSE %]&mdash;[% END %]</td>
+                <td><span class="badge-[% m.level %]">[% m.level | upper %]</span></td>
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
+        </div>
+        [% ELSE %]
+        <p class="muted" style="margin-top:8px">No hardware_metrics rows for this host in the selected window.</p>
+        [% END %]
+    </details>
+
+    [% UNLESS selected_host_ip %]
+    <h2 style="font-size:1rem;margin:0 0 8px">Local Application Host (Catalyst)</h2>
+    <div class="si-grid">
+        <div class="si-card">
+            <div class="si-card-h">Runtime</div>
+            <div class="si-card-b">
+                <dl class="si-kv">
+                    <dt>Perl</dt><dd>[% system_info.perl_version %] (<code>[% system_info.perl_executable | html %]</code>)</dd>
+                    <dt>Catalyst</dt><dd>[% system_info.catalyst_version %]</dd>
+                    <dt>Server</dt><dd>[% system_info.server_software | html %]</dd>
+                    <dt>HTTP Host</dt><dd>[% system_info.http_host | html %]</dd>
+                    <dt>Uptime</dt><dd class="si-pre">[% system_info.system_uptime | html %]</dd>
+                    <dt>Load</dt><dd>[% system_info.system_load | html %]</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="si-card">
+            <div class="si-card-h">Resources</div>
+            <div class="si-card-b">
+                <dl class="si-kv">
+                    <dt>Memory</dt><dd class="si-pre">[% system_info.memory_usage | html %]</dd>
+                    <dt>Disk (cwd)</dt><dd class="si-pre">[% system_info.disk_usage | html %]</dd>
+                    [% IF app_disk %]
+                    <dt>App disk</dt>
+                    <dd>[% app_disk.pct %]% — [% app_disk.used_fmt %] / [% app_disk.total_fmt %]</dd>
+                    [% END %]
+                    [% IF nfs_disk && !nfs_disk.unavailable %]
+                    [% IF nfs_disk.same_device %]
+                    <dt>NFS</dt><dd>Same device as app disk (bind mount)</dd>
+                    [% ELSE %]
+                    <dt>NFS storage</dt>
+                    <dd>[% nfs_disk.pct %]% — [% nfs_disk.used_fmt %] / [% nfs_disk.total_fmt %][% IF nfs_disk.path %] ([% nfs_disk.path | html %])[% END %]</dd>
+                    [% END %]
+                    [% END %]
+                    <dt>Database</dt><dd>[% system_info.database_info | html %]</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="si-card">
+            <div class="si-card-h">Hardware agent ingest</div>
+            <div class="si-card-b">
+                <dl class="si-kv">
+                    <dt>Ingest URL</dt><dd style="font-size:.75rem;word-break:break-all">[% ingest_url | html %]</dd>
+                    <dt>Token</dt><dd><code>[% ingest_token | html %]</code></dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    [% IF perl_envs.size %]
+    <h3 style="font-size:.95rem;margin:16px 0 8px">Perl module lists</h3>
+    <p style="font-size:.8rem;color:#666;margin:0 0 10px">
+        <strong>Loaded</strong> = modules in the running Catalyst process.
+        <strong>Installed</strong> = full site-module list for that Perl binary (perlbrew vs system).
+    </p>
+    [% FOR env IN perl_envs %]
+    <details style="margin-bottom:8px">
+        <summary style="cursor:pointer;font-weight:600">
+            [% env.label | html %] — [% env.modules.size %] modules
+            <span style="font-weight:normal;color:#888;font-size:.8rem">([% env.path | html %], v[% env.version %])</span>
+        </summary>
+        <p style="font-size:.78rem;color:#666;margin:6px 0">[% env.note | html %]</p>
+        <div class="si-pre" style="max-height:280px;overflow-y:auto">
+[% FOREACH pm_module IN env.modules %][% pm_module.name %] [% pm_module.version %]
+[% END %]
+        </div>
+    </details>
+    [% END %]
+    [% END %]
+    [% END %]
+</div>
+
+[% PROCESS 'admin/partials/hw_metric_charts.tt' %]
+
+<script>
+function installAgent(btn) {
+    var ip = btn.getAttribute('data-ip');
+    var out = document.getElementById('install-output');
+    btn.disabled = true;
+    btn.textContent = 'Installing…';
+    if (out) { out.style.display = 'block'; out.textContent = 'Connecting via SSH…'; }
+    fetch('/admin/install_hardware_agent?ip=' + encodeURIComponent(ip), { method: 'POST', credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (out) out.textContent = (data.output || data.error || JSON.stringify(data, null, 2));
+            btn.textContent = data.success ? 'Installed — refresh page' : 'Install failed — retry';
+            btn.disabled = false;
+            if (data.success) setTimeout(function() { location.reload(); }, 2000);
+        })
+        .catch(function(err) {
+            if (out) out.textContent = 'Error: ' + err;
+            btn.textContent = 'Install failed — retry';
+            btn.disabled = false;
+        });
+}
+</script>

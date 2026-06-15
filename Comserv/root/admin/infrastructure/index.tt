@@ -323,6 +323,7 @@
                 <a href="[% c.uri_for('/proxmox') %]" class="btn btn-primary">VM Dashboard</a>
                 <a href="[% c.uri_for('/proxmox/create') %]" class="btn btn-success">Create VM</a>
                 <a href="[% c.uri_for('/proxmox_servers') %]" class="btn btn-secondary">Servers</a>
+                <a href="/Documentation/proxmox_disk_resize_guide" class="btn btn-secondary">Disk Resize How-To</a>
             </div>
         </div>
 

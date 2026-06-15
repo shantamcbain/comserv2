@@ -1,0 +1,212 @@
+[% META title = 'Edit Newsletter' %]
+
+<div class="admin-content">
+    <div class="admin-header" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+            <h1>Edit: [% page.title | html %]</h1>
+            <nav style="font-size:0.9em;color:var(--text-muted-color);">
+                <a href="[% c.uri_for('/mail/newsletters') %]">Newsletters</a> &rsaquo; Edit
+            </nav>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <a href="[% c.uri_for('/page', page.page_code) %]" class="btn btn-secondary">Preview</a>
+            <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-primary">Send Newsletter</a>
+        </div>
+    </div>
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success">
+            [% c.flash.success_msg | html %]
+            [% IF page.status == 'active' || page.status == 'published' %]
+                <span style="margin-left:8px;">
+                    <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-primary btn-sm">Send Newsletter →</a>
+                </span>
+            [% END %]
+        </div>
+    [% END %]
+
+    [% IF page.status == 'active' || page.status == 'published' %]
+    <div class="nl-send-next" style="margin:0 0 16px;padding:14px 18px;border:1px solid var(--border-color,#c5d0e8);border-radius:8px;background:#f0f4ff;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+            <strong>Published online</strong> at <a href="[% c.uri_for('/page', page.page_code) %]" target="_blank">/page/[% page.page_code | html %]</a>.
+            <span style="display:block;font-size:0.9em;color:var(--text-muted-color);margin-top:4px;">
+                Next step: email subscribers a teaser with a link to read the full issue.
+            </span>
+        </div>
+        <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-primary">Send Newsletter →</a>
+    </div>
+    [% ELSIF page.status == 'draft' %]
+    <div style="margin:0 0 16px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary,#f8f9fa);font-size:0.9em;color:var(--text-muted-color);">
+        <strong>Draft</strong> — not in the public archive until you set status to <em>Published</em>.
+        You can still <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]">send email</a> when ready (preview page may stay draft-only).
+    </div>
+    [% END %]
+
+    <div class="admin-card">
+        <form method="POST" action="[% c.uri_for('/mail/newsletter/edit', page.page_code) %]">
+            <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                    <label for="nl_series">Series</label>
+                    <select name="nl_series" id="nl_series" class="form-control">
+                        [% FOREACH s IN newsletter_series %]
+                        <option value="[% s.key %]" [% IF nl_meta.series == s.key %]selected[% END %]>
+                            [% s.label | html %]
+                        </option>
+                        [% END %]
+                        <option value="custom" [% IF nl_meta.series == 'custom' %]selected[% END %]>Custom</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="nl_version">Version</label>
+                    <input type="number" name="nl_version" id="nl_version" min="1" class="form-control"
+                           value="[% nl_meta.version %]">
+                </div>
+            </div>
+            <div class="form-group" id="nl-custom-wrap" [% UNLESS nl_meta.series == 'custom' %]style="display:none;"[% END %]>
+                <label for="nl_custom_label">Custom series name</label>
+                <input type="text" name="nl_custom_label" id="nl_custom_label" class="form-control"
+                       value="[% nl_meta.custom_label | html %]">
+            </div>
+            <p style="font-size:0.88em;color:var(--text-muted-color);margin:-8px 0 12px;">
+                [% IF nl_meta.pub_title %]
+                Newsletter: <strong>[% nl_meta.pub_title | html %]</strong> &middot;
+                [% END %]
+                Issue [% nl_meta.version %]
+                — [% nl_meta.audience_label | html %]
+                · email list: <em>[% nl_meta.mailing_list | html %]</em>
+            </p>
+
+            <div class="form-group">
+                <label for="page_code">Page URL</label>
+                [% IF page.status == 'draft' %]
+                <input type="text" name="page_code" id="page_code" class="form-control"
+                       value="[% page.page_code | html %]" style="font-family:monospace;">
+                <small>Draft only — rename to something readable like <code>hosting-news-v3-2026-06</code>.</small>
+                [% ELSE %]
+                <input type="text" disabled value="/page/[% page.page_code | html %]" class="form-control">
+                [% END %]
+            </div>
+
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" name="title" id="title" required value="[% page.title | html %]" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Summary</label>
+                <textarea name="description" id="description" rows="2" class="form-control">[% page.description | html %]</textarea>
+            </div>
+
+            [% PROCESS 'newsletter/partials/feature_guide_picker.tt' %]
+
+            [% PROCESS 'newsletter/partials/html_editor.tt'
+               body_label    = 'Content'
+               body_required = 1
+               body_content  = page.body
+            %]
+
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select name="status" id="status">
+                    <option value="draft"   [% IF page.status == 'draft'   %]selected[% END %]>Draft</option>
+                    <option value="active"  [% IF page.status == 'active'  %]selected[% END %]>Published</option>
+                    <option value="inactive"[% IF page.status == 'inactive'%]selected[% END %]>Archived</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="roles">Who can read online</label>
+                <select name="roles" id="roles">
+                    <option value="public" [% IF page.roles == 'public' %]selected[% END %]>Public</option>
+                    <option value="member" [% IF page.roles == 'member' %]selected[% END %]>Members only</option>
+                    <option value="admin"  [% IF page.roles == 'admin'  %]selected[% END %]>Admins only</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="share_with">Share with other SiteNames</label>
+                <input type="text" name="share_with" id="share_with" class="form-control"
+                       value="[% page.share_with | html %]"
+                       placeholder="3d, USBM or all">
+                <small>Partner sites see this in their <a href="[% c.uri_for('/newsletters') %]">newsletter archive</a>.</small>
+            </div>
+
+            <div class="form-actions" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                <button type="submit" name="save_only" value="1" class="btn btn-primary">Save</button>
+                <button type="submit" name="go_send" value="1" class="btn btn-success"
+                        title="Save changes then open the email send screen">
+                    Save &amp; Send Email →
+                </button>
+                <a href="[% c.uri_for('/mail/newsletter/send', page.id) %]" class="btn btn-secondary">Send (without saving)</a>
+                <a href="[% c.uri_for('/mail/newsletters') %]" class="btn btn-secondary">Back</a>
+            </div>
+            <p style="margin:8px 0 0;font-size:0.85em;color:var(--text-muted-color);">
+                <strong>Save &amp; Send Email</strong> saves your edits, then opens the screen to set subject, teaser, and mailing list.
+            </p>
+        </form>
+
+        [% SET nl_ai_system = 'You edit a Comserv newsletter at /page/' _ page.page_code _ '. Return ONLY raw JSON: title, description, body.
+PRIMARY SOURCE: FEATURE GUIDES in APPLICATION DATA — add sections from selected guides; keep all <a href> links.
+Do not invent features from git. Preserve good existing content. body = HTML. description = one plain sentence.' %]
+
+        [% PROCESS 'ai/partials/ai_form_assistant.tt'
+           ai_form_entity_label = 'newsletter issue'
+           ai_form_context      = 'editing newsletter page ' _ page.page_code
+           ai_form_fields       = 'title, description, body'
+           ai_form_system       = nl_ai_system
+        %]
+
+        <div style="margin-top:10px;font-size:0.85em;color:var(--text-muted-color);">
+            <strong>AI shortcuts:</strong>
+            <span class="nl-ai-prompt" role="button" tabindex="0"
+                  style="cursor:pointer;margin:0 6px;text-decoration:underline;"
+                  data-prompt="Add sections from FEATURE GUIDES in APPLICATION DATA. Keep all links. No invented features.">add sections from feature guides</span>
+            ·
+            <span class="nl-ai-prompt" role="button" tabindex="0"
+                  style="cursor:pointer;margin:0 6px;text-decoration:underline;"
+                  data-prompt="Add a Planning &amp; Calendar section: what is new on /planning/daily and how hosting customers should use it">add planning guide</span>
+            ·
+            <span class="nl-ai-prompt" role="button" tabindex="0"
+                  style="cursor:pointer;margin:0 6px;text-decoration:underline;"
+                  data-prompt="Add a Newsletters section: how to read, subscribe, and (for editors) create and send issues">add newsletters guide</span>
+        </div>
+
+        <script>
+        (function() {
+            var seriesEl = document.getElementById('nl_series');
+            var customWrap = document.getElementById('nl-custom-wrap');
+            if (seriesEl && customWrap) {
+                seriesEl.addEventListener('change', function() {
+                    customWrap.style.display = seriesEl.value === 'custom' ? 'block' : 'none';
+                });
+            }
+            function guideQuery() {
+                var q = [];
+                document.querySelectorAll('.nl-guide-cb:checked').forEach(function(cb) {
+                    if (cb.value) q.push('guides=' + encodeURIComponent(cb.value));
+                });
+                return q.length ? '?' + q.join('&') : '';
+            }
+            fetch('[% c.uri_for('/mail/newsletter/ai_context') %]' + guideQuery(), { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.ok || !data.context) return;
+                    var meta = document.getElementById('ai-form-meta');
+                    if (!meta) return;
+                    var sys = meta.getAttribute('data-system') || '';
+                    meta.setAttribute('data-system', sys + '\n\nAPPLICATION DATA:\n' + data.context);
+                })
+                .catch(function() {});
+            document.querySelectorAll('.nl-ai-prompt').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var inp = document.getElementById('ai-form-entity-name');
+                    if (inp) inp.value = el.getAttribute('data-prompt') || '';
+                });
+            });
+        })();
+        </script>
+    </div>
+</div>

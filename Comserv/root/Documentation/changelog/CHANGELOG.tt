@@ -1,13 +1,36 @@
-[% META title = 'Changelog' %]
-[% PageVersion = 'Documentation/changelog/CHANGELOG.tt,v 1.01 2025/01/21 system Exp system ' %]
-[% debug %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
+[% META title = 'Comserv Changelog (single file)' %]
+[% PageVersion = 'Documentation/changelog/CHANGELOG.tt,v 2.00 2026/06/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-<h1>Changelog</h1>
+<h1>Comserv Changelog</h1>
+
+<div style="margin:16px 0;padding:12px 16px;border-left:4px solid var(--primary-color,#1565c0);background:var(--bg-secondary,#f5f5f5);">
+    <p><strong>Policy (2026-06):</strong> Append <em>all new code changes</em> here — do not create new <code>YYYY-MM-DD-*.tt</code> changelog files.</p>
+    <ul>
+        <li><strong>Code changes</strong> → this file (<code>/Documentation/CHANGELOG</code>)</li>
+        <li><strong>Member how-to</strong> → stable <code>Documentation/guides/*.tt</code> (update in place) or <code>page.feature_guide</code></li>
+        <li><strong>Pre-2026 per-file history</strong> → read-only archive: <a href="/Documentation/all_changelog">all_changelog</a></li>
+        <li><strong>Where to put docs</strong> → <a href="/Documentation/newsletter_feature_guide_workflow">documentation decision guide</a></li>
+    </ul>
+</div>
+
+<h2>[Unreleased]</h2>
+<p><em>Add bullets here while working; move to a dated section when shipped.</em></p>
+
+<h2>[2026-06-13] — HelpDesk member guide (newsletter / mailing)</h2>
+<ul>
+    <li>Stable guide: <a href="/Documentation/helpdesk-how-to-use">helpdesk-how-to-use</a> — web <code>/HelpDesk/ticket/new</code>, AI prescreen, Chat with AI widget, email <code>[FIRST_NAME]</code> tags.</li>
+</ul>
+
+<h2>[2026-06-13] — Documentation: stable guides + single changelog</h2>
+<ul>
+    <li>Member how-tos moved to <code>Documentation/guides/</code> (<a href="/Documentation/newsletters-how-to-use">newsletters</a>, <a href="/Documentation/planning-how-to-use">planning</a>) — edit in place, not new dated copies.</li>
+    <li>Newsletter picker reads <code>guides/</code> + <code>page.feature_guide</code> only.</li>
+    <li><code>CHANGELOG.tt</code> is the only place for new code-change entries.</li>
+    <li>Documentation JSON UTF-8 load fix; subdirectory .tt lookup for <code>/Documentation/FILENAME</code>.</li>
+</ul>
+
+<h2>Prior history (in this file)</h2>
 
 <h2>[2025-01-21] - Documentation System Overhaul</h2>
 

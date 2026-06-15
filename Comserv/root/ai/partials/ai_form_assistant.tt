@@ -234,8 +234,17 @@
     function getModelAndProvider() {
         var sel = document.getElementById('ai-form-model-sel');
         if (sel && sel.value) {
-            var parts = sel.value.split('|');
-            return { model: parts[0], provider: parts[1] || 'ollama' };
+            var val = sel.value;
+            var pipe = val.lastIndexOf('|');
+            if (pipe > 0) {
+                return {
+                    model: val.substring(0, pipe),
+                    provider: val.substring(pipe + 1) || 'ollama'
+                };
+            }
+            // Fallback when option value lacks |provider suffix (e.g. grok-4.3 alone)
+            var provider = /grok/i.test(val) ? 'grok' : 'ollama';
+            return { model: val, provider: provider };
         }
         return { model: 'mistral:latest', provider: 'ollama' };
     }
@@ -267,10 +276,10 @@
             : 'Return ONLY a raw JSON object. Fields available in this form: ' + fieldList + '. Fill fields you are confident about.';
 
         btn.disabled = true;
-        statusEl.textContent = 'Asking ' + mp.model + '\u2026';
+        statusEl.textContent = 'Asking ' + mp.provider + '/' + mp.model + '\u2026';
         document.getElementById('ai-form-raw').style.display = 'none';
 
-        var timeoutMs = mp.provider === 'grok' ? 45000 : 120000;
+        var timeoutMs = mp.provider === 'grok' ? 90000 : 180000;
         var controller = new AbortController();
         var tid = setTimeout(function() { controller.abort(); }, timeoutMs);
 
@@ -285,13 +294,15 @@
             credentials: 'include',
             signal: controller.signal,
             body: JSON.stringify({
-                prompt:     promptText,
-                system:     SYSTEM,
-                provider:   mp.provider,
-                model:      mp.model,
-                page_path:  window.location.pathname,
-                page_title: document.title,
-                use_search: (mp.provider === 'grok') && useSearch
+                prompt:           promptText,
+                system:           SYSTEM,
+                provider:         mp.provider,
+                model:            mp.model,
+                page_path:        window.location.pathname,
+                page_title:       document.title,
+                page_context:     'form_fill',
+                skip_role_prompt: true,
+                use_search:       (mp.provider === 'grok') && useSearch
             })
         })
         .then(function(r) {

@@ -15,7 +15,9 @@
 # ---------------------------------------------------------------------------
 # Configuration — override via environment or edit here
 # ---------------------------------------------------------------------------
-INGEST_URL="${INGEST_URL:-http://comserv.computersystemconsulting.ca/admin/hardware_monitor/ingest}"
+# Production host: use http://127.0.0.1:5000/... when agent runs on same machine as Docker.
+# Workstation: use http://192.168.1.199:3001/... or set HW_INGEST_BASE_URL in app env.
+INGEST_URL="${INGEST_URL:-http://127.0.0.1:5000/admin/hardware_monitor/ingest}"
 INGEST_TOKEN="${INGEST_TOKEN:-changeme}"
 HOSTNAME_OVERRIDE="${HOSTNAME_OVERRIDE:-}"    # leave blank to auto-detect
 

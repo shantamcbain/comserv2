@@ -38,10 +38,14 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-mail"></i>Mail Services</span>
             <div class="submenu">
+                <a href="/newsletters" class="submenu-link"><i class="icon-mail"></i>Newsletters</a>
                 [% IF c.session.user_id %]
                 <a href="/mail/my_subscriptions" class="submenu-link"><i class="icon-mail"></i>My Email Subscriptions</a>
                 [% ELSE %]
                 <a href="/mail/subscribe" class="submenu-link"><i class="icon-mail"></i>Join Mailing List</a>
+                [% END %]
+                [% IF c.session.roles.grep('(?i)admin').size || c.session.roles.grep('(?i)editor').size %]
+                <a href="/mail/newsletters" class="submenu-link"><i class="icon-edit"></i>Manage Newsletters</a>
                 [% END %]
                 [% IF c.session.username == 'Shanta' %]
                 <a href="http://mail.coop.ca/roundcube/" target="_blank" class="submenu-link"><i class="icon-webmail"></i>COOP Webmail</a>

@@ -52,7 +52,25 @@ pre.dh-pre    { background:#1e1e1e; color:#ddd; padding:12px; border-radius:4px;
     <a href="/admin/hardware_monitor/disk_diagnose?hostname=workstation&path=/" class="btn btn-secondary btn-sm">&#128202; Disk Diagnose</a>
     <a href="/file/duplicates" class="btn btn-secondary btn-sm">&#128461; Duplicates</a>
     <a href="/file/admin_browser" class="btn btn-secondary btn-sm">&#128193; File Browser</a>
+    <button type="button" class="btn btn-warning btn-sm" id="prod-cleanup-btn" onclick="runProductionCleanup()">&#128465; Production Cleanup (SSH)</button>
   </div>
+  <pre id="prod-cleanup-output" class="dh-pre" style="display:none;margin-bottom:12px;max-height:240px;overflow:auto"></pre>
+  <script>
+  function runProductionCleanup() {
+    var btn = document.getElementById('prod-cleanup-btn');
+    var out = document.getElementById('prod-cleanup-output');
+    btn.disabled = true;
+    out.style.display = 'block';
+    out.textContent = 'Running production disk cleanup on 192.168.1.126...';
+    fetch('/admin/production-disk-cleanup?target=production1', { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        out.textContent = (d.output || d.error || JSON.stringify(d));
+        btn.disabled = false;
+      })
+      .catch(function(e){ out.textContent = 'Error: ' + e; btn.disabled = false; });
+  }
+  </script>
 
   [% IF c.flash.success_msg %]
   <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#1b5e20">
@@ -146,12 +164,17 @@ pre.dh-pre    { background:#1e1e1e; color:#ddd; padding:12px; border-radius:4px;
 
     [% IF nfs_usage && nfs_usage.pct %]
     <div style="margin-top:14px;padding-top:10px;border-top:1px solid #eee">
-      <strong>NFS Storage ([% nfs_root | html %]):</strong>
+      <strong>NFS Storage ([% nfs_root | html %][% IF nfs_usage.source %] — [% nfs_usage.source | html %][% END %]):</strong>
       [% nfs_usage.used | html %] used of [% nfs_usage.size | html %]
       ([% nfs_usage.pct %]% — <span class="dh-badge [% nfs_usage.level %]">
         [% nfs_usage.level == 'critical' ? 'CRITICAL' : nfs_usage.level == 'warn' ? 'WARNING' : 'OK' %]
       </span>)
       &nbsp;<a href="/file/admin_browser" class="btn btn-sm btn-secondary">Browse NFS</a>
+    </div>
+    [% ELSIF nfs_usage && nfs_usage.not_separate %]
+    <div style="margin-top:14px;padding-top:10px;border-top:1px solid #eee;color:#888;font-size:.9rem">
+      <strong>NFS Storage ([% nfs_root | html %]):</strong>
+      Path is a local bind mount, not a separate NFS filesystem — stats are shown under App Server Disk only.
     </div>
     [% END %]
   </div>

@@ -527,6 +527,22 @@ catalyst_framework:
     
     [CRITICAL_CONSTRAINT]: "`:Path('/')` in site-specific controllers causes 'all sites return USBM home page' bug"
   
+  documentation_compliance:
+    [SOURCE]: "DevelopmentStandards.tt, newsletter_feature_guide_workflow.tt"
+    mandatory: "Append CHANGELOG.tt on behaviour changes; update stable guides when members/editors affected"
+    changelog:
+      single_file: "Comserv/root/Documentation/changelog/CHANGELOG.tt"
+      url: "/Documentation/CHANGELOG"
+      rule: "No new YYYY-MM-DD-*.tt files — legacy archive via /Documentation/all_changelog"
+    member_howto:
+      stable_tt: "Comserv/root/Documentation/guides/feature-how-to-use.tt (edit in place)"
+      or_page: "page_type=feature_guide at /page/{slug}"
+      ad_hoc: "Choose .tt only, DB only, or both per topic — see newsletter_feature_guide_workflow"
+    in_app_docs:
+      - "/Documentation/DevelopmentStandards#doc-compliance"
+      - "/Documentation/newsletter_feature_guide_workflow"
+      - "/Documentation/CHANGELOG"
+
   logging_requirement:
     [SOURCE]: "controller_routing_guidelines.tt"
     mandatory: "Every controller MUST include logging"

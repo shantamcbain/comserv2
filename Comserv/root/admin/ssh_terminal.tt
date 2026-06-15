@@ -1,0 +1,379 @@
+<!-- File: root/admin/ssh_terminal.tt -->
+[% PageVersion = 'ssh_terminal.tt,v 0.18 2026/06/14 shanta' %]
+
+[% SET page_title = 'System SSH Terminal' %]
+[% SET breadcrumbs = [
+    { label => 'Admin', url => '/admin' },
+    { label => 'SSH Terminal', url => '/admin/ssh_terminal' }
+] %]
+[% SET ttyd_start_href = c.stash.ttyd_start_url || c.uri_for('/admin/ssh_terminal', { start_ttyd => 1 }) %]
+[% SET ttyd_host = c.req.uri.host || '127.0.0.1' %]
+[%# Native dev (3001): iframe hits ttyd :7682 directly. Docker (3000): same-origin proxy. %]
+[% IF c.stash.ttyd_host_mode %]
+    [% SET ttyd_iframe_url = c.uri_for('/admin/ttyd-proxy') %]
+[% ELSE %]
+    [% SET ttyd_iframe_url = 'http://' _ ttyd_host _ ':7682/admin/ttyd-proxy' %]
+[% END %]
+
+<div class="container-fluid">
+    <div class="page-header">
+        <h1><i class="fas fa-terminal"></i> [% page_title %]</h1>
+        <p class="text-muted mb-1">
+            Interactive bash via <strong>ttyd</strong> at
+            <code>[% ttyd_iframe_url %]</code>.
+            [% IF c.stash.ttyd_host_mode %]
+            <span class="d-block small mt-1">
+                <strong>Docker dev (port 3000):</strong> proxied through Comserv (port 3000 only).
+                Keep <code>[% c.stash.ttyd_watcher_cmd %]</code> on the host so <strong>Start ttyd</strong> works.
+            </span>
+            [% ELSE %]
+            <span class="d-block small mt-1">Native dev — terminal loads from <code>:7682</code> on this host.</span>
+            [% END %]
+        </p>
+    </div>
+
+    [% IF c.stash.ttyd_start_result %]
+    <div class="alert alert-[% IF c.stash.ttyd_start_result.success %]success[% ELSE %]danger[% END %]">
+        [% IF c.stash.ttyd_start_result.success %]
+        <strong>ttyd started.</strong>
+        [% ELSE %]
+        <strong>Failed to start ttyd.</strong>
+        [% IF c.stash.ttyd_start_result.error %] [% c.stash.ttyd_start_result.error %][% END %]
+        [% END %]
+        [% IF c.stash.ttyd_start_result.output %]
+        <pre class="small mb-0 mt-2">[% c.stash.ttyd_start_result.output %]</pre>
+        [% END %]
+    </div>
+    [% END %]
+
+    [% UNLESS c.stash.ttyd_reachable && c.stash.ttyd_writable %]
+    <div class="alert alert-warning" id="ttyd-warning">
+        [% IF c.stash.ttyd_reachable && !c.stash.ttyd_writable %]
+        <strong>ttyd is running in read-only mode.</strong> Keyboard input is disabled until ttyd is restarted with <code>-W</code>.
+        [% ELSIF c.stash.ttyd_reachable %]
+        <strong>ttyd reachable but not writable.</strong>
+        [% ELSE %]
+        <strong>ttyd is not running.</strong>
+        [% END %]
+        <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+            <a href="[% ttyd_start_href %]" class="btn btn-sm btn-primary" id="ttyd-start-btn">
+                <i class="fas fa-play"></i> Start ttyd
+            </a>
+            <span class="small text-muted">Starts writable ttyd on this server (no JSON/AJAX).</span>
+        </div>
+        <div class="mt-2 small">
+            [% IF c.stash.ttyd_host_mode %]
+            On the <strong>workstation host</strong> (once): <code>[% c.stash.ttyd_watcher_cmd %]</code>
+            — then use Start ttyd here. Or run <code>[% c.stash.ttyd_start_cmd %]</code> on the host.
+            [% ELSE %]
+            Or from a shell: <code id="ttyd-start-cmd">[% c.stash.ttyd_start_cmd %]</code>
+            <button type="button" id="ttyd-copy-start-cmd" class="btn btn-sm btn-outline-dark ms-1">Copy</button>
+            [% END %]
+            — until ttyd is up, use the <strong>HTTP Commands</strong> tab.
+        </div>
+    </div>
+    [% END %]
+
+    <ul class="nav nav-tabs" id="shell-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="shell-tab-interactive" data-bs-toggle="tab"
+                    data-bs-target="#shell-pane-interactive" type="button" role="tab">
+                <i class="fas fa-keyboard"></i> Interactive shell
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="shell-tab-http" data-bs-toggle="tab"
+                    data-bs-target="#shell-pane-http" type="button" role="tab">
+                <i class="fas fa-code"></i> HTTP commands
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content border border-top-0 rounded-bottom shadow-sm bg-white">
+        <div class="tab-pane fade show active p-0" id="shell-pane-interactive" role="tabpanel">
+            <div class="card border-0">
+                <div class="card-header d-flex flex-wrap align-items-center justify-content-between py-2 gap-2">
+                    <span id="ttyd-connection-status" class="text-muted small">
+                        [% IF c.stash.ttyd_reachable && c.stash.ttyd_writable %]
+                        <i class="fas fa-circle" style="color:#28a745;"></i> ttyd ready — click terminal, then type
+                        [% ELSIF c.stash.ttyd_reachable %]
+                        <i class="fas fa-circle" style="color:#ffc107;"></i> ttyd read-only (click Start ttyd)
+                        [% ELSE %]
+                        <i class="fas fa-circle" style="color:#dc3545;"></i> ttyd not running
+                        [% END %]
+                    </span>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        [% UNLESS c.stash.ttyd_reachable && c.stash.ttyd_writable %]
+                        <a href="[% ttyd_start_href %]" class="btn btn-sm btn-primary" id="ttyd-start-btn-header">
+                            <i class="fas fa-play"></i> Start ttyd
+                        </a>
+                        [% END %]
+                        <a href="[% ttyd_iframe_url %]" target="_blank" rel="noopener"
+                           class="btn btn-sm btn-outline-secondary">Open in new tab</a>
+                        <button type="button" id="ttyd-reload-btn" class="btn btn-sm btn-outline-secondary">Reload</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <iframe id="ttyd-frame"
+                            src="[% ttyd_iframe_url %]/"
+                            title="System shell"
+                            allow="clipboard-read; clipboard-write"
+                            tabindex="0"></iframe>
+                </div>
+            </div>
+            <div class="px-3 py-2 text-muted small border-top">
+                Shell runs on the server as <code>shanta</code>. Click inside the black terminal area first.
+                If the frame is blank, click <strong>Start ttyd</strong> above, then Reload.
+                If you see <strong>Press ⌘ to Reconnect</strong> after idle time, click inside the terminal or use Reload
+                (VPN/Wi‑Fi often drops idle WebSockets after ~2 minutes).
+            </div>
+        </div>
+
+        <div class="tab-pane fade p-3" id="shell-pane-http" role="tabpanel">
+            <p class="text-muted small mb-3">
+                Run one command at a time — output is plain text you can copy (works without ttyd).
+            </p>
+            <div class="input-group mb-2">
+                <span class="input-group-text font-monospace">$</span>
+                <input type="text" id="shell-http-cmd" class="form-control font-monospace"
+                       placeholder="e.g. ls -la lib, git status, whoami" autocomplete="off" spellcheck="false">
+                <button type="button" id="shell-http-run" class="btn btn-primary">Run</button>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button type="button" id="shell-http-copy-sel" class="btn btn-sm btn-outline-primary">Copy selection</button>
+                <button type="button" id="shell-http-copy-all" class="btn btn-sm btn-outline-primary">Copy all output</button>
+                <button type="button" id="shell-http-clear" class="btn btn-sm btn-outline-secondary">Clear</button>
+                <span id="shell-http-status" class="align-self-center text-muted small ms-1"></span>
+            </div>
+            <pre id="shell-http-output" class="command-output shell-http-output" tabindex="0">Ready. Enter a command and click Run.</pre>
+        </div>
+    </div>
+</div>
+
+<style>
+    #ttyd-frame {
+        display: block;
+        width: 100%;
+        height: 80vh;
+        min-height: 400px;
+        border: 0;
+        background: #000;
+    }
+    .shell-http-output {
+        max-height: 70vh;
+        min-height: 280px;
+        user-select: text;
+        cursor: text;
+    }
+</style>
+
+<script>
+(function() {
+    var ttydUrl = '[% ttyd_iframe_url %]';
+    var useProxy = [% IF c.stash.ttyd_host_mode %]true[% ELSE %]false[% END %];
+    var frame = document.getElementById('ttyd-frame');
+    var reloadBtn = document.getElementById('ttyd-reload-btn');
+    var statusEl = document.getElementById('ttyd-connection-status');
+    var justStarted = [% IF c.stash.ttyd_start_result && c.stash.ttyd_start_result.success %]true[% ELSE %]false[% END %];
+    var hostMode = [% IF c.stash.ttyd_host_mode %]true[% ELSE %]false[% END %];
+
+    function setBrowserTtydStatus(ok, detail) {
+        if (!statusEl) return;
+        if (ok) {
+            statusEl.innerHTML = '<i class="fas fa-circle" style="color:#28a745;"></i> ttyd reachable from browser — click terminal, then type';
+            var warn = document.getElementById('ttyd-warning');
+            if (warn) warn.style.display = 'none';
+        } else if (detail) {
+            statusEl.innerHTML = '<i class="fas fa-circle" style="color:#dc3545;"></i> ' + detail;
+        }
+    }
+
+    function reloadTtydFrame() {
+        if (!frame) return;
+        frame.src = ttydUrl + '/?t=' + Date.now();
+    }
+
+    function isSameOriginUrl(url) {
+        try { return new URL(url, window.location.href).origin === window.location.origin; }
+        catch (e) { return false; }
+    }
+
+    function probeTtydUrl(url, done) {
+        if (!url) { done(false); return; }
+        var probe = url + '/?probe=' + Date.now();
+        if (isSameOriginUrl(url)) {
+            fetch(probe, { credentials: 'include' })
+                .then(function(r) { done(r.ok); })
+                .catch(function() { done(false); });
+            return;
+        }
+        /* Direct :7682 — different origin; opaque fetch only tests TCP reachability */
+        fetch(probe, { mode: 'no-cors', credentials: 'omit' })
+            .then(function() { done(true); })
+            .catch(function() { done(false); });
+    }
+
+    function probeTtydFromBrowser() {
+        if (!ttydUrl) return;
+        var finished = false;
+        function finish(ok, detail) {
+            if (finished) return;
+            finished = true;
+            setBrowserTtydStatus(ok, detail);
+        }
+        probeTtydUrl(ttydUrl, function(ok) {
+            if (ok) { finish(true); return; }
+            finish(false, hostMode
+                ? 'Cannot reach ' + ttydUrl + ' — start host ttyd (script/ttyd_comserv_start.sh)'
+                : 'Cannot reach ' + ttydUrl + ' from this browser');
+        });
+        setTimeout(function() {
+            if (!finished) finish(false, 'ttyd connection timed out');
+        }, 8000);
+    }
+
+    if (frame) {
+        frame.addEventListener('load', function() { setBrowserTtydStatus(true); });
+    }
+
+    if (reloadBtn) reloadBtn.addEventListener('click', function() { reloadTtydFrame(); probeTtydFromBrowser(); });
+
+    /* Server picks URL; native uses direct :7682, Docker uses /admin/ttyd-proxy */
+    reloadTtydFrame();
+    probeTtydFromBrowser();
+
+    /* Auto-reload after idle disconnect (ttyd "Press ⌘ to Reconnect" overlay) */
+    var lastReload = Date.now();
+    function maybeReloadAfterIdle() {
+        if (!frame || Date.now() - lastReload < 15000) return;
+        lastReload = Date.now();
+        reloadTtydFrame();
+        probeTtydFromBrowser();
+    }
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) maybeReloadAfterIdle();
+    });
+    window.addEventListener('focus', maybeReloadAfterIdle);
+    if (useProxy) {
+        setInterval(function() {
+            if (!frame) return;
+            fetch(ttydUrl + '/?ka=' + Date.now(), { credentials: 'include', mode: 'no-cors' }).catch(function() {});
+        }, 45000);
+    }
+    if (justStarted) {
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', '[% c.uri_for('/admin/ssh_terminal') %]');
+        }
+        setTimeout(function() { reloadTtydFrame(); probeTtydFromBrowser(); }, 500);
+    }
+
+    function copyText(text, label) {
+        if (!text) return;
+        var btn = document.getElementById('ttyd-copy-start-cmd');
+        function done(ok) {
+            if (!btn) return;
+            var prev = btn.textContent;
+            btn.textContent = ok ? (label + ' copied') : 'Copy failed';
+            setTimeout(function() { btn.textContent = prev; }, 1500);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() { done(true); }).catch(function() { done(false); });
+            return;
+        }
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            done(true);
+        } catch (e) { done(false); }
+    }
+
+    var copyStart = document.getElementById('ttyd-copy-start-cmd');
+    if (copyStart) {
+        copyStart.addEventListener('click', function() {
+            var cmd = document.getElementById('ttyd-start-cmd').textContent;
+            copyText(cmd, 'Start command');
+        });
+    }
+
+    /* HTTP commands — uses shell_run_command when available */
+    var runPath = '/admin/shell_run_command';
+    var outputEl = document.getElementById('shell-http-output');
+    var httpStatusEl = document.getElementById('shell-http-status');
+    var cmdEl = document.getElementById('shell-http-cmd');
+    var httpRunning = false;
+
+    function setHttpStatus(msg, color) {
+        if (!httpStatusEl) return;
+        httpStatusEl.textContent = msg || '';
+        httpStatusEl.style.color = color || '';
+    }
+    function appendOutput(text) {
+        if (!outputEl) return;
+        outputEl.textContent += text;
+        outputEl.scrollTop = outputEl.scrollHeight;
+    }
+    function runHttpCommand() {
+        if (httpRunning || !cmdEl) return;
+        var cmd = (cmdEl.value || '').trim();
+        if (!cmd) { setHttpStatus('Enter a command', '#ffc107'); return; }
+        httpRunning = true;
+        var runBtn = document.getElementById('shell-http-run');
+        if (runBtn) runBtn.disabled = true;
+        appendOutput('\n$ ' + cmd + '\n');
+        setHttpStatus('Running…', '#ffc107');
+        fetch(runPath, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'command=' + encodeURIComponent(cmd)
+        })
+        .then(function(r) {
+            var ct = (r.headers.get('content-type') || '').toLowerCase();
+            if (ct.indexOf('application/json') === -1) {
+                throw new Error('HTTP ' + r.status + ' — server returned HTML, not JSON');
+            }
+            return r.json();
+        })
+        .then(function(data) {
+            if (data.success) {
+                appendOutput((data.output || '(no output)') + '\n[exit ' + data.exit_code + ']\n');
+                setHttpStatus('Done (exit ' + data.exit_code + ')', '#28a745');
+            } else {
+                appendOutput('Error: ' + (data.error || 'Command failed') + '\n');
+                setHttpStatus('Failed', '#dc3545');
+            }
+        })
+        .catch(function(e) {
+            appendOutput('Error: ' + e + '\n');
+            setHttpStatus('Request failed', '#dc3545');
+        })
+        .finally(function() {
+            httpRunning = false;
+            if (runBtn) runBtn.disabled = false;
+            cmdEl.focus();
+        });
+    }
+    document.getElementById('shell-http-run').addEventListener('click', runHttpCommand);
+    document.getElementById('shell-http-copy-sel').addEventListener('click', function() {
+        copyText(window.getSelection ? window.getSelection().toString() : '', 'Selection');
+    });
+    document.getElementById('shell-http-copy-all').addEventListener('click', function() {
+        copyText(outputEl ? outputEl.textContent : '', 'All output');
+    });
+    document.getElementById('shell-http-clear').addEventListener('click', function() {
+        if (outputEl) outputEl.textContent = 'Ready.\n';
+        setHttpStatus('', '');
+    });
+    if (cmdEl) {
+        cmdEl.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); runHttpCommand(); }
+        });
+    }
+})();
+</script>

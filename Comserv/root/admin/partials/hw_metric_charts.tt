@@ -1,0 +1,139 @@
+<script>
+(function() {
+    try {
+    var rawData = [% chart_data_json || '[]' %];
+    if (!Array.isArray(rawData)) { rawData = []; }
+    var container = document.getElementById('charts-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    var COLORS = ['#2196f3','#f44336','#4caf50','#ff9800','#9c27b0','#00bcd4','#795548','#607d8b'];
+    var HOST_COLORS = {
+        'workstation': '#2196f3', 'comservproduction1': '#f44336', 'db-production': '#ff9800'
+    };
+
+    function hostColor(label) {
+        var short = label.replace(/\.computersystemconsulting\.ca$/, '').replace(/\..*$/, '');
+        var prefix = short.split(/\s*\u2013\s*/)[0].trim();
+        if (HOST_COLORS[prefix]) return HOST_COLORS[prefix];
+        var fallback = 0;
+        for (var i = 0; i < prefix.length; i++) fallback += prefix.charCodeAt(i);
+        return COLORS[fallback % COLORS.length];
+    }
+
+    var METRIC_LABELS = {
+        cpu_load_pct: 'CPU Load %', mem_used_pct: 'Memory Used %', swap_used_pct: 'Swap Used %',
+        ipmi_power_consumption: 'Power (W)', ipmi_ps1_current: 'PS1 Current (A)',
+        ipmi_ps2_current: 'PS2 Current (A)', ipmi_inlet_temp: 'Inlet Temperature (°C)'
+    };
+    var METRIC_UNITS = {
+        cpu_load_pct:'%', mem_used_pct:'%', swap_used_pct:'%',
+        ipmi_power_consumption:'W', ipmi_ps1_current:'A', ipmi_ps2_current:'A', ipmi_inlet_temp:'°C'
+    };
+
+    function tsToMs(ts) { return new Date(ts.replace(' ', 'T')).getTime(); }
+
+    function makeDatasets(hostMap) {
+        return Object.keys(hostMap).sort().map(function(host) {
+            var color = hostColor(host);
+            return {
+                label: host,
+                data: hostMap[host].map(function(pt){ return { x: tsToMs(pt[0]), y: pt[1] }; }),
+                borderColor: color, backgroundColor: color + '22',
+                tension: 0.3, fill: false, pointRadius: 2, pointHoverRadius: 5, spanGaps: true
+            };
+        });
+    }
+
+    function makeChart(canvas, hostMap, unit, onClickCb) {
+        new Chart(canvas, {
+            type: 'line',
+            data: { datasets: makeDatasets(hostMap) },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                onClick: onClickCb || null,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: { callbacks: { label: function(item){ return item.dataset.label+': '+item.parsed.y+(unit?' '+unit:''); } } }
+                },
+                scales: {
+                    x: { type: 'time', time: { tooltipFormat: 'MMM d HH:mm', displayFormats: { minute: 'HH:mm', hour: 'HH:mm', day: 'MMM d' } },
+                         ticks: { maxTicksLimit: 8, maxRotation: 30, font: { size: 10 } } },
+                    y: { beginAtZero: false, ticks: { font: { size: 10 } } }
+                }
+            }
+        });
+    }
+
+    function addChart(title, hostMap, unit, onClickCb) {
+        var box = document.createElement('div');
+        box.className = 'hw-chart-box';
+        var h4 = document.createElement('h4');
+        h4.innerHTML = title;
+        box.appendChild(h4);
+        var wrap = document.createElement('div');
+        wrap.className = 'hw-chart-wrap';
+        var canvas = document.createElement('canvas');
+        wrap.appendChild(canvas);
+        box.appendChild(wrap);
+        container.appendChild(box);
+        makeChart(canvas, hostMap, unit, onClickCb);
+    }
+
+    var byMetric = {};
+    rawData.forEach(function(entry){ byMetric[entry.metric] = entry.hosts; });
+    var rendered = 0, powerDone = false;
+
+    rawData.forEach(function(entry) {
+        var metric = entry.metric, hostMap = entry.hosts;
+        if (!hostMap || !Object.keys(hostMap).length) return;
+        if (metric === 'ipmi_power_consumption') {
+            if (!powerDone) { addChart(METRIC_LABELS[metric]||metric, hostMap, 'W'); rendered++; powerDone = true; }
+            return;
+        }
+        if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
+        if (metric.match(/_temp$/)) return;
+        if (metric.match(/^disk_/)) return;
+        addChart(METRIC_LABELS[metric] || metric, hostMap, METRIC_UNITS[metric] || '');
+        rendered++;
+    });
+
+    var diskCombined = {};
+    rawData.forEach(function(entry) {
+        if (!entry.metric.match(/^disk_used_pct/) || !entry.hosts) return;
+        var mountPart = entry.metric.replace(/^disk_used_pct/, '') || '_';
+        var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
+        Object.keys(entry.hosts).forEach(function(host) {
+            var shortHost = host.replace(/\.computersystemconsulting\.ca$/, '').replace(/\..*$/, '');
+            diskCombined[shortHost + ' \u2014 ' + mountLabel] = entry.hosts[host];
+        });
+    });
+    if (Object.keys(diskCombined).length) {
+        addChart('Disk Usage %', diskCombined, '%');
+        rendered++;
+    }
+
+    var combinedTemps = {};
+    rawData.forEach(function(entry) {
+        if (!entry.metric.match(/_temp$/) || !entry.hosts) return;
+        var shortMetric = entry.metric.replace(/_temp$/, '').replace(/_/g, ' ');
+        Object.keys(entry.hosts).forEach(function(host) {
+            var shortHost = host.replace(/\.computersystemconsulting\.ca$/, '').replace(/\..*$/, '');
+            combinedTemps[shortHost + ' \u2013 ' + shortMetric] = entry.hosts[host];
+        });
+    });
+    if (Object.keys(combinedTemps).length) {
+        addChart('Temperatures (\u00b0C)', combinedTemps, '\u00b0C');
+        rendered++;
+    }
+
+    if (!rendered) {
+        container.innerHTML = '<p class="muted">No graph data in the selected time window. Ensure the hardware agent is reporting.</p>';
+    }
+    } catch(e) {
+        var container2 = document.getElementById('charts-container');
+        if (container2) container2.innerHTML = '<p class="muted" style="color:#c00">Chart error: ' + e.message + '</p>';
+    }
+})();
+</script>
