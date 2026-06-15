@@ -332,10 +332,11 @@
                 <div class="cluster-name"><i class="fas fa-shield-alt"></i> OPNsense Gateway</div>
             </div>
             <div class="cluster-info">
-                <div>Firewall rules, DHCP leases, VPN tunnels, interfaces</div>
+                <div>Firewall, DHCP, Unbound DNS, gateway plan &amp; drift</div>
             </div>
             <div class="cluster-actions">
                 <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="btn btn-primary">Open Gateway</a>
+                <a href="[% c.uri_for('/Documentation/system/GatewayPlan') %]" class="btn btn-secondary">Gateway Plan Doc</a>
             </div>
         </div>
 
@@ -347,7 +348,7 @@
                 <div>Manage DNS zones, records, and subdomains</div>
             </div>
             <div class="cluster-actions">
-                <a href="[% c.uri_for('/cloudflare') %]" class="btn btn-primary">DNS Manager</a>
+                <a href="[% c.uri_for('/admin/dns') %]" class="btn btn-primary">DNS Manager</a>
             </div>
         </div>
 

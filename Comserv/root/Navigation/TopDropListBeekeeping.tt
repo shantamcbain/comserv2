@@ -1,9 +1,9 @@
 [%#
     TopDropListBeekeeping.tt — Beekeeping / Apiary management dropdown menu.
 
-    Visibility rules:
-      - enabled_modules.beekeeping  (member opted into beekeeping feature)
-      - enabled_modules.apiary      (site-level apiary module enabled)
+    Visibility rules (see Root.pm can_beekeep):
+      - enabled_modules.beekeeping  (hosting addon, site_modules, or user grant)
+      - enabled_modules.apiary      (alias when beekeeping addon is subscribed)
       - SiteName == 'BMaster'       (always show on BMaster site)
 
     Link strategy:
@@ -17,9 +17,7 @@
     <!-- [% PageVersion %] -->
 [% END %]
 
-[% SET site = c.stash.SiteName || c.session.SiteName || '' %]
-[% SET mods = c.stash.enabled_modules %]
-[% SET can_beekeep = mods.beekeeping || mods.apiary || (site == 'BMaster') || c.stash.is_admin %]
+[% SET can_beekeep = c.stash.can_beekeep %]
 [% SET logged_in = 0 %]
 [% IF c.session.username %][% SET logged_in = 1 %][% END %]
 

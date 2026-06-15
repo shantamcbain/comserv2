@@ -14,6 +14,8 @@ use HTTP::Request;
 use MIME::Base64 qw(encode_base64);
 use Comserv::Util::Logging;
 use Comserv::Util::Opnsense;
+use Comserv::Util::GatewayPlan;
+use Comserv::Util::GatewayOrchestrator;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -495,6 +497,10 @@ sub opnsense_index :Path('/admin/infrastructure/opnsense') :Args(0) {
         $api = Comserv::Util::Opnsense->new($config);
         if ($api) {
             $status = $api->fetch_status;
+            if ($status && ref $status eq 'HASH') {
+                my $hap = $api->fetch_haproxy_status;
+                $status->{haproxy} = $hap if $hap;
+            }
         } else {
             $error = 'Could not initialize OPNsense API client.';
         }
@@ -502,11 +508,17 @@ sub opnsense_index :Path('/admin/infrastructure/opnsense') :Args(0) {
         $error = 'OPNsense not configured. Please set host, key, and secret below.';
     }
 
+    my $gateway_plan = Comserv::Util::GatewayOrchestrator->merged_plan($c, $status);
+    my $gateway_audit = Comserv::Util::GatewayOrchestrator->audit($c, $status, $gateway_plan);
+
     $c->stash(
         opnsense_config => $config,
         opnsense_status => $status,
         opnsense_error  => $error,
         dev_access      => $self->_dev_zerotier_access_hints($c),
+        gateway_plan    => $gateway_plan,
+        gateway_audit   => $gateway_audit,
+        gateway_doc_links => Comserv::Util::GatewayPlan->doc_links($c),
         template        => 'admin/infrastructure/opnsense.tt',
     );
 }
@@ -604,6 +616,57 @@ sub opnsense_action :Path('/admin/infrastructure/opnsense/action') :Args(0) {
         if ($result->{success}) {
             $api->apply_nat;
             $c->flash->{success_msg} = 'NAT rule updated.';
+        }
+    } elsif ($action eq 'fix_dev_gateway') {
+        my $tgt = Comserv::Util::GatewayOrchestrator->targets;
+        $result = $api->ensure_dev_csc_gateway({
+            gateway_ip   => $tgt->{gateway_lan},
+            backend_ip   => $tgt->{dev_workstation_lan},
+            backend_port => $tgt->{dev_port},
+            domain       => $p->{domain} || 'computersystemconsulting.ca',
+        });
+        if ($result->{success}) {
+            my $msg = 'dev.csc gateway ready: Unbound → ' . $tgt->{gateway_lan}
+                    . ', HAProxy :80 → ' . $tgt->{dev_workstation_lan} . ':' . $tgt->{dev_port} . '.';
+            $msg .= ' ' . ($result->{note} // '') if $result->{note};
+            $c->flash->{success_msg} = $msg;
+        }
+    } elsif ($action eq 'fix_dev_unbound') {
+        my $domain_part = $p->{domain} || 'computersystemconsulting.ca';
+        my $tgt = Comserv::Util::GatewayOrchestrator->targets;
+        if ($domain_part eq 'computersystemconsulting.ca') {
+            $result = $api->ensure_dev_csc_gateway({
+                gateway_ip   => $tgt->{gateway_lan},
+                backend_ip   => $tgt->{dev_workstation_lan},
+                backend_port => $tgt->{dev_port},
+                domain       => $domain_part,
+            });
+            if ($result->{success}) {
+                $c->flash->{success_msg} = 'dev.csc uses gateway HAProxy (Unbound → '
+                    . $tgt->{gateway_lan} . ', backend :' . $tgt->{dev_port} . ').';
+            }
+        } else {
+            my $status = $api->fetch_status;
+            my @rows = ref $status->{dns_hosts} eq 'HASH'
+                ? @{ $status->{dns_hosts}{rows} || [] } : ();
+            my ($existing) = grep {
+                ($_->{hostname} // '') eq 'dev' && ($_->{domain} // '') eq $domain_part
+            } @rows;
+            if ($existing && ($existing->{server} // '') eq $tgt->{dev_workstation_lan}) {
+                $result = { success => 1 };
+                $c->flash->{success_msg} = "dev.$domain_part already points to $tgt->{dev_workstation_lan} in Unbound (no change).";
+            } else {
+                $result = $api->add_host_override({
+                    hostname    => 'dev',
+                    domain      => $domain_part,
+                    ip          => $tgt->{dev_workstation_lan},
+                    description => 'Comserv gateway audit fix (dev → workstation)',
+                });
+                if ($result->{success}) {
+                    $api->reconfigure_unbound;
+                    $c->flash->{success_msg} = "Added dev.$domain_part → $tgt->{dev_workstation_lan} in Unbound (LAN DNS only).";
+                }
+            }
         }
     } else {
         $c->flash->{error_msg} = "Unknown action: $action";

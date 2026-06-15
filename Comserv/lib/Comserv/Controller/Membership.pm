@@ -186,6 +186,10 @@ sub _get_modules_data {
                 $subscribed{'workshop'} = 1;
                 $subscribed{'workshops'} = 1;
             }
+            if ($lc_addon eq 'beekeeping' || $lc_addon eq 'apiary' || $lc_addon eq 'bmaster') {
+                $subscribed{'beekeeping'} = 1;
+                $subscribed{'apiary'}     = 1;
+            }
         }
     }
 

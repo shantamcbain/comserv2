@@ -1,0 +1,104 @@
+{
+  "version": "1.1",
+  "updated": "2026-06-15",
+  "summary": "Policy templates + live hosting_accounts drive routing. Customer subdomains are not stored here — they are generated when accounts are active.",
+  "targets": {
+    "gateway_lan": "192.168.1.1",
+    "production_lan": "192.168.1.126",
+    "production_zt": "172.30.50.206",
+    "dev_workstation_lan": "192.168.1.199",
+    "dev_workstation_zt": "172.30.131.126",
+    "dev_port": 3001,
+    "prod_port": 5000,
+    "wildcard_zones": ["computersystemconsulting.ca"]
+  },
+  "zero_naming": {
+    "pattern": "zero.{domain}",
+    "example": "zero.computersystemconsulting.ca",
+    "not": "A single zero hostname on the OPNsense gateway IP"
+  },
+  "dns_precedence": "Unbound: specific host (dev) beats wildcard (*). Hosting subdomains on wildcard zones use * for prod; dev always needs explicit override.",
+  "provision_order": [
+    "Site + SiteDomain (Comserv DB)",
+    "Cloudflare A record (public DNS)",
+    "OPNsense Unbound (only if dev, apex, or non-wildcard zone)",
+    "HAProxy/NPM SSL (production HTTPS)",
+    "OPNsense firewall/NAT (WAN or private VM)",
+    "Private VM (dedicated plan — Phase 4)"
+  ],
+  "policy_rules": [
+    {
+      "id": "prod-csc-wildcard",
+      "source": "policy",
+      "label": "Production wildcard (CSC LAN)",
+      "hostname": "*",
+      "domain": "computersystemconsulting.ca",
+      "fqdn": "*.computersystemconsulting.ca",
+      "lan_ip": "192.168.1.126",
+      "zt_ip": "172.30.50.206",
+      "port": 5000,
+      "dns_layer": "unbound",
+      "public_dns": "cloudflare",
+      "ssl": "haproxy_acme",
+      "priority": 100,
+      "phase": "active",
+      "notes": "Shared prod subdomains (coop.csc, etc.) use this — no per-site Unbound row needed."
+    },
+    {
+      "id": "dev-csc",
+      "source": "policy",
+      "label": "Dev Comserv (must beat wildcard)",
+      "hostname": "dev",
+      "domain": "computersystemconsulting.ca",
+      "fqdn": "dev.computersystemconsulting.ca",
+      "lan_ip": "192.168.1.1",
+      "backend_lan": "192.168.1.199",
+      "zt_ip": "172.30.131.126",
+      "port": 80,
+      "backend_port": 3001,
+      "dns_layer": "unbound",
+      "public_dns": null,
+      "ssl": "haproxy_lan_http",
+      "priority": 10,
+      "phase": "active",
+      "notes": "Unbound → gateway :80; HAProxy forwards to workstation Starman :3001 (no :3001 in URL)."
+    },
+    {
+      "id": "dev-beemaster",
+      "source": "policy",
+      "label": "Dev BeeMaster",
+      "hostname": "dev",
+      "domain": "beemaster.ca",
+      "fqdn": "dev.beemaster.ca",
+      "lan_ip": "192.168.1.199",
+      "zt_ip": "172.30.131.126",
+      "port": 3000,
+      "dns_layer": "unbound",
+      "phase": "active",
+      "notes": "Verify audit: must resolve to workstation not production."
+    },
+    {
+      "id": "zero-csc-public",
+      "source": "policy",
+      "label": "ZeroTier entry — CSC (public)",
+      "hostname": "zero",
+      "domain": "computersystemconsulting.ca",
+      "fqdn": "zero.computersystemconsulting.ca",
+      "lan_ip": null,
+      "zt_ip": "172.30.50.206",
+      "port": 5000,
+      "dns_layer": "cloudflare",
+      "phase": "active",
+      "notes": "Per-domain zero hostname in Application DNS."
+    }
+  ],
+  "tool_roles": [
+    {"tool": "hosting_accounts DB", "role": "Source of customer hostnames (dynamic rules at runtime)"},
+    {"tool": "Site Provisioning", "role": "Site + Cloudflare + gateway Unbound on approve"},
+    {"tool": "OPNsense Unbound", "role": "LAN DNS — dev overrides and non-wildcard zones only"},
+    {"tool": "Cloudflare (Application DNS)", "role": "Public DNS for all customer subdomains"},
+    {"tool": "OPNsense HAProxy + ACME", "role": "WAN HTTPS termination and health failover"},
+    {"tool": "NPM (172.30.159.100)", "role": "Per-container reverse proxy and certs"},
+    {"tool": "Gateway audit", "role": "Flags wildcard shadowing, wrong IPs, missing SiteDomain"}
+  ]
+}

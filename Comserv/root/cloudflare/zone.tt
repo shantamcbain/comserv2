@@ -94,7 +94,7 @@
         </thead>
         <tbody>
         [% FOREACH r IN records %]
-            <tr id="row-[% r.id | html %]">
+            <tr id="row-[% r.id | html %]"[% IF highlight_host && r.name == highlight_host %] class="dns-highlight-row" style="background:#fff8e1;"[% END %]>
                 <td><strong>[% r.type | html %]</strong></td>
                 <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0" title="[% r.name | html %]"><code>[% r.name | html %]</code></td>
                 <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0" title="[% r.content | html %]">[% r.content | html %]</td>
@@ -174,4 +174,10 @@ function toggleEdit(id) {
     var row = document.getElementById('edit-' + id);
     row.style.display = (row.style.display === 'none') ? 'table-row' : 'none';
 }
+document.addEventListener('DOMContentLoaded', function() {
+    var target = [% IF highlight_host %]document.querySelector('.dns-highlight-row')[% ELSE %]null[% END %];
+    if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+});
 </script>

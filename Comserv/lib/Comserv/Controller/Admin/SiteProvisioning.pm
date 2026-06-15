@@ -5,6 +5,7 @@ use Comserv::Util::Logging;
 use Comserv::Model::AccountingDB;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::CloudflareManager;
+use Comserv::Util::GatewayOrchestrator;
 use Try::Tiny;
 use File::Path qw(make_path);
 use POSIX qw(strftime);
@@ -324,7 +325,14 @@ sub provision :Path('provision') :Args(0) {
         }
 
         # 4. Cloudflare DNS
-        my $cf_result = $self->_create_cloudflare_dns($c, $domain, $domain_type, $p->{server_ip}, \@steps);
+        $self->_create_cloudflare_dns($c, $domain, $domain_type, $p->{server_ip}, \@steps);
+
+        # 4b. Gateway (OPNsense Unbound when needed — skips if wildcard covers prod)
+        Comserv::Util::GatewayOrchestrator->provision_for_hosting($c, {
+            domain    => $domain,
+            plan_slug => $request->plan_slug,
+            sitename  => $site_name,
+        }, \@steps);
 
         # 5. Set theme
         eval { $c->model('ThemeConfig')->set_site_theme($c, $site_name, 'default') };

@@ -17,7 +17,7 @@
 [% SET host = c.req.uri.host %]
 [% SET host = host.replace('(?i)^www\.', '') %]
 [% SET is_brew_host = host.match('(?i)^brew\.') ? 1 : 0 %]
-[% SET can_brew = mods.item('brew') || mods.brew || (site_lc == 'brew') || is_brew_host || c.stash.is_brew_host || c.stash.brew_addon_active || c.stash.is_admin %]
+[% SET can_brew = mods.item('brew') || mods.brew || (site_lc == 'brew') || is_brew_host || c.stash.is_brew_host || c.stash.brew_addon_active %]
 [% SET brew_home = c.uri_for('/brew') %]
 [% SET can_plan = c.stash.can_plan %]
 
