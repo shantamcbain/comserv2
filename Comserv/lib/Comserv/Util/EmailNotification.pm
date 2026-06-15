@@ -3,10 +3,11 @@ use Moose;
 use Email::MIME;
 use Email::Sender::Simple;
 use Email::Sender::Transport::SMTP;
+use Comserv::Util::Logging;
 
 has 'logging' => (
-    is => 'ro',
-    required => 1,
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance },
 );
 
 sub send_verification_email {

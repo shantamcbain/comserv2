@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::EmailNotification;
+use Comserv::Util::DiskStats;
 use JSON ();
 use Scalar::Util qw(looks_like_number);
 use List::Util ();
@@ -319,6 +320,7 @@ sub _ingest_url {
 my %LOCAL_HOSTS = map { $_ => 1 } qw(
     workstation workstation.local workstation.computersystemconsulting.ca
     localhost 127.0.0.1 192.168.1.199
+    comservproduction1 comservproduction2 192.168.1.126 192.168.1.127
 );
 my $NFS_BASE = '/data/nfs';
 
@@ -671,14 +673,36 @@ sub ingest :Path('/admin/hardware_monitor/ingest') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ingest',
         "Ingested $count metrics from $hostname");
 
-    $self->_check_disk_alerts($c, $hostname, $body->{metrics} // []);
+    # Alert/email failures must not fail ingest (device_agent expects 200 + JSON).
+    eval { $self->_check_disk_alerts($c, $hostname, $body->{metrics} // []); };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ingest',
+            "disk alert check failed (metrics stored): $@");
+    }
 
     $c->response->content_type('application/json');
     $c->response->body(JSON::encode_json({ ok => 1, count => $count, hostname => $hostname }));
 }
 
+# Ingest test payloads (e.g. hostname=testhost) store metrics but must not email admins.
+sub _ingest_hostname_sends_alerts {
+    my ($self, $hostname) = @_;
+    return 0 if !$hostname;
+    return 0 if $hostname =~ /^(?:test(?:host)?|unknown)$/i;
+    if (my $extra = $ENV{HW_ALERT_HOSTNAMES}) {
+        my %ok = map { lc($_) => 1 } grep { $_ ne '' } split /,\s*/, $extra;
+        return 1 if $ok{ lc $hostname };
+    }
+    return 1 if $LOCAL_HOSTS{$hostname};
+    my $short = (split /\./, $hostname)[0];
+    return 1 if $short && $LOCAL_HOSTS{$short};
+    return 0;
+}
+
 sub _check_disk_alerts {
     my ($self, $c, $hostname, $metrics) = @_;
+
+    return unless $self->_ingest_hostname_sends_alerts($hostname);
 
     my $schema = eval { $c->model('DBEncy') };
     return unless $schema;
@@ -686,7 +710,7 @@ sub _check_disk_alerts {
     my $alert_rs = eval { $schema->resultset('HealthAlert') };
     return unless $alert_rs;
 
-    my $email_util = Comserv::Util::EmailNotification->new();
+    my $email_util = Comserv::Util::EmailNotification->new(logging => $self->logging);
     my $admin_email = 'helpdesk@computersystemconsulting.ca';
 
     for my $m (@$metrics) {
@@ -922,20 +946,23 @@ sub disk_health :Path('/admin/hardware_monitor/disk_health') :Args(0) {
         }
     };
 
-    # ── 3. NFS disk usage ─────────────────────────────────────────────
-    my $nfs_root = '/data/nfs';
-    $nfs_root = $ENV{NFS_ROOT} if $ENV{NFS_ROOT};
+    # ── 3. NFS disk usage (real NFS mount only — not local bind mounts) ─
+    my $nfs_root = $ENV{NFS_DATA_PATH} // $ENV{NFS_ROOT} // '/data/nfs';
     my %nfs_usage;
-    if (-d $nfs_root) {
-        eval {
-            my $out = `df -h --output=size,used,avail,pcent \Q$nfs_root\E 2>/dev/null | tail -1`;
-            if ($out =~ /(\S+)\s+(\S+)\s+(\S+)\s+(\d+)%/) {
-                $nfs_usage{size} = $1; $nfs_usage{used} = $2;
-                $nfs_usage{avail} = $3; $nfs_usage{pct} = $4;
-                $nfs_usage{level} = $4 >= 90 ? 'critical' : $4 >= 80 ? 'warn' : 'ok';
-            }
-        };
-    }
+    eval {
+        my $nfs = Comserv::Util::DiskStats->separated_nfs_stats($c);
+        if ($nfs && $nfs->{pct} && !$nfs->{blended} && !$nfs->{same_device}) {
+            $nfs_root = $nfs->{path} // $nfs_root;
+            $nfs_usage{size}  = $nfs->{total_fmt};
+            $nfs_usage{used}  = $nfs->{used_fmt};
+            $nfs_usage{avail} = $nfs->{avail_fmt};
+            $nfs_usage{pct}   = $nfs->{pct};
+            $nfs_usage{level} = $nfs->{level};
+            $nfs_usage{source} = $nfs->{source} if $nfs->{source};
+        } elsif ($nfs && ($nfs->{blended} || $nfs->{same_device})) {
+            $nfs_usage{not_separate} = 1;
+        }
+    };
 
     # ── 4. Duplicate files ────────────────────────────────────────────
     my ($dup_count, $dup_size_mb) = (0, 0);

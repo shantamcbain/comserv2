@@ -21,11 +21,18 @@ services:
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session
       SYSTEM_IDENTIFIER: ${SYSTEM_IDENTIFIER:-production1}
+      TTYD_HOST_PORT: "7682"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - ${COMSERV_LOGS_DIR:-/var/log/comserv}:/opt/comserv/applogs
       - ${WORKSHOP_LOCAL_DIR:-/var/lib/comserv/data}:/data/nfs:rw
       - /home/ubuntu/comserv-sessions:/tmp/comserv/session:rw
+      # Live Perl fixes from host git (deploy.sh pulls /opt/comserv/Comserv before compose up)
+      - /opt/comserv/Comserv/lib:/opt/comserv/lib:ro
+      # Host ttyd status + start requests (shared with script/ttyd_comserv_start.sh on production1)
+      - /opt/comserv/Comserv/var:/opt/comserv/var:rw
       - whisper-venv:/opt/comserv/whisper_venv:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
