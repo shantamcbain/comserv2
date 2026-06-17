@@ -377,6 +377,8 @@ sub terminal_ws :Path('/coding/terminal_ws') :Args(0) {
 sub end : Private {
     my ($self, $c) = @_;
     return if $c->req->path =~ m{/coding/terminal_ws};
+    my $path = $c->req->path || '';
+    return if $path =~ m{^/admin/};
     my $status = $c->response->status || 0;
     return if $status >= 300 && $status < 400;
     return if $status == 204;
