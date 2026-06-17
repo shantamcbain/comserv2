@@ -254,6 +254,10 @@ sub proxy_dispatch {
     $path =~ s{\A/?admin/dev-preview/site}{};
     $path = '/' if $path eq '' || $path eq '/';
     $path = "/$path" unless $path =~ m{\A/};
+    # Prevent filesystem paths from being used as routes
+    if ($path =~ m{^/home/} || $path =~ m{^/[a-zA-Z]:/}) {
+        $path = '/';
+    }
 
     my $qs = $c->req->uri->query;
     my $uri = $path . ( defined $qs && $qs ne '' ? "?$qs" : '' );
