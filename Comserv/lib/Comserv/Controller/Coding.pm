@@ -382,6 +382,8 @@ sub end : Private {
     return if $path =~ m{^/admin/};
     return if $path =~ m{^/dev-preview};
     return if $path =~ m{^/home/} || $path =~ m{^/[a-zA-Z]:/} || $path =~ m{/script$};
+    # Also skip any path that looks like a filesystem path (contains /script/ or similar)
+    return if $path =~ m{/script/};
     my $status = $c->response->status || 0;
     return if $status >= 300 && $status < 400;
     return if $status == 204;
