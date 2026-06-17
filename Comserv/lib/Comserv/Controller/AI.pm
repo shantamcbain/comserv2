@@ -387,7 +387,7 @@ sub editor_config :Local :Args(0) {
     my $enabled = $self->_editor_enabled($c) ? 1 : 0;
     my $has_key = $enabled && $self->_grok_cli_api_key($c) ? 1 : 0;
 
-    my $current_model = 'phi4:14b';
+    my $current_model = 'grok-4.3';
     my $installed_models = [];
     my @ext_models;
     my $ollama_host = '';
