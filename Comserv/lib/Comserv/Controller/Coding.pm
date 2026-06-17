@@ -380,8 +380,7 @@ sub end : Private {
     return if $c->req->path =~ m{/coding/terminal_ws};
     my $path = $c->req->path || '';
     return if $path =~ m{^/admin/};
-    return if $path =~ m{^/dev-preview};
-    return if $path eq 'dev-preview' || $path =~ m{^dev-preview};
+    return if $path =~ m{dev-preview};
     return if $path =~ m{^/home/} || $path =~ m{^/[a-zA-Z]:/} || $path =~ m{/script$};
     # Also skip any path that looks like a filesystem path (contains /script/ or similar)
     return if $path =~ m{/script/};
