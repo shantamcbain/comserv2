@@ -85,7 +85,7 @@ sub preview_sitename {
 
 sub can_preview {
     my $c = _c(@_);
-    return 0 unless $c && $c->user_exists;
+    return 0 unless $c && $c->user;
 
     my $auth     = Comserv::Util::AdminAuth->new;
     my $sitename = preview_sitename($c);
