@@ -379,6 +379,7 @@ sub end : Private {
     return if $c->req->path =~ m{/coding/terminal_ws};
     my $path = $c->req->path || '';
     return if $path =~ m{^/admin/};
+    return if $path =~ m{^/dev-preview};
     return if $path =~ m{^/home/} || $path =~ m{^/[a-zA-Z]:/} || $path =~ m{/script$};
     my $status = $c->response->status || 0;
     return if $status >= 300 && $status < 400;
