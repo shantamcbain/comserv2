@@ -571,6 +571,12 @@ sub grok_cli :Local :Args(0) {
              || $c->request->params->{model}
              || '';
 
+    my $http_cli = $json->{http_cli}
+                || $c->request->body_parameters->{http_cli}
+                || $c->request->params->{http_cli}
+                || 0;
+    $http_cli = ($http_cli && $http_cli !~ /^(?:0|false|no)$/i) ? 1 : 0;
+
     my $grok = $self->_find_grok_binary();
     my $has_grok_binary = ($grok && -x $grok) ? 1 : 0;
 
@@ -584,8 +590,9 @@ sub grok_cli :Local :Args(0) {
 
     # Direct routing: If the requested model is an Ollama model (does not contain 'grok' in its name),
     # bypass any Grok binary or xAI API key fallbacks and use the local Ollama backend immediately.
+    # HTTP CLI "Grok" tool always uses the Grok/xAI path — ignore the header Ollama model dropdown.
     my $is_grok_model = (!$model || $model =~ /grok/i) ? 1 : 0;
-    if (!$is_grok_model) {
+    if (!$http_cli && !$is_grok_model) {
         my $ollama = $c->model('Ollama');
         if ($ollama) {
             my ($chost, $cport, $cmodel) = $self->_get_current_ollama_config($c, 1);
@@ -801,11 +808,30 @@ sub grok_cli :Local :Args(0) {
             return;
         }
         my $api_err = $api_resp->{error} || 'Grok xAI API returned no content';
+        if ($http_cli) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => $api_err,
+                hint    => 'HTTP CLI uses xAI API only (local grok binary is too slow over the browser). '
+                         . 'Check Admin → API Keys, or use the Chat tab with Ollama.',
+                backend => 'grok_api',
+            }));
+            return;
+        }
         $c->response->body(encode_json({
             success => JSON::false,
             error   => $api_err,
             hint    => 'Check Admin → API Keys (grok/xAI), or switch to Comserv AI in the dropdown.',
             backend => 'grok_api',
+        }));
+        return;
+    }
+
+    if ($http_cli) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'HTTP CLI requires an xAI API key (local grok binary takes 1–3 min and often drops the browser connection).',
+            hint    => 'Add a Grok/xAI key at /ai/manage_api_keys, or use the Chat tab with Ollama.',
         }));
         return;
     }
@@ -5593,7 +5619,7 @@ sub _get_module_data {
     }
 
     # --- Project data ---
-    if ($prompt =~ /project/i) {
+    if ($prompt =~ /project|opnsense|opn.?sense/i) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
@@ -6292,6 +6318,9 @@ Supported actions:
     Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
     ALTER TABLE to match Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_table", "database": "ency"}}]
     (Omit "field" to sync all fields in the table. Use "database": "forager" for the forager DB.)
+- Open one page:           [ACTION: {"action": "navigate", "url": "/path", "target": "_self"}]
+- Open multiple pages:      [ACTION: {"action": "navigate_multi", "urls": [{"url": "/admin/infrastructure/opnsense", "target": "_self"}, {"url": "/project/details?project_id=N", "target": "_blank"}]}]
+  (Use navigate_multi for OPNsense gateway requests — gateway first, project second. target "_blank" opens a new tab.)
 
 Rules:
 - ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
@@ -6322,7 +6351,8 @@ ACTION
              . "Do NOT dump or list all navigation links/URLs in your response — only include the one or two most relevant links for the user's actual question. "
              . $web_search_note . "\n"
              . "NAVIGATION: When the user says 'take me to', 'open', 'go to', or 'show me' a page, "
-             . "reply with the exact URL from the navigation guide below.\n"
+             . "reply with the exact URL from the navigation guide below. "
+             . "For OPNsense/gateway/firewall requests, open BOTH the gateway admin page and the OpnSense project (see OPNSENSE DISAMBIGUATION in the guide).\n"
              . $action_instructions
              . $page_nav
              . $nav_guide;
@@ -6509,6 +6539,12 @@ sub _build_navigation_command_guide {
             [ 'File management',            '/file/list'                ],
             [ 'Duplicate files',            '/file/duplicates'          ],
         ]],
+        [ 'Infrastructure / Gateway (admin)', 'admin', [
+            [ 'OPNsense Gateway Management (live firewall dashboard)', '/admin/infrastructure/opnsense' ],
+            [ 'Infrastructure overview',    '/admin/infrastructure'     ],
+            [ 'Application DNS zones',      '/admin/dns'                ],
+            [ 'Gateway routing plan (docs)', '/Documentation/system/GatewayPlan' ],
+        ]],
         [ 'Inventory', 'admin', [
             [ 'Inventory dashboard',        '/Inventory'                ],
             [ 'Inventory items',            '/Inventory/items'          ],
@@ -6662,6 +6698,13 @@ sub _build_navigation_command_guide {
          . "  Docs:      $base_url/Documentation/Inventory/consignment\n"
          . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
          . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
+         . "OPNSENSE DISAMBIGUATION (admin): 'OPNsense' / 'OpnSense' means TWO different things:\n"
+         . "  1. Live firewall gateway admin: $base_url/admin/infrastructure/opnsense (Unbound, HAProxy, drift audit)\n"
+         . "  2. Comserv planning project named OpnSense: $base_url/project/details?project_id=ID (use ID from LIVE PROJECT DATA)\n"
+         . "When the user asks to open OPNsense, the gateway dashboard, or the firewall — open BOTH URLs (gateway in current tab, project in a new tab if LIVE PROJECT DATA lists OpnSense). "
+         . "Do NOT send them only to the project page when they asked for the gateway/dashboard.\n"
+         . "Emit dual navigation with: [ACTION: {\"action\": \"navigate_multi\", \"urls\": [{\"url\": \"/admin/infrastructure/opnsense\", \"target\": \"_self\"}, {\"url\": \"/project/details?project_id=N\", \"target\": \"_blank\"}]}] "
+         . "(replace N with the OpnSense project ID from LIVE PROJECT DATA).\n"
          . $guide;
 }
 
@@ -12066,8 +12109,12 @@ sub _is_shanta_editor {
     my $username = $c->session->{username} || ($c->user ? $c->user->username : '') || '';
     return 0 unless lc($username) eq 'shanta';
     my $host = lc($c->req->uri->host || '');
+    $host =~ s/:\d+\z//;
     return 1 if $host eq '172.30.131.126';
     return 1 if $host =~ /^(127\.0\.0\.1|localhost|workstation\.local|workstation\.zero)$/;
+    # Public dev hostnames (dev.somedomain.name) — primary way to open the editor remotely.
+    return 1 if $host =~ /^dev\./;
+    return 1 if $host =~ /\.local$/;
     return 1 if $self->_is_dev_mode($c);
     return 0;
 }
@@ -12397,6 +12444,97 @@ sub _is_dev_mode {
     return 0;
 }
 
+# ── Internal Helpers for Code Editing ───────────────────────────────────────
+
+=head2 _apply_unified_diff
+
+Applies a unified diff string to a target file.
+Returns (success, error_message).
+
+=cut
+
+sub _apply_unified_diff {
+    my ($self, $full_path, $diff) = @_;
+
+    # Basic validation: must have --- and +++ headers
+    unless ($diff =~ /---\s+.+\n\+\+\+\s+.+/s) {
+        return (0, "Invalid unified diff format: missing headers");
+    }
+
+    # Read current content
+    open(my $rfh, '<:utf8', $full_path) or return (0, "Could not read file: $!");
+    local $/;
+    my $original_content = <$rfh>;
+    close $rfh;
+
+    my @original_lines = split(/\n?/, $original_content, -1);
+    my @new_lines = @original_lines;
+    my $offset = 0;
+
+    # Split diff into hunks
+    my @hunks = split(/(?=@@\s+.*?\s+@@)/, $diff);
+    
+    # The first element of split is usually the header (---/+++)
+    # We skip it and process the hunks.
+    for my $hunk (@hunks) {
+        next unless $hunk =~ /^@@\s+-?(\d+),\s*(\d+)\s+.*?\s+(\d+),\s*(\d+)\s+@@/;
+        
+        my ($old_start, $old_len, $new_start, $new_len) = ($1, $2, $3, $4);
+        $old_start -= 1; # 0-indexed
+
+        # Extract the actual lines in the hunk (everything after the @@ line)
+        my ($content) = $hunk =~ /@@.*?\n([\s\S]*)$/;
+        my @hunk_lines = split(/\n?/, $content, -1);
+        # Remove trailing empty line from split if it exists
+        pop @hunk_lines if scalar @hunk_lines > 0 && $hunk_lines[-1] eq '';
+
+        my $current_ptr = $old_start + $offset;
+        my @replacement_lines;
+        my $lines_removed = 0;
+
+        for my $line (@hunk_lines) {
+            my $prefix = substr($line, 0, 1);
+            my $text = substr($line, 1);
+
+            if ($prefix eq '+') {
+                push @replacement_lines, $text;
+            } elsif ($prefix eq '-') {
+                $lines_removed++;
+                $current_ptr++;
+            } elsif ($prefix eq ' ') {
+                push @replacement_lines, $text;
+                $current_ptr++;
+            } else {
+                # This is a weird line or empty, treat as context if it's truly empty
+                # but usually, it's the end of the hunk.
+                last if $line eq '';
+                push @replacement_lines, $line;
+                $current_ptr++;
+            }
+        }
+
+        # Safety check: ensure we are within bounds
+        if ($current_ptr > scalar @new_lines) {
+            return (0, "Patch offset out of bounds for hunk starting at $old_start");
+        }
+
+        # Replace the slice in the array
+        # splice(array, start, length, @replacements)
+        splice(@new_lines, $old_start + $offset, $lines_removed, @replacement_lines);
+        
+        # Update offset for subsequent hunks
+        $offset += ($new_len - $old_len);
+    }
+
+    my $final_content = join("\n", @new_lines);
+    open(my $wfh, '>:utf8', $full_path) or return (0, "Could not write file: $!");
+    print $wfh $final_content;
+    close $wfh;
+
+    return (1, undef);
+}
+
+
 # Interactive WebSocket PTY (Twiggy) — not available under Starman/Docker.
 sub _interactive_ws_available {
     my ($self, $c) = @_;
@@ -12580,15 +12718,20 @@ When you have diagnosed an issue and want to provide an applicable fix, use this
 so the "Apply Fix" button appears:
 
   ## FIX: lib/path/to/file.pm
-  ```perl
-  ... corrected content (full function or complete file for small files) ...
+  ```diff
+  --- lib/path/to/file.pm
+  +++ lib/path/to/file.pm
+  @@ -line,count +line,count @@
+   context line
+  -old line
+  +new line
+   context line
   ```
 
 Rules for fixes:
-- For small files (<200 lines): provide the complete new file content.
-- For large files: provide only the corrected function/method/block. The user will need to
-  manually splice it in, or use the find/replace mode (provide FIND: and REPLACE WITH: sections).
-- Always show the fixed code in a single fenced code block immediately after the ## FIX: line.
+- Use the Unified Diff format (---, +++, @@) for all edits. This is the most precise and preferred method.
+- Ensure the context lines (those starting with a space) are exact matches to the file content.
+- Always show the fixed code in a single fenced code block marked as `diff` immediately after the ## FIX: line.
 - Never output ## FIX: without a code block following it.
 - Only propose a fix when you are confident it is correct.
 - Do not add code comments unless the user asks.
@@ -12821,6 +12964,29 @@ sub apply_fix :Local :Args(0) {
     my $content = $c->request->body_parameters->{content}
                // $c->request->params->{content}
                // '';
+
+    my $patch = $c->request->body_parameters->{patch}
+              // $c->request->params->{patch}
+              // undef;
+
+    if ($patch) {
+        # Use the new unified diff applicator
+        my ($ok, $err) = $self->_apply_unified_diff($full, $patch);
+        if ($ok) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'apply_fix', "Applied patch to $rel");
+            $c->response->body(encode_json({
+                success => JSON::true,
+                path    => $rel,
+                message => "Patch applied successfully to $rel",
+            }));
+            return;
+        } else {
+            $c->response->body(encode_json({ success => JSON::false, error => "Patch failed: $err" }));
+            unlink $bak;
+            return;
+        }
+    }
 
     # Optional partial replacement mode: find + replace strings
     if (!$content) {
