@@ -56,12 +56,11 @@ BEGIN {
 # Configuration - only set if the module can accept it
 # (i.e., when Catalyst::View::Email::Template successfully loaded)
 if (__PACKAGE__->can('config')) {
+    my $root = eval { Comserv->path_to('root') } || '/home/shanta/pycharmprojects/comserv2/comserv/root';
     __PACKAGE__->config(
         template_prefix => 'email',
         render_params => {
-            INCLUDE_PATH => [
-                eval { Comserv->path_to('root') } || 'root',
-            ],
+            INCLUDE_PATH => [ $root ],
             WRAPPER => 'email/wrapper.tt',
         },
         sender => {
