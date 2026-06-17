@@ -390,6 +390,42 @@ sub end : Private {
     $c->forward($c->view('TT')) unless $c->response->body;
 }
 
+# Resolve an error stack trace path (handles ../ and searches the codebase)
+sub _resolve_error_file {
+    my ($self, $c, $error_text) = @_;
+    return unless $error_text;
+
+    # Extract file path from typical Perl error: "at /path/file.pm line 68"
+    if ($error_text =~ /at\s+([^\s]+?)\s+line\s+\d+/i) {
+        my $raw_path = $1;
+
+        # Resolve .. segments
+        my $resolved = $raw_path;
+        $resolved =~ s{script/\.\./}{};
+        $resolved =~ s{/\./}{/}g;
+        while ($resolved =~ s{[^/]+/\.\./}{}) {}
+
+        # If the resolved path exists on disk, return it
+        if (-f $resolved) {
+            return $resolved;
+        }
+
+        # Otherwise search the project root for a file with the same basename
+        my ($basename) = $raw_path =~ m{([^/]+)$};
+        if ($basename) {
+            my $root = $self->_project_root_path($c);
+            require File::Find;
+            my @matches;
+            File::Find::find(sub {
+                return unless -f $_;
+                push @matches, $File::Find::name if $_ eq $basename;
+            }, $root);
+            return $matches[0] if @matches;
+        }
+    }
+    return undef;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
