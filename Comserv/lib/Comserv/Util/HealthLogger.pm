@@ -67,13 +67,42 @@ my %CATEGORY_SCORE = (
 );
 
 my $_app_instance;
+my $_standalone_schema;  # memoized DBEncy schema for non-Catalyst callers (deploy.sh, etc.)
 
 sub _get_app_instance {
     return $_app_instance if defined $_app_instance;
     my $name = Comserv::Util::Logging->get_system_identifier();
-    my $port = $ENV{WEB_PORT} || $ENV{CATALYST_PORT} || '3000';
+    my $port = $ENV{WEB_PORT} || $ENV{CATALYST_PORT} || $ENV{COMSERV_PORT} || '3001';
     $_app_instance = "$name:$port";
     return $_app_instance;
+}
+
+# Resolve a DBEncy schema regardless of caller context.
+# Returns the schema on success, undef on failure.
+sub _schema {
+    my ($c) = @_;
+
+    if ($c && eval { $c->can('model') }) {
+        my $s = eval { $c->model('DBEncy') };
+        return $s if $s;
+    }
+
+    if (!$_standalone_schema) {
+        eval {
+            require Comserv;
+            my $app = Comserv->new;
+            $_standalone_schema = $app->model('DBEncy');
+        };
+        if ($@ || !$_standalone_schema) {
+            my $err = $@ || 'unknown error';
+            $logging->log_with_details(
+                undef, 'error', __FILE__, __LINE__, 'HealthLogger::_schema',
+                "Failed to obtain DBEncy schema: $err"
+            );
+            return undef;
+        }
+    }
+    return $_standalone_schema;
 }
 
 # Build the structured message prefix embedded into system_log.message
@@ -108,8 +137,16 @@ sub log_event {
     my $now = strftime('%Y-%m-%d %H:%M:%S', localtime);
 
     my $sys_id = _get_app_instance();
+    my $schema = _schema($c);
+    if (!$schema) {
+        $logging->log_with_details(
+            undef, 'error', __FILE__, __LINE__, 'HealthLogger::log_event',
+            "Failed to write system_log record: no DBEncy schema available (no Catalyst context and standalone bootstrap failed)"
+        );
+        return;
+    }
+
     eval {
-        my $schema = $c->model('DBEncy');
         $schema->resultset('SystemLog')->create({
             timestamp         => $now,
             level             => $level,
@@ -125,7 +162,6 @@ sub log_event {
     if ($@) {
         # Retry without system_identifier in case column not yet in DB
         eval {
-            my $schema = $c->model('DBEncy');
             $schema->resultset('SystemLog')->create({
                 timestamp  => $now,
                 level      => $level,
@@ -139,7 +175,7 @@ sub log_event {
         };
         if ($@) {
             $logging->log_with_details(
-                $c, 'error', __FILE__, __LINE__, 'HealthLogger::log_event',
+                undef, 'error', __FILE__, __LINE__, 'HealthLogger::log_event',
                 "Failed to write system_log record: $@"
             );
         }
