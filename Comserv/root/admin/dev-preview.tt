@@ -1,0 +1,4 @@
+[% INCLUDE header.tt %]
+<h1>Dev Preview</h1>
+<p>Development preview page.</p>
+[% INCLUDE footer.tt %]
