@@ -109,6 +109,7 @@ sub run_command :Local :Args(0) {
 
     local $ENV{XAI_API_KEY} = $api_key if $api_key;
     local $ENV{GROK_API_KEY} = $api_key if $api_key;
+    local $ENV{GROK_MODEL}   = 'grok-4.3';
     local $ENV{HOME}     = $home || $ENV{HOME};
     local $ENV{USER}     = 'shanta';
     local $ENV{LOGNAME}  = 'shanta';
