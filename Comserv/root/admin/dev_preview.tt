@@ -1,0 +1,47 @@
+[% META title = 'Preview Upcoming Changes' %]
+
+<div class="app-container" style="max-width:1200px;margin:0 auto;padding:1rem;">
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+    <div>
+      <h1 style="margin:0 0 0.35rem;"><i class="fas fa-flask"></i> Preview Upcoming Changes</h1>
+      <p style="margin:0;color:#555;max-width:52rem;">
+        Live view of the <strong>dev workstation</strong> for site
+        <strong>[% preview_site | html %]</strong>.
+        Use this while working with HelpDesk to see fixes before they go to production.
+        No hosts file or ZeroTier required.
+      </p>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">← Admin</a>
+      <a href="[% preview_iframe %]" target="_blank" rel="noopener" class="btn btn-primary">Open in new tab</a>
+    </div>
+  </div>
+
+  [% IF on_dev_server %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">
+    You are already on the dev server — preview opens the site directly.
+  </div>
+  [% ELSE %]
+  <div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.92em;">
+    Traffic is proxied from production to the dev workstation. Only logged-in administrators can access this page.
+    [% IF is_csc_admin %]
+    CSC admins can pass <code>?site=SiteName</code> to preview another site.
+    [% END %]
+  </div>
+  [% END %]
+
+  <div style="border:2px solid #3949ab;border-radius:8px;overflow:hidden;background:#111;min-height:70vh;">
+    <iframe
+      id="dev-preview-frame"
+      src="[% preview_iframe | html %]"
+      title="Dev preview for [% preview_site | html %]"
+      style="width:100%;height:72vh;border:0;background:#fff;"
+      referrerpolicy="no-referrer-when-downgrade"
+    ></iframe>
+  </div>
+
+  <p style="margin:1rem 0 0;font-size:0.85em;color:#666;">
+    Developers: for faster daily work, use ZeroTier and <code>dev.computersystemconsulting.ca</code> in your hosts file.
+    This preview is for site owners and HelpDesk collaboration.
+  </p>
+</div>

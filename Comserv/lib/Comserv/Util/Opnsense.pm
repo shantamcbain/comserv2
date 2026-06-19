@@ -562,7 +562,7 @@ sub ensure_dev_csc_gateway {
         enabled       => '1',
         name          => $names->{frontend},
         description   => "LAN HTTP for $fqdn (no :$backend_port in URL)",
-        bind          => "$gateway_ip:80",
+        bind          => "$gateway_ip:80,0.0.0.0:80",
         mode          => 'http',
         defaultBackend => '',
         forwardFor    => '1',

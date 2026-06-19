@@ -21,6 +21,7 @@
             'IT'         => 'IT_links',
             'Global'     => 'Global_links',
             'Shop'       => 'Shop_links',
+            'Admin'      => 'Admin_links',
         } %]
         [% SET nav_add_cat = nav_menu_cat_map.item(add_link_menu) || (add_link_menu _ '_links') %]
     [% END %]

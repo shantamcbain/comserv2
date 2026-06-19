@@ -3632,10 +3632,22 @@
         { label: 'system info',                url: '/admin/system_info', adminOnly: true },
         { label: 'ssh terminal',               url: '/admin/ssh_terminal', adminOnly: true,
           aliases: ['terminal', 'system terminal', 'shell', 'command line', 'system shell'] },
+        { label: 'preview upcoming changes',   url: '/admin/dev-preview', adminOnly: true,
+          aliases: ['dev preview', 'preview changes', 'upcoming changes', 'preview site', 'preview dev', 'workstation preview', 'see dev changes'] },
+        { label: 'dev preview',                url: '/admin/dev-preview', adminOnly: true },
         { label: 'admin settings',             url: '/admin/settings', adminOnly: true },
         { label: 'settings',                   url: '/admin/settings', adminOnly: true },
         { label: 'docker containers',          url: '/admin/docker-containers', adminOnly: true },
         { label: 'docker',                     url: '/admin/docker-containers', adminOnly: true },
+        { label: 'opnsense',                   url: '/admin/infrastructure/opnsense', adminOnly: true,
+          aliases: ['opn sense', 'opn-sense', 'opsence', 'opnsence', 'opnsense gateway', 'opnsense dashboard', 'opnsense firewall', 'gateway dashboard'] },
+        { label: 'opnsense gateway',           url: '/admin/infrastructure/opnsense', adminOnly: true },
+        { label: 'opnsense dashboard',         url: '/admin/infrastructure/opnsense', adminOnly: true },
+        { label: 'gateway management',         url: '/admin/infrastructure/opnsense', adminOnly: true },
+        { label: 'infrastructure',             url: '/admin/infrastructure', adminOnly: true },
+        { label: 'application dns',            url: '/admin/dns', adminOnly: true },
+        { label: 'dns zones',                  url: '/admin/dns', adminOnly: true },
+        { label: 'gateway plan',               url: '/Documentation/system/GatewayPlan' },
         { label: 'security scan',              url: '/admin/security-scan', adminOnly: true },
         { label: 'link crawler',               url: '/admin/security-scan', adminOnly: true },
         { label: 'crawler',                    url: '/admin/security-scan', adminOnly: true },
@@ -3896,6 +3908,89 @@
         return deduped;
     }
 
+    function _phraseLooksLikeOpnsense(text) {
+        const compact = (text || '').toLowerCase().replace(/[^a-z]/g, '');
+        if (compact.length < 4) return false;
+        if (/opnsense|opsense|opsence|opnsence|opense|opensense/.test(compact)) return true;
+        if (/^opn/.test(compact) && /(?:sense|sence)$/.test(compact)) return true;
+        return false;
+    }
+
+    function _findOpnsenseProjectIdFromContext() {
+        const prompt = (state.pageContext && state.pageContext.system_prompt) || '';
+        const m = prompt.match(/\[ID=(\d+)\]\s*OpnSense\b/i);
+        if (m) return m[1];
+        const m2 = prompt.match(/\[ID=(\d+)\][^\n]*opn\s*-?\s*sense/i);
+        if (m2) return m2[1];
+        if (state.userNavLinks && state.userNavLinks.length) {
+            for (var i = 0; i < state.userNavLinks.length; i++) {
+                var lnk = state.userNavLinks[i];
+                if (!lnk || !lnk.url) continue;
+                if (!/\/project\/details\?project_id=\d+/i.test(lnk.url)) continue;
+                if (_phraseLooksLikeOpnsense(lnk.label || '') || _phraseLooksLikeOpnsense(lnk.name || '')) {
+                    var pid = lnk.url.match(/project_id=(\d+)/i);
+                    if (pid) return pid[1];
+                }
+            }
+        }
+        return null;
+    }
+
+    function _isOpnsenseNavIntent(message) {
+        if (!message) return false;
+        const m = message.replace(/['']/g, "'").toLowerCase();
+        if (/\bproject\b/.test(m)
+            && !/\b(dashboard|gateway|firewall|admin|infrastructure|management)\b/.test(m)
+            && _phraseLooksLikeOpnsense(m)) {
+            return false;
+        }
+        const stripped = m.replace(/^(?:goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|show me|take me to the|go to the)\s+/i, '')
+            .replace(/^(?:the|a|an)\s+/i, '').trim();
+        if (_phraseLooksLikeOpnsense(stripped) || _phraseLooksLikeOpnsense(m)) return true;
+        return /\b(open|show|go to|take me to|navigate to|visit|display|browse)\b/.test(m)
+            && /\bopn/.test(m) && /\b(?:sense|sence)\b/.test(m);
+    }
+
+    function _executeOpnsenseNav(message, messageInput) {
+        const gatewayUrl = '/admin/infrastructure/opnsense';
+        const projectId = _findOpnsenseProjectIdFromContext();
+        const destinations = [
+            { url: gatewayUrl, target: '_self', label: 'OPNsense Gateway Dashboard' }
+        ];
+        if (projectId) {
+            destinations.push({
+                url: '/project/details?project_id=' + projectId,
+                target: '_blank',
+                label: 'OpnSense Project'
+            });
+        }
+
+        addMessage(message, 'user-message');
+        if (messageInput) messageInput.value = '';
+        persistMessages();
+
+        destinations.forEach(function(dest, idx) {
+            setTimeout(function() {
+                _openNavUrl(_resolveNavUrl(dest.url), dest.target);
+            }, idx * 350);
+        });
+
+        let navHtml = '<p>Opening <strong>OPNsense Gateway</strong>';
+        if (projectId) {
+            navHtml += ' and <strong>OpnSense project</strong> (new tab)';
+        }
+        navHtml += '.</p><ul class="lc-nav-choices">';
+        destinations.forEach(function(dest) {
+            const abs = _resolveNavUrl(dest.url);
+            navHtml += '<li><a href="' + _escH(abs) + '" target="' + _escH(dest.target) + '" rel="noopener noreferrer">'
+                + _escH(dest.label) + '</a></li>';
+        });
+        navHtml += '</ul>';
+        addMessage(navHtml, 'ai-message', true);
+        persistMessages();
+        return true;
+    }
+
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
@@ -3971,8 +4066,11 @@
         var manageUrl = window.location.origin + '/navigation/manage_links';
         addMessage(
             '<p>No navigation link matched <strong>' + _escH(phrase) + '</strong>. '
-            + 'Add it in <a href="' + _escH(manageUrl) + '" target="_self">Manage Links</a> '
-            + '(menu, submenu, and site scope CSC or All). '
+            + 'Chat nav auto-indexes your site menu links (filtered by role), saved shortcuts, '
+            + 'and pages observed during prior AI sessions. '
+            + 'If this page should be reachable by name, add it in '
+            + '<a href="' + _escH(manageUrl) + '" target="_self">Manage Links</a> '
+            + '(menu, submenu, site scope CSC or All). '
             + 'Navigation commands are not sent to the AI.</p>',
             'ai-message',
             true
@@ -3980,35 +4078,118 @@
         persistMessages();
     }
 
+    function _executeOpnsenseNavBundle(message, messageInput, serverLinks) {
+        const gatewayUrl = '/admin/infrastructure/opnsense';
+        const destinations = [{ url: gatewayUrl, target: '_self', label: 'OPNsense Gateway Dashboard', name: 'OPNsense Gateway Dashboard' }];
+        if (serverLinks && serverLinks.length) {
+            serverLinks.forEach(function(l) {
+                if (!l || !l.url) return;
+                if (l.url.indexOf('/admin/infrastructure/opnsense') >= 0) return;
+                destinations.push({
+                    url: l.url,
+                    target: l.target || '_blank',
+                    label: l.label || l.name || l.url,
+                    name: l.name || l.label || l.url
+                });
+            });
+        } else {
+            const projectId = _findOpnsenseProjectIdFromContext();
+            if (projectId) {
+                destinations.push({
+                    url: '/project/details?project_id=' + projectId,
+                    target: '_blank',
+                    label: 'OpnSense Project',
+                    name: 'OpnSense Project'
+                });
+            }
+        }
+        addMessage(message, 'user-message');
+        if (messageInput) messageInput.value = '';
+        persistMessages();
+        destinations.forEach(function(dest, idx) {
+            setTimeout(function() {
+                _openNavUrl(_resolveNavUrl(dest.url), dest.target);
+            }, idx * 350);
+        });
+        let navHtml = '<p>Opening <strong>OPNsense Gateway</strong>';
+        if (destinations.length > 1) navHtml += ' and related project (new tab)';
+        navHtml += '.</p><ul class="lc-nav-choices">';
+        destinations.forEach(function(dest) {
+            const abs = _resolveNavUrl(dest.url);
+            navHtml += '<li><a href="' + _escH(abs) + '" target="' + _escH(dest.target) + '" rel="noopener noreferrer">'
+                + _escH(dest.name || dest.label) + '</a></li>';
+        });
+        navHtml += '</ul>';
+        addMessage(navHtml, 'ai-message', true);
+        persistMessages();
+        return true;
+    }
+
     // Refresh user nav links, try client resolve, then server match — calls onNoMatch if nothing found
     function _handleNavCommand(message, messageInput, onNoMatch) {
         const done = (typeof onNoMatch === 'function') ? onNoMatch : function() {};
         loadUserNavLinks().then(function() {
+            const navParts = message && message.match(NAV_RE);
+            const phrase = navParts
+                ? navParts[2].replace(/^(the|a|an)\s+/i, '').trim()
+                : message.replace(/[^\w.\-]+/g, ' ').trim();
+            if (state.isAdmin && _phraseLooksLikeOpnsense(phrase)) {
+                return fetch('/navigation/match_user_nav_link?phrase=' + encodeURIComponent(phrase), {
+                    method: 'GET',
+                    credentials: 'include'
+                })
+                .then(function(r) { return r.ok ? r.json() : { success: false }; })
+                .then(function(data) {
+                    if (data.success) {
+                        _executeOpnsenseNavBundle(message, messageInput, data.links || (data.link ? [data.link] : null));
+                    } else {
+                        _executeOpnsenseNav(message, messageInput);
+                    }
+                })
+                .catch(function() { _executeOpnsenseNav(message, messageInput); });
+            }
             const matches = resolveNavIntent(message);
             if (matches && matches.length >= 1) {
                 _executeNavMatch(message, messageInput, matches);
                 return;
             }
-            const navParts = message && message.match(NAV_RE);
-            const phrase = navParts
-                ? navParts[2].replace(/^(the|a|an)\s+/i, '').trim()
-                : message.replace(/[^\w.\-]+/g, ' ').trim();
             if (!phrase || phrase.length < 2) {
                 done();
                 return;
             }
-            return fetch('/navigation/match_user_nav_link?phrase=' + encodeURIComponent(phrase), {
+            return fetch('/navigation/match_ai_shortcut?phrase=' + encodeURIComponent(phrase), {
                 method: 'GET',
                 credentials: 'include'
             })
             .then(function(r) { return r.ok ? r.json() : { success: false }; })
-            .then(function(data) {
-                const m = data.success && data.link ? _navLinksToMatch(data.link) : null;
-                if (m) {
-                    _executeNavMatch(message, messageInput, [m]);
-                } else {
-                    done();
+            .then(function(scData) {
+                if (scData.success && scData.shortcut) {
+                    const sc = scData.shortcut;
+                    _executeNavMatch(message, messageInput, [_navLinksToMatch({
+                        label: sc.label,
+                        name: sc.label,
+                        url: sc.url,
+                        target: '_blank'
+                    })]);
+                    return;
                 }
+                return fetch('/navigation/match_user_nav_link?phrase=' + encodeURIComponent(phrase), {
+                    method: 'GET',
+                    credentials: 'include'
+                })
+                .then(function(r) { return r.ok ? r.json() : { success: false }; })
+                .then(function(data) {
+                    if (data.success && data.multi && data.links && data.links.length) {
+                        _executeOpnsenseNavBundle(message, messageInput, data.links);
+                        return;
+                    }
+                    const m = data.success && data.link ? _navLinksToMatch(data.link) : null;
+                    if (m) {
+                        _executeNavMatch(message, messageInput, [m]);
+                    } else {
+                        done();
+                    }
+                });
             })
             .catch(function() { done(); });
         }).catch(function() { done(); });
@@ -4370,6 +4551,10 @@
         // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         if (isAdminNavIntent(message)) {
             denyAdminNav(message, messageInput);
+            return;
+        }
+        if (state.isAdmin && _isOpnsenseNavIntent(message)) {
+            _executeOpnsenseNav(message, messageInput);
             return;
         }
         // 1. Explicit nav keyword: "open X", "go to X", etc. — never send to AI without trying server link match
@@ -5287,6 +5472,28 @@
         // fill_form is handled entirely client-side — no server round-trip needed.
         if (actionObj.action === 'fill_form') {
             _executeFillForm(actionObj);
+            return;
+        }
+
+        // navigate_multi: open several URLs (e.g. OPNsense gateway + project)
+        if (actionObj.action === 'navigate_multi') {
+            const multiUrls = actionObj.urls || (actionObj.params && actionObj.params.urls) || [];
+            if (!multiUrls.length) return;
+            const allowed = multiUrls.filter(function(u) {
+                const navUrl = (u && (u.url || u)) || '';
+                return state.isAdmin || !isAdminOnlyNavUrl(navUrl);
+            });
+            if (!allowed.length) {
+                addMessage('That section requires administrator privileges.', 'ai-message');
+                return;
+            }
+            allowed.forEach(function(u, idx) {
+                const navUrl = (u && (u.url || u)) || '';
+                const navTarget = (u && u.target) || '_self';
+                setTimeout(function() {
+                    executeAIAction({ action: 'navigate', url: navUrl, target: navTarget });
+                }, idx * 350);
+            });
             return;
         }
 

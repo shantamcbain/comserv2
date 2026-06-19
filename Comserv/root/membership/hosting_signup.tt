@@ -188,6 +188,18 @@
         </div>
 
         <div class="content-section">
+          <h2>Site Migration</h2>
+          <div class="form-field">
+            <label for="existing_site_url">Existing Website URL <span style="color:#888;font-size:0.85em;">(optional)</span></label>
+            <input type="url" name="existing_site_url" id="existing_site_url"
+              placeholder="https://yoursite.com"
+              value="[% hosting_account.existing_site_url | html %]"
+              style="width:100%;box-sizing:border-box;">
+            <small style="color:#888;">If you have a current website, enter its address. CSC will clone it to a staging subdomain on this site so you can edit pages and test with AI assistance before pointing your public domain.</small>
+          </div>
+        </div>
+
+        <div class="content-section">
           <h2>Additional Information</h2>
           <div class="form-field">
             <label for="notes">Notes for CSC Admin <span style="color:#888;font-size:0.85em;">(optional)</span></label>

@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
 [% IF NOT _active_mem %][% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'grace'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %][% END %]
 [% SET _csc_mem = undef %]
 [% TRY %]
-  [% SET _csc_site = c.model('DBEncy').resultset('Site').search({name => 'CSC'}, {rows => 1}).single %]
+  [% TRY %][% SET _csc_site = c.model('DBEncy').resultset('Site').search({name => 'CSC'}, {rows => 1}).single %][% CATCH %][% SET _csc_site = '' %][% END %]
   [% IF _csc_site AND _csc_site.id != _sid %]
     [% _csc_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _csc_site.id, 'me.status' => 'active'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %]
     [% IF NOT _csc_mem %][% _csc_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _csc_site.id, 'me.status' => 'grace'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %][% END %]
@@ -388,39 +388,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-    <!-- Main Menu -->
+    <!-- Main Menu (delegated to Navigation/Menu.tt for clean separation) -->
     <nav id="main-menu">
         <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="main-menu-list">&#9776;</button>
         <ul class="horizontal-menu" id="main-menu-list">
-            <li class="horizontal-dropdown">
-                <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
-            </li>
-        [% INCLUDE 'Navigation/TopDropListMain.tt' %]
-        [% IF site_has_shop || c.stash.enabled_modules.ecommerce %][% INCLUDE 'Navigation/TopDropListShop.tt' %][% END %]
-        [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
-        [%# Global discontinued — Mail/Jobs/Join moved to Main %]
-        [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
-        [% IF c.stash.show_hosted_nav %][% INCLUDE 'Navigation/TopDropListHosted.tt' %][% END %]
-        [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-        [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
-        [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
-        [%# IT discontinued — IT content moved to HelpDesk submenu %]
-        [% IF 0 %][% INCLUDE 'Navigation/TopDropListIT.tt' %][% END %]
-        [%# Coop removed and merged into admintopmenu.tt %]
-
-        [% IF is_admin %]
-            [% INCLUDE 'Navigation/admintopmenu.tt' %]
-        [% END %]
-        [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
-        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
-        [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
-        [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
-        [% IF c.stash.enabled_modules.item('brew') || c.stash.enabled_modules.brew || c.stash.brew_addon_active || c.stash.is_brew_host %]
-        [% INCLUDE 'Navigation/TopDropListBrew.tt' %]
-        [% END %]
-        [% IF c.stash.enabled_modules.item('printing_3d') %]
-            [% INCLUDE 'Navigation/TopDropList3d.tt' %]
-        [% END %]
+            [% INCLUDE 'Navigation/Menu.tt' %]
         </ul>
     </nav>
 

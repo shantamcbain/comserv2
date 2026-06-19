@@ -364,7 +364,7 @@ sub get_system_identifier {
     $identifier .= " ($tag_str)" if $tag_str;
 
     # Append port to disambiguate multiple dev servers on the same host
-    $port //= '3000';
+    $port //= $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || ( $is_docker ? '3000' : '3001' );
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
     return $identifier;

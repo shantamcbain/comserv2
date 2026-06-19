@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Let Firefox treat your private dev origin as "secure" so mic works over plain HTTP.
-# No certificate, no Virtualmin, no public DNS. Firefox only (restart required).
+# Legacy: Firefox HTTP allowlist for mic on raw IP:3001.
+# Preferred: private HTTPS on the workstation (no allowlist needed):
+#   workstation: ./script/dev_tls_install.sh
+#   laptop:      ./script/dev_tls_trust_firefox.sh
+#   hosts:       172.30.131.126  dev.computersystemconsulting.ca
+#   open:        https://dev.computersystemconsulting.ca/ai/widget
 #
 # Usage: ./script/dev_firefox_voice_allow.sh
 #        ./script/dev_firefox_voice_allow.sh --print

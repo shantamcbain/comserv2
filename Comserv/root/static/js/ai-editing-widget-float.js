@@ -46,10 +46,22 @@
         el.style.color = type === 'err' ? '#f48771' : (type === 'ok' ? '#89d185' : '#888');
     }
 
-    function fetchJson(url, opts) {
+    function ajaxFetchOpts(opts) {
         opts = opts || {};
         opts.credentials = 'include';
-        return fetch(url, opts).then(function(r) {
+        opts.headers = opts.headers || {};
+        if (!opts.headers['X-Requested-With']) {
+            opts.headers['X-Requested-With'] = 'XMLHttpRequest';
+        }
+        return opts;
+    }
+
+    function ajaxFetch(url, opts) {
+        return fetch(url, ajaxFetchOpts(opts));
+    }
+
+    function fetchJson(url, opts) {
+        return ajaxFetch(url, opts).then(function(r) {
             if (!r.ok) {
                 return r.text().then(function(body) {
                     var msg = 'HTTP ' + r.status;
@@ -66,6 +78,98 @@
         });
     }
 
+    function isRetryableFetchError(err) {
+        var msg = String(err && err.message ? err.message : err);
+        return /NetworkError|Failed to fetch|fetch resource|Empty response from server/i.test(msg);
+    }
+
+    function waitForDevServer(attempt) {
+        var delay = Math.min(4000, 1200 * attempt);
+        return new Promise(function(resolve) { setTimeout(resolve, delay); })
+            .then(function() {
+                return ajaxFetch('/ai/editor_config').then(function(r) {
+                    if (!r.ok) throw new Error('dev server not ready');
+                });
+            });
+    }
+
+    function fetchJsonWithRetry(url, fetchOpts, retryOpts) {
+        retryOpts = retryOpts || {};
+        var maxRetries = retryOpts.maxRetries != null ? retryOpts.maxRetries : 2;
+        var timeoutMs = retryOpts.timeoutMs;
+        var onStatus = retryOpts.onStatus;
+        var attempt = 0;
+
+        function doFetch() {
+            var opts = fetchOpts || {};
+            var abortCtrl;
+            var abortTimer;
+            if (timeoutMs) {
+                abortCtrl = new AbortController();
+                abortTimer = setTimeout(function() { abortCtrl.abort(); }, timeoutMs);
+                opts = Object.assign({}, opts, { signal: abortCtrl.signal });
+            }
+            return ajaxFetch(url, opts)
+                .then(function(r) {
+                    return r.text().then(function(text) {
+                        if (!text || !text.trim()) {
+                            throw new Error('Empty response from server (HTTP ' + r.status + ')');
+                        }
+                        try {
+                            var data = JSON.parse(text);
+                            if (!r.ok && data && !data.success && !data.error) {
+                                data.success = false;
+                                data.error = 'HTTP ' + r.status;
+                            }
+                            return data;
+                        } catch (e) {
+                            throw new Error('Server returned non-JSON (HTTP ' + r.status + '): '
+                                + text.slice(0, 300));
+                        }
+                    });
+                })
+                .catch(function(err) {
+                    if (err && err.name === 'AbortError') {
+                        throw new Error('Request timed out after '
+                            + Math.round(timeoutMs / 1000) + 's');
+                    }
+                    throw err;
+                })
+                .finally(function() {
+                    if (abortTimer) clearTimeout(abortTimer);
+                });
+        }
+
+        function run() {
+            return doFetch().catch(function(err) {
+                if (!isRetryableFetchError(err) || attempt >= maxRetries) {
+                    throw err;
+                }
+                attempt += 1;
+                if (onStatus) {
+                    onStatus('Connection dropped — retrying (' + attempt + '/' + maxRetries + ')…', '#ffc107');
+                }
+                return waitForDevServer(attempt).then(run);
+            });
+        }
+        return run();
+    }
+
+    function grokModelForRequest() {
+        var modelEl = q('#aew-model');
+        var selected = modelEl ? (modelEl.value || '') : '';
+        return (/grok/i.test(selected) ? selected : '');
+    }
+
+    function cliNetworkErrorHint(err) {
+        var msg = String(err && err.message ? err.message : err);
+        if (!/NetworkError|Failed to fetch|fetch resource|timed out/i.test(msg)) {
+            return msg;
+        }
+        return msg + '\n(Dev server may have restarted, or Grok CLI took too long over HTTP. '
+            + 'Retries are automatic — try again, or use the Chat tab with Ollama for faster replies.)';
+    }
+
     function escapeHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
@@ -73,7 +177,7 @@
     function loadPastConversations() {
         var selectEl = q('#aew-conversation-select') || document.getElementById('aew-conversation-select');
         if (!selectEl) return;
-        fetch('/ai/get_conversation_list', { credentials: 'include' })
+        ajaxFetch('/ai/get_conversation_list')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.success && data.conversations) {
@@ -263,7 +367,7 @@
         var deployPollingInterval = null;
 
         function pollDeployProgress() {
-            fetch('/ai/deploy_progress', { credentials: 'include' })
+            ajaxFetch('/ai/deploy_progress')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     var consoleEl = q('#aew-terminal-console');
@@ -314,9 +418,8 @@
                        '&recreate_volumes=' + recreateVols +
                        '&no_rollback=' + noRollback;
 
-            fetch('/ai/deploy_docker', {
+            ajaxFetch('/ai/deploy_docker', {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body
             })
@@ -400,32 +503,6 @@
             }
         }
 
-        function populateCliOllamaModels(cfg) {
-            var modelEl = q('#aew-cli-ollama-model');
-            if (!modelEl) return;
-            modelEl.innerHTML = '';
-            var models = (cfg && cfg.installed_models) || [];
-            if (!models.length && cfg && cfg.current_model) {
-                models = [cfg.current_model];
-            }
-            if (!models.length) {
-                var opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = '(default model)';
-                modelEl.appendChild(opt);
-                return;
-            }
-            models.forEach(function(m) {
-                var name = (typeof m === 'string') ? m : (m.name || m.model || '');
-                if (!name) return;
-                var opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = name;
-                if (cfg.current_model && name === cfg.current_model) opt.selected = true;
-                modelEl.appendChild(opt);
-            });
-        }
-
         function switchCliPanel(mode) {
             state.cliMode = mode === 'pty' ? 'pty' : 'http';
             var httpPanel = q('#aew-cli-http-panel');
@@ -464,17 +541,21 @@
             };
 
             if (tool === 'grok') {
-                var modelEl = q('#aew-model');
-                var selectedModel = modelEl ? modelEl.value : '';
-                var body = 'prompt=' + encodeURIComponent(text)
-                    + '&model=' + encodeURIComponent(selectedModel);
-                fetch('/ai/grok_cli', {
+                var grokModel = grokModelForRequest();
+                setCliHttpStatus('Grok/xAI API running…', '#ffc107');
+                fetchJsonWithRetry('/ai/grok_cli', {
                     method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: body,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: text,
+                        model: grokModel || undefined,
+                        http_cli: 1,
+                    }),
+                }, {
+                    timeoutMs: 200000,
+                    maxRetries: 2,
+                    onStatus: setCliHttpStatus,
                 })
-                .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
                         appendCliOutput((data.response || data.stdout || '(no output)') + '\n');
@@ -487,7 +568,7 @@
                     }
                 })
                 .catch(function(e) {
-                    appendCliOutput('Network error: ' + e + '\n');
+                    appendCliOutput('Network error: ' + cliNetworkErrorHint(e) + '\n');
                 })
                 .finally(done);
                 return;
@@ -497,9 +578,9 @@
                 var ollamaModelEl = q('#aew-cli-ollama-model');
                 var ollamaModel = ollamaModelEl ? ollamaModelEl.value : '';
                 if (!ollamaModel && state.modelTiers.small) ollamaModel = state.modelTiers.small;
-                fetch('/ai/generate', {
+                setCliHttpStatus('Ollama running…', '#ffc107');
+                fetchJsonWithRetry('/ai/generate', {
                     method: 'POST',
-                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: text,
@@ -507,8 +588,11 @@
                         model: ollamaModel || undefined,
                         agent_id: 'coding',
                     }),
+                }, {
+                    timeoutMs: 120000,
+                    maxRetries: 2,
+                    onStatus: setCliHttpStatus,
                 })
-                .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
                         appendCliOutput((data.response || data.text || '(no output)') + '\n');
@@ -518,19 +602,22 @@
                     }
                 })
                 .catch(function(e) {
-                    appendCliOutput('Network error: ' + e + '\n');
+                    appendCliOutput('Network error: ' + cliNetworkErrorHint(e) + '\n');
                 })
                 .finally(done);
                 return;
             }
 
-            fetch('/ai/run_command', {
+            setCliHttpStatus('Running shell command…', '#ffc107');
+            fetchJsonWithRetry('/ai/run_command', {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'command=' + encodeURIComponent(text),
+            }, {
+                timeoutMs: 120000,
+                maxRetries: 2,
+                onStatus: setCliHttpStatus,
             })
-            .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.success) {
                     appendCliOutput((data.output || '(no output)') + '\n[exit ' + data.exit_code + ']\n');
@@ -539,7 +626,7 @@
                 }
             })
             .catch(function(e) {
-                appendCliOutput('Network error: ' + e + '\n');
+                appendCliOutput('Network error: ' + cliNetworkErrorHint(e) + '\n');
             })
             .finally(done);
         }
@@ -553,9 +640,11 @@
                 '<code>workstation.local:3000</code> / <code>workstation.zero:3000</code>.'
             ];
             if (cfg.grok_mode === 'xai_api') {
-                parts.push(' Grok uses xAI API (no local binary needed).');
+                parts.push(' <strong>Grok CLI</strong> uses xAI API (ignores the header Ollama model dropdown).');
             } else if (cfg.grok_cli) {
-                parts.push(' Grok uses local binary when available, else xAI API.');
+                parts.push(' <strong>Grok CLI</strong> uses xAI API when configured; header model dropdown is for Chat/Ollama only.');
+            } else {
+                parts.push(' <strong>Grok CLI</strong> needs an xAI API key at /ai/manage_api_keys.');
             }
             if (cfg.ollama_reachable && cfg.ollama_host) {
                 parts.push(' Ollama: ' + escapeHtml(cfg.ollama_host) + ':' + (cfg.ollama_port || 11434) + '.');
@@ -924,7 +1013,7 @@
 
         q('#aew-cli-reconnect').onclick = function() {
             if (!state.codingTerminalAllowed) {
-                fetch('/coding/terminal_status', { credentials: 'include' })
+                ajaxFetch('/coding/terminal_status')
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         state.codingTerminalAllowed = !!data.allowed;
@@ -986,7 +1075,7 @@
                 path = path.trim();
                 if (!path) return;
                 setStatus("Creating " + path + "...");
-                fetch("/ai/create_file", {
+                ajaxFetch("/ai/create_file", {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1022,7 +1111,7 @@
                 }
                 var path = state.currentPath;
                 setStatus("Deleting " + path + "...");
-                fetch("/ai/delete_file", {
+                ajaxFetch("/ai/delete_file", {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1077,7 +1166,7 @@
                     return;
                 }
                 setStatus("Reverting codebase to main...", "info");
-                fetch("/ai/revert_to_main", { method: 'POST', credentials: 'include' })
+                ajaxFetch("/ai/revert_to_main", { method: 'POST' })
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         if (data.success) {
@@ -1122,7 +1211,7 @@
         function loadBranches() {
             var selectEl = q('#aew-branch');
             if (!selectEl) return;
-            fetch('/ai/list_branches', { credentials: 'include' })
+            ajaxFetch('/ai/list_branches')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success && data.branches) {
@@ -1151,9 +1240,8 @@
                 return;
             }
             setStatus('Switching branch...', 'info');
-            fetch('/ai/switch_branch', {
+            ajaxFetch('/ai/switch_branch', {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'branch=' + encodeURIComponent(branch)
             })
@@ -1194,7 +1282,7 @@
                     return;
                 }
                 setStatus('Loading past chat ' + convId + '...', 'info');
-                fetch('/ai/get_conversation_messages/' + convId, { credentials: 'include' })
+                ajaxFetch('/ai/get_conversation_messages/' + convId)
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         if (data.success && data.messages) {
@@ -1297,6 +1385,32 @@
         if (!selectEl.childElementCount) {
             selectEl.innerHTML = '<option value="">No models available</option>';
         }
+    }
+
+    function populateCliOllamaModels(cfg) {
+        var modelEl = q('#aew-cli-ollama-model');
+        if (!modelEl) return;
+        modelEl.innerHTML = '';
+        var models = (cfg && cfg.installed_models) || [];
+        if (!models.length && cfg && cfg.current_model) {
+            models = [cfg.current_model];
+        }
+        if (!models.length) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '(default model)';
+            modelEl.appendChild(opt);
+            return;
+        }
+        models.forEach(function(m) {
+            var name = (typeof m === 'string') ? m : (m.name || m.model || '');
+            if (!name) return;
+            var opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            if (cfg.current_model && name === cfg.current_model) opt.selected = true;
+            modelEl.appendChild(opt);
+        });
     }
 
     function initDrag(panel) {
@@ -1585,7 +1699,7 @@
         if (!confirm('Execute command on server?\n\n' + cmd)) return;
         setStatus('Running command…');
         addMsg('Running: ' + cmd, 'system');
-        fetch('/ai/run_command', {
+        ajaxFetch('/ai/run_command', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1637,7 +1751,7 @@
         applyBtn.style.marginTop = '4px';
         applyBtn.onclick = function() {
             if (!confirm('Apply AI fix to ' + fix.path + '?')) return;
-            fetch('/ai/apply_fix', {
+            ajaxFetch('/ai/apply_fix', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2344,7 +2458,7 @@
     function saveFile() {
         if (!state.currentPath) return;
         var content = q('#aew-editor').value;
-        fetch('/ai/apply_fix', {
+        ajaxFetch('/ai/apply_fix', {
             method: 'POST', credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'path=' + encodeURIComponent(state.currentPath) + '&content=' + encodeURIComponent(content),
@@ -2413,23 +2527,17 @@
         setStatus('AI Code Editor running…');
         q('#aew-send-btn').disabled = true;
         var ctx = openerContext();
-        var modelEl = q('#aew-model');
-        var selectedModel = modelEl ? modelEl.value : '';
-        var body = 'prompt=' + encodeURIComponent(prompt)
-            + '&page_path=' + encodeURIComponent(ctx.page_path)
-            + '&page_title=' + encodeURIComponent(ctx.page_title)
-            + '&model=' + encodeURIComponent(selectedModel);
+        var grokOpts = { timeoutMs: 660000, maxRetries: 2 };
+        var grokBody = {
+            prompt: prompt,
+            page_path: ctx.page_path,
+            page_title: ctx.page_title,
+            model: grokModelForRequest() || undefined,
+        };
         if (state.conversationId) {
-            body += '&conversation_id=' + encodeURIComponent(state.conversationId);
+            grokBody.conversation_id = state.conversationId;
         }
-        return fetch('/ai/grok_cli', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body,
-        })
-        .then(function(r) { return r.json(); })
-        .finally(function() { q('#aew-send-btn').disabled = false; });
+        return fetchAiJson('/ai/grok_cli', grokBody, grokOpts);
     }
 
     function isErrorDiagnosisRequest(text) {
@@ -2443,6 +2551,70 @@
             return state.modelTiers.large || state.modelTiers.small || selected;
         }
         return selected;
+    }
+
+    function pickGrokModel() {
+        var cfg = state.editorConfig || {};
+        var models = cfg.external_models || [];
+        if (!models.length) return "";
+        var i, n, names = [];
+        for (i = 0; i < models.length; i++) {
+            n = models[i].name || "";
+            names.push(n);
+            if (/code|fast/i.test(n)) return n;
+        }
+        // Prefer a good-but-cheap Grok model if present
+        var cheapGood = names.find(function(m){ return /grok-3-mini|mini|cheap/i.test(m); });
+        if (cheapGood) return cheapGood;
+        return names[0] || "";
+    }
+
+    function editorCapabilities() {
+        var cfg = state.editorConfig || {};
+        return {
+            ollama: !!state.ollamaReachable,
+            grokApi: !!(cfg.grok_api_available || (cfg.external_models && cfg.external_models.length)),
+            grokCli: !!(cfg.grok_cli && cfg.grok_mode !== 'xai_api'),
+            small: state.modelTiers.small || '',
+            large: state.modelTiers.large || '',
+        };
+    }
+
+    function pickEditorRoute(userText) {
+        var tier = classifyEditorQuery(userText);
+        var cap = editorCapabilities();
+        if (tier === 'local') {
+            return { tier: 'local' };
+        }
+        if (tier === 'simple' && cap.ollama && cap.small) {
+            return { backend: 'comserv', method: 'quick', agent: 'coding', model: cap.small, label: 'Ollama quick' };
+        }
+        if (isErrorDiagnosisRequest(userText)) {
+            if (cap.ollama && cap.large) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: cap.large, label: 'Ollama (errors)' };
+            }
+            if (cap.grokApi) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel(), label: 'Grok API (errors)' };
+            }
+        }
+        if (tier === 'complex') {
+            if (cap.grokApi) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel() || pickEditorModel(userText), label: 'Grok API' };
+            }
+            if (cap.ollama && cap.large) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: cap.large, label: 'Ollama large' };
+            }
+        }
+        if (cap.ollama) {
+            return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickEditorModel(userText), label: 'Ollama' };
+        }
+        if (cap.grokApi) {
+            return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel(), label: 'Grok API' };
+        }
+        if (cap.grokCli) {
+            return { backend: 'grok_cli', method: 'cli', agent: 'coding', label: 'Grok CLI' };
+        }
+        return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickEditorModel(userText), label: 'Comserv AI' };
     }
 
     function classifyEditorQuery(msg) {
@@ -2464,7 +2636,7 @@
         return 'medium';
     }
 
-    function fetchAiJson(url, body, opts) {
+    function fetchAiJsonOnce(url, body, opts) {
         opts = opts || {};
         var timeoutMs = opts.timeoutMs || 660000;
         var abortCtrl = new AbortController();
@@ -2473,7 +2645,7 @@
         var progressPoller = null;
         if (opts.pollProgress) {
             progressPoller = setInterval(function() {
-                fetch('/ai/chat_progress', { credentials: 'include' })
+                ajaxFetch('/ai/chat_progress')
                     .then(function(r) { return r.ok ? r.json() : null; })
                     .then(function(d) {
                         if (!d || !d.steps || !d.steps.length) return;
@@ -2487,9 +2659,8 @@
                     .catch(function() {});
             }, 3000);
         }
-        return fetch(url, {
+        return ajaxFetch(url, {
             method: 'POST',
-            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
             signal: abortCtrl.signal,
@@ -2526,6 +2697,24 @@
         });
     }
 
+    function fetchAiJson(url, body, opts) {
+        opts = opts || {};
+        var maxRetries = opts.maxRetries != null ? opts.maxRetries : 2;
+        var attempt = 0;
+        function run() {
+            return fetchAiJsonOnce(url, body, opts).catch(function(err) {
+                if (!isRetryableFetchError(err) || attempt >= maxRetries) {
+                    throw err;
+                }
+                attempt += 1;
+                setStatus('Connection dropped — waiting for dev server (retry '
+                    + attempt + '/' + maxRetries + ')…', 'info');
+                return waitForDevServer(attempt).then(run);
+            });
+        }
+        return run();
+    }
+
     function sendChatQuick(userText) {
         setStatus('Ollama quick…');
         q('#aew-send-btn').disabled = true;
@@ -2543,22 +2732,29 @@
         });
     }
 
-    function sendChatComserv(prompt, userText) {
-        setStatus('Comserv AI…');
-        q('#aew-send-btn').disabled = true;
-        var selectedModel = pickEditorModel(userText || prompt);
-        var tier = classifyEditorQuery(userText || prompt);
-        if (tier === 'simple' && state.ollamaReachable && !isErrorDiagnosisRequest(userText || prompt)) {
+    function sendChatComserv(prompt, userText, route) {
+        route = route || pickEditorRoute(userText || prompt);
+        if (route.method === 'quick') {
             return sendChatQuick(userText || prompt);
         }
+        setStatus((route.label || 'Comserv AI') + '…');
+        q('#aew-send-btn').disabled = true;
         return fetchAiJson('/ai/chat', {
             prompt: prompt,
-            agent_id: 'coding',
-            model: selectedModel || undefined,
+            agent_id: route.agent || 'coding',
+            model: route.model || undefined,
             history: state.chatHistory.slice(-20),
             page_path: window.location.pathname,
             conversation_id: state.conversationId || undefined,
-        }, { timeoutMs: 660000, pollProgress: true });
+        }, { timeoutMs: route.method === 'quick' ? 120000 : 660000, pollProgress: route.method !== 'quick' });
+    }
+
+    function executeEditorRoute(userText, route) {
+        var full = buildPrompt(userText);
+        if (route.backend === 'grok_cli') {
+            return sendChatGrokCli(buildGrokCliPrompt(userText));
+        }
+        return sendChatComserv(full, userText, route);
     }
 
     function sendChat(userText) {
@@ -2594,16 +2790,20 @@
     }
 
     function sendChatToBackend(userText) {
-        var tier = classifyEditorQuery(userText);
-        var useComserv = state.backend === 'comserv'
-            || tier === 'simple'
-            || isErrorDiagnosisRequest(userText)
-            || (tier === 'medium' && state.ollamaReachable && !/grok/i.test((q('#aew-model') || {}).value || ''));
-        if ((tier === 'simple' || isErrorDiagnosisRequest(userText)) && state.ollamaReachable) {
-            useComserv = true;
+        var route = pickEditorRoute(userText);
+        if (state.backend === 'comserv' && route.backend === 'grok_cli') {
+            route = pickEditorRoute(userText);
+            if (route.backend === 'grok_cli') {
+                var cap = editorCapabilities();
+                if (cap.ollama || cap.grokApi) {
+                    route = cap.ollama
+                        ? { backend: 'comserv', method: 'chat', agent: 'coding', model: pickEditorModel(userText), label: 'Ollama' }
+                        : { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel(), label: 'Grok API' };
+                }
+            }
         }
-        var full = useComserv ? buildPrompt(userText) : buildGrokCliPrompt(userText);
-        var req = useComserv ? sendChatComserv(full, userText) : sendChatGrokCli(full);
+        setStatus('Using ' + (route.label || route.backend || 'auto'));
+        var req = executeEditorRoute(userText, route);
         req.then(function(data) {
             if (!data.success) {
                 var err = data.error || 'failed';
@@ -2637,7 +2837,7 @@
             } else if (data.backend === 'ollama_quick') {
                 backendLabel = 'Ollama quick' + (data.ollama_host ? ' @' + data.ollama_host : '');
             } else {
-                backendLabel = data.backend || (useComserv ? 'comserv' : state.backend);
+                backendLabel = data.backend || route.label || state.backend;
             }
             setStatus(backendLabel + ' done', 'ok');
             var rf = reply.match(/\[READ_FILE:\s*([^\]]+)\]/i);
@@ -2647,17 +2847,31 @@
             if (fix) showFixPanel(fix);
         }).catch(function(e) {
             var errMsg = String(e);
+            if (/NetworkError|Failed to fetch|fetch resource|aborted|timed out/i.test(errMsg)
+                && route.backend !== 'comserv' && state.ollamaReachable) {
+                setStatus('Retrying with Comserv AI + Ollama…', 'info');
+                var fallback = {
+                    backend: 'comserv',
+                    method: isErrorDiagnosisRequest(userText) || classifyEditorQuery(userText) === 'complex'
+                        ? 'chat' : 'quick',
+                    agent: 'coding',
+                    model: state.modelTiers.large || state.modelTiers.small || pickEditorModel(userText),
+                    label: 'Ollama fallback'
+                };
+                return executeEditorRoute(userText, fallback).then(function(data) {
+                    if (!data.success) throw new Error(data.error || 'fallback failed');
+                    addMsg(data.response || '', 'ai');
+                    state.chatHistory.push({ role: 'assistant', content: data.response || '' });
+                    setStatus('Ollama fallback done', 'ok');
+                });
+            }
             var hint = '';
             if (/NetworkError|Failed to fetch|fetch resource|aborted|timed out/i.test(errMsg)) {
-                hint = '\n\nTip: For error diagnosis, use backend "Comserv AI" with an Ollama model selected.';
-                if (/grok/i.test((q('#aew-model') || {}).value || '')) {
-                    hint += '\nGrok request failed — sync models at /ai/models or switch to an Ollama model in the dropdown.';
-                }
-                if (state.ollamaReachable) {
-                    hint += '\nOllama is available on this workstation — paste errors with Comserv AI backend.';
-                } else if (state.backend === 'grok_cli') {
-                    hint += '\nRemote? Switch backend to "Comserv AI" or open the editor on 172.30.131.126:3001.';
-                }
+                hint = '\n\nLikely cause: the dev server restarted (auto-reload after Save, or manual restart) while this request was in flight.';
+                hint += '\nFix: wait a few seconds and send again — retries are automatic.';
+                hint += '\nIf it keeps failing on the workstation: bash script/restart_dev_server.sh';
+                hint += '\nOr open the editor directly: '
+                    + window.location.origin + '/ai/editing_widget_popup';
             }
             addMsg('Network error: ' + errMsg + hint, 'system');
             setStatus(errMsg, 'err');
@@ -2831,20 +3045,12 @@
             diagHtml += '<strong>Ollama hosts to try:</strong> ' + escapeHtml(cfg.ollama_hosts.join(', ')) + '<br>';
         }
 
-        var host = window.location.hostname || '';
-        var isRemote = cfg.remote_ok && !/^(localhost|127\.0\.0\.1)$/i.test(host)
-            && !/172\.30\.131\.126/.test(host)
-            && !/\.local$/i.test(host);
-        if (isRemote || cfg.grok_mode === 'xai_api' || cfg.default_backend === 'comserv') {
-            state.backend = cfg.default_backend || 'comserv';
-            var be = q('#aew-backend');
-            if (be) be.value = state.backend;
+        state.backend = 'comserv';
+        if (!cfg.ollama_reachable && !cfg.grok_api_available && cfg.default_backend === 'grok_cli') {
+            state.backend = 'grok_cli';
         }
-        if (cfg.ollama_reachable && !isRemote) {
-            state.backend = 'comserv';
-            var be2 = q('#aew-backend');
-            if (be2) be2.value = 'comserv';
-        }
+        var be = q('#aew-backend');
+        if (be) be.value = state.backend;
         if (window.AEW_POPUP_MODE) {
             checkForErrorSourceAndLoad();
             return;
@@ -2852,5 +3058,20 @@
         if (sessionStorage.getItem('aew_open') === 'inline') openPanel();
         if (window.location.search.match(/open_aew=(?:1|popup)/)) openPopup();
         if (window.location.search.indexOf('open_aew=inline') >= 0) openPanel();
-    }).catch(function() {});
+    }).catch(function(err) {
+        var msg = String(err);
+        var isFetch = /NetworkError|Failed to fetch|fetch resource|HTTP \d{3}/i.test(msg);
+        if (window.AEW_POPUP_MODE && isFetch) {
+            document.body.innerHTML = '<div style="padding:24px;font-family:system-ui;color:#f48771;background:#1e1e1e;min-height:100vh">'
+                + '<h2 style="color:#fff">AI Code Editor — cannot reach dev server</h2>'
+                + '<p>Open this page on your dev hostname (e.g. <code>dev.computersystemconsulting.ca</code>), not a raw IP.</p>'
+                + '<p>On the workstation, restart Starman: <code>CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3001 -r</code></p>'
+                + '<p style="color:#888">' + escapeHtml(msg) + '</p></div>';
+        } else {
+            console.error('AI Code Editor init failed:', err);
+            if (window.AEW_POPUP_MODE) {
+                addMsg('Editor init error: ' + msg, 'system');
+            }
+        }
+    });
 })();

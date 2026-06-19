@@ -155,8 +155,11 @@
     [% END %]
 
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
+    [%# Only load legacy menu JS when NOT using DB-driven menus (true legacy static includes need no JS) %]
+    [% UNLESS c.session.use_db_menu || c.stash.use_db_menu %]
     <script src="/static/js/sub-menu.js"></script>
     <script src="/static/js/menu.js"></script>
+    [% END %]
     <script src="/static/js/back-to-top.js?v=[% cv %]"></script>
     <script language="javascript" type="text/javascript">
         function switchpage(select) {

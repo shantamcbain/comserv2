@@ -86,23 +86,73 @@
                     </a>
                     <a href="[% c.uri_for('/admin/git_pull') %]" class="admin-link">
                         <i class="fas fa-download"></i>
-                        <span>Git Pull (origin/main)</span>
+                        <span>Git Pull</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/git_push') %]" class="admin-link">
+                        <i class="fas fa-upload"></i>
+                        <span>Git Push[% IF software_status.git_status.commits_ahead > 0 %] ([% software_status.git_status.commits_ahead %])[% END %]</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/git_commit') %]" class="admin-link">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Git Commit</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/branch_management') %]" class="admin-link">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Branches</span>
                     </a>
                 </div>
+                [% IF software_status.git_status.commits_ahead > 0 %]
+                <div style="margin-top:0.75rem;">
+                    <a href="[% c.uri_for('/admin/git_push') %]"
+                       style="display:inline-flex;align-items:center;gap:0.4rem;background:#1565c0;color:#fff;padding:0.55rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:600;">
+                        <i class="fas fa-upload"></i>
+                        Push [% software_status.git_status.commits_ahead %] commit[% IF software_status.git_status.commits_ahead != 1 %]s[% END %] to remote
+                    </a>
+                </div>
+                [% END %]
                 [% IF software_status.git_status %]
                 <div class="section-info">
                     <span><i class="fas fa-code-branch"></i> [% software_status.git_status.current_branch || 'Unknown' %]</span>
+                    [% IF software_status.git_status.upstream_ref %]
+                    &bull;
+                    <span><i class="fas fa-link"></i> tracking [% software_status.git_status.upstream_ref | html %]</span>
+                    [% END %]
                     &bull;
                     <span><i class="fas fa-clock"></i> [% software_status.git_status.last_commit || 'No commits' %]</span>
+                    [% IF software_status.git_status.commits_ahead > 0 %]
+                    &bull;
+                    <span class="section-info-warn"><i class="fas fa-upload"></i> [% software_status.git_status.commits_ahead %] unpushed commit[% IF software_status.git_status.commits_ahead != 1 %]s[% END %]</span>
+                    [% END %]
                     [% IF software_status.git_status.commits_behind > 0 %]
                     &bull;
-                    <span class="section-info-warn"><i class="fas fa-exclamation-triangle"></i> [% software_status.git_status.commits_behind %] behind origin/main</span>
+                    <span class="section-info-warn"><i class="fas fa-exclamation-triangle"></i> [% software_status.git_status.commits_behind %] behind remote</span>
                     [% END %]
                     [% IF software_status.git_status.has_uncommitted_changes %]
                     &bull;
                     <span class="section-info-warn"><i class="fas fa-pencil-alt"></i> Uncommitted changes</span>
                     [% END %]
                 </div>
+                [% IF software_status.git_status.commits_ahead > 0 && software_status.git_status.unpushed_commits.size %]
+                <div class="section-info" style="margin-top:0.5rem;font-size:0.9em;">
+                    <strong>Unpushed:</strong>
+                    [% FOREACH cmt IN software_status.git_status.unpushed_commits %]
+                    <code style="display:inline-block;margin:0.15rem 0.35rem 0.15rem 0;">[% cmt | html %]</code>
+                    [% END %]
+                    [% IF software_status.git_status.commits_ahead > software_status.git_status.unpushed_commits.size %]
+                    <span>…and [% software_status.git_status.commits_ahead - software_status.git_status.unpushed_commits.size %] more</span>
+                    [% END %]
+                </div>
+                [% END %]
+                [% IF software_status.recommendations.size %]
+                <ul class="section-recommendations" style="margin:0.75rem 0 0;padding-left:1.2rem;font-size:0.92em;">
+                    [% FOREACH rec IN software_status.recommendations %]
+                    <li>
+                        <i class="[% rec.icon %]"></i> [% rec.message | html %]
+                        [% IF rec.link %] — <a href="[% rec.link %]">[% rec.action | html %]</a>[% END %]
+                    </li>
+                    [% END %]
+                </ul>
+                [% END %]
                 [% END %]
             </div>
         </div>
@@ -578,6 +628,10 @@
                     <a href="[% c.uri_for('/HelpDesk/kb') %]" class="admin-link">
                         <i class="fas fa-book"></i>
                         <span>Knowledge Base</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/dev-preview') %]" class="admin-link" title="See dev workstation changes while working with HelpDesk">
+                        <i class="fas fa-flask"></i>
+                        <span>Preview Upcoming Changes</span>
                     </a>
                 </div>
             </div>

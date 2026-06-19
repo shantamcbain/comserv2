@@ -519,6 +519,7 @@ sub opnsense_index :Path('/admin/infrastructure/opnsense') :Args(0) {
         gateway_plan    => $gateway_plan,
         gateway_audit   => $gateway_audit,
         gateway_doc_links => Comserv::Util::GatewayPlan->doc_links($c),
+        dev_hosts_snippet => Comserv::Util::GatewayOrchestrator->hosts_file_snippet($gateway_plan),
         template        => 'admin/infrastructure/opnsense.tt',
     );
 }
@@ -631,6 +632,23 @@ sub opnsense_action :Path('/admin/infrastructure/opnsense/action') :Args(0) {
             $msg .= ' ' . ($result->{note} // '') if $result->{note};
             $c->flash->{success_msg} = $msg;
         }
+    } elsif ($action eq 'fix_all_dev_to_workstation') {
+        $result = Comserv::Util::GatewayOrchestrator->apply_all_dev_to_workstation($c);
+        if ( $result->{success} ) {
+            my $msg = 'All dev.* → workstation: Unbound, HAProxy, and Cloudflare updated.';
+            $msg .= ' See gateway dashboard for /etc/hosts snippet.';
+            $c->flash->{success_msg} = $msg;
+            if ( $result->{hosts_snippet} ) {
+                $c->flash->{dev_hosts_snippet} = $result->{hosts_snippet};
+            }
+        }
+    } elsif ($action eq 'reorder_gateway_plan') {
+        my $raw = $p->{rule_order} || '';
+        my @ids = grep { length $_ } split /\s*,\s*/, $raw;
+        $result = Comserv::Util::GatewayPlan->save_policy_rules_order(\@ids);
+        if ($result->{success}) {
+            $c->flash->{success_msg} = 'Gateway plan rule order saved (dev rules first, wildcard last).';
+        }
     } elsif ($action eq 'fix_dev_unbound') {
         my $domain_part = $p->{domain} || 'computersystemconsulting.ca';
         my $tgt = Comserv::Util::GatewayOrchestrator->targets;
@@ -684,6 +702,8 @@ sub opnsense_action :Path('/admin/infrastructure/opnsense/action') :Args(0) {
 
 sub _dev_zerotier_access_hints {
     my ($self, $c) = @_;
+    my $tgt = Comserv::Util::GatewayOrchestrator->targets;
+    my $dev_port = $tgt->{dev_port};
     my $zero_host = 'zero.computersystemconsulting.ca';
     my $cf_zone   = 'computersystemconsulting.ca';
     my $dns_zone_url = $c->uri_for('/admin/dns/zone/' . $cf_zone);
@@ -691,17 +711,17 @@ sub _dev_zerotier_access_hints {
     return {
         prod_zero_host    => $zero_host,
         prod_zero_ip      => '172.30.50.206',
-        prod_port         => 5000,
-        dev_zt_ip         => '172.30.131.126',
+        prod_port         => $tgt->{prod_port},
+        dev_zt_ip         => $tgt->{dev_workstation_zt},
         dev_hostname      => 'workstation.zero',
-        dev_port          => 3001,
-        dev_url           => 'http://workstation.zero:3001/ai/editing_widget_popup',
+        dev_port          => $dev_port,
+        dev_url           => "http://workstation.zero:$dev_port/ai/editing_widget_popup",
         cf_zone           => $cf_zone,
         dns_dashboard_url => $c->uri_for('/admin/dns'),
         dns_zone_url      => $dns_zone_url,
         dns_zero_edit_url => $dns_zero_url,
         note              => 'Public DNS for zero.computersystemconsulting.ca is managed in Comserv Application DNS (Cloudflare). '
-                           . 'It currently points at production1 (:5000). For dev Starman :3001 use workstation.zero or 172.30.131.126, '
+                           . "It currently points at production1 (:$tgt->{prod_port}). For dev Starman :$dev_port use workstation.zero or $tgt->{dev_workstation_zt}, "
                            . 'or change the Cloudflare A record to the workstation ZeroTier IP.',
     };
 }

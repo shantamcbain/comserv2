@@ -236,7 +236,7 @@
                       <span class="text-muted">Parent Platform</span>
                     [% ELSE %]
                       <span class="text-warning" style="font-weight:bold;">Not Registered</span><br>
-                      <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', site_name => s.site_name }) %]" class="btn btn-sm btn-primary" style="font-size:0.8em;padding:2px 6px;margin-top:2px;text-decoration:none;display:inline-block;border-radius:3px;">
+                      <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', site_name => s.site_name, new => 1 }) %]" class="btn btn-sm btn-primary" style="font-size:0.8em;padding:2px 6px;margin-top:2px;text-decoration:none;display:inline-block;border-radius:3px;">
                         Register with CSC &rarr;
                       </a>
                     [% END %]

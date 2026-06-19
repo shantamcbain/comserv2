@@ -317,6 +317,7 @@ h6.section-subhead {
                     <li>
                         <span class="model-name">[% model.name %]</span>
                         <span class="models-badge badge-size">[% model.size %]</span>
+                        <span class="models-badge badge-connected" style="background:#4caf50">[% model.best_used_for %]</span>
                         [% IF can_select_model %]
                         <div class="model-actions">
                             <button class="btn btn-sm btn-outline-success"
@@ -419,6 +420,8 @@ h6.section-subhead {
                         [% ELSE %]
                         <span class="models-badge badge-connected">text/chat</span>
                         [% END %]
+                        <span class="models-badge badge-connected" style="background:#4caf50">[% m.best_used_for %]</span>
+                        <span class="models-badge badge-size" style="background:#ff9800">[% m.cost %] per 1M tokens</span>
                     </li>
                     [% END %]
                     [% ELSE %]

@@ -174,14 +174,15 @@
         </div>
       </div>
 
-      [%# ── How to Get Started ────────────────────────────────────────────────── %]
+      [%# ── How to Get Started / Payment (only for NEW subscribers) ───────────── %]
+      [% UNLESS user_has_plan %]
       <div class="content-section">
         <h2>How to Get Started</h2>
         <ol style="font-family:var(--body-font);line-height:1.8;padding-left:1.4em">
           <li>
             <strong>Create your account</strong> — Takes about 2 minutes.
             <a href="[% c.uri_for('/user/register', { return_to => c.req.uri }) %]" class="btn btn-sm btn-secondary" style="margin-left:0.5em">Create Account</a>
-            <span style="font-size:0.85em;color:var(--text-muted-color)"> or
+            <span > or
               <a href="[% c.uri_for('/user/login', { return_to => c.req.uri }) %]">log in</a> if you already have one.
             </span>
           </li>
@@ -216,7 +217,6 @@
         </ol>
       </div>
 
-      [%# ── Payment Options ─────────────────────────────────────────────────── %]
       <div class="content-section">
         <h2>Payment Options</h2>
         <div class="form-row">
@@ -236,21 +236,27 @@
           </div>
         </div>
       </div>
+      [% END %]
 
-      [%# ── CTA + Popup trigger ─────────────────────────────────────────────── %]
+      [%# ── CTA (context-aware for hosting plans) ───────────────────────────── %]
       <div class="form-actions" style="margin-top:1.5rem">
-        [% IF c.session.username %]
-          <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
-             class="btn btn-primary" style="font-size:1.1rem;padding:0.6em 1.8em">
-            Subscribe to [% plan.name | html %]
+        [% IF user_has_plan %]
+          <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">Manage My Subscription</a>
+        [% ELSIF c.session.username AND plan.has_hosting %]
+          <a href="[% c.uri_for('/hosting_signup/details', { plan_slug => plan.slug }) %]" class="btn btn-primary">
+            Continue to Hosting Setup
           </a>
+          <span style="margin-left:1rem;font-size:0.9em;color:var(--success-color,#28a745)">
+            + 100 SiteCoins bonus on activation (limited-time offer)
+          </span>
+        [% ELSIF c.session.username %]
+          <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]" class="btn btn-primary">Subscribe to [% plan.name | html %]</a>
         [% ELSE %]
-          <button type="button" class="btn btn-primary" style="font-size:1.1rem;padding:0.6em 1.8em"
-                  onclick="document.getElementById('signup-modal').style.display='flex'">
+          <button type="button" class="btn btn-primary" onclick="document.getElementById('signup-modal').style.display='flex'">
             Join — [% IF display_price == 0 %]Free[% ELSE %][% plan.price_currency | html %] [% display_price %]/mo[% END %]
           </button>
         [% END %]
-        <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← Compare All Plans</a>
+        <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← All Plans</a>
       </div>
 
     </div>

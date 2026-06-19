@@ -18,7 +18,11 @@
             [% END %]
         [% END %]
     </select>
-    <small class="form-text text-muted">Choose which section inside the menu. For <strong>Login menu (My Links)</strong>, pick <strong>My Links (login dropdown)</strong>.</small>
+    <small class="form-text text-muted">
+        Sections come from the database — built-in areas plus any custom submenus your site admin created.
+        <a href="/navigation/manage_submenus">Manage submenus</a>.
+        For <strong>Login menu (My Links)</strong>, pick <strong>My Links (login dropdown)</strong>.
+    </small>
 </div>
 
 <script>

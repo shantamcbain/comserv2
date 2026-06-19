@@ -49,6 +49,7 @@
     <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
     [%- SET cv = c.stash.css_v || '1' -%]
     <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% cv %]">
+    <script src="/static/js/nav-back.js?v=[% cv %]"></script>
     <script>
     window.AI_CHAT_USER_CONFIG = {
         username: '[% c.session.username || 'Guest' %]',
@@ -62,7 +63,7 @@
     <script src="/static/js/local-chat.js?v=[% cv %]"></script>
     [% IF c.stash.show_code_editor_widget %]
     <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
-    <script src="/static/js/ai-editing-widget-float.js?v=20260612i"></script>
+    <script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
     [% END %]
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->

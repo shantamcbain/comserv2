@@ -14,9 +14,9 @@
     [% PageVersion %]
 [% END %]
 
+[% IF error_title || error_msg %]
 [% INCLUDE 'error.tt' %]
-
-[% IF !error_title %]
+[% ELSE %]
 <div class="app-container">
     <h1>[% c.session.Domain || c.req.uri.host %]</h1>
     <p>This site is currently under construction. Please check back later.</p>

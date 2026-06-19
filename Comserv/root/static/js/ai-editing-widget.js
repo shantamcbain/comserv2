@@ -508,28 +508,38 @@
         var box = $('aew-messages');
         var panel = document.createElement('div');
         panel.className = 'aew-fix-panel';
-        panel.innerHTML = '<strong>Proposed fix:</strong> ' + escapeHtml(fix.path)
+        
+        var isPatch = fix.content.indexOf('--- ') !== -1 && fix.content.indexOf('+++ ') !== -1;
+        var label = isPatch ? 'Proposed Patch (Diff):' : 'Proposed Full Fix:';
+        
+        panel.innerHTML = '<strong role="status">' + label + '</strong> ' + escapeHtml(fix.path)
             + '<pre>' + escapeHtml(fix.content.slice(0, 2000)) + (fix.content.length > 2000 ? '\n…' : '') + '</pre>';
         var applyBtn = document.createElement('button');
         applyBtn.className = 'aew-btn aew-btn-success';
         applyBtn.textContent = 'Apply Fix';
         applyBtn.onclick = function() {
             if (!confirm('Apply AI fix to ' + fix.path + '?')) return;
+            
+            var bodyParams = 'path=' + encodeURIComponent(fix.path);
+            if (isPatch) {
+                bodyParams += '&patch=' + encodeURIComponent(fix.content);
+            } else {
+                bodyParams += '&content=' + encodeURIComponent(fix.content);
+            }
+
             fetch('/ai/apply_fix', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'path=' + encodeURIComponent(fix.path)
-                    + '&content=' + encodeURIComponent(fix.content),
+                body: bodyParams,
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.success) {
                     addMessage('Applied fix to ' + fix.path, 'system');
                     if (fix.path === state.currentPath) {
-                        state.currentContent = fix.content;
-                        state.dirty = false;
-                        $('aew-editor').value = fix.content;
+                        // Re-load file to reflect the patch changes
+                        loadFile(fix.path);
                     }
                     setStatus('Fix applied', 'ok');
                 } else {

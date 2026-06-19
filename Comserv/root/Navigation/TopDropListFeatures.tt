@@ -1,0 +1,97 @@
+[% PageVersion = 'Navigation/TopDropListFeatures.tt,v 1.01 2026/06/16 CSC public Features menu' %]
+<style>
+#features-dropdown .dropdown-content {
+    min-width: 320px;
+    max-width: 380px;
+}
+#features-dropdown .feature-entry {
+    display: block;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.08));
+    text-decoration: none;
+    color: inherit;
+    line-height: 1.35;
+}
+#features-dropdown .feature-entry:last-child {
+    border-bottom: none;
+}
+#features-dropdown .feature-entry:hover {
+    background: var(--nav-hover-bg, rgba(0,0,0,0.05));
+}
+#features-dropdown .feature-title {
+    display: block;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color, #222);
+}
+#features-dropdown .feature-desc {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-muted, #555);
+    margin: 3px 0 4px 0;
+}
+#features-dropdown .feature-more {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--link-color, #1565c0);
+}
+#features-dropdown .feature-entry i {
+    margin-right: 6px;
+    opacity: 0.85;
+}
+</style>
+<li class="horizontal-dropdown" id="features-dropdown">
+    <a href="/hosted" class="dropbtn"><i class="icon-hosted"></i>Features</a>
+    <div class="dropdown-content features-dropdown-panel">
+        <a href="/hosted" class="feature-entry">
+            <span class="feature-title"><i class="icon-hosted"></i>Hosted Sites</span>
+            <span class="feature-desc">Multi-tenant web apps for co-ops, member stores, and organizations.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/marketplace" class="feature-entry">
+            <span class="feature-title"><i class="icon-marketplace"></i>Marketplace</span>
+            <span class="feature-desc">Buy, sell, post jobs, and trade services — members can use points.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/workshop" class="feature-entry">
+            <span class="feature-title"><i class="icon-workshop"></i>Workshops</span>
+            <span class="feature-desc">Schedule training, workshops, and events for your members.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/HelpDesk" class="feature-entry">
+            <span class="feature-title"><i class="icon-helpdesk"></i>HelpDesk</span>
+            <span class="feature-desc">Support tickets, FAQ, and knowledge base for your community.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/todo" class="feature-entry">
+            <span class="feature-title"><i class="icon-planning"></i>Planning &amp; Todos</span>
+            <span class="feature-desc">Projects, calendars, and daily planning for teams.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/ENCY" class="feature-entry">
+            <span class="feature-title"><i class="icon-ency"></i>Encyclopedia</span>
+            <span class="feature-desc">Shared knowledge base with searchable articles and entries.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/membership" class="feature-entry">
+            <span class="feature-title"><i class="icon-member"></i>Membership &amp; Points</span>
+            <span class="feature-desc">Member accounts, roles, and CSC points for services.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/mail" class="feature-entry">
+            <span class="feature-title"><i class="icon-mail"></i>Mail &amp; Newsletters</span>
+            <span class="feature-desc">Mailing lists and newsletters for your organization.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/shop" class="feature-entry">
+            <span class="feature-title"><i class="icon-shop"></i>Shop &amp; Hosting Plans</span>
+            <span class="feature-desc">Order hosting plans and add-ons for your site.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+        <a href="/join" class="feature-entry">
+            <span class="feature-title"><i class="icon-user-plus"></i>Join CSC</span>
+            <span class="feature-desc">Create a member account and get started — no subscription required to browse.</span>
+            <span class="feature-more">Learn more &rarr;</span>
+        </a>
+    </div>
+</li>

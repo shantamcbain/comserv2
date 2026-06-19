@@ -104,7 +104,7 @@
                         </p>
                         <ul>
                             <li>Automatically install/update all required Perl modules</li>
-                            <li>Start on the default development port (3000)</li>
+                            <li>Start on the default development port (3001)</li>
                             <li>Provide a testing environment before production deployment</li>
                             <li>Allow you to verify all functionality works correctly</li>
                         </ul>

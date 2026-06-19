@@ -48,6 +48,11 @@ __PACKAGE__->config(
     aew_ssh_port     => $ENV{AEW_SSH_PORT}     || 22,
     aew_app_port     => $ENV{AEW_APP_PORT}     || 3001,
     aew_ssh_config_host => $ENV{AEW_SSH_CONFIG_HOST} || 'comserv-aew',
+    # Dev preview: production proxies to workstation for site-admin / helpdesk workflows
+    dev_preview_backend       => $ENV{DEV_PREVIEW_BACKEND}       || 'http://192.168.1.199:3001',
+    dev_preview_backend_zt    => $ENV{DEV_PREVIEW_BACKEND_ZT}    || 'http://172.30.131.126:3001',
+    dev_preview_backend_host  => $ENV{DEV_PREVIEW_BACKEND_HOST}  || 'dev.computersystemconsulting.ca',
+    dev_preview_secret        => $ENV{DEV_PREVIEW_SECRET}        || '',
     default_view => 'TT',
     'Plugin::Log::Dispatch' => {
         dispatchers => [
@@ -447,6 +452,7 @@ sub _initialize_ai_chat_schema {
     }
 
     eval { $class->_ensure_ai_navigation_shortcuts_table(); };
+    eval { $class->_ensure_nav_submenu_table(); };
     if ($@) {
         warn "Warning: Could not ensure ai_navigation_shortcuts table: $@\n";
     }
@@ -607,6 +613,7 @@ sub _ensure_ai_navigation_shortcuts_table {
         }
 
         $class->_seed_newsletter_ai_shortcuts($dbh);
+        $class->_seed_dev_preview_nav_links($dbh);
     };
     if ($@) {
         warn "Failed to ensure ai_navigation_shortcuts schema: $@\n";
@@ -678,6 +685,19 @@ sub _seed_newsletter_ai_shortcuts {
             min_role  => 'admin',
             link_order => 10,
         },
+        {
+            label => 'Preview Upcoming Changes',
+            url   => '/admin/dev-preview',
+            trigger_phrases => encode_json([
+                'dev preview', 'preview upcoming changes', 'preview changes',
+                'upcoming changes', 'preview site', 'preview dev',
+                'see dev changes', 'workstation preview',
+            ]),
+            category  => 'HelpDesk_links',
+            sitename  => 'All',
+            min_role  => 'admin',
+            link_order => 15,
+        },
     );
 
     require JSON;
@@ -700,6 +720,107 @@ sub _seed_newsletter_ai_shortcuts {
             }
         };
     }
+}
+
+sub _seed_dev_preview_nav_links {
+    my ($class, $dbh) = @_;
+    return unless $dbh;
+
+    my @links = (
+        {
+            category    => 'HelpDesk_links',
+            sitename    => 'All',
+            name        => 'Preview Upcoming Changes',
+            url         => '/admin/dev-preview',
+            target      => '_self',
+            description => 'admin_only',
+            submenu     => 'resources',
+            link_order  => 8,
+        },
+        {
+            category    => 'Admin_links',
+            sitename    => 'All',
+            name        => 'Preview Upcoming Changes',
+            url         => '/admin/dev-preview',
+            target      => '_self',
+            description => 'admin_only',
+            submenu     => 'admin_links',
+            link_order  => 8,
+        },
+    );
+
+    for my $link (@links) {
+        eval {
+            my $check = $dbh->prepare(
+                'SELECT id FROM internal_links_tb '
+                . 'WHERE category = ? AND url = ? AND sitename = ? LIMIT 1'
+            );
+            $check->execute( $link->{category}, $link->{url}, $link->{sitename} );
+            next if $check->fetchrow_arrayref;
+
+            $dbh->do(
+                'INSERT INTO internal_links_tb '
+                . '(category, sitename, name, url, target, description, submenu, link_order, status) '
+                . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)',
+                undef,
+                $link->{category}, $link->{sitename}, $link->{name}, $link->{url},
+                $link->{target}, $link->{description}, $link->{submenu},
+                $link->{link_order},
+            );
+        };
+    }
+
+    eval {
+        $dbh->do(
+            'UPDATE internal_links_tb SET submenu = ? '
+            . 'WHERE category = ? AND url = ? '
+            . "AND (submenu IS NULL OR submenu = '' OR submenu = 'cms_pages')",
+            undef,
+            'admin_links', 'Admin_links', '/admin/dev-preview',
+        );
+    };
+}
+
+sub _ensure_nav_submenu_table {
+    my $class = shift;
+    eval {
+        my $schema = $class->model('DBEncy');
+        return unless $schema && $schema->storage && $schema->storage->dbh;
+        my $dbh = $schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW TABLES LIKE 'nav_submenu_tb'");
+        $sth->execute();
+        unless ( $sth->fetchrow_arrayref ) {
+            $dbh->do(q{
+                CREATE TABLE nav_submenu_tb (
+                    id INT NOT NULL AUTO_INCREMENT,
+                    category VARCHAR(50) NOT NULL,
+                    sitename VARCHAR(50) NOT NULL DEFAULT 'All',
+                    submenu_id VARCHAR(64) NOT NULL,
+                    label VARCHAR(120) NOT NULL,
+                    icon VARCHAR(64) DEFAULT '',
+                    header_url VARCHAR(255) DEFAULT '',
+                    section_order INT NOT NULL DEFAULT 0,
+                    is_system TINYINT(1) NOT NULL DEFAULT 0,
+                    template_slot VARCHAR(64) DEFAULT '',
+                    status TINYINT(1) NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uq_nav_submenu_scope (category, sitename, submenu_id),
+                    KEY idx_nav_submenu_category (category),
+                    KEY idx_nav_submenu_sitename (sitename),
+                    KEY idx_nav_submenu_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            });
+        }
+        require Comserv::Controller::Navigation;
+        my $nav = Comserv::Controller::Navigation->new;
+        $nav->seed_nav_submenu_catalog_dbh($dbh);
+    };
+    if ($@) {
+        warn "Failed to ensure nav_submenu_tb: $@\n";
+    }
+    return 1;
 }
 
 sub _initialize_session_schema {

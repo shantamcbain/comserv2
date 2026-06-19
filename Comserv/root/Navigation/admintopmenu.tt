@@ -21,14 +21,23 @@
         [% END %]
 
         [% IF c.session.username %]
-        <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+        <a href="/navigation/add_link?menu=Admin&amp;category=Admin_links&amp;submenu=cms_pages&amp;return_url=/admin"><i class="icon-add"></i>Add Link</a>
+        [% END %]
+        [% SET admin_top_db = c.stash.admin_top_links || [] %]
+        [% IF admin_top_db.size %]
+        [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+            db_links = admin_top_db
+            add_link_category = 'Admin_links'
+            add_link_submenu = 'top'
+            add_link_menu = 'Admin'
+            skip_add_link = 1 %]
         [% END %]
         <div class="dropdown-divider"></div>
         
         <div class="submenu-item">
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
             <div class="submenu">
-                <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
+                <a href="/navigation/add_link?menu=Admin&amp;category=Admin_links&amp;submenu=admin_links&amp;return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
                 <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
                 <a href="/admin/docker-containers-old"><i class="icon-docker"></i>Docker Containers (Old)</a>
@@ -38,9 +47,23 @@
                 <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
                 <a href='/ProxyManager'><i class="icon-proxy"></i>Proxy Manager</a>
                 <a href="/admin/schema_compare"><i class="icon-schema"></i>Schema Compare &amp; Migration</a>
+                <a href="[% c.uri_for('/admin/dev-preview') %]"><i class="icon-flask"></i>Preview Upcoming Changes</a>
                 <a href="/admin/environment_variables"><i class="icon-settings"></i>DB Passwords / Env</a>
                 <a href="/remotedb"><i class="icon-server"></i>Database Servers</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
+                [% SET admin_sub_db = c.stash.admin_submenu_links || [] %]
+                [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+                    db_links = admin_sub_db
+                    add_link_category = 'Admin_links'
+                    add_link_submenu = 'admin_links'
+                    add_link_menu = 'Admin'
+                    add_link_label = 'Add Link Here'
+                    skip_add_link = 1 %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Admin_links'
+                    add_link_submenu = 'admin_links'
+                    add_link_menu = 'Admin'
+                    add_link_label = 'Add Link Here' %]
             </div>
         </div>
 
@@ -109,8 +132,11 @@
                         [% END %]
                         <span class="site-domain-row">
                             <span class="site-domain-label">[% row.domain %]</span>
-                            <a href="http://[% row.domain %]:3000" class="site-port-link" target="_blank" title="Port 3000">:3000</a>
-                            <a href="http://[% row.domain %]:3001" class="site-port-link" target="_blank" title="Port 3001">:3001</a>
+                            [% IF row.domain == 'computersystemconsulting.ca' || row.domain.match('computersystemconsulting\.ca$') %]
+                            <a href="http://dev.computersystemconsulting.ca/" class="site-port-link" target="_blank" title="Dev via gateway">dev</a>
+                            [% END %]
+                            <a href="http://[% row.domain %]:3001" class="site-port-link" target="_blank" title="Starman dev :3001">:3001</a>
+                            <a href="http://[% row.domain %]:3000" class="site-port-link" target="_blank" title="Docker :3000 (legacy)">:3000</a>
                         </span>
                     [% END %]
                     [% IF current_site_name != '' %]
@@ -284,6 +310,7 @@
                     <span class="submenu-section-title">Navigation Management</span>
                     <a href="/navigation/add_link"><i class="icon-add"></i>Add New Link</a>
                     <a href="/navigation/manage_links"><i class="icon-settings"></i>Manage Links</a>
+                    <a href="/navigation/manage_submenus"><i class="icon-settings"></i>Manage Submenus</a>
                 </div>
             </div>
         </div>
@@ -413,12 +440,16 @@
                     [% END %]
                 </div>
                 
-                <!-- TTML Links -->
+                <!-- Your private Admin bookmarks only (public site links live in the Admin submenu above) -->
                 <div class="submenu-section">
-                    <span class="submenu-section-title">TTML Links</span>
-                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Admin_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-                        <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.name %]">[% link.name %]</a>
-                    [% END %]
+                    <span class="submenu-section-title">My Private Admin Links</span>
+                    [% SET admin_private_db = c.stash.admin_private_links || [] %]
+                    [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+                        db_links = admin_private_db
+                        add_link_category = 'Admin_links'
+                        add_link_submenu = 'admin_links'
+                        add_link_menu = 'Admin'
+                        add_link_label = 'Add Private Admin Link' %]
                 </div>
             </div>
         </div>
@@ -428,7 +459,7 @@
         <div class="submenu-item">
             <span class="submenu-header"><a href="/mcoop"><i class="icon-mcoop"></i>MCOOP Admin</a></span>
             <div class="submenu">
-                <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
+                <a href="/navigation/add_link?menu=Admin&amp;category=Admin_links&amp;submenu=admin_links&amp;return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/mcoop"><i class="icon-home"></i>MCOOP Home</a>
                 <a href="/mcoop/server-room-plan"><i class="icon-server"></i>Server Room Plan</a>
                 <a href="/mcoop/network"><i class="icon-network"></i>Network Infrastructure</a>
@@ -451,14 +482,16 @@
             </div>
         </div>
 
+        [% INCLUDE 'Navigation/inc/admin_dynamic_submenu_sections.tt' %]
+
         <!-- Debug Options -->
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-debug"></i>Debug Options</span>
             <div class="submenu">
                 [% IF c.session.debug_mode == 1 %]
-                    <a href="[% c.session.return_url %]?debug=0"><i class="icon-toggle-off"></i>Toggle Debug Mode OFF</a>
+                    <a href="[% c.req.uri %]?debug=0"><i class="icon-toggle-off"></i>Toggle Debug Mode OFF</a>
                 [% ELSE %]
-                    <a href="[% c.session.return_url %]?debug=1"><i class="icon-toggle-on"></i>Toggle Debug Mode ON</a>
+                    <a href="[% c.req.uri %]?debug=1"><i class="icon-toggle-on"></i>Toggle Debug Mode ON</a>
                 [% END %]
                 <a href="/debug" target="_blank"><i class="icon-debug"></i>Debug Console</a>
                 <a href="https://computersystemconsulting.ca:10000" target="_blank"><i class="icon-server"></i>Sunfire WHM</a>

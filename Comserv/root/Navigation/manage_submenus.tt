@@ -1,0 +1,87 @@
+[% PageVersion = 'manage_submenus.tt,v 0.01 2026/06/16 dynamic nav submenus' %]
+
+<div class="container">
+    <h2><i class="icon-settings"></i> Manage Menu Submenus</h2>
+    <p class="text-muted">
+        Submenu sections are stored in the database. Built-in sections map to existing dropdown areas;
+        <strong>custom</strong> sections appear automatically in the menu. Add links to a section from
+        <a href="/navigation/add_link">Add Link</a> using <em>Appear in Submenu</em>.
+    </p>
+
+    [% IF error_msg %]<div class="alert alert-danger">[% error_msg %]</div>[% END %]
+    [% IF success_msg %]<div class="alert alert-success">[% success_msg %]</div>[% END %]
+
+    <div class="actions-bar" style="margin-bottom:1rem;">
+        <a href="/navigation/add_submenu" class="btn btn-success"><i class="icon-add"></i> Add Custom Submenu</a>
+        <a href="/navigation/manage_links" class="btn btn-secondary">Manage Links</a>
+        <a href="/navigation/add_link" class="btn btn-outline-primary">Add Link</a>
+    </div>
+
+    <form method="GET" action="/navigation/manage_submenus" class="filter-row" style="margin-bottom:1rem;display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+            <label for="filter_category">Menu</label>
+            <select name="category" id="filter_category" class="form-control">
+                <option value="">All menus</option>
+                [% FOREACH cat IN permissions.available_categories %]
+                    [% NEXT IF cat == 'Private_links' %]
+                    <option value="[% cat %]" [% IF filter_category == cat %]selected[% END %]>
+                        [% permissions.category_labels.item(cat) || cat %]
+                    </option>
+                [% END %]
+            </select>
+        </div>
+        [% IF permissions.is_csc %]
+        <div>
+            <label for="filter_site">Site</label>
+            <select name="sitename" id="filter_site" class="form-control">
+                <option value="">All sites</option>
+                [% FOREACH site IN permissions.available_sites %]
+                    <option value="[% site %]" [% IF filter_site == site %]selected[% END %]>[% site %]</option>
+                [% END %]
+            </select>
+        </div>
+        [% END %]
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+
+    [% IF submenu_rows && submenu_rows.size %]
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Menu</th>
+                <th>Site</th>
+                <th>Submenu ID</th>
+                <th>Label</th>
+                <th>Order</th>
+                <th>Type</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH row IN submenu_rows %]
+            <tr>
+                <td>[% permissions.category_labels.item(row.category) || row.category %]</td>
+                <td>[% row.sitename %]</td>
+                <td><code>[% row.submenu_id %]</code></td>
+                <td>[% row.label | html %]</td>
+                <td>[% row.section_order %]</td>
+                <td>
+                    [% IF row.is_system %]
+                        <span class="badge badge-secondary">Built-in</span>
+                    [% ELSE %]
+                        <span class="badge badge-primary">Custom</span>
+                    [% END %]
+                </td>
+                <td>
+                    <a href="/navigation/edit_submenu?id=[% row.id %]" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <a href="/navigation/add_link?category=[% row.category | uri %]&amp;sitename=[% row.sitename | uri %]&amp;submenu=[% row.submenu_id | uri %]&amp;link_type=public"
+                       class="btn btn-sm btn-outline-primary">Add Link Here</a>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="alert alert-info">No submenu sections found for this filter.</div>
+    [% END %]
+</div>

@@ -12,6 +12,8 @@ sub workstation_allowed {
     $host =~ s/:\d+\z//;
     return 1 if $host eq '172.30.131.126';
     return 1 if $host =~ /^(127\.0\.0\.1|localhost|workstation\.local|workstation\.zero)$/;
+    return 1 if $host =~ /^dev\./;
+    return 1 if $host =~ /\.local$/;
     return 0;
 }
 

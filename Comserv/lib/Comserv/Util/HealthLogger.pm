@@ -5,17 +5,14 @@ package Comserv::Util::HealthLogger;
 sub _schema {
     my ($c) = @_;
 
-    if (!$c || !$c->can('model')) {
-        # If no Catalyst context, try to get a standalone schema
+    if (!$c || !eval { $c->can('model') }) {
         return _get_standalone_schema();
     }
 
-    if (eval { $c->can('model') }) {
-        my $s = eval { $c->model('DBEncy') };
-        return $s if $s;
-    }
+    my $s = eval { $c->model('DBEncy') };
+    return $s if $s;
 
-    # ...
+    return _get_standalone_schema();
 }
 
 sub _get_standalone_schema {
@@ -36,3 +33,5 @@ sub _get_standalone_schema {
     }
     return $_standalone_schema;
 }
+
+1;

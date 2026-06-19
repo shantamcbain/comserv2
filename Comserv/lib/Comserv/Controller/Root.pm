@@ -184,6 +184,17 @@ sub auto :Private {
         return 0;
     }
 
+    # Dev workstation preview proxy (production → workstation :3001).
+    # Call proxy_dispatch directly — $c->go from auto re-dispatches and can recurse on Admin _BEGIN/_END.
+    if ($c->req->path =~ m{^admin/dev-preview/site(?:/|$)}) {
+        eval { require Comserv::Util::DevPreview; Comserv::Util::DevPreview::maybe_apply_preview_session($c) };
+        Comserv::Util::DevPreview::proxy_dispatch($c);
+        return 0;
+    }
+
+    # Signed preview session from production proxy or direct ?_dvpt= link
+    eval { require Comserv::Util::DevPreview; Comserv::Util::DevPreview::maybe_apply_preview_session($c) };
+
     $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
@@ -436,6 +447,7 @@ sub auto :Private {
         $c->stash->{helpdesk_links} = [];
         $c->stash->{hosted_links} = [];
         $c->stash->{show_hosted_nav} = 0;
+        # show_features_nav set in begin + after populate (CSC-only public menu)
         $c->stash->{admin_pages} = [];
         $c->stash->{admin_links} = [];
         $c->stash->{private_links} = [];
@@ -457,6 +469,12 @@ sub auto :Private {
                 alarm(0);  # Cancel alarm on success
             };
             alarm(0);  # Make sure alarm is cancelled
+
+            # CSC public Features menu — set outside populate eval (cheap; not link-cache data)
+            {
+                my $sn_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
+                $c->stash->{show_features_nav} = ( $sn_lc eq 'csc' ) ? 1 : 0;
+            }
             
             if ($@) {
                 if ($@ =~ /timeout/i) {
@@ -504,14 +522,35 @@ sub auto :Private {
                 # Get admin data if user is admin
                 if ($c->stash->{is_admin}) {
                     $c->stash->{admin_pages} = $nav_controller->get_admin_pages($c, $site_name);
-                    $c->stash->{admin_links} = $nav_controller->get_admin_links($c, $site_name);
+                    my $admin_merged = $nav_controller->get_merged_menu_links(
+                        $c, 'Admin_links', $site_name
+                    );
+                    $c->stash->{admin_links} = $admin_merged;
+                    $c->stash->{admin_submenu_links} = $nav_controller->filter_menu_links_by_submenu(
+                        $admin_merged, 'admin_links', 'admin_links', $c, $site_name
+                    );
+                    $c->stash->{admin_top_links} = $nav_controller->filter_menu_links_by_submenus(
+                        $admin_merged, [qw(top cms_pages)], $c, $site_name
+                    );
+                    $c->stash->{admin_links_by_submenu} = $nav_controller->group_menu_links_by_submenu(
+                        $admin_merged, 'Admin_links', $c, $site_name
+                    );
+                    $c->stash->{admin_custom_submenu_sections} = $nav_controller->get_custom_submenu_sections(
+                        $c, 'Admin_links', $site_name
+                    );
                 }
                 
                 # Private links for user dropdown — always load full list (any site scope).
                 if ($c->stash->{user_logged_in}) {
-                    $c->stash->{private_links} = $nav_controller->get_all_private_links_for_user(
+                    my $private = $nav_controller->get_all_private_links_for_user(
                         $c, $c->session->{username}
                     );
+                    $c->stash->{private_links} = $private;
+                    if ( $c->stash->{is_admin} ) {
+                        $c->stash->{admin_private_links} = [
+                            grep { ( $_->{category} // '' ) eq 'Admin_links' } @$private
+                        ];
+                    }
                 }
             }
             
@@ -1268,7 +1307,8 @@ sub fetch_and_set {
                 $c->session->{SiteName} = $value;
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
 
-                my $home_view = $site->home_view || 'Root';
+                my $home_view = $site->home_view;
+                $home_view = 'SiteHome' if !defined $home_view || $home_view eq '';
                 my $controller_exists = 0;
                 eval {
                     my $ctrl = $c->controller($home_view);
@@ -1691,7 +1731,8 @@ sub setup_site {
                 $c->session->{SiteName} = $SiteName;
 
                 # Set ControllerName based on the site's home_view
-                my $home_view = $site->home_view || $site->name || 'Root';  # Use home_view if available
+                my $home_view = $site->home_view;
+                $home_view = 'SiteHome' if !defined $home_view || $home_view eq '';
 
                 # Verify the controller exists before setting it
                 my $controller_exists = 0;
@@ -2001,6 +2042,23 @@ sub site_setup {
     $c->session->{site_display_name} = $site_display_name;
     $c->session->{SiteName}          = $site_name;
 
+    # Home controller: empty home_view → SiteHome (per-site template under root/SiteHome/)
+    my $home_view = $site->can('home_view') ? $site->home_view : '';
+    $home_view = 'SiteHome' if !defined $home_view || $home_view eq '';
+    my $home_ctrl_ok = 0;
+    eval { $home_ctrl_ok = 1 if $c->controller($home_view); };
+    if ($home_ctrl_ok) {
+        $c->stash->{ControllerName} = $home_view;
+        $c->session->{ControllerName} = $home_view;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "ControllerName set to: $home_view");
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
+            "Controller '$home_view' not found; using Root for home");
+        $c->stash->{ControllerName} = 'Root';
+        $c->session->{ControllerName} = 'Root';
+    }
+
     # Log the final values being set for verification
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "STASHED: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') .
@@ -2130,6 +2188,8 @@ sub begin :Private {
         " Path: " . $c->req->path . 
         " at " . scalar(localtime($c->stash->{_request_start_time})));
 
+    $self->_track_nav_back_url($c);
+
     # Ensure SiteName is established as early as possible for all routes
     eval {
         my $sn = $c->stash->{SiteName} // $c->session->{SiteName};
@@ -2146,6 +2206,8 @@ sub begin :Private {
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin',
             "BEGIN INIT: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') . "', SiteName='" . ($c->stash->{SiteName}//'UNDEF') . "'");
+        my $sn_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
+        $c->stash->{show_features_nav} = ( $sn_lc eq 'csc' ) ? 1 : 0;
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
@@ -2176,6 +2238,36 @@ sub begin :Private {
     if ($@) {
         $c->stash->{active_todos} = {};
     }
+}
+
+# Remember previous full-page GET so nav "Back" goes to the last page, not the current one.
+# Skips /ai/, /navigation/, etc. — those AJAX polls were overwriting session history.
+sub _track_nav_back_url {
+    my ($self, $c) = @_;
+    return unless $c->req->method eq 'GET';
+    return if ($c->req->headers->header('X-Requested-With') || '') =~ /XMLHttpRequest/i;
+    return if ($c->req->headers->header('Accept') || '') =~ m{application/json}i;
+    return if $c->req->path =~ m{^/(?:static|api/|admin/health|health|ai/|navigation/|chat/)(?:/|$)}i;
+
+    my $uri = $c->req->uri->path_query || '/';
+    $uri =~ s/#.*//;
+
+    my $last = $c->session->{_nav_last_uri};
+    if (defined $last && $last ne '' && $last ne $uri) {
+        $c->session->{nav_back_url} = $last;
+    }
+    $c->session->{_nav_last_uri} = $uri;
+
+    my $back = $c->session->{nav_back_url} || '/';
+    if ($back eq $uri) {
+        my $ref = $c->req->referer || '';
+        my $host = $c->req->uri->host || '';
+        if ($ref =~ m{^https?://\Q$host\E(?::\d+)?(/[^?#]*)(\?[^#]*)?}i) {
+            my $ref_uri = ($1 || '/') . ($2 || '');
+            $back = $ref_uri if $ref_uri ne '' && $ref_uri ne $uri;
+        }
+    }
+    $c->stash->{nav_back_url} = $back;
 }
 
 sub _port_label {

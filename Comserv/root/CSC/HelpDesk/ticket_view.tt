@@ -56,6 +56,13 @@
             <span>Closed: <strong>[% ticket.closed_at %]</strong></span>
             [% END %]
         </div>
+        <div style="margin-top:0.75rem;">
+            <a href="[% c.uri_for('/admin/dev-preview') %][% IF ticket.site_name %]?site=[% ticket.site_name | uri %][% END %]"
+               class="btn btn-sm btn-secondary" target="_blank" rel="noopener"
+               title="View dev workstation changes for this site (admin login required)">
+                <i class="fas fa-flask"></i> Preview upcoming changes
+            </a>
+        </div>
     </div>
 
     [% IF is_staff %]

@@ -1,0 +1,41 @@
+--- a/Comserv/root/admin/schema_compare.tt
++++ b/Comserv/root/admin/schema_compare.tt
+@@
+-                                    [% END %]
+-                                [% END %]
+-                        </div>
+-                    </div>
+-                    [% ELSE %]
+-                    <p style="padding:12px;color:#6c757d;"><i class="fas fa-info-circle"></i> No user databases found on this server yet.</p>
+-                [% ELSE %]
+-                <div class="error-message" style="margin:12px;">
+-                    <i class="fas fa-exclamation-triangle"></i>
+-                    <strong>Connection Error:</strong> [% database_comparison.migration_mysql.error | html %]
+-                    <br><small>
+-                        Set <code>MIGRATION_MYSQL_PASSWORD</code> in
+-                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="color:inherit;font-weight:bold;">
+-                            Admin → Database Management → DB Connection Passwords
+-                        </a>
+-                        (copy <code>MYSQL_ROOT_PASSWORD</code> from <code>/opt/csc-db/.env</code> on 192.168.1.20, then restart the app).
+-                        See the <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" style="color:inherit;font-weight:bold;">Migration Server Setup Guide</a>.
+-                    </small>
+-                </div>
+-                [% END %]
+-            </div>
+-        </div>
+-        [% END %]
++                                [% END %]
++                            </div>
++                        </div>
++                    [% ELSE %]
++                        <p style="padding:12px;color:#6c757d;"><i class="fas fa-info-circle"></i> No user databases found on this server yet.</p>
++                    [% END %]
++                [% ELSE %]
++                    <div class="error-message" style="margin:12px;">
++                        <i class="fas fa-exclamation-triangle"></i>
++                        <strong>Connection Error:</strong> [% database_comparison.migration_mysql.error | html %]
++                    </div>
++                [% END %]
++            </div>
++        </div>
++    [% END %]

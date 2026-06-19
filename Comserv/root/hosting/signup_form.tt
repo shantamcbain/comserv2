@@ -1,5 +1,5 @@
-[% META title = 'Starter Hosting Signup' %]
-[% PageVersion = 'hosting/signup_form.tt,v 0.01 2025/04/12 shanta Exp shanta ' %]
+ [% META title = 'Hosting Signup' %]
+[% PageVersion = 'hosting/signup_form.tt,v 0.02 2026/06/17 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -13,14 +13,35 @@
     [% END %]
 [% END %]
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h2 class="card-title">Starter Hosting Signup</h2>
-                </div>
-                <div class="card-body">
+<!-- Application-compliant container structure -->
+<div class="app-container">
+    <div class="page-header">
+        <h1>[% title || 'Hosting Signup' %]</h1>
+        [% IF subtitle %]<h2 class="page-subtitle">[% subtitle %]</h2>[% END %]
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+            <div class="form-container">
+<style>
+.plan-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.plan-card {
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 6px;
+  padding: 1rem;
+  background: var(--card-bg, #fff);
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+}
+.plan-card h3 { margin: 0 0 .5rem; }
+.plan-card-price { font-size: 1.1rem; font-weight: bold; }
+.plan-card ul { font-size: .9rem; padding-left: 1.1em; flex: 1; }
+</style>
                     [% IF errors && errors.size %]
                     <div class="alert alert-danger">
                         <h4 class="alert-heading">Please fix the following errors:</h4>
@@ -32,161 +53,116 @@
                     </div>
                     [% END %]
                     
-                    <p class="lead">Complete the form below to sign up for our Starter Hosting package.</p>
-                    
-                    <form method="POST" action="[% form_action %]" class="needs-validation" novalidate>
-                        <h3 class="mb-3">Account Information</h3>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="first_name" class="col-sm-3 col-form-label">First Name:</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="first_name" name="first_name" 
-                                       value="[% form_data.first_name | html %]" required>
-                                <div class="invalid-feedback">Please provide your first name.</div>
-                            </div>
+
+                    <p class="lead">Select a hosting plan below. Domain and site details will be collected after plan selection.</p>
+
+                                        <!-- Plan chooser only — no form submission here. Domain details collected after plan selection. -->
+                    <div class="content-section">
+                        <h3>Available Hosting Plans</h3>
+                        <p class="text-muted">Choose a plan. You will be taken to the plan details page where you can review features and continue the signup flow.</p>
+                        [% IF c.session.username %]
+                        <div class="alert alert-success" style="margin:1rem 0">
+                            <strong>Limited-time offer:</strong> Activate any hosting plan now and receive <strong>100 SiteCoins</strong> bonus credit.
                         </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="last_name" class="col-sm-3 col-form-label">Last Name:</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="last_name" name="last_name" 
-                                       value="[% form_data.last_name | html %]" required>
-                                <div class="invalid-feedback">Please provide your last name.</div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="email" class="col-sm-3 col-form-label">Email Address:</label>
-                            <div class="col-sm-9">
-                                <input type="email" class="form-control" id="email" name="email" 
-                                       value="[% form_data.email | html %]" required>
-                                <div class="invalid-feedback">Please provide a valid email address.</div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="username" class="col-sm-3 col-form-label">Username:</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="username" name="username" 
-                                       value="[% form_data.username | html %]" required>
-                                <div class="invalid-feedback">Please choose a username (letters, numbers, and underscores only).</div>
-                                <small class="form-text text-muted">Use only letters, numbers, and underscores.</small>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="password" class="col-sm-3 col-form-label">Password:</label>
-                            <div class="col-sm-9">
-                                <input type="password" class="form-control" id="password" name="password" required>
-                                <div class="invalid-feedback">Please provide a password (minimum 8 characters).</div>
-                                <small class="form-text text-muted">Minimum 8 characters.</small>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="confirm_password" class="col-sm-3 col-form-label">Confirm Password:</label>
-                            <div class="col-sm-9">
-                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-                                <div class="invalid-feedback">Please confirm your password.</div>
-                                <small class="form-text text-muted">Enter your password again to confirm.</small>
-                            </div>
-                        </div>
-                        
-                        <hr class="my-4">
-                        
-                        <h3 class="mb-3">Website Information</h3>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="domain_name" class="col-sm-3 col-form-label">Domain Name:</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="domain_name" name="domain_name" 
-                                       value="[% form_data.domain_name | html %]" required>
-                                <div class="invalid-feedback">Please provide a valid domain name.</div>
-                                <small class="form-text text-muted">Example: yourdomain.com</small>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="site_name" class="col-sm-3 col-form-label">Site Name:</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="site_name" name="site_name" 
-                                       value="[% form_data.site_name | html %]" required>
-                                <div class="invalid-feedback">Please provide a site name.</div>
-                                <small class="form-text text-muted">Internal name for your site (no spaces).</small>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="site_display_name" class="col-sm-3 col-form-label">Display Name:</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="site_display_name" name="site_display_name" 
-                                       value="[% form_data.site_display_name | html %]">
-                                <small class="form-text text-muted">Public display name for your site (optional).</small>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <label for="site_description" class="col-sm-3 col-form-label">Description:</label>
-                            <div class="col-sm-9">
-                                <textarea class="form-control" id="site_description" name="site_description" rows="3">[% form_data.site_description | html %]</textarea>
-                                <small class="form-text text-muted">Brief description of your website (optional).</small>
-                            </div>
-                        </div>
-                        
-                        <hr class="my-4">
-                        
-                        <h3 class="mb-3">Hosting Package</h3>
-                        
-                        <div class="card mb-4">
-                            <div class="card-header bg-success text-white">
-                                <h4 class="mb-0">Starter Hosting Package</h4>
-                            </div>
-                            <div class="card-body">
-                                <ul class="list-group list-group-flush mb-3">
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Disk Space
-                                        <span class="badge bg-primary rounded-pill">5 GB</span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Bandwidth
-                                        <span class="badge bg-primary rounded-pill">50 GB/month</span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Email Accounts
-                                        <span class="badge bg-primary rounded-pill">5</span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        MySQL Databases
-                                        <span class="badge bg-primary rounded-pill">2</span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Price
-                                        <span class="badge bg-success rounded-pill">$9.95/month</span>
-                                    </li>
+                        [% END %]
+
+                        [% IF user_plans.size || user_hosting.size %]
+                        <h4 style="margin-top:1rem;">Your Current Hosting / Memberships</h4>
+                        <div class="plan-cards-grid">
+                            [% FOREACH m IN user_plans %]
+                            [% SET p = m.plan %]
+                            [% SET display_price = p.inventory_item ? p.inventory_item.unit_price : p.price_monthly %]
+                            <div class="plan-card">
+                                <h3 class="plan-card-name">[% p.name | html %] <small style="font-weight:normal;color:#666">([% m.site.name || 'CSC' %])</small></h3>
+                                <div class="plan-card-price">
+                                    [% IF display_price == 0 %]Free
+                                    [% ELSE %][% p.price_currency | html %]&nbsp;[% display_price %]/mo[% END %]
+                                </div>
+                                <div class="plan-card-desc"><small>Status: [% m.status %] • Expires: [% m.expires_at || 'Never' %]</small></div>
+                                <ul class="plan-card-features">
+                                    [% IF p.has_subdomain %]<li>Subdomain included</li>[% END %]
+                                    [% IF p.has_custom_domain %]<li>Custom domain support</li>[% END %]
+                                    [% IF p.has_email %]<li>[% p.email_addresses || 1 %] email address[% IF (p.email_addresses||1) != 1 %]es[% END %]</li>[% END %]
+                                    [% IF p.has_hosting %]<li>Hosting tier: [% p.hosting_tier || 'included' %]</li>[% END %]
+                                    [% IF p.ai_requests_per_day > 0 %]<li>[% p.ai_requests_per_day %] AI requests/day</li>[% END %]
                                 </ul>
-                                <p class="card-text">Our Starter Hosting package is perfect for small websites, personal blogs, and small business sites.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group row mb-3">
-                            <div class="col-sm-9 offset-sm-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
-                                    <label class="form-check-label" for="terms">
-                                        I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>
-                                    </label>
-                                    <div class="invalid-feedback">You must agree to the terms and conditions.</div>
+                                <div class="plan-card-actions" style="margin-top:auto;">
+                                    <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">Manage</a>
+                                    <a href="[% c.uri_for('/membership/plan_details/' _ p.id) %]" class="btn btn-primary" style="margin-left:4px;">Features &amp; Upgrades</a>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="form-group row mt-4">
-                            <div class="col-sm-9 offset-sm-3">
-                                <button type="submit" class="btn btn-primary btn-lg">Sign Up Now</button>
-                                <a href="/CSC/hosting" class="btn btn-outline-secondary">Cancel</a>
+                            [% END %]
+
+                            [% FOREACH ha IN user_hosting %]
+                            <div class="plan-card">
+                                <h3 class="plan-card-name">Hosting Account <small style="font-weight:normal;color:#666">([% ha.sitename %])</small></h3>
+                                <div class="plan-card-desc"><small>Domain: [% ha.domain || '—' %] • Status: [% ha.status %]</small></div>
+                                <ul class="plan-card-features">
+                                    <li>Plan: [% ha.plan_slug || '—' %]</li>
+                                    [% IF ha.contact_email %]<li>Contact: [% ha.contact_email %]</li>[% END %]
+                                </ul>
+                                <div class="plan-card-actions" style="margin-top:auto;">
+                                    <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">Manage</a>
+                                </div>
                             </div>
+                            [% END %]
                         </div>
-                    </form>
+                        [% END %]
+
+                        [% IF public_plans.size %]
+                        <h4 style="margin-top:1rem;">Site Plans</h4>
+                        <div class="plan-cards-grid">
+                            [% FOREACH plan IN public_plans %]
+                            [% SET display_price = plan.inventory_item ? plan.inventory_item.unit_price : plan.price_monthly %]
+                            <div class="plan-card">
+                                <h3 class="plan-card-name">[% plan.name | html %]</h3>
+                                <div class="plan-card-price">
+                                    [% IF display_price == 0 %]Free
+                                    [% ELSE %][% plan.price_currency | html %]&nbsp;[% display_price %]/mo[% END %]
+                                </div>
+                                [% IF plan.price_annual > 0 AND display_price > 0 %]
+                                <div class="plan-card-annual">or [% plan.price_currency | html %]&nbsp;[% plan.price_annual %]/yr</div>
+                                [% END %]
+                                [% IF plan.description %]<p class="plan-card-desc">[% plan.description | html %]</p>[% END %]
+                                <ul class="plan-card-features">
+                                    [% IF plan.has_subdomain %]<li>Subdomain included</li>[% END %]
+                                    [% IF plan.has_custom_domain %]<li>Custom domain support</li>[% END %]
+                                </ul>
+                                <div class="plan-card-actions">
+                                    <a href="[% c.uri_for('/membership/hosting_signup', { plan => plan.slug, new => 1 }) %]" class="btn btn-primary">Learn More &amp; Join →</a>
+                                </div>
+                            </div>
+                            [% END %]
+                        </div>
+                        [% END %]
+
+                        [% IF csc_plans.size %]
+                        <h4 style="margin-top:1rem;">CSC Hosting Plans</h4>
+                        <div class="plan-cards-grid">
+                            [% FOREACH plan IN csc_plans %]
+                            [% SET display_price = plan.inventory_item ? plan.inventory_item.unit_price : plan.price_monthly %]
+                            <div class="plan-card">
+                                <h3 class="plan-card-name">[% plan.name | html %]</h3>
+                                <div class="plan-card-price">
+                                    [% IF display_price == 0 %]Free
+                                    [% ELSE %][% plan.price_currency | html %]&nbsp;[% display_price %]/mo[% END %]
+                                </div>
+                                [% IF plan.price_annual > 0 AND display_price > 0 %]
+                                <div class="plan-card-annual">or [% plan.price_currency | html %]&nbsp;[% plan.price_annual %]/yr</div>
+                                [% END %]
+                                [% IF plan.description %]<p class="plan-card-desc">[% plan.description | html %]</p>[% END %]
+                                <ul class="plan-card-features">
+                                    [% IF plan.has_subdomain %]<li>Subdomain included</li>[% END %]
+                                    [% IF plan.has_custom_domain %]<li>Custom domain support</li>[% END %]
+                                </ul>
+                                <div class="plan-card-actions">
+                                    <a href="[% c.uri_for('/membership/hosting_signup', { plan => plan.slug, new => 1 }) %]" class="btn btn-primary">Learn More &amp; Join →</a>
+                                </div>
+                            </div>
+                            [% END %]
+                        </div>
+                        [% END %]
+                    </div>
                 </div>
             </div>
         </div>
@@ -194,6 +170,13 @@
 </div>
 
 <script>
+// Plan selection helper
+function selectPlan(slug) {
+    document.getElementById('plan_slug').value = slug;
+    // Optionally highlight selected card or scroll to submit
+    alert('Plan selected: ' + slug + '. Click Sign Up Now to continue.');
+}
+
 // Form validation script
 (function() {
     'use strict';

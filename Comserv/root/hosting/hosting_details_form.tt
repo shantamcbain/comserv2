@@ -1,0 +1,148 @@
+[% META title = 'Hosting Application' %]
+<div class="app-container">
+  <div class="page-header">
+    <h1>Hosting Application — [% plan.name || 'Selected Plan' %]</h1>
+    <p>Step 1: Review features • Step 2: Provide domain &amp; account details • Step 3: Select options &amp; add-ons → Cart</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [%# Features summary from the selected plan %]
+      <div class="content-section">
+        <h2>Plan Features</h2>
+        <ul class="plan-card-features" style="font-size:1rem">
+          [% IF plan.has_subdomain %]<li>Subdomain hosting included</li>[% END %]
+          [% IF plan.has_custom_domain %]<li>Custom domain support</li>[% END %]
+          [% IF plan.has_email %]<li>[% plan.email_addresses || 1 %] email address[% IF (plan.email_addresses||1) != 1 %]es[% END %]</li>[% END %]
+          [% IF plan.has_hosting %]<li>Hosting tier: [% plan.hosting_tier || 'included' %]</li>[% END %]
+          [% IF plan.ai_requests_per_day > 0 %]<li>[% plan.ai_requests_per_day %] AI requests/day</li>[% END %]
+          [% IF plan.has_planning %]<li>Planning &amp; project tools</li>[% END %]
+        </ul>
+        <p class="text-muted" style="margin-top:0.5rem">
+          <strong>Limited-time offer:</strong> Activate now and receive <strong>100 SiteCoins</strong> bonus.
+        </p>
+      </div>
+
+      [%# Step 3: Select Options / Add-ons (HelpDesk is mandatory) %]
+      <div class="content-section">
+        <h2>Step 3: Select Options &amp; Add-ons</h2>
+        <p class="text-muted">Choose additional features for your new site. <strong>HelpDesk is required on every site.</strong></p>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.75rem;margin-top:1rem;">
+          [% FOREACH addon IN [
+              { key = 'helpdesk',    label = '🎫 HelpDesk',               hint = 'Ticket system (mandatory)', mandatory = 1 },
+              { key = 'planning',    label = '📋 Planning Tools',         hint = 'Project & task management' },
+              { key = 'ai',          label = '🤖 AI Models',               hint = 'Access to AI chat & form-fill' },
+              { key = 'workshops',   label = '🎓 Workshop Calendar',    hint = 'Event scheduling & registration' },
+              { key = 'printing_3d', label = '🖊️ 3D Printing',           hint = 'Printer farm & print-on-demand' },
+              { key = 'beekeeping',  label = '🐝 Beekeeping / Apiary', hint = 'Hive management & inspections' },
+              { key = 'foraging',    label = '🌿 Foraging',               hint = 'Forager tools & plant database' },
+              { key = 'ency',        label = '📖 ENCY',                   hint = 'Encyclopedia of life' },
+              { key = 'ecommerce',   label = '🛒 Shop / Price List',     hint = 'Inventory & cart' },
+              { key = 'accounting',  label = '💰 Accounting',           hint = 'Double-entry ledger & invoicing' },
+              { key = 'brew',        label = '🍺 Brew / Brewhouse',     hint = 'Brewhouse operations' },
+          ] %]
+            <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid var(--border-color,#ddd);border-radius:6px;padding:0.75rem;background:var(--bg-secondary,#fafafa);">
+              <input type="checkbox" name="addon_[% addon.key %]" value="1"
+                [% IF addon.mandatory %]checked disabled[% END %]
+                style="margin-top:0.2rem;flex-shrink:0;">
+              <div>
+                <strong>[% addon.label %]</strong><br>
+                <small style="color:#666;">[% addon.hint %]</small>
+                [% IF addon.mandatory %]<br><span style="color:#d32f2f;font-size:0.8em;font-weight:bold;">Required</span>[% END %]
+              </div>
+            </label>
+          [% END %]
+        </div>
+      </div>
+
+      [%# Domain / Account details form %]
+      <div class="content-section">
+        <h2>Domain &amp; Account Details</h2>
+        <form method="post" action="[% form_action %]" class="app-form">
+          <input type="hidden" name="plan_slug" value="[% plan_slug | html %]">
+          <input type="hidden" name="new_site_flow" value="1">
+
+          <div class="form-row">
+            <div class="form-field">
+              <label>Desired Domain or Subdomain</label>
+              <input type="text" name="domain_name" class="form-input"
+                     value="[% form_data.domain_name | html %]" placeholder="bmast  or  bmast.forager.com  or  beemaster.ca">
+              <small class="text-muted">Leave blank to use the Site Name below as a subdomain of the current site. Enter a full domain (e.g. bmast.forager.com) to use it as the SiteName.</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label>Internal Site / Account Name (SiteName)</label>
+              <input type="text" name="site_name" class="form-input"
+                     value="[% form_data.site_name | html %]" placeholder="my-new-site" required>
+              <small class="text-muted">This becomes your SiteName. Must be a valid DNS label (letters, numbers, hyphens).</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label>First Name</label>
+              <input type="text" name="first_name" class="form-input"
+                     value="[% form_data.first_name | html %]" required>
+            </div>
+            <div class="form-field">
+              <label>Last Name</label>
+              <input type="text" name="last_name" class="form-input"
+                     value="[% form_data.last_name | html %]" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label>Email Address</label>
+              <input type="email" name="email" class="form-input"
+                     value="[% form_data.email | html %]" required>
+            </div>
+            <div class="form-field">
+              <label>Username</label>
+              <input type="text" name="username" class="form-input"
+                     value="[% form_data.username | html %]" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label>Existing Website to Transfer / Clone (optional)</label>
+              <input type="url" name="existing_site_url" class="form-input"
+                     value="[% form_data.existing_site_url | html %]"
+                     placeholder="https://your-current-site.com">
+              <small class="text-muted">If you want us to clone or migrate an existing site.</small>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Continue to Cart →</button>
+            <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+
+          [%# Floating mini-cart widget (bottom-middle, like chat) %]
+          <div id="mini-cart-widget" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);padding:8px 16px;font-size:0.9rem;display:none;">
+            <span id="mini-cart-text">Your cart is empty</span>
+            <a href="[% c.uri_for('/Cart') %]" class="btn btn-sm btn-primary" style="margin-left:8px;">View Cart</a>
+          </div>
+
+          <script>
+            // Show mini-cart if session has pending_hosting_cart
+            fetch('/Cart.json').then(r => r.json()).then(data => {
+              if (data && data.items && data.items.length) {
+                const w = document.getElementById('mini-cart-widget');
+                const t = document.getElementById('mini-cart-text');
+                t.innerHTML = data.items.length + ' item(s) in cart';
+                w.style.display = 'block';
+              }
+            }).catch(()=>{});
+          </script>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>

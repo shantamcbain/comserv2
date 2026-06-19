@@ -1,0 +1,3 @@
+[%# Fallback only — SiteHome serves page table row page_code=home when present. %]
+[% PageVersion = 'SiteHome/Sunfire.tt,v 1.01 2026/06/15 DB home fallback' %]
+<p>Sunfire home page is managed in <a href="/admin/pages">Admin &rarr; Pages</a> (page code: <code>home</code>).</p>

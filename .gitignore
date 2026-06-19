@@ -154,3 +154,10 @@ AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
 /Comserv/data/forager_offline.db
 /config/dbi_config.json
 deploy-logs/
+.aider*
+.env
+.env
+.env
+.env
+.env
+.env

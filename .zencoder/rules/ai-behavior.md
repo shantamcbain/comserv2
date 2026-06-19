@@ -12,6 +12,7 @@ alwaysApply: true
 - **Execution**: Never run the application unless explicitly requested by the user.
 - **File Management**: Do not create new documents or code files if one already exists for the same purpose.
 - **Consolidation**: If there are two or more documents or code files for the same purpose, ask to consolidate them into one.
+- **Duplicate modules**: On Perl compile/load errors, scan for misplaced or duplicate `.pm` files before applying fixes — especially `package` name vs file path under `lib/Comserv/Controller/`. See **`AGENTS.md` → Perl module hygiene**.
 
 ## APPROVAL-BASED CODE REVIEW WORKFLOW
 
