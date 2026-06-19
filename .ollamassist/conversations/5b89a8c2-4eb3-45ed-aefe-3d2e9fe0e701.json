@@ -1,0 +1,19 @@
+{
+  "id" : "5b89a8c2-4eb3-45ed-aefe-3d2e9fe0e701",
+  "title" : "We have a problem with the chat with ai not loading the olla...",
+  "createdAt" : 1781886558132,
+  "updatedAt" : 1781887031420,
+  "messages" : [ {
+    "role" : "USER",
+    "content" : "We have a problem with the chat with ai not loading the ollama models and when attempting to addes the ai modle mangament it will time out it will lockup the worktation where bothe the dev code and ollama is running how to we fix this error",
+    "timestamp" : 1781886716259
+  }, {
+    "role" : "ASSISTANT",
+    "content" : " => 'varchar',\n        size => 255,\n    },\n    site_stats_viewname => {\n        data_type => 'varchar',\n        size => 255,\n    },\n    last_date_from => {\n        data_type => 'datetime',\n    },\n    last_date_to => {\n        data_type => 'datetime',\n    },\n    last_update_from => {\n        data_type => 'timestamp',\n        is_nullable => 1,\n    },\n    last_update_to => {\n        data_type => 'timestamp',\n        is_nullable => 1,\n    },\n    date_from => {\n        data_type => 'date',\n    },\n    date_to => {\n        data_type => 'date',\n    },\n    display_date_from => {\n        data_type => 'datetime',\n    },\n    display_date_to => {\n        data_type => 'datetime',\n    },\n);\n\n__PACKAGE__->set_primary_key('id');\n\n1;ta_type => 'varchar',\n        size => 255,\n    },\n    cal_table_name => {\n        data_type => 'varchar',\n        size => 255,\n    },\n    cal_date_col => {\n        data_type => 'varchar',\n        size => 255,\n    },\n    cal_desc_col => {\n        data_type => 'varchar',\n        size => 255,\n    },\n    cal_title_col => {\n        data_type",
+    "timestamp" : 1781886741478
+  }, {
+    "role" : "USER",
+    "content" : "are you not able to serarch the file in the application for the code that is causing the errror/",
+    "timestamp" : 1781887031420
+  } ]
+}
