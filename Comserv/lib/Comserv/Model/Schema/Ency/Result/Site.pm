@@ -1,3 +1,4 @@
+
 # AI-REMINDER: keep file < 4 k lines; follow .ai-policy.md
 package Comserv::Model::Schema::Ency::Result::Site;
 use base 'DBIx::Class::Core';
