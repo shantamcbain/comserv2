@@ -284,23 +284,56 @@ sub checkout :Path('/Cart/checkout') :Args(0) {
     my $username    = $c->session->{username} || '';
     my $points_bal  = 0;
 
+    # Pre-fill customer data from logged-in user
+    my %customer = ( name => '', email => '', phone => '', address => '' );
     if ($user_id) {
         eval {
+            my $u = $c->model('DBEncy')->resultset('User')->find($user_id);
+            if ($u) {
+                $customer{name}    = join(' ', grep { $_ } ($u->first_name, $u->last_name));
+                $customer{email}   = $u->email || '';
+                $customer{phone}   = $u->phone   || '';
+                $customer{address} = $u->address || '';
+            }
+        };
+        eval {
             require Comserv::Util::PointSystem;
-            my $ps   = Comserv::Util::PointSystem->new(c => $c);
+            my $ps = Comserv::Util::PointSystem->new(c => $c);
             $points_bal = $ps->balance($user_id) || 0;
         };
     }
 
+    # SiteName payment policy
+    my ($points_enabled, $cash_allowed) = (0, 0);
+    eval {
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->first;
+        if ($site) {
+            $points_enabled = $site->can('points_enabled') ? $site->points_enabled : 0;
+            $cash_allowed   = $site->can('cash_allowed')   ? $site->cash_allowed   : 0;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'checkout',
+            "Site lookup failed (possible schema mismatch): $@");
+    }
+
+    # Credit / invoice allowed only if user has approved credit account for this SiteName
+    # (table Accounting::CustomerCredit not yet implemented – default = no credit)
+    my $has_credit = 0;
+
     $c->stash(
-        cart        => $cart,
-        cart_total  => $self->_cart_total($c),
-        cart_count  => $self->_cart_count($c),
-        sitename    => $sitename,
-        username    => $username,
-        user_id     => $user_id,
-        points_bal  => $points_bal,
-        template    => 'Cart/checkout.tt',
+        cart          => $cart,
+        cart_total    => $self->_cart_total($c),
+        cart_count    => $self->_cart_count($c),
+        sitename      => $sitename,
+        username      => $username,
+        user_id       => $user_id,
+        points_bal    => $points_bal,
+        customer      => \%customer,
+        points_enabled=> $points_enabled,
+        cash_allowed  => $cash_allowed,
+        has_credit    => $has_credit,
+        template      => 'Cart/checkout.tt',
     );
 }
 
@@ -330,9 +363,9 @@ sub place_order :Path('/Cart/place_order') :Args(0) {
     my $username       = $c->session->{username} || 'guest';
 
     my $subtotal = $self->_cart_total($c) + 0;
-    my $tax_rate = 0.13;
-    my $tax_amount = sprintf('%.2f', $subtotal * $tax_rate);
-    my $total    = sprintf('%.2f', $subtotal + $tax_amount);
+    my $tax_rate = 0;          # HST disabled for now (SiteName-specific later)
+    my $tax_amount = 0;
+    my $total    = sprintf('%.2f', $subtotal);
 
     # Points payment validation
     my $points_redeemed = 0;

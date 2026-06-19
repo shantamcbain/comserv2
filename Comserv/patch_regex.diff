@@ -1,0 +1,10 @@
+--- a/lib/Comserv/Controller/Admin.pm
++++ b/lib/Comserv/Controller/Admin.pm
+@@ -5376,7 +5376,7 @@ sub parse_result_file_columns {
+     my $columns = {};
+ 
+     # Split by column definitions (looking for column_name => { ... })
+-    while ($columns_text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,?\s*\))/g) {
++    while ($columns_text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,?\s*\);?)/g) {
+         my $column_name = $1;
+         my $column_def = $2;

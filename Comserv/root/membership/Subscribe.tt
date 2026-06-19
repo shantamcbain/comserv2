@@ -38,6 +38,12 @@
           [% END %]
         </div>
         [% IF plan.description %]<p>[% plan.description | html %]</p>[% END %]
+
+        [% IF c.session.username AND plan.has_hosting %]
+        <div class="alert alert-success" style="margin-top:1rem">
+          <strong>Limited-time SiteCoins offer:</strong> Activate this hosting plan and receive <strong>100 bonus SiteCoins</strong> credited to your account.
+        </div>
+        [% END %]
       </div>
 
       <div class="content-section">
@@ -76,9 +82,14 @@
 
             <div class="form-field" style="text-align:center;padding:1em;border:1px solid var(--border-color, #ddd);border-radius:8px">
               <strong>Site Coins</strong>
+              [% IF plan.has_hosting %]
+              <em style="font-size:0.8em;display:block;color:var(--success-color,#28a745)">Limited-time offer: +100 SiteCoins bonus on activation</em>
+              [% ELSE %]
               <em style="font-size:0.8em;display:block;color:var(--warning-color,#e67e22)">Promotional Offer</em>
+              [% END %]
               <small>Pay using your coin balance. Coins can also be used for services offered by participating members.</small><br><br>
-              <button type="submit" formaction="[% c.uri_for('/payment/internal/checkout') %]"
+              <button type="submit"
+                      formaction="[% IF plan.has_hosting %][% c.uri_for('/hosting_signup/details', { plan_slug => plan.slug }) %][% ELSE %][% c.uri_for('/payment/internal/checkout') %][% END %]"
                       class="btn btn-primary">Pay with Coins</button>
               <br><small><a href="[% c.uri_for('/payment/buy/coins') %]">Need coins?</a></small>
             </div>

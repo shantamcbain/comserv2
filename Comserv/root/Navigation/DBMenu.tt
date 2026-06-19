@@ -1,0 +1,26 @@
+[%#
+  Navigation/DBMenu.tt
+  Pure server-rendered menu when use_db_menu = 1.
+  No JavaScript dropdown logic required — everything is static HTML.
+  Data comes from Navigation controller via stash: db_menu_items
+#]
+
+[% IF c.stash.db_menu_items && c.stash.db_menu_items.size %]
+    [% FOREACH item IN c.stash.db_menu_items %]
+        <li class="horizontal-dropdown">
+            [% IF item.children && item.children.size %]
+                <a href="[% item.url || '#' %]" class="dropbtn">[% item.label %]</a>
+                <ul class="dropdown-content">
+                    [% FOREACH child IN item.children %]
+                        <li><a href="[% child.url %]">[% child.label %]</a></li>
+                    [% END %]
+                </ul>
+            [% ELSE %]
+                <a href="[% item.url %]" class="dropbtn">[% item.label %]</a>
+            [% END %]
+        </li>
+    [% END %]
+[% ELSE %]
+    <!-- DB menu opted in but no items found — fallback to legacy -->
+    [% INCLUDE 'Navigation/Menu.tt' use_db=0 %]
+[% END %]

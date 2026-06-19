@@ -1,0 +1,73 @@
+[%# Schema Compare - Database List (server drill-down)
+    Shows databases on the selected server with basic stats.
+    Clicking a database tunnels to its table comparison view.
+    Follows ApplicationTtTemplate.tt structure and CSS classes.
+%]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Databases on [% server.name | html %]</h1>
+        [% IF server.ip %]
+            <p class="page-subtitle">Server: [% server.ip | html %] • Containers: [% server.container_count %]</p>
+        [% END %]
+    </div>
+
+    <div class="breadcrumb-container">
+        <nav class="breadcrumb">
+            <a href="[% c.uri_for('/admin/schema_compare') %]">Schema Compare</a>
+            <span>›</span>
+            <span>[% server.name | html %]</span>
+        </nav>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+            [% IF databases.size %]
+            <div class="database-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+                [% FOREACH db IN databases %]
+                <div class="database-card" 
+                     style="border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; background: var(--card-bg, #fff); cursor: pointer;"
+                     data-db="[% db.name | html %]" 
+                     onclick="loadDatabaseTables('[% server.name | html %]', '[% db.name | html %]')">
+                    <div class="database-header" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;">
+                        <i class="fas fa-database"></i>
+                        <h3 style="margin:0; font-size:1.1rem;">[% db.name | html %]</h3>
+                    </div>
+                    <div class="database-meta" style="font-size:0.9rem; line-height:1.4;">
+                        <div><strong>Tables:</strong> [% db.table_count || 0 %]</div>
+                        <div><strong>Size:</strong> [% db.size || '—' | html %]</div>
+                        <div><strong>Status:</strong> <span class="status-[% db.status || 'unknown' %]">[% db.status || 'Unknown' | ucfirst %]</span></div>
+                    </div>
+                    <div class="database-actions" style="margin-top:0.75rem;">
+                        <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); refreshDatabase('[% server.name | html %]', '[% db.name | html %]')">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                [% END %]
+            </div>
+            [% ELSE %]
+            <div class="empty-state">
+                <p>No databases found on this server.</p>
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/admin/schema_compare') %]" class="btn btn-secondary">← Back to Servers</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function loadDatabaseTables(serverName, dbName) {
+    window.location.href = '[% c.uri_for("/admin/schema_compare/server") %]/' + encodeURIComponent(serverName) + '/db/' + encodeURIComponent(dbName);
+}
+
+function refreshDatabase(serverName, dbName) {
+    console.log('Refresh database:', serverName, dbName);
+    // Placeholder for future AJAX refresh
+}
+</script>

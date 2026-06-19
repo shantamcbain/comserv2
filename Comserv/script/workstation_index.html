@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Opening Comserv…</title>
+    <script>
+    (function () {
+        var loc = window.location;
+        var host = loc.hostname;
+        var port = loc.port;
+        var devPort = '3001';
+        if (port === devPort) {
+            return;
+        }
+        if (!port || port === '80') {
+            loc.replace(loc.protocol + '//' + host + ':' + devPort + loc.pathname + loc.search + loc.hash);
+        }
+    })();
+    </script>
+</head>
+<body>
+    <p>Opening Comserv on <strong id="host"></strong>…</p>
+    <p><a id="go" href="#">Continue</a> if you are not redirected.</p>
+    <script>
+    (function () {
+        var loc = window.location;
+        var host = loc.hostname;
+        var target = loc.protocol + '//' + host + ':3001' + loc.pathname + loc.search + loc.hash;
+        document.getElementById('host').textContent = host;
+        document.getElementById('go').href = target;
+    })();
+    </script>
+</body>
+</html>

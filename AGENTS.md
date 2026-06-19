@@ -31,6 +31,33 @@ Entry point for AI assistants (Cursor, Continue, Zencoder, etc.) working on this
 - Access: [./.zencoder/rules/application-access-standards.md](./.zencoder/rules/application-access-standards.md)
 - Config paths: [./.zencoder/rules/config-location.md](./.zencoder/rules/config-location.md)
 
+## Perl module hygiene — check for duplicates
+
+When fixing `BEGIN failed`, `package is not defined`, or adding/moving `.pm` files, **always scan for duplicates and path mismatches before closing the task**.
+
+Catalyst maps `lib/Comserv/Controller/Foo.pm` → `Comserv::Controller::Foo`. A file in that path that declares a different package (e.g. a DBIx::Class model) loads successfully but breaks autoload with *"require was successful but the package is not defined"*.
+
+**Checklist:**
+
+1. **Path vs package** — first `package` line must match the file path (`lib/Foo/Bar.pm` → `package Foo::Bar;`).
+2. **Duplicate packages** — same `package` name must not appear in two files.
+3. **Duplicate purpose** — do not add a second file for the same role; extend the existing module (see `.zencoder/rules/ai-behavior.md` consolidation rule).
+4. **Stale copies** — after moves/renames, delete or update the old path; grep for leftover `require`/`use` of the old location.
+
+**Quick scan** (from `Comserv/`):
+
+```bash
+# Path/package mismatches under Controller (most common Catalyst break)
+for f in lib/Comserv/Controller/*.pm lib/Comserv/Controller/*/*.pm; do
+  [ -f "$f" ] || continue
+  pkg=$(grep -m1 '^package ' "$f" | sed 's/^package //;s/;//')
+  expected=$(echo "$f" | sed 's|lib/||;s|\.pm$||;s|/|::|g')
+  [ "$pkg" = "$expected" ] || echo "MISMATCH $f → $pkg (want $expected)"
+done
+```
+
+After the InventoryItem fix (2026-06-15), a full `lib/Comserv` scan reported **no remaining mismatches or duplicate packages**. Re-run after any module move or large merge.
+
 ## Quick summary
 
 - **Language**: Perl (Catalyst Framework)

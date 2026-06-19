@@ -32,6 +32,10 @@ table.data-table.opn-plan-table { min-width: 900px; font-size: 0.85em; }
 table.data-table th { background: var(--header-bg, #f0f0f0); padding: 8px 10px; text-align: left; white-space: nowrap; }
 table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-color, #eee); vertical-align: top; }
 table.data-table td code { word-break: break-all; }
+tr.opn-plan-draggable { cursor: grab; }
+tr.opn-plan-dragging { opacity: 0.55; background: #e3f2fd !important; }
+tr.opn-plan-fixed { background: var(--bg-secondary, #fafafa); }
+.opn-drag-handle { text-align: center; width: 2em; }
 .config-form label { display: block; margin-bottom: 4px; font-weight: bold; }
 .config-form input[type=text], .config-form input[type=number], .config-form input[type=password] {
     width: 100%; padding: 7px 10px; border: 1px solid var(--border-color, #ccc);
@@ -178,6 +182,41 @@ table.data-table td code { word-break: break-all; }
         </div>
         <div id="opn-section-plan" class="panel-body collapsible-content expanded">
 
+            <div class="opn-dns-callout" style="background:#e8f5e9;border-color:#a5d6a7;margin-bottom:14px;">
+                <strong><i class="fas fa-laptop-code"></i> Dev policy (all sources)</strong>
+                <p style="margin:8px 0 0;">
+                    Every <code>dev.{domain}</code> must be <strong>served by the workstation</strong>
+                    (<code>[% gateway_plan.targets.dev_workstation_lan | html %]</code> LAN /
+                    <code>[% gateway_plan.targets.dev_workstation_zt | html %]</code> ZeroTier) —
+                    <em>never</em> production (<code>192.168.1.126</code>).
+                    Starman default: <code>:[% gateway_plan.targets.dev_port | html %]</code>
+                    (<code>dev.csc</code> is portless via gateway <code>:80</code> → HAProxy → <code>:[% gateway_plan.targets.dev_port | html %]</code>).
+                    Works via Unbound, Cloudflare, or <code>/etc/hosts</code>.
+                </p>
+                <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" style="margin:10px 0 0;">
+                    <input type="hidden" name="action" value="fix_all_dev_to_workstation">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-wrench"></i> Fix all dev.* → workstation
+                    </button>
+                    <span style="font-size:0.88em;color:#555;margin-left:8px;">
+                        Unbound + HAProxy (dev.csc) + Cloudflare dev A records + hosts snippet below
+                    </span>
+                </form>
+            </div>
+
+            [% IF c.flash.dev_hosts_snippet %]
+            <div class="opn-dns-callout" style="background:#fff8e1;border-color:#ffe082;margin-bottom:14px;">
+                <strong><i class="fas fa-file-alt"></i> /etc/hosts snippet</strong>
+                <p style="margin:6px 0 0;font-size:0.88em;">Paste on any machine that does not use OPNsense DNS (laptop, phone over VPN, etc.):</p>
+                <pre style="margin:8px 0 0;padding:10px;background:#fff;border:1px solid #ddd;border-radius:4px;font-size:0.85em;overflow-x:auto;">[% c.flash.dev_hosts_snippet | html %]</pre>
+            </div>
+            [% ELSIF dev_hosts_snippet %]
+            <details style="margin-bottom:14px;font-size:0.9em;">
+                <summary style="cursor:pointer;font-weight:bold;"><i class="fas fa-file-alt"></i> /etc/hosts snippet (dev.* → workstation)</summary>
+                <pre style="margin:8px 0 0;padding:10px;background:var(--bg-secondary,#fafafa);border:1px solid #ddd;border-radius:4px;font-size:0.85em;overflow-x:auto;">[% dev_hosts_snippet | html %]</pre>
+            </details>
+            [% END %]
+
             [% IF gateway_audit && gateway_audit.warnings.size %]
             <div class="opn-warnings">
                 <h4 style="margin:0 0 10px;">
@@ -296,20 +335,55 @@ table.data-table td code { word-break: break-all; }
             </p>
 
             <div class="opn-dns-callout" style="background:#e3f2fd;border-color:#90caf9;">
-                <strong><i class="fas fa-sort-amount-down"></i> Wildcard <code>*</code> vs <code>dev</code> — does <code>dev</code> win?</strong>
+                <strong><i class="fas fa-sort-amount-down"></i> Rule order — what actually runs where?</strong>
                 <p style="margin:6px 0 0;">
-                    <strong>On OPNsense Unbound:</strong> yes — a specific host override (<code>dev.domain</code>) beats the wildcard
-                    (<code>*.domain</code>). Comserv drift checks each rule separately; it does <em>not</em> auto-apply overrides yet (Phase 4).
+                    <strong>This table (top → bottom):</strong> policy precedence in <code>gateway_plan.json</code>.
+                    <strong>Drag policy rows</strong> so every <code>dev.*</code> rule is above the <code>*.</code> wildcard, then click
+                    <em>Save rule order</em>. Lower <code>priority</code> number = higher precedence.
                 </p>
                 <p style="margin:6px 0 0;">
-                    <strong>New subdomain (e.g. <code>coop.computersystemconsulting.ca</code>):</strong> Site Provisioning creates the
-                    <strong>Cloudflare A record</strong> only today. Unbound, NAT, HAProxy, and NPM are still manual or planned — see
-                    <a href="[% c.uri_for('/Documentation/system/GatewayPlan') %]#new-domain">new-domain checklist</a>.
+                    <strong>OPNsense Unbound (LAN DNS):</strong> a specific override (<code>dev.domain</code>) always beats
+                    <code>*.domain</code> on the firewall — even if the wildcard row appears first in OPNsense’s own UI.
+                    Your audit shows <span class="badge badge-ok">ok</span> when <code>dev.csc → 192.168.1.1</code>.
                 </p>
-                <p style="margin:6px 0 0;font-size:0.9em;">
-                    <strong>ZeroTier:</strong> not required to open Comserv admin pages on <code>workstation.local:3001</code>.
-                    ZT is for remote reachability (<code>172.30.131.126</code>). Optional local <code>/etc/hosts</code> entries help
-                    LAN dev names only — they do not replace Cloudflare (public) or Unbound (office LAN).
+                <p style="margin:6px 0 0;">
+                    <strong>HAProxy (HTTP forwarding):</strong> <code>dev.csc</code> uses a <em>separate</em> frontend on gateway
+                    <code>:80</code> (ACL → workstation <code>:3001</code>). The production wildcard uses <code>:443</code> /
+                    <code>Catalyst_Backend</code>. Reordering this table does not move HAProxy rules — use
+                    <strong>Enable dev.csc → workstation :3001 (HTTP)</strong> above if HAProxy shows missing.
+                </p>
+                <p style="margin:6px 0 0;">
+                    <strong>Why <code>https://dev.csc</code> shows SSL_ERROR_RX_RECORD_TOO_LONG:</strong> public DNS must
+                    <em>not</em> point at the workstation ZT/LAN IP. The browser opens <code>:443</code> there and gets plain HTTP
+                    (Apache), not TLS. Fix: Application DNS → <strong>gateway WAN IP</strong> (orange cloud), HAProxy dev ACL →
+                    <code>:[% gateway_plan.targets.dev_port | html %]</code>. LAN without TLS:
+                    <code>http://dev.computersystemconsulting.ca</code> with DNS = <code>192.168.1.1</code>.
+                </p>
+            </div>
+
+            <div class="opn-dns-callout" style="background:#f3e5f5;border-color:#ce93d8;margin-bottom:14px;">
+                <strong><i class="fas fa-project-diagram"></i> Connection map — what talks to what</strong>
+                <p style="margin:6px 0 0;font-size:0.88em;">
+                    Use this when a hostname “almost works” but lands on the wrong page or SSL fails.
+                </p>
+                <pre class="opn-conn-map" style="margin:10px 0 0;padding:12px;background:#fff;border:1px solid #ddd;border-radius:4px;font-size:0.8em;overflow-x:auto;line-height:1.45;">Browser
+  │
+  ├─ DNS: Unbound (LAN) ──► dev.csc → 192.168.1.1 (gateway)
+  │                              └─► HAProxy :80 ──► workstation :[% gateway_plan.targets.dev_port | html %] (Starman / Comserv home)
+  │
+  ├─ DNS: Cloudflare → workstation ZT (172.30.x)  ✗ BROKEN for https://
+  │       http://  → Apache :80 (index.html)     ✗ not Comserv
+  │       https:// → :443 plain HTTP             ✗ SSL_ERROR_RX_RECORD_TOO_LONG
+  │
+  └─ DNS: Cloudflare → gateway WAN (proxied)     ✓ target for https://dev.csc
+         OPNsense HAProxy :443 ACME + dev ACL ──► workstation :[% gateway_plan.targets.dev_port | html %]
+
+Other dev.* (not dev.csc): Unbound → workstation LAN → http://dev.domain:[% gateway_plan.targets.dev_port | html %]/</pre>
+                <p style="margin:8px 0 0;font-size:0.85em;color:#555;">
+                    <strong>Phase order (provision):</strong>
+                    [% FOREACH step IN gateway_plan.provision_order %]
+                    [% step %][% UNLESS loop.last %] → [% END %]
+                    [% END %]
                 </p>
             </div>
 
@@ -317,19 +391,36 @@ table.data-table td code { word-break: break-all; }
             <p style="margin:0 0 12px;color:var(--text-muted-color,#666);">[% gateway_plan.summary | html %]</p>
             [% END %]
 
+            <p style="margin:0 0 8px;font-size:0.88em;color:#666;">
+                <i class="fas fa-grip-vertical"></i> Drag <strong>policy</strong> rows to set precedence. Hosting rows (auto-generated) stay at the bottom.
+            </p>
+            <form id="opn-plan-reorder-form" method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" style="margin-bottom:10px;">
+                <input type="hidden" name="action" value="reorder_gateway_plan">
+                <input type="hidden" name="rule_order" id="opn-plan-rule-order" value="">
+                <button type="submit" class="btn btn-secondary" id="opn-plan-save-order" style="display:none;">
+                    <i class="fas fa-save"></i> Save rule order
+                </button>
+            </form>
             <div class="opn-table-wrap">
             <table class="data-table opn-plan-table">
                 <thead>
                     <tr>
-                        <th>Rule</th><th>FQDN</th><th>LAN</th><th>ZeroTier</th><th>Port</th>
+                        <th style="width:2em;"></th><th>#</th><th>Rule</th><th>FQDN</th><th>LAN</th><th>ZeroTier</th><th>Port</th>
                         <th>DNS</th><th>SSL</th><th>Phase</th><th>Live sync</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="opn-plan-tbody">
                 [% FOREACH rule IN gateway_plan.routing_rules %]
-                <tr>
+                <tr class="[% IF rule.source == 'policy' %]opn-plan-draggable[% ELSE %]opn-plan-fixed[% END %]"
+                    [% IF rule.id %]data-rule-id="[% rule.id | html %]"[% END %]
+                    [% IF rule.source == 'policy' %]draggable="true"[% END %]>
+                    <td class="opn-drag-handle" title="Drag to reorder policy rules">
+                        [% IF rule.source == 'policy' %]<i class="fas fa-grip-vertical" style="color:#888;cursor:grab;"></i>[% END %]
+                    </td>
+                    <td class="opn-plan-prio">[% rule.priority | html %]</td>
                     <td><strong>[% rule.label | html %]</strong>
                         [% IF rule.source == 'hosting_account' %]<br><span class="badge badge-external" style="font-size:0.75em;">hosting</span>[% END %]
+                        [% IF rule.hostname == '*' %]<br><span class="badge badge-warn" style="font-size:0.75em;">wildcard — keep last</span>[% END %]
                         [% IF rule.notes %]<br><span style="font-size:0.82em;color:#666;">[% rule.notes | html %]</span>[% END %]
                     </td>
                     <td><code>[% rule.fqdn | html %]</code></td>
@@ -958,7 +1049,54 @@ function refreshStatus() {
     window.location.reload();
 }
 
+function opnPlanSyncOrder() {
+    var tbody = document.getElementById('opn-plan-tbody');
+    var input = document.getElementById('opn-plan-rule-order');
+    var btn = document.getElementById('opn-plan-save-order');
+    if (!tbody || !input) return;
+    var ids = [];
+    tbody.querySelectorAll('tr.opn-plan-draggable[data-rule-id]').forEach(function(tr) {
+        ids.push(tr.getAttribute('data-rule-id'));
+    });
+    input.value = ids.join(',');
+    if (btn) btn.style.display = ids.length ? 'inline-block' : 'none';
+}
+
+function opnPlanInitDrag() {
+    var tbody = document.getElementById('opn-plan-tbody');
+    if (!tbody) return;
+    var dragRow = null;
+    tbody.querySelectorAll('tr.opn-plan-draggable').forEach(function(tr) {
+        tr.addEventListener('dragstart', function(e) {
+            dragRow = tr;
+            e.dataTransfer.effectAllowed = 'move';
+            tr.classList.add('opn-plan-dragging');
+        });
+        tr.addEventListener('dragend', function() {
+            tr.classList.remove('opn-plan-dragging');
+            dragRow = null;
+            opnPlanSyncOrder();
+        });
+        tr.addEventListener('dragover', function(e) {
+            if (!dragRow || tr === dragRow || !tr.classList.contains('opn-plan-draggable')) return;
+            e.preventDefault();
+            var rect = tr.getBoundingClientRect();
+            var after = (e.clientY - rect.top) > (rect.height / 2);
+            if (after) {
+                tr.parentNode.insertBefore(dragRow, tr.nextSibling);
+            } else {
+                tr.parentNode.insertBefore(dragRow, tr);
+            }
+        });
+    });
+    tbody.querySelectorAll('tr.opn-plan-fixed').forEach(function(tr) {
+        tr.addEventListener('dragover', function(e) { e.preventDefault(); });
+    });
+    opnPlanSyncOrder();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    opnPlanInitDrag();
     document.querySelectorAll('.opn-top-nav a[data-opn]').forEach(function(link) {
         link.addEventListener('click', function(e) {
             e.preventDefault();

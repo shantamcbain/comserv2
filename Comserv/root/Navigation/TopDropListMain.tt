@@ -13,7 +13,7 @@
     <div class="dropdown-content">
         <!-- Core Navigation -->
         <a href="/" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
-        <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
+        <a href="[% c.stash.nav_back_url || c.session.nav_back_url || '/' %]" class="nav-back-link" data-nav-back="1"><i class="icon-back"></i>Go Back</a>
         [% IF c.session.username && (c.session.roles.grep('admin').size || c.session.roles.grep('workshop_leader').size) %]
         <a href="/workshop" onclick="activateSite('Workshops')" target="_blank"><i class="icon-workshop"></i>Workshops</a>
         [% END %]

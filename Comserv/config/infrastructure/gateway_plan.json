@@ -2,6 +2,17 @@
   "version": "1.1",
   "updated": "2026-06-15",
   "summary": "Policy templates + live hosting_accounts drive routing. Customer subdomains are not stored here — they are generated when accounts are active.",
+  "dev_policy": {
+    "rule": "Every dev.{domain} is served by the workstation (Starman). Never production.",
+    "workstation_lan": "192.168.1.199",
+    "workstation_zt": "172.30.131.126",
+    "forbidden_targets": ["192.168.1.126", "172.30.50.206"],
+    "csc_portless_unbound": "192.168.1.1",
+    "csc_backend_port": 3001,
+    "default_starman_port": 3001,
+    "hosts_note": "Paste /etc/hosts lines from the gateway dashboard. dev.csc uses gateway IP for portless HTTP; all other dev.* use workstation LAN.",
+    "https_note": "https://dev.csc needs Cloudflare → gateway WAN (proxied), not workstation ZT IP. OPNsense HAProxy :443 ACME + dev ACL → :3001. Until then use http:// with LAN DNS 192.168.1.1."
+  },
   "targets": {
     "gateway_lan": "192.168.1.1",
     "production_lan": "192.168.1.126",
@@ -17,7 +28,7 @@
     "example": "zero.computersystemconsulting.ca",
     "not": "A single zero hostname on the OPNsense gateway IP"
   },
-  "dns_precedence": "Unbound: specific host (dev) beats wildcard (*). Hosting subdomains on wildcard zones use * for prod; dev always needs explicit override.",
+  "dns_precedence": "dev.* → workstation always (any DNS source). Unbound: dev beats wildcard *. Hosts: workstation LAN (dev.csc → gateway for portless). Cloudflare: dev A → workstation ZT IP.",
   "provision_order": [
     "Site + SiteDomain (Comserv DB)",
     "Cloudflare A record (public DNS)",
@@ -27,23 +38,6 @@
     "Private VM (dedicated plan — Phase 4)"
   ],
   "policy_rules": [
-    {
-      "id": "prod-csc-wildcard",
-      "source": "policy",
-      "label": "Production wildcard (CSC LAN)",
-      "hostname": "*",
-      "domain": "computersystemconsulting.ca",
-      "fqdn": "*.computersystemconsulting.ca",
-      "lan_ip": "192.168.1.126",
-      "zt_ip": "172.30.50.206",
-      "port": 5000,
-      "dns_layer": "unbound",
-      "public_dns": "cloudflare",
-      "ssl": "haproxy_acme",
-      "priority": 100,
-      "phase": "active",
-      "notes": "Shared prod subdomains (coop.csc, etc.) use this — no per-site Unbound row needed."
-    },
     {
       "id": "dev-csc",
       "source": "policy",
@@ -72,10 +66,29 @@
       "fqdn": "dev.beemaster.ca",
       "lan_ip": "192.168.1.199",
       "zt_ip": "172.30.131.126",
-      "port": 3000,
+      "port": 3001,
+      "backend_port": 3001,
       "dns_layer": "unbound",
+      "priority": 20,
       "phase": "active",
-      "notes": "Verify audit: must resolve to workstation not production."
+      "notes": "Unbound → workstation; Starman :3001 (same as all dev.* except dev.csc portless via gateway :80)."
+    },
+    {
+      "id": "prod-csc-wildcard",
+      "source": "policy",
+      "label": "Production wildcard (CSC LAN)",
+      "hostname": "*",
+      "domain": "computersystemconsulting.ca",
+      "fqdn": "*.computersystemconsulting.ca",
+      "lan_ip": "192.168.1.126",
+      "zt_ip": "172.30.50.206",
+      "port": 5000,
+      "dns_layer": "unbound",
+      "public_dns": "cloudflare",
+      "ssl": "haproxy_acme",
+      "priority": 100,
+      "phase": "active",
+      "notes": "Shared prod subdomains (coop.csc, etc.) use this — no per-site Unbound row needed. Keep last (lowest precedence)."
     },
     {
       "id": "zero-csc-public",

@@ -34,6 +34,33 @@ sub auto :Private {
     return 1; # Allow the request to proceed
 }
 
+# Hosting details form for logged-in users choosing a hosting plan
+sub details :Path('details') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "Please log in to add hosting.";
+        return $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+    }
+
+    my $plan_slug = $c->req->param('plan_slug') || 'pro';
+    my $plan = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+        { slug => $plan_slug },
+        { prefetch => 'inventory_item' }
+    )->first;
+
+    my $user_data = _prefill_from_user($c);
+
+    $c->stash(
+        template    => 'hosting/hosting_details_form.tt',
+        title       => 'Hosting Application',
+        plan        => $plan,
+        plan_slug   => $plan_slug,
+        form_data   => $user_data,
+        form_action => $c->uri_for($self->action_for('process_signup')),
+    );
+}
+
 # Main signup form
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
@@ -48,12 +75,99 @@ sub index :Path :Args(0) {
     $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
     push @{$c->stash->{debug_msg}}, "Hosting Signup Form";
     
+        # Debug: check authentication state
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "User check: c->user exists=" . ($c->user ? 'YES' : 'NO') .
+        ", username=" . ($c->user ? ($c->user->can('username') ? $c->user->username : 'N/A') : 'N/A'));
+
+    # Gather plans for display (user's plans + SiteName/CSC public hosting plans)
+    # Match the membership page pattern: prefetch inventory_item for pricing/features
+    my (@user_plans, @public_plans);
+    my $username = $c->user ? ($c->user->can('username') ? $c->user->username : $c->session->{username}) : $c->session->{username};
+    my $user_id  = $c->session->{user_id};
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+    # User's current hosting-related memberships with full plan + inventory details
+    if ($user_id) {
+        @user_plans = $c->model('DBEncy')->resultset('UserMembership')->search(
+            { 'me.user_id' => $user_id, 'me.status' => ['active','grace'] },
+            { prefetch => { plan => 'inventory_item' }, site => undef, order_by => 'me.created_at' }
+        )->all;
+    }
+
+    # Also fetch user's actual HostingAccount records for context (sitename, domain, etc.)
+    # Only show accounts the user created AND that are not in a terminal/pending-cancelled state
+    my @user_hosting;
+    if ($username) {
+        @user_hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+            {
+                created_by => $username,
+                status   => { -not_in => ['cancelled', 'rejected', 'withdrawn'] }
+            },
+            { order_by => 'created_at' }
+        )->all;
+    }
+
+    # Public hosting-enabled plans for current site + CSC fallback
+    # Use same fetch pattern as Membership controller for rich card display
+    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->first;
+    if ($site) {
+        @public_plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+            { site_id => $site->id, has_hosting => 1, is_active => 1 },
+            { order_by => 'sort_order', prefetch => 'inventory_item' }
+        )->all;
+    }
+    # Always include CSC public hosting plans as fallback/option
+    my $csc = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->first;
+    my @csc_plans;
+    if ($csc) {
+        @csc_plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+            { site_id => $csc->id, has_hosting => 1, is_active => 1 },
+            { order_by => 'sort_order', prefetch => 'inventory_item' }
+        )->all;
+    }
+
+    # Pre-select plan if passed from plan details page
+    my $preselected_plan = $c->req->param('plan_slug') || $c->req->param('plan');
+
     # Set the template
     $c->stash(
         template => 'hosting/signup_form.tt',
-        title => 'Starter Hosting Signup',
+        title => 'Hosting Signup',
         form_action => $c->uri_for($self->action_for('process_signup')),
+        form_data => _prefill_from_user($c),
+        signup_for_existing_user => ($c->user || $c->session->{username}) ? 1 : 0,
+        preselected_plan => $preselected_plan,
+        user_plans   => \@user_plans,
+        user_hosting => \@user_hosting,
+        public_plans => \@public_plans,
+        csc_plans    => \@csc_plans,
     );
+}
+
+# Build a form_data hash from the logged-in user, if any.
+# Returns {} for anonymous visitors (preserves existing form behavior).
+sub _prefill_from_user {
+    my ($c) = @_;
+    return {} unless $c && $c->user;
+    my $u = $c->user;
+    # Support both Catalyst::Authentication user objects AND legacy session-based auth
+    my $obj;
+    if ($c->user) {
+        my $u = $c->user;
+        $obj = $u->can('get_object') ? $u->get_object : $u;
+    } elsif ($c->session->{username}) {
+        # Legacy session auth - fetch user row from DB
+        $obj = $c->model('DBEncy')->resultset('User')->find({ username => $c->session->{username} });
+    }
+    return {} unless $obj;
+    my $username = $obj->can('username') ? ($obj->username || $c->session->{username}) : $c->session->{username};
+    return {
+        first_name => ($obj->can('first_name') ? $obj->first_name : '') || '',
+        last_name  => ($obj->can('last_name')  ? $obj->last_name  : '') || '',
+        email      => ($obj->can('email')      ? $obj->email      : '') || '',
+        username   => $username || '',
+    };
 }
 
 # Process the signup form submission
@@ -74,7 +188,8 @@ sub process_signup :Path('process') :Args(0) {
         ", email=" . ($params->{email} || 'N/A') . 
         ", username=" . ($params->{username} || 'N/A') . 
         ", domain_name=" . ($params->{domain_name} || 'N/A') . 
-        ", site_name=" . ($params->{site_name} || 'N/A') . 
+        ", existing_site_url=" . ($params->{existing_site_url} || 'N/A') .
+        ", site_name=" . ($params->{site_name} || 'N/A') .
         ", password_provided=" . ($params->{password} ? 'Yes' : 'No') . 
         ", confirm_password_provided=" . ($params->{confirm_password} ? 'Yes' : 'No') . 
         ", passwords_match=" . (($params->{password} && $params->{confirm_password} && $params->{password} eq $params->{confirm_password}) ? 'Yes' : 'No'));
@@ -83,15 +198,23 @@ sub process_signup :Path('process') :Args(0) {
     my @errors;
     
     # Required fields
+    my $is_logged_in = ($c->user || $c->session->{username}) ? 1 : 0;
     push @errors, "First name is required" unless $params->{first_name};
     push @errors, "Last name is required" unless $params->{last_name};
-    push @errors, "Last name is required" unless $params->{last_name};
     push @errors, "Email is required" unless $params->{email};
-    push @errors, "Username is required" unless $params->{username};
-    push @errors, "Password is required" unless $params->{password};
-    push @errors, "Password confirmation is required" unless $params->{confirm_password};
-    push @errors, "Domain name is required" unless $params->{domain_name};
+
+    # Username: required for anonymous users; taken from session for logged-in users
+    if ($is_logged_in) {
+        $params->{username} ||= $c->session->{username};
+    } else {
+        push @errors, "Username is required" unless $params->{username};
+        push @errors, "Password is required" unless $params->{password};
+        push @errors, "Password confirmation is required" unless $params->{confirm_password};
+    }
+
     push @errors, "Site name is required" unless $params->{site_name};
+    # Domain is optional for logged-in users (we derive it from SiteName + current site)
+    # For anonymous users we still require it so the subdomain is explicit.
     
     # Email validation
     push @errors, "Invalid email format" if $params->{email} && $params->{email} !~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -105,10 +228,27 @@ sub process_signup :Path('process') :Args(0) {
     # Password confirmation validation
     push @errors, "Passwords do not match" if $params->{password} && $params->{confirm_password} && $params->{password} ne $params->{confirm_password};
     
-    # Domain name validation (basic format check)
-    push @errors, "Invalid domain name format" if $params->{domain_name} && $params->{domain_name} !~ /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+    # Domain / subdomain validation
+    # Accepts:
+    #   - simple label (e.g. bmast)
+    #   - full subdomain (e.g. bmast.forager.com)
+    #   - custom domain (e.g. beemaster.ca)
+    if ($params->{domain_name}) {
+        my $d = $params->{domain_name};
+        unless (
+            $d =~ /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]$/          # simple label
+            || $d =~ /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\.[a-zA-Z0-9.-]+$/   # full domain/subdomain
+        ) {
+            push @errors, "Invalid domain name format";
+        }
+    }
+
+    # Optional existing site URL validation
+    if ($params->{existing_site_url} && $params->{existing_site_url} !~ m{^https?://}i) {
+        push @errors, "Existing website URL must start with http:// or https://";
+    }
     
-    # If there are validation errors, redisplay the form with error messages
+    # If there are validation errors, redisplay the appropriate form
     if (@errors) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', "Validation errors: " . join(", ", @errors));
         
@@ -119,58 +259,151 @@ sub process_signup :Path('process') :Args(0) {
         # Ensure debug_msg is an array reference
         $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Validation errors in form submission";
-        
+
+        # If this came from the new-site details form, re-show that form
+        if ($params->{new_site_flow}) {
+            my $plan = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { slug => $params->{plan_slug} || 'pro' },
+                { prefetch => 'inventory_item' }
+            )->first;
+
+            $c->stash(
+                template    => 'hosting/hosting_details_form.tt',
+                title       => 'Hosting Application',
+                plan        => $plan,
+                plan_slug   => $params->{plan_slug},
+                form_data   => $params,
+                form_action => $c->uri_for($self->action_for('process_signup')),
+                errors      => \@errors,
+            );
+            return;
+        }
+
+        # Otherwise fall back to the old plan-selection form
         $c->stash(
             template => 'hosting/signup_form.tt',
-            title => 'Starter Hosting Signup',
+            title => 'Hosting Signup',
             form_action => $c->uri_for($self->action_for('process_signup')),
             errors => \@errors,
-            form_data => $params, # Return the submitted data to pre-fill the form
-            # debug_msg is already an array initialized in auto
+            form_data => $params,
+            signup_for_existing_user => ($c->user || $c->session->{username}) ? 1 : 0,
         );
         return;
     }
     
-    # Process the signup - create user, save pending hosting request, notify admin
+    # Process the signup
     try {
-        # 1. Create the user
-        my $user_data = {
-            username => $params->{username},
-            password => $params->{password},
-            email => $params->{email},
-            first_name => $params->{first_name},
-            last_name => $params->{last_name},
-            roles => 'normal', # Default role for new users
-        };
-        
-        my $user = $c->model('User')->create_user($user_data);
-        
-        # Check if user creation was successful
-        if (!ref $user) {
-            # If create_user returned an error message instead of a user object
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', "User creation failed: $user");
-            
-            # Ensure debug_errors is an array reference
-            $c->stash->{debug_errors} = [] unless ref $c->stash->{debug_errors} eq 'ARRAY';
-            push @{$c->stash->{debug_errors}}, "User creation failed: $user";
-            
-            # Ensure debug_msg is an array reference
-            $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
-            push @{$c->stash->{debug_msg}}, "User creation failed";
-            
-            $c->stash(
-                template => 'hosting/signup_form.tt',
-                title => 'Starter Hosting Signup',
-                form_action => $c->uri_for($self->action_for('process_signup')),
-                errors => ["User creation failed: $user"],
-                form_data => $params,
-                # debug_msg is already an array initialized in auto
-            );
-            return;
+        my $is_logged_in = ($c->user || $c->session->{username}) ? 1 : 0;
+
+        # ──────────────────────────────────────────────────────────────
+        # LOGGED-IN USER → send straight to cart for payment
+        # ──────────────────────────────────────────────────────────────
+        if ($is_logged_in) {
+            # Derive domain if left blank: use SiteName + current site's first registered domain
+            my $final_domain = $params->{domain_name};
+            unless ($final_domain) {
+                my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+                my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->first;
+                my $parent;
+                if ($site) {
+                    my $first_domain = $site->site_domains->first;
+                    $parent = $first_domain ? $first_domain->domain : "$sitename.com";
+                } else {
+                    $parent = "$sitename.com";
+                }
+                $final_domain = lc($params->{site_name}) . '.' . $parent;
+            }
+
+            # Add the hosting item to the normal session cart used by Shop/Cart
+            my $cart = $c->session->{cart} // {};
+            my $plan_slug = $params->{plan_slug} || 'pro';
+            my $cart_key = "hosting_" . lc($params->{site_name});
+
+            # Look up the real price from the plan (or its inventory_item)
+            my $plan = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { slug => $plan_slug },
+                { prefetch => 'inventory_item' }
+            )->first;
+            my $unit_price = 0;
+            if ($plan) {
+                if ($plan->inventory_item && $plan->inventory_item->unit_price) {
+                    $unit_price = $plan->inventory_item->unit_price;
+                } elsif ($plan->price_monthly) {
+                    $unit_price = $plan->price_monthly;
+                }
+            }
+
+            $cart->{$cart_key} = {
+                item_id      => $cart_key,
+                name         => "Hosting - $plan_slug - $params->{site_name}",
+                sku          => $plan_slug,
+                quantity     => 1,
+                unit_price   => $unit_price,
+                domain       => $final_domain,
+                site_name    => $params->{site_name},
+                addons       => [ grep { /^addon_/ && $params->{$_} } keys %$params ],
+                notes        => $params->{existing_site_url} ? "Clone from: $params->{existing_site_url}" : undef,
+                type         => 'hosting',
+            };
+
+            $c->session->{cart} = $cart;
+
+            # Redirect to the unified cart
+            return $c->response->redirect($c->uri_for('/Cart'));
         }
-        
+
+        # ──────────────────────────────────────────────────────────────
+        # ANONYMOUS USER → create account + pending request (existing flow)
+        # ──────────────────────────────────────────────────────────────
+        my $user;
+        if ($c->user) {
+            my $obj = $c->user->can('get_object') ? $c->user->get_object : $c->user;
+            $user = $obj;
+        } else {
+            # 1. Create the user (anonymous signup flow)
+            my $user_data = {
+                username => $params->{username},
+                password => $params->{password},
+                email => $params->{email},
+                first_name => $params->{first_name},
+                last_name => $params->{last_name},
+                roles => 'normal', # Default role for new users
+            };
+
+            $user = $c->model('User')->create_user($c, $user_data);
+
+            # Check if user creation was successful
+            if (!ref $user) {
+                # If create_user returned an error message instead of a user object
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', "User creation failed: $user");
+
+                # Ensure debug_errors is an array reference
+                $c->stash->{debug_errors} = [] unless ref $c->stash->{debug_errors} eq 'ARRAY';
+                push @{$c->stash->{debug_errors}}, "User creation failed: $user";
+
+                # Ensure debug_msg is an array reference
+                $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+                push @{$c->stash->{debug_msg}}, "User creation failed";
+
+                $c->stash(
+                    template => 'hosting/signup_form.tt',
+                    title => 'Hosting Signup',
+                    form_action => $c->uri_for($self->action_for('process_signup')),
+                    errors => ["User creation failed: $user"],
+                    form_data => $params,
+                    # debug_msg is already an array initialized in auto
+                );
+                return;
+            }
+        }
+
         # 2. Save pending hosting request and notify admin
         my $now = do { use POSIX qw(strftime); strftime('%Y-%m-%d', localtime) };
+        my $notes = "First name: $params->{first_name} $params->{last_name}";
+        if ($params->{existing_site_url}) {
+            $notes .= "\nExisting site URL: $params->{existing_site_url}";
+            $notes .= "\nClone workflow: staging subdomain on applying site → theme from source CSS → admin/AI review → public DNS when ready";
+        }
         my $ha = eval {
             $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find_or_create(
                 { sitename => $params->{site_name} },
@@ -183,7 +416,7 @@ sub process_signup :Path('process') :Args(0) {
                         status         => 'pending',
                         contact_email  => $params->{email},
                         created_by     => $params->{username},
-                        notes          => "First name: $params->{first_name} $params->{last_name}",
+                        notes          => $notes,
                     }
                 }
             );
@@ -200,8 +433,11 @@ sub process_signup :Path('process') :Args(0) {
                                        . "Contact: $params->{first_name} $params->{last_name} <$params->{email}>\n"
                                        . "Username: $params->{username}\n"
                                        . "Site name: $params->{site_name}\n"
-                                       . "Domain: $params->{domain_name}\n\n"
-                                       . "Review and provision at: /admin/site_provisioning",
+                                       . "Domain: $params->{domain_name}\n"
+                                       . ($params->{existing_site_url}
+                                          ? "Existing site to clone: $params->{existing_site_url}\n"
+                                          : "")
+                                       . "\nReview and provision at: /admin/site_provisioning",
                 status                => 1,
                 priority              => 2,
                 share                 => 0,
@@ -511,7 +747,7 @@ sub process_signup :Path('process') :Args(0) {
             
             $c->stash(
                 template => 'hosting/signup_form.tt',
-                title => 'Starter Hosting Signup',
+                title => 'Hosting Signup',
                 form_action => $c->uri_for($self->action_for('process_signup')),
                 errors => ["Site creation failed. Please try again."],
                 form_data => $params,
@@ -539,7 +775,7 @@ sub process_signup :Path('process') :Args(0) {
         
         $c->stash(
             template => 'hosting/signup_form.tt',
-            title => 'Starter Hosting Signup',
+            title => 'Hosting Signup',
             form_action => $c->uri_for($self->action_for('process_signup')),
             errors => ["An error occurred during signup: $error"],
             form_data => $params,

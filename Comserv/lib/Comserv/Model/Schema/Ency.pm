@@ -12,6 +12,8 @@ __PACKAGE__->load_namespaces;
 __PACKAGE__->register_class('ProjectSite', 'Comserv::Model::Schema::Ency::Result::ProjectSite');
 __PACKAGE__->register_class('NetworkDevice', 'Comserv::Model::Schema::Ency::Result::NetworkDevice');
 __PACKAGE__->register_class('Page', 'Comserv::Model::Schema::Ency::Result::Page');
+__PACKAGE__->register_class('MenuStock', 'Comserv::Model::Schema::Ency::Result::MenuStock');
+__PACKAGE__->register_class('SiteMenuOverride', 'Comserv::Model::Schema::Ency::Result::SiteMenuOverride');
 
 # Created by DBIx::Class::Schema::Loader v0.07051 @ 2024-02-10 06:41:40
 # DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:mVufLKsHMeSer486KG6RQA

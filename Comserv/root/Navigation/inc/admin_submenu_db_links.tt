@@ -1,0 +1,18 @@
+[%# DB navigation links for one section of the Admin dropdown.
+    Required: submenu_id (e.g. admin_links, ai_assistant, file_management)
+%]
+[% SET asm_id = submenu_id %]
+[% SET asm_links = [] %]
+[% IF c.stash.admin_links_by_submenu && asm_id %]
+    [% SET asm_links = c.stash.admin_links_by_submenu.item(asm_id) || [] %]
+[% ELSIF asm_id == 'admin_links' %]
+    [% SET asm_links = c.stash.admin_submenu_links || [] %]
+[% END %]
+[% IF asm_links.size %]
+    [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+        db_links = asm_links
+        add_link_category = 'Admin_links'
+        add_link_submenu = asm_id
+        add_link_menu = 'Admin'
+        skip_add_link = 1 %]
+[% END %]

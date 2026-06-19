@@ -86,8 +86,12 @@ function updateLinkScopeFields() {
     if (!category) return;
 
     const isPublic = linkType && linkType.value === 'public';
+    const isAdmin = [% IF permissions.can_create_public %]true[% ELSE %]false[% END %];
     category.querySelectorAll('[data-admin-only="1"]').forEach(function(opt) {
-        opt.style.display = isPublic ? '' : 'none';
+        // Admins may add private bookmarks to the Admin menu as well as public site links.
+        const show = isPublic || isAdmin;
+        opt.style.display = show ? '' : 'none';
+        opt.disabled = !show;
     });
     category.querySelectorAll('[data-legacy-cat="1"]').forEach(function(opt) {
         opt.style.display = 'none';

@@ -1,0 +1,26 @@
+[%# Renders site-specific custom Admin submenu sections from nav_submenu_tb (is_system=0). %]
+[% SET custom_sections = c.stash.admin_custom_submenu_sections || [] %]
+[% FOREACH section IN custom_sections %]
+    [% NEXT UNLESS section.submenu_id %]
+    <div class="submenu-item">
+        <span class="submenu-header">
+            [% IF section.header_url %]
+                <a href="[% section.header_url %]" class="dropbtn">
+                    [% IF section.icon %]<i class="[% section.icon %]"></i>[% END %]
+                    [% section.label | html %]
+                </a>
+            [% ELSE %]
+                [% IF section.icon %]<i class="[% section.icon %]"></i>[% END %]
+                [% section.label | html %]
+            [% END %]
+        </span>
+        <div class="submenu">
+            [% INCLUDE 'Navigation/inc/admin_submenu_db_links.tt' submenu_id = section.submenu_id %]
+            [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                add_link_category = 'Admin_links'
+                add_link_submenu  = section.submenu_id
+                add_link_menu     = 'Admin'
+                add_link_label    = 'Add Link Here' %]
+        </div>
+    </div>
+[% END %]

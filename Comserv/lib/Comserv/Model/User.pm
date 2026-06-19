@@ -72,13 +72,33 @@ package Comserv::Model::User;
 
                 sub create_user {
                     my ($self, $c, $user_data) = @_;
-                    my $existing_user = $c->model('DBEncy')->resultset('User')->find({ username => $user_data->{username} });
+                    
+                    # Context Safety Net: Ensure $c is a blessed object with a model method.
+                    # If not, we fall back to a cached schema to prevent "unblessed reference" crashes.
+                    my $db = eval { $c->model('DBEncy') } if (ref $c && $c->can('model'));
+                    unless ($db) {
+                        require Comserv::Util::Logging;
+                        my $log = Comserv::Util::Logging->instance;
+                        $log->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_user', 
+                            "Invalid context passed to create_user; falling back to cached schema.");
+                        
+                        # Fallback to a singleton-like schema if $c is missing or broken
+                        eval {
+                            require Comserv::Model::Schema::Ency;
+                            my $schema = Comserv::Model::Schema::Ency->new;
+                            $db = $schema;
+                        };
+                    }
+                    
+                    my $existing_user = $db->resultset('User')->find({ username => $user_data->{username} });
                     return "Username already exists" if $existing_user;
-                    my $new_user = $c->model('DBEncy')->resultset('User')->create({
+                    my $new_user_row = $db->resultset('User')->create({
                         %$user_data,
                         roles => $user_data->{roles} // 'default_role',
                     });
-                    return $new_user;
+                    # Return a properly blessed Comserv::Model::User wrapper so callers
+                    # (and the auth system) can use it like $c->user without "unblessed reference" errors.
+                    return $self->new(_user => $new_user_row);
                 }
                 
                 sub delete_user {

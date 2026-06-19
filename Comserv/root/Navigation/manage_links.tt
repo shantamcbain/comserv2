@@ -19,9 +19,416 @@
         </div>
     [% END %]
     
+    <!-- Link + seed button for the living DB plan page -->
+    <div style="margin: 8px 0 12px; padding: 10px 14px; background: #fff8e1; border: 1px solid #ffcc80; border-radius: 6px; font-size: 0.95em;">
+        <strong>📋 Living Document:</strong>
+        <a href="/page/menu-system-upgrade-plan" style="font-weight:600; text-decoration:underline;">Menu System DB Migration &amp; Upgrade Plan (2026)</a>
+        — Edit this page to track progress.
+        <form method="post" action="/navigation/seed_plan_page" style="display:inline; margin-left:10px;">
+            <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Seed / refresh the plan page in the DB?');">
+                Run Seed for Plan Page
+            </button>
+        </form>
+        <div style="font-size:0.85em; margin-top:4px;">(This creates or updates the editable plan page in the live database.)</div>
+    </div>
+
+    <!-- Note about the visual editor (the main interactive part is the rich section below that looks like the real menu) -->
+
+    <!-- Professional quality Menu Editor, matching the page create/edit screen (rich UI for add/edit containers like cards, text styles on items, proper preview of existing links so you see how the menu will look or act).
+         Top bar looks like the real menu (your screenshot).
+         Panels show current existing links/pages in real menu-like items.
+         Drag between sections/panels.
+         Add/edit containers (submenus) like cards.
+         Edit item text.
+         Full CSC stock palette.
+         Quality and features like the existing page editor. -->
+    <div class="interactive-menu-editor" style="margin:15px 0; padding:12px; border:2px solid #ffcc80; border-radius:6px; background:#fffef5; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <h3 style="margin:0; font-size:1.1em; color:#1565c0;">Menu Editor — Visual &amp; Interactive (matches real site menu + page editor quality)</h3>
+            <a href="/page/menu-system-upgrade-plan" style="font-size:0.8em;">Living Plan Document</a>
+        </div>
+
+        <p style="margin:0 0 6px; font-size:0.85em; background:#e3f2fd; padding:4px 6px; border-radius:3px;">
+            The bar looks like the real top nav. The panels below show the **current live dropdown contents** (your existing links + pages) so you see exactly how the menu will look and act right now. Drag items between any section or panel. Use the palette to add CSC stock. Edit text on items and containers (like editing cards/text in the page editor). Add new containers (sections) like adding cards.
+        </p>
+
+        <!-- Real-looking top nav bar (interactive: click to open/focus its content panel, drag headers left/right to reorder) -->
+        <div id="editor-menu-bar" style="background:#e0f7fa; border-bottom:3px solid #4db6ac; padding:5px 8px; border-radius:3px; margin-bottom:8px; font-family:Verdana,Helvetica,sans-serif;">
+            <div style="display:flex; flex-wrap:wrap; gap:4px; font-size:0.88em; color:#333;">
+                <span data-menu="Back" style="padding:2px 6px;">Back</span>
+                <span data-menu="Main_links" style="padding:2px 6px; font-weight:600; cursor:pointer;" title="Click to focus Main content; drag to reorder top level">Main</span>
+                <span data-menu="Features" style="padding:2px 6px;">Features</span>
+                <span data-menu="Shop" style="padding:2px 6px;">Shop</span>
+                <span data-menu="Shanta" style="padding:2px 6px; font-weight:600; background:#b2dfdb; border-radius:2px;">Shanta</span>
+                <span data-menu="Hosted" style="padding:2px 6px;">Hosted</span>
+                <span data-menu="Member_links" style="padding:2px 6px;">Member</span>
+                <span data-menu="ENCY" style="padding:2px 6px;">ENCY</span>
+                <span data-menu="Weather" style="padding:2px 6px;">Weather</span>
+                <span data-menu="Admin_links" style="padding:2px 6px; font-weight:600; cursor:pointer;" title="Click to focus Admin content; drag to reorder top level">Admin</span>
+                <span data-menu="Planning" style="padding:2px 6px;">Planning</span>
+                <span data-menu="HelpDesk_links" style="padding:2px 6px; font-weight:600; cursor:pointer;" title="Click to focus HelpDesk content; drag to reorder top level">HelpDesk</span>
+                <span data-menu="Workshops" style="padding:2px 6px;">Workshops</span>
+            </div>
+        </div>
+
+        [% IF editor_menus && editor_menus.size %]
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:8px; margin-bottom:8px;">
+                [% FOREACH mkey IN ['Main_links', 'HelpDesk_links', 'Admin_links'] %]
+                    [% SET em = editor_menus.$mkey %]
+                    <div class="menu-editor-panel" data-menu="[% mkey %]" style="border:1px solid #81d4fa; border-radius:4px; background:white; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,0.06);">
+                        
+                        <div style="background:#e0f7fa; padding:3px 6px; font-weight:600; font-size:0.9em; border-bottom:1px solid #4db6ac; color:#0d47a1; display:flex; justify-content:space-between; align-items:center;">
+                            <span>[% em.label %] — Live Dropdown Content (existing links shown)</span>
+                            <button type="button" class="add-container-btn btn btn-xs btn-outline-primary" data-menu="[% mkey %]" style="font-size:0.65em; padding:0 3px;">+ Add Container (card)</button>
+                        </div>
+
+                        <!-- Containers like cards in page editor - editable labels -->
+                        <div class="containers-bar" style="background:#f5f5f5; padding:2px 4px; font-size:0.7em; border-bottom:1px solid #e0e0e0;">
+                            <strong>Containers (edit like cards):</strong>
+                            [% IF editor_submenus && editor_submenus.$mkey %]
+                                [% FOREACH sub IN editor_submenus.$mkey %]
+                                    <span class="container-chip editable-container" data-sub-id="[% sub.id %]" data-menu="[% mkey %]" style="display:inline-block; background:white; border:1px solid #90caf9; padding:0 3px; margin:1px; border-radius:2px; cursor:pointer; font-size:0.9em;" title="Click to edit container label (text style)">
+                                        [% sub.label %]
+                                    </span>
+                                [% END %]
+                            [% END %]
+                        </div>
+
+                        <!-- Content with EXISTING links and pages shown so user sees how the menu will look or act -->
+                        <div style="padding:4px; background:#fafafa; min-height:70px;">
+                            [% FOREACH subkey IN em.sections.keys %]
+                                <div class="editor-section droppable" data-submenu="[% subkey %]" style="margin:3px 0; padding:2px; background:white; border:1px dashed #90a4ae; border-radius:2px;">
+                                    <div style="font-size:0.65em; color:#455a64; padding:0 2px; margin-bottom:1px; border-bottom:1px solid #eceff1;">[% subkey %]</div>
+                                    <div class="editor-items" style="min-height:20px; display:flex; flex-wrap:wrap; gap:2px; padding:1px;">
+                                        [% FOREACH it IN em.sections.$subkey %]
+                                            [% IF it.type == 'link' %]
+                                                [% SET d = it.data %]
+                                                <div class="editor-item draggable" draggable="true" data-type="link" data-id="[% d.id %]"
+                                                     style="background:#e3f2fd; border:1px solid #4fc3f7; padding:1px 4px; font-size:0.72em; border-radius:2px; cursor:move; display:inline-flex; align-items:center; gap:2px; max-width:160px; overflow:hidden;">
+                                                    <span class="item-text" title="[% d.url %]">[% d.name %]</span>
+                                                    <small style="color:#2e7d32; font-size:0.55em; margin-left:2px;">[DB]</small>
+                                                    <a href="/navigation/edit_link?id=[% d.id %]" class="edit-item-btn" style="font-size:0.6em; color:#1565c0; text-decoration:none; margin-left:2px;">edit text</a>
+                                                </div>
+                                            [% ELSIF it.type == 'page' %]
+                                                [% SET d = it.data %]
+                                                <div class="editor-item draggable" draggable="true" data-type="page" data-id="[% d.id %]"
+                                                     style="background:#e8f5e9; border:1px solid #81c784; padding:1px 4px; font-size:0.72em; border-radius:2px; cursor:move; display:inline-flex; align-items:center; gap:2px;">
+                                                    <span class="item-text">[% d.title || d.page_code %] (page)</span>
+                                                    <small style="color:#2e7d32; font-size:0.55em; margin-left:2px;">[DB]</small>
+                                                    <a href="/pages/edit/[% d.page_code %]" class="edit-item-btn" style="font-size:0.6em; color:#2e7d32; text-decoration:none; margin-left:2px;">edit</a>
+                                                </div>
+                                            [% END %]
+                                        [% END %]
+                                    </div>
+                                </div>
+                            [% END %]
+                        </div>
+
+                        <!-- Example Hard-coded fallbacks (from .tt templates for DB failure resilience) - shown so you see the mix of hard-coded vs DB -->
+                        [% IF mkey == 'Main_links' %]
+                            <div style="margin:3px 0; padding:2px; background:#fff3e0; border:1px solid #ffcc80; border-radius:2px;">
+                                <div style="font-size:0.6em; color:#e65100; padding:0 2px;">Hard-coded fallbacks (from templates - not yet in DB stock)</div>
+                                <div style="display:flex; flex-wrap:wrap; gap:2px; padding:1px;">
+                                    <div style="background:#fff8e1; border:1px solid #ffcc80; padding:0 3px; font-size:0.65em; border-radius:2px;">Home [Hard-coded]</div>
+                                    <div style="background:#fff8e1; border:1px solid #ffcc80; padding:0 3px; font-size:0.65em; border-radius:2px;">Back [Hard-coded]</div>
+                                    <div style="background:#fff8e1; border:1px solid #ffcc80; padding:0 3px; font-size:0.65em; border-radius:2px;">Join & Services [Hard-coded]</div>
+                                </div>
+                            </div>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        [% ELSE %]
+            <div style="padding:6px; background:#fff3cd; border:1px solid #ffcc80; border-radius:3px; font-size:0.85em;">No current data. Add some links/pages for this site or click the Run Seed button above and refresh.</div>
+        [% END %]
+
+        <!-- Full CSC Stock Palette -->
+        [% IF csc_stock_palette && csc_stock_palette.size %]
+            <div style="border:1px solid #a5d6a7; background:#e8f5e9; padding:3px 5px; border-radius:3px; margin-bottom:6px;">
+                <div style="font-size:0.72em; font-weight:600; color:#2e7d32; margin-bottom:1px;">All CSC Stock (drag any into the panels above - you are presented with all of them)</div>
+                <div class="editor-items palette" style="display:flex; flex-wrap:wrap; gap:2px; max-height:50px; overflow:auto; padding:1px;">
+                    [% FOREACH item IN csc_stock_palette %]
+                        <div class="editor-item draggable palette-item" draggable="true" data-type="stock" data-key="[% item.stock_key %]"
+                             style="background:white; border:1px solid #81c784; padding:0 3px; font-size:0.65em; border-radius:2px; cursor:move; white-space:nowrap;">
+                            [% item.default_label %]
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+        [% END %]
+
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            <button type="button" id="save-visual-btn" class="btn btn-success btn-sm" style="font-weight:600;">Save Menu Layout (from drags + edits + new containers)</button>
+            <span id="visual-status" style="font-size:0.8em;"></span>
+            <a href="/navigation/manage_submenus" class="btn btn-outline-secondary btn-xs" style="font-size:0.7em;">Full Manage Containers</a>
+        </div>
+
+        <div style="font-size:0.65em; color:#607d8b; margin-top:2px;">
+            Existing links and pages from your current menu are shown in the panels (you see how it will look/act). Drag them or stock from the green palette. Click "edit text" on items. Click container labels to edit (text styles). Use "+ Add Container" on each panel (like adding cards in page editor). Save updates the live menu for this site. ★ mandatory.
+        </div>
+    </div>
+
+    <!-- Additional JS for bar interaction: click header to focus/open its content panel, drag headers left/right to change position -->
+    <script>
+    (function() {
+        var bar = document.getElementById('editor-menu-bar');
+        if (!bar) return;
+
+        var flex = bar.querySelector('div[style*="display:flex"]');
+        if (!flex) return;
+
+        // Click on a header (if not dragging) -> focus the corresponding panel and "open" it (shows all links in that menu)
+        flex.querySelectorAll('span[data-menu]').forEach(function(span) {
+            span.addEventListener('click', function(e) {
+                // If we just finished a drag, ignore
+                if (span.getAttribute('data-just-dragged') === '1') {
+                    span.removeAttribute('data-just-dragged');
+                    return;
+                }
+                var menu = span.getAttribute('data-menu');
+                // Find the panel for editable menus
+                var panel = document.querySelector('.menu-editor-panel[data-menu="' + menu + '"]');
+                if (panel) {
+                    panel.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    panel.style.boxShadow = '0 0 0 3px #4fc3f7';
+                    setTimeout(function() {
+                        if (panel) panel.style.boxShadow = '0 1px 2px rgba(0,0,0,0.06)';
+                    }, 1200);
+                    // "Open" effect: highlight the content area (like opening the dropdown)
+                    var content = panel.querySelector('.editor-items');
+                    if (content) {
+                        content.style.background = '#e3f2fd';
+                        setTimeout(function() { if (content) content.style.background = '#fafafa'; }, 800);
+                    }
+                } else {
+                    // For non-editable in the bar, just a visual "open" flash on the bar item itself
+                    span.style.background = '#b3e5fc';
+                    setTimeout(function() { if (span) span.style.background = ''; }, 600);
+                    alert('Preview for ' + menu + ' would open its full dropdown content here (all links in that menu, with Hard-coded vs DB badges). For editable menus, use the panels below.');
+                }
+            });
+        });
+
+        // Drag the bar items left/right to reorder top level headers
+        var draggedHeader = null;
+
+        flex.querySelectorAll('span[data-menu]').forEach(function(item) {
+            item.setAttribute('draggable', 'true');
+
+            item.addEventListener('dragstart', function(e) {
+                draggedHeader = item;
+                e.dataTransfer.setData('text/plain', item.getAttribute('data-menu') || '');
+                item.style.opacity = '0.4';
+            });
+
+            item.addEventListener('dragend', function() {
+                if (draggedHeader) draggedHeader.style.opacity = '';
+                draggedHeader = null;
+            });
+        });
+
+        flex.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+
+        flex.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (!draggedHeader) return;
+            var target = e.target.closest('span[data-menu]');
+            if (!target || target === draggedHeader) return;
+
+            var rect = target.getBoundingClientRect();
+            var after = (e.clientX - rect.left) / rect.width > 0.5;
+
+            if (after) {
+                target.parentNode.insertBefore(draggedHeader, target.nextSibling);
+            } else {
+                target.parentNode.insertBefore(draggedHeader, target);
+            }
+            draggedHeader.setAttribute('data-just-dragged', '1');
+            // Mark that order changed for save
+            flex.setAttribute('data-order-changed', '1');
+        });
+
+        // Extend the existing save to include current top_order from the bar
+        var origSave = document.getElementById('save-visual-btn');
+        if (origSave) {
+            var oldClick = origSave.onclick;
+            origSave.addEventListener('click', function(e) {
+                // The main save JS will run; we append top_order here if the handler uses formData
+                // We assume the previous visual save JS builds formData; we can hook by setting a global
+                window._editorTopOrder = [];
+                flex.querySelectorAll('span[data-menu]').forEach(function(s) {
+                    var m = s.getAttribute('data-menu');
+                    if (m) window._editorTopOrder.push(m);
+                });
+            }, true); // capture to run before
+        }
+    })();
+    </script>
+
+    <!-- Comprehensive save logic for the current editor structure (collects sections from panels + top_order from bar) -->
+    <script>
+    (function() {
+        var btn = document.getElementById('save-visual-btn');
+        if (!btn) return;
+
+        btn.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            var status = document.getElementById('visual-status');
+            if (status) status.textContent = 'Saving...';
+
+            var formData = new FormData();
+
+            // Collect current structure from the panels (existing + dragged stock + moved items)
+            document.querySelectorAll('.menu-editor-panel').forEach(function(panel) {
+                var menu = panel.getAttribute('data-menu');
+                if (!menu) return;
+
+                panel.querySelectorAll('.editor-section').forEach(function(section) {
+                    var sub = section.getAttribute('data-submenu') || 'top';
+                    var field = 'visual_' + menu + '_' + sub;
+
+                    section.querySelectorAll('.editor-item[data-key], .editor-item[data-type][data-id]').forEach(function(item) {
+                        var key = item.getAttribute('data-key');
+                        if (!key) {
+                            var typ = item.getAttribute('data-type');
+                            var iid = item.getAttribute('data-id');
+                            if (typ && iid) {
+                                key = (typ === 'stock' ? 'stock:' : 'link:') + iid;
+                            }
+                        }
+                        if (key) formData.append(field, key);
+                    });
+                });
+            });
+
+            // Top order from the bar (headers dragged left/right)
+            var topOrder = window._editorTopOrder || [];
+            if (!topOrder.length) {
+                document.querySelectorAll('#editor-menu-bar span[data-menu]').forEach(function(s) {
+                    var m = s.getAttribute('data-menu');
+                    if (m) topOrder.push(m);
+                });
+            }
+            topOrder.forEach(function(m) { formData.append('top_order', m); });
+
+            fetch('/navigation/save_visual_menu', {
+                method: 'POST',
+                body: formData
+            }).then(function(r) { return r.text(); }).then(function(txt) {
+                if (status) status.textContent = 'Saved! Reloading...';
+                setTimeout(function() { location.reload(); }, 700);
+            }).catch(function() {
+                if (status) status.textContent = 'Save failed - try again';
+            });
+        });
+    })();
+    </script>
+         - Top bar looks like your real site menu bar (Image 2)
+         - Open dropdown contents shown as rich panels below (multiple sections/containers)
+         - Full CSC stock visible for dragging in (all items presented)
+         - Drag between any section or panel ("from one place in the menu to another")
+         - Quality matching the existing page create/edit UI (clear instructions, good layout, feedback, prominent save)
+         - The bar + panels together give the "menu as it is on the page" feel with live editing -->
+    <div class="interactive-menu-editor" style="margin:15px 0; padding:12px; border:2px solid #ffcc80; border-radius:6px; background:#fffef5; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:6px;">
+            <div>
+                <h3 style="margin:0 0 2px; font-size:1.1em;">Menu Editor — Visual &amp; Interactive (matches real site menu)</h3>
+                <div style="font-size:0.82em; color:#455a64;">Drag items between sections or entire menus. This preview uses the same structure as the live top nav on every page.</div>
+            </div>
+            <a href="/page/menu-system-upgrade-plan" style="font-size:0.8em; white-space:nowrap;">Living Plan Document</a>
+        </div>
+
+        <!-- The top navigation bar replica (styled to match your real bar in the screenshot) -->
+        <div style="background:#e0f7fa; border-bottom:3px solid #4db6ac; padding:5px 8px; border-radius:3px; margin-bottom:6px;">
+            <div style="display:flex; flex-wrap:wrap; gap:4px; font-size:0.88em; font-family:Verdana,Helvetica,sans-serif; color:#333;">
+                <span style="padding:2px 6px;">Back</span>
+                <span style="padding:2px 6px; font-weight:600;">Main</span>
+                <span style="padding:2px 6px;">Features</span>
+                <span style="padding:2px 6px;">Shop</span>
+                <span style="padding:2px 6px; font-weight:600; background:#b2dfdb; border-radius:2px;">Shanta</span>
+                <span style="padding:2px 6px;">Hosted</span>
+                <span style="padding:2px 6px;">Member</span>
+                <span style="padding:2px 6px;">ENCY</span>
+                <span style="padding:2px 6px;">Weather</span>
+                <span style="padding:2px 6px; font-weight:600;">Admin</span>
+                <span style="padding:2px 6px;">Planning</span>
+                <span style="padding:2px 6px; font-weight:600;">HelpDesk</span>
+                <span style="padding:2px 6px;">Workshops</span>
+            </div>
+        </div>
+
+        <p style="margin:0 0 6px; font-size:0.85em; background:#fff8e1; padding:4px 6px; border-radius:2px;">
+            <strong>Drag to edit:</strong> The panels below are the live dropdown contents for the main editable menus. Drag any item (including from the full CSC stock) from one section or panel to any other place. The top bar above is visual reference only.
+        </p>
+
+        [% IF visual_menus && visual_menus.size %]
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(270px, 1fr)); gap:8px; margin-bottom:6px;">
+                [% FOREACH mkey IN ['Main_links', 'HelpDesk_links', 'Admin_links'] %]
+                    [% SET vm = visual_menus.$mkey %]
+                    <div class="menu-editor-panel" data-menu="[% mkey %]" style="border:1px solid #81d4fa; border-radius:4px; background:white; box-shadow:0 1px 2px rgba(0,0,0,0.06);">
+                        <div style="background:#e0f7fa; padding:3px 6px; font-size:0.9em; font-weight:600; border-bottom:1px solid #4db6ac; color:#0d47a1;">
+                            [% vm.label %] — Open Dropdown Content
+                        </div>
+                        <div style="padding:5px; background:#f5f5f5; min-height:90px;">
+                            [% FOREACH subkey IN vm.sections.keys %]
+                                <div class="editor-section droppable" data-submenu="[% subkey %]" 
+                                     style="margin:3px 0; padding:3px; background:white; border:1px dashed #90a4ae; border-radius:2px;">
+                                    <div style="font-size:0.7em; color:#455a64; padding:0 3px; margin-bottom:2px;">[% subkey %]</div>
+                                    <div class="editor-items" style="min-height:26px; display:flex; flex-wrap:wrap; gap:3px; padding:2px;">
+                                        [% FOREACH item IN vm.sections.$subkey %]
+                                            <div class="editor-item draggable" draggable="true"
+                                                 data-key="stock:[% item.stock_key %]"
+                                                 style="background:#e1f5fe; border:1px solid #4fc3f7; padding:1px 5px; font-size:0.78em; border-radius:2px; cursor:move; display:inline-block; white-space:nowrap;">
+                                                [% item.default_label || item.name %]
+                                                [% IF item.always_include || item.is_mandatory %]<span style="color:#c62828;">★</span>[% END %]
+                                            </div>
+                                        [% END %]
+                                    </div>
+                                </div>
+                            [% END %]
+                        </div>
+                    </div>
+                [% END %]
+            </div>
+        [% ELSE %]
+            <div style="color:#c62828; font-size:0.9em; margin:6px 0;">No data — click "Run Seed for Plan Page" above then hard-refresh.</div>
+        [% END %]
+
+        <!-- Full CSC Stock Palette — always shows every stock item so you are "presented with all the CSC stock menu items" -->
+        [% IF csc_stock_for_editor && csc_stock_for_editor.size %]
+            <div style="border:1px solid #a5d6a7; background:#f1f8e9; padding:5px 6px; border-radius:3px; margin-bottom:6px;">
+                <div style="font-size:0.8em; font-weight:600; color:#2e7d32; margin-bottom:3px;">All CSC Stock (drag any of these into the panels above to add/include them)</div>
+                <div class="editor-items palette" style="display:flex; flex-wrap:wrap; gap:3px;">
+                    [% FOREACH item IN csc_stock_for_editor %]
+                        <div class="editor-item draggable palette-item" draggable="true"
+                             data-key="stock:[% item.stock_key %]"
+                             style="background:white; border:1px solid #81c784; padding:1px 5px; font-size:0.75em; border-radius:2px; cursor:move; white-space:nowrap;">
+                            [% item.default_label %]
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+        [% END %]
+
+        <div style="display:flex; gap:8px; align-items:center;">
+            <button type="button" id="save-visual-btn" class="btn btn-success btn-sm" style="font-weight:600;">Save Menu Layout (from drags)</button>
+            <span id="visual-status" style="font-size:0.9em;"></span>
+        </div>
+        <div style="font-size:0.72em; color:#607d8b; margin-top:3px;">
+            ★ = CSC mandatory (will always be present). Drag from the green palette into any section or between panels. Save updates the live menu for this site.
+        </div>
+    </div>
+    
     <div class="actions-bar">
         <a href="/navigation/add_link" class="btn btn-success">
             <i class="icon-add"></i> Add New Link
+        </a>
+        <a href="/navigation/manage_submenus" class="btn btn-outline-secondary">
+            <i class="icon-settings"></i> Manage Submenus
         </a>
         
         [% IF permissions.can_create_public %]
@@ -44,9 +451,14 @@
     
     [% IF user_links && user_links.size %]
         <div class="links-table">
-            <table class="table table-striped">
+            <div style="margin-bottom: 8px;">
+                <button type="button" id="save-order-btn" class="btn btn-success btn-sm" disabled>Save New Order</button>
+                <span id="order-status" style="margin-left:8px; font-size:0.9em; color:#666;"></span>
+            </div>
+            <table class="table table-striped" id="links-table">
                 <thead>
                     <tr>
+                        <th style="width:22px;" title="Drag rows to reorder"></th>
                         <th>Type</th>
                         <th>Category</th>
                         <th>Submenu</th>
@@ -59,9 +471,10 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="sortable-links">
                     [% FOREACH link IN user_links %]
-                        <tr class="link-row [% link.link_type %]-link">
+                        <tr class="link-row [% link.link_type %]-link" draggable="true" data-id="[% link.id %]">
+                            <td style="cursor:move; text-align:center; color:#999;" title="Drag to reorder">☰</td>
                             <td>
                                 <span class="badge badge-[% IF link.link_type == 'private' %]secondary[% ELSE %]primary[% END %]">
                                     [% link.link_type | ucfirst %]
@@ -121,6 +534,160 @@
             </table>
         </div>
         
+        <script>
+        (function() {
+            var tbody = document.getElementById('sortable-links');
+            var saveBtn = document.getElementById('save-order-btn');
+            var statusEl = document.getElementById('order-status');
+            if (!tbody) return;
+
+            var dragged = null;
+
+            tbody.addEventListener('dragstart', function(e) {
+                if (e.target.tagName === 'TR') {
+                    dragged = e.target;
+                    e.target.style.opacity = '0.4';
+                }
+            });
+
+            tbody.addEventListener('dragend', function(e) {
+                if (dragged) dragged.style.opacity = '';
+                dragged = null;
+                if (saveBtn) saveBtn.disabled = false;
+            });
+
+            tbody.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                var target = e.target.closest('tr');
+                if (!target || target === dragged) return;
+                var rect = target.getBoundingClientRect();
+                var next = (e.clientY - rect.top) / rect.height > 0.5;
+                if (next) {
+                    target.parentNode.insertBefore(dragged, target.nextSibling);
+                } else {
+                    target.parentNode.insertBefore(dragged, target);
+                }
+            });
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    saveBtn.disabled = true;
+                    statusEl.textContent = 'Saving...';
+
+                    var ids = [];
+                    tbody.querySelectorAll('tr[data-id]').forEach(function(tr) {
+                        ids.push(tr.getAttribute('data-id'));
+                    });
+
+                    var formData = new FormData();
+                    ids.forEach(function(id) { formData.append('link_ids', id); });
+
+                    fetch('/navigation/update_link_orders', {
+                        method: 'POST',
+                        body: formData
+                    }).then(function(r) { return r.json(); }).then(function(data) {
+                        if (data.success) {
+                            statusEl.textContent = 'Order saved! (' + data.updated + ' links)';
+                            setTimeout(function(){ statusEl.textContent = ''; location.reload(); }, 800);
+                        } else {
+                            statusEl.textContent = 'Error saving order';
+                            saveBtn.disabled = false;
+                        }
+                    }).catch(function() {
+                        statusEl.textContent = 'Network error';
+                        saveBtn.disabled = false;
+                    });
+                });
+            }
+        })();
+        </script>
+
+        <!-- JS for the visual interactive menu drag & drop (drag items from one place/section to another) -->
+        <script>
+        (function() {
+            var editor = document.querySelector('.interactive-menu-editor');
+            if (!editor) return;
+
+            var saveBtn = document.getElementById('save-visual-btn');
+            var statusEl = document.getElementById('visual-status');
+
+            // Make all .editor-item draggable and handle drops between .editor-items containers
+            function setupDrags() {
+                editor.querySelectorAll('.editor-item').forEach(function(item) {
+                    item.setAttribute('draggable', 'true');
+                    item.addEventListener('dragstart', function(e) {
+                        e.dataTransfer.setData('text/plain', item.getAttribute('data-key') || '');
+                        item.style.opacity = '0.5';
+                    });
+                    item.addEventListener('dragend', function() {
+                        item.style.opacity = '';
+                    });
+                });
+
+                editor.querySelectorAll('.editor-items').forEach(function(container) {
+                    container.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                    });
+                    container.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        var key = e.dataTransfer.getData('text/plain');
+                        if (!key) return;
+                        var existing = container.querySelector('.editor-item[data-key="' + key + '"]');
+                        if (existing) existing.parentNode.removeChild(existing);
+
+                        // Find the item element by key (it may be in another container or palette)
+                        var sourceItem = editor.querySelector('.editor-item[data-key="' + key + '"]');
+                        if (sourceItem) {
+                            container.appendChild(sourceItem);
+                        } else {
+                            // If not found (e.g. from palette not rendered), create a temp one
+                            var newItem = document.createElement('div');
+                            newItem.className = 'editor-item';
+                            newItem.setAttribute('data-key', key);
+                            newItem.setAttribute('draggable', 'true');
+                            newItem.style.cssText = 'display:inline-block;background:white;border:1px solid #ccc;padding:2px 6px;margin:2px;border-radius:3px;cursor:move;font-size:0.85em;';
+                            newItem.textContent = key;  // placeholder label
+                            container.appendChild(newItem);
+                            // re-attach listeners
+                            setupDrags();
+                        }
+                        if (saveBtn) saveBtn.disabled = false;
+                    });
+                });
+            }
+            setupDrags();
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    saveBtn.disabled = true;
+                    statusEl.textContent = 'Saving...';
+
+                    var formData = new FormData();
+                    editor.querySelectorAll('.editor-section').forEach(function(section) {
+                        var menu = section.closest('.menu-preview').getAttribute('data-menu') || 'Main_links';
+                        var sub = section.getAttribute('data-submenu') || 'top';
+                        var fieldName = 'visual_' + menu + '_' + sub;
+
+                        section.querySelectorAll('.editor-item[data-key]').forEach(function(item) {
+                            formData.append(fieldName, item.getAttribute('data-key'));
+                        });
+                    });
+
+                    fetch('/navigation/save_visual_menu', {
+                        method: 'POST',
+                        body: formData
+                    }).then(function(r){ return r.text(); }).then(function(txt) {
+                        statusEl.textContent = 'Saved! Reloading...';
+                        setTimeout(function(){ location.reload(); }, 600);
+                    }).catch(function() {
+                        statusEl.textContent = 'Save failed';
+                        saveBtn.disabled = false;
+                    });
+                });
+            }
+        })();
+        </script>
+
         <div class="summary-info">
             <p class="form-text text-muted" style="margin-bottom:0.75rem;">
                 All of your private links are listed here (every site scope).

@@ -429,10 +429,45 @@ sub hosting_signup :Local :Args(0) {
             $csc_hosting_plans = \@plans;
         }
 
-        $hosting_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
-            { sitename => $site_name }, { rows => 1 }
-        )->single;
+        unless ($c->req->param('new')) {
+            $hosting_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+                { sitename => $site_name }, { rows => 1 }
+            )->single;
+        }
     };
+
+    # If user clicked "Learn More & Join" with new=1, render the new-site details form directly
+    # (plan already chosen, form pre-filled from logged-in user)
+    if ($c->req->param('new') && $c->req->param('plan')) {
+        my $plan_slug = $c->req->param('plan');
+        my $plan = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+            { slug => $plan_slug },
+            { prefetch => 'inventory_item' }
+        )->first;
+
+        my $user_data = {};
+        if ($c->session->{username}) {
+            my $u = $c->model('DBEncy')->resultset('User')->find({ username => $c->session->{username} });
+            if ($u) {
+                $user_data = {
+                    first_name => $u->first_name || '',
+                    last_name  => $u->last_name  || '',
+                    email      => $u->email      || '',
+                    username   => $u->username   || '',
+                };
+            }
+        }
+
+        $c->stash(
+            template    => 'hosting/hosting_details_form.tt',
+            title       => 'Hosting Application',
+            plan        => $plan,
+            plan_slug   => $plan_slug,
+            form_data   => $user_data,
+            form_action => $c->uri_for('/hosting_signup/process'),
+        );
+        return $c->forward($c->view('TT'));
+    }
 
     my %plan_price = map { $_->slug => ($_->price_monthly || 0) } @$csc_hosting_plans;
 
@@ -493,40 +528,54 @@ sub hosting_signup :Local :Args(0) {
 
         my $monthly_cost = $base_price + $addons_extra;
 
-        eval {
-            if ($hosting_account) {
-                $hosting_account->update({
-                    plan_slug          => $p->{plan_slug},
-                    domain             => $p->{domain},
-                    domain_type        => $p->{domain_type} || 'subdomain',
-                    parent_domain      => $p->{parent_domain},
-                    referring_sitename => $p->{referring_sitename},
-                    contact_email      => $p->{contact_email},
-                    monthly_cost       => $monthly_cost,
-                    notes              => $p->{notes},
-                    requested_addons   => $addons_str,
-                    updated_at         => \'NOW()',
-                });
-            } else {
-                $c->model('DBEncy')->resultset('Accounting::HostingAccount')->create({
-                    sitename           => $site_name,
-                    plan_slug          => $p->{plan_slug},
-                    domain             => $p->{domain},
-                    domain_type        => $p->{domain_type} || 'subdomain',
-                    parent_domain      => $p->{parent_domain},
-                    referring_sitename => $p->{referring_sitename} || $site_name,
-                    contact_email      => $p->{contact_email},
-                    status             => 'pending',
-                    monthly_cost       => $monthly_cost,
-                    notes              => $p->{notes},
-                    requested_addons   => $addons_str,
-                    created_by         => $c->session->{username},
-                });
-            }
-        };
-        if ($@) {
-            $c->stash->{error_msg} = ($hosting_account ? "Update" : "Registration") . " failed: $@";
+        require Comserv::Util::HostingAccount;
+        my $existing_url = $p->{existing_site_url} // '';
+        $existing_url =~ s/^\s+|\s+$//g;
+        my $save_ok = 0;
+        if ($existing_url ne '' && $existing_url !~ m{^https?://}i) {
+            $c->stash->{error_msg} = "Existing website URL must start with http:// or https://";
         } else {
+            my $merged_notes = Comserv::Util::HostingAccount::merge_notes_with_existing_site_url(
+                $p->{notes}, $existing_url
+            );
+
+            eval {
+                if ($hosting_account) {
+                    $hosting_account->update({
+                        plan_slug          => $p->{plan_slug},
+                        domain             => $p->{domain},
+                        domain_type        => $p->{domain_type} || 'subdomain',
+                        parent_domain      => $p->{parent_domain},
+                        referring_sitename => $p->{referring_sitename},
+                        contact_email      => $p->{contact_email},
+                        monthly_cost       => $monthly_cost,
+                        notes              => $merged_notes,
+                        requested_addons   => $addons_str,
+                        updated_at         => \'NOW()',
+                    });
+                } else {
+                    $c->model('DBEncy')->resultset('Accounting::HostingAccount')->create({
+                        sitename           => $site_name,
+                        plan_slug          => $p->{plan_slug},
+                        domain             => $p->{domain},
+                        domain_type        => $p->{domain_type} || 'subdomain',
+                        parent_domain      => $p->{parent_domain},
+                        referring_sitename => $p->{referring_sitename} || $site_name,
+                        contact_email      => $p->{contact_email},
+                        status             => 'pending',
+                        monthly_cost       => $monthly_cost,
+                        notes              => $merged_notes,
+                        requested_addons   => $addons_str,
+                        created_by         => $c->session->{username},
+                    });
+                }
+                $save_ok = 1;
+            };
+            if ($@) {
+                $c->stash->{error_msg} = ($hosting_account ? "Update" : "Registration") . " failed: $@";
+            }
+        }
+        if ($save_ok) {
             my $new_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { sitename => $site_name }, { rows => 1 }
             )->single;
@@ -545,6 +594,13 @@ sub hosting_signup :Local :Args(0) {
     }
 
     $c->session->{return_url} = $c->uri_for('/membership')->as_string;
+
+    if ($hosting_account) {
+        require Comserv::Util::HostingAccount;
+        $hosting_account->{existing_site_url} = Comserv::Util::HostingAccount::extract_existing_site_url(
+            $hosting_account->notes
+        );
+    }
 
     $c->stash(
         template          => 'membership/hosting_signup.tt',
@@ -774,11 +830,20 @@ sub plan_details :Local :Args(1) {
     my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
 
+    # Detect if logged-in user already has this plan (modify vs signup view)
+    my $user_has_plan = 0;
+    if ($c->session->{user_id}) {
+        $user_has_plan = $c->model('DBEncy')->resultset('UserMembership')->search(
+            { user_id => $c->session->{user_id}, plan_id => $plan->id, status => ['active','grace'] }
+        )->count > 0;
+    }
+
     $c->stash(
-        template    => 'membership/PlanDetails.tt',
-        plan        => $plan,
-        site_name   => $site_name,
-        patreon_cfg => $patreon_cfg,
+        template      => 'membership/PlanDetails.tt',
+        plan          => $plan,
+        site_name     => $site_name,
+        patreon_cfg   => $patreon_cfg,
+        user_has_plan => $user_has_plan,
     );
     $c->forward($c->view('TT'));
 }

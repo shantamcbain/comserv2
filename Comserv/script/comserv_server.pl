@@ -232,7 +232,7 @@ sub _strip_twiggy_flag {
 
 sub _parse_port_and_reload {
     my @args = @_;
-    my $port   = 3000;
+    my $port   = 3001;
     my $reload = 0;
 
     for (my $i = 0; $i < @args; $i++) {
@@ -619,7 +619,11 @@ sub _run_link_audit {
     }
 }
 
-my $_is_dev_worktree = ($FindBin::Bin =~ m{\.zenflow[\\/]worktrees[\\/]});
+my $_is_dev_worktree =
+    ($FindBin::Bin =~ m{\.zenflow[\\/]worktrees[\\/]}) ||
+    ($FindBin::Bin =~ m{PycharmProjects}) ||
+    ($FindBin::Bin =~ m{comserv2});
+
 _start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1' || $_is_dev_worktree;
 
 if ($use_twiggy) {
@@ -651,7 +655,7 @@ comserv_server.pl [options]
                         (defaults to false)
    -? --help            display this help and exits
    -h --host            host (defaults to all)
-   -p --port            port (defaults to 3000)
+   -p --port            port (defaults to 3001 on workstation dev)
    -k --keepalive       enable keep-alive connections
    -r --restart         restart when files get modified
                         (defaults to false)

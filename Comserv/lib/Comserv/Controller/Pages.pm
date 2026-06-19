@@ -935,8 +935,12 @@ sub admin_submenus_for_menu {
     my ($self, $c, $menu) = @_;
     my $nav = $c ? $c->controller('Navigation') : undef;
     my $mtc = ($nav && $nav->can('nav_menu_to_category')) ? $nav->nav_menu_to_category() : {};
-    my $sub = ($nav && $nav->can('nav_submenu_catalog')) ? $nav->nav_submenu_catalog() : {};
     my $cat = $mtc->{$menu} // '';
+    if ( $nav && $nav->can('get_submenus_for_category') && $c ) {
+        my $site = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        return $nav->get_submenus_for_category( $cat, $c, $site );
+    }
+    my $sub = ($nav && $nav->can('nav_submenu_catalog')) ? $nav->nav_submenu_catalog() : {};
     return $sub->{$cat} || [];
 }
 
@@ -969,7 +973,8 @@ sub admin_page_form_extras {
     }
 
     my $nav = $c->controller('Navigation');
-    my $submenu_catalog  = ($nav && $nav->can('nav_submenu_catalog'))  ? $nav->nav_submenu_catalog()  : {};
+    my $submenu_catalog  = ( $nav && $nav->can('build_submenu_catalog_for_site') )
+        ? $nav->build_submenu_catalog_for_site( $c, $sitename ) : {};
     my $submenu_defaults = ($nav && $nav->can('nav_submenu_defaults')) ? $nav->nav_submenu_defaults() : {};
     my $menu_to_category = ($nav && $nav->can('nav_menu_to_category')) ? $nav->nav_menu_to_category() : {};
 

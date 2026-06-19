@@ -7,6 +7,7 @@ use Comserv::Util::GatewayPlan;
 use Comserv::Util::Opnsense;
 use Socket;
 use Try::Tiny;
+use JSON;
 
 # Dynamic gateway orchestration: rules from hosting_accounts + policy templates.
 # Avoids growing static route/DNS lists — accounts drive customer hostnames.
@@ -67,11 +68,34 @@ sub _has_wildcard {
     return _find_unbound($rows, '*', $domain);
 }
 
+# Normalize dev.* policy rows: workstation Starman is always targets.dev_port (3001).
+# dev.csc is special — browser uses gateway :80 (HAProxy → :3001); keep port 80 in the plan UI.
+sub _normalize_policy_rule {
+    my ( $class, $rule, $tgt ) = @_;
+    return $rule unless ref $rule eq 'HASH';
+    $tgt ||= $class->targets;
+    my $host = $rule->{hostname} // '';
+    return $rule unless $host eq 'dev';
+    my $zone = $rule->{domain} // '';
+    return $rule if $zone eq 'computersystemconsulting.ca';
+
+    my $want = $tgt->{dev_port} // 3001;
+    my $port = $rule->{port};
+    return $rule if defined $port && $port == $want;
+
+    my %out = %$rule;
+    $out{port}          = $want;
+    $out{backend_port}  = $rule->{backend_port} // $want;
+    return \%out;
+}
+
 # Policy templates from gateway_plan.json (wildcard, dev patterns — not per customer).
 sub policy_rules {
     my ($class, $plan) = @_;
     $plan ||= Comserv::Util::GatewayPlan->load;
-    return @{ $plan->{policy_rules} || $plan->{routing_rules} || [] };
+    my $tgt = $class->targets($plan);
+    return map { $class->_normalize_policy_rule( $_, $tgt ) }
+        @{ $plan->{policy_rules} || $plan->{routing_rules} || [] };
 }
 
 # One rule per active hosting account — generated at runtime, not stored in JSON.
@@ -148,7 +172,8 @@ sub merged_plan {
         next if $seen{$key}++;
         push @all, $r;
     }
-    my $merged = { %$base, routing_rules => \@all };
+    my $sorted = Comserv::Util::GatewayPlan->sort_routing_rules( \@all );
+    my $merged = { %$base, routing_rules => $sorted };
     return Comserv::Util::GatewayPlan->enrich_with_drift($merged, $opnsense_status);
 }
 
@@ -330,21 +355,49 @@ sub audit {
     # --- Public DNS for dev.csc (Apply Unbound does not change Cloudflare) ---
     my $dev_csc = 'dev.computersystemconsulting.ca';
     my $pub_ips = _public_dns_ips($dev_csc);
-    if (@$pub_ips && !grep { $_ eq $tgt->{dev_workstation_lan} || $_ eq $tgt->{dev_workstation_zt} } @$pub_ips) {
-        $add->(
-            severity => 'warn',
-            code     => 'dev_public_dns_not_workstation',
-            title    => "$dev_csc public DNS does not point at the workstation",
-            detail   => 'Unbound LAN override may be correct, but browsers using Cloudflare/public DNS see: '
-                      . join(', ', @$pub_ips)
-                      . " — not $tgt->{dev_workstation_lan}. "
-                      . 'https://dev.csc hits Cloudflare/production, not Starman :3001 on the workstation.',
-            fix      => 'For remote dev: add Cloudflare A record dev → ZT IP (grey cloud) or use '
-                      . "http://$tgt->{dev_workstation_lan}:$tgt->{dev_port}/ on LAN. "
-                      . 'Edit in Application DNS.',
-            fqdn       => $dev_csc,
-            fix_domain => 'computersystemconsulting.ca',
-        );
+    if (@$pub_ips) {
+        my $ip = $pub_ips->[0];
+        if ( $ip eq $tgt->{dev_workstation_zt} || $ip eq $tgt->{dev_workstation_lan} ) {
+            $add->(
+                severity   => 'error',
+                code       => 'dev_csc_dns_workstation_breaks_https',
+                title      => "$dev_csc public DNS points at the workstation — HTTPS will fail",
+                detail     => "Public DNS resolves to $ip. Browsers open :443 for https:// and get plain HTTP "
+                          . '(SSL_ERROR_RX_RECORD_TOO_LONG). Apache :80 shows the workstation index page, not Starman :'
+                          . "$tgt->{dev_port}. LAN Unbound ($tgt->{gateway_lan}) is correct; Cloudflare/public DNS is not.",
+                fix        => "In Application DNS: set dev A record to the **gateway WAN IP** (orange cloud proxied), "
+                          . "not the workstation. OPNsense HAProxy terminates SSL and forwards to :$tgt->{dev_port}. "
+                          . 'Until then use http://dev.computersystemconsulting.ca with LAN DNS = '
+                          . "$tgt->{gateway_lan}.",
+                fqdn       => $dev_csc,
+                fix_domain => 'computersystemconsulting.ca',
+            );
+        }
+        elsif ( $ip eq $tgt->{production_lan} || $ip eq $tgt->{production_zt} ) {
+            $add->(
+                severity   => 'error',
+                code       => 'dev_csc_dns_production',
+                title      => "$dev_csc public DNS points at production",
+                detail     => 'Public DNS resolves to ' . join( ', ', @$pub_ips ) . ' (production stack).',
+                fix        => "Point dev A record at gateway WAN IP with HAProxy dev ACL, or LAN-only via Unbound → $tgt->{gateway_lan}.",
+                fqdn       => $dev_csc,
+                fix_domain => 'computersystemconsulting.ca',
+            );
+        }
+        elsif ( $ip ne $tgt->{gateway_lan} ) {
+            $add->(
+                severity => 'warn',
+                code     => 'dev_public_dns_not_gateway',
+                title    => "$dev_csc public DNS is not the gateway",
+                detail   => 'Unbound LAN may be correct, but public DNS sees: '
+                          . join( ', ', @$pub_ips )
+                          . " — want gateway $tgt->{gateway_lan} (LAN) or WAN IP (HTTPS).",
+                fix      => 'Set dev A record to gateway WAN IP (Cloudflare proxied) with HAProxy :80/:443 → workstation :'
+                          . "$tgt->{dev_port}. Edit in Application DNS.",
+                fqdn       => $dev_csc,
+                fix_domain => 'computersystemconsulting.ca',
+            );
+        }
     }
 
     my $error_count = scalar grep { ($_->{severity} // '') eq 'error' } @warnings;
@@ -465,6 +518,196 @@ sub _resolve_ipv4 {
         return inet_ntoa($packed);
     } catch {
         return;
+    };
+}
+
+# All dev.{domain} FQDNs from policy + active hosting (for fix-all and hosts snippet).
+sub all_dev_fqdns {
+    my ( $class, $c, $plan ) = @_;
+    $plan ||= ( $c ? $class->merged_plan($c) : Comserv::Util::GatewayPlan->load );
+    my %seen;
+    if ($plan) {
+        for my $r ( @{ $plan->{routing_rules} || [] } ) {
+            next unless ( $r->{hostname} // '' ) eq 'dev';
+            my $fq = $r->{fqdn} // '';
+            $fq =~ s/^\*\.//;
+            $seen{$fq}++ if $fq =~ /\./;
+        }
+    }
+    if ($c) {
+        try {
+            my @accounts = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+                { status => 'active' },
+            )->all;
+            for my $ha (@accounts) {
+                my $fqdn = Comserv::Util::HostingAccount::resolve_hostname($ha);
+                next unless $fqdn;
+                my ( $host, $zone ) = fqdn_parts($fqdn);
+                next unless defined $host && $host eq 'dev' && $zone;
+                $seen{$fqdn}++;
+            }
+        } catch { };
+    }
+    $seen{'dev.computersystemconsulting.ca'}++;
+    $seen{'dev.beemaster.ca'}++;
+    return [ sort keys %seen ];
+}
+
+# Lines for /etc/hosts — dev.* never production, regardless of resolver.
+sub hosts_file_snippet {
+    my ( $class, $plan ) = @_;
+    $plan ||= Comserv::Util::GatewayPlan->load;
+    my $tgt  = $class->targets($plan);
+    my $ws   = $tgt->{dev_workstation_lan};
+    my $gw   = $tgt->{gateway_lan};
+    my $zt   = $tgt->{dev_workstation_zt};
+    my $csc  = 'dev.computersystemconsulting.ca';
+    my @other;
+    for my $fq ( @{ $class->all_dev_fqdns( undef, $plan ) } ) {
+        push @other, $fq unless $fq eq $csc;
+    }
+    my @lines = (
+        '# Comserv dev.* → workstation (never production)',
+        '# LAN — use gateway for dev.csc so HTTP :80 reaches Starman :3001 without a port in the URL',
+        "$gw\t$csc",
+        ( map { "$ws\t$_" } @other ),
+        '# ZeroTier / remote — direct to workstation',
+        "$zt\t$csc " . join( ' ', @other ),
+        '# Or open directly: http://' . $ws . ':' . $tgt->{dev_port} . '/',
+    );
+    return join( "\n", @lines );
+}
+
+# One action: Unbound + HAProxy + Cloudflare dev records → workstation path.
+sub apply_all_dev_to_workstation {
+    my ( $class, $c ) = @_;
+    my $tgt   = $class->targets;
+    my @steps;
+    my $api   = _opnsense_client($c);
+
+    unless ($api) {
+        return {
+            success => 0,
+            error   => 'OPNsense API not configured',
+            steps   => ['OPNsense API not configured — fix Connection settings first.'],
+        };
+    }
+
+    my $gw = $api->ensure_dev_csc_gateway(
+        {   gateway_ip   => $tgt->{gateway_lan},
+            backend_ip   => $tgt->{dev_workstation_lan},
+            backend_port => $tgt->{dev_port},
+            domain       => 'computersystemconsulting.ca',
+        }
+    );
+    if ( $gw->{success} ) {
+        push @steps, "dev.csc: Unbound → $tgt->{gateway_lan}, HAProxy :80 → workstation :$tgt->{dev_port}.";
+        push @steps, @{ $gw->{steps} || [] } if ref $gw->{steps} eq 'ARRAY';
+    }
+    else {
+        push @steps, 'dev.csc gateway failed: ' . ( $gw->{error} // 'unknown' );
+        return { success => 0, error => $gw->{error}, steps => \@steps };
+    }
+
+    my $csc_zone = 'computersystemconsulting.ca';
+    for my $fqdn ( @{ $class->all_dev_fqdns( $c ) } ) {
+        my ( $host, $zone ) = fqdn_parts($fqdn);
+        next unless defined $host && $host eq 'dev' && $zone;
+        next if $zone eq $csc_zone;
+
+        my $dns = $api->set_host_override_ip(
+            {   hostname    => 'dev',
+                domain      => $zone,
+                ip          => $tgt->{dev_workstation_lan},
+                description => 'Comserv: all dev.* → workstation',
+            }
+        );
+        if ( $dns->{success} ) {
+            push @steps, "Unbound dev.$zone → $tgt->{dev_workstation_lan} (workstation).";
+        }
+        else {
+            push @steps, "Unbound dev.$zone failed: " . ( $dns->{error} // 'unknown' );
+        }
+    }
+    $api->reconfigure_unbound;
+
+    $class->_sync_dev_cloudflare_to_workstation( $c, $tgt, \@steps );
+
+    push @steps, 'Hosts file: copy the snippet from the gateway dashboard into /etc/hosts on any machine that bypasses Unbound.';
+
+    return {
+        success        => 1,
+        steps          => \@steps,
+        hosts_snippet  => $class->hosts_file_snippet,
+    };
+}
+
+sub _sync_dev_cloudflare_to_workstation {
+    my ( $class, $c, $tgt, $steps ) = @_;
+    return unless $c;
+    try {
+        require Comserv::Util::CloudflareManager;
+        require URI::Escape;
+        my $dbh = eval { $c->model('DBEncy')->storage->dbh };
+        return unless $dbh;
+        my $cf = Comserv::Util::CloudflareManager->new( dbh => $dbh );
+        my $zt = $tgt->{dev_workstation_zt};
+        my %zones;
+        for my $fqdn ( @{ $class->all_dev_fqdns($c) } ) {
+            my ( $host, $zone ) = fqdn_parts($fqdn);
+            next unless $host eq 'dev' && $zone;
+            $zones{$zone} = $fqdn;
+        }
+        for my $zone ( sort keys %zones ) {
+            my $fqdn   = $zones{$zone};
+            # dev.csc uses gateway HAProxy (:80/:443) — never point public DNS at workstation ZT.
+            next if $zone eq 'computersystemconsulting.ca';
+            my $record = 'dev.' . $zone;
+            my $zones_resp = $cf->_api_request(
+                'GET',
+                '/zones?name=' . URI::Escape::uri_escape($zone) . '&per_page=5'
+            );
+            my @zlist = ref $zones_resp eq 'HASH' ? @{ $zones_resp->{result} || [] } : ();
+            next unless @zlist && $zlist[0]{id};
+            my $zone_id = $zlist[0]{id};
+            my $rec_resp = $cf->_api_request(
+                'GET',
+                "/zones/$zone_id/dns_records?type=A&name="
+                    . URI::Escape::uri_escape($record) . '&per_page=5'
+            );
+            my @recs = ref $rec_resp eq 'HASH' ? @{ $rec_resp->{result} || [] } : ();
+            if (@recs) {
+                my $rid = $recs[0]{id};
+                $cf->_api_request(
+                    'PUT',
+                    "/zones/$zone_id/dns_records/$rid",
+                    {   type    => 'A',
+                        name    => $record,
+                        content => $zt,
+                        ttl     => 1,
+                        proxied => JSON::false,
+                    }
+                );
+                push @$steps,
+                    "Cloudflare $record → $zt (DNS only, workstation ZeroTier).";
+            }
+            else {
+                $cf->_api_request(
+                    'POST',
+                    "/zones/$zone_id/dns_records",
+                    {   type    => 'A',
+                        name    => 'dev',
+                        content => $zt,
+                        ttl     => 1,
+                        proxied => JSON::false,
+                    }
+                );
+                push @$steps, "Cloudflare created dev.$zone → $zt.";
+            }
+        }
+    }
+    catch {
+        push @$steps, 'Cloudflare dev sync skipped: ' . $_;
     };
 }
 

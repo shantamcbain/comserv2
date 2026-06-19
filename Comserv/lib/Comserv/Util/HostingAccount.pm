@@ -85,4 +85,31 @@ sub is_csc_partner_public_host {
     return 0;
 }
 
+# Extract "Existing site URL: ..." from hosting_accounts.notes (signup / migration field).
+sub extract_existing_site_url {
+    my ($notes) = @_;
+    return '' unless defined $notes && $notes ne '';
+    if ($notes =~ /^Existing site URL:\s*(\S+)/m) {
+        return $1;
+    }
+    if ($notes =~ /^Migrated from:\s*(\S+)/m) {
+        return $1;
+    }
+    return '';
+}
+
+# Set or replace the existing-site URL line in notes.
+sub merge_notes_with_existing_site_url {
+    my ($notes, $url) = @_;
+    $notes //= '';
+    $url = '' unless defined $url;
+    $url =~ s/^\s+|\s+$//g;
+    my @lines = grep { $_ !~ /^(?:Existing site URL|Migrated from):/ } split /\n/, $notes;
+    @lines = grep { $_ ne '' } @lines;
+    if ($url ne '') {
+        push @lines, "Existing site URL: $url";
+    }
+    return join("\n", @lines);
+}
+
 1;

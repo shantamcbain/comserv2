@@ -26,6 +26,7 @@
                 [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
                 <div class="submenu-section">
                     <span class="submenu-section-title">Admin Resources</span>
+                    <a href="[% c.uri_for('/admin/dev-preview') %]" class="submenu-link"><i class="icon-flask"></i>Preview Upcoming Changes</a>
                     <a href="/HelpDesk/kb/linux_commands" class="submenu-link"><i class="icon-terminal"></i>Linux Commands</a>
                 </div>
                 [% END %]

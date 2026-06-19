@@ -1,0 +1,92 @@
+[% PageVersion = 'add_submenu.tt,v 0.01 2026/06/16 dynamic nav submenus' %]
+
+<div class="container nav-link-form" style="max-width:640px;">
+    <h2><i class="icon-add"></i> Add Custom Submenu</h2>
+    <p class="text-muted">Creates a new dropdown section for the selected menu. Links assigned to this submenu appear there automatically.</p>
+
+    [% IF error_msg %]<div class="alert alert-danger">[% error_msg %]</div>[% END %]
+
+    <form method="POST" action="/navigation/add_submenu">
+        <div class="form-group">
+            <label for="category">Parent Menu</label>
+            <select id="category" name="category" class="form-control" required>
+                [% FOREACH cat IN permissions.available_categories %]
+                    [% NEXT IF cat == 'Private_links' %]
+                    <option value="[% cat %]"
+                            [% IF (form_data.category || preset_category) == cat %]selected[% END %]>
+                        [% permissions.category_labels.item(cat) || cat %]
+                    </option>
+                [% END %]
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Site Scope</label>
+            <div class="site-scope-row">
+                <select id="sitename" name="sitename" class="form-control">
+                    [% FOREACH site IN permissions.available_sites %]
+                        <option value="[% site %]"
+                                [% IF (form_data.sitename || preset_sitename) == site %]selected[% END %]>
+                            [% site %]
+                        </option>
+                    [% END %]
+                </select>
+                [% IF permissions.is_csc %]
+                <label class="cross-site-toggle" for="cross_site">
+                    <input type="checkbox" id="cross_site" name="cross_site" value="1"
+                           [% IF form_data.cross_site %]checked[% END %]>
+                    All sites (global)
+                </label>
+                [% END %]
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="label">Section Label</label>
+            <input type="text" id="label" name="label" class="form-control" required maxlength="120"
+                   value="[% form_data.label | html %]" placeholder="e.g. My Site Tools">
+        </div>
+
+        <div class="form-group">
+            <label for="submenu_id">Submenu ID <small class="text-muted">(optional — auto-generated from label)</small></label>
+            <input type="text" id="submenu_id" name="submenu_id" class="form-control" maxlength="64"
+                   pattern="[a-z][a-z0-9_]*"
+                   value="[% form_data.submenu_id | html %]" placeholder="my_site_tools">
+        </div>
+
+        <div class="form-group">
+            <label for="icon">Icon class <small class="text-muted">(optional)</small></label>
+            <input type="text" id="icon" name="icon" class="form-control" maxlength="64"
+                   value="[% form_data.icon | html %]" placeholder="icon-settings">
+        </div>
+
+        <div class="form-group">
+            <label for="header_url">Header link URL <small class="text-muted">(optional)</small></label>
+            <input type="text" id="header_url" name="header_url" class="form-control" maxlength="255"
+                   value="[% form_data.header_url | html %]" placeholder="/admin">
+        </div>
+
+        <div class="form-group">
+            <label for="section_order">Sort order</label>
+            <input type="number" id="section_order" name="section_order" class="form-control"
+                   value="[% form_data.section_order || 500 %]">
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Submenu</button>
+            <a href="/navigation/manage_submenus" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var cross = document.getElementById('cross_site');
+    var site = document.getElementById('sitename');
+    if (cross && site) {
+        function sync() { site.disabled = cross.checked; }
+        cross.addEventListener('change', sync);
+        sync();
+    }
+});
+</script>

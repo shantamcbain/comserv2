@@ -1,0 +1,121 @@
+[%# Schema Compare - Field Comparison (table drill-down)
+    Shows fields from both the live table and its Result file.
+    Highlights missing fields on either side.
+    Allows: add missing field to table / add to result / drop column.
+    Follows ApplicationTtTemplate.tt structure and CSS classes.
+%]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Fields for [% table.name | html %]</h1>
+        <p class="page-subtitle">Database: [% db.name | html %] • Server: [% server.name | html %]</p>
+    </div>
+
+    <div class="breadcrumb-container">
+        <nav class="breadcrumb">
+            <a href="[% c.uri_for('/admin/schema_compare') %]">Schema Compare</a>
+            <span>›</span>
+            <a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]">[% server.name | html %]</a>
+            <span>›</span>
+            <a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]/db/[% db.name | uri %]">[% db.name | html %]</a>
+            <span>›</span>
+            <span>[% table.name | html %]</span>
+        </nav>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+            [% IF fields.size %]
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Field Name</th>
+                            <th>Table Definition</th>
+                            <th>Result File Definition</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH field IN fields %]
+                        <tr data-field="[% field.name | html %]">
+                            <td><strong>[% field.name | html %]</strong></td>
+                            <td>
+                                [% IF field.in_table %]
+                                    <code>[% field.table_def | html %]</code>
+                                [% ELSE %]
+                                    <span class="text-muted">— (missing in table)</span>
+                                [% END %]
+                            </td>
+                            <td>
+                                [% IF field.in_result %]
+                                    <code>[% field.result_def | html %]</code>
+                                [% ELSE %]
+                                    <span class="text-muted">— (missing in result)</span>
+                                [% END %]
+                            </td>
+                            <td>
+                                [% IF field.in_table && field.in_result %]
+                                    <span class="status-badge synchronized">Match</span>
+                                [% ELSIF field.in_table %]
+                                    <span class="status-badge table-only">Table only</span>
+                                [% ELSE %]
+                                    <span class="status-badge result-only">Result only</span>
+                                [% END %]
+                            </td>
+                            <td class="action-cell">
+                                [% IF field.in_result && !field.in_table %]
+                                    <button class="btn btn-sm btn-primary" onclick="addFieldToTable('[% field.name | html %]', '[% table.name | html %]')">
+                                        <i class="fas fa-plus"></i> Add to Table
+                                    </button>
+                                [% END %]
+                                [% IF field.in_table && !field.in_result %]
+                                    <button class="btn btn-sm btn-secondary" onclick="addFieldToResult('[% field.name | html %]', '[% table.name | html %]')">
+                                        <i class="fas fa-file-alt"></i> Add to Result
+                                    </button>
+                                [% END %]
+                                [% IF field.in_table %]
+                                    <button class="btn btn-sm btn-delete" onclick="dropColumn('[% field.name | html %]', '[% table.name | html %]'); event.stopPropagation();">
+                                        <i class="fas fa-trash"></i> Drop
+                                    </button>
+                                [% END %]
+                            </td>
+                        </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+            [% ELSE %]
+            <div class="empty-state">
+                <p>No field comparison data available.</p>
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]/db/[% db.name | uri %]" class="btn btn-secondary">← Back to Tables</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function addFieldToTable(fieldName, tableName) {
+    console.log('Add field to table:', fieldName, tableName);
+    // TODO: wire to controller endpoint
+}
+
+function addFieldToResult(fieldName, tableName) {
+    console.log('Add field to result:', fieldName, tableName);
+    // TODO: wire to controller endpoint
+}
+
+function dropColumn(fieldName, tableName) {
+    if (confirm('Drop column ' + fieldName + ' from ' + tableName + '?')) {
+        console.log('Drop column:', fieldName, tableName);
+        // TODO: wire to controller endpoint
+    }
+}
+</script>

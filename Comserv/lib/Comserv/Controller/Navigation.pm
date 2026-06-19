@@ -7,6 +7,7 @@ BEGIN { extends 'Catalyst::Controller'; }
 
 use URI::Escape qw(uri_escape);
 use JSON::MaybeXS qw(decode_json encode_json);
+use List::Util qw(min);
 
 # Class-level cache for navigation data
 has '_navigation_cache' => (
@@ -99,9 +100,23 @@ our %NAV_SUBMENU_CATALOG = (
         { id => 'top',             label => 'Top of menu (main list)' },
     ],
     Admin_links => [
-        { id => 'cms_pages', label => 'CMS Site Pages (top of Admin menu)' },
-        { id => 'admin_links', label => 'Admin Links submenu' },
-        { id => 'top', label => 'Top of Admin menu' },
+        { id => 'admin_links',      label => 'Admin → Admin (Site Modules, Git Pull, Preview, …)' },
+        { id => 'cms_pages',        label => 'Top of Admin dropdown (with CMS site pages)' },
+        { id => 'top',              label => 'Top of Admin dropdown (direct links only)' },
+        { id => 'ai_assistant',     label => 'AI Assistant' },
+        { id => 'documentation',    label => 'Documentation' },
+        { id => 'file_management',  label => 'File Management' },
+        { id => 'marketplace',      label => 'Marketplace' },
+        { id => 'inventory',        label => 'Inventory & Accounting' },
+        { id => 'logging',          label => 'Logging' },
+        { id => 'projects',         label => 'Projects' },
+        { id => 'system_links',     label => 'System Links' },
+        { id => 'system_setup',     label => 'System Setup' },
+        { id => 'todo',             label => 'ToDo' },
+        { id => 'user_management',  label => 'User Management' },
+        { id => 'theme_css',        label => 'Theme & CSS' },
+        { id => 'debug_options',    label => 'Debug Options' },
+        { id => 'mcoop_admin',      label => 'MCOOP Admin' },
     ],
     Private_links => [
         { id => 'login_dropdown', label => 'My Links (login dropdown)' },
@@ -113,7 +128,7 @@ our %NAV_SUBMENU_DEFAULTS = (
     HelpDesk_links => 'resources',
     Main_links     => 'join_services',
     Member_links   => 'member_services',
-    Admin_links    => 'cms_pages',
+    Admin_links    => 'admin_links',
     Private_links  => 'login_dropdown',
 );
 
@@ -322,6 +337,19 @@ sub _link_visible_to_viewer {
     return $pv ? 1 : 0;
 }
 
+# Public menu rows: blank description, or admin_only when viewer is an administrator.
+sub _public_link_description_or {
+    my ( $self, $c ) = @_;
+    my @or = (
+        { description => undef },
+        { description => '' },
+    );
+    if ( $c->stash->{is_admin} ) {
+        push @or, { description => 'admin_only' };
+    }
+    return \@or;
+}
+
 # Fetch private links with raw SQL when DBIC/schema drift would otherwise fail.
 sub _fetch_private_links_sql {
     my ( $self, $c, $username, $site_name ) = @_;
@@ -362,9 +390,483 @@ sub _fetch_private_links_sql {
     return \@results;
 }
 
+my $_nav_submenu_table_ok;
+
+sub _ensure_nav_submenu_table {
+    my ( $self, $c ) = @_;
+    return 0 unless $c;
+    return 1 if $_nav_submenu_table_ok;
+
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW TABLES LIKE 'nav_submenu_tb'");
+        $sth->execute();
+        unless ( $sth->fetchrow_arrayref ) {
+            $dbh->do(q{
+                CREATE TABLE nav_submenu_tb (
+                    id INT NOT NULL AUTO_INCREMENT,
+                    category VARCHAR(50) NOT NULL,
+                    sitename VARCHAR(50) NOT NULL DEFAULT 'All',
+                    submenu_id VARCHAR(64) NOT NULL,
+                    label VARCHAR(120) NOT NULL,
+                    icon VARCHAR(64) DEFAULT '',
+                    header_url VARCHAR(255) DEFAULT '',
+                    section_order INT NOT NULL DEFAULT 0,
+                    is_system TINYINT(1) NOT NULL DEFAULT 0,
+                    template_slot VARCHAR(64) DEFAULT '',
+                    status TINYINT(1) NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uq_nav_submenu_scope (category, sitename, submenu_id),
+                    KEY idx_nav_submenu_category (category),
+                    KEY idx_nav_submenu_sitename (sitename),
+                    KEY idx_nav_submenu_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            });
+            $c->log->info('Created nav_submenu_tb');
+        }
+        $_nav_submenu_table_ok = 1;
+        $self->_seed_nav_submenu_catalog( $c, $dbh );
+    };
+    if ($@) {
+        $c->log->error("nav_submenu_tb ensure failed: $@");
+        $_nav_submenu_table_ok = 0;
+    }
+    return $_nav_submenu_table_ok ? 1 : 0;
+}
+
+sub seed_nav_submenu_catalog_dbh {
+    my ( $self, $dbh ) = @_;
+    return unless $dbh;
+
+    my $order = 0;
+    for my $category ( sort keys %NAV_SUBMENU_CATALOG ) {
+        for my $item ( @{ $NAV_SUBMENU_CATALOG{$category} } ) {
+            my $id = $item->{id} // next;
+            my $label = $item->{label} // $id;
+            eval {
+                my $check = $dbh->prepare(
+                    'SELECT id FROM nav_submenu_tb '
+                    . 'WHERE category = ? AND sitename = ? AND submenu_id = ? LIMIT 1'
+                );
+                $check->execute( $category, 'All', $id );
+                next if $check->fetchrow_arrayref;
+
+                $dbh->do(
+                    'INSERT INTO nav_submenu_tb '
+                    . '(category, sitename, submenu_id, label, section_order, is_system, template_slot, status) '
+                    . 'VALUES (?, ?, ?, ?, ?, 1, ?, 1)',
+                    undef,
+                    $category, 'All', $id, $label, $order, $id,
+                );
+            };
+            $order += 10;
+        }
+        $order = 0;
+    }
+}
+
+sub _seed_nav_submenu_catalog {
+    my ( $self, $c, $dbh ) = @_;
+    $dbh //= eval { $c->model('DBEncy')->schema->storage->dbh };
+    $self->seed_nav_submenu_catalog_dbh($dbh);
+}
+
+# ============================================================
+# NEW: menu_stock (CSC stock catalog) + site_menu_overrides
+# For the DB-dominated menu system with CSC base + SiteName overrides.
+# Hybrid: critical fallbacks remain in .tt; stock powers editor + customizable lists.
+# ============================================================
+
+my $_menu_stock_table_ok;
+my $_site_menu_overrides_table_ok;
+
+sub _ensure_menu_stock_tables {
+    my ( $self, $c ) = @_;
+    return 0 unless $c;
+    return 1 if $_menu_stock_table_ok && $_site_menu_overrides_table_ok;
+
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+
+        # menu_stock
+        my $sth = $dbh->prepare("SHOW TABLES LIKE 'menu_stock'");
+        $sth->execute();
+        unless ( $sth->fetchrow_arrayref ) {
+            my $sql_file = $c->path_to('sql', '20260617_create_menu_stock.sql')->stringify;
+            if (-e $sql_file) {
+                my $sql = do { local (@ARGV, $/) = $sql_file; <> };
+                foreach my $statement (split /;/, $sql) {
+                    $statement =~ s/^\s+|\s+$//g;
+                    next unless $statement && $statement !~ /^--/;
+                    eval { $dbh->do($statement); };
+                    $c->log->error("menu_stock migration stmt error: $@") if $@;
+                }
+            } else {
+                # Fallback inline CREATE (matches the .sql)
+                $dbh->do(q{
+                    CREATE TABLE IF NOT EXISTS menu_stock (
+                        id INT NOT NULL AUTO_INCREMENT,
+                        stock_key VARCHAR(64) NOT NULL,
+                        default_label VARCHAR(120) NOT NULL,
+                        default_url VARCHAR(500) NOT NULL,
+                        default_icon VARCHAR(64) DEFAULT '',
+                        default_category VARCHAR(50) NOT NULL,
+                        default_submenu VARCHAR(64) DEFAULT '',
+                        always_include TINYINT(1) NOT NULL DEFAULT 0,
+                        always_visible TINYINT(1) NOT NULL DEFAULT 0,
+                        reorderable TINYINT(1) NOT NULL DEFAULT 1,
+                        gating VARCHAR(255) DEFAULT '',
+                        sort_hint INT NOT NULL DEFAULT 100,
+                        description TEXT,
+                        is_active TINYINT(1) NOT NULL DEFAULT 1,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        UNIQUE KEY uq_menu_stock_key (stock_key),
+                        KEY idx_menu_stock_category (default_category)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                });
+            }
+            $c->log->info('Created menu_stock table');
+        }
+        $_menu_stock_table_ok = 1;
+
+        # site_menu_overrides
+        $sth = $dbh->prepare("SHOW TABLES LIKE 'site_menu_overrides'");
+        $sth->execute();
+        unless ( $sth->fetchrow_arrayref ) {
+            my $sql_file2 = $c->path_to('sql', '20260617_create_site_menu_overrides.sql')->stringify;
+            if (-e $sql_file2) {
+                my $sql2 = do { local (@ARGV, $/) = $sql_file2; <> };
+                foreach my $statement (split /;/, $sql2) {
+                    $statement =~ s/^\s+|\s+$//g;
+                    next unless $statement && $statement !~ /^--/;
+                    eval { $dbh->do($statement); };
+                    $c->log->error("site_menu_overrides migration stmt error: $@") if $@;
+                }
+            } else {
+                $dbh->do(q{
+                    CREATE TABLE IF NOT EXISTS site_menu_overrides (
+                        id INT NOT NULL AUTO_INCREMENT,
+                        site_name VARCHAR(50) NOT NULL DEFAULT 'All',
+                        stock_id INT NULL,
+                        stock_key VARCHAR(64) NULL,
+                        custom_label VARCHAR(120) NULL,
+                        custom_url VARCHAR(500) NULL,
+                        custom_icon VARCHAR(64) DEFAULT '',
+                        custom_category VARCHAR(50) NULL,
+                        custom_submenu VARCHAR(64) DEFAULT '',
+                        sort_order INT NOT NULL DEFAULT 100,
+                        is_included TINYINT(1) NOT NULL DEFAULT 1,
+                        page_pattern VARCHAR(255) DEFAULT NULL,
+                        is_page_specific TINYINT(1) NOT NULL DEFAULT 0,
+                        notes TEXT,
+                        created_by VARCHAR(100),
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        UNIQUE KEY uq_site_stock (site_name, stock_id),
+                        KEY idx_site_menu_overrides_site (site_name)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                });
+            }
+            $c->log->info('Created site_menu_overrides table');
+        }
+        $_site_menu_overrides_table_ok = 1;
+
+        # Seed stock (idempotent)
+        $self->_seed_csc_menu_stock( $c, $dbh );
+    };
+    if ($@) {
+        $c->log->error("menu_stock / site_menu_overrides ensure failed: $@");
+        $_menu_stock_table_ok = 0;
+        $_site_menu_overrides_table_ok = 0;
+    }
+    return ($_menu_stock_table_ok && $_site_menu_overrides_table_ok) ? 1 : 0;
+}
+
+sub seed_csc_menu_stock_dbh {
+    my ( $self, $dbh ) = @_;
+    return unless $dbh;
+
+    # Core CSC stock items. These are presented to *every* SiteName admin when editing menus.
+    # Key mandatories (per user spec): Main always, Admin (for admins) always visible/included,
+    # login/user basics protected but many renamable. Gating re-uses/extends existing patterns.
+    # Hard-coded fallbacks in .tt for resilience on a few (login, HelpDesk entry, main home).
+    # New and most others are fully DB editable after "convert" or direct use.
+
+    my @stock = (
+        # === Main (core, mostly DB now; home has .tt fallback) ===
+        { stock_key => 'main_home', default_label => 'Home', default_url => '/', default_icon => 'icon-home', default_category => 'Main_links', default_submenu => 'top', always_include => 1, always_visible => 1, reorderable => 1, gating => '', sort_hint => 10, description => 'Core site home (DB by default; .tt fallback available)' },
+        { stock_key => 'main_marketplace', default_label => 'Marketplace', default_url => '/marketplace', default_icon => 'icon-marketplace', default_category => 'Main_links', default_submenu => 'join_services', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 30, description => '' },
+        { stock_key => 'main_mail', default_label => 'Mail', default_url => '/mail', default_icon => 'icon-mail', default_category => 'Main_links', default_submenu => 'join_services', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 40, description => '' },
+        { stock_key => 'main_jobs', default_label => 'Jobs', default_url => '/jobs', default_icon => 'icon-briefcase', default_category => 'Main_links', default_submenu => 'join_services', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 50, description => '' },
+        { stock_key => 'main_join', default_label => 'Join', default_url => '/join', default_icon => 'icon-user-plus', default_category => 'Main_links', default_submenu => 'join_services', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 60, description => '' },
+
+        # === HelpDesk / Login support (some core hard-coded in TopDropListHelpDesk.tt and Login for resilience) ===
+        { stock_key => 'helpdesk_home', default_label => 'HelpDesk Home', default_url => '/HelpDesk', default_icon => 'icon-helpdesk', default_category => 'HelpDesk_links', default_submenu => 'top', always_include => 1, always_visible => 1, reorderable => 1, gating => '', sort_hint => 10, description => 'Primary support entry (hard fallback in .tt)' },
+        { stock_key => 'helpdesk_submit', default_label => 'Submit a Ticket', default_url => '/HelpDesk/ticket/new', default_icon => 'icon-ticket', default_category => 'HelpDesk_links', default_submenu => 'top', always_include => 1, always_visible => 1, reorderable => 1, gating => '', sort_hint => 20, description => 'Key support action (hard fallback)' },
+        { stock_key => 'helpdesk_status', default_label => 'Check Ticket Status', default_url => '/HelpDesk/ticket/status', default_icon => 'icon-status', default_category => 'HelpDesk_links', default_submenu => 'top', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 30, description => '' },
+        { stock_key => 'helpdesk_kb', default_label => 'Knowledge Base', default_url => '/HelpDesk/kb', default_icon => 'icon-kb', default_category => 'HelpDesk_links', default_submenu => 'resources', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 50, description => '' },
+        { stock_key => 'helpdesk_faq', default_label => 'FAQ', default_url => '/faq', default_icon => 'icon-faq', default_category => 'HelpDesk_links', default_submenu => 'resources', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 60, description => '' },
+        { stock_key => 'helpdesk_docs', default_label => 'Documentation', default_url => '/Documentation', default_icon => 'icon-docs', default_category => 'HelpDesk_links', default_submenu => 'resources', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 70, description => '' },
+
+        # === Admin (always visible to admins on all pages per spec; admin dropdown protected) ===
+        { stock_key => 'admin_home', default_label => 'Admin Home', default_url => '/admin', default_icon => 'icon-admin', default_category => 'Admin_links', default_submenu => 'top', always_include => 1, always_visible => 1, reorderable => 1, gating => 'admin_only', sort_hint => 5, description => 'Admin entry; always visible to admins' },
+        { stock_key => 'admin_site_modules', default_label => 'Site Modules', default_url => '/admin/site_modules', default_icon => 'icon-settings', default_category => 'Admin_links', default_submenu => 'admin_links', always_include => 0, always_visible => 0, reorderable => 1, gating => 'admin_only', sort_hint => 20, description => '' },
+        { stock_key => 'admin_git_pull', default_label => 'Git Pull', default_url => '/admin/git_pull', default_icon => 'icon-git', default_category => 'Admin_links', default_submenu => 'admin_links', always_include => 0, always_visible => 0, reorderable => 1, gating => 'admin_only', sort_hint => 30, description => '' },
+        { stock_key => 'admin_preview', default_label => 'Preview Upcoming Changes', default_url => '/admin/dev-preview', default_icon => 'icon-flask', default_category => 'Admin_links', default_submenu => 'admin_links', always_include => 0, always_visible => 0, reorderable => 1, gating => 'admin_only', sort_hint => 40, description => '' },
+        { stock_key => 'admin_theme', default_label => 'Theme & CSS', default_url => '/admin/theme', default_icon => 'icon-paint', default_category => 'Admin_links', default_submenu => 'theme_css', always_include => 0, always_visible => 0, reorderable => 1, gating => 'admin_only', sort_hint => 120, description => '' },
+
+        # === Member / other common (DB dominated; renamable) ===
+        { stock_key => 'member_home', default_label => 'Member Home', default_url => '/membership', default_icon => 'icon-accounts', default_category => 'Member_links', default_submenu => 'member_services', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 10, description => '' },
+
+        # === Examples of gated (per user spec: subscription / module) ===
+        { stock_key => 'weather', default_label => 'Weather', default_url => '/Weather', default_icon => 'icon-weather', default_category => 'Weather_links', default_submenu => 'top', always_include => 0, always_visible => 0, reorderable => 1, gating => 'subscription', sort_hint => 10, description => 'Visible/movable if subscribed' },
+        { stock_key => 'beekeeping', default_label => 'Beekeeping', default_url => '/Beekeeping', default_icon => 'icon-beekeeping', default_category => 'Beekeeping_links', default_submenu => 'top', always_include => 0, always_visible => 0, reorderable => 1, gating => 'module:beekeeping', sort_hint => 10, description => 'Only if beekeeping module enabled' },
+
+        # === Hosted / CSC specific examples ===
+        { stock_key => 'hosted_catalog', default_label => 'Hosted Sites', default_url => '/hosted', default_icon => 'icon-server', default_category => 'Hosted_links', default_submenu => 'top', always_include => 0, always_visible => 0, reorderable => 1, gating => 'csc_only_or_hosted', sort_hint => 10, description => 'CSC or active hosted account' },
+
+        # Placeholder for future custom top-levels (sites may create additional)
+        { stock_key => 'custom_placeholder', default_label => 'Custom Menu (example)', default_url => '#', default_icon => 'icon-folder', default_category => 'Custom_top', default_submenu => 'top', always_include => 0, always_visible => 0, reorderable => 1, gating => '', sort_hint => 999, description => 'Example; sites can create real custom tops' },
+    );
+
+    for my $item (@stock) {
+        eval {
+            my $check = $dbh->prepare('SELECT id FROM menu_stock WHERE stock_key = ? LIMIT 1');
+            $check->execute( $item->{stock_key} );
+            if ( $check->fetchrow_arrayref ) {
+                # Update defaults if changed (label/url/icon mainly; keep admin flags from CSC)
+                $dbh->do(
+                    'UPDATE menu_stock SET default_label=?, default_url=?, default_icon=?, default_category=?, default_submenu=?, gating=?, sort_hint=?, description=?, updated_at=NOW() WHERE stock_key=?',
+                    undef,
+                    $item->{default_label}, $item->{default_url}, $item->{default_icon},
+                    $item->{default_category}, $item->{default_submenu},
+                    $item->{gating}, $item->{sort_hint}, $item->{description},
+                    $item->{stock_key}
+                );
+                return;
+            }
+            $dbh->do(
+                q{INSERT INTO menu_stock
+                    (stock_key, default_label, default_url, default_icon, default_category, default_submenu,
+                     always_include, always_visible, reorderable, gating, sort_hint, description, is_active)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)},
+                undef,
+                $item->{stock_key}, $item->{default_label}, $item->{default_url}, $item->{default_icon},
+                $item->{default_category}, $item->{default_submenu},
+                $item->{always_include}, $item->{always_visible}, $item->{reorderable},
+                $item->{gating}, $item->{sort_hint}, $item->{description}
+            );
+        };
+        if ($@) {
+            # non-fatal during seed
+        }
+    }
+}
+
+sub _seed_csc_menu_stock {
+    my ( $self, $c, $dbh ) = @_;
+    $dbh //= eval { $c->model('DBEncy')->schema->storage->dbh };
+    $self->seed_csc_menu_stock_dbh($dbh);
+}
+
+sub get_csc_stock_catalog {
+    my ( $self, $c, $category ) = @_;
+    $self->_ensure_menu_stock_tables($c);
+    my @rows;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sql = 'SELECT * FROM menu_stock WHERE is_active = 1';
+        my @bind;
+        if ($category) {
+            $sql .= ' AND default_category = ?';
+            push @bind, $category;
+        }
+        $sql .= ' ORDER BY sort_hint ASC, default_label ASC';
+        my $sth = $dbh->prepare($sql);
+        $sth->execute(@bind);
+        while (my $r = $sth->fetchrow_hashref) { push @rows, $r; }
+    };
+    if ($@) { $c->log->error("get_csc_stock_catalog: $@"); }
+    return \@rows;
+}
+
+sub get_site_menu_overrides {
+    my ( $self, $c, $site_name ) = @_;
+    $site_name //= $self->_current_site($c);
+    $self->_ensure_menu_stock_tables($c);
+    my @rows;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare(q{
+            SELECT * FROM site_menu_overrides
+            WHERE site_name = ? OR site_name = 'All'
+            ORDER BY sort_order ASC, custom_label ASC
+        });
+        $sth->execute($site_name);
+        while (my $r = $sth->fetchrow_hashref) { push @rows, $r; }
+    };
+    if ($@) { $c->log->error("get_site_menu_overrides: $@"); }
+    return \@rows;
+}
+
+# Very basic effective list for Phase 1 verification (stock + site overrides).
+# Full context (page, drag order, mandatory force, gating) expanded in later phases.
+sub get_effective_stock_items_for_category {
+    my ( $self, $c, $category, $site_name ) = @_;
+    $site_name //= $self->_current_site($c);
+    my $stock = $self->get_csc_stock_catalog($c, $category);
+    my $overrides = $self->get_site_menu_overrides($c, $site_name);
+
+    my %ov_by_stock;
+    for my $o (@$overrides) {
+        my $key = $o->{stock_key} || ($o->{stock_id} ? 'id:'.$o->{stock_id} : '');
+        $ov_by_stock{$key} = $o if $key;
+    }
+
+    my @eff;
+    for my $s (@$stock) {
+        my $ov = $ov_by_stock{ $s->{stock_key} } || $ov_by_stock{ 'id:'.($s->{id}//0) };
+        next if $ov && !$ov->{is_included} && !$s->{always_include};
+
+        push @eff, {
+            %$s,
+            _override_id => $ov ? $ov->{id} : undef,
+            name  => ( $ov && $ov->{custom_label} ) ? $ov->{custom_label} : $s->{default_label},
+            url   => ( $ov && $ov->{custom_url} )   ? $ov->{custom_url}   : $s->{default_url},
+            icon  => ( $ov && $ov->{custom_icon} )  ? $ov->{custom_icon}  : $s->{default_icon},
+            category => ( $ov && $ov->{custom_category} ) ? $ov->{custom_category} : $s->{default_category},
+            submenu  => ( $ov && $ov->{custom_submenu} )  ? $ov->{custom_submenu}  : $s->{default_submenu},
+            sort_order => ( $ov && defined $ov->{sort_order} ) ? $ov->{sort_order} : $s->{sort_hint},
+            is_from_stock => 1,
+            is_mandatory  => $s->{always_include} || $s->{always_visible},
+            reorderable   => $s->{reorderable},
+        };
+    }
+    @eff = sort { ($a->{sort_order}||0) <=> ($b->{sort_order}||0) || lc($a->{name}||'') cmp lc($b->{name}||'') } @eff;
+    return \@eff;
+}
+
+sub _slugify_submenu_id {
+    my ( $self, $label ) = @_;
+    return '' unless defined $label && $label ne '';
+    my $slug = lc $label;
+    $slug =~ s/[^a-z0-9]+/_/g;
+    $slug =~ s/^_+|_+$//g;
+    $slug =~ s/_+/_/g;
+    $slug = substr( $slug, 0, 64 );
+    return $slug if $slug ne '';
+    return 'submenu';
+}
+
+sub _fetch_nav_submenu_rows {
+    my ( $self, $c, $category, $site_name ) = @_;
+    return [] unless $self->_ensure_nav_submenu_table($c);
+
+    $site_name //= $self->_current_site($c);
+    my @rows;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare(q{
+            SELECT *
+            FROM nav_submenu_tb
+            WHERE category = ?
+              AND status = 1
+              AND (sitename = ? OR sitename = 'All')
+            ORDER BY section_order ASC, label ASC
+        });
+        $sth->execute( $category, $site_name );
+        while ( my $row = $sth->fetchrow_hashref ) {
+            push @rows, $row;
+        }
+    };
+    if ($@) {
+        $c->log->error("Error loading nav submenus for $category: $@");
+        return [];
+    }
+
+    my %by_id;
+    for my $row (@rows) {
+        my $sid = $row->{submenu_id} // next;
+        my $existing = $by_id{$sid};
+        if ( !$existing ) {
+            $by_id{$sid} = $row;
+            next;
+        }
+        if ( ( $row->{sitename} // '' ) ne 'All' ) {
+            $by_id{$sid} = $row;
+        }
+    }
+
+    return [ sort { ( $a->{section_order} || 0 ) <=> ( $b->{section_order} || 0 )
+                    || lc( $a->{label} // '' ) cmp lc( $b->{label} // '' ) } values %by_id ];
+}
+
 sub get_submenus_for_category {
-    my ($self, $category) = @_;
+    my ( $self, $category, $c, $site_name ) = @_;
+    if ($c) {
+        my $rows = $self->_fetch_nav_submenu_rows( $c, $category, $site_name );
+        if (@$rows) {
+            return [
+                map { +{ id => $_->{submenu_id}, label => $_->{label} } } @$rows
+            ];
+        }
+    }
     return $NAV_SUBMENU_CATALOG{$category} // [];
+}
+
+sub build_submenu_catalog_for_site {
+    my ( $self, $c, $site_name ) = @_;
+    $site_name //= $self->_current_site($c);
+    my %catalog;
+    for my $cat ( @{ $self->_nav_categories_for_user( $c, $c->stash->{is_admin} ? 1 : 0 ) } ) {
+        $catalog{$cat} = $self->get_submenus_for_category( $cat, $c, $site_name );
+    }
+    return \%catalog;
+}
+
+sub build_submenu_labels_for_site {
+    my ( $self, $c, $site_name ) = @_;
+    $site_name //= $self->_current_site($c);
+    my %labels = %NAV_SUBMENU_LABELS;
+    if ( $self->_ensure_nav_submenu_table($c) ) {
+        eval {
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            my $sth = $dbh->prepare(q{
+                SELECT submenu_id, label
+                FROM nav_submenu_tb
+                WHERE status = 1 AND (sitename = ? OR sitename = 'All')
+            });
+            $sth->execute($site_name);
+            while ( my ( $id, $label ) = $sth->fetchrow_array ) {
+                $labels{$id} = $label if defined $id && $id ne '';
+            }
+        };
+    }
+    return \%labels;
+}
+
+sub get_custom_submenu_sections {
+    my ( $self, $c, $category, $site_name ) = @_;
+    my $rows = $self->_fetch_nav_submenu_rows( $c, $category, $site_name );
+    return [ grep { !$_->{is_system} } @$rows ];
+}
+
+sub group_menu_links_by_submenu {
+    my ( $self, $links, $category, $c, $site_name ) = @_;
+    my @out_links = @{ $links || [] };
+    my %by;
+    for my $l (@out_links) {
+        next unless ref($l) eq 'HASH';
+        my $cat = $self->_normalize_link_category( $l->{category} // $category );
+        my $sub = $self->normalize_link_submenu( $cat, $l->{submenu}, $c, $site_name );
+        push @{ $by{$sub} }, $l;
+    }
+    return \%by;
 }
 
 sub default_submenu_for_category {
@@ -373,19 +875,27 @@ sub default_submenu_for_category {
 }
 
 sub normalize_link_submenu {
-    my ($self, $category, $submenu) = @_;
+    my ( $self, $category, $submenu, $c, $site_name ) = @_;
     $category = $self->_normalize_link_category($category);
     my $default = $self->default_submenu_for_category($category);
     $submenu = $default if !defined $submenu || $submenu eq '';
-    my @allowed = map { $_->{id} } @{ $self->get_submenus_for_category($category) };
-    return $default unless @allowed;
-    return $submenu if grep { $_ eq $submenu } @allowed;
+    my @allowed = map { $_->{id} }
+        @{ $self->get_submenus_for_category( $category, $c, $site_name ) };
+    return $submenu if @allowed && grep { $_ eq $submenu } @allowed;
+    return $submenu
+        if defined $submenu
+        && $submenu ne ''
+        && $submenu =~ /^[a-z][a-z0-9_]{0,62}$/;
     return $default;
 }
 
 sub submenu_display_label {
-    my ($self, $submenu) = @_;
+    my ( $self, $submenu, $c, $site_name ) = @_;
     return '' unless defined $submenu && $submenu ne '';
+    if ($c) {
+        my $labels = $self->build_submenu_labels_for_site( $c, $site_name );
+        return $labels->{$submenu} if $labels->{$submenu};
+    }
     return $NAV_SUBMENU_LABELS{$submenu} // $submenu;
 }
 
@@ -396,14 +906,29 @@ sub _normalize_link_category {
 }
 
 sub filter_menu_links_by_submenu {
-    my ($self, $links, $want_submenu, $default_submenu) = @_;
+    my ( $self, $links, $want_submenu, $default_submenu, $c, $site_name ) = @_;
     $default_submenu //= 'main';
     my @out;
-    for my $l (@{ $links || [] }) {
+    for my $l ( @{ $links || [] } ) {
         next unless ref($l) eq 'HASH';
         my $cat = $self->_normalize_link_category( $l->{category} );
-        my $sub = $self->normalize_link_submenu( $cat, $l->{submenu} );
+        my $sub = $self->normalize_link_submenu( $cat, $l->{submenu}, $c, $site_name );
         push @out, $l if $sub eq $want_submenu;
+    }
+    return \@out;
+}
+
+sub filter_menu_links_by_submenus {
+    my ( $self, $links, $want_submenus, $c, $site_name ) = @_;
+    $want_submenus = [$want_submenus] unless ref($want_submenus) eq 'ARRAY';
+    my %want = map { $_ => 1 } grep { defined $_ && $_ ne '' } @$want_submenus;
+    return [] unless %want;
+    my @out;
+    for my $l ( @{ $links || [] } ) {
+        next unless ref($l) eq 'HASH';
+        my $cat = $self->_normalize_link_category( $l->{category} );
+        my $sub = $self->normalize_link_submenu( $cat, $l->{submenu}, $c, $site_name );
+        push @out, $l if $want{$sub};
     }
     return \@out;
 }
@@ -431,6 +956,14 @@ sub is_public_dns_domain {
     my ( $self, $domain ) = @_;
     require Comserv::Util::HostingAccount;
     return Comserv::Util::HostingAccount::is_public_dns_domain($domain);
+}
+
+# Features dropdown: CSC public product overview (no subscription required).
+sub features_nav_visible {
+    my ( $self, $c ) = @_;
+    my $sn = $c->session->{SiteName} || $c->stash->{SiteName} || '';
+    return 0 unless $sn ne '';
+    return lc($sn) eq 'csc' ? 1 : 0;
 }
 
 # Hosted dropdown: CSC hub, active hosted customer sites, or referring sites with clients.
@@ -766,7 +1299,13 @@ sub merge_hosted_resource_links {
 sub _attach_submenu_to_link_data {
     my ($self, $c, $link_data, $category, $submenu) = @_;
     return unless $self->_internal_links_has_submenu_column($c);
-    $link_data->{submenu} = $self->normalize_link_submenu($category, $submenu);
+    if ( ( !defined $submenu || $submenu eq '' )
+        && $category eq 'Admin_links'
+        && !$link_data->{description} )
+    {
+        $submenu = 'admin_links';
+    }
+    $link_data->{submenu} = $self->normalize_link_submenu( $category, $submenu, $c );
 }
 
 sub get_available_link_sites {
@@ -833,10 +1372,7 @@ sub get_merged_menu_links {
             category => $category,
             sitename => [ $site_name, 'All' ],
             status   => 1,
-            -or      => [
-                { description => undef },
-                { description => '' },
-            ],
+            -or      => $self->_public_link_description_or($c),
         );
         if (  $self->_internal_links_has_public_visible_column($c)
             && !$self->_viewer_sees_member_content($c) )
@@ -902,10 +1438,7 @@ sub get_internal_links {
         my %where = (
             category => $category,
             sitename => [ $site_name, 'All' ],
-            -or      => [
-                { description => undef },
-                { description => '' },
-            ],
+            -or      => $self->_public_link_description_or($c),
         );
         if (  !$include_hidden
             && $self->_internal_links_has_public_visible_column($c)
@@ -927,12 +1460,15 @@ sub get_internal_links {
         
         if (!@results) {
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            my $desc_sql = $c->stash->{is_admin}
+                ? q{(description IS NULL OR description = '' OR description = 'admin_only')}
+                : q{(description IS NULL OR description = '')};
             my $query = qq{
                 SELECT *
                 FROM internal_links_tb
                 WHERE category = ?
                   AND (sitename = ? OR sitename = 'All')
-                  AND (description IS NULL OR description = '')
+                  AND $desc_sql
             };
             if (  !$include_hidden
                 && $self->_internal_links_has_public_visible_column($c)
@@ -1335,10 +1871,16 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
     }
     
     # Pre-populate form based on URL parameters
-    my $preset_category = $c->req->param('category') || $self->_menu_param_to_category($c->req->param('menu')) || 'Member_links';
+    my $preset_menu     = $c->req->param('menu') || '';
+    my $preset_category = $c->req->param('category')
+        || $self->_menu_param_to_category($preset_menu)
+        || 'Member_links';
     my $preset_sitename = $c->req->param('sitename') || $user_sitename;
-    my $preset_submenu  = $c->req->param('submenu')
-        || $self->default_submenu_for_category($preset_category);
+    my $preset_submenu  = $c->req->param('submenu') || '';
+    if ( !$preset_submenu && $preset_menu eq 'Admin' && $preset_category eq 'Admin_links' ) {
+        $preset_submenu = 'admin_links';
+    }
+    $preset_submenu ||= $self->default_submenu_for_category($preset_category);
     my $preset_return   = $return_url;
     my $preset_linktype = 'private';
     
@@ -1400,7 +1942,478 @@ sub manage_links :Path('/navigation/manage_links') :Args(0) {
     $c->stash->{user_links} = $user_links;
     $c->stash->{permissions} = $permissions;
     $c->stash->{template_title} = 'Manage Links';
+
+    # Make sure navigation data (merged links, submenus, pages) is available for the real preview
+    $self->populate_navigation_data($c);
+
+    my $sitename = $c->session->{SiteName} || $self->_current_site($c);
+
+    # Prepare editor data: current real menu structure (existing links + pages) so user sees "how the menu will look or act"
+    # Plus full CSC stock palette for adding.
+    my %editor_menus;
+    for my $cat (qw(Main_links HelpDesk_links Admin_links)) {
+        my $links = $self->get_merged_menu_links($c, $cat, $sitename) || [];
+        my $grouped = $self->group_menu_links_by_submenu($links, $cat, $c, $sitename) || {};
+
+        my %secs;
+        for my $sub (keys %$grouped) {
+            $secs{$sub} = [ map { +{ type => 'link', data => $_ } } @{ $grouped->{$sub} } ];
+        }
+
+        # Add pages that belong to this menu (they appear in the real menu)
+        my $menu_short = $cat;
+        $menu_short =~ s/_links//i;
+        my $pages = $self->get_pages($c, $menu_short, $sitename) || [];
+        for my $p (@$pages) {
+            my $sub = 'cms_pages'; # or top / public_links depending on the menu
+            push @{ $secs{$sub} ||= [] }, { type => 'page', data => $p };
+        }
+
+        $editor_menus{$cat} = {
+            label => ($cat =~ s/_links//r),
+            sections => \%secs,
+        };
+    }
+    $c->stash->{editor_menus} = \%editor_menus;
+
+    # Full CSC stock for the palette (all items the user can drag in)
+    $c->stash->{csc_stock_palette} = $self->get_csc_stock_catalog($c);
+
+    # Also the submenus for "containers" management (like cards in page editor)
+    my $submenus = {};
+    for my $cat (keys %editor_menus) {
+        $submenus->{$cat} = $self->get_submenus_for_category($cat, $c, $sitename) || [];
+    }
+    $c->stash->{editor_submenus} = $submenus;
+
     $c->stash->{template} = 'Navigation/manage_links.tt';
+}
+
+# Button on manage links page runs this to ensure the living plan page exists in the live DB.
+sub seed_plan_page :Path('/navigation/seed_plan_page') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $permissions = $self->get_user_link_permissions($c);
+    unless ( $permissions->{can_create_public} ) {
+        $c->flash->{error_msg} = "Admin access required to seed plan page.";
+        $c->response->redirect( $c->uri_for('/navigation/manage_links') );
+        return;
+    }
+
+    my $plan_body = q{<h1>Menu System DB Migration &amp; Upgrade Plan (2026)</h1>
+<p><strong>LIVING DOCUMENT</strong> — Edit this page in the normal CMS editor (/pages/edit/menu-system-upgrade-plan) to track progress, add notes, and update the checklist as we implement the changes. This page was created/updated by the "Run Seed" button on the Manage Links screen.</p>
+
+<p><a href="/navigation/manage_links">← Back to Manage Links (menu editor)</a></p>
+
+<h2>Goal</h2>
+<p>DB-dominated menu system. CSC provides the base/mandatory stock items and lists (Main, HelpDesk, Admin, etc.). SiteName admins rename, reorder, and change list appearance according to the page/context. When editing a menu the admin sees <strong>all CSC stock items</strong>. Styles come only from the chosen SiteName theme. Critical items keep hard-coded .tt fallbacks for resilience.</p>
+
+<h2>Progress (update this section by editing the page)</h2>
+<h3>✅ Phase 1: Foundations — COMPLETE</h3>
+<ul>
+<li>menu_stock + site_menu_overrides tables + DBIC models</li>
+<li>Seeder with CSC stock (mandatory flags, gating)</li>
+<li>Controller population of stock catalog into stash</li>
+<li>Link + "Run Seed" button added to manage_links</li>
+</ul>
+
+<h3>🔄 Phase 2: Drag &amp; Drop + Stock Browser Editor</h3>
+<p>Basic drag &amp; drop ordering has been added to this manage links table. Full "Browse all CSC Stock" palette and per-item override form coming next.</p>
+
+<h2>Notes Log</h2>
+<p><strong>2026-06-16:</strong> Plan page now lives in the DB and is linked from the menu edit UI. Click the seed button anytime to refresh it. Drag &amp; drop reordering for links is active on this page.</p>};
+
+    eval {
+        my $page_rs = $c->model('DBEncy')->resultset('Page');
+        $page_rs->update_or_create({
+            sitename   => 'CSC',
+            menu       => 'Admin',
+            page_code  => 'menu-system-upgrade-plan',
+            title      => 'Menu System Upgrade Plan - Living Document',
+            body       => $plan_body,
+            status     => 'active',
+            roles      => 'admin',
+            link_order => 500,
+            created_by => $c->session->{username} || 'admin-seed',
+        });
+
+        # Also try pages_content for broader compatibility
+        eval {
+            my $content_rs = $c->model('DBEncy')->resultset('PagesContent');
+            $content_rs->update_or_create({
+                sitename  => 'CSC',
+                page_code => 'menu-system-upgrade-plan',
+                title     => 'Menu System Upgrade Plan - Living Document',
+                body      => $plan_body,
+                menu      => 'Admin',
+                status    => 'active',
+                roles     => 'admin',
+                link_order => 500,
+            });
+        };
+
+        $c->flash->{success_msg} = "Plan page seeded/updated in the live database. You can now visit /page/menu-system-upgrade-plan and edit it like any CMS page.";
+    };
+    if ($@) {
+        $c->log->error("seed_plan_page failed: $@");
+        $c->flash->{error_msg} = "Could not seed plan page: $@";
+    }
+
+    $c->response->redirect( $c->uri_for('/navigation/manage_links') );
+}
+
+# Support for drag & drop reordering on the manage links table.
+# Expects POST with ordered list of link ids.
+sub update_link_orders :Path('/navigation/update_link_orders') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{username}) {
+        $c->response->body('{"error":"login required"}');
+        $c->response->status(403);
+        return;
+    }
+
+    my @ordered_ids = $c->req->param('link_ids');
+
+    my $updated = 0;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb');
+        my $pos = 10;
+        for my $id (@ordered_ids) {
+            next unless $id =~ /^\d+$/;
+            my $link = $rs->find($id);
+            next unless $link && $self->user_can_edit_link($c, $link);
+            $link->update({ link_order => $pos });
+            $pos += 10;
+            $updated++;
+        }
+        $self->clear_navigation_cache($c);
+    };
+    if ($@) {
+        $c->log->error("update_link_orders: $@");
+        $c->response->body('{"error":"update failed"}');
+        $c->response->status(500);
+        return;
+    }
+
+    $c->response->body( encode_json({ success => 1, updated => $updated }) );
+    $c->response->content_type('application/json');
+}
+
+# Save changes from the interactive visual menu editor (drag items between places/sections).
+# Expects JSON or form with structure like:
+# sections[Main_links][top][] = stock_key_or_id   (repeated for order)
+sub save_visual_menu :Path('/navigation/save_visual_menu') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{username}) {
+        $c->flash->{error_msg} = "Login required";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $sitename = $c->session->{SiteName} || $self->_current_site($c);
+    my $username = $c->session->{username};
+
+    my $data = $c->req->body_data || {};
+    my $updated = 0;
+
+    eval {
+        my $override_rs = $c->model('DBEncy')->resultset('SiteMenuOverride');
+        my $stock_rs    = $c->model('DBEncy')->resultset('MenuStock');
+        my $link_rs     = $c->model('DBEncy')->resultset('InternalLinksTb');
+
+        # Handle top-level menu order (drag headers left/right in the bar)
+        if ($data->{top_order} && ref $data->{top_order} eq 'ARRAY') {
+            my @top = @{$data->{top_order}};
+            my $pos = 10;
+            foreach my $menu (@top) {
+                $override_rs->update_or_create({
+                    site_name => $sitename,
+                    stock_key => 'top_level_' . $menu,
+                    custom_category => 'top_level',
+                    custom_submenu => $menu,
+                    sort_order => $pos,
+                    is_included => 1,
+                    created_by => $username,
+                    notes => 'Top level menu order override from editor',
+                });
+                $pos += 10;
+                $updated++;
+            }
+        }
+
+        # Example: data has 'menu_Main_links_top' => [ 'main_home', 'link-123', ... ]
+        # or we can accept nested. For simplicity, look for keys like visual_*
+        foreach my $key (keys %$data) {
+            next unless $key =~ /^visual_(.+?)_(.+)$/;
+            my ($cat, $sub) = ($1, $2);
+            my $items = $data->{$key};
+            $items = [$items] unless ref $items eq 'ARRAY';
+
+            my $pos = 10;
+            foreach my $item_key (@$items) {
+                if ($item_key =~ /^stock:(.+)$/) {
+                    my $stock_key = $1;
+                    my $stock = $stock_rs->search({stock_key => $stock_key})->first;
+                    next unless $stock;
+
+                    $override_rs->update_or_create({
+                        site_name => $sitename,
+                        stock_key => $stock_key,
+                        stock_id  => $stock->id,
+                        custom_submenu => $sub,
+                        sort_order => $pos,
+                        is_included => 1,
+                        created_by => $username,
+                    });
+                    $updated++;
+                } elsif ($item_key =~ /^link:(\d+)$/) {
+                    my $lid = $1;
+                    my $link = $link_rs->find($lid);
+                    next unless $link && $self->user_can_edit_link($c, $link);
+                    $link->update({
+                        submenu => $sub,
+                        link_order => $pos,
+                    });
+                    $updated++;
+                }
+                $pos += 10;
+            }
+        }
+        $self->clear_navigation_cache($c);
+    };
+    if ($@) {
+        $c->log->error("save_visual_menu: $@");
+        $c->flash->{error_msg} = "Failed to save menu layout: $@";
+    } else {
+        $c->flash->{success_msg} = "Menu layout saved ($updated changes). The menus will reflect the new order (including top level header positions from bar drag).";
+    }
+    $c->response->redirect($c->uri_for('/navigation/manage_links'));
+}
+
+sub _require_submenu_admin {
+    my ( $self, $c ) = @_;
+    my $root_controller = $c->controller('Root');
+    unless ( $root_controller->user_exists($c) && $c->session->{username} ) {
+        $c->flash->{error_msg} = 'You must be logged in.';
+        $c->response->redirect( $c->uri_for('/user/login') );
+        return 0;
+    }
+    my $permissions = $self->get_user_link_permissions($c);
+    unless ( $permissions->{can_create_public} ) {
+        $c->flash->{error_msg} = 'Only site administrators can manage submenu sections.';
+        $c->response->redirect( $c->uri_for('/navigation/manage_private_links') );
+        return 0;
+    }
+    $self->_ensure_nav_submenu_table($c);
+    return $permissions;
+}
+
+sub _fetch_manageable_submenus {
+    my ( $self, $c, $permissions, $filter_site, $filter_category ) = @_;
+    my @rows;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sql = q{
+            SELECT *
+            FROM nav_submenu_tb
+            WHERE status = 1
+        };
+        my @bind;
+        if ( $filter_category && $filter_category ne '' ) {
+            $sql .= ' AND category = ?';
+            push @bind, $filter_category;
+        }
+        if ( $filter_site && $filter_site ne '' ) {
+            $sql .= ' AND (sitename = ? OR sitename = ?)';
+            push @bind, $filter_site, 'All';
+        }
+        elsif ( !$permissions->{is_csc} ) {
+            my $sn = $c->session->{SiteName} || $self->_current_site($c);
+            $sql .= ' AND (sitename = ? OR sitename = ?)';
+            push @bind, $sn, 'All';
+        }
+        $sql .= ' ORDER BY category ASC, sitename ASC, section_order ASC, label ASC';
+        my $sth = $dbh->prepare($sql);
+        $sth->execute(@bind);
+        while ( my $row = $sth->fetchrow_hashref ) {
+            push @rows, $row;
+        }
+    };
+    if ($@) {
+        $c->log->error("Error listing nav submenus: $@");
+    }
+    return \@rows;
+}
+
+sub manage_submenus :Path('/navigation/manage_submenus') :Args(0) {
+    my ( $self, $c ) = @_;
+    my $permissions = $self->_require_submenu_admin($c);
+    return unless $permissions;
+
+    my $filter_site     = $c->req->param('sitename') || '';
+    my $filter_category = $c->req->param('category') || '';
+
+    $c->stash->{submenu_rows}     = $self->_fetch_manageable_submenus(
+        $c, $permissions, $filter_site, $filter_category
+    );
+    $c->stash->{permissions}      = $permissions;
+    $c->stash->{filter_site}      = $filter_site;
+    $c->stash->{filter_category}  = $filter_category;
+    $c->stash->{template_title}   = 'Manage Menu Submenus';
+    $c->stash->{template}         = 'Navigation/manage_submenus.tt';
+}
+
+sub add_submenu :Path('/navigation/add_submenu') :Args(0) {
+    my ( $self, $c ) = @_;
+    my $permissions = $self->_require_submenu_admin($c);
+    return unless $permissions;
+
+    my $user_sitename = $c->session->{SiteName} || $self->_current_site($c);
+
+    if ( $c->req->method eq 'POST' ) {
+        my $category = $c->req->param('category') || 'Admin_links';
+        my $cross_site = $c->req->param('cross_site') ? 1 : 0;
+        my $sitename   = $cross_site ? 'All' : ( $c->req->param('sitename') || $user_sitename );
+        my $label      = $c->req->param('label') || '';
+        my $submenu_id = $c->req->param('submenu_id') || $self->_slugify_submenu_id($label);
+        my $icon       = $c->req->param('icon') || '';
+        my $header_url = $c->req->param('header_url') || '';
+        my $section_order = $c->req->param('section_order') || 500;
+
+        unless ( $label && $submenu_id && $category ) {
+            $c->flash->{error_msg} = 'Label and menu category are required.';
+        }
+        elsif ( $submenu_id !~ /^[a-z][a-z0-9_]{0,62}$/ ) {
+            $c->flash->{error_msg}
+                = 'Submenu ID must be lowercase letters, numbers, and underscores.';
+        }
+        else {
+            eval {
+                my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                my $check = $dbh->prepare(
+                    'SELECT id FROM nav_submenu_tb '
+                    . 'WHERE category = ? AND sitename = ? AND submenu_id = ? LIMIT 1'
+                );
+                $check->execute( $category, $sitename, $submenu_id );
+                if ( $check->fetchrow_arrayref ) {
+                    $c->flash->{error_msg}
+                        = "Submenu ID '$submenu_id' already exists for this menu and site scope.";
+                }
+                else {
+                    $dbh->do(
+                        'INSERT INTO nav_submenu_tb '
+                        . '(category, sitename, submenu_id, label, icon, header_url, section_order, is_system, status) '
+                        . 'VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)',
+                        undef,
+                        $category, $sitename, $submenu_id, $label,
+                        $icon, $header_url, $section_order,
+                    );
+                    $self->clear_navigation_cache($c);
+                    $c->flash->{success_msg} = "Submenu '$label' added.";
+                    $c->response->redirect( $c->uri_for('/navigation/manage_submenus') );
+                    return;
+                }
+            };
+            if ($@) {
+                $c->log->error("Error adding submenu: $@");
+                $c->flash->{error_msg} = 'Error adding submenu. Please try again.';
+            }
+        }
+    }
+
+    $c->stash->{permissions}    = $permissions;
+    $c->stash->{preset_category} = $c->req->param('category') || 'Admin_links';
+    $c->stash->{preset_sitename} = $user_sitename;
+    $c->stash->{form_data}      = $c->req->params;
+    $c->stash->{template_title} = 'Add Menu Submenu';
+    $c->stash->{template}       = 'Navigation/add_submenu.tt';
+}
+
+sub edit_submenu :Path('/navigation/edit_submenu') :Args(0) {
+    my ( $self, $c ) = @_;
+    my $permissions = $self->_require_submenu_admin($c);
+    return unless $permissions;
+
+    my $id = $c->req->param('id');
+    unless ($id) {
+        $c->flash->{error_msg} = 'Submenu ID is required.';
+        $c->response->redirect( $c->uri_for('/navigation/manage_submenus') );
+        return;
+    }
+
+    my $row;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare('SELECT * FROM nav_submenu_tb WHERE id = ? LIMIT 1');
+        $sth->execute($id);
+        $row = $sth->fetchrow_hashref;
+    };
+    unless ($row) {
+        $c->flash->{error_msg} = 'Submenu not found.';
+        $c->response->redirect( $c->uri_for('/navigation/manage_submenus') );
+        return;
+    }
+
+    if ( $c->req->method eq 'POST' ) {
+        if ( $c->req->param('delete') && !$row->{is_system} ) {
+            eval {
+                my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                $dbh->do( 'UPDATE nav_submenu_tb SET status = 0 WHERE id = ?', undef, $id );
+                $self->clear_navigation_cache($c);
+                $c->flash->{success_msg} = 'Submenu removed.';
+            };
+            if ($@) {
+                $c->log->error("Error deleting submenu: $@");
+                $c->flash->{error_msg} = 'Error removing submenu.';
+            }
+            $c->response->redirect( $c->uri_for('/navigation/manage_submenus') );
+            return;
+        }
+
+        my $label        = $c->req->param('label') || '';
+        my $icon         = $c->req->param('icon') || '';
+        my $header_url   = $c->req->param('header_url') || '';
+        my $section_order = $c->req->param('section_order') || $row->{section_order} || 0;
+
+        unless ($label) {
+            $c->flash->{error_msg} = 'Label is required.';
+        }
+        else {
+            eval {
+                my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                $dbh->do(
+                    'UPDATE nav_submenu_tb SET label = ?, icon = ?, header_url = ?, section_order = ? WHERE id = ?',
+                    undef,
+                    $label, $icon, $header_url, $section_order, $id,
+                );
+                $self->clear_navigation_cache($c);
+                $c->flash->{success_msg} = "Submenu '$label' updated.";
+                $c->response->redirect( $c->uri_for('/navigation/manage_submenus') );
+                return;
+            };
+            if ($@) {
+                $c->log->error("Error updating submenu: $@");
+                $c->flash->{error_msg} = 'Error updating submenu.';
+            }
+        }
+    }
+
+    $c->stash->{submenu_row}    = $row;
+    $c->stash->{permissions}    = $permissions;
+    $c->stash->{form_data}      = $c->req->params;
+    $c->stash->{template_title} = 'Edit Menu Submenu';
+    $c->stash->{template}       = 'Navigation/edit_submenu.tt';
 }
 
 # Method to edit a link
@@ -1688,9 +2701,9 @@ sub get_user_link_permissions {
         user_role            => $is_admin ? 'admin' : 'normal',
         category_labels      => { %CATEGORY_LABELS },
         menu_catalog         => \@NAV_MENU_CATALOG,
-        submenu_catalog      => { %NAV_SUBMENU_CATALOG },
+        submenu_catalog      => $self->build_submenu_catalog_for_site( $c, $sitename ),
         submenu_defaults     => { %NAV_SUBMENU_DEFAULTS },
-        submenu_labels       => { %NAV_SUBMENU_LABELS },
+        submenu_labels       => $self->build_submenu_labels_for_site( $c, $sitename ),
     };
     
     # Developer scaffolding (future role) - keep structure ready
@@ -1833,6 +2846,7 @@ sub populate_navigation_data {
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
         my $username = $c->session->{username} || '';
+        $self->_ensure_nav_submenu_table($c);
         
         # Create cache key based on site and user
         my $cache_key = "${site_name}_${username}";
@@ -1850,9 +2864,12 @@ sub populate_navigation_data {
         if ($self->_navigation_cache->{$cache_key} && 
             ($current_time - $self->_cache_timestamp) < $cache_ttl) {
             
-            # Use cached data
+            # Use cached data (visibility flags always recomputed — cheap and schema-independent)
             my $cached_data = $self->_navigation_cache->{$cache_key};
             $c->stash->{$_} = $cached_data->{$_} for keys %$cached_data;
+            $c->stash->{show_hosted_nav} = $self->hosted_nav_visible($c);
+            my $sn_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
+            $c->stash->{show_features_nav} = ( $sn_lc eq 'csc' ) ? 1 : 0;
             $c->log->debug("Using cached navigation data for site: $site_name");
             return;
         }
@@ -1885,6 +2902,9 @@ sub populate_navigation_data {
             $self->_ensure_hosting_list_publicly_column($c);
             $self->_tables_checked(1);
         }
+
+        # NEW menu system tables (CSC stock + site overrides) – ensure + seed on first use
+        $self->_ensure_menu_stock_tables($c);
         
         # Prepare data structure for caching
         my $nav_data = {
@@ -1899,6 +2919,27 @@ sub populate_navigation_data {
         }
         $nav_data->{nav_merged_links} = \%nav_merged_links;
 
+        # NEW: CSC stock catalog + basic effective site menu items (Phase 1 foundation)
+        # Full context/page/gating/merge with customs + drag order in later phases + editor.
+        eval {
+            $nav_data->{csc_stock_catalog} = $self->get_csc_stock_catalog($c);
+            $nav_data->{csc_stock_by_category} = {};
+            for my $cat (@MENU_LINK_CATEGORIES, 'Custom_top') {
+                $nav_data->{csc_stock_by_category}{$cat} = $self->get_csc_stock_catalog($c, $cat);
+            }
+            # Effective (stock + site overrides) for key menus – available in stash for debug/editor
+            $nav_data->{effective_menu_items} = {
+                Main_links   => $self->get_effective_stock_items_for_category($c, 'Main_links', $site_name),
+                HelpDesk_links => $self->get_effective_stock_items_for_category($c, 'HelpDesk_links', $site_name),
+                Admin_links  => $is_admin ? $self->get_effective_stock_items_for_category($c, 'Admin_links', $site_name) : [],
+            };
+        };
+        if ($@) {
+            $c->log->error("Phase1 menu_stock stash failed (non-fatal): $@");
+            $nav_data->{csc_stock_catalog} = [];
+            $nav_data->{effective_menu_items} = {};
+        }
+
         # Legacy stash keys (public-only internal links)
         $nav_data->{member_links} = $nav_merged_links{Member_links} // $self->get_internal_links($c, 'Member_links', $site_name);
         $nav_data->{member_pages} = $self->get_pages($c, 'member', $site_name);
@@ -1907,21 +2948,36 @@ sub populate_navigation_data {
         $nav_data->{hosted_links} = $self->get_merged_hosted_menu_links( $c, $site_name );
         my $hosted_merged = $nav_data->{hosted_links} || [];
         $nav_data->{hosted_custom_links} = $self->filter_menu_links_by_submenu(
-            $hosted_merged, 'hosted_links', 'hosted_links'
+            $hosted_merged, 'hosted_links', 'hosted_links', $c, $site_name
         );
         $nav_data->{hosted_pages_user_links} = $self->filter_menu_links_by_submenu(
-            $hosted_merged, 'hosted_pages', 'hosted_links'
+            $hosted_merged, 'hosted_pages', 'hosted_links', $c, $site_name
         );
         $nav_data->{hosted_top_links} = $self->filter_menu_links_by_submenu(
-            $hosted_merged, 'top', 'hosted_links'
+            $hosted_merged, 'top', 'hosted_links', $c, $site_name
         );
         $nav_data->{hosted_sites_merged}   = $self->get_merged_hosted_sites_for_nav($c);
         $nav_data->{hosted_resource_links} = $self->merge_hosted_resource_links($hosted_merged);
         $nav_data->{show_hosted_nav}       = $self->hosted_nav_visible($c);
+        my $feat_sn_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
+        $nav_data->{show_features_nav}     = ( $feat_sn_lc eq 'csc' ) ? 1 : 0;
 
         if ($is_admin) {
+            my $admin_merged = $nav_merged_links{Admin_links}
+                // $self->get_merged_menu_links( $c, 'Admin_links', $site_name );
             $nav_data->{admin_pages} = $self->get_admin_pages($c, $site_name);
-            $nav_data->{admin_links} = $nav_merged_links{Admin_links} // $self->get_admin_links($c, $site_name);
+            $nav_data->{admin_links} = $admin_merged;
+            $nav_data->{admin_submenu_links} = $self->filter_menu_links_by_submenu(
+                $admin_merged, 'admin_links', 'admin_links', $c, $site_name
+            );
+            $nav_data->{admin_top_links} = $self->filter_menu_links_by_submenus(
+                $admin_merged, [qw(top cms_pages)], $c, $site_name
+            );
+            $nav_data->{admin_links_by_submenu} = $self->group_menu_links_by_submenu(
+                $admin_merged, 'Admin_links', $c, $site_name
+            );
+            $nav_data->{admin_custom_submenu_sections}
+                = $self->get_custom_submenu_sections( $c, 'Admin_links', $site_name );
         }
 
         # All private links for user dropdown and per-menu private rows (any site scope)
@@ -1933,6 +2989,11 @@ sub populate_navigation_data {
                 $l->{can_edit}  = 1;
             }
             $nav_data->{private_links} = $private;
+            if ($is_admin) {
+                $nav_data->{admin_private_links} = [
+                    grep { ( $_->{category} // '' ) eq 'Admin_links' } @$private
+                ];
+            }
         }
         
         # Cap cache size to prevent unbounded memory growth (max 50 entries)
@@ -2206,7 +3267,7 @@ sub manage :Path('/navigation/manage') :Args(0) {
     
     # Get all navigation items
     my @navigation_items = $c->model('DBEncy')->resultset('Navigation')->search({}, {
-        order_by => ['menu', 'parent_id', 'order'],
+        order_by => ['me.menu', 'me.parent_id', 'me.order'],
         prefetch => 'page'
     })->all;
     
@@ -2232,6 +3293,47 @@ sub _decode_trigger_phrases {
 }
 
 # AI navigation shortcuts visible to current user/site/role
+# Lightweight DB-driven menu builder for use_db_menu=1 path
+sub _get_db_menu {
+    my ($self, $c) = @_;
+    my $site = $self->_current_site($c);
+    
+    my @items = $c->model('DBEncy')->resultset('NavSubmenuTb')->search({
+        sitename => $site,
+        status   => 1,
+    }, { order_by => ['section_order', 'label'] })->all;
+    
+    my @menu;
+    for my $row (@items) {
+        my $item = { label => $row->label, url => $row->header_url || '#', icon => $row->icon };
+        my @children = $c->model('DBEncy')->resultset('NavSubmenuTb')->search({
+            sitename   => $site,
+            status     => 1,
+            category   => $row->category,
+            submenu_id => { '!=' => '' },
+        }, { order_by => ['section_order', 'label'] })->all;
+        
+        $item->{children} = [ map {{ label => $_->label, url => $_->header_url || '#' }} @children ] if @children;
+        push @menu, $item;
+    }
+    return \@menu;
+}
+
+# Runtime toggle for admin users (legacy <-> db)
+sub toggle_menu_mode :Path('/navigation/toggle_menu_mode') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($c->session->{is_admin} || $c->stash->{is_admin}) {
+        $c->response->redirect('/');
+        return;
+    }
+    my $mode = $c->req->param('mode') || 'legacy';
+    if ($mode eq 'db') {
+        $c->session->{use_db_menu} = 1;
+    } else {
+        $c->session->{use_db_menu} = 0;
+    }
+    my $ref = $c->req->referer || '/'; $c->response->redirect($ref);
+}
 sub get_ai_navigation_shortcuts {
     my ($self, $c, $role_tier, $site_name, $max) = @_;
     $max //= 50;
@@ -2441,13 +3543,132 @@ sub _nav_source_priority {
         private_link    => 100,
         menu_link       => 95,
         shortcut        => 90,
+        core_route      => 88,
         site_local      => 75,
         site_production => 70,
         site_module     => 70,
         hosting_account => 60,
+        learned_link    => 55,
         site_domain     => 40,
     );
     return $p{ $source // '' } // 0;
+}
+
+# Role-gated app routes indexed for chat nav (no manual JS/AI.pm edits per link).
+# Each: [ label, path, min_role, optional alias phrases... ]
+our @CORE_ROLE_NAV_ROUTES = (
+    [ 'opnsense gateway', '/admin/infrastructure/opnsense', 'admin',
+      qw(opnsense opn sense opn-sense opnsense gateway opnsense dashboard gateway management opsence opnsence) ],
+    [ 'infrastructure', '/admin/infrastructure', 'admin', qw(infrastructure infra) ],
+    [ 'application dns', '/admin/dns', 'admin', qw(dns dns zones application dns) ],
+    [ 'gateway plan', '/Documentation/system/GatewayPlan', 'admin', qw(gateway plan routing plan) ],
+    [ 'admin panel', '/admin', 'admin', qw(admin admin dashboard) ],
+    [ 'projects', '/project', 'user', qw(projects project list) ],
+    [ 'todo list', '/todo', 'user', qw(todos todo list) ],
+    [ 'helpdesk', '/HelpDesk', 'guest', qw(helpdesk help desk support) ],
+    [ 'documentation', '/Documentation', 'guest', qw(documentation docs) ],
+    [ 'ai chat', '/ai', 'guest', qw(ai ai chat assistant) ],
+    [ 'preview upcoming changes', '/admin/dev-preview', 'admin',
+      qw(dev preview preview upcoming changes upcoming changes dev preview preview changes preview site) ],
+);
+
+sub _nav_path_admin_only {
+    my ( $self, $path ) = @_;
+    return 0 unless defined $path && length $path;
+    return 1 if $path =~ m{^/admin(?:/|$)}i;
+    return 1 if $path =~ m{^/file/}i;
+    return 1 if $path =~ m{^/site(?:/|$)}i;
+    return 1 if $path =~ m{^/themeadmin}i;
+    return 1 if $path =~ m{^/log$}i;
+    return 1 if $path =~ m{^/chat/admin}i;
+    return 1 if $path =~ m{^/ai/models}i;
+    return 1 if $path =~ m{^/navigation/manage_links}i;
+    return 0;
+}
+
+sub _viewer_role_tier {
+    my ( $self, $c ) = @_;
+    return 'admin' if $c->stash->{is_admin};
+    return $c->session->{username} ? 'user' : 'guest';
+}
+
+sub _edit_distance {
+    my ( $self, $a, $b ) = @_;
+    $a //= '';
+    $b //= '';
+    return length($b) if !length($a);
+    return length($a) if !length($b);
+    return 0 if $a eq $b;
+    my @prev = 0 .. length($b);
+    for my $i ( 0 .. length($a) - 1 ) {
+        my @curr = ( $i + 1 );
+        for my $j ( 0 .. length($b) - 1 ) {
+            my $cost = substr( $a, $i, 1 ) eq substr( $b, $j, 1 ) ? 0 : 1;
+            push @curr, min( $curr[$j] + 1, $prev[ $j + 1 ] + 1, $prev[$j] + $cost );
+        }
+        @prev = @curr;
+    }
+    return $prev[-1];
+}
+
+sub _phrase_looks_like_opnsense {
+    my ( $self, $phrase ) = @_;
+    return 0 unless defined $phrase && $phrase ne '';
+    my $compact = lc($phrase);
+    $compact =~ s/[^a-z]//g;
+    return 0 unless length($compact) >= 4;
+    return 1 if $compact =~ /opnsense|opsense|opsence|opnsence|opense|opensense/;
+    return 1 if $compact =~ /^opn/ && $compact =~ /(?:sense|sence)$/;
+    return 0;
+}
+
+sub _register_core_role_nav_routes {
+    my ( $self, $c, $add, $role ) = @_;
+    my $user_rank = $self->_role_rank($role);
+    for my $row (@CORE_ROLE_NAV_ROUTES) {
+        my ( $label, $path, $min_role, @aliases ) = @$row;
+        next if $self->_role_rank( $min_role // 'guest' ) > $user_rank;
+        next if $user_rank < 2 && $self->_nav_path_admin_only($path);
+        $self->_register_chat_nav_link(
+            $add, $label, $path, '_self', 'core_route', 1, $label
+        );
+        for my $alias (@aliases) {
+            $self->_register_chat_nav_link(
+                $add, $alias, $path, '_self', 'core_route', 0, $label
+            );
+        }
+    }
+}
+
+sub _register_learned_chat_nav_links {
+    my ( $self, $c, $add, $role ) = @_;
+    my $user_rank = $self->_role_rank($role);
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return unless $schema;
+        my @rows = $schema->resultset('LearnedData')->search(
+            { file => 'ai_discovered_link', word => { like => 'ai_link:%' } },
+            { order_by => { -desc => 'frequency' }, rows => 50 }
+        )->all;
+        for my $r (@rows) {
+            my $w = $r->word || '';
+            $w =~ s/^ai_link://;
+            next unless $w =~ m{^/};
+            next if $user_rank < 2 && $self->_nav_path_admin_only($w);
+            my $label = $w;
+            $label =~ s{.*/}{};
+            $label =~ s/[_?.-]+/ /g;
+            $label =~ s/\s+/ /g;
+            $label =~ s/^\s+|\s+$//g;
+            next unless length($label) >= 2;
+            $self->_register_chat_nav_link(
+                $add, $label, $w, '_self', 'learned_link', 1, $label
+            );
+        }
+    };
+    if ($@) {
+        $c->log->error("Error loading learned chat nav links: $@");
+    }
 }
 
 sub _nav_link_host_key {
@@ -2482,7 +3703,7 @@ sub _default_local_site_port {
             return $1;
         }
     }
-    return 3000;
+    return 3001;
 }
 
 sub _normalize_hosting_nav_url {
@@ -2728,6 +3949,10 @@ sub get_user_chat_nav_links {
         }
     }
 
+    # Role-filtered core routes + links observed during prior AI sessions (LearnedData)
+    $self->_register_core_role_nav_routes( $c, $add, $role );
+    $self->_register_learned_chat_nav_links( $c, $add, $role );
+
     return $self->_dedupe_chat_nav_destinations( $c, \@out );
 }
 
@@ -2754,7 +3979,55 @@ sub _chat_nav_link_matches_phrase {
     my @words = split /\s+/, $label;
     return 1 if grep { $_ eq $q } @words;
     return 1 if length($q) >= 4 && $label eq $q;
+    if ( length($q) >= 4 ) {
+        my $max_dist = length($q) >= 7 ? 2 : 1;
+        return 1 if $self->_edit_distance( $q, $label ) <= $max_dist;
+        return 1 if length($name) >= 4 && $self->_edit_distance( $q, $name ) <= $max_dist;
+        for my $w (@words) {
+            return 1 if length($w) >= 4 && $self->_edit_distance( $q, $w ) <= $max_dist;
+        }
+    }
+    if ( $self->_phrase_looks_like_opnsense($q) ) {
+        my $url = $l->{url} // '';
+        return 1 if $url =~ m{/admin/infrastructure/opnsense}i;
+        return 1 if ( $label =~ /opn.?sense/i || $name =~ /opn.?sense/i )
+            && $url =~ m{/project/details}i;
+    }
     return 0;
+}
+
+sub find_opnsense_nav_destinations {
+    my ( $self, $c ) = @_;
+    return [] unless $c->stash->{is_admin};
+    my @dest;
+    push @dest, {
+        label  => 'opnsense gateway',
+        name   => 'OPNsense Gateway Dashboard',
+        url    => '/admin/infrastructure/opnsense',
+        target => '_self',
+        source => 'core_route',
+    };
+    eval {
+        my $site = $self->_current_site($c);
+        my $projects = $c->model('Project')->get_projects(
+            $c->model('DBEncy')->schema, $site
+        );
+        if ($projects) {
+            for my $p (@$projects) {
+                my $n = $p->name // '';
+                next unless $n =~ /opn\s*sense/i;
+                push @dest, {
+                    label  => 'opnsense project',
+                    name   => $n,
+                    url    => '/project/details?project_id=' . ( $p->id // '' ),
+                    target => '_blank',
+                    source => 'menu_link',
+                };
+                last;
+            }
+        }
+    };
+    return \@dest;
 }
 
 sub find_user_nav_link_for_phrase {
@@ -2762,12 +4035,20 @@ sub find_user_nav_link_for_phrase {
     my $q = $self->_normalize_nav_phrase($phrase);
     return undef unless $q && length($q) >= 2;
 
+    if ( $self->_phrase_looks_like_opnsense($q) && $c->stash->{is_admin} ) {
+        my $bundle = $self->find_opnsense_nav_destinations($c);
+        return $bundle->[0] if $bundle && @$bundle;
+    }
+
     my @raw = @{ $self->get_user_chat_nav_links($c) };
     my @matches = grep { $self->_chat_nav_link_matches_phrase( $_, $q ) } @raw;
     return undef unless @matches;
 
-    my $deduped = $self->_dedupe_chat_nav_destinations( $c, \@matches, $q );
-    return $deduped->[0] if $deduped && @$deduped == 1;
+    my @scored = sort {
+        $self->_chat_nav_link_score( $c, $b, $q ) <=> $self->_chat_nav_link_score( $c, $a, $q )
+    } @matches;
+    my $deduped = $self->_dedupe_chat_nav_destinations( $c, \@scored, $q );
+    return $deduped->[0] if $deduped && @$deduped;
     return undef;
 }
 
@@ -2783,7 +4064,23 @@ sub match_user_nav_link :Path('/navigation/match_user_nav_link') :Args(0) {
     }
 
     my $phrase = $c->req->param('phrase') || '';
-    my $match  = $self->find_user_nav_link_for_phrase( $c, $phrase );
+    my $q      = $self->_normalize_nav_phrase($phrase);
+
+    if ( $q && $self->_phrase_looks_like_opnsense($q) && $c->stash->{is_admin} ) {
+        my $bundle = $self->find_opnsense_nav_destinations($c);
+        if ( $bundle && @$bundle ) {
+            $c->stash->{json} = {
+                success => 1,
+                multi   => 1,
+                links   => $bundle,
+                link    => $bundle->[0],
+            };
+            $c->forward('View::JSON');
+            return;
+        }
+    }
+
+    my $match = $self->find_user_nav_link_for_phrase( $c, $phrase );
 
     if ($match) {
         $c->stash->{json} = { success => 1, link => $match };
@@ -2855,12 +4152,4 @@ sub auto :Private {
     return 1; # Allow the request to proceed
 }
 
-# Alias method for backward compatibility
-sub populate_navigation {
-    my ($self, $c) = @_;
-    return $self->populate_navigation_data($c);
-}
 
-__PACKAGE__->meta->make_immutable;
-
-1;

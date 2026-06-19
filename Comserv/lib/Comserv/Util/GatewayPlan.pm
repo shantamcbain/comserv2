@@ -3,7 +3,7 @@ package Comserv::Util::GatewayPlan;
 use strict;
 use warnings;
 use JSON::MaybeXS qw(decode_json encode_json);
-use File::Slurp qw(read_file);
+use File::Slurp qw(read_file write_file);
 use Catalyst::Utils;
 
 sub config_path {
@@ -29,6 +29,64 @@ sub _default_plan {
         routing_rules => [],
         tool_roles    => [],
     };
+}
+
+# Lower priority number = evaluated first in the plan UI and policy docs.
+# Wildcard (*) rows always sort after specific hostnames (dev, coop, etc.).
+sub sort_routing_rules {
+    my ( $class, $rules ) = @_;
+    $rules = [] unless ref $rules eq 'ARRAY';
+    return [] unless @$rules;
+    my @sorted = sort {
+        my $pa = $a->{priority} // 50;
+        my $pb = $b->{priority} // 50;
+        my $wa = ( ( $a->{hostname} // '' ) eq '*' ) ? 1 : 0;
+        my $wb = ( ( $b->{hostname} // '' ) eq '*' ) ? 1 : 0;
+        $pa <=> $pb || $wa <=> $wb || ( $a->{fqdn} // '' ) cmp ( $b->{fqdn} // '' );
+    } @$rules;
+    return \@sorted;
+}
+
+# Persist drag-reorder of policy_rules in gateway_plan.json (admin only).
+sub save_policy_rules_order {
+    my ( $class, $ordered_ids ) = @_;
+    $ordered_ids = [] unless ref $ordered_ids eq 'ARRAY';
+    my $plan = $class->load;
+    my @policy = @{ $plan->{policy_rules} || $plan->{routing_rules} || [] };
+    return { success => 0, error => 'No policy rules in plan' } unless @policy;
+
+    my %by_id = map { ( $_->{id} // '' ) => $_ } grep { $_->{id} } @policy;
+    my @new;
+    my $prio = 10;
+    for my $id (@$ordered_ids) {
+        next unless $id && $by_id{$id};
+        my %r = %{ $by_id{$id} };
+        if ( ( $r{hostname} // '' ) eq '*' ) {
+            $r{priority} = 100;
+        }
+        else {
+            $r{priority} = $prio;
+            $prio += 10;
+        }
+        push @new, \%r;
+        delete $by_id{$id};
+    }
+    push @new, $_ for sort { ( $a->{fqdn} // '' ) cmp ( $b->{fqdn} // '' ) } values %by_id;
+
+    $plan->{policy_rules}   = \@new;
+    $plan->{routing_rules}  = \@new;
+    $plan->{updated}        = do {
+        my @t = localtime;
+        sprintf '%04d-%02d-%02d', $t[5] + 1900, $t[4] + 1, $t[3];
+    };
+
+    my $file = config_path();
+    eval {
+        my $json = JSON::MaybeXS->new( utf8 => 1, pretty => 1, canonical => 1 )->encode($plan);
+        write_file( $file, { binmode => ':utf8' }, $json );
+    };
+    return { success => 0, error => "$@" } if $@;
+    return { success => 1, rules => \@new };
 }
 
 # Compare planned Unbound rules against live OPNsense host overrides.
@@ -76,7 +134,8 @@ sub enrich_with_drift {
         push @enriched, \%entry;
     }
 
-    my $out = { %$plan, routing_rules => \@enriched };
+    my $sorted = $class->sort_routing_rules( \@enriched );
+    my $out = { %$plan, routing_rules => $sorted };
     $out->{drift_count} = scalar grep {
         $_->{sync_status} && $_->{sync_status} =~ /^(missing|drift)$/
     } @enriched;

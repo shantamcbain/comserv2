@@ -1,0 +1,272 @@
+[%# Schema Compare - Table List (database drill-down)
+    Shows tables in the selected database.
+    Indicates: has result file / table only / result only.
+    Allows add/remove actions and drill to field comparison.
+    Follows ApplicationTtTemplate.tt structure.
+%]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Tables in [% db.name | html %]</h1>
+        <p class="page-subtitle">Server: [% server.name | html %] • Database: [% db.name | html %]</p>
+    </div>
+
+    <div class="breadcrumb-container">
+        <nav class="breadcrumb">
+            <a href="[% c.uri_for('/admin/schema_compare') %]">Schema Compare</a>
+            <span>›</span>
+            <a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]">[% server.name | html %]</a>
+            <span>›</span>
+            <span>[% db.name | html %]</span>
+        </nav>
+    </div>
+
+    <!-- Result File Discovery Header (shows both ENCY total and current schema) -->
+    <div class="result-header" style="background: #e8f4f8; border: 1px solid #17a2b8; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem;">
+        <h4 style="margin: 0 0 0.5rem 0; color: #17a2b8;">
+            <i class="fas fa-folder-open"></i> Result Files Discovery
+        </h4>
+        <p style="margin: 0; font-size: 1rem;">
+            <strong>ENCY total:</strong> <span style="font-weight: bold; color: #17a2b8;">[% ency_result_count || 0 %]</span>
+            &nbsp;|&nbsp;
+            <strong>Current schema ([% result_schema %]):</strong> <span style="font-weight: bold; color: #17a2b8;">[% result_count || 0 %]</span>
+        </p>
+        [% IF result_count %]
+        <details style="margin-top: 0.5rem;">
+            <summary style="cursor: pointer; color: #17a2b8;">Show first 20 result files for [% result_schema %]</summary>
+            <div style="max-height: 150px; overflow-y: auto; margin-top: 0.5rem; font-family: monospace; font-size: 0.8rem; background: #fff; padding: 0.5rem; border-radius: 4px;">
+                [% FOREACH rf IN result_files.splice(0,20) %]
+                    <div>[% rf.name | html %]</div>
+                [% END %]
+            </details>
+        [% END %]
+
+        [% IF result_extract_failures.size %]
+        <details style="margin-top: 0.75rem; border-top: 1px solid #17a2b8; padding-top: 0.5rem;">
+            <summary style="cursor: pointer; color: #dc3545; font-weight: bold;">
+                ⚠ Extraction failures: [% result_extract_failures.size %] result files could not be parsed
+            </summary>
+            <div style="max-height: 200px; overflow-y: auto; margin-top: 0.5rem; font-family: monospace; font-size: 0.75rem; background: #fff3cd; padding: 0.5rem; border-radius: 4px; border: 1px solid #ffc107;">
+                [% FOREACH fail IN result_extract_failures %]
+                    <div style="margin-bottom: 0.25rem;">
+                        <strong style="color: #dc3545;">[% fail.name | html %]</strong><br>
+                        <span style="color: #666;">[% fail.path | html %]</span>
+                    </div>
+                [% END %]
+            </div>
+        </details>
+        [% END %]
+
+        <!-- Diagnostic: why Result files without tables is empty -->
+        <details style="margin-top: 0.5rem; font-size: 0.9rem;" open>
+            <summary style="cursor: pointer; color: #666;">Debug: Result file vs DB table matching (open by default)</summary>
+            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 0.8rem;">
+                Total result files scanned: <strong>[% result_count %]</strong><br>
+                DB tables from information_schema: <strong>[% db_table_count %]</strong><br>
+                Result files whose table name matches a DB table: <strong>[% matched_count %]</strong><br>
+                Result files whose table name does NOT exist in DB: <strong>[% result_only.size %]</strong><br>
+                <span style="color: #dc3545;">If result_only is 0 but result_count > matched_count, the DB table list is incomplete or keys don't match.</span>
+
+                [% IF result_only.size == 0 && result_count > matched_count %]
+                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                    <strong>WARNING:</strong> 219 result files but only 213 matched. The 6 unmatched result table names are NOT appearing in result_only.<br>
+                    This means the DB table query is returning fewer tables than MariaDB reports, or the key comparison is failing.
+                </div>
+                [% END %]
+
+                [% IF orphaned_result_files.size %]
+                <div style="margin-top: 0.75rem; padding: 0.5rem; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px;">
+                    <strong>Orphaned Result files (table name not in DB):</strong><br>
+                    [% FOREACH o IN orphaned_result_files %]
+                        [% o.result_name | html %] → extracted table name: <code>[% o.extracted_table_name | html %]</code><br>
+                    [% END %]
+                </div>
+                [% END %]
+            </div>
+        </details>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+            
+            <!-- Section 1: Tables with Result files -->
+            <div class="comparison-section" style="margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; cursor: pointer;" onclick="toggleSection(this)">
+                    <i class="fas fa-check-circle" style="color: #28a745;"></i> Tables (all have result files) ([% both.size %])
+                    <span style="float: right; font-size: 0.9rem;">[click to toggle]</span>
+                </h3>
+                <div class="section-content">
+                    [% IF both.size %]
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Table Name</th>
+                                    <th>Rows</th>
+                                    <th>Size</th>
+                                    <th>Result File</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH table IN both %]
+                                <tr>
+                                    <td><a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]/db/[% db.name | uri %]/table/[% table.name | uri %]">[% table.name | html %]</a></td>
+                                    <td>[% table.row_count || 0 %]</td>
+                                    <td>[% table.size %]</td>
+                                    <td>[% table.result_name | html %]</td>
+                                    <td class="action-cell">
+                                        <button class="btn btn-sm btn-delete" onclick="dropTable('[% table.name | html %]', '[% db.name | html %]'); event.stopPropagation();"><i class="fas fa-trash"></i> Drop</button>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <p class="text-muted">No tables with matching result files.</p>
+                    [% END %]
+                </div>
+            </div>
+
+            <!-- Section 2: Tables without Result files -->
+            <div class="comparison-section" style="margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; cursor: pointer;" onclick="toggleSection(this)">
+                    <i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Tables without Result files ([% table_only.size %])
+                    <span style="float: right; font-size: 0.9rem;">[click to toggle]</span>
+                </h3>
+                <div class="section-content">
+                    [% IF table_only.size %]
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Table Name</th>
+                                    <th>Rows</th>
+                                    <th>Size</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH table IN table_only %]
+                                <tr>
+                                    <td>[% table.name | html %]</td>
+                                    <td>[% table.row_count || 0 %]</td>
+                                    <td>[% table.size %]</td>
+                                    <td class="action-cell">
+                                        <button class="btn btn-sm btn-secondary" onclick="createResultFromTable('[% table.name | html %]', '[% db.name | html %]')"><i class="fas fa-file-alt"></i> Create Result</button>
+                                        <button class="btn btn-sm btn-delete" onclick="dropTable('[% table.name | html %]', '[% db.name | html %]'); event.stopPropagation();"><i class="fas fa-trash"></i> Drop</button>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <p class="text-muted">All tables have corresponding result files.</p>
+                    [% END %]
+                </div>
+            </div>
+
+            <!-- Section 3: Result files without tables -->
+            <div class="comparison-section" style="margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; cursor: pointer;" onclick="toggleSection(this)">
+                    <i class="fas fa-file-code" style="color: #17a2b8;"></i> Result files without tables ([% result_only.size %])
+                    <span style="float: right; font-size: 0.9rem;">[click to toggle]</span>
+                </h3>
+                <div class="section-content">
+                    [% IF result_only.size %]
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Result Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH res IN result_only %]
+                                <tr>
+                                    <td>[% res.result_name | html %]</td>
+                                    <td class="action-cell">
+                                        <button class="btn btn-sm btn-primary" onclick="createTableFromResult('[% res.result_name | html %]', '[% db.name | html %]')"><i class="fas fa-plus"></i> Create Table</button>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <p class="text-muted">No orphaned result files.</p>
+                    [% END %]
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]" class="btn btn-secondary">← Back to Databases</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function createTableFromResult(resultName, dbName) {
+    if (!confirm('Create table from result file "' + resultName + '"?')) return;
+
+    fetch('[% c.uri_for("/schema-comparison/create_table_from_result") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            result_name: resultName,
+            database: dbName
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Success: ' + (data.message || 'Table created'));
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        alert('Request failed: ' + err);
+    });
+}
+
+function createResultFromTable(tableName, dbName) {
+    console.log('Create result from table:', tableName, dbName);
+    // TODO: wire to controller endpoint
+}
+
+function dropTable(tableName, dbName) {
+    if (confirm('Drop table ' + tableName + '?')) {
+        console.log('Drop table:', tableName, dbName);
+        // TODO: wire to controller endpoint
+    }
+}
+
+function toggleSection(headerEl) {
+    var content = headerEl.nextElementSibling;
+    if (content.style.display === 'none') {
+        content.style.display = '';
+    } else {
+        content.style.display = 'none';
+    }
+}
+
+// Auto-collapse empty sections on load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.comparison-section').forEach(function(section) {
+        var count = parseInt(section.querySelector('h3').textContent.match(/\((\d+)\)/)[1] || '0');
+        if (count === 0) {
+            var content = section.querySelector('.section-content');
+            if (content) content.style.display = 'none';
+        }
+    });
+});
+</script>

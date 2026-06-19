@@ -1,0 +1,8 @@
+[%# Navigation/manage.tt - Admin navigation manager (placeholder) #]
+
+<h2>Navigation Management</h2>
+
+<p>This is a placeholder for the new DB-driven menu manager.</p>
+
+<p><a href="/navigation/manage_links">Legacy link manager</a> | 
+   <a href="/navigation/manage_submenus">Submenu manager</a></p>

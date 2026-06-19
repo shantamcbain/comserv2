@@ -1,3 +1,4 @@
+# AI-REMINDER: keep file < 4 k lines; follow .ai-policy.md
 package Comserv::Model::Schema::Ency::Result::Site;
 use base 'DBIx::Class::Core';
 
@@ -123,6 +124,16 @@ __PACKAGE__->add_columns(
     http_header_keywords => {
         data_type => 'varchar',
         size => 255,
+    },
+    points_enabled => {
+        data_type     => 'tinyint',
+        is_nullable   => 1,
+        default_value => 0,
+    },
+    cash_allowed => {
+        data_type     => 'tinyint',
+        is_nullable   => 1,
+        default_value => 0,
     },
 );
 __PACKAGE__->set_primary_key('id');

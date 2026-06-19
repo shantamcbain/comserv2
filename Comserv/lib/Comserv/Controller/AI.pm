@@ -4165,6 +4165,33 @@ sub models :Local :Args(0) {
                     # Get installed models
                     my $installed = $ollama->list_models();
                     if ($installed && ref($installed) eq 'ARRAY') {
+                        # Normalize size + add "best used for" hints
+                        my %best_for = (
+                            'qwen2.5-coder' => 'Daily coding & completion',
+                            'qwen3.6'       => 'Deep planning & architecture',
+                            'phi4:14b'      => 'Balanced coding + planning',
+                            'llama3.1'      => 'General coding tasks',
+                            'gemma4:12b'    => 'Structured reasoning & specs',
+                            'gemma4'        => 'General reasoning',
+                            'mistral'       => 'Fast general chat',
+                            'nomic-embed'   => 'Embeddings / RAG',
+                        );
+                        for my $m (@$installed) {
+                            if (ref($m)) {
+                                if (exists $m->{size}) {
+                                    my $bytes = $m->{size};
+                                    if ($bytes >= 1<<30) {
+                                        $m->{size} = sprintf('%.1f GB', $bytes / (1<<30));
+                                    } elsif ($bytes >= 1<<20) {
+                                        $m->{size} = sprintf('%.0f MB', $bytes / (1<<20));
+                                    } else {
+                                        $m->{size} = sprintf('%.0f KB', $bytes / 1024);
+                                    }
+                                }
+                                my $name = $m->{name} || '';
+                                $m->{best_used_for} = $best_for{(split /:/, $name)[0]} || 'General purpose';
+                            }
+                        }
                         $server_info->{installed_models} = $installed;
                         
                         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -7370,9 +7397,63 @@ sub _grok_models_page_info {
         $info{text_model_count}  = scalar @text_ids;
         $info{media_model_count} = $media_count;
         $info{chat_model_count}  = scalar @text_ids;
+
+        # Grok "best used for" + pricing (USD per 1 M tokens, input/output)
+        my %grok_meta = (
+            'grok-4.3'        => { best => 'Top-tier reasoning & coding',          cost => '$5 in / $15 out' },
+            'grok-3'          => { best => 'Balanced general chat & coding',       cost => '$2 in / $10 out' },
+            'grok-3-mini'     => { best => 'Fast lightweight tasks',               cost => '$0.60 in / $4 out' },
+            'grok-3-fast'     => { best => 'Low-latency chat & quick answers',     cost => '$5 in / $25 out' },
+            'grok-2'          => { best => 'Legacy general purpose',               cost => '$2 in / $10 out' },
+            'grok-2-vision'   => { best => 'Image + text understanding',           cost => '$2 in / $10 out' },
+        );
+
+        # Image generation pricing (per image, not per token)
+        my %grok_image_cost = (
+            'grok-2-image'    => '$0.01–$0.05 per image',
+            'grok-2-vision'   => '$0.01–$0.05 per image',
+            'flux'            => '$0.01–$0.05 per image',
+        );
+
         $info{models} = [
-            map { { id => $_, label => $self->_grok_label_for_id($_), kind => 'text' } } @text_ids
+            map {
+                my $id   = $_;
+                my $meta = { best => 'General purpose', cost => '—' };
+
+                # Try exact match first
+                if (exists $grok_meta{$id}) {
+                    $meta = $grok_meta{$id};
+                } else {
+                    # Normalize and try partial matching
+                    my $norm = lc($id);
+                    $norm =~ s/^(xai-)?//;
+                    $norm =~ s/[-_].*$//;  # keep base name only
+
+                    for my $key (keys %grok_meta) {
+                        my $k = lc($key);
+                        if ($norm eq $k || index($norm, $k) >= 0 || index($k, $norm) >= 0) {
+                            $meta = $grok_meta{$key};
+                            last;
+                        }
+                    }
+                }
+
+                { id => $id, label => $self->_grok_label_for_id($id), kind => 'text',
+                  best_used_for => $meta->{best}, cost => $meta->{cost} }
+            } @text_ids
         ];
+
+        # Add cost info for media models
+        if ($can_select_model && $media_count) {
+            push @{ $info{models} },
+                map {
+                    my $id   = $_;
+                    my $cost = $grok_image_cost{$id} || $grok_image_cost{(keys %grok_image_cost)[0]} || '—';
+                    { id => $id, label => $self->_grok_label_for_id($id), kind => 'media',
+                      best_used_for => 'Image generation', cost => $cost }
+                }
+                grep { $self->_grok_is_media_model($_) && $self->_grok_model_visible_in_picker($_, 1) } @$synced_ids;
+        }
         if ($can_select_model && $media_count) {
             push @{ $info{models} },
                 map { { id => $_, label => $self->_grok_label_for_id($_), kind => 'media' } }
@@ -7584,7 +7665,7 @@ sub _ollama_hosts_to_probe {
 
     my @hosts;
     if ($self->_prefer_local_ollama($c)) {
-        push @hosts, '127.0.0.1', 'localhost', $ws_host, $zt_host;
+        push @hosts, '127.0.0.1', 'localhost', $ws_host, $zt_host;  # local-first
     }
     push @hosts, $primary_host;
     push @hosts, $fallback_host if $fallback_host && $fallback_host ne $primary_host;
