@@ -158,7 +158,24 @@ sub index :Path :Args(0) {
                 )->first;
             }
             if ($grok_key && $grok_key->api_key_encrypted) {
-                @external_models = @{ $self->_grok_external_models_for_user($c, $user_id, $can_select_model) };
+                # Use synced models from metadata if available, else hardcoded fallback
+                my $meta = $grok_key->get_metadata() || {};
+                my $synced = $meta->{available_models};
+                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
+                    foreach my $m (@$synced) {
+                        my $id = $m->{id} || $m->{name} || '';
+                        next unless $id;
+                        next if $id =~ /^(grok-imagine|grok-.*video)/i;  # skip image/video models
+                        (my $label = $id) =~ s/-/ /g;
+                        $label = ucfirst($label) . ' (xAI)';
+                        push @external_models, { name => $id, provider => 'grok', label => $label };
+                    }
+                } else {
+                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                }
             }
         } catch {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -320,6 +337,12 @@ sub editing_widget :Local :Args(0) {
         return;
     }
 
+    unless ($self->_is_dev_mode($c)) {
+        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
     if (($c->request->param('mode') || '') eq 'full') {
         my $template_path = $c->path_to('root')->stringify;
         my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
@@ -357,6 +380,12 @@ sub editing_widget_popup :Local :Args(0) {
         return;
     }
 
+    unless ($self->_is_dev_mode($c)) {
+        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
     my $template_path = $c->path_to('root')->stringify;
     my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
     my $output = '';
@@ -387,42 +416,6 @@ sub editor_config :Local :Args(0) {
     my $enabled = $self->_editor_enabled($c) ? 1 : 0;
     my $has_key = $enabled && $self->_grok_cli_api_key($c) ? 1 : 0;
 
-    my $current_model = 'grok-4.3';
-    my $installed_models = [];
-    my @ext_models;
-    my $ollama_host = '';
-    my $ollama_port = 11434;
-    my $ollama_reachable = 0;
-    my @ollama_hosts;
-    my $tier_small = '';
-    my $tier_large = '';
-
-    if ($enabled) {
-        try {
-            my ($chost, $cport, $cmodel, $inst) = $self->_get_current_ollama_config($c, 1);
-            $current_model = $cmodel if $cmodel;
-            $installed_models = $inst if $inst;
-            $ollama_host = $chost || '';
-            $ollama_port = $cport || 11434;
-            @ollama_hosts = $self->_ollama_hosts_to_probe($c);
-            if ($ollama_host) {
-                my $check = Comserv::Model::Ollama->new(host => $ollama_host, port => $ollama_port, timeout => 3);
-                $ollama_reachable = ($check && $check->check_connection()) ? 1 : 0;
-            }
-            ($tier_small, $tier_large) = $self->_pick_ollama_tier(
-                $installed_models, $current_model, 'coding', 'coding');
-        } catch {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                'editor_config', "Failed to get ollama config: $_");
-        };
-
-        my $user_id = $c->session->{user_id};
-        if ($user_id) {
-            my $can_sel = 1;
-            @ext_models = @{ $self->_grok_external_models_for_user($c, $user_id, $can_sel) };
-        }
-    }
-
     my $ssh_host = $c->config->{aew_ssh_host}     || '172.30.131.126';
     my $zt_host  = $c->config->{aew_zerotier_host} || $ssh_host;
     my $browser_host = $c->config->{aew_browser_host} || 'workstation.local';
@@ -434,20 +427,9 @@ sub editor_config :Local :Args(0) {
     my $ssh_line_named = "ssh -N $ssh_alias";
     my $editor_popup = "/ai/editing_widget_popup";
 
-    require Comserv::Util::CodingAccess;
-    my $coding_terminal_allowed = Comserv::Util::CodingAccess::workstation_allowed($c) ? 1 : 0;
-    my $interactive_ws = $self->_interactive_ws_available($c) ? 1 : 0;
-    my $cli_mode = $interactive_ws ? 'pty' : 'http';
-
     $c->response->body(encode_json({
         success     => JSON::true,
         enabled     => $enabled,
-        coding_terminal_allowed => $coding_terminal_allowed ? JSON::true : JSON::false,
-        coding_terminal_ws      => '/coding/terminal_ws',
-        coding_terminal_status  => '/coding/terminal_status',
-        cli_mode                => $cli_mode,
-        interactive_ws_available => $interactive_ws ? JSON::true : JSON::false,
-        cli_tools               => $enabled ? ['grok', 'ollama', 'shell'] : [],
         grok_cli     => $enabled ? $self->_find_grok_binary() : undef,
         grok_home    => $enabled ? $self->_grok_home() : undef,
         project_root => $self->_project_root_path($c),
@@ -455,21 +437,6 @@ sub editor_config :Local :Args(0) {
         grok_auth   => $enabled ? ($has_key ? 'api_key' : (-r $self->_grok_home() . '/.grok/auth.json' ? 'session' : 'unavailable')) : undef,
         grok_mode   => $has_key ? 'xai_api' : 'local_cli',
         remote_ok   => $enabled ? JSON::true : JSON::false,
-        installed_models => $installed_models,
-        external_models  => \@ext_models,
-        current_model    => $current_model,
-        ollama_host      => $ollama_host,
-        ollama_port      => $ollama_port,
-        ollama_reachable => $ollama_reachable ? JSON::true : JSON::false,
-        ollama_hosts     => \@ollama_hosts,
-        model_tiers      => { small => $tier_small, large => $tier_large },
-        quick_chat       => $ollama_reachable ? JSON::true : JSON::false,
-        default_backend  => $ollama_reachable ? 'comserv' : ($has_key ? 'comserv' : 'grok_cli'),
-        prefer_local_ollama => $self->_prefer_local_ollama($c) ? JSON::true : JSON::false,
-        grok_api_available  => (@ext_models ? JSON::true : JSON::false),
-        grok_sync_hint      => @ext_models
-            ? 'xAI models loaded from your API key (sync at /ai/models to refresh).'
-            : 'No xAI models — add Grok API key at /ai/manage_api_keys then Sync at /ai/models',
         ssh_host    => $ssh_host,
         ssh_user    => $ssh_user,
         ssh_port    => $ssh_port,
@@ -560,207 +527,12 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
-    my $original_prompt = $prompt;
-    my $conversation_id = $json->{conversation_id}
-                       || $c->request->body_parameters->{conversation_id}
-                       || $c->request->params->{conversation_id}
-                       || undef;
-
-    my $model = $json->{model}
-             || $c->request->body_parameters->{model}
-             || $c->request->params->{model}
-             || '';
-
-    my $http_cli = $json->{http_cli}
-                || $c->request->body_parameters->{http_cli}
-                || $c->request->params->{http_cli}
-                || 0;
-    $http_cli = ($http_cli && $http_cli !~ /^(?:0|false|no)$/i) ? 1 : 0;
-
     my $grok = $self->_find_grok_binary();
-    my $has_grok_binary = ($grok && -x $grok) ? 1 : 0;
-
-    my $page_path  = $json->{page_path}  || $c->request->body_parameters->{page_path} || $c->request->params->{page_path} || '';
-    my $page_title = $json->{page_title} || $c->request->body_parameters->{page_title} || $c->request->params->{page_title} || '';
-    if ($page_path || $page_title) {
-        $prompt = "Context: user is viewing Comserv page $page_path ($page_title)\n\n$prompt";
-    }
-
-    $prompt = $self->_inject_read_file_tags($c, $prompt);
-
-    # Direct routing: If the requested model is an Ollama model (does not contain 'grok' in its name),
-    # bypass any Grok binary or xAI API key fallbacks and use the local Ollama backend immediately.
-    # HTTP CLI "Grok" tool always uses the Grok/xAI path — ignore the header Ollama model dropdown.
-    my $is_grok_model = (!$model || $model =~ /grok/i) ? 1 : 0;
-    if (!$http_cli && !$is_grok_model) {
-        my $ollama = $c->model('Ollama');
-        if ($ollama) {
-            my ($chost, $cport, $cmodel) = $self->_get_current_ollama_config($c, 1);
-            my $active_model = $model || $cmodel;
-            
-            $ollama->set_host($chost);
-            $ollama->port($cport);
-            $ollama->model($active_model);
-            
-            my $system = $self->_build_coding_system_prompt($c);
-            my @ollama_messages = (
-                { role => 'system', content => $system },
-                { role => 'user',   content => $prompt },
-            );
-
-            my ($response, $used_host, $ollama_err) = $self->_ollama_chat_with_failover(
-                $c, $ollama, \@ollama_messages, {
-                    port       => $cport,
-                    model      => $active_model,
-                    timeout    => 300,
-                    start_host => $chost,
-                    save_host  => 1,
-                });
-            my $reply_body = $response
-                ? (($response->{message} && $response->{message}{content})
-                    || $response->{response} || '')
-                : '';
-            if ($reply_body) {
-                my $reply = $reply_body;
-                while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
-                    my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
-                    if ($snippet) {
-                        $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
-                    } elsif ($err) {
-                        $reply .= "\n\n[Could not load $1: $err]";
-                    }
-                }
-                $reply = $self->_apply_response_file_actions($c, $reply);
-
-                my $persisted_id = $self->_persist_chat($c, {
-                    username        => $c->session->{username} || 'Shanta',
-                    conversation_id => $conversation_id,
-                    model           => $active_model || 'ollama-grok-fallback',
-                    prompt          => $original_prompt,
-                    response        => $reply,
-                });
-
-                $c->response->body(encode_json({
-                    success         => JSON::true,
-                    response        => $reply,
-                    backend         => 'ollama_local',
-                    model           => $active_model,
-                    ollama_host     => $used_host || $chost,
-                    conversation_id => $persisted_id,
-                }));
-                return;
-            } else {
-                my $err = $ollama_err || $ollama->last_error || 'Ollama connection failed or returned no response';
-                $c->response->status(503);
-                $c->response->body(encode_json({
-                    success => JSON::false,
-                    error   => "Ollama failed: $err",
-                    hint    => 'Tried multiple Ollama hosts. Verify Ollama is running on the workstation (127.0.0.1 or ' . ($chost || '172.30.131.126') . ').',
-                }));
-                return;
-            }
-        }
-    }
-
-    if (!$has_grok_binary) {
-        # Fallback 1: Use xAI API key if configured
-        if ($self->_grok_cli_api_key($c)) {
-            my $api_resp = $self->_grok_cli_via_api($c, $prompt, $model);
-            if ($api_resp && $api_resp->{response} && $api_resp->{response} =~ /\S/) {
-                my $reply = $api_resp->{response};
-                while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
-                    my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
-                    if ($snippet) {
-                        $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
-                    } elsif ($err) {
-                        $reply .= "\n\n[Could not load $1: $err]";
-                    }
-                }
-                $reply = $self->_apply_response_file_actions($c, $reply);
-
-                my $persisted_id = $self->_persist_chat($c, {
-                    username        => $c->session->{username} || 'Shanta',
-                    conversation_id => $conversation_id,
-                    model           => $api_resp->{model} || $model || 'grok-fallback-api',
-                    prompt          => $original_prompt,
-                    response        => $reply,
-                });
-
-                $c->response->body(encode_json({
-                    success         => JSON::true,
-                    response        => $reply,
-                    backend         => 'grok_api',
-                    model           => $api_resp->{model},
-                    conversation_id => $persisted_id,
-                }));
-                return;
-            }
-        }
-
-        # Fallback 2: Ollama Local model
-        my $ollama = $c->model('Ollama');
-        if ($ollama) {
-            my ($chost, $cport, $cmodel) = $self->_get_current_ollama_config($c, 1);
-            my $active_model = $model || $cmodel;
-            
-            $ollama->set_host($chost);
-            $ollama->port($cport);
-            $ollama->model($active_model);
-            
-            my $system = $self->_build_coding_system_prompt($c);
-            my @ollama_messages = (
-                { role => 'system', content => $system },
-                { role => 'user',   content => $prompt },
-            );
-
-            my ($response, $used_host, $ollama_err) = $self->_ollama_chat_with_failover(
-                $c, $ollama, \@ollama_messages, {
-                    port       => $cport,
-                    model      => $active_model,
-                    timeout    => 300,
-                    start_host => $chost,
-                    save_host  => 1,
-                });
-            my $reply_body = $response
-                ? (($response->{message} && $response->{message}{content})
-                    || $response->{response} || '')
-                : '';
-            if ($reply_body) {
-                my $reply = $reply_body;
-                while ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/g) {
-                    my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
-                    if ($snippet) {
-                        $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
-                    } elsif ($err) {
-                        $reply .= "\n\n[Could not load $1: $err]";
-                    }
-                }
-                $reply = $self->_apply_response_file_actions($c, $reply);
-
-                my $persisted_id = $self->_persist_chat($c, {
-                    username        => $c->session->{username} || 'Shanta',
-                    conversation_id => $conversation_id,
-                    model           => $active_model || 'ollama-fallback',
-                    prompt          => $original_prompt,
-                    response        => $reply,
-                });
-
-                $c->response->body(encode_json({
-                    success         => JSON::true,
-                    response        => $reply,
-                    backend         => 'ollama_fallback',
-                    model           => $active_model,
-                    ollama_host     => $used_host || $chost,
-                    conversation_id => $persisted_id,
-                }));
-                return;
-            }
-        }
-
+    unless ($grok && -x $grok) {
         $c->response->status(503);
         $c->response->body(encode_json({
             success => JSON::false,
-            error   => 'grok CLI not found, and no API key or Ollama connection is available as fallback.',
+            error   => 'grok CLI not found (install Grok Build CLI or set GROK_BIN)',
         }));
         return;
     }
@@ -776,8 +548,16 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
+    my $page_path  = $json->{page_path}  || '';
+    my $page_title = $json->{page_title} || '';
+    if ($page_path || $page_title) {
+        $prompt = "Context: user is viewing Comserv page $page_path ($page_title)\n\n$prompt";
+    }
+
+    $prompt = $self->_inject_read_file_tags($c, $prompt);
+
     if ($self->_grok_cli_api_key($c)) {
-        my $api_resp = $self->_grok_cli_via_api($c, $prompt, $model);
+        my $api_resp = $self->_grok_cli_via_api($c, $prompt);
         if ($api_resp && $api_resp->{response} && $api_resp->{response} =~ /\S/) {
             my $reply = $api_resp->{response};
             if ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/i) {
@@ -788,50 +568,20 @@ sub grok_cli :Local :Args(0) {
                     $reply .= "\n\n[Could not load $1: $err]";
                 }
             }
-            $reply = $self->_apply_response_file_actions($c, $reply);
-
-            my $persisted_id = $self->_persist_chat($c, {
-                username        => $c->session->{username} || 'Shanta',
-                conversation_id => $conversation_id,
-                model           => $api_resp->{model} || $model || 'grok-api',
-                prompt          => $original_prompt,
-                response        => $reply,
-            });
-
             $c->response->body(encode_json({
-                success         => JSON::true,
-                response        => $reply,
-                backend         => 'grok_api',
-                model           => $api_resp->{model},
-                conversation_id => $persisted_id,
+                success  => JSON::true,
+                response => $reply,
+                backend  => 'grok_api',
+                model    => $api_resp->{model},
             }));
             return;
         }
         my $api_err = $api_resp->{error} || 'Grok xAI API returned no content';
-        if ($http_cli) {
-            $c->response->body(encode_json({
-                success => JSON::false,
-                error   => $api_err,
-                hint    => 'HTTP CLI uses xAI API only (local grok binary is too slow over the browser). '
-                         . 'Check Admin → API Keys, or use the Chat tab with Ollama.',
-                backend => 'grok_api',
-            }));
-            return;
-        }
         $c->response->body(encode_json({
             success => JSON::false,
             error   => $api_err,
             hint    => 'Check Admin → API Keys (grok/xAI), or switch to Comserv AI in the dropdown.',
             backend => 'grok_api',
-        }));
-        return;
-    }
-
-    if ($http_cli) {
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error   => 'HTTP CLI requires an xAI API key (local grok binary takes 1–3 min and often drops the browser connection).',
-            hint    => 'Add a Grok/xAI key at /ai/manage_api_keys, or use the Chat tab with Ollama.',
         }));
         return;
     }
@@ -875,23 +625,12 @@ sub grok_cli :Local :Args(0) {
         return;
     }
 
-    $stdout = $self->_apply_response_file_actions($c, $stdout);
-
-    my $persisted_id = $self->_persist_chat($c, {
-        username        => $c->session->{username} || 'Shanta',
-        conversation_id => $conversation_id,
-        model           => $model || 'grok-cli',
-        prompt          => $original_prompt,
-        response        => $stdout,
-    });
-
     $c->response->body(encode_json({
-        success         => JSON::true,
-        response        => $stdout,
-        backend         => 'grok_cli',
-        exit            => $exit,
-        stderr          => ($stderr ? $stderr : undef),
-        conversation_id => $persisted_id,
+        success  => JSON::true,
+        response => $stdout,
+        backend  => 'grok_cli',
+        exit     => $exit,
+        stderr   => ($stderr ? $stderr : undef),
     }));
 }
 
@@ -916,42 +655,18 @@ sub _grok_home {
 sub _grok_cli_api_key {
     my ($self, $c) = @_;
     return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
-    return $ENV{GROK_API_KEY} if $ENV{GROK_API_KEY} && $ENV{GROK_API_KEY} =~ /\S/;
-
-    my $k8s_secret_path = '/run/secrets/grok_api_key';
-    if (-e $k8s_secret_path) {
-        if (open my $fh, '<', $k8s_secret_path) {
-            my $key = do { local $/; <$fh> };
-            close $fh;
-            chomp($key);
-            return $key if $key && $key =~ /\S/;
-        }
-    }
-
-    try {
-        my $grok = $c->model('Grok');
-        if ($grok && $grok->api_key && $grok->api_key =~ /\S/) {
-            return $grok->api_key;
-        }
-    } catch {};
-
-    my $cfg_key = $c->config->{grok_cli_xai_api_key}
-               || $c->config->{xai_api_key}
-               || $c->config->{grok_api_key}
-               || $c->config->{grok_cli_grok_api_key};
+    my $cfg_key = $c->config->{grok_cli_xai_api_key} || $c->config->{xai_api_key};
     return $cfg_key if $cfg_key && $cfg_key =~ /\S/;
 
     my $user_id = $c->session->{user_id} || 0;
+    return '' unless $user_id;
 
     try {
         my $schema = $c->model('DBEncy')->schema;
-        my $key_obj;
-        if ($user_id) {
-            $key_obj = $schema->resultset('UserApiKeys')->search(
-                { user_id => $user_id, service => 'grok', is_active => '1' },
-                { rows => 1 }
-            )->first;
-        }
+        my $key_obj = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id, service => 'grok', is_active => '1' },
+            { rows => 1 }
+        )->first;
         $key_obj ||= $schema->resultset('UserApiKeys')->search(
             { service => 'grok', is_active => '1' },
             { rows => 1 }
@@ -981,7 +696,7 @@ sub _grok_cli_timeout_sec {
 }
 
 sub _grok_cli_via_api {
-    my ($self, $c, $prompt, $model_override) = @_;
+    my ($self, $c, $prompt) = @_;
     my $api_key = $self->_grok_cli_api_key($c);
     return { error => 'No xAI API key configured' } unless $api_key;
 
@@ -991,7 +706,7 @@ sub _grok_cli_via_api {
     }
 
     $grok->api_key($api_key);
-    my $model = $model_override || $c->config->{grok_cli_model} || 'grok-4.3';
+    my $model = $c->config->{grok_cli_model} || 'grok-4-fast-non-reasoning';
     $grok->model($model);
 
     my $system = $self->_build_coding_system_prompt($c);
@@ -1161,11 +876,6 @@ sub _find_grok_binary {
     return $home_grok if -x $home_grok;
     my $alt = "$home/.grok/bin/grok";
     return $alt if -x $alt;
-    my @caches = glob("$home/.cache/JetBrains/PyCharm*/acp-agents/grok-build/*/grok");
-    if (@caches) {
-        my $latest = $caches[-1];
-        return $latest if -x $latest;
-    }
     for my $dir (split /:/, $ENV{PATH} || '') {
         my $bin = "$dir/grok";
         return $bin if -x $bin;
@@ -1339,7 +1049,7 @@ sub generate :Local :Args(0) {
             $c->stash->{ai_image_data} = $image_data_b64;
             $c->stash->{ai_image_mime} = $image_mime;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', model='" . ($model || '') . "', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search, form_fill=" . ($json_data->{skip_role_prompt} ? 'yes' : 'no'));
+                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search");
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                 'generate', "JSON parsing resulted in no data or invalid hash");
@@ -1359,10 +1069,7 @@ sub generate :Local :Args(0) {
         $agent_id = $c->request->params->{agent_id} || 'general';
         $agent_name = $c->request->params->{agent_name} || 'AI Assistant';
         $conversation_id = $c->request->params->{conversation_id};  # May be undef if new conversation
-        $model = $c->request->params->{model} || '';
     }
-
-    $model = $self->_substitute_dead_grok_model($c, $model, 'generate') if $model;
     
     # Fall back to session-stored conversation_id if not provided in request
     unless ($conversation_id) {
@@ -1493,10 +1200,10 @@ sub generate :Local :Args(0) {
     }
 
     if (lc($normalized_agent_type) eq 'coding') {
-        unless ($self->_is_dev_mode($c) || $self->_is_shanta_editor($c)) {
+        unless ($self->_is_dev_mode($c)) {
             $c->response->body(encode_json({
                 success => JSON::false,
-                error   => 'The Coding Assistant is only available in development mode or for Shanta admin.',
+                error   => 'The Coding Assistant is only available in development mode.',
             }));
             $c->response->content_type('application/json');
             $c->response->status(403);
@@ -1530,9 +1237,6 @@ sub generate :Local :Args(0) {
         $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
     }
 
-    # Form-fill requests ship a focused system prompt — skip nav guide / module dump / duplicate context.
-    my $is_form_fill = ($c->stash->{skip_role_prompt} || ($page_context && $page_context eq 'form_fill'));
-
     # Role-based capability injection into system prompt (skip when caller supplies a precise system prompt)
     unless ($c->stash->{skip_role_prompt}) {
         my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
@@ -1554,45 +1258,31 @@ sub generate :Local :Args(0) {
         $system .= "\n\n" . $schema_ctx;
     }
 
-    # Inject newsletter drafting context on newsletter admin pages (skip when client already loaded it)
-    if (!$is_form_fill && $page_path && $page_path =~ m{/mail/newsletter|/newsletters}i) {
-        eval {
-            my $nl = $c->controller('Newsletter');
-            if ($nl && $nl->can('build_ai_context')) {
-                my $nl_ctx = $nl->build_ai_context($c);
-                $system .= "\n\nNEWSLETTER DRAFTING DATA:\n" . $nl_ctx if $nl_ctx;
-            }
-        };
-    }
-
     # --- Live DB data injection (same as /ai/chat) ---
-    my ($module_data_gen, $shared_hist_gen) = ('', '');
-    unless ($is_form_fill) {
-        my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        # Planning agent already injects project list via _build_planning_system_prompt;
-        # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
-        my $inject_prompt = $prompt;
-        if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
-            $inject_prompt = "project todo $prompt";
+    my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    # Planning agent already injects project list via _build_planning_system_prompt;
+    # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
+    my $inject_prompt = $prompt;
+    if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
+        $inject_prompt = "project todo $prompt";
+    }
+    if ($normalized_agent_type =~ /^accounting$/i) {
+        $inject_prompt = "inventory accounting gl coa invoice $prompt";
+    }
+    my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
+    if ($module_data_gen) {
+        # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
+        # planning agent gets less room because its own prompt already includes the project list.
+        my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
+        if (length($module_data_gen) > $inject_cap) {
+            $module_data_gen = substr($module_data_gen, 0, $inject_cap)
+                . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
         }
-        if ($normalized_agent_type =~ /^accounting$/i) {
-            $inject_prompt = "inventory accounting gl coa invoice $prompt";
-        }
-        my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
-        if ($module_data_gen) {
-            # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
-            # planning agent gets less room because its own prompt already includes the project list.
-            my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
-            if (length($module_data_gen) > $inject_cap) {
-                $module_data_gen = substr($module_data_gen, 0, $inject_cap)
-                    . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
-            }
-            $system .= "\n\n" . $module_data_gen;
-        }
-        my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
-        if ($shared_hist_gen) {
-            $system .= "\n\n" . $shared_hist_gen;
-        }
+        $system .= "\n\n" . $module_data_gen;
+    }
+    my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
+    if ($shared_hist_gen) {
+        $system .= "\n\n" . $shared_hist_gen;
     }
 
     # --- Trace: initial context ---
@@ -1665,7 +1355,16 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
-            $model = $self->_substitute_dead_grok_model($c, $model, 'generate') if $model;
+            # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
+            # Only add models here that are confirmed permanently retired by xAI
+            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+                grok-code-fast-1
+            );
+            if ($model && $GROK_DEAD{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
+                $model = $GROK_DEAD{$model};
+            }
             if ($model) {
                 # Pre-flight: if the requested model is known deprecated in DB, use last_working_model instead
                 eval {
@@ -1678,7 +1377,7 @@ sub generate :Local :Args(0) {
                         my $deprecated = $meta->{deprecated_models} || {};
                         if ($deprecated->{$model}) {
                             my $replacement = $meta->{last_working_model} || '';
-                            if ($replacement && $replacement ne $model) {
+                            if ($replacement && $replacement ne $model && !$GROK_DEAD{$replacement}) {
                                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                                     'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
                                 $model = $replacement;
@@ -1819,47 +1518,11 @@ sub generate :Local :Args(0) {
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    push @trace, sprintf("❌ Grok failed: %s", $error);
-                    push @trace, "🔀 Attempting Ollama fallback (Grok unavailable)";
-                    $self->_flush_progress($gen_progress_file, \@trace, 0);
-                    my $ollama_fb = $c->model('Ollama');
-                    if ($ollama_fb) {
-                        my ($fb_host, $fb_port, $fb_default, $fb_installed)
-                            = $self->_get_current_ollama_config($c, $can_select_model_gen);
-                        my ($fb_small, $fb_large) = $self->_pick_ollama_tier(
-                            $fb_installed, $fb_default, $agent_id, $agent_id);
-                        my $fb_model = $fb_large || $fb_small || $fb_default;
-                        my ($fb_resp, $fb_used_host) = $self->_ollama_chat_with_failover(
-                            $c, $ollama_fb, \@grok_messages, {
-                                port       => $fb_port || 11434,
-                                model      => $fb_model,
-                                timeout    => 300,
-                                start_host => $fb_host,
-                                trace      => \@trace,
-                            });
-                        if ($fb_resp) {
-                            $response   = $fb_resp;
-                            $provider   = 'ollama';
-                            $active_ollama_host = $fb_used_host || $fb_host;
-                            push @trace, sprintf("✅ Ollama fallback OK @%s model=%s",
-                                $active_ollama_host, $fb_model);
-                        }
-                    }
-                    unless ($response) {
-                        die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
-                    }
+                    die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
                 }
             }
             
             $model_used = $response->{model} || $grok->model;
-            if ($provider eq 'ollama' && $response) {
-                my $fb_text = ($response->{message} && $response->{message}{content})
-                           || $response->{response} || '';
-                $response->{response} = $fb_text;
-                $model_used = $response->{model} || $model_used;
-            } elsif ($response->{choices} && @{$response->{choices} || []}) {
-                $response->{response} = $response->{choices}[0]{message}{content} || '';
-            }
         } else {
             # Default to Ollama
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -1881,10 +1544,6 @@ sub generate :Local :Args(0) {
             }
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
             $active_ollama_host = $current_host;
-
-            my $member_plus = $self->_is_member_or_above($c, $user_id, $user_roles, $is_guest);
-            my $lightweight = $member_plus
-                && $self->_is_lightweight_ollama_request($normalized_agent_type, $prompt);
             
             # ── 3-Tier model selection: start small, escalate if needed ─────────
             # Tier 1 = tier_small (fastest / lightest installed model)
@@ -1892,36 +1551,14 @@ sub generate :Local :Args(0) {
             my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
                 $installed_models, $current_model, $agent_id, $page_context);
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
-            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier.
-            # Member+ helpdesk/navigation requests stay on the small tier for reliability.
-            my $force_large = (!$is_guest && !$manual_model && !$lightweight &&
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
+            my $force_large = (!$is_guest && !$manual_model &&
                 $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
             my $use_model = $manual_model || ($force_large ? $tier_large : $tier_small);
 
             push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large, $use_model,
-                $manual_model ? " (manual override)"
-                : ($lightweight ? " (member nav/helpdesk)" : ($force_large ? " (agent forced large)" : "")));
-
-            # Probe all candidate hosts — config primary may be down while workstation Ollama is up
-            my ($reachable_host, $fast_check) = $self->_find_reachable_ollama_host($c, {
-                port       => $current_port || 11434,
-                start_host => $current_host,
-            });
-            unless ($reachable_host) {
-                die "Ollama is not reachable. Please select an external AI model (Grok) or try again later.";
-            }
-            if ($reachable_host ne $current_host) {
-                push @trace, sprintf("🔀 Ollama reachable at %s (config had %s)", $reachable_host, $current_host);
-                $current_host = $reachable_host;
-                $active_ollama_host = $reachable_host;
-                my $reachable_ollama = Comserv::Model::Ollama->new(
-                    host => $reachable_host, port => $current_port || 11434, timeout => 3);
-                if ($reachable_ollama && $reachable_ollama->check_connection()) {
-                    my $models = $reachable_ollama->list_models();
-                    $installed_models = $models if $models && ref($models) eq 'ARRAY' && @$models;
-                }
-            }
+                $manual_model ? " (manual override)" : ($force_large ? " (agent forced large)" : ""));
 
             $ollama->host($current_host);
             $ollama->port($current_port) if $current_port;
@@ -1929,7 +1566,13 @@ sub generate :Local :Args(0) {
             $ollama->clear_endpoint;
 
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'generate', "Ollama Tier-1 host=$current_host model=$use_model agent=$agent_id member_plus=$member_plus lightweight=$lightweight");
+                'generate', "Ollama Tier-1 host=$current_host model=$use_model agent=$agent_id");
+
+            # Fast availability check (3-second timeout) before committing
+            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
+            unless ($fast_check && $fast_check->check_connection()) {
+                die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
+            }
 
             # ── Prefer in-memory models to avoid cold-start delays ──────────────
             # If the selected tier_small is NOT already loaded but another installed
@@ -1965,13 +1608,15 @@ sub generate :Local :Args(0) {
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive asynchronously without Perl fork DBI handle pollution
+                    # Renew keep_alive asynchronously — fork so it never delays the chat request
                     my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
                     my $ping_payload = encode_json({ model => $use_model, keep_alive => '2h' });
-                    my $escaped_payload = $ping_payload;
-                    $escaped_payload =~ s/'/'\\''/g;
-                    my $ping_cmd = "curl -s -X POST -H 'Content-Type: application/json' -d '$escaped_payload' --max-time 15 '$ping_url' > /dev/null 2>&1 &";
-                    system($ping_cmd);
+                    my $ping_pid = fork();
+                    if (defined $ping_pid && $ping_pid == 0) {
+                        my $child_ua = LWP::UserAgent->new(timeout => 15);
+                        $child_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
+                        exit 0;
+                    }
                     push @trace, "🔁 keep_alive renewal dispatched async for '$use_model'";
                 }
             }
@@ -2001,7 +1646,7 @@ sub generate :Local :Args(0) {
                     push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
                     my $fb_grok = $c->model('Grok');
                     $fb_grok->api_key($fallback_key);
-                    $fb_grok->model('grok-4.3');
+                    $fb_grok->model('grok-3-fast');
                     my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
                     push @fb_msgs, { role => 'user', content => $prompt };
                     my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
@@ -2012,7 +1657,7 @@ sub generate :Local :Args(0) {
                         $c->res->body(encode_json({
                             success        => 1,
                             response       => $fb_resp,
-                            model          => 'grok-4.3 (cold-start fallback)',
+                            model          => 'grok-3-fast (cold-start fallback)',
                             provider       => 'grok',
                             trace          => $trace_txt,
                             thinking_trace => \@trace,
@@ -2024,12 +1669,10 @@ sub generate :Local :Args(0) {
                 push @trace, sprintf("🧊 Cold start — no Grok fallback available; proceeding with %s (may be slow)", $use_model);
             }
 
-            my $timeout_secs = $lightweight ? 120 : ($is_cold_start ? 600 : 480);
-            push @trace, $lightweight
-                ? "⚡ Member nav/helpdesk — timeout ${timeout_secs}s on small model"
-                : ($is_cold_start
-                    ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
-                    : "🔥 Model warm — timeout ${timeout_secs}s");
+            my $timeout_secs = $is_cold_start ? 600 : 480;
+            push @trace, $is_cold_start
+                ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
+                : "🔥 Model warm — timeout ${timeout_secs}s";
             $ollama->timeout($timeout_secs);
 
             # ── Pre-call: create conversation + save user prompt BEFORE Ollama ─
@@ -2200,28 +1843,26 @@ sub generate :Local :Args(0) {
                 }
             }
 
-            # ── Tier 1 query (with multi-host failover) ───────────────────────
+            # ── Tier 1 query ─────────────────────────────────────────────────
             my $query_start = time();
-            push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
-                $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
-            $self->_flush_progress($gen_progress_file, \@trace, 0);
-            my ($gen_resp, $gen_host, $gen_err) = $self->_ollama_chat_with_failover(
-                $c, $ollama, \@ollama_msgs, {
-                    port       => $current_port || 11434,
-                    model      => $use_model,
-                    timeout    => $timeout_secs,
-                    start_host => $current_host,
-                    trace      => \@trace,
-                    save_host  => $can_select_model ? 1 : 0,
-                });
-            $response = $gen_resp;
-            if ($gen_host && $gen_host ne $current_host) {
-                $current_host = $gen_host;
-                $active_ollama_host = $gen_host;
-                push @trace, "🔀 Ollama host switched to $gen_host";
+            if (@$history_items || $system) {
+                push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
+                    $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                    'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
+                # Flush trace to progress file before blocking call so JS poller can read it
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
+                $response = $ollama->chat(messages => \@ollama_msgs);
+            } else {
+                push @trace, sprintf("📡 Tier-1 /api/generate to %s — model=%s single-turn",
+                    $current_host, $use_model);
+                # Flush trace to progress file before blocking call so JS poller can read it
+                $self->_flush_progress($gen_progress_file, \@trace, 0);
+                $response = $ollama->query(
+                    prompt => $prompt,
+                    format => $format eq 'json' ? 'json' : undef,
+                    system => $system || undef
+                );
             }
             my $query_elapsed = time() - $query_start;
 
@@ -3016,7 +2657,6 @@ sub chat :Local :Args(0) {
     # Get parameters from JSON or fallback to form params
     my $prompt = $json_data->{prompt} || $c->request->params->{prompt} || '';
     my $model = $json_data->{model} || $c->request->params->{model} || '';
-    $model = $self->_substitute_dead_grok_model($c, $model, 'chat') if $model;
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
@@ -3082,17 +2722,6 @@ sub chat :Local :Args(0) {
     if ($chat_page_path && $chat_page_path =~ m{/admin/(?:compare_schema|schema_compare)}) {
         my $schema_ctx = $self->_build_schema_compare_context();
         $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '') . $schema_ctx;
-    }
-
-    if ($chat_page_path && $chat_page_path =~ m{/mail/newsletter|/newsletters}i) {
-        eval {
-            my $nl = $c->controller('Newsletter');
-            if ($nl && $nl->can('build_ai_context')) {
-                my $nl_ctx = $nl->build_ai_context($c);
-                $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '')
-                    . "NEWSLETTER DRAFTING DATA:\n" . $nl_ctx if $nl_ctx;
-            }
-        };
     }
 
     # Build messages array for chat API
@@ -3182,10 +2811,10 @@ sub chat :Local :Args(0) {
     }
 
     if (lc($chat_agent_id) eq 'coding') {
-        unless ($self->_is_dev_mode($c) || $self->_is_shanta_editor($c)) {
+        unless ($self->_is_dev_mode($c)) {
             $c->response->body(encode_json({
                 success => JSON::false,
-                error   => 'The Coding Assistant is only available in development mode or for Shanta admin.',
+                error   => 'The Coding Assistant is only available in development mode.',
             }));
             $c->response->content_type('application/json');
             $c->response->status(403);
@@ -3198,9 +2827,6 @@ sub chat :Local :Args(0) {
     my @system_parts;
     push @system_parts, $chat_agent_system if $chat_agent_system;
     push @system_parts, $role_prompt_chat  if $role_prompt_chat;
-
-    my $page_ui_hints = $self->_build_page_ui_hints($chat_page_path, $prompt);
-    push @system_parts, $page_ui_hints if $page_ui_hints;
 
     # Fetch live module data — force inject for agents that always need project/todo data
     my $chat_inject_prompt = $prompt;
@@ -3246,22 +2872,8 @@ sub chat :Local :Args(0) {
 
     # Always try to pull previously learned / dynamically observed links (from this or prior sessions)
     # and inject them so the AI gradually knows about new features without manual prompt edits.
-    my $chat_is_admin = grep { /^(admin|developer|editor)$/i } @$user_roles_chat;
-    my $chat_role_tier = $chat_is_admin ? 'admin' : ($is_guest ? 'guest' : 'user');
-    my $learned_additions = $self->_get_learned_navigation_additions($c, 10, $chat_role_tier);
+    my $learned_additions = $self->_get_learned_navigation_additions($c, 10);
     push @system_parts, $learned_additions if $learned_additions;
-
-    eval {
-        my $nav_ctrl = $c->controller('Navigation');
-        if ($nav_ctrl) {
-            my $chat_base = $c->uri_for('/') . '';
-            $chat_base =~ s{/$}{};
-            my $shortcut_section = $nav_ctrl->build_ai_shortcut_navigation_section($c, $chat_role_tier, $chat_base);
-            push @system_parts, $shortcut_section if $shortcut_section;
-            my $menu_links_section = $nav_ctrl->build_internal_links_navigation_section($c, $chat_role_tier, $chat_base);
-            push @system_parts, $menu_links_section if $menu_links_section;
-        }
-    };
 
     my $combined_system_prompt = join("\n\n", @system_parts);
 
@@ -3349,7 +2961,15 @@ sub chat :Local :Args(0) {
             }
 
             $grok->api_key($grok_api_key);
-            $model = $self->_substitute_dead_grok_model($c, $model, 'chat') if $model;
+            # Hardcoded known-dead Grok models — substitute before any API call
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+                grok-code-fast-1
+            );
+            if ($model && $GROK_DEAD_CHAT{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
+                $model = $GROK_DEAD_CHAT{$model};
+            }
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
@@ -3422,40 +3042,12 @@ sub chat :Local :Args(0) {
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    push @chat_trace, sprintf("❌ Grok failed: %s", $error);
-                    push @chat_trace, "🔀 Attempting Ollama fallback (Grok unavailable)";
-                    $self->_flush_progress($progress_file, \@chat_trace, 0);
-                    my $ollama_fb = $c->model('Ollama');
-                    if ($ollama_fb) {
-                        my ($fb_host, $fb_port, $fb_default, $fb_installed)
-                            = $self->_get_current_ollama_config($c, $can_select_model_perm);
-                        my ($fb_small, $fb_large) = $self->_pick_ollama_tier(
-                            $fb_installed, $fb_default, $chat_agent_id, $chat_agent_id);
-                        my $fb_model = $fb_large || $fb_small || $fb_default;
-                        my ($fb_resp, $fb_used_host) = $self->_ollama_chat_with_failover(
-                            $c, $ollama_fb, \@final_messages, {
-                                port       => $fb_port || 11434,
-                                model      => $fb_model,
-                                timeout    => 300,
-                                start_host => $fb_host,
-                                trace      => \@chat_trace,
-                            });
-                        if ($fb_resp) {
-                            $response = $fb_resp;
-                            push @chat_trace, sprintf("✅ Ollama fallback OK @%s model=%s",
-                                $fb_used_host || $fb_host, $fb_model);
-                        }
-                    }
-                    unless ($response) {
-                        die "Grok chat failed: $error — Admin: please go to /ai/models and Sync to update available models";
-                    }
+                    die "Grok chat failed: $error — Admin: please go to /ai/models and Sync to update available models";
                 }
             }
 
             if ($response->{choices} && ref($response->{choices}) eq 'ARRAY' && @{$response->{choices}}) {
                 $ai_response = $response->{choices}[0]{message}{content} || '';
-            } elsif ($response->{message} && $response->{message}{content}) {
-                $ai_response = $response->{message}{content};
             } elsif ($response->{response}) {
                 $ai_response = $response->{response};
             }
@@ -3464,11 +3056,11 @@ sub chat :Local :Args(0) {
             # Capture Grok token usage for billing
             $response_eval_count = ($response->{usage} && $response->{usage}{total_tokens})
                 ? $response->{usage}{total_tokens}
-                : ($response->{eval_count} || 0);
+                : 0;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Grok/Ollama-fallback chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars" .
+                'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars" .
                 ($response_eval_count ? ", tokens=$response_eval_count" : ''));
-            push @chat_trace, sprintf("✅ Responded — model=%s %d chars%s", $model_used, length($ai_response),
+            push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars%s", $model_used, length($ai_response),
                 $response_eval_count ? " ($response_eval_count tokens)" : '');
 
         } else {
@@ -3483,26 +3075,10 @@ sub chat :Local :Args(0) {
 
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model_perm);
 
-            my $chat_member_plus = $self->_is_member_or_above($c, $user_id, $user_roles_chat, $is_guest);
-            my $chat_lightweight = $chat_member_plus
-                && $self->_is_lightweight_ollama_request($chat_agent_id, $prompt);
-
-            my ($reachable_host, $avail_check) = $self->_find_reachable_ollama_host($c, {
-                port       => $current_port || 11434,
-                start_host => $current_host,
-            });
-            unless ($reachable_host) {
-                die "Ollama is not reachable. Please select an external AI model (Grok) or try again later.";
-            }
-            if ($reachable_host ne $current_host) {
-                push @chat_trace, sprintf("🔀 Ollama reachable at %s (config had %s)", $reachable_host, $current_host);
-                $current_host = $reachable_host;
-                my $reachable_ollama = Comserv::Model::Ollama->new(
-                    host => $reachable_host, port => $current_port || 11434, timeout => 3);
-                if ($reachable_ollama && $reachable_ollama->check_connection()) {
-                    my $models = $reachable_ollama->list_models();
-                    $installed_models = $models if $models && ref($models) eq 'ARRAY' && @$models;
-                }
+            # Quick availability check before committing to a long request
+            my $avail_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
+            unless ($avail_check && $avail_check->check_connection()) {
+                die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
 
             $ollama->set_host($current_host);
@@ -3515,16 +3091,14 @@ sub chat :Local :Args(0) {
 
             # If user manually picked a model (admin override), skip escalation logic
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
-            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier.
-            # Member+ helpdesk/navigation requests stay on the small tier for reliability.
-            my $chat_force_large = (!$is_guest && !$manual_model && !$chat_lightweight &&
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
+            my $chat_force_large = (!$is_guest && !$manual_model &&
                 $chat_agent_id =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
 
             push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large,
                 $manual_model || ($chat_force_large ? $tier_large : $tier_small),
-                $manual_model ? ' (manual override)'
-                : ($chat_lightweight ? ' (member nav/helpdesk)' : ($chat_force_large ? ' (agent forced large)' : '')));
+                $manual_model ? ' (manual override)' : ($chat_force_large ? ' (agent forced large)' : ''));
 
             # ── Prefer in-memory models to avoid cold-start delays ──────────────
             my $chat_use_model = $manual_model || ($chat_force_large ? $tier_large : $tier_small);
@@ -3544,13 +3118,15 @@ sub chat :Local :Args(0) {
                     } else {
                         push @chat_trace, "💾 '$chat_use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive asynchronously without Perl fork DBI handle pollution
+                    # Renew keep_alive asynchronously — fork so it never delays the chat request
                     my $chat_ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
                     my $chat_ping_payload = encode_json({ model => $chat_use_model, keep_alive => '2h' });
-                    my $escaped_payload = $chat_ping_payload;
-                    $escaped_payload =~ s/'/'\\''/g;
-                    my $chat_ping_cmd = "curl -s -X POST -H 'Content-Type: application/json' -d '$escaped_payload' --max-time 15 '$chat_ping_url' > /dev/null 2>&1 &";
-                    system($chat_ping_cmd);
+                    my $chat_ping_pid = fork();
+                    if (defined $chat_ping_pid && $chat_ping_pid == 0) {
+                        my $child_ua = LWP::UserAgent->new(timeout => 15);
+                        $child_ua->post($chat_ping_url, 'Content-Type' => 'application/json', Content => $chat_ping_payload);
+                        exit 0;
+                    }
                     push @chat_trace, "🔁 keep_alive renewal dispatched async for '$chat_use_model'";
                 }
             }
@@ -3558,12 +3134,10 @@ sub chat :Local :Args(0) {
             # Use a longer timeout for cold starts (model not in memory)
             my $chat_running = eval { $avail_check->get_running_models() } || [];
             my $chat_cold = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $chat_use_model } @$chat_running;
-            my $chat_timeout = $chat_lightweight ? 120 : ($chat_cold ? 600 : 480);
-            push @chat_trace, $chat_lightweight
-                ? "⚡ Member nav/helpdesk — timeout ${chat_timeout}s on small model"
-                : ($chat_cold
-                    ? "🧊 Cold start — timeout extended to ${chat_timeout}s"
-                    : "🔥 Model warm — timeout ${chat_timeout}s");
+            my $chat_timeout = $chat_cold ? 600 : 480;
+            push @chat_trace, $chat_cold
+                ? "🧊 Cold start — timeout extended to ${chat_timeout}s"
+                : "🔥 Model warm — timeout ${chat_timeout}s";
             $ollama->timeout($chat_timeout);
 
             # Prepend combined system prompt for Ollama
@@ -3627,10 +3201,6 @@ sub chat :Local :Args(0) {
                         $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
                     }
-                    $self->_append_protected_page_ui_hints(\$ollama_messages[0]{content}, $page_ui_hints);
-                    if ($page_ui_hints && index($ollama_messages[0]{content}, '--- Current page UI:') >= 0) {
-                        push @chat_trace, '📌 Page UI hints preserved after context trim';
-                    }
                 }
             }
 
@@ -3665,25 +3235,11 @@ sub chat :Local :Args(0) {
             $self->_flush_progress($progress_file, \@chat_trace, 0);
 
             my $chat_start = time();
-            my ($chat_resp, $failover_host, $failover_err) = $self->_ollama_chat_with_failover(
-                $c, $ollama, \@ollama_messages, {
-                    port       => $current_port || 11434,
-                    model      => $use_model,
-                    timeout    => $chat_timeout,
-                    start_host => $current_host,
-                    trace      => \@chat_trace,
-                    save_host  => $can_select_model_perm ? 1 : 0,
-                });
-            $response = $chat_resp;
-            if ($failover_host && $failover_host ne $current_host) {
-                $current_host = $failover_host;
-                push @chat_trace, "🔀 Ollama host switched to $failover_host";
-                $self->_flush_progress($progress_file, \@chat_trace, 0);
-            }
+            $response   = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
-                my $error = $failover_err || $ollama->last_error || 'Unknown error';
+                my $error = $ollama->last_error || 'Unknown error';
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
                 push @chat_trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $chat_elapsed, $error);
@@ -3934,10 +3490,6 @@ sub chat :Local :Args(0) {
         # Mark progress as done so poller stops
         $self->_flush_progress($progress_file, \@chat_trace, 1);
 
-        if ($chat_agent_id && lc($chat_agent_id) eq 'coding') {
-            $ai_response = $self->_apply_response_file_actions($c, $ai_response);
-        }
-
         # Build JSON response
         $response_data = {
             success => JSON::true,
@@ -4158,40 +3710,9 @@ sub models :Local :Args(0) {
                 if ($ollama->check_connection()) {
                     $server_info->{connected} = 1;
                     
-                    # Get Ollama version
-                    my $version = $ollama->get_version();
-                    $server_info->{version} = $version if $version;
-                    
                     # Get installed models
                     my $installed = $ollama->list_models();
                     if ($installed && ref($installed) eq 'ARRAY') {
-                        # Normalize size + add "best used for" hints
-                        my %best_for = (
-                            'qwen2.5-coder' => 'Daily coding & completion',
-                            'qwen3.6'       => 'Deep planning & architecture',
-                            'phi4:14b'      => 'Balanced coding + planning',
-                            'llama3.1'      => 'General coding tasks',
-                            'gemma4:12b'    => 'Structured reasoning & specs',
-                            'gemma4'        => 'General reasoning',
-                            'mistral'       => 'Fast general chat',
-                            'nomic-embed'   => 'Embeddings / RAG',
-                        );
-                        for my $m (@$installed) {
-                            if (ref($m)) {
-                                if (exists $m->{size}) {
-                                    my $bytes = $m->{size};
-                                    if ($bytes >= 1<<30) {
-                                        $m->{size} = sprintf('%.1f GB', $bytes / (1<<30));
-                                    } elsif ($bytes >= 1<<20) {
-                                        $m->{size} = sprintf('%.0f MB', $bytes / (1<<20));
-                                    } else {
-                                        $m->{size} = sprintf('%.0f KB', $bytes / 1024);
-                                    }
-                                }
-                                my $name = $m->{name} || '';
-                                $m->{best_used_for} = $best_for{(split /:/, $name)[0]} || 'General purpose';
-                            }
-                        }
                         $server_info->{installed_models} = $installed;
                         
                         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -4275,38 +3796,6 @@ sub models :Local :Args(0) {
             'models', "Failed to fetch user API keys: $_");
     };
     
-    # Determine if user is a CSC admin
-    my $is_csc_admin = 0;
-    try {
-        use Comserv::Util::AdminAuth;
-        $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
-    } catch {
-        $is_csc_admin = ($username eq 'shanta' || grep { $_ =~ /^admin$/i } @$user_roles) ? 1 : 0;
-    };
-
-    my $grok_sync_message;
-    if ($can_select_model && $c->session->{user_id}) {
-        my $grok_key = $self->_find_active_grok_api_key($c, $c->session->{user_id}, $can_select_model);
-        if ($grok_key) {
-            my $meta   = $grok_key->get_metadata() || {};
-            my $synced = $meta->{available_models} || [];
-            my $force  = $c->request->param('sync_grok') ? 1 : 0;
-            if ($force || !@$synced) {
-                my ($ok, $err, $count) = $self->_sync_grok_key_models($c, $grok_key,
-                    $force ? 'models_manual_sync' : 'models_auto_sync');
-                if ($ok) {
-                    eval { $grok_key->discard_changes; $grok_key->reload; };
-                    $grok_sync_message = "Synced $count models from xAI.";
-                } else {
-                    $grok_sync_message = "xAI sync failed: $err";
-                }
-            }
-        }
-    }
-
-    my $grok_info = $self->_grok_models_page_info($c, $c->session->{user_id}, $can_select_model);
-    $grok_info->{sync_message} = $grok_sync_message if $grok_sync_message;
-
     # Set template variables
     $c->stash(
         template => 'ai/models.tt',
@@ -4314,78 +3803,12 @@ sub models :Local :Args(0) {
         username => $username,
         servers => $servers,
         can_select_model => $can_select_model,
-        is_csc_admin => $is_csc_admin,
         servers_json => encode_json($servers || []),
-        user_api_keys => \@user_api_keys,
-        grok_provider => $grok_info,
-        grok_provider_json => encode_json($grok_info || {}),
+        user_api_keys => \@user_api_keys
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'models', "AI models interface loaded for user: $username (can_select: " . ($can_select_model ? 'yes' : 'no') . ") with " . scalar(@$servers) . " servers configured");
-}
-
-=head2 upgrade_ollama
-
-Endpoint to run the official Ollama upgrade script. Accessible only to csc admins.
-
-=cut
-
-sub upgrade_ollama :Local :Args(0) {
-    my ($self, $c) = @_;
-    
-    $c->response->content_type('application/json');
-    
-    # Check authentication and authorization
-    my $username = $c->session->{username};
-    unless ($username) {
-        $c->response->status(401);
-        $c->response->body(encode_json({ success => JSON::false, error => "Unauthorized" }));
-        return;
-    }
-    
-    my $user_roles = $c->session->{roles} || [];
-    if (!ref($user_roles)) {
-        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
-    }
-    
-    my $is_csc_admin = 0;
-    try {
-        use Comserv::Util::AdminAuth;
-        $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
-    } catch {
-        $is_csc_admin = ($username eq 'shanta' || grep { $_ =~ /^admin$/i } @$user_roles) ? 1 : 0;
-    };
-    
-    unless ($is_csc_admin) {
-        $c->response->status(403);
-        $c->response->body(encode_json({ success => JSON::false, error => "Forbidden" }));
-        return;
-    }
-    
-    # Get current version before starting the background upgrade
-    my ($chost, $cport, $cmodel, $installed_models) = $self->_get_current_ollama_config($c, 1);
-    my $ollama = $c->model('Ollama');
-    my $version_before = 'unknown';
-    if ($ollama) {
-        $version_before = eval { $ollama->get_version() } || 'unknown';
-    }
-
-    # Run the upgrade command safely in the background via the shell & operator
-    # This avoids any Perl fork memory/DBI connection pollution.
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upgrade_ollama',
-        "Ollama upgrade started in background for user: $username");
-
-    my $cmd = "curl -fsSL https://ollama.com/install.sh | sh >/dev/null 2>&1 &";
-    system($cmd);
-    
-    $c->response->body(encode_json({
-        success => JSON::true,
-        version_before => $version_before,
-        version_after  => "Upgrading...",
-        output         => "The official Ollama installer script has been successfully launched on the server in the background.\n\nThis process typically takes 10 to 30 seconds to download and complete the update.\nPlease wait a moment and refresh this page to see your updated Ollama version.",
-        message        => "Ollama upgrade process started successfully in background."
-    }));
 }
 
 =head2 pull_model
@@ -4782,192 +4205,6 @@ sub remove_model :Local :Args(0) {
         $response_data = {
             success => JSON::false,
             error => 'Failed to remove model: ' . $error
-        };
-        $c->response->status(500);
-    };
-    
-    my $json_response = encode_json($response_data);
-    $c->response->body($json_response);
-}
-
-=head2 auto_sync_models
-
-Pull all recommended models that are not installed, and remove deprecated models on all configured Ollama servers.
-
-=cut
-
-sub auto_sync_models :Local :Args(0) {
-    my ($self, $c) = @_;
-    
-    $c->response->content_type('application/json');
-    
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'auto_sync_models', "Unauthorized access attempt to AI auto-sync models");
-        
-        my $error_response = encode_json({
-            success => JSON::false,
-            error => 'Authentication required'
-        });
-        $c->response->body($error_response);
-        $c->response->status(401);
-        return;
-    }
-    
-    my $username = $c->session->{username};
-    
-    my $user_roles = $c->session->{roles} || [];
-    if (!ref($user_roles)) {
-        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
-    }
-    my $can_manage_models = 0;
-    if (ref($user_roles) eq 'ARRAY') {
-        $can_manage_models = grep { $_ =~ /^(admin|developer)$/i } @$user_roles;
-    }
-    
-    unless ($can_manage_models) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'auto_sync_models', "Unauthorized model auto-sync attempt by user: $username");
-        
-        my $error_response = encode_json({
-            success => JSON::false,
-            error => 'Insufficient permissions to sync models'
-        });
-        $c->response->body($error_response);
-        $c->response->status(403);
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-        'auto_sync_models', "Processing AI models auto-sync request");
-    
-    my $response_data;
-    
-    try {
-        my $ollama = $c->model('Ollama');
-        unless ($ollama) {
-            die "Failed to load Ollama model";
-        }
-        
-        my $ollama_cfg2   = $c->config->{Ollama} || {};
-        my $cfg_host      = $ollama_cfg2->{host}          || 'localhost';
-        my $cfg_fallback  = $ollama_cfg2->{fallback_host} || $cfg_host;
-        my $cfg_port      = $ollama_cfg2->{port}          || 11434;
-
-        my @server_configs = (
-            { host => $cfg_host, port => $cfg_port },
-        );
-        if ($cfg_fallback ne $cfg_host) {
-            push @server_configs, { host => $cfg_fallback, port => $cfg_port };
-        }
-        
-        my @servers_result;
-        my $total_pulled = 0;
-        my $total_removed = 0;
-        
-        my $available = $ollama->list_available_models() || [];
-        my @rec_models = map { $_->{name} } grep { $_->{recommended} && !$_->{cloud} } @$available;
-        my $dep_models = $ollama->deprecated_models() || [];
-        
-        for my $srv (@server_configs) {
-            my $srv_host = $srv->{host};
-            my $srv_port = $srv->{port};
-            
-            my $srv_res = {
-                host => $srv_host,
-                port => $srv_port,
-                pulled => [],
-                removed => [],
-                skipped => [],
-                errors => []
-            };
-            
-            $ollama->host($srv_host);
-            $ollama->port($srv_port);
-            $ollama->clear_endpoint;
-            
-            my $orig_timeout = $ollama->timeout;
-            $ollama->timeout(3);
-            
-            if (!$ollama->check_connection()) {
-                $srv_res->{error} = "Connection failed: " . ($ollama->last_error || "Offline");
-                push @servers_result, $srv_res;
-                $ollama->timeout($orig_timeout) if defined $orig_timeout;
-                next;
-            }
-            
-            $ollama->timeout($orig_timeout) if defined $orig_timeout;
-            
-            my $installed = $ollama->list_models() || [];
-            my @installed_names;
-            my %installed_map;
-            for my $m (@$installed) {
-                my $name = ref($m) ? ($m->{name} || '') : ($m || '');
-                next unless $name;
-                push @installed_names, $name;
-                $installed_map{$name} = 1;
-                (my $base = $name) =~ s/:.*$//;
-                $installed_map{$base} = 1;
-            }
-            
-            for my $installed_name (@installed_names) {
-                (my $base_name = $installed_name) =~ s/:.*$//;
-                
-                my $is_deprecated = 0;
-                for my $dep_model (@$dep_models) {
-                    if ($installed_name eq $dep_model || $base_name eq $dep_model) {
-                        $is_deprecated = 1;
-                        last;
-                    }
-                }
-                
-                if ($is_deprecated) {
-                    my $del_res = $ollama->remove_model(model => $installed_name);
-                    if ($del_res && $del_res->{success}) {
-                        push @{$srv_res->{removed}}, $installed_name;
-                        $total_removed++;
-                    } else {
-                        my $err = $del_res->{error} || $ollama->last_error || 'Unknown error';
-                        push @{$srv_res->{errors}}, "Failed to remove $installed_name: $err";
-                    }
-                }
-            }
-            
-            for my $rec_model (@rec_models) {
-                (my $base_rec = $rec_model) =~ s/:.*$//;
-                
-                if ($installed_map{$rec_model} || $installed_map{$base_rec}) {
-                    push @{$srv_res->{skipped}}, $rec_model;
-                } else {
-                    my $pull_res = $ollama->pull_model(model => $rec_model);
-                    if ($pull_res && $pull_res->{success}) {
-                        push @{$srv_res->{pulled}}, $rec_model;
-                        $total_pulled++;
-                    } else {
-                        my $err = $pull_res->{error} || $ollama->last_error || 'Unknown error';
-                        push @{$srv_res->{errors}}, "Failed to pull $rec_model: $err";
-                    }
-                }
-            }
-            
-            push @servers_result, $srv_res;
-        }
-        
-        $response_data = {
-            success => JSON::true,
-            total_pulled => $total_pulled,
-            total_removed => $total_removed,
-            servers => \@servers_result
-        };
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'auto_sync_models', "Model auto-sync failed for user '$username': $error");
-        
-        $response_data = {
-            success => JSON::false,
-            error => 'Failed to sync models: ' . $error
         };
         $c->response->status(500);
     };
@@ -5451,18 +4688,6 @@ sub _get_module_data {
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $today     = DateTime->today->ymd;
 
-    # --- Newsletter drafting data ---
-    if ($prompt =~ /newsletter|mailing\s*list|mailout|read\s+online/i
-        || ($agent_id && $agent_id =~ /newsletter|mail/i)) {
-        eval {
-            my $nl = $c->controller('Newsletter');
-            if ($nl && $nl->can('build_ai_context')) {
-                my $nl_ctx = $nl->build_ai_context($c);
-                push @sections, "NEWSLETTER DRAFTING DATA:\n" . $nl_ctx if $nl_ctx;
-            }
-        };
-    }
-
     # --- Workshop data ---
     if ($prompt =~ /workshop|class|course|session|seminar|event|beekeep/i) {
         eval {
@@ -5646,7 +4871,7 @@ sub _get_module_data {
     }
 
     # --- Project data ---
-    if ($prompt =~ /project|opnsense|opn.?sense/i) {
+    if ($prompt =~ /project/i) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
@@ -5976,7 +5201,7 @@ sub _assess_response_quality {
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
+        return 'poor' if index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -6218,7 +5443,7 @@ sub _pick_ollama_tier {
         # 2. Known family prefix
         unless ($score) {
             for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
             }
         }
         # 3. Generic hints
@@ -6235,7 +5460,7 @@ sub _pick_ollama_tier {
 
     # Exclude sub-2B toy models (tinyllama, 1.1b, etc.) from auto-selection —
     # they produce unreliable answers.  Only fall back to them if nothing better exists.
-    my @usable = grep { ($size_score{$_} // 7) >= 2 } @sorted;
+    my @usable = grep { ($size_score{$_} // 7) >= 3 } @sorted;
     @usable = @sorted unless @usable;  # fallback if ALL models are tiny
 
     my $small = $usable[0]  || $default_model || 'gemma3:4b';
@@ -6297,18 +5522,9 @@ sub _build_role_system_prompt {
 
     # NEW: learned links + auto .tt discovery so new pages (e.g. freshly added ai/usage.tt or admin tools)
     # are findable by users in the chat ("open ai usage") and via links without manual code changes here.
-    $nav_guide .= $self->_get_learned_navigation_additions($c, 8, $role_tier);
+    $nav_guide .= $self->_get_learned_navigation_additions($c, 8);
 
-    # DB-driven shortcuts + user/site menu links (Option B)
-    eval {
-        my $nav_ctrl = $c->controller('Navigation');
-        if ($nav_ctrl) {
-            $nav_guide .= $nav_ctrl->build_ai_shortcut_navigation_section($c, $role_tier, $base_url);
-            $nav_guide .= $nav_ctrl->build_internal_links_navigation_section($c, $role_tier, $base_url);
-        }
-    };
-
-    my $tt_pages = $self->_get_auto_discovered_tt_pages($base_url, $role_tier);
+    my $tt_pages = $self->_get_auto_discovered_tt_pages($base_url);
     if ($tt_pages && @$tt_pages) {
         $nav_guide .= "\nAuto-discovered pages (new .tt templates become available here automatically):\n";
         my $count = 0;
@@ -6345,9 +5561,6 @@ Supported actions:
     Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
     ALTER TABLE to match Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_table", "database": "ency"}}]
     (Omit "field" to sync all fields in the table. Use "database": "forager" for the forager DB.)
-- Open one page:           [ACTION: {"action": "navigate", "url": "/path", "target": "_self"}]
-- Open multiple pages:      [ACTION: {"action": "navigate_multi", "urls": [{"url": "/admin/infrastructure/opnsense", "target": "_self"}, {"url": "/project/details?project_id=N", "target": "_blank"}]}]
-  (Use navigate_multi for OPNsense gateway requests — gateway first, project second. target "_blank" opens a new tab.)
 
 Rules:
 - ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
@@ -6378,8 +5591,7 @@ ACTION
              . "Do NOT dump or list all navigation links/URLs in your response — only include the one or two most relevant links for the user's actual question. "
              . $web_search_note . "\n"
              . "NAVIGATION: When the user says 'take me to', 'open', 'go to', or 'show me' a page, "
-             . "reply with the exact URL from the navigation guide below. "
-             . "For OPNsense/gateway/firewall requests, open BOTH the gateway admin page and the OpnSense project (see OPNSENSE DISAMBIGUATION in the guide).\n"
+             . "reply with the exact URL from the navigation guide below.\n"
              . $action_instructions
              . $page_nav
              . $nav_guide;
@@ -6444,24 +5656,9 @@ New pages like the AI usage monitor will appear automatically without editing th
     my $cache_time = 0;
     my $CACHE_TTL = 300;  # 5 minutes
 
-    sub _nav_path_admin_only {
-        my ($self, $path) = @_;
-        return 0 unless defined $path && length $path;
-        return 1 if $path =~ m{^/admin(?:/|$)}i;
-        return 1 if $path =~ m{^/file/}i;
-        return 1 if $path =~ m{^/site(?:/|$)}i;
-        return 1 if $path =~ m{^/themeadmin}i;
-        return 1 if $path =~ m{^/log$}i;
-        return 1 if $path =~ m{^/chat/admin}i;
-        return 1 if $path =~ m{^/ai/models}i;
-        return 1 if $path =~ m{^/navigation/manage_links}i;
-        return 0;
-    }
-
     sub _get_auto_discovered_tt_pages {
-        my ($self, $base_url, $role_tier) = @_;
+        my ($self, $base_url) = @_;
         $base_url //= '';
-        $role_tier //= 'guest';
 
         my $now = time();
         if ($cached_tt_links && ($now - $cache_time) < $CACHE_TTL) {
@@ -6517,9 +5714,6 @@ New pages like the AI usage monitor will appear automatically without editing th
         # De-dup + sort (ai/ first)
         my %dedup;
         my @unique = grep { !$dedup{$_->[1]}++ } @found;
-        if ($role_tier ne 'admin') {
-            @unique = grep { !$self->_nav_path_admin_only($_->[1]) } @unique;
-        }
         @unique = sort {
             ($a->[1] =~ m{^/ai/} ? 0 : 1) <=> ($b->[1] =~ m{^/ai/} ? 0 : 1)
             || $a->[1] cmp $b->[1]
@@ -6565,12 +5759,6 @@ sub _build_navigation_command_guide {
             [ 'Log viewer',                 '/log'                      ],
             [ 'File management',            '/file/list'                ],
             [ 'Duplicate files',            '/file/duplicates'          ],
-        ]],
-        [ 'Infrastructure / Gateway (admin)', 'admin', [
-            [ 'OPNsense Gateway Management (live firewall dashboard)', '/admin/infrastructure/opnsense' ],
-            [ 'Infrastructure overview',    '/admin/infrastructure'     ],
-            [ 'Application DNS zones',      '/admin/dns'                ],
-            [ 'Gateway routing plan (docs)', '/Documentation/system/GatewayPlan' ],
         ]],
         [ 'Inventory', 'admin', [
             [ 'Inventory dashboard',        '/Inventory'                ],
@@ -6675,19 +5863,6 @@ sub _build_navigation_command_guide {
         [ 'Workshops (admin/leader)', 'admin', [
             [ 'Workshop resources',         '/workshop/resources'       ],
         ]],
-        [ 'Mail & Newsletters', 'guest', [
-            [ 'Newsletter archive (read issues)', '/newsletters'          ],
-            [ 'Subscribe to mailing list',        '/mail/subscribe'       ],
-            [ 'Mail dashboard',                   '/mail'                 ],
-        ]],
-        [ 'Mail & Newsletters (logged in)', 'user', [
-            [ 'My email subscriptions',           '/mail/my_subscriptions'],
-        ]],
-        [ 'Newsletters (admin/editor)', 'admin', [
-            [ 'Manage newsletters',               '/mail/newsletters'     ],
-            [ 'Create newsletter issue',          '/mail/newsletter/create'],
-            [ 'Member menu also has Newsletters link', '/newsletters'     ],
-        ]],
     );
 
     my %role_rank = ( guest => 0, user => 1, admin => 2 );
@@ -6725,13 +5900,6 @@ sub _build_navigation_command_guide {
          . "  Docs:      $base_url/Documentation/Inventory/consignment\n"
          . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
          . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
-         . "OPNSENSE DISAMBIGUATION (admin): 'OPNsense' / 'OpnSense' means TWO different things:\n"
-         . "  1. Live firewall gateway admin: $base_url/admin/infrastructure/opnsense (Unbound, HAProxy, drift audit)\n"
-         . "  2. Comserv planning project named OpnSense: $base_url/project/details?project_id=ID (use ID from LIVE PROJECT DATA)\n"
-         . "When the user asks to open OPNsense, the gateway dashboard, or the firewall — open BOTH URLs (gateway in current tab, project in a new tab if LIVE PROJECT DATA lists OpnSense). "
-         . "Do NOT send them only to the project page when they asked for the gateway/dashboard.\n"
-         . "Emit dual navigation with: [ACTION: {\"action\": \"navigate_multi\", \"urls\": [{\"url\": \"/admin/infrastructure/opnsense\", \"target\": \"_self\"}, {\"url\": \"/project/details?project_id=N\", \"target\": \"_blank\"}]}] "
-         . "(replace N with the OpnSense project ID from LIVE PROJECT DATA).\n"
          . $guide;
 }
 
@@ -6867,9 +6035,8 @@ These survive prompt budget stripping better if we keep the list small.
 =cut
 
 sub _get_learned_navigation_additions {
-    my ($self, $c, $max, $role_tier) = @_;
+    my ($self, $c, $max) = @_;
     $max //= 8;
-    $role_tier //= 'guest';
     return '' unless $c;
 
     my $out = '';
@@ -6887,7 +6054,6 @@ sub _get_learned_navigation_additions {
             my $w = $r->word || '';
             $w =~ s/^ai_link://;
             next unless $w =~ /^\//;
-            next if $role_tier ne 'admin' && $self->_nav_path_admin_only($w);
             my $f = $r->frequency || 1;
             push @items, "  - (observed $f×) $w";
         }
@@ -7048,25 +6214,6 @@ sub _build_page_navigation_hint {
             $hint .= "- Admin: manage AI models at $base_url/ai/models\n"
                    . "- Manage API keys at $base_url/ai/manage_api_keys\n";
         }
-    } elsif ($page_path =~ m{/newsletters?|/mail/newsletter}i) {
-        $hint .= "Navigation context — Newsletters:\n"
-               . "- Public archive (read all issues): $base_url/newsletters\n"
-               . "- Also in menus: Main → Mail Services → Newsletters, or Member → Newsletters\n"
-               . "- Subscribe to email updates: $base_url/mail/subscribe\n"
-               . "- Manage my subscriptions: $base_url/mail/my_subscriptions\n";
-        if ($role eq 'admin') {
-            $hint .= "- Admin/editor: manage at $base_url/mail/newsletters\n"
-                   . "- Create new issue: $base_url/mail/newsletter/create\n"
-                   . "- Each newsletter is a permanent page at /page/{page_code}; email sends a teaser + read-online link.\n"
-                   . "- On create/edit forms, use AI Form Assistant to draft from git changes, todos, and planning calendar.\n"
-                   . "- Example prompts: \"Summarize code changes since last newsletter\", \"What did we plan this week?\"\n";
-        }
-    } elsif ($page_path =~ m{/mail}i) {
-        $hint .= "Navigation context — Mail:\n"
-               . "- Mail home: $base_url/mail\n"
-               . "- Newsletters archive: $base_url/newsletters\n"
-               . "- Subscribe: $base_url/mail/subscribe\n";
-        $hint .= "- Manage newsletters (admin/editor): $base_url/mail/newsletters\n" if $role eq 'admin';
     }
 
     return $hint;
@@ -7150,597 +6297,6 @@ sub _select_model_for_context {
     return 'llama3.1:latest';
 }
 
-=head2 _substitute_dead_grok_model
-
-Replace retired xAI model IDs (410 Gone) before any API call.
-
-=cut
-
-sub _fetch_xai_models {
-    my ($self, $api_key, $timeout) = @_;
-    return ([], 'API key missing') unless $api_key;
-    $timeout ||= 25;
-    require LWP::UserAgent;
-    require HTTP::Request;
-    my $ua = LWP::UserAgent->new(timeout => $timeout);
-    $ua->agent('Comserv/1.0');
-    my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
-    $req->header('Authorization' => "Bearer $api_key");
-    $req->header('Content-Type'  => 'application/json');
-    my $resp = $ua->request($req);
-    unless ($resp->is_success) {
-        my $detail = $resp->status_line;
-        if ($resp->content && length($resp->content) < 500) {
-            $detail .= ' — ' . $resp->content;
-        }
-        return ([], "xAI API error: $detail");
-    }
-    my $data = eval { decode_json($resp->content) };
-    return ([], 'Invalid JSON from xAI') if $@;
-    my @models;
-    foreach my $m (@{ $data->{data} || [] }) {
-        next unless $m->{id};
-        push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
-    }
-    @models = sort { $a->{id} cmp $b->{id} } @models;
-    return (\@models, undef);
-}
-
-sub _sync_grok_key_models {
-    my ($self, $c, $key_obj, $ctx) = @_;
-    $ctx ||= 'sync_grok_key_models';
-    unless ($key_obj && $key_obj->api_key_encrypted) {
-        return (0, 'No active Grok API key found.', 0);
-    }
-    my $api_key = $key_obj->get_api_key() || '';
-    unless ($api_key) {
-        return (0, 'Failed to decrypt Grok API key. Re-save it at /ai/manage_api_keys.', 0);
-    }
-    my ($models, $err) = $self->_fetch_xai_models($api_key);
-    if ($err) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, $ctx, $err);
-        eval {
-            my $meta = $key_obj->get_metadata() || {};
-            $meta->{last_sync_error} = $err;
-            $meta->{last_sync_error_at} = time();
-            $key_obj->set_metadata($meta);
-            $key_obj->update;
-        };
-        return (0, $err, 0);
-    }
-    my $existing_meta = $key_obj->get_metadata() || {};
-    $existing_meta->{available_models} = $models;
-    $existing_meta->{models_synced_at} = time();
-    delete $existing_meta->{last_sync_error};
-    delete $existing_meta->{last_sync_error_at};
-    $key_obj->set_metadata($existing_meta);
-    eval { $key_obj->update };
-    if ($@) {
-        my $err = "Failed to save synced models to database: $@";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, $ctx, $err);
-        return (0, $err, 0);
-    }
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-        $ctx, 'Synced ' . scalar(@$models) . ' Grok models from xAI');
-    return (1, undef, scalar @$models);
-}
-
-sub _grok_default_model_id {
-    return 'grok-4.3';
-}
-
-sub _grok_fallback_model_ids {
-    return qw(grok-4.3 grok-build-0.1);
-}
-
-sub _grok_model_id_from_entry {
-    my ($self, $m) = @_;
-    return '' unless defined $m;
-    return $m if !ref($m) && $m ne '';
-    return '' unless ref($m) eq 'HASH';
-    return $m->{id} || $m->{name} || '';
-}
-
-sub _grok_is_media_model {
-    my ($self, $id) = @_;
-    return $id && $id =~ /imagine|video/i ? 1 : 0;
-}
-
-sub _grok_synced_model_ids {
-    my ($self, $meta, $key_obj) = @_;
-    $meta ||= {};
-    my $synced = $meta->{available_models};
-    if ((!$synced || ref($synced) ne 'ARRAY' || !@$synced) && $key_obj) {
-        my $raw = $key_obj->metadata;
-        if ($raw && !ref($raw)) {
-            my $parsed = eval { decode_json($raw) } || {};
-            $synced = $parsed->{available_models} if ref($parsed) eq 'HASH';
-        }
-    }
-    return [] unless $synced && ref($synced) eq 'ARRAY';
-    my @ids;
-    my %seen;
-    foreach my $m (@$synced) {
-        my $id = $self->_grok_model_id_from_entry($m);
-        next unless $id;
-        next if $seen{$id}++;
-        push @ids, $id;
-    }
-    return \@ids;
-}
-
-sub _grok_label_for_id {
-    my ($self, $id) = @_;
-    return '' unless $id;
-    (my $label = $id) =~ s/-/ /g;
-    $label =~ s/\b(\w)/\u$1/g;
-    return "$label (xAI)";
-}
-
-sub _substitute_dead_grok_model {
-    my ($self, $c, $model, $ctx) = @_;
-    return $model unless $model;
-    return $model unless $self->_is_retired_grok_model($model);
-    my $replacement = $model =~ /^grok-code-fast/i ? 'grok-build-0.1' : $self->_grok_default_model_id();
-    if ($replacement ne $model) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            $ctx || '_substitute_dead_grok_model',
-            "Model '$model' is retired; substituting '$replacement'");
-        return $replacement;
-    }
-    return $model;
-}
-
-=head2 _is_retired_grok_model
-
-True for legacy xAI model IDs that should not appear in pickers (410 Gone).
-
-=cut
-
-sub _is_retired_grok_model {
-    my ($self, $id) = @_;
-    return 0 unless $id;
-    return 1 if $id eq 'grok-beta';
-    return 1 if $id =~ /^grok-2(?:-|$)/i;
-    return 1 if $id eq 'grok-code-fast-1';
-    return 0;
-}
-
-sub _grok_model_visible_in_picker {
-    my ($self, $id, $include_media) = @_;
-    return 0 unless $id;
-    return 0 if $self->_is_retired_grok_model($id);
-    return 0 if $self->_grok_is_media_model($id) && !$include_media;
-    return 1;
-}
-
-sub _find_active_grok_api_key {
-    my ($self, $c, $user_id, $can_select_model) = @_;
-    return unless $user_id;
-    my $schema = $c->model('DBEncy')->schema;
-    my $grok_key = $schema->resultset('UserApiKeys')->search(
-        { user_id => $user_id, service => 'grok', is_active => '1' }
-    )->first;
-    if (!$grok_key && $can_select_model) {
-        $grok_key = $schema->resultset('UserApiKeys')->search(
-            { service => 'grok', is_active => '1' }
-        )->first;
-    }
-    return $grok_key if $grok_key && $grok_key->api_key_encrypted;
-    return;
-}
-
-sub _grok_chat_model_ids_from_meta {
-    my ($self, $meta, $include_media, $key_obj) = @_;
-    $meta ||= {};
-    my @ids;
-    my $synced_ids = $self->_grok_synced_model_ids($meta, $key_obj);
-    if (@$synced_ids) {
-        foreach my $id (@$synced_ids) {
-            next unless $self->_grok_model_visible_in_picker($id, $include_media);
-            push @ids, $id;
-        }
-    }
-    # Only use hardcoded defaults when nothing has ever been synced
-    unless (@ids) {
-        unless ($meta->{models_synced_at}) {
-            @ids = $self->_grok_fallback_model_ids();
-        }
-    }
-    return @ids;
-}
-
-sub _grok_models_page_info {
-    my ($self, $c, $user_id, $can_select_model) = @_;
-    my %info = (
-        configured       => 0,
-        models           => [],
-        synced_models    => [],
-        synced_at        => undef,
-        synced_at_human  => undef,
-        total_synced     => 0,
-        chat_model_count => 0,
-        can_sync         => $can_select_model ? 1 : 0,
-        note             => 'Add an xAI API key at /ai/manage_api_keys, then Sync to load models from your account.',
-    );
-    return \%info unless $user_id;
-
-    try {
-        my $grok_key = $self->_find_active_grok_api_key($c, $user_id, $can_select_model);
-        unless ($grok_key) {
-            return \%info;
-        }
-        $info{configured} = 1;
-        my $meta = $grok_key->get_metadata() || {};
-        my $synced_ids = $self->_grok_synced_model_ids($meta, $grok_key);
-        $info{total_synced} = scalar @$synced_ids;
-        my $text_count  = 0;
-        my $media_count = 0;
-        foreach my $id (@$synced_ids) {
-            if ($self->_grok_is_media_model($id)) { $media_count++ }
-            elsif (!$self->_is_retired_grok_model($id)) { $text_count++ }
-            push @{ $info{synced_models} }, {
-                id        => $id,
-                retired   => $self->_is_retired_grok_model($id) ? 1 : 0,
-                media     => $self->_grok_is_media_model($id) ? 1 : 0,
-                in_picker => $self->_grok_model_visible_in_picker($id, $can_select_model) ? 1 : 0,
-            };
-        }
-        if ($meta->{models_synced_at}) {
-            $info{synced_at} = 0 + $meta->{models_synced_at};
-            $info{synced_at_human} = scalar localtime($info{synced_at});
-        }
-        my @text_ids = $self->_grok_chat_model_ids_from_meta($meta, 0, $grok_key);
-        my @admin_ids = $can_select_model
-            ? $self->_grok_chat_model_ids_from_meta($meta, 1, $grok_key)
-            : @text_ids;
-        $info{text_model_count}  = scalar @text_ids;
-        $info{media_model_count} = $media_count;
-        $info{chat_model_count}  = scalar @text_ids;
-
-        # Grok "best used for" + pricing (USD per 1 M tokens, input/output)
-        my %grok_meta = (
-            'grok-4.3'        => { best => 'Top-tier reasoning & coding',          cost => '$5 in / $15 out' },
-            'grok-3'          => { best => 'Balanced general chat & coding',       cost => '$2 in / $10 out' },
-            'grok-3-mini'     => { best => 'Fast lightweight tasks',               cost => '$0.60 in / $4 out' },
-            'grok-3-fast'     => { best => 'Low-latency chat & quick answers',     cost => '$5 in / $25 out' },
-            'grok-2'          => { best => 'Legacy general purpose',               cost => '$2 in / $10 out' },
-            'grok-2-vision'   => { best => 'Image + text understanding',           cost => '$2 in / $10 out' },
-        );
-
-        # Image generation pricing (per image, not per token)
-        my %grok_image_cost = (
-            'grok-2-image'    => '$0.01–$0.05 per image',
-            'grok-2-vision'   => '$0.01–$0.05 per image',
-            'flux'            => '$0.01–$0.05 per image',
-        );
-
-        $info{models} = [
-            map {
-                my $id   = $_;
-                my $meta = { best => 'General purpose', cost => '—' };
-
-                # Try exact match first
-                if (exists $grok_meta{$id}) {
-                    $meta = $grok_meta{$id};
-                } else {
-                    # Normalize and try partial matching
-                    my $norm = lc($id);
-                    $norm =~ s/^(xai-)?//;
-                    $norm =~ s/[-_].*$//;  # keep base name only
-
-                    for my $key (keys %grok_meta) {
-                        my $k = lc($key);
-                        if ($norm eq $k || index($norm, $k) >= 0 || index($k, $norm) >= 0) {
-                            $meta = $grok_meta{$key};
-                            last;
-                        }
-                    }
-                }
-
-                { id => $id, label => $self->_grok_label_for_id($id), kind => 'text',
-                  best_used_for => $meta->{best}, cost => $meta->{cost} }
-            } @text_ids
-        ];
-
-        # Add cost info for media models
-        if ($can_select_model && $media_count) {
-            push @{ $info{models} },
-                map {
-                    my $id   = $_;
-                    my $cost = $grok_image_cost{$id} || $grok_image_cost{(keys %grok_image_cost)[0]} || '—';
-                    { id => $id, label => $self->_grok_label_for_id($id), kind => 'media',
-                      best_used_for => 'Image generation', cost => $cost }
-                }
-                grep { $self->_grok_is_media_model($_) && $self->_grok_model_visible_in_picker($_, 1) } @$synced_ids;
-        }
-        if ($can_select_model && $media_count) {
-            push @{ $info{models} },
-                map { { id => $_, label => $self->_grok_label_for_id($_), kind => 'media' } }
-                grep { $self->_grok_is_media_model($_) && $self->_grok_model_visible_in_picker($_, 1) } @$synced_ids;
-        }
-        if ($info{total_synced}) {
-            $info{note} = sprintf(
-                'Your xAI API key has %d models (%d text/chat, %d image/video). Text models appear in chat/editor; admins also see media models below.',
-                $info{total_synced}, $text_count, $media_count
-            );
-            $info{using_fallbacks} = 0;
-        } elsif ($info{configured}) {
-            my $meta = {};
-            eval {
-                my $grok_key = $self->_find_active_grok_api_key($c, $user_id, $can_select_model);
-                $meta = $grok_key ? ($grok_key->get_metadata() || {}) : {};
-            };
-            if ($meta->{last_sync_error}) {
-                $info{error} = $meta->{last_sync_error};
-                $info{note} = 'Grok API key is configured but the last xAI sync failed. Check the error below or use Sync via page reload.';
-            } else {
-                $info{note} = 'Grok API key is configured but models have not been synced yet. Reload this page to auto-sync, or click Sync Models.';
-            }
-            $info{using_fallbacks} = 1;
-        }
-    } catch {
-        $info{error} = "$_";
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            '_grok_models_page_info', "Failed: $_");
-    };
-
-    return \%info;
-}
-
-=head2 _grok_external_models_for_user
-
-Build filtered xAI model list for editor/chat pickers.
-
-=cut
-
-sub _grok_external_models_for_user {
-    my ($self, $c, $user_id, $can_select_model) = @_;
-    my @ext_models;
-    return \@ext_models unless $user_id;
-
-    try {
-        my $grok_key = $self->_find_active_grok_api_key($c, $user_id, $can_select_model);
-        return \@ext_models unless $grok_key;
-
-        my $meta = $grok_key->get_metadata() || {};
-        foreach my $id ($self->_grok_chat_model_ids_from_meta($meta, $can_select_model, $grok_key)) {
-            push @ext_models, {
-                name     => $id,
-                provider => 'grok',
-                label    => $self->_grok_label_for_id($id),
-            };
-        }
-    } catch {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            '_grok_external_models_for_user', "Failed: $_");
-    };
-
-    return \@ext_models;
-}
-
-=head2 _prefer_local_ollama
-
-True when Comserv runs on the dev workstation (Ollama is on localhost).
-
-=cut
-
-sub _prefer_local_ollama {
-    my ($self, $c) = @_;
-    return 1 if $ENV{COMSERV_WORKSTATION};
-    return 1 if ($ENV{COMSERV_DEPLOYMENT_ENV} || '') =~ /^(development|dev|workstation)/i;
-    return 1 if $ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG};
-    my $ws = $c->config->{aew_ssh_host} || '';
-    return 1 if $ws =~ /^(127\.0\.0\.1|localhost|172\.30\.131\.126)$/i;
-    my $port = ($c->config->{Ollama} || {})->{port} || 11434;
-    my $test = Comserv::Model::Ollama->new(host => '127.0.0.1', port => $port, timeout => 1);
-    return ($test && $test->check_connection()) ? 1 : 0;
-}
-
-=head2 _ollama_hosts_to_probe
-
-Ordered list of Ollama hosts to try. On the workstation, localhost is probed first.
-
-=cut
-
-=head2 _is_member_or_above
-
-True for logged-in users with member role, admin/developer/editor, or active site membership.
-
-=cut
-
-sub _is_member_or_above {
-    my ($self, $c, $user_id, $roles, $is_guest) = @_;
-    return 0 if $is_guest || !$user_id || $user_id == 199;
-
-    $roles //= $c->session->{roles} || [];
-    $roles = [split(/\s*,\s*/, $roles)] unless ref($roles) eq 'ARRAY';
-    return 1 if grep { /^(admin|developer|editor|member)$/i } @$roles;
-
-    my $site_id = $c->session->{SiteID};
-    return 0 unless $site_id;
-
-    my $membership = eval { $c->model('Membership')->get_active_plan($c, $user_id, $site_id) };
-    return $membership ? 1 : 0;
-}
-
-=head2 _is_lightweight_ollama_request
-
-Navigation, helpdesk, and general support queries that work well on small local models.
-
-=cut
-
-sub _is_lightweight_ollama_request {
-    my ($self, $agent_id, $prompt) = @_;
-    $agent_id //= '';
-    $prompt   //= '';
-
-    return 1 if $agent_id =~ /^(helpdesk|documentation|general)$/i;
-    return 1 if $prompt =~ /^\s*(take\s+me\s+to|go\s+to|open|show\s+me|navigate\s+to|where\s+(?:is|are|can\s+i\s+find)|how\s+do\s+i\s+(?:get\s+to|find|access|open))\b/i;
-    return 1 if $prompt =~ /\b(helpdesk|help\s+desk|support\s+ticket|submit\s+(?:a\s+)?ticket|navigation|navigate)\b/i;
-    return 1 if $prompt =~ /\b(colou?r|colour)\b/i && $prompt =~ /\b(calendar|schedule|site|legend)\b/i;
-    return 0;
-}
-
-=head2 _build_page_ui_hints
-
-Compact, high-priority UI help for the user's current page. Injected even when
-full page_content is trimmed for token budget (unlike the large page scrape).
-
-=cut
-
-sub _build_page_ui_hints {
-    my ($self, $page_path, $prompt) = @_;
-    $page_path //= '';
-    $prompt    //= '';
-    my $norm = _normalize_editor_route($page_path);
-    return '' unless $norm;
-
-    if ($norm =~ m{^/planning/daily}) {
-        return <<'UI_HINT';
---- Current page UI: /planning/daily (Daily Schedule calendar) ---
-CALENDAR COLORS (todo bar colors are per Site, NOT random):
-- In the legend bar under the date filters, find "Sites:" and the colored dot (●) next to each site name (e.g. CSC).
-- Click the dot to open the browser color picker; your choice is saved to your user account (offline: browser cache).
-- Shift+click the dot restores that site's default color. Hover the dot for a short tooltip.
-- Do NOT direct users to /ai/widget or /ai/advanced_settings for calendar colors — those pages are unrelated.
-
-RESCHEDULE: Use the "♻ Reschedule" button in the filter row (admins). It restacks today's visible todos from the current time (red line), per user.
---- End page UI help ---
-UI_HINT
-    }
-
-    return '';
-}
-
-=head2 _append_protected_page_ui_hints
-
-Re-append compact page UI help after system-prompt truncation so small models still
-see in-page instructions (legend color picker, reschedule button, etc.).
-
-=cut
-
-sub _append_protected_page_ui_hints {
-    my ($self, $system_ref, $hints) = @_;
-    return unless $hints && $system_ref && ref $system_ref eq 'SCALAR' && length($$system_ref);
-    return if index($$system_ref, '--- Current page UI:') >= 0;
-    $$system_ref .= "\n\n" . $hints;
-}
-
-=head2 _find_reachable_ollama_host
-
-Probe the ordered host list and return the first reachable Ollama endpoint.
-
-Returns: ($host, $probe_client) or (undef, undef)
-
-=cut
-
-sub _find_reachable_ollama_host {
-    my ($self, $c, $opts) = @_;
-    $opts ||= {};
-    my $port  = $opts->{port} || ($c->config->{Ollama} || {})->{port} || 11434;
-    my $start = $opts->{start_host};
-
-    my @hosts = $self->_ollama_hosts_to_probe($c);
-    if ($start) {
-        @hosts = ($start, grep { $_ ne $start } @hosts);
-    }
-
-    for my $host (@hosts) {
-        my $probe = Comserv::Model::Ollama->new(host => $host, port => $port, timeout => 3);
-        next unless $probe && $probe->check_connection();
-        return ($host, $probe);
-    }
-
-    return (undef, undef);
-}
-
-sub _ollama_hosts_to_probe {
-    my ($self, $c) = @_;
-    my $ollama_cfg    = $c->config->{Ollama} || {};
-    my $primary_host  = $ollama_cfg->{host}          || '192.168.1.199';
-    my $fallback_host = $ollama_cfg->{fallback_host} || $primary_host;
-    my $ws_host       = $c->config->{aew_ssh_host}     || '172.30.131.126';
-    my $zt_host       = $c->config->{aew_zerotier_host} || $ws_host;
-
-    my @hosts;
-    if ($self->_prefer_local_ollama($c)) {
-        push @hosts, '127.0.0.1', 'localhost', $ws_host, $zt_host;  # local-first
-    }
-    push @hosts, $primary_host;
-    push @hosts, $fallback_host if $fallback_host && $fallback_host ne $primary_host;
-    push @hosts, $ws_host, $zt_host, 'workstation.zero';
-    push @hosts, 'host.docker.internal', '172.17.0.1', '192.168.1.199';
-    unless ($self->_prefer_local_ollama($c)) {
-        push @hosts, '127.0.0.1', 'localhost';
-    }
-
-    my %seen;
-    return grep { $_ && !$seen{$_}++ } @hosts;
-}
-
-=head2 _ollama_retryable_error
-
-True when an Ollama failure should trigger trying the next host.
-
-=cut
-
-sub _ollama_retryable_error {
-    my ($self, $err) = @_;
-    return 1 unless $err;
-    return 1 if $err =~ /connection|timeout|refused|reset|unreachable|network|can't connect|failed to connect|HTTP 5\d\d|timed out|nodename|resolve/i;
-    return 0;
-}
-
-=head2 _ollama_chat_with_failover
-
-Run Ollama chat, retrying across reachable hosts on connection errors.
-
-Returns: ($response, $host_used, $last_error)
-
-=cut
-
-sub _ollama_chat_with_failover {
-    my ($self, $c, $ollama, $messages_ref, $opts) = @_;
-    $opts ||= {};
-    my $port    = $opts->{port} || 11434;
-    my $model   = $opts->{model};
-    my $timeout = $opts->{timeout} || 120;
-    my $trace   = $opts->{trace};
-    my $start   = $opts->{start_host};
-
-    my @hosts = $self->_ollama_hosts_to_probe($c);
-    if ($start) {
-        @hosts = ($start, grep { $_ ne $start } @hosts);
-    }
-
-    my $last_error = '';
-    for my $host (@hosts) {
-        my $probe = Comserv::Model::Ollama->new(host => $host, port => $port, timeout => 3);
-        next unless $probe && $probe->check_connection();
-
-        push @$trace, "📡 Ollama chat → $host" if $trace && ref($trace) eq 'ARRAY';
-
-        $ollama->set_host($host);
-        $ollama->port($port);
-        $ollama->clear_endpoint;
-        $ollama->model($model) if $model;
-        $ollama->timeout($timeout);
-
-        my $response = $ollama->chat(messages => $messages_ref);
-        if ($response) {
-            $c->session->{ollama_host} = $host if $opts->{save_host};
-            return ($response, $host, '');
-        }
-
-        $last_error = $ollama->last_error || 'Unknown error';
-        push @$trace, "❌ $host failed: $last_error" if $trace && ref($trace) eq 'ARRAY';
-        next if $self->_ollama_retryable_error($last_error);
-    }
-
-    return (undef, '', $last_error);
-}
-
 =head2 _get_current_ollama_config
 
 Private method to determine current Ollama configuration with automatic fallback.
@@ -7753,7 +6309,13 @@ sub _get_current_ollama_config {
     # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
     my $ollama_cfg      = $c->config->{Ollama} || {};
     my $primary_host    = $ollama_cfg->{host}          || '192.168.1.199';
+    my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
     my $config_port     = $ollama_cfg->{port}          || 11434;
+    # Never silently fall back to localhost — production Docker has no local Ollama.
+    # If fallback is localhost/127.0.0.1 and primary is a real host, keep primary.
+    if ($fallback_host =~ /^(localhost|127\.0\.0\.1)$/i && $primary_host !~ /^(localhost|127\.0\.0\.1)$/i) {
+        $fallback_host = $primary_host;
+    }
 
     my $ollama = $c->model('Ollama');
     my $current_host  = $primary_host;
@@ -7762,39 +6324,24 @@ sub _get_current_ollama_config {
     my $installed_models = [];
 
     # Session override (admin/privileged users can switch host via /ai/models UI)
-    my $use_session_host = 0;
     if ($can_select_model && $c->session->{ollama_host}) {
-        my $sh = $c->session->{ollama_host};
-        my $test_sh = Comserv::Model::Ollama->new(host => $sh, port => $config_port, timeout => 3);
-        if ($test_sh && $test_sh->check_connection()) {
-            $current_host = $sh;
-            $use_session_host = 1;
+        $current_host = $c->session->{ollama_host};
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            '_get_current_ollama_config', "Using session preferred host: $current_host");
+    } else {
+        # Try primary host; fall back to fallback_host if unreachable
+        my $test = Comserv::Model::Ollama->new(host => $primary_host, port => $config_port, timeout => 3);
+        if ($test && $test->check_connection()) {
+            $current_host = $primary_host;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                '_get_current_ollama_config', "Using session preferred host: $current_host");
-        } else {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                '_get_current_ollama_config', "Session preferred host $sh is unreachable. Falling back to dynamic probe.");
-            delete $c->session->{ollama_host};
-        }
-    }
-
-    unless ($use_session_host) {
-        my @candidates = $self->_ollama_hosts_to_probe($c);
-        my $found = 0;
-        for my $host (@candidates) {
-            my $test = Comserv::Model::Ollama->new(host => $host, port => $config_port, timeout => 3);
-            if ($test && $test->check_connection()) {
-                $current_host = $host;
-                $found = 1;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                    '_get_current_ollama_config', "Ollama reachable at $host" .
-                    ($host ne $primary_host ? " (config primary $primary_host unavailable)" : ''));
-                last;
-            }
-        }
-        unless ($found) {
+                '_get_current_ollama_config', "Primary host $primary_host available");
+        } elsif ($fallback_host ne $primary_host) {
+            $current_host = $fallback_host;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                '_get_current_ollama_config', "No Ollama host reachable (tried " . scalar(@candidates) . " candidates)");
+                '_get_current_ollama_config', "Primary host $primary_host unavailable, using fallback $fallback_host");
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Ollama host $primary_host is not reachable");
         }
     }
     
@@ -8838,11 +7385,10 @@ sub get_user_providers :Local :Args(0) {
     my $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
     my $is_admin     = $can_select_model || $is_csc_admin;
     my $is_guest     = (!$user_id || $user_id == 199) ? 1 : 0;
-    my $is_member_or_above = $self->_is_member_or_above($c, $user_id, $user_roles, $is_guest);
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
         'get_user_providers',
-        "User $username (id=" . ($user_id||'none') . ") can_select=$can_select_model is_admin=$is_admin is_guest=$is_guest member_plus=$is_member_or_above");
+        "User $username (id=" . ($user_id||'none') . ") can_select=$can_select_model is_admin=$is_admin is_guest=$is_guest");
 
     my @providers;
 
@@ -8851,60 +7397,62 @@ sub get_user_providers :Local :Args(0) {
         my $ollama_cfg     = $c->config->{Ollama} || {};
         my $primary_host   = $ollama_cfg->{host}          || '192.168.1.199';
         my $fallback_host  = $ollama_cfg->{fallback_host} || $primary_host;
+        my $cfg_port       = $ollama_cfg->{port}          || 11434;
+        my $session_host   = ($can_select_model && $c->session->{ollama_host}) ? $c->session->{ollama_host} : '';
+        my $active_host    = $session_host || $primary_host;
 
-        my ($active_host, $active_port, $current_model, $installed) = $self->_get_current_ollama_config($c, $can_select_model);
-        $installed ||= [];
+        my $ollama = $c->model('Ollama');
+        if ($ollama) {
+            $ollama->host($active_host);
+            $ollama->port($cfg_port);
+            my $orig_timeout = $ollama->timeout;
+            $ollama->timeout(3);
+            my $installed = $ollama->list_models() || [];
+            $ollama->timeout($orig_timeout);
+            my @chat_models = grep {
+                my $n = $_->{name} || '';
+                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+            } @$installed;
 
-        my @chat_models = grep {
-            my $n = $_->{name} || '';
-            $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
-        } @$installed;
+            # Build servers list for admins (used by widget server-switcher)
+            my @servers;
+            if ($can_select_model) {
+                push @servers, {
+                    host     => $primary_host,
+                    label    => "Primary ($primary_host)",
+                    active   => ($active_host eq $primary_host) ? JSON::true : JSON::false,
+                };
+                if ($fallback_host ne $primary_host) {
+                    push @servers, {
+                        host   => $fallback_host,
+                        label  => "Fallback ($fallback_host)",
+                        active => ($active_host eq $fallback_host) ? JSON::true : JSON::false,
+                    };
+                }
+                # If session overrides to a host not in config, add it too
+                if ($session_host && $session_host ne $primary_host && $session_host ne $fallback_host) {
+                    push @servers, {
+                        host   => $session_host,
+                        label  => "Custom ($session_host)",
+                        active => JSON::true,
+                    };
+                }
+            }
 
-        # Build servers list for admins (used by widget server-switcher)
-        my @servers;
-        if ($can_select_model) {
-            push @servers, {
-                host     => $primary_host,
-                label    => "Primary ($primary_host)",
-                active   => ($active_host eq $primary_host) ? JSON::true : JSON::false,
+            push @providers, {
+                service     => 'ollama',
+                name        => 'Ollama (Local AI)',
+                is_local    => JSON::true,
+                active_host => $active_host,
+                servers     => \@servers,
+                models      => [ map { { id => $_->{name} } } @chat_models ],
             };
-            if ($fallback_host ne $primary_host) {
-                push @servers, {
-                    host   => $fallback_host,
-                    label  => "Fallback ($fallback_host)",
-                    active => ($active_host eq $fallback_host) ? JSON::true : JSON::false,
-                };
-            }
-            # If session overrides to a host not in config, add it too
-            my $session_host = ($can_select_model && $c->session->{ollama_host}) ? $c->session->{ollama_host} : '';
-            if ($session_host && $session_host ne $primary_host && $session_host ne $fallback_host) {
-                push @servers, {
-                    host   => $session_host,
-                    label  => "Custom ($session_host)",
-                    active => JSON::true,
-                };
-            }
         }
-
-        my ($reachable_host) = $self->_find_reachable_ollama_host($c, {
-            port       => $active_port || 11434,
-            start_host => $active_host,
-        });
-
-        push @providers, {
-            service     => 'ollama',
-            name        => 'Ollama (Local AI)',
-            is_local    => JSON::true,
-            active_host => $reachable_host || $active_host,
-            reachable   => $reachable_host ? JSON::true : JSON::false,
-            servers     => \@servers,
-            models      => [ map { { id => $_->{name} } } @chat_models ],
-        };
     } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'get_user_providers', "Ollama list failed: $_");
         push @providers, { service => 'ollama', name => 'Ollama (Local AI)', is_local => JSON::true,
-                           active_host => '', reachable => JSON::false, servers => [], models => [] };
+                           active_host => '', servers => [], models => [] };
     };
 
     # 2. External API keys — authenticated users only
@@ -8921,23 +7469,22 @@ sub get_user_providers :Local :Args(0) {
             foreach my $key ($own_keys->all) {
                 next if $seen{$key->service}++;
                 my $meta   = $key->get_metadata() || {};
-                my @filtered;
-                if ($key->service eq 'grok') {
-                    my $synced = $meta->{available_models} || [];
-                    if (!@$synced) {
-                        $self->_sync_grok_key_models($c, $key, 'get_user_providers_auto_sync');
-                        eval { $key->discard_changes; $key->reload; };
-                        $meta = $key->get_metadata() || {};
-                    }
-                    @filtered = map { { id => $_ } }
-                        $self->_grok_chat_model_ids_from_meta($meta, $is_admin, $key);
-                } else {
-                    my $models = $meta->{available_models} || [];
-                    @filtered = grep {
-                        my $id = $_->{id} || '';
-                        $is_admin || !$id || $id !~ /imagine|video/i
-                    } @$models;
+                my $models = $meta->{available_models} || [];
+
+                # Fallback to hardcoded Grok models if none stored in metadata
+                if (!@$models && $key->service eq 'grok') {
+                    $models = [
+                        { id => 'grok-4-fast-reasoning' },
+                        { id => 'grok-4-fast-non-reasoning' },
+                        { id => 'grok-3' },
+                        { id => 'grok-3-mini' },
+                    ];
                 }
+
+                # Filter image/video models for non-admins
+                my @filtered = grep {
+                    $is_admin || !$_->{id} || $_->{id} !~ /imagine|video/i
+                } @$models;
 
                 push @providers, {
                     service  => $key->service,
@@ -8955,21 +7502,11 @@ sub get_user_providers :Local :Args(0) {
                 foreach my $key ($any_keys->all) {
                     next if $seen{$key->service}++;
                     my $meta   = $key->get_metadata() || {};
-                    my @filtered;
-                    if ($key->service eq 'grok') {
-                        @filtered = map { { id => $_ } }
-                            $self->_grok_chat_model_ids_from_meta($meta, 1, $key);
-                    } else {
-                        my $models = $meta->{available_models} || [];
-                        @filtered = grep {
-                            my $id = $_->{id} || '';
-                            $id && $id !~ /imagine|video/i
-                        } @$models;
-                    }
+                    my $models = $meta->{available_models} || [];
                     push @providers, {
                         service => $key->service,
                         name    => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
-                        models  => \@filtered,
+                        models  => $models,
                     };
                 }
             }
@@ -8982,11 +7519,6 @@ sub get_user_providers :Local :Args(0) {
         };
     }
 
-    my $ollama_reachable = 0;
-    if (my $ollama_provider = (grep { ($_->{service} || '') eq 'ollama' } @providers)[0]) {
-        $ollama_reachable = $ollama_provider->{reachable} ? 1 : 0;
-    }
-
     $c->response->body(encode_json({
         success            => JSON::true,
         providers          => \@providers,
@@ -8994,8 +7526,6 @@ sub get_user_providers :Local :Args(0) {
         user_id            => $user_id  || 0,
         is_guest           => $is_guest  ? JSON::true : JSON::false,
         is_admin           => $is_admin  ? JSON::true : JSON::false,
-        is_member_or_above => $is_member_or_above ? JSON::true : JSON::false,
-        ollama_reachable   => $ollama_reachable ? JSON::true : JSON::false,
         can_access_history => $is_admin  ? JSON::true : JSON::false,
         is_dev             => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
@@ -9044,13 +7574,12 @@ sub sync_models :Local :Args(0) {
     if (!ref($user_roles_sync)) {
         $user_roles_sync = [split(/\s*,\s*/, $user_roles_sync)] if $user_roles_sync;
     }
-    my $can_sync = ref($user_roles_sync) eq 'ARRAY'
-        ? (grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_sync) ? 1 : 0
-        : 0;
+    my $is_admin_sync = ref($user_roles_sync) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer)$/i } @$user_roles_sync : 0;
 
-    unless ($can_sync) {
+    unless ($is_admin_sync) {
         $c->response->status(403);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin/developer access required' }));
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
         return;
     }
 
@@ -9075,36 +7604,6 @@ sub sync_models :Local :Args(0) {
             return;
         }
 
-        if (lc($service) eq 'grok') {
-            my ($ok, $err, $count) = $self->_sync_grok_key_models($c, $key_obj, 'sync_models');
-            unless ($ok) {
-                $c->response->body(encode_json({ success => JSON::false, error => $err }));
-                return;
-            }
-            my $meta   = $key_obj->get_metadata() || {};
-            my $models = $meta->{available_models} || [];
-            $c->response->body(encode_json({
-                success => JSON::true,
-                service => $service,
-                models  => $models,
-                count   => $count,
-            }));
-            return;
-        }
-
-        # OpenAI and other providers
-        my %models_endpoint = (
-            openai  => 'https://api.openai.com/v1/models',
-        );
-        my $endpoint = $models_endpoint{lc($service)};
-        unless ($endpoint) {
-            $c->response->body(encode_json({
-                success => JSON::false,
-                error   => "Model sync not supported for service: $service"
-            }));
-            return;
-        }
-
         my $api_key = $key_obj->get_api_key() || '';
         unless ($api_key) {
             $c->response->body(encode_json({
@@ -9114,42 +7613,75 @@ sub sync_models :Local :Args(0) {
             return;
         }
 
+        # Provider endpoint map
+        my %models_endpoint = (
+            grok    => 'https://api.x.ai/v1/models',
+            openai  => 'https://api.openai.com/v1/models',
+        );
+
+        my $endpoint = $models_endpoint{lc($service)};
+        unless ($endpoint) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Model sync not supported for service: $service"
+            }));
+            return;
+        }
+
+        # Fetch models from the provider
         require LWP::UserAgent;
         require HTTP::Request;
-        my $ua = LWP::UserAgent->new(timeout => 25);
+        my $ua = LWP::UserAgent->new(timeout => 15);
         $ua->agent('Comserv/1.0');
         my $req = HTTP::Request->new(GET => $endpoint);
         $req->header('Authorization' => "Bearer $api_key");
         $req->header('Content-Type'  => 'application/json');
+
         my $resp = $ua->request($req);
+
         unless ($resp->is_success) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'sync_models', "Failed to fetch models from $service: " . $resp->status_line);
             $c->response->body(encode_json({
                 success => JSON::false,
                 error   => "Provider returned error: " . $resp->status_line
             }));
             return;
         }
+
         my $data = eval { decode_json($resp->content) };
         if ($@) {
-            $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON from provider' }));
+            $c->response->body(encode_json({ success => JSON::false, error => "Invalid JSON from provider" }));
             return;
         }
+
+        # Extract model list (OpenAI-compatible format: data[].id)
         my @models;
-        foreach my $m (@{ $data->{data} || [] }) {
-            next unless $m->{id};
-            push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
+        if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
+            foreach my $m (@{$data->{data}}) {
+                next unless $m->{id};
+                push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
+            }
         }
+
+        # Sort models alphabetically
         @models = sort { $a->{id} cmp $b->{id} } @models;
+
+        # Store model list in metadata of the key record
         my $existing_meta = $key_obj->get_metadata() || {};
         $existing_meta->{available_models} = \@models;
         $existing_meta->{models_synced_at} = time();
         $key_obj->set_metadata($existing_meta);
         $key_obj->update;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'sync_models', "Synced " . scalar(@models) . " models for service $service");
+
         $c->response->body(encode_json({
             success => JSON::true,
             service => $service,
             models  => \@models,
-            count   => scalar(@models),
+            count   => scalar(@models)
         }));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -9230,31 +7762,14 @@ sub _persist_chat {
     my $prompt          = $args->{prompt}          || '';
     my $response        = $args->{response}        || '';
 
-    my $user_id = $c->session->{user_id} || ($c->user ? $c->user->id : undef);
-    my $schema = $c->model('DBEncy')->schema;
-
-    unless ($user_id) {
-        # Fallback: look up username in database to make sure we don't drop developer chats
-        try {
-            my $target_username = $username || $c->session->{username} || 'Shanta';
-            my $u = $schema->resultset('User')->find({ username => $target_username });
-            if ($u) {
-                $user_id = $u->id;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                    '_persist_chat', "Recovered user_id=$user_id for username='$target_username' via DB lookup");
-            }
-        } catch {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                '_persist_chat', "Failed to look up user in DB: $_");
-        };
-    }
-
+    my $user_id = $c->session->{user_id};
     unless ($user_id) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            '_persist_chat', "No user_id in session/DB for user '$username', skipping DB persist");
+            '_persist_chat', "No user_id in session for user '$username', skipping DB persist");
         return undef;
     }
 
+    my $schema = $c->model('DBEncy')->schema;
     my $conv;
 
     eval {
@@ -9561,129 +8076,6 @@ sub _doc_candidates {
     # De-duplicate while preserving order
     my %seen;
     return grep { !$seen{$_}++ } @cands;
-}
-
-=head2 quick_chat
-
-Lightweight Ollama endpoint for simple editor/search questions.
-Uses the small model tier, short timeout, and multi-host failover.
-
-POST JSON: { prompt, model (optional), history (optional) }
-
-=cut
-
-sub quick_chat :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($c->request->method eq 'POST') {
-        $c->response->status(405);
-        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
-        return;
-    }
-
-    my $json_data = {};
-    try {
-        my $raw_body;
-        if ($c->req->can('content')) {
-            $raw_body = $c->req->content;
-        } else {
-            $raw_body = $c->request->body;
-            if (ref($raw_body)) {
-                seek($raw_body, 0, 0);
-                $raw_body = do { local $/; <$raw_body> };
-            }
-        }
-        $json_data = decode_json($raw_body) if $raw_body && length($raw_body);
-    } catch {
-        $c->response->status(400);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON' }));
-        return;
-    };
-
-    my $prompt = $json_data->{prompt} || '';
-    $prompt =~ s/\A\s+|\s+\z//g;
-    unless ($prompt) {
-        $c->response->status(400);
-        $c->response->body(encode_json({ success => JSON::false, error => 'prompt is required' }));
-        return;
-    }
-    if (length($prompt) > 8_000) {
-        $c->response->status(400);
-        $c->response->body(encode_json({ success => JSON::false, error => 'prompt too large (max 8k)' }));
-        return;
-    }
-
-    my $ollama = $c->model('Ollama');
-    unless ($ollama) {
-        $c->response->status(503);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Ollama service unavailable' }));
-        return;
-    }
-
-    my ($host, $port, $default_model, $installed) = $self->_get_current_ollama_config($c, 0);
-    unless ($host) {
-        $c->response->status(503);
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error   => 'No reachable Ollama host',
-            hint    => 'Ollama should run on the workstation at 127.0.0.1:11434',
-        }));
-        return;
-    }
-
-    my ($tier_small, undef) = $self->_pick_ollama_tier($installed, $default_model, 'coding', 'coding');
-    my $use_model = $json_data->{model} || $tier_small || $default_model;
-
-    my @messages = (
-        { role => 'system', content =>
-            'You are a concise Comserv coding assistant. Answer briefly and practically. '
-          . 'For file lookups, suggest exact paths under lib/ or root/ when known.' },
-    );
-    my $history = $json_data->{history};
-    if ($history && ref($history) eq 'ARRAY') {
-        for my $h (@$history) {
-            next unless ref($h) eq 'HASH';
-            my $role = $h->{role} || '';
-            my $content = $h->{content} || '';
-            next unless $content =~ /\S/;
-            next unless $role =~ /^(user|assistant)$/i;
-            push @messages, { role => lc($role), content => substr($content, 0, 500) };
-        }
-    }
-    push @messages, { role => 'user', content => $prompt };
-
-    my @trace;
-    my ($response, $used_host, $err) = $self->_ollama_chat_with_failover(
-        $c, $ollama, \@messages, {
-            port       => $port || 11434,
-            model      => $use_model,
-            timeout    => 90,
-            start_host => $host,
-            trace      => \@trace,
-            save_host  => 1,
-        });
-
-    if ($response) {
-        my $reply = ($response->{message} && $response->{message}{content})
-                 || $response->{response} || '';
-        $c->response->body(encode_json({
-            success     => JSON::true,
-            response    => $reply,
-            model       => $response->{model} || $use_model,
-            backend     => 'ollama_quick',
-            ollama_host => $used_host || $host,
-        }));
-        return;
-    }
-
-    $c->response->status(503);
-    $c->response->body(encode_json({
-        success => JSON::false,
-        error   => "Ollama quick chat failed: " . ($err || 'unknown'),
-        hint    => 'Tried hosts: ' . join(', ', $self->_ollama_hosts_to_probe($c)),
-        trace   => \@trace,
-    }));
 }
 
 =head2 chat_progress
@@ -12187,16 +10579,15 @@ END_PROMPT
 # ── _is_shanta_editor ─────────────────────────────────────────────────────────
 sub _is_shanta_editor {
     my ($self, $c) = @_;
+    my $auth = Comserv::Util::AdminAuth->new();
+    return 1 if $auth->is_csc_admin($c);
     my $username = $c->session->{username} || ($c->user ? $c->user->username : '') || '';
-    return 0 unless lc($username) eq 'shanta';
-    my $host = lc($c->req->uri->host || '');
-    $host =~ s/:\d+\z//;
-    return 1 if $host eq '172.30.131.126';
-    return 1 if $host =~ /^(127\.0\.0\.1|localhost|workstation\.local|workstation\.zero)$/;
-    # Public dev hostnames (dev.somedomain.name) — primary way to open the editor remotely.
-    return 1 if $host =~ /^dev\./;
-    return 1 if $host =~ /\.local$/;
-    return 1 if $self->_is_dev_mode($c);
+    return 1 if lc($username) eq 'shanta';
+    # On dev workstations, any logged-in admin may use the code editor
+    if ($self->_is_dev_mode($c)) {
+        return 1 if $c->stash->{is_admin};
+        return 1 if $auth->check_admin_access($c, 'shanta_editor');
+    }
     return 0;
 }
 
@@ -12216,32 +10607,11 @@ sub _require_shanta_editor {
 
 sub _project_root_path {
     my ($self, $c) = @_;
-    my $pycharm_path = '/home/shanta/PycharmProjects/comserv2';
-    if (-d $pycharm_path) {
-        return $pycharm_path;
-    }
-    my $home = $c->config->{home}
+    return $c->config->{home}
         || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
-    if ($home =~ m{/Comserv$} && -d "$home/../.git") {
-        (my $parent = $home) =~ s{/Comserv$}{};
-        return $parent;
-    }
-    return $home;
 }
 
-my @_EDITOR_ROOTS = qw(
-    Comserv lib root sql script t admin app config data deploy-logs Documentation
-    infrastructure local logs proxmox scripts tests venv aimanager
-    CHANGELOG.tt README.tt AGENTS.md docker-compose.yml .env .gitignore
-);
-
-# Catalyst app code lives under Comserv/ — API paths use lib/... not Comserv/lib/...
-my @_EDITOR_APP_DIRS = qw(lib root sql script t);
-
-my @_EDITOR_INDEX_SKIP_DIRS = map { lc $_ } qw(
-    .git .idea .svn blib local logs node_modules venv whisper_venv
-    __pycache__ aimanager deploy-logs site-packages pycache
-);
+my @_EDITOR_ROOTS = qw(lib root sql script t);
 
 sub _list_dir_param {
     my ($self, $c) = @_;
@@ -12255,7 +10625,7 @@ sub _list_dir_param {
 }
 
 sub _sanitize_editor_rel_path {
-    my ($self, $rel) = @_;
+    my ($rel) = @_;
     return '' unless defined $rel;
     return '' if ref $rel;
     $rel = "$rel";
@@ -12264,8 +10634,8 @@ sub _sanitize_editor_rel_path {
     $rel =~ s{^/+}{};
     $rel =~ s{\.\.}{}g;
     $rel =~ s{//+}{/}g;
-    $rel =~ s{\[([^\]]+)\]\(http[s]?://[^\)]+\)}{$1}g;
     $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+    $rel =~ s{^Comserv/}{}i;
     return $rel;
 }
 
@@ -12276,44 +10646,6 @@ sub _editor_path_allowed {
     my ($top) = split m{/}, $rel, 2;
     return 0 unless grep { $_ eq $top } @_EDITOR_ROOTS;
     return $rel;
-}
-
-sub _editor_has_comserv_subdir {
-    my ($self, $c) = @_;
-    my $root = $self->_project_root_path($c);
-    return -d "$root/Comserv/lib";
-}
-
-# Map API path (lib/Comserv/...) to on-disk path (Comserv/lib/Comserv/...).
-sub _editor_fs_path {
-    my ($self, $c, $rel) = @_;
-    my $root = $self->_project_root_path($c);
-    $rel = $self->_sanitize_editor_rel_path($rel // '');
-    return "$root/$rel" unless $rel;
-    if ($self->_editor_has_comserv_subdir($c) && $rel =~ m{^(?:lib|root|sql|script|t)(?:/|$)}) {
-        return "$root/Comserv/$rel";
-    }
-    return "$root/$rel";
-}
-
-# Normalize filesystem path back to API path for index + read_file responses.
-sub _editor_canonical_rel {
-    my ($self, $c, $fs_path) = @_;
-    my $root = $self->_project_root_path($c);
-    my $rel = $fs_path // '';
-    $rel =~ s/^\Q$root\E\/?//;
-    if ($self->_editor_has_comserv_subdir($c) && $rel =~ s{^Comserv/}{}) {
-        $rel = $self->_sanitize_editor_rel_path($rel);
-    }
-    return $self->_sanitize_editor_rel_path($rel);
-}
-
-sub _editor_index_is_stale {
-    my ($self, $files) = @_;
-    return 1 unless $files && ref $files eq 'ARRAY' && @$files;
-    return 1 if @$files > 15_000;
-    return 1 if grep { m{^Comserv/} } @$files;
-    return 0;
 }
 
 sub _editor_read_file_snippet {
@@ -12330,9 +10662,9 @@ sub _editor_read_file_snippet {
         return (undef, "Path not allowed: $rel (use lib/, root/, sql/, script/, or t/ under the project root)");
     }
 
-    my $full = $self->_editor_fs_path($c, $rel);
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$rel";
     unless (-f $full) {
-        my $root = $self->_project_root_path($c);
         return (undef, "File not found: $rel (project root: $root)");
     }
 
@@ -12364,136 +10696,6 @@ sub _inject_read_file_tags {
     return $out;
 }
 
-sub _apply_response_file_actions {
-    my ($self, $c, $response_text) = @_;
-    return $response_text unless defined $response_text && $response_text =~ /\S/;
-
-    my $root = $self->_project_root_path($c);
-    my $action_logs = "";
-
-    # 1. Parse WRITE_FILE blocks
-    # Format: [WRITE_FILE: path] content [/WRITE_FILE]
-    while ($response_text =~ s{\[WRITE_FILE:\s*([^\]]+)\]([\s\S]*?)\[/WRITE_FILE\]}{}i) {
-        my $rel_path = $1;
-        my $content = $2;
-        $rel_path =~ s/^\s+|\s+$//g;
-        
-        $rel_path = $self->_sanitize_editor_rel_path($rel_path);
-        if ($self->_editor_path_allowed($rel_path)) {
-            my $full_path = "$root/$rel_path";
-            
-            # Make backup
-            if (-f $full_path) {
-                require File::Copy;
-                File::Copy::copy($full_path, $full_path . '.bak');
-            } else {
-                # Create parent directories if they don't exist
-                my ($vol, $dir, $file) = File::Spec->splitpath($full_path);
-                if ($dir) {
-                    require File::Path;
-                    File::Path::make_path($dir);
-                }
-            }
-
-            if (open my $fh, '>:utf8', $full_path) {
-                print $fh $content;
-                close $fh;
-                $action_logs .= "✅ Instantly wrote file: $rel_path\n";
-            } else {
-                $action_logs .= "❌ Failed to write file: $rel_path ($!)\n";
-            }
-        } else {
-            $action_logs .= "❌ Blocked writing to disallowed path: $rel_path\n";
-        }
-    }
-
-    # 2. Parse EDIT_FILE blocks
-    # Format: [EDIT_FILE: path] ... [/EDIT_FILE]
-    # Inside may be multiple: <<<<<<< SEARCH ... ======= ... >>>>>>> REPLACE
-    while ($response_text =~ s{\[EDIT_FILE:\s*([^\]]+)\]([\s\S]*?)\[/EDIT_FILE\]}{}i) {
-        my $rel_path = $1;
-        my $edit_block = $2;
-        $rel_path =~ s/^\s+|\s+$//g;
-
-        $rel_path = $self->_sanitize_editor_rel_path($rel_path);
-        if ($self->_editor_path_allowed($rel_path)) {
-            my $full_path = "$root/$rel_path";
-            unless (-f $full_path) {
-                $action_logs .= "❌ File not found for editing: $rel_path\n";
-                next;
-            }
-
-            # Read file content
-            open my $rfh, '<:utf8', $full_path or do {
-                $action_logs .= "❌ Failed to read $rel_path for editing: $!\n";
-                next;
-            };
-            local $/;
-            my $file_content = <$rfh>;
-            close $rfh;
-
-            # Backup
-            require File::Copy;
-            File::Copy::copy($full_path, $full_path . '.bak');
-
-            # Parse search & replace blocks
-            my $applied_count = 0;
-            my $failed_count = 0;
-            while ($edit_block =~ m{<<<<<<< SEARCH[\r\n]+([\s\S]*?)=======[\r\n]+([\s\S]*?)>>>>>>> REPLACE}g) {
-                my $search = $1;
-                my $replace = $2;
-
-                # Check for exact match
-                if ($file_content =~ s/\Q$search\E/$replace/) {
-                    $applied_count++;
-                } else {
-                    # Try with trailing/leading space trimming on lines
-                    my $cleaned_search = $search;
-                    $cleaned_search =~ s/^\s+|\s+$//g;
-                    
-                    if ($cleaned_search && CORE::index($file_content, $cleaned_search) >= 0) {
-                        $file_content =~ s/\Q$cleaned_search\E/$replace/;
-                        $applied_count++;
-                    } else {
-                        # Try line-by-line whitespace normalization match
-                        my $norm_search = $search;
-                        $norm_search =~ s/\s+/ /g;
-                        $norm_search =~ s/^\s+|\s+$//g;
-                        
-                        my $norm_content = $file_content;
-                        $norm_content =~ s/\s+/ /g;
-                        
-                        if ($norm_search && CORE::index($norm_content, $norm_search) >= 0) {
-                            # Attempt to replace by escaping special chars or using relaxed regex
-                            # Let's fallback to search string matching
-                            $failed_count++;
-                        } else {
-                            $failed_count++;
-                        }
-                    }
-                }
-            }
-
-            if ($applied_count > 0) {
-                open my $wfh, '>:utf8', $full_path;
-                print $wfh $file_content;
-                close $wfh;
-                $action_logs .= "✅ Instantly updated file $rel_path ($applied_count blocks applied" . ($failed_count ? ", $failed_count failed" : "") . ")\n";
-            } else {
-                $action_logs .= "❌ Failed to apply search/replace blocks for $rel_path (exact search blocks not found in file)\n";
-            }
-        } else {
-            $action_logs .= "❌ Blocked editing disallowed path: $rel_path\n";
-        }
-    }
-
-    if ($action_logs) {
-        $response_text = "### 🛠️ AI Actions Executed:\n$action_logs\n---\n\n$response_text";
-    }
-
-    return $response_text;
-}
-
 # ── _editor_enabled ───────────────────────────────────────────────────────────
 # Shanta/CSC admin code editor: dev workstation, or remote_code_editor in config.
 # Clients (tablet, laptop) hit the server over HTTPS; code stays on the dev host.
@@ -12521,116 +10723,7 @@ sub _is_dev_mode {
     my $hostname = eval { require Comserv::Util::SystemInfo;
                           Comserv::Util::SystemInfo::get_server_hostname() } || '';
     return 1 if $hostname =~ /workstation|localhost/i;
-    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /^(dev|development|workstation|docker-dev)/i;
-    return 0;
-}
-
-# ── Internal Helpers for Code Editing ───────────────────────────────────────
-
-=head2 _apply_unified_diff
-
-Applies a unified diff string to a target file.
-Returns (success, error_message).
-
-=cut
-
-sub _apply_unified_diff {
-    my ($self, $full_path, $diff) = @_;
-
-    # Basic validation: must have --- and +++ headers
-    unless ($diff =~ /---\s+.+\n\+\+\+\s+.+/s) {
-        return (0, "Invalid unified diff format: missing headers");
-    }
-
-    # Read current content
-    open(my $rfh, '<:utf8', $full_path) or return (0, "Could not read file: $!");
-    local $/;
-    my $original_content = <$rfh>;
-    close $rfh;
-
-    my @original_lines = split(/\n?/, $original_content, -1);
-    my @new_lines = @original_lines;
-    my $offset = 0;
-
-    # Split diff into hunks
-    my @hunks = split(/(?=@@\s+.*?\s+@@)/, $diff);
-    
-    # The first element of split is usually the header (---/+++)
-    # We skip it and process the hunks.
-    for my $hunk (@hunks) {
-        next unless $hunk =~ /^@@\s+-?(\d+),\s*(\d+)\s+.*?\s+(\d+),\s*(\d+)\s+@@/;
-        
-        my ($old_start, $old_len, $new_start, $new_len) = ($1, $2, $3, $4);
-        $old_start -= 1; # 0-indexed
-
-        # Extract the actual lines in the hunk (everything after the @@ line)
-        my ($content) = $hunk =~ /@@.*?\n([\s\S]*)$/;
-        my @hunk_lines = split(/\n?/, $content, -1);
-        # Remove trailing empty line from split if it exists
-        pop @hunk_lines if scalar @hunk_lines > 0 && $hunk_lines[-1] eq '';
-
-        my $current_ptr = $old_start + $offset;
-        my @replacement_lines;
-        my $lines_removed = 0;
-
-        for my $line (@hunk_lines) {
-            my $prefix = substr($line, 0, 1);
-            my $text = substr($line, 1);
-
-            if ($prefix eq '+') {
-                push @replacement_lines, $text;
-            } elsif ($prefix eq '-') {
-                $lines_removed++;
-                $current_ptr++;
-            } elsif ($prefix eq ' ') {
-                push @replacement_lines, $text;
-                $current_ptr++;
-            } else {
-                # This is a weird line or empty, treat as context if it's truly empty
-                # but usually, it's the end of the hunk.
-                last if $line eq '';
-                push @replacement_lines, $line;
-                $current_ptr++;
-            }
-        }
-
-        # Safety check: ensure we are within bounds
-        if ($current_ptr > scalar @new_lines) {
-            return (0, "Patch offset out of bounds for hunk starting at $old_start");
-        }
-
-        # Replace the slice in the array
-        # splice(array, start, length, @replacements)
-        splice(@new_lines, $old_start + $offset, $lines_removed, @replacement_lines);
-        
-        # Update offset for subsequent hunks
-        $offset += ($new_len - $old_len);
-    }
-
-    my $final_content = join("\n", @new_lines);
-    open(my $wfh, '>:utf8', $full_path) or return (0, "Could not write file: $!");
-    print $wfh $final_content;
-    close $wfh;
-
-    return (1, undef);
-}
-
-
-# Interactive WebSocket PTY (Twiggy) — not available under Starman/Docker.
-sub _interactive_ws_available {
-    my ($self, $c) = @_;
-    return 1 if ($ENV{COMSERV_TWIGGY} // '') eq '1';
-    return 1 if ($ENV{PLACK_SERVER_SOFTWARE} // '') =~ /Twiggy/i;
-    if ($c && eval { $c->req }) {
-        my $env = $c->req->env || {};
-        my $sw  = join ' ', grep { $_ }
-            ($env->{SERVER_SOFTWARE} // ''),
-            ($env->{'psgi.server_software'} // '');
-        return 1 if $sw =~ /Twiggy/i;
-    }
-    my $home = $c && $c->config->{home} ? $c->config->{home} : undef;
-    return 1 if $home && -f "$home/var/twiggy.enabled";
-    return 1 if $c->config->{interactive_terminal};
+    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /^(dev|development|workstation)/i;
     return 0;
 }
 
@@ -12751,9 +10844,6 @@ YOUR ROLE:
 - Spot security issues: SQL injection, XSS, CSRF, auth gaps
 - When suggesting DB changes, always provide both Result class and migration SQL
 - Point out when something will break production before committing
-- For "how do I use this page?" questions (calendar colors, buttons, filters), answer from
-  "--- Current page UI:" hints in the system prompt — not from CSS files or /ai/widget settings
-  unless the user explicitly asks to change application source code
 
 ## ERROR ANALYSIS WORKFLOW
 When the user reports an error or a [PAGE ERROR DETECTED] block is present:
@@ -12764,55 +10854,25 @@ When the user reports an error or a [PAGE ERROR DETECTED] block is present:
 4. Propose a fix. For small files or single functions, use the fix format below.
 5. If the user approves, they will click "Apply Fix" — you do not need to repeat it.
 
-## INTERACTIVE TOOLS (USE THESE TO TAKE ACTIONS)
-You have access to interactive, click-to-run tools that the developer can execute with one click:
-1. To ask the widget to load/read a file in the editor, write exactly:
-     [READ_FILE: relative/path/to/file.pm]
-   Only one file per response. Use relative paths from the project root.
-2. To propose executing a command on the development server (with developer approval), write exactly:
-     [RUN_COMMAND: command_here]
-   Example: [RUN_COMMAND: prove -Ilib t/controller_AI_run_command.t]
-3. To search for a text pattern/grep across files in the codebase, write exactly:
-     [SEARCH_GREP: pattern_here]
-   Example: [SEARCH_GREP: sub _build_coding_system_prompt]
-
-## INSTANT AGENTIC FILE ACTIONS (HIGHLY RECOMMENDED)
-You have the power to instantly create, write, or edit files on the development server automatically. To perform these actions without needing any click from the user, write exactly:
-
-1. To write a new file or completely overwrite an existing file:
-[WRITE_FILE: relative/path/to/file.pm]
-... complete file content here ...
-[/WRITE_FILE]
-
-2. To edit an existing file using search/replace blocks (target specific sections cleanly):
-[EDIT_FILE: relative/path/to/file.pm]
-<<<<<<< SEARCH
-exact lines to find in the original file
-=======
-new replacement lines
->>>>>>> REPLACE
-[/EDIT_FILE]
-(You can include multiple SEARCH/REPLACE blocks inside a single [EDIT_FILE] block. The SEARCH block must match the original lines in the file exactly, including spaces and indentation.)
+## REQUESTING FILES
+To ask the widget to load a file, write exactly:
+  [READ_FILE: relative/path/to/file.pm]
+Only one file per response. Use relative paths from the project root (e.g. lib/Comserv/Controller/AI.pm).
 
 ## PROPOSING FIXES
 When you have diagnosed an issue and want to provide an applicable fix, use this exact format
 so the "Apply Fix" button appears:
 
   ## FIX: lib/path/to/file.pm
-  ```diff
-  --- lib/path/to/file.pm
-  +++ lib/path/to/file.pm
-  @@ -line,count +line,count @@
-   context line
-  -old line
-  +new line
-   context line
+  ```perl
+  ... corrected content (full function or complete file for small files) ...
   ```
 
 Rules for fixes:
-- Use the Unified Diff format (---, +++, @@) for all edits. This is the most precise and preferred method.
-- Ensure the context lines (those starting with a space) are exact matches to the file content.
-- Always show the fixed code in a single fenced code block marked as `diff` immediately after the ## FIX: line.
+- For small files (<200 lines): provide the complete new file content.
+- For large files: provide only the corrected function/method/block. The user will need to
+  manually splice it in, or use the find/replace mode (provide FIND: and REPLACE WITH: sections).
+- Always show the fixed code in a single fenced code block immediately after the ## FIX: line.
 - Never output ## FIX: without a code block following it.
 - Only propose a fix when you are confident it is correct.
 - Do not add code comments unless the user asks.
@@ -12820,11 +10880,6 @@ Rules for fixes:
 DEDICATED WORKSPACE:
 - Shanta admin opens /ai/editing_widget for a Cursor-like UI: file tree, editor, and this chat side-by-side.
 - When a file is open in that editor, the user message will include a [FILE: path] block automatically.
-
-KNOWN ROUTE → TEMPLATE (use exact paths; never guess):
-- /planning/daily → root/admin/planning/DailyPlan.tt (Planning.pm daily())
-- root/DailyPlan.tt does NOT exist — never use [READ_FILE: root/DailyPlan.tt]
-- Legacy copies: root/Documentation/DailyPlan.tt, root/admin/documentation/DailyPlan.tt
 
 RESTRICTION: This agent is DEVELOPMENT ONLY. Never available on production.
 END_PROMPT
@@ -12867,20 +10922,12 @@ sub list_dir :Local :Args(0) {
     my @entries;
 
     if ($dir eq '') {
-        if ($self->_editor_has_comserv_subdir($c)) {
-            for my $sub (@_EDITOR_APP_DIRS) {
-                my $full = $self->_editor_fs_path($c, $sub);
-                push @entries, { name => $sub, path => $sub, type => 'dir' } if -d $full;
-            }
-        }
         for my $top (@_EDITOR_ROOTS) {
-            next if $top eq 'Comserv';
-            next if $self->_editor_has_comserv_subdir($c) && grep { $_ eq $top } @_EDITOR_APP_DIRS;
             my $full = "$root/$top";
             push @entries, { name => $top, path => $top, type => 'dir' } if -d $full;
         }
     } else {
-        my $full = $self->_editor_fs_path($c, $dir);
+        my $full = "$root/$dir";
         unless (-d $full) {
             $c->response->body(encode_json({ success => JSON::false, error => "Not a directory: $dir" }));
             return;
@@ -12895,7 +10942,7 @@ sub list_dir :Local :Args(0) {
             my $child_rel = "$dir/$name";
             $child_rel =~ s{//+}{/}g;
             next unless $self->_editor_path_allowed($child_rel);
-            my $child_full = $self->_editor_fs_path($c, $child_rel);
+            my $child_full = "$root/$child_rel";
             push @entries, {
                 name => $name,
                 path => $child_rel,
@@ -12963,7 +11010,8 @@ sub read_file :Local :Args(0) {
         return;
     }
 
-    my $full = $self->_editor_fs_path($c, $rel);
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$rel";
 
     unless (-f $full) {
         $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
@@ -13028,7 +11076,8 @@ sub apply_fix :Local :Args(0) {
         return;
     }
 
-    my $full = $self->_editor_fs_path($c, $rel);
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$rel";
 
     unless (-f $full) {
         $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
@@ -13045,29 +11094,6 @@ sub apply_fix :Local :Args(0) {
     my $content = $c->request->body_parameters->{content}
                // $c->request->params->{content}
                // '';
-
-    my $patch = $c->request->body_parameters->{patch}
-              // $c->request->params->{patch}
-              // undef;
-
-    if ($patch) {
-        # Use the new unified diff applicator
-        my ($ok, $err) = $self->_apply_unified_diff($full, $patch);
-        if ($ok) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'apply_fix', "Applied patch to $rel");
-            $c->response->body(encode_json({
-                success => JSON::true,
-                path    => $rel,
-                message => "Patch applied successfully to $rel",
-            }));
-            return;
-        } else {
-            $c->response->body(encode_json({ success => JSON::false, error => "Patch failed: $err" }));
-            unlink $bak;
-            return;
-        }
-    }
 
     # Optional partial replacement mode: find + replace strings
     if (!$content) {
@@ -13112,572 +11138,6 @@ sub apply_fix :Local :Args(0) {
         backup  => "$rel.bak",
         message => "File updated. Original backed up as $rel.bak",
     }));
-}
-
-=head2 revert_code
-
-Revert changes back to their original state using .bak backup files and optionally git.
-Restores any file with a .bak extension back to its original name.
-
-=cut
-
-sub revert_code :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_is_shanta_editor($c)) {
-        $c->response->status(403);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Unauthorized access' }));
-        return;
-    }
-
-    my $root = $self->_project_root_path($c);
-    
-    require File::Find;
-    require File::Copy;
-    my @restored;
-    my @errors;
-
-    eval {
-        File::Find::find({
-            wanted => sub {
-                return unless -f $_ && $_ =~ /\.bak$/;
-                my $bak_path = $File::Find::name;
-                (my $orig_path = $bak_path) =~ s/\.bak$//;
-                
-                if (File::Copy::copy($bak_path, $orig_path)) {
-                    push @restored, $orig_path;
-                    unlink($bak_path);
-                } else {
-                    push @errors, "Failed to restore $orig_path: $!";
-                }
-            },
-            no_chdir => 1,
-        }, $root);
-    };
-
-    if ($@) {
-        $c->response->status(500);
-        $c->response->body(encode_json({ success => JSON::false, error => "Error during find: $@" }));
-        return;
-    }
-
-    my $git_msg = '';
-    my $git_exit = -1;
-    if (!$ENV{HARNESS_ACTIVE} && eval { my $out = `git --version 2>&1`; $? == 0 }) {
-        my $git_out = `git checkout -- . 2>&1`;
-        $git_exit = $?;
-        $git_msg = "Git checkout output: $git_out (exit $git_exit)";
-    }
-
-    $c->response->body(encode_json({
-        success  => JSON::true,
-        restored => \@restored,
-        errors   => \@errors,
-        git_info => $git_msg,
-        message  => scalar(@restored) . " files restored successfully via .bak backups." . ($git_msg ? " Git checkout also performed." : "")
-    }));
-}
-
-# Helper path for the file index (lives under Comserv/ when app is in a subdir)
-sub _file_index_path {
-    my ($self, $c) = @_;
-    my $root = $self->_project_root_path($c);
-    if ($self->_editor_has_comserv_subdir($c)) {
-        return "$root/Comserv/comserv_file_index.json";
-    }
-    return "$root/comserv_file_index.json";
-}
-
-# Recursively build list of files (stores canonical API paths: lib/..., root/...)
-sub _build_index_for_dir {
-    my ($self, $c, $dir, $files_ref) = @_;
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$dir";
-    return unless -d $full;
-
-    if (opendir(my $dh, $full)) {
-        my @names = readdir($dh);
-        closedir $dh;
-        for my $name (@names) {
-            next if $name eq '.' || $name eq '..';
-            next if $name =~ /^\./; # skip hidden
-            next if $name =~ /\.bak$/; # skip backup files
-            next if grep { lc($name) eq $_ } @_EDITOR_INDEX_SKIP_DIRS;
-            my $rel_path = $dir ? "$dir/$name" : $name;
-            $rel_path =~ s{//+}{/}g;
-            my $child_full = "$root/$rel_path";
-            if (-d $child_full) {
-                $self->_build_index_for_dir($c, $rel_path, $files_ref);
-                next;
-            }
-            next unless -f $child_full;
-            my $canonical = $self->_editor_canonical_rel($c, $child_full);
-            next unless $canonical && $self->_editor_path_allowed($canonical);
-            push @$files_ref, $canonical;
-        }
-    }
-}
-
-# Internal rebuild routine
-sub _rebuild_index_internal {
-    my ($self, $c) = @_;
-    my $files = [];
-    my $root = $self->_project_root_path($c);
-    if ($self->_editor_has_comserv_subdir($c)) {
-        for my $sub (@_EDITOR_APP_DIRS) {
-            my $scan = "Comserv/$sub";
-            $self->_build_index_for_dir($c, $scan, $files) if -d "$root/$scan";
-        }
-    }
-    for my $top (@_EDITOR_ROOTS) {
-        next if $top eq 'Comserv';
-        next if $self->_editor_has_comserv_subdir($c) && grep { $_ eq $top } @_EDITOR_APP_DIRS;
-        $self->_build_index_for_dir($c, $top, $files) if -d "$root/$top";
-    }
-    my %seen;
-    my @sorted_files = sort { lc($a) cmp lc($b) }
-        grep { !$seen{$_}++ }
-        grep { defined $_ && $_ ne '' } @$files;
-    
-    my $index_file = $self->_file_index_path($c);
-    if (open(my $fh, '>:utf8', $index_file)) {
-        print $fh encode_json(\@sorted_files);
-        close $fh;
-    }
-    return \@sorted_files;
-}
-
-# Internal add_to_index routine
-sub _add_to_index_internal {
-    my ($self, $c, $rel) = @_;
-    my $index_file = $self->_file_index_path($c);
-    my $files = [];
-    if (-f $index_file && open(my $fh, '<:utf8', $index_file)) {
-        local $/;
-        my $json_text = <$fh>;
-        close $fh;
-        try { $files = decode_json($json_text); };
-    }
-    
-    unless (grep { $_ eq $rel } @$files) {
-        push @$files, $rel;
-        my @sorted = sort { lc($a) cmp lc($b) } @$files;
-        if (open(my $wfh, '>:utf8', $index_file)) {
-            print $wfh encode_json(\@sorted);
-            close $wfh;
-        }
-    }
-}
-
-# Internal remove_from_index routine
-sub _remove_from_index_internal {
-    my ($self, $c, $rel) = @_;
-    my $index_file = $self->_file_index_path($c);
-    my $files = [];
-    if (-f $index_file && open(my $fh, '<:utf8', $index_file)) {
-        local $/;
-        my $json_text = <$fh>;
-        close $fh;
-        try { $files = decode_json($json_text); };
-    }
-    
-    my @filtered = grep { $_ ne $rel } @$files;
-    if (open(my $wfh, '>:utf8', $index_file)) {
-        print $wfh encode_json(\@filtered);
-        close $wfh;
-    }
-}
-
-sub _load_file_index {
-    my ($self, $c) = @_;
-    my $index_file = $self->_file_index_path($c);
-    my $files = [];
-
-    if (-f $index_file && open(my $fh, '<:utf8', $index_file)) {
-        local $/;
-        my $json_text = <$fh>;
-        close $fh;
-        try { $files = decode_json($json_text); } catch { $files = []; };
-    }
-
-    if (!@$files || $self->_editor_index_is_stale($files)) {
-        $files = $self->_rebuild_index_internal($c);
-    }
-    return $files;
-}
-
-sub _levenshtein {
-    my ($s, $t) = @_;
-    my @s = split //, ($s // '');
-    my @t = split //, ($t // '');
-    my $m = @s;
-    my $n = @t;
-    return $n if !$m;
-    return $m if !$n;
-    my @prev = (0 .. $n);
-    for my $i (1 .. $m) {
-        my @cur;
-        $cur[0] = $i;
-        for my $j (1 .. $n) {
-            my $cost = ($s[$i - 1] eq $t[$j - 1]) ? 0 : 1;
-            my $del = $prev[$j] + 1;
-            my $ins = $cur[$j - 1] + 1;
-            my $sub = $prev[$j - 1] + $cost;
-            $cur[$j] = $del < $ins ? ($del < $sub ? $del : $sub) : ($ins < $sub ? $ins : $sub);
-        }
-        @prev = @cur;
-    }
-    return $prev[$n];
-}
-
-sub _score_file_search {
-    my ($path, $query) = @_;
-    my $lower = lc($path // '');
-    my $q     = lc($query // '');
-    return 0 unless $q;
-    my ($name) = $lower =~ m{([^/]+)$};
-    return 0 unless defined $name;
-
-    return 100 if $name eq $q;
-    return 80  if CORE::index($name, $q) == 0;
-    return 60  if CORE::index($name, $q) >= 0;
-    return 40  if $lower =~ /\Q$q\E/;
-
-    return 0 if length($q) < 4;
-    my $dist = _levenshtein($name, $q);
-    my $max  = length($q) > length($name) ? length($q) : length($name);
-    return 0 unless $max;
-    my $sim = 1 - ($dist / $max);
-    return int(30 + 20 * $sim) if $sim >= 0.72;
-    return 0;
-}
-
-# Known Comserv routes → primary TT template (editor paths under root/).
-my %_EDITOR_KNOWN_ROUTES = (
-    '/planning/daily' => {
-        template   => 'root/admin/planning/DailyPlan.tt',
-        controller => 'Planning.pm → daily()',
-        note       => 'Main daily planning dashboard. Legacy URL: /Documentation/DailyPlan',
-        related    => [
-            'root/admin/documentation/DailyPlan.tt',
-            'root/Documentation/DailyPlan.tt',
-        ],
-    },
-    '/planning/daily_log' => {
-        template   => 'root/admin/planning/DailyPlan.tt',
-        controller => 'Planning.pm → daily_log()',
-        note       => 'Daily log JSON endpoint (same DailyPlan context)',
-    },
-    '/documentation/dailyplan' => {
-        template   => 'root/Documentation/DailyPlan.tt',
-        controller => 'Documentation.pm redirect',
-        note       => 'Legacy documentation path; live app uses /planning/daily',
-        related    => ['root/admin/planning/DailyPlan.tt'],
-    },
-);
-
-sub _normalize_editor_route {
-    my ($path) = @_;
-    return '' unless defined $path && $path =~ /\S/;
-    $path = lc($path);
-    $path =~ s/^\s+|\s+$//g;
-    $path =~ s{^https?://[^/]+}{}i;
-    $path =~ s/\?.*$//;
-    $path =~ s{//+}{/}g;
-    $path = "/$path" unless $path =~ m{^/};
-    $path =~ s{/$}{};
-    $path =~ s{/planing/}{/planning/}g;
-    return $path;
-}
-
-=head2 get_file_index
-
-GET /ai/get_file_index - Get complete list of indexed files
-
-=cut
-
-sub get_file_index :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $files = $self->_load_file_index($c);
-
-    $c->response->body(encode_json({
-        success => JSON::true,
-        files   => $files,
-        count   => scalar(@$files),
-    }));
-}
-
-=head2 search_files
-
-GET /ai/search_files?q=DailyPlan.tt - Lightweight server-side file search (no full index download).
-
-=cut
-
-sub search_files :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $query = $c->request->params->{q} // '';
-    $query =~ s/^\s+|\s+$//g;
-    unless ($query) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'q parameter required' }));
-        return;
-    }
-
-    my $files = $self->_load_file_index($c);
-    my @matched = grep { _score_file_search($_, $query) > 0 } @$files;
-    @matched = sort {
-        _score_file_search($b, $query) <=> _score_file_search($a, $query)
-            || lc($a) cmp lc($b)
-    } @matched;
-    my $limit = int($c->request->params->{limit} || 50);
-    $limit = 100 if $limit > 100;
-    splice @matched, $limit if @matched > $limit;
-
-    $c->response->body(encode_json({
-        success => JSON::true,
-        query   => $query,
-        files   => \@matched,
-        count   => scalar(@matched),
-        total_indexed => scalar(@$files),
-        fuzzy   => (@matched && _score_file_search($matched[0], $query) < 40) ? JSON::true : JSON::false,
-    }));
-}
-
-=head2 resolve_route
-
-GET /ai/resolve_route?path=/planning/daily — Map URL path to TT template (no AI call).
-
-=cut
-
-sub resolve_route :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $path = _normalize_editor_route($c->request->params->{path} // '');
-    my $q    = $c->request->params->{q} // '';
-    if (!$path && $q =~ /\S/) {
-        if ($q =~ /\b(?:daily\s*plan(?:ning)?|dailyplan|planning)\b/i) {
-            $path = '/planning/daily';
-        }
-    }
-    unless ($path) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'path parameter required (e.g. /planning/daily)' }));
-        return;
-    }
-
-    my $info = $_EDITOR_KNOWN_ROUTES{$path};
-    unless ($info) {
-        my $files = $self->_load_file_index($c);
-        my $slug  = $path;
-        $slug =~ s{^/}{};
-        $slug =~ s{/}{.}g;
-        my @guessed = grep {
-            my $score = _score_file_search($_, $slug);
-            $score >= 35;
-        } @$files;
-        @guessed = sort {
-            _score_file_search($b, $slug) <=> _score_file_search($a, $slug)
-        } @guessed;
-        splice @guessed, 10 if @guessed > 10;
-
-        $c->response->body(encode_json({
-            success => @guessed ? JSON::true : JSON::false,
-            route   => $path,
-            error   => @guessed ? undef : "No known template mapping for $path",
-            guessed_templates => \@guessed,
-        }));
-        return;
-    }
-
-    $c->response->body(encode_json({
-        success    => JSON::true,
-        route      => $path,
-        template   => $info->{template},
-        controller => $info->{controller},
-        note       => $info->{note},
-        related    => $info->{related} || [],
-    }));
-}
-
-=head2 rebuild_file_index
-
-POST/GET /ai/rebuild_file_index - Rebuild the file index from scratch
-
-=cut
-
-sub rebuild_file_index :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $files = $self->_rebuild_index_internal($c);
-    $c->response->body(encode_json({
-        success => JSON::true,
-        files   => $files,
-    }));
-}
-
-=head2 add_to_index
-
-POST /ai/add_to_index - Manually add a file path to the index
-
-=cut
-
-sub add_to_index :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
-    unless ($self->_editor_path_allowed($rel)) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
-        return;
-    }
-
-    $self->_add_to_index_internal($c, $rel);
-    $c->response->body(encode_json({ success => JSON::true, path => $rel }));
-}
-
-=head2 remove_from_index
-
-POST /ai/remove_from_index - Manually remove a file path from the index
-
-=cut
-
-sub remove_from_index :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
-    unless ($self->_editor_path_allowed($rel)) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
-        return;
-    }
-
-    $self->_remove_from_index_internal($c, $rel);
-    $c->response->body(encode_json({ success => JSON::true, path => $rel }));
-}
-
-=head2 create_file
-
-POST /ai/create_file - Create a new file on disk and add it to the index
-
-=cut
-
-sub create_file :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
-    unless ($self->_editor_path_allowed($rel)) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
-        return;
-    }
-
-    my $full = $self->_editor_fs_path($c, $rel);
-
-    if (-e $full) {
-        $c->response->body(encode_json({ success => JSON::false, error => "File or directory already exists: $rel" }));
-        return;
-    }
-
-    require File::Path;
-    require File::Spec;
-    my ($vol, $parent_dir, $file) = File::Spec->splitpath($full);
-    File::Path::make_path($parent_dir) unless -d $parent_dir;
-
-    if (open(my $fh, '>', $full)) {
-        print $fh "";
-        close $fh;
-    } else {
-        $c->response->body(encode_json({ success => JSON::false, error => "Cannot write file: $!" }));
-        return;
-    }
-
-    $self->_add_to_index_internal($c, $rel);
-
-    $c->response->body(encode_json({
-        success => JSON::true,
-        path    => $rel,
-        message => "File created successfully: $rel",
-    }));
-}
-
-=head2 delete_file
-
-POST /ai/delete_file - Delete a file from disk and subtract/remove it from the index
-
-=cut
-
-sub delete_file :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
-        return;
-    }
-
-    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} // '');
-    unless ($self->_editor_path_allowed($rel)) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Path not allowed: $rel" }));
-        return;
-    }
-
-    my $full = $self->_editor_fs_path($c, $rel);
-
-    unless (-f $full) {
-        $c->response->body(encode_json({ success => JSON::false, error => "File not found: $rel" }));
-        return;
-    }
-
-    if (unlink $full) {
-        $self->_remove_from_index_internal($c, $rel);
-        $c->response->body(encode_json({
-            success => JSON::true,
-            path    => $rel,
-            message => "File deleted successfully: $rel",
-        }));
-    } else {
-        $c->response->body(encode_json({ success => JSON::false, error => "Cannot delete file: $!" }));
-    }
 }
 
 =head2 transcribe
@@ -14619,424 +12079,6 @@ sub _log_ai_usage {
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_log_ai_usage',
             "Failed to write ai_usage_logs: $@");
-    }
-}
-
-sub git_commit :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
-        return;
-    }
-
-    my $message = $c->request->params->{message} || '';
-    unless ($message =~ /\S/) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Commit message required' }));
-        return;
-    }
-
-    my $root = $self->_project_root_path($c);
-    chdir $root or do {
-        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
-        return;
-    };
-
-    my $add_out = qx(git add -A 2>&1);
-    my $commit_out = qx(git commit -m "$message" 2>&1);
-    my $exit_val = $? >> 8;
-
-    $c->response->body(encode_json({
-        success => $exit_val == 0 ? JSON::true : JSON::false,
-        output  => "Add:\n$add_out\nCommit:\n$commit_out",
-        exit_code => $exit_val
-    }));
-}
-
-sub deploy_docker :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
-        return;
-    }
-
-    my $target = $c->request->params->{target} || 'production1';
-    my $commit_msg = $c->request->params->{commit_msg} || '';
-    my $recreate_vols = $c->request->params->{recreate_volumes} ? 1 : 0;
-    my $no_rollback = $c->request->params->{no_rollback} ? 1 : 0;
-    my $session_id = $c->sessionid || 'unknown';
-    my $progress_file = "/tmp/comserv_deploy_progress_${session_id}";
-
-    unlink $progress_file if -f $progress_file;
-
-    my $pid = fork();
-    if (!defined $pid) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Fork failed: $!" }));
-        return;
-    }
-
-    if ($pid == 0) {
-        close(STDOUT);
-        close(STDERR);
-        open(STDOUT, '>', $progress_file) or exit(1);
-        open(STDERR, '>&', STDOUT) or exit(1);
-        
-        select((select(STDOUT), $| = 1)[0]);
-
-        print "Starting deployment pipeline for target: " . uc($target) . "\n";
-        my $root = $self->_project_root_path($c);
-        chdir $root or do {
-            print "ERROR: Failed to chdir to project root $root: $!\n";
-            print "__DONE__\n";
-            exit(1);
-        };
-
-        if ($commit_msg =~ /\S/) {
-            print "\n--- [Git Commit] ---\n";
-            print "Adding changes to git...\n";
-            system("git add -A");
-            print "Committing changes with message: '$commit_msg'\n";
-            my $commit_output = qx(git commit -m "$commit_msg" 2>&1);
-            my $exit_val = $? >> 8;
-            print $commit_output;
-            if ($exit_val == 0) {
-                print "✓ Changes committed successfully\n";
-            } else {
-                if ($commit_output =~ /nothing to commit/i || $commit_output =~ /no changes added to commit/i) {
-                    print "✓ Nothing to commit, working tree clean\n";
-                } else {
-                    print "⚠ Git commit failed with exit code $exit_val, but continuing to deploy...\n";
-                }
-            }
-        }
-
-        print "\n--- [Docker Deploy] ---\n";
-        my $deploy_script = "Comserv/script/deploy_docker_to_production.pl";
-        if (!-f $deploy_script) {
-            print "ERROR: Deployment script not found at $deploy_script\n";
-            print "__DONE__\n";
-            exit(1);
-        }
-
-        my $ssh_password = $ENV{SSHPASS} || '';
-        if (!$ssh_password) {
-            my $home = $ENV{HOME} || '/home/shanta';
-            my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
-            if (-f $creds_file && open my $cf, '<', $creds_file) {
-                local $/;
-                my $json = <$cf>;
-                close $cf;
-                my $creds = eval { decode_json($json) };
-                if ($creds && $creds->{ssh_password}) {
-                    $ssh_password = $creds->{ssh_password};
-                }
-            }
-        }
-        local $ENV{SSHPASS} = $ssh_password if $ssh_password;
-
-        my $cmd = "perl $deploy_script --target=$target";
-        $cmd .= " --recreate-volumes" if $recreate_vols;
-        $cmd .= " --no-rollback" if $no_rollback;
-
-        print "Running: $cmd\n";
-        system($cmd);
-        my $deploy_exit = $? >> 8;
-
-        if ($deploy_exit == 0) {
-            print "\n🎉 Deployment completed successfully!\n";
-        } else {
-            print "\n❌ Deployment failed with exit code $deploy_exit.\n";
-        }
-
-        print "__DONE__\n";
-        exit(0);
-    }
-
-    $c->response->body(encode_json({
-        success => JSON::true,
-        message => "Deployment started in background",
-        pid     => $pid
-    }));
-}
-
-sub deploy_progress :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    my $session_id = $c->sessionid || '';
-    my $progress_file = "/tmp/comserv_deploy_progress_${session_id}";
-
-    unless ($session_id && -f $progress_file) {
-        $c->response->body(encode_json({ content => '', done => JSON::true }));
-        return;
-    }
-
-    my $content = '';
-    my $done = 0;
-    if (open my $fh, '<:utf8', $progress_file) {
-        $content = do { local $/; <$fh> };
-        close $fh;
-    }
-
-    if ($content =~ s/__DONE__\n?$//) {
-        $done = 1;
-    }
-
-    $c->response->body(encode_json({
-        content => $content,
-        done    => $done ? JSON::true : JSON::false,
-    }));
-}
-
-sub run_command :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
-        return;
-    }
-
-    my $cmd = $c->request->params->{command} || '';
-    unless ($cmd =~ /\S/) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Command is required' }));
-        return;
-    }
-
-    if ($cmd =~ /rm\s+-rf\s+\/|mkfs|dd\s+if=/i) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Command blocked for safety' }));
-        return;
-    }
-
-    my $root = $self->_project_root_path($c);
-    chdir $root or do {
-        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
-        return;
-    };
-
-    my $api_key = $self->_grok_cli_api_key($c);
-
-    local $ENV{XAI_API_KEY} = $api_key if $api_key;
-    local $ENV{GROK_API_KEY} = $api_key if $api_key;
-    local $ENV{HOME} = $self->_grok_home() || $ENV{HOME};
-    local $ENV{USER} = 'shanta';
-    local $ENV{LOGNAME} = 'shanta';
-
-    my $output = qx($cmd 2>&1) // '';
-    my $exit_val = ($? == -1) ? -1 : ($? >> 8);
-
-    $c->response->body(encode_json({
-        success   => JSON::true,
-        output    => $output,
-        exit_code => $exit_val
-    }));
-}
-
-sub list_branches :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
-        return;
-    }
-
-    my $root = $self->_project_root_path($c);
-    chdir $root or do {
-        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir: $!" }));
-        return;
-    };
-
-    my $output = qx(git branch -a 2>&1) // '';
-    my $exit_val = $? >> 8;
-
-    if ($exit_val != 0) {
-        $c->response->body(encode_json({ success => JSON::false, error => "git branch -a failed: $output" }));
-        return;
-    }
-
-    my @branches;
-    my $current = '';
-    my %seen;
-
-    for my $line (split /\n/, $output) {
-        $line =~ s/^\s+//;
-        $line =~ s/\s+$//;
-        next unless $line;
-        
-        my $is_current = 0;
-        if ($line =~ s/^\*\s+//) {
-            $is_current = 1;
-            $current = $line;
-        }
-        
-        # Clean up remote branch names if needed, but let's keep them distinctive
-        next if $line =~ m{/HEAD\s+->}; # skip remote HEAD pointers
-        
-        next if $seen{$line}++; # avoid duplicates
-        
-        push @branches, {
-            name => $line,
-            current => $is_current ? JSON::true : JSON::false,
-        };
-    }
-
-    $c->response->body(encode_json({
-        success => JSON::true,
-        branches => \@branches,
-        current => $current
-    }));
-}
-
-sub switch_branch :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
-        return;
-    }
-
-    my $branch = $c->request->params->{branch};
-    unless ($branch =~ /\S/) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Branch name is required' }));
-        return;
-    }
-
-    # Sanitize branch name for shell safety
-    unless ($branch =~ m{^[a-zA-Z0-9_\-\./\+]+$}) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid branch name characters' }));
-        return;
-    }
-
-    my $root = $self->_project_root_path($c);
-    chdir $root or do {
-        $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir: $!" }));
-        return;
-    };
-
-    # If it is a remote branch name, we might want to track it
-    my $remote_match = '';
-    if ($branch =~ m{^remotes/([^/]+)/(.*)$}) {
-        $remote_match = $2;
-    }
-
-    my $target_branch = $remote_match || $branch;
-    my $output = qx(git checkout "$target_branch" 2>&1) // '';
-    my $exit_val = $? >> 8;
-
-    if ($exit_val != 0) {
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error => "git checkout failed (exit $exit_val): $output"
-        }));
-        return;
-    }
-
-    $c->response->body(encode_json({
-        success => JSON::true,
-        message => "Switched branch to $target_branch",
-        output => $output
-    }));
-}
-
-sub revert_to_main :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    # Enforce editor access check
-    unless ($self->_editor_enabled($c)) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
-        return;
-    }
-
-    my $root = $self->_project_root_path($c);
-    my $is_docker = -f '/.dockerenv' ? 1 : 0;
-
-    my $output = '';
-    my $exit_val = 0;
-
-    if ($is_docker) {
-        # We are inside the docker container! We must run SSH to the host to checkout main and revert changes.
-        # Let's load the SSH credentials.
-        my $home = $ENV{HOME} || '/home/shanta';
-        my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
-        
-        # Fallback path if HOME is /root or different in container
-        unless (-f $creds_file) {
-            $creds_file = "/home/shanta/.comserv/secrets/ssh_credentials.json";
-        }
-
-        my $ssh_password = '';
-        my $ssh_port = 22;
-        my $ssh_user = 'shanta';
-        my $ssh_host = '172.30.131.126';
-
-        if (-f $creds_file && open my $cf, '<', $creds_file) {
-            local $/;
-            my $json = <$cf>;
-            close $cf;
-            my $creds = eval { decode_json($json) };
-            if ($creds) {
-                $ssh_password = $creds->{ssh_password} || '';
-                $ssh_port = $creds->{ssh_port} || 22;
-                if (my $target = $creds->{ssh_target}) {
-                    if ($target =~ /^([a-zA-Z0-9_\-]+)\@([a-zA-Z0-9_\-\.]+)$/) {
-                        $ssh_user = $1;
-                        $ssh_host = $2;
-                    }
-                }
-            }
-        }
-
-        # Override host/user specifically for our workstation reset
-        $ssh_user = 'shanta';
-        $ssh_host = '172.30.131.126';
-
-        if (!$ssh_password) {
-            $c->response->body(encode_json({
-                success => JSON::false,
-                error => "SSH password not found. Please save host credentials under Admin -> Docker Containers first."
-            }));
-            return;
-        }
-
-        # Let's run SSH command to checkout main and reset hard!
-        my $git_cmd = 'cd /home/shanta/PycharmProjects/comserv2 && git checkout main && git reset --hard origin/main && git pull';
-        my $escaped_git_cmd = $git_cmd;
-        $escaped_git_cmd =~ s/'/'\\''/g;
-
-        local $ENV{SSHPASS} = $ssh_password;
-        my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host '$escaped_git_cmd' 2>&1);
-        $output = `$cmd` // '';
-        $exit_val = $? >> 8;
-    } else {
-        # We are on the host directly! We can run it directly.
-        chdir $root or do {
-            $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to $root: $!" }));
-            return;
-        };
-
-        $output = qx(git checkout main && git reset --hard origin/main && git pull 2>&1) // '';
-        $exit_val = $? >> 8;
-    }
-
-    if ($exit_val != 0) {
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error => "Git revert failed (exit $exit_val): $output",
-            is_docker => $is_docker ? JSON::true : JSON::false,
-        }));
-    } else {
-        $c->response->body(encode_json({
-            success => JSON::true,
-            message => "Successfully reverted /home/shanta/PycharmProjects/comserv2 to main branch and discarded changes.",
-            output => $output,
-            is_docker => $is_docker ? JSON::true : JSON::false,
-        }));
     }
 }
 
