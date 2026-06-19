@@ -464,7 +464,7 @@ sub auto :Private {
                 alarm(5);  # 5 second timeout for navigation setup
                 
                 # Ensure navigation tables exist and populate navigation data
-                $nav_controller->populate_navigation($c);
+                $nav_controller->populate_navigation_data($c);
                 
                 alarm(0);  # Cancel alarm on success
             };
