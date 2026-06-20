@@ -52,23 +52,10 @@ pre_build_git_sync() {
         echo "✓ Working tree clean (no new commit needed)"
     fi
 
-    unpushed=0
-    if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
-        unpushed=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
-    elif git rev-parse --verify "origin/$BRANCH" &>/dev/null; then
-        unpushed=$(git rev-list --count "origin/$BRANCH"..HEAD 2>/dev/null || echo 0)
-    else
-        unpushed=1
-    fi
-
-    if [ "${unpushed:-0}" -gt 0 ]; then
-        echo "⚠️  $unpushed unpushed commit(s) detected — skipping CLI push (must be done from PyCharm)"
-        echo "   Commit(s) are ready locally. Run git push from PyCharm when convenient."
-        # Push intentionally skipped to avoid large-file / LFS issues from CLI
-    else
-        echo "✓ Branch is up to date with remote"
-    fi
-
+    # NOTE: Push step intentionally removed.
+    # Commits (if any) are left local. Push must be done manually from PyCharm later.
+    # This allows the deploy to proceed immediately even with unpushed commits.
+    echo "⚠️  Skipping remote push (push disabled in deploy.sh — will be fixed later)"
     echo "Deploy will build from commit: $(git rev-parse --short HEAD) ($(git log -1 --pretty=%s))"
     echo "--------------------------------------------"
     return 0
@@ -158,10 +145,17 @@ if [ -n "$GLOBAL_HOST_APP_DIR" ] && command -v git &>/dev/null; then
     echo "--- Early Git Repository Synchronization ---"
     echo "Updating local host repository at $GLOBAL_HOST_APP_DIR..."
     safe_git "$GLOBAL_HOST_APP_DIR" fetch origin main 2>/dev/null || safe_git "$GLOBAL_HOST_APP_DIR" fetch 2>/dev/null || true
-    if safe_git "$GLOBAL_HOST_APP_DIR" pull origin main || safe_git "$GLOBAL_HOST_APP_DIR" pull; then
+    if safe_git "$GLOBAL_HOST_APP_DIR" pull --ff-only origin main 2>/dev/null || safe_git "$GLOBAL_HOST_APP_DIR" pull --ff-only 2>/dev/null; then
         echo "✅ Host repository successfully synchronized with origin/main."
     else
-        echo "⚠️  Warning: Early git pull failed, using existing repository state."
+        echo "⚠️  Warning: Early git pull (fast-forward only) failed — server has local modifications."
+        echo "   Stashing server-side changes to allow pull..."
+        safe_git "$GLOBAL_HOST_APP_DIR" stash push -m "deploy.sh auto-stash before pull $(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null || true
+        if safe_git "$GLOBAL_HOST_APP_DIR" pull origin main || safe_git "$GLOBAL_HOST_APP_DIR" pull; then
+            echo "✅ Host repository synchronized after stashing local changes."
+        else
+            echo "⚠️  Warning: Early git pull still failed after stash — using existing repository state."
+        fi
     fi
     echo "--------------------------------------------"
 fi
