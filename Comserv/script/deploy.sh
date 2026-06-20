@@ -62,12 +62,9 @@ pre_build_git_sync() {
     fi
 
     if [ "${unpushed:-0}" -gt 0 ]; then
-        echo "Pushing $unpushed unpushed commit(s) to origin/$BRANCH..."
-        if ! git push origin "$BRANCH"; then
-            echo "❌ git push failed — deploy aborted" >&2
-            return 1
-        fi
-        echo "✅ Pushed to origin/$BRANCH"
+        echo "⚠️  $unpushed unpushed commit(s) detected — skipping CLI push (must be done from PyCharm)"
+        echo "   Commit(s) are ready locally. Run git push from PyCharm when convenient."
+        # Push intentionally skipped to avoid large-file / LFS issues from CLI
     else
         echo "✓ Branch is up to date with remote"
     fi
