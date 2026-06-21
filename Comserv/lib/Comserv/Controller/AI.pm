@@ -452,7 +452,7 @@ sub editor_config :Local :Args(0) {
         editor_url_workstation_zero => "http://workstation.zero:${app_port}${editor_popup}",
         editor_url_tunnel => "http://${browser_host}:${app_port}${editor_popup}",
         tunnel_hosts_hint => "On tablet: add '127.0.0.1 ${browser_host}' to /etc/hosts, run SSH tunnel, open editor_url_tunnel",
-        zerotier_dns_note => 'zero.computersystemconsulting.ca is production1 (:5000). Dev :3001 use workstation.zero or 172.30.131.126',
+        zerotier_dns_note => 'zero.computersystemconsulting.ca is production1 (:5000). Dev default :3001 on 172.30.131.126. Admin may start secondary server on :3000 if needed.',
     }));
 }
 
@@ -3723,7 +3723,7 @@ sub models :Local :Args(0) {
                     }
                     
                     # Get available models (static catalog), then exclude already-installed ones
-                    my $available = $ollama->list_available_models();
+                    my $available = undef;  # TEMP DISABLE list_available_models()
                     if ($available && ref($available) eq 'ARRAY') {
                         # Build a set of installed base names (strip tag) for fast lookup
                         my %installed_names;
@@ -3797,6 +3797,8 @@ sub models :Local :Args(0) {
     };
     
     # Set template variables
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'models', "About to stash - servers count: " . scalar(@$servers));
     $c->stash(
         template => 'ai/models.tt',
         page_title => 'AI Models',

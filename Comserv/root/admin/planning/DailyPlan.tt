@@ -873,8 +873,7 @@
         [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
         [% SET view_sitename = filter_site || plan_sitename %]
 
-        [%# ── Branch server launcher (CSC admin, or any .local/.zero dev domain) ── %]
-        [%# is_local_domain computed in Planning.pm::daily (Perl regex on host_port) %]
+        [%# 25002500 Branch server launcher (CSC admin/developer, or any .local/.zero dev domain) 25002500 %]
         [% IF (is_admin && is_csc) || is_local_domain %]
         [% SET cur_branch = c.stash.app_workflow || 'main' %]
         [% SET host       = c.req.uri.host %]
@@ -942,15 +941,15 @@
         [%# host may include port (e.g. bmast.local:4001) so match without $ anchor %]
         [% SET is_workstation = (host.match('\.local(?::\d+)?$') || host.match('\.zero(?::\d+)?$') || host.match('^localhost')) ? 1 : 0 %]
 
-        <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
-            <summary style="padding:8px 14px;cursor:pointer;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-weight:bold;color:#fd7e14;">🌿 Branch Servers
+        <div style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
+            <div style="background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));padding:8px 14px;border-radius:6px 6px 0 0;font-weight:bold;color:#fd7e14;display:flex;justify-content:space-between;align-items:center;">
+                <span>🌿 Branch Servers
                     [% IF cur_branch && cur_branch != 'main' %]
                     — currently on <code style="font-size:1em;">[% cur_branch %]</code>
                     [% END %]
                 </span>
                 <span style="color:var(--text-muted-color);font-size:0.9em;">▾</span>
-            </summary>
+            </div>
             <div style="padding:10px 14px;">
 
                 [%# Quick-open dropdown — shown on ALL hosts %]
@@ -971,6 +970,14 @@
                     <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value)window.open(s.value,'_blank');})()"
                             style="padding:5px 14px;background:#fd7e14;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;white-space:nowrap;">
                         Open →
+                    </button>
+                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value){var url=s.value;var m=url.match(/:(\d+)/);if(m){fetch('/admin/branch_server_action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=stop&branch=main&port='+m[1]}).then(()=>alert('Stop requested'))}}})()"
+                            style="padding:5px 10px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;white-space:nowrap;">
+                        Stop
+                    </button>
+                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value){var url=s.value;var m=url.match(/:(\d+)/);if(m){fetch('/admin/branch_server_action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=restart&branch=main&port='+m[1]}).then(()=>alert('Restart requested'))}}})()"
+                            style="padding:5px 10px;background:#ffc107;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;white-space:nowrap;">
+                        Restart
                     </button>
                 </div>
 
@@ -1003,15 +1010,19 @@
                             <code style="font-size:0.82em;user-select:all;cursor:text;color:var(--text-muted-color);">[% b.cmd %]</code>
                         </td>
                         <td style="padding:5px 8px;white-space:nowrap;">
-                            <a href="[% scheme %]://[% host %]:[% b.port %][% b.url %]" target="_blank"
-                               style="padding:2px 8px;background:var(--primary-color);color:#fff;border-radius:3px;text-decoration:none;font-size:0.85em;">Open</a>
+                            <button onclick="smartOpenBranch('[% b.name %]', [% b.port %], '[% scheme %]://[% host %]:[% b.port %][% b.url %]')"
+                                    style="padding:2px 8px;background:var(--primary-color);color:#fff;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Open</button>
+                            <button onclick="branchAction('stop', '[% b.name %]', [% b.port %])"
+                                    style="padding:2px 6px;background:#dc3545;color:#fff;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Stop</button>
+                            <button onclick="branchAction('restart', '[% b.name %]', [% b.port %])"
+                                    style="padding:2px 6px;background:#ffc107;color:#000;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Restart</button>
                         </td>
                     </tr>
                     [% END %]
                 </table>
                 [% END %]
             </div>
-        </details>
+        </div>
         [% END %]
 
         [%# ── Header row ── %]
@@ -2179,3 +2190,80 @@ function doneWithLogTodoCard(btn, recordId) {
     to { transform: rotate(360deg); }
 }
 </style>
+
+<!-- Smart Open Modal for branch servers -->
+<div id="branch-start-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-color,#fff); border:1px solid var(--border-color); border-radius:8px; width:90%; max-width:700px; max-height:80vh; display:flex; flex-direction:column;">
+        <div style="padding:12px 16px; border-bottom:1px solid var(--border-color); font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
+            <span id="branch-modal-title">Starting server…</span>
+            <button onclick="closeBranchModal()" style="background:none;border:none;font-size:1.4em;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:12px 16px; flex:1; overflow:auto;">
+            <div style="font-family:monospace; font-size:0.85em; margin-bottom:8px; color:var(--text-muted-color);" id="branch-modal-cmd"></div>
+            <pre id="branch-modal-log" style="background:#1e1e1e; color:#d4d4d4; padding:10px; border-radius:4px; font-size:0.82em; max-height:300px; overflow-y:auto; white-space:pre-wrap; margin:0;"></pre>
+        </div>
+        <div style="padding:10px 16px; border-top:1px solid var(--border-color); text-align:right;">
+            <button onclick="closeBranchModal()" style="padding:6px 14px; border:1px solid var(--border-color); border-radius:4px; background:transparent; cursor:pointer;">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function smartOpenBranch(branch, port, targetUrl) {
+    // Always call the backend (it will start the server if needed)
+    fetch('/admin/branch_server_action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'action=open&branch=' + encodeURIComponent(branch) + '&port=' + port
+    }).catch(() => {});
+
+    // Always open the system shell terminal so the admin can see the output
+    var cmd = encodeURIComponent('cd /home/shanta/.zenflow/worktrees/' + branch + '/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p ' + port + ' -r');
+    window.open('/admin/system-shell-terminal?cmd=' + cmd, '_blank');
+
+    // Open the actual page after a delay (gives the server time to start)
+    setTimeout(function() {
+        window.open(targetUrl, '_blank');
+    }, 8000);
+}
+
+function showBranchStartModal(branch, port, targetUrl) {
+    var modal = document.getElementById('branch-start-modal');
+    var title = document.getElementById('branch-modal-title');
+    var cmdEl = document.getElementById('branch-modal-cmd');
+    var logEl = document.getElementById('branch-modal-log');
+
+    title.textContent = 'Starting ' + branch + ' on port ' + port + '…';
+    cmdEl.textContent = '';
+    logEl.textContent = 'Waiting for output...\n';
+    modal.style.display = 'flex';
+
+    var poll = setInterval(function() {
+        fetch('/admin/branch_server_log?file=' + encodeURIComponent('/tmp/branch-' + branch + '.log'))
+            .then(r => r.text())
+            .then(text => {
+                logEl.textContent = text;
+                logEl.scrollTop = logEl.scrollHeight;
+            })
+            .catch(() => {});
+
+        fetch('/admin/branch_server_action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=open&branch=' + encodeURIComponent(branch) + '&port=' + port
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.running) {
+                clearInterval(poll);
+                closeBranchModal();
+                window.open(targetUrl, '_blank');
+            }
+        });
+    }, 2000);
+}
+
+function closeBranchModal() {
+    document.getElementById('branch-start-modal').style.display = 'none';
+}
+</script>

@@ -14,6 +14,7 @@ BEGIN { extends 'Comserv::Controller::Base'; }
 
 has 'logging' => (
     is      => 'ro',
+    lazy    => 1,
     default => sub { Comserv::Util::Logging->instance }
 );
 

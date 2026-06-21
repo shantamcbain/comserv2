@@ -9603,6 +9603,66 @@ it under the same terms as Perl itself.
 
 =cut
 
+use Comserv::Util::DevServerControl;
+use Comserv::Util::BranchServerControl;
+use Comserv::Util::UserPreferences;
+
+sub dev_server_status :Path('/admin/dev_server/status') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $ctrl = Comserv::Util::DevServerControl->new;
+    $c->response->body(encode_json($ctrl->status));
+}
+
+sub dev_server_start :Path('/admin/dev_server/start') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $ctrl = Comserv::Util::DevServerControl->new;
+    my $cmd  = $c->req->param('command');
+    my $res  = $ctrl->start($cmd);
+    $c->response->body(encode_json($res));
+}
+
+sub dev_server_stop :Path('/admin/dev_server/stop') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $ctrl = Comserv::Util::DevServerControl->new;
+    my $res  = $ctrl->stop;
+    $c->response->body(encode_json($res));
+}
+
+sub branch_server_action :Path('/admin/branch_server_action') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $action = $c->req->param('action') || '';
+    my $branch = $c->req->param('branch') || '';
+    my $port   = $c->req->param('port')   || '';
+    return $c->response->body(encode_json({ok=>0,error=>'Missing branch or port'}))
+        unless $branch && $port;
+
+    my $ctrl = Comserv::Util::BranchServerControl->new;
+
+    if ($action eq 'start') {
+        my $res = $ctrl->start($branch, $port);
+        $c->response->body(encode_json($res));
+    }
+    elsif ($action eq 'stop') {
+        my $res = $ctrl->stop($branch, $port);
+        $c->response->body(encode_json($res));
+    }
+    elsif ($action eq 'restart') {
+        my $res = $ctrl->restart($branch, $port);
+        $c->response->body(encode_json($res));
+    }
+    elsif ($action eq 'open') {
+        my $res = $ctrl->open_or_start($branch, $port);
+        $c->response->body(encode_json($res));
+    }
+    else {
+        $c->response->body(encode_json({ok=>0, error=>'Unknown action'}));
+    }
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

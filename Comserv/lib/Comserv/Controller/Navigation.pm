@@ -1791,6 +1791,19 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
     my $return_url  = $c->req->param('return_url') || $c->req->referer || $c->uri_for('/')->as_string;
     # ensure we always have a safe relative fallback
     $return_url = $c->uri_for('/')->as_string unless $return_url;
+    # Provide the complete list of all menus (from nav_submenu_tb) so the form can show every seeded menu
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SELECT DISTINCT category FROM nav_submenu_tb WHERE status=1 ORDER BY category");
+        $sth->execute();
+        my @all_menus;
+        while (my ($cat) = $sth->fetchrow_array) { push @all_menus, $cat; }
+        $c->stash->{all_menus} = \@all_menus if @all_menus;
+    };
+    if ($@) {
+        $c->log->warn("Could not load complete menu list for add_link form: $@");
+    }
+
     
     if ($c->req->method eq 'POST') {
         my $name = $c->req->param('name');

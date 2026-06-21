@@ -26,7 +26,12 @@
             submenu    => form_data.submenu || preset_submenu
         } %]
         [% INCLUDE 'Navigation/inc/link_scope_fields.tt' form = form %]
-        [% INCLUDE 'Navigation/inc/link_submenu_field.tt' form = form preset_submenu = preset_submenu %]
+        [%# Submenu is no longer shown to the user; it is passed as a hidden field so the link knows its exact location %]
+        [% IF preset_submenu %]
+            <input type="hidden" name="submenu" value="[% preset_submenu | html %]">
+        [% ELSIF form.submenu %]
+            <input type="hidden" name="submenu" value="[% form.submenu | html %]">
+        [% END %]
         [% INCLUDE 'Navigation/inc/link_public_visible_field.tt' form = form %]
 
         <div class="form-group">

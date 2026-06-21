@@ -18,16 +18,12 @@
 <div class="form-group">
     <label for="category">Appear in Menu:</label>
     <select id="category" name="category" class="form-control" required>
-        [% FOREACH cat IN permissions.available_categories %]
-            [% NEXT IF cat == 'Private_links' && form.link_type != 'private' %]
-            [% SET cat_label = labels.item(cat) || cat.replace('_', ' ') %]
-            [% SET is_legacy_cat = cat.match('legacy') || cat == 'IT_links' || cat == 'Global_links' || cat == 'COOP_links' %]
-            <option value="[% cat %]"
-                    [% IF form.category == cat %]selected[% END %]
-                    [% IF cat == 'Admin_links' %]data-admin-only="1"[% END %]
-                    [% IF cat == 'Private_links' %]data-private-only="1"[% END %]
-                    [% IF is_legacy_cat %]data-legacy-cat="1"[% END %]>
-                [% cat_label %]
+        [%# Single direct query - proven pattern from admintopmenu.tt %]
+        [% SET preselect = c.req.param('menu') || c.req.param('submenu') || form.category %]
+        [% FOREACH row = c.stash.dbi.query("SELECT DISTINCT category FROM nav_submenu_tb WHERE status=1 ORDER BY category") %]
+            <option value="[% row.category %]"
+                    [% IF row.category == preselect %]selected[% END %]>
+                [% row.category.replace('_',' ') %]
             </option>
         [% END %]
     </select>

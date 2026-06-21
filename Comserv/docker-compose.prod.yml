@@ -22,7 +22,7 @@ services:
       DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
-      SYSTEM_IDENTIFIER: workstation-prod
+      SYSTEM_IDENTIFIER: ${SYSTEM_IDENTIFIER:-workstation-prod-local}
     ports:
       - "5000:5000"
     volumes:
