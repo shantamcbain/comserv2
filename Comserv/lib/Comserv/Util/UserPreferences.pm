@@ -10,6 +10,7 @@ our %ALLOWED_KEYS = (
     'calendar.site_colors'    => 'object',
     'calendar.fixed_lane_pct' => 'number',
     'ui.theme_override'       => 'string',
+    'dev_server.saved_commands' => 'object',
 );
 
 sub new { bless {}, shift }

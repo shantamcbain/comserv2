@@ -116,41 +116,20 @@
         <div class="submenu-item">
             <span class="submenu-header"><a href="/site/list_domains"><i class="icon-domain"></i>Domain Selection</a></span>
             <div class="submenu">
-                <div class="domain-list-container">
-                    <!-- Sites from sitedomain table — grouped by site name -->
-                    [% SET current_site_name = '' %]
-                    [% FOREACH row = c.stash.dbi.query("SELECT s.name AS site_name, sd.domain FROM sites s JOIN sitedomain sd ON sd.site_id = s.id ORDER BY s.name, sd.domain") %]
-                        [% IF row.site_name != current_site_name %]
-                            [% IF current_site_name != '' %]
-                            </div>
-                            </div>
-                            [% END %]
-                            [% SET current_site_name = row.site_name %]
-                            <div class="submenu-section">
-                            <span class="submenu-section-title">[% row.site_name %]</span>
-                            <div class="site-domain-group">
-                        [% END %]
-                        <span class="site-domain-row">
-                            <span class="site-domain-label">[% row.domain %]</span>
-                            [% IF row.domain == 'computersystemconsulting.ca' || row.domain.match('computersystemconsulting\.ca$') %]
-                            <a href="http://dev.computersystemconsulting.ca/" class="site-port-link" target="_blank" title="Dev via gateway">dev</a>
-                            [% END %]
-                            <a href="http://[% row.domain %]:3001" class="site-port-link" target="_blank" title="Starman dev :3001">:3001</a>
-                            <a href="http://[% row.domain %]:3000" class="site-port-link" target="_blank" title="Docker :3000 (legacy)">:3000</a>
-                        </span>
-                    [% END %]
-                    [% IF current_site_name != '' %]
-                            </div>
-                            </div>
-                    [% END %]
-
-                    <!-- Other Options -->
-                    <div class="submenu-section">
-                        <span class="submenu-section-title">Switch Site Context</span>
-                        <a href="?site=Dev" class="site-dropdown-item" onclick="activateSite('Dev')">Development</a>
-                        <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>
-                        <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')">Default home</a>
-                    </div>
+                <a href="/navigation/add_link?menu=Admin&amp;category=Admin_links&amp;submenu=domain_selection&amp;return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Link</a>
+                [% SET domain_db = c.stash.domain_selection_links || [] %]
+                [% INCLUDE 'Navigation/inc/menu_db_links.tt'
+                    db_links = domain_db
+                    add_link_category = 'Admin_links'
+                    add_link_submenu = 'domain_selection'
+                    add_link_menu = 'Admin'
+                    skip_add_link = 1 %]
+                <!-- Other Options -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Switch Site Context</span>
+                    <a href="?site=Dev" class="site-dropdown-item" onclick="activateSite('Dev')">Development</a>
+                    <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>
+                    <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')">Default home</a>
                 </div>
             </div>
         </div>
