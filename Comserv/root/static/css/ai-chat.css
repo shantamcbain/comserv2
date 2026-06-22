@@ -632,8 +632,8 @@ body.ai-widget-popup .chat-panel {
     transform: none !important;
 }
 
-body.ai-widget-popup .chat-header {
-    display: none !important;
+/* body.ai-widget-popup .chat-header {
+    display: none !important; */  /* header now visible */
 }
 
 @media (max-width: 600px) {
@@ -716,3 +716,4 @@ body.ai-widget-popup .chat-a11y-label {
     font-weight: 600;
 }
 
+/* force cache bust Mon Jun 22 04:22:38 AM UTC 2026 */

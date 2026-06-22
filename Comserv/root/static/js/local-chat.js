@@ -913,7 +913,7 @@
                 '<input type="checkbox" id="enable-web-search" style="vertical-align:middle;"> 🔍 Web' +
               '</label>' +
             '</span>' +
-            '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
+            '<a href="/ai/admin/models" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
 
         // Agent-specific banner (shown when a special agent needs a dedicated page)
         const agentBanner = document.createElement('div');
@@ -6656,4 +6656,4 @@
             openChat();
         }).catch(function() { openChat(); });
     };
-})();
+})();/* force-reload 1782102224 */

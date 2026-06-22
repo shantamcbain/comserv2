@@ -451,23 +451,23 @@ sub shell_run_command :Path('/admin/shell_run_command') :Args(0) {
         return;
     }
 
-    require Comserv::Controller::AI;
-    my $ai = $c->controller('AI');
-    unless ($ai) {
+    # require Comserv::Controller::AI;  # now uses model layer
+    my $cfg = $c->model('AI')->config;
+    unless ($cfg) {
         $c->response->body(encode_json({ success => JSON::false, error => 'AI controller unavailable' }));
         return;
     }
 
-    my $root = $ai->_project_root_path($c);
+    my $root = $cfg->_project_root_path($c);
     chdir $root or do {
         $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
         return;
     };
 
-    my $api_key = $ai->_grok_cli_api_key($c);
+    my $api_key = $cfg->_grok_cli_api_key($c);
     local $ENV{XAI_API_KEY}  = $api_key if $api_key;
     local $ENV{GROK_API_KEY}  = $api_key if $api_key;
-    local $ENV{HOME}          = $ai->_grok_home() || $ENV{HOME};
+    local $ENV{HOME}          = $cfg->_grok_home() || $ENV{HOME};
     local $ENV{USER}          = 'shanta';
     local $ENV{LOGNAME}       = 'shanta';
     local $ENV{PATH}          = join ':', grep { $_ && -d $_ }

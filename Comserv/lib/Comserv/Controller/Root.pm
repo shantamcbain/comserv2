@@ -425,8 +425,8 @@ sub auto :Private {
 
         # AI Code Editor float widget — same gate as AI.pm _editor_enabled
         eval {
-            my $ai = $c->controller('AI');
-            $c->stash->{show_code_editor_widget} = ($ai && $ai->_editor_enabled($c)) ? 1 : 0;
+            my $cfg = $c->model('AI')->config;
+            $c->stash->{show_code_editor_widget} = ($cfg && $cfg->_editor_enabled($c)) ? 1 : 0;
         };
         $c->stash->{show_code_editor_widget} //= 0;
 
