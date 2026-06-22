@@ -79,8 +79,14 @@
             padding: 0 !important;
         }
         #detach-chat, #close-chat, #dock-chat-inline { display: none !important; }
-        .chat-header { display: none !important; }
         .chat-resize-handle { display: none !important; }
+
+        /* Force the chat header (model bar + controls) to stay visible in the popup */
+        body.ai-widget-popup .chat-header {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
 
         /* Form fill panel */
         #form-fill-panel {

@@ -133,6 +133,10 @@ __PACKAGE__->config(
         # NPM configuration is loaded dynamically from environment-specific config files
         # See Comserv::Controller::NPM for implementation details
     },
+    'Model::AI' => {
+        # Central AI facade. All heavy logic lives in Comserv::Model::AI::*
+        # Providers, chat routing, conversations, usage, etc. are delegated here.
+    },
 );
 
 sub psgi_app {
