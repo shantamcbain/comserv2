@@ -451,15 +451,15 @@ sub seed_nav_submenu_catalog_dbh {
                     . 'WHERE category = ? AND sitename = ? AND submenu_id = ? LIMIT 1'
                 );
                 $check->execute( $category, 'All', $id );
-                next if $check->fetchrow_arrayref;
-
-                $dbh->do(
-                    'INSERT INTO nav_submenu_tb '
-                    . '(category, sitename, submenu_id, label, section_order, is_system, template_slot, status) '
-                    . 'VALUES (?, ?, ?, ?, ?, 1, ?, 1)',
-                    undef,
-                    $category, 'All', $id, $label, $order, $id,
-                );
+                if (!$check->fetchrow_arrayref) {
+                    $dbh->do(
+                        'INSERT INTO nav_submenu_tb '
+                        . '(category, sitename, submenu_id, label, section_order, is_system, template_slot, status) '
+                        . 'VALUES (?, ?, ?, ?, ?, 1, ?, 1)',
+                        undef,
+                        $category, 'All', $id, $label, $order, $id,
+                    );
+                }
             };
             $order += 10;
         }
