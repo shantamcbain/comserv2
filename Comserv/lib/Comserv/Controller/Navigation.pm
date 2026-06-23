@@ -2855,6 +2855,12 @@ sub get_user_manageable_links {
 sub populate_navigation_data {
     my ($self, $c) = @_;
     
+    # === NAVIGATION SYSTEM TOGGLE ===
+    # Set USE_NEW_NAVIGATION=1 (or true) in environment to use the new hybrid system.
+    # Default (unset / 0 / false) → fall back to the old reliable navigation.
+    my $use_new_nav = $ENV{USE_NEW_NAVIGATION} || 0;
+    return unless $use_new_nav;
+
     # Use eval to catch any errors
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
