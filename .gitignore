@@ -166,3 +166,4 @@ deploy-logs/
 .env
 LM-Studio*
 *.AppImage
+.env
