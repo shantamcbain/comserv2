@@ -1292,6 +1292,10 @@
                                     ↻ Restart
                                 </button>
                                 <button onclick="viewLogsDirect('${container.name}')"
+                                <button onclick="rebuildContainerDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🔄 Rebuild
+                                </button>
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
                                 </button>
@@ -1301,6 +1305,10 @@
                                     ▶ Start
                                 </button>
                                 <button onclick="viewLogsDirect('${container.name}')"
+                                <button onclick="rebuildContainerDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🔄 Rebuild
+                                </button>
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
                                 </button>
