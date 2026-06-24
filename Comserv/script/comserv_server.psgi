@@ -35,6 +35,9 @@ my $app = Comserv->psgi_app;
 
 my $wrapped = builder {
     enable 'ReverseProxy';
+    enable 'Static',
+        path => qr{^/(static|root|assets)/},
+        root => "$FindBin::Bin/..";
     $app;
 };
 

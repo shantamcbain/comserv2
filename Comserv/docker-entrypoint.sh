@@ -14,19 +14,11 @@ echo "Workers: $WORKERS"
 if [ "$ENVIRONMENT" = "production" ] || [ "$ENVIRONMENT" = "staging" ]; then
     echo "→ Starting with Starman (production-grade server)"
 
-    # Make sure we have a .psgi file (create one if missing)
-    if [ ! -f "comserv.psgi" ]; then
-        echo "Creating comserv.psgi..."
-        cat > comserv.psgi << 'EOF'
-use lib 'lib';
-use Comserv;
-use Plack::Builder;
-
-builder {
-    enable 'Plack::Middleware::ReverseProxy';
-    Comserv->psgi_app(@_);
-};
-EOF
+    # Use the canonical production PSGI (has Static middleware for menu CSS/JS)
+    PSGI_FILE="script/comserv_server.psgi"
+    if [ ! -f "$PSGI_FILE" ]; then
+        echo "ERROR: $PSGI_FILE not found!"
+        exit 1
     fi
 
     exec plackup -s Starman \
@@ -34,7 +26,7 @@ EOF
         --port "$PORT" \
         --access-log /dev/stdout \
         --error-log /dev/stderr \
-        comserv.psgi
+        "$PSGI_FILE"
 
 else
     echo "→ Starting development server (comserv_server.pl)"
