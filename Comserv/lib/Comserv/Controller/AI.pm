@@ -181,6 +181,7 @@ sub get_user_providers :Local :Args(0) {
         providers => $providers,
         models    => $models,
     }));
+    $c->detach;  # prevent default template rendering
 }
 
 # Conversation helpers (thin delegation)
