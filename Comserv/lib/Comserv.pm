@@ -38,6 +38,8 @@ __PACKAGE__->config(
     enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
+    # Force-disable stack traces in production even if CATALYST_DEBUG is accidentally set
+    'Plugin::StackTrace' => { enable => $ENV{CATALYST_DEBUG} // 0 ? 1 : 0 },
     # Allow Shanta code editor from any browser (tablet/VPN) when server is the dev workstation
     remote_code_editor => ($ENV{SYSTEM_IDENTIFIER} || '') =~ /workstation/i ? 1 : 0,
     # SSH tunnel target for tablet → workstation (see script/aew_ssh_tunnel.sh)

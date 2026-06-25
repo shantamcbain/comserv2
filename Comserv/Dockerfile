@@ -119,6 +119,7 @@ RUN chmod +x /opt/comserv/docker-entrypoint.sh && chown comserv:comserv /opt/com
 
 # Don't switch to comserv user - entrypoint runs as root to configure supervisor,
 # then supervisord handles dropping privileges for app processes
+USER comserv
 ENTRYPOINT ["/opt/comserv/docker-entrypoint.sh"]
 CMD []
 
