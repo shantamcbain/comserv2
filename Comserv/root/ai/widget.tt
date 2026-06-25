@@ -6,7 +6,7 @@
     <title>AI Chat</title>
     <link rel="stylesheet" href="/static/css/themes/[% theme_name || 'default' %].css">
     <link rel="stylesheet" href="/static/css/theme-overrides.css">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=20260612j">
+    <link rel="stylesheet" href="/static/css/ai-chat.css">
     <style>
         html, body {
             margin: 0;
@@ -63,11 +63,11 @@
         }
         .chat-button { display: none !important; }
         .chat-panel {
-            position: fixed !important;
-            top: 38px !important; left: 0 !important;
+            position: absolute !important;
+            top: 0 !important; left: 0 !important;
             right: 0 !important; bottom: 0 !important;
             width: 100% !important;
-            height: calc(100% - 38px) !important;
+            height: 100% !important;
             max-width: 100% !important;
             max-height: 100% !important;
             min-width: unset !important;
@@ -75,18 +75,10 @@
             border-radius: 0 !important;
             box-shadow: none !important;
             border: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
         }
-        #detach-chat, #close-chat, #dock-chat-inline { display: none !important; }
+        #detach-chat { display: none !important; }
+        .chat-header-drag { cursor: default !important; opacity: 0.2 !important; pointer-events: none !important; }
         .chat-resize-handle { display: none !important; }
-
-        /* Force the chat header (model bar + controls) to stay visible in the popup */
-        body.ai-widget-popup .chat-header {
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-        }
 
         /* Form fill panel */
         #form-fill-panel {
@@ -162,7 +154,7 @@
         #ff-fields-info { font-size:0.8em; color:#888; margin-bottom:0.4em; }
     </style>
 </head>
-<body class="theme-[% theme_name || 'default' %] ai-widget-popup">
+<body class="theme-[% theme_name || 'default' %]">
 
     <!-- Tab bar -->
     <div id="widget-tab-bar">
@@ -237,8 +229,7 @@
             }
         })();
     </script>
-    <script src="/static/js/ai-common.js?v=20260612a"></script>
-    <script src="/static/js/local-chat.js?v=20260612j"></script>
+    <script src="/static/js/local-chat.js?v=20260513e"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Note: local-chat.js auto-opens the chat panel when AI_WIDGET_POPUP is true.
