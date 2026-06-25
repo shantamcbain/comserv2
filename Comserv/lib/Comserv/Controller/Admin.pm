@@ -6999,6 +6999,26 @@ sub _query_system_diagnostics {
     };
 }
 
+sub docker :Path('/admin/docker') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker',
+        "Docker overview page accessed by user: " . ($c->session->{username} || 'unknown'));
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker',
+            "Access denied for docker overview");
+        $c->response->status(403);
+        $c->stash(template => 'admin/error.tt', error => 'Access denied');
+        return;
+    }
+
+    $c->stash(
+        template => 'admin/docker/index.tt',
+        page_title => 'Docker Management',
+    );
+}
+
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
