@@ -4,6 +4,30 @@ set -e
 # Ensure standard system bin paths are included in PATH (critical for non-interactive SSH)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
+# ── New top-level mode handling (must be first) ──────────────────────────────
+# Supported modes:
+#   --prod / DEPLOY_MODE=prod           : Full production deploy (build + push + deploy)
+#   --local / DEPLOY_MODE=local         : Local testing build (build only, no push)
+#   --deploy-only / DEPLOY_MODE=deploy-only : Deploy without build/push (pull + recreate)
+
+DEPLOY_MODE_DETECTED=""
+case "${1:-}" in
+    --prod|prod)
+        DEPLOY_MODE_DETECTED="prod"
+        ;;
+    --local|local)
+        DEPLOY_MODE_DETECTED="local"
+        ;;
+    --deploy-only|deploy-only)
+        DEPLOY_MODE_DETECTED="deploy-only"
+        ;;
+esac
+
+# If a mode flag was passed, export it so the rest of the script can see it
+if [ -n "$DEPLOY_MODE_DETECTED" ]; then
+    export DEPLOY_MODE="$DEPLOY_MODE_DETECTED"
+fi
+
 # Auto-commit and push before deploy (Auto Deploy Step 0a).
 # Developers may edit code without manually committing; deploy must never ship
 # un-pushed changes. Production servers only git pull — they never auto-commit.
@@ -276,7 +300,66 @@ sync_host_app_lib() {
     return 0
 }
 
-# ── Non-interactive Deploy Mode ──────────────────────────────────────────────
+# ── Explicit Deploy Mode Handling ─────────────────────────────────────────────
+# This block handles the three primary modes requested by the user.
+if [ -n "${DEPLOY_MODE:-}" ]; then
+    case "$DEPLOY_MODE" in
+        "prod")
+            echo "=== PRODUCTION DEPLOY MODE ==="
+            echo "Full production deploy: auto-commit + build + push + deploy"
+            # Continue to the normal production deploy flow below
+            ;;
+        
+        "local")
+            echo "=== LOCAL TESTING MODE ==="
+            echo "Building image locally for testing (no push to registry)"
+            
+            # Build the production image locally
+            if [ -f "docker-compose.prod.yml" ]; then
+                docker compose -f docker-compose.prod.yml build
+            elif [ -f "Dockerfile" ]; then
+                docker build -t shantamcsbain/comserv-web-prod:local .
+            else
+                echo "❌ No Dockerfile or docker-compose.prod.yml found for local build"
+                exit 1
+            fi
+            
+            echo "✅ Local build complete. Image tagged as :local"
+            echo "To run locally: docker compose -f docker-compose.prod.yml up"
+            exit 0
+            ;;
+        
+        "deploy-only")
+            echo "=== DEPLOY-ONLY MODE (no build/push) ==="
+            echo "Pulling latest image and deploying without building"
+            
+            # Just pull and deploy - skip all build/push logic
+            echo "Pulling latest image from Docker Hub..."
+            docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
+            
+            echo "Stopping old container..."
+            docker stop "$CONTAINER" 2>/dev/null || true
+            docker rm -f "$CONTAINER" 2>/dev/null || true
+            
+            echo "Starting new container..."
+            docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+            
+            echo "✅ Deploy-only complete"
+            exit 0
+            ;;
+        
+        "monitor"|"full"|"quick"|"pull_only"|"stop_all"|"git_pull"|"lib_sync"|"manual_server")
+            # These are handled by the existing non-interactive block below
+            ;;
+        
+        *)
+            echo "Unknown DEPLOY_MODE: $DEPLOY_MODE"
+            exit 1
+            ;;
+    esac
+fi
+
+# ── Non-interactive Deploy Mode (legacy modes) ─────────────────────────────────
 if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
     echo "Non-interactive Deploy Mode requested: $DEPLOY_MODE"
     case "$DEPLOY_MODE" in
