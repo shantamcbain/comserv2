@@ -161,13 +161,17 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                    <a href="[% c.uri_for('/admin/docker-containers-working') %]" class="admin-link">
                         <i class="fas fa-cubes"></i>
                         <span>Docker Containers (Production)</span>
                     </a>
-                    <a href="[% c.uri_for('/admin/docker-containers-old') %]" class="admin-link">
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
                         <i class="fas fa-flask"></i>
                         <span>Docker Containers (Development)</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/docker-containers-old') %]" class="admin-link">
+                        <i class="fas fa-archive"></i>
+                        <span>Docker Containers (Legacy)</span>
                     </a>
                 </div>
             </div>

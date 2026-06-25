@@ -7048,6 +7048,28 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     );
 }
 
+sub docker_containers_working :Path('/admin/docker-containers-working') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers_working',
+        "Docker containers working (production) page accessed");
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_containers')) {
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker/docker_containers_working.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
 sub docker_containers_old :Path('/admin/docker-containers-old') :Args(0) {
     my ($self, $c) = @_;
 
