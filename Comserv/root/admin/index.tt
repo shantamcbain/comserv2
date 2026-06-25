@@ -10,7 +10,7 @@
     </div>
 
     <nav class="admin-quick-nav">
-        [% IF is_csc %]<a href="[% c.uri_for('/admin/docker-containers') %]"><i class="fas fa-docker"></i> Docker</a>[% END %]
+        [% IF is_csc %]<a href="[% c.uri_for('/admin/docker') %]"><i class="fas fa-docker"></i> Docker</a>[% END %]
         [% IF is_csc %]<a href="#section-software"><i class="fas fa-cogs"></i> Software</a>[% END %]
         <a href="#section-helpdesk"><i class="fas fa-life-ring"></i> HelpDesk</a>
         [% IF has_accounting %]<a href="#section-accounting"><i class="fas fa-book"></i> Accounting &amp; Inventory</a>[% END %]
