@@ -1,0 +1,2271 @@
+[% META
+   title = 'Docker Container Management'
+   version = '1.0'
+   author = 'AI Assistant'
+   date = '2025-12-14'
+   last_modified = '2025-12-14'
+   category = 'admin'
+   tags = 'docker, containers, infrastructure'
+%]
+[% PageVersion = 'docker_containers.tt,v 1.0 2025/12/14 ai_assistant Exp ai_assistant ' %]
+
+<!-- xterm.js for SSH Terminal -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
+<style>
+.collapsible-header {
+    cursor: pointer;
+    user-select: none;
+}
+.collapsible-header:hover {
+    background-color: var(--bg-secondary, #e9ecef) !important;
+}
+.collapsible-content {
+    display: none;
+}
+.collapsible-content.expanded {
+    display: block;
+}
+.chevron-icon {
+    transition: transform 0.2s ease;
+}
+.chevron-icon.expanded {
+    transform: rotate(90deg);
+}
+</style>
+
+<div class="app-container" style="margin: 20px auto; max-width: 1200px;">
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;">
+        <h1 style="margin: 0;"><i class="icon-docker"></i> Docker Container Management</h1>
+        <div>
+            <a href="/admin/docker-containers-old" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 6px 12px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; transition: background-color 0.2s;">
+                <i class="fas fa-history"></i> Switch to Old View (Scrolling Layout)
+            </a>
+        </div>
+    </div>
+
+    [% IF !docker_available %]
+    <div class="alert alert-warning" role="alert">
+        <strong>Notice:</strong> Docker container management is not available from within a Docker container.
+        Use the host development server:
+        <a href="http://workstation.local:3001/admin/docker-containers" style="font-weight:bold;">
+            Open Docker Management on port 3001 →
+        </a>
+        <br><small style="color: var(--text-muted-color, #666);">You will need to log in separately at port 3001 (sessions are per-port).</small>
+    </div>
+    [% ELSE %]
+    
+    <!-- Docker Host System Selector -->
+    <div class="compact-card" style="margin-bottom: 15px; border-left: 4px solid #0066cc;">
+        <div class="compact-card-body" style="padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; background-color: #f8f9fa;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label for="docker-target-select" style="font-weight: bold; font-size: 13px; color: var(--text-color, #333); margin-bottom: 0; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-server" style="color: #0066cc;"></i> Docker System Target:
+                </label>
+                <select id="docker-target-select" class="form-control" style="width: auto; display: inline-block; font-size: 12px; padding: 4px 10px; height: 30px; border-radius: 4px; border: 1px solid #ccc;" onchange="onTargetChange()">
+                    <option value="workstation" selected>Workstation (Local Host)</option>
+                    <option value="production1">Production 1 (192.168.1.126)</option>
+                    <option value="production2">Production 2 (192.168.1.127)</option>
+                </select>
+            </div>
+            <div id="target-info-display" style="font-size: 11px; color: #666; font-style: italic;">
+                Active System: <strong>Workstation (Local Host)</strong>
+            </div>
+        </div>
+    </div>
+    
+    <div class="dashboard-grid">
+        <!-- Left Column: Container Info, Controls & Deployment Tools -->
+        <div class="dashboard-col-left">
+            <!-- Container Status Overview -->
+            <div class="compact-card">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('container-status')" style="background-color: #f8f9fa;">
+                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-container-status" style="margin-right: 8px;"></i>
+                            <i class="icon-list" style="margin-right: 8px; color: #0066cc;"></i>
+                            Container Status Overview
+                        </span>
+                        <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
+                            <i class="icon-refresh"></i> Refresh
+                        </button>
+                    </h4>
+                </div>
+                <div id="container-status" class="compact-card-body collapsible-content">
+                    <div id="containers-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <p style="color: #666; text-align: center; font-size: 11px; margin: 5px 0;">Loading container information...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Recovery Backups -->
+            <div class="compact-card">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('backups-status')" style="background-color: #f8f9fa;">
+                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-backups-status" style="margin-right: 8px;"></i>
+                            <i class="fas fa-history" style="margin-right: 8px; color: #6c757d;"></i>
+                            Available Recovery Backups
+                        </span>
+                        <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
+                            <i class="icon-refresh"></i> Refresh
+                        </button>
+                    </h4>
+                </div>
+                <div id="backups-status" class="compact-card-body collapsible-content">
+                    <div id="backups-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <p style="color: #666; text-align: center; font-size: 11px; margin: 5px 0;">Loading backup information...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Volume Status Overview -->
+            <div class="compact-card">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('volumes-status')" style="background-color: #f8f9fa;">
+                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-volumes-status" style="margin-right: 8px;"></i>
+                            <i class="icon-storage" style="margin-right: 8px; color: #17a2b8;"></i>
+                            Volume Status Overview
+                        </span>
+                        <button class="compact-btn" onclick="event.stopPropagation(); refreshVolumes();" style="background-color: #6c757d; color: white;">
+                            <i class="icon-refresh"></i> Refresh
+                        </button>
+                    </h4>
+                </div>
+                <div id="volumes-status" class="compact-card-body collapsible-content">
+                    <div id="volumes-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <p style="color: #666; text-align: center; font-size: 11px; margin: 5px 0;">Loading volume information...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Container Controls -->
+            <div class="compact-card">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('container-controls')" style="background-color: #f8f9fa;">
+                    <h4 style="margin: 0; display: flex; align-items: center; font-size: 13px; color: var(--text-color, #333);">
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-container-controls" style="margin-right: 8px;"></i>
+                        <i class="icon-tools" style="margin-right: 8px; color: #ffc107;"></i>
+                        Container Controls
+                    </h4>
+                </div>
+                <div id="container-controls" class="compact-card-body collapsible-content">
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
+                        <div style="flex: 1 1 150px;">
+                            <label for="service-select" style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 2px;">Select Service:</label>
+                            <select id="service-select" style="width:100%; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid #ccc; height: 28px;">
+                                <option value="">-- Select a service --</option>
+                                <option value="all">All Services</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                            <button id="restart-btn" onclick="restartContainer()" class="compact-btn" style="background-color: #0066cc; color: white;">
+                                <i class="icon-refresh"></i> Restart
+                            </button>
+                            <button id="rebuild-btn" onclick="rebuildContainer()" class="compact-btn" style="background-color: #ffc107; color: #333;">
+                                🔨 Rebuild
+                            </button>
+                            <button id="logs-btn" onclick="viewLogs()" class="compact-btn" style="background-color: #17a2b8; color: white;">
+                                <i class="icon-log"></i> Logs
+                            </button>
+                            <button id="prune-btn" onclick="pruneDockerSystem()" class="compact-btn" style="background-color: #dc3545; color: white;">
+                                🗑️ Prune
+                            </button>
+                            <button id="disk-usage-btn" onclick="showDiskUsage()" class="compact-btn" style="background-color: #6c757d; color: white;">
+                                💾 Disk
+                            </button>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <label for="force-restart" style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="force-restart" style="width: 14px; height: 14px; margin: 0;">
+                            <span>Force restart (down/up cycle)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Production Deployment -->
+            <div class="compact-card" style="border: 1px solid #ffeaa7;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('production-deployment')" style="background-color: #fff3cd; border-bottom: 1px solid #ffeaa7;">
+                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #856404;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-production-deployment" style="margin-right: 8px;"></i>
+                            <i class="fas fa-rocket" style="margin-right: 8px; color: #dc3545;"></i>
+                            Production Deployment Panel
+                        </span>
+                        <span style="font-size: 9px; background-color: #dc3545; color: white; padding: 1px 5px; border-radius: 3px; font-weight: bold;">CAUTION</span>
+                    </h4>
+                </div>
+                <div id="production-deployment" class="compact-card-body collapsible-content">
+                    <!-- Collapsible Connection Settings (Normally Closed) -->
+                    <div class="compact-card" style="margin-bottom: 12px; border: 1px dashed #ffeaa7;">
+                        <div class="compact-card-header collapsible-header" onclick="toggleSection('deploy-connection-settings')" style="background-color: #fff9db; padding: 6px 10px;">
+                            <span style="font-size: 11px; font-weight: bold; color: #856404; display: flex; align-items: center; gap: 4px;">
+                                <i class="fas fa-chevron-right chevron-icon" id="chevron-deploy-connection-settings"></i>
+                                <i class="fas fa-sliders-h"></i> Target Connection & SSH Settings (Click to expand)
+                            </span>
+                        </div>
+                        <div id="deploy-connection-settings" class="compact-card-body collapsible-content" style="padding: 10px; background-color: #fafdf6;">
+                            <div class="compact-form-grid" style="margin-bottom: 8px;">
+                                <div class="compact-form-group">
+                                    <label for="deploy-service-select" title="Select whether to deploy web-prod (optimized production container) or web-dev (debug container)." style="cursor: help;">Service to Deploy:</label>
+                                    <select id="deploy-service-select">
+                                        <option value="web-prod">web-prod (Production)</option>
+                                        <option value="web-dev">web-dev (Development)</option>
+                                    </select>
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="ssh-target-select" title="Select a preconfigured SSH target profile to automatically fill host and port values." style="cursor: help;">SSH Target:</label>
+                                    <select id="ssh-target-select" onchange="updateSSHTarget()">
+                                        <option value="custom">Custom...</option>
+                                        <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
+                                        <option value="shanta@workstation.local">shanta@workstation.local</option>
+                                    </select>
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="production-host" title="The hostname or IP address of the remote host (e.g., Production 1 or Production 2)." style="cursor: help;">Production Server:</label>
+                                    <input type="text" id="production-host" value="ubuntu@192.168.1.126">
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="ssh-port" title="The secure shell port of the remote host (default is 22)." style="cursor: help;">SSH Port:</label>
+                                    <input type="number" id="ssh-port" value="22" min="1" max="65535">
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="ssh-password" title="SSH authentication password (not saved on disk, processed securely in memory)." style="cursor: help;">SSH Password:</label>
+                                    <div style="position: relative;">
+                                        <input type="password" id="ssh-password" placeholder="SSH password" style="width: 100%; padding-right: 32px;">
+                                        <button onclick="togglePasswordVisibility()" type="button" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; font-size: 11px; padding: 0;">
+                                            <i id="password-eye-icon" class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="production-directory" title="Absolute directory path on the remote production server where comserv application is located." style="cursor: help;">Production Dir:</label>
+                                    <input type="text" id="production-directory" value="/opt/comserv/Comserv">
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 5px; font-size: 11px; color: #dc3545; display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" id="recreate-volumes" style="width: 14px; height: 14px; margin: 0; cursor: pointer;">
+                                <label for="recreate-volumes" style="font-weight: bold; cursor: pointer; margin: 0; color: #dc3545;">Recreate NFS Volumes (CAUTION: Removes logs & workshop data)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
+                        <button onclick="openSSHTerminal()" class="compact-btn" style="background-color: #0066cc; color: white;">
+                            <i class="fas fa-terminal"></i> Terminal
+                        </button>
+                        <button onclick="testSSHConnection()" class="compact-btn" style="background-color: #6c757d; color: white;">
+                            <i class="fas fa-network-wired"></i> Test Connect
+                            <span id="ssh-status-indicator" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #ccc; border: 1px solid #999; margin-left: 2px;"></span>
+                        </button>
+                        <button onclick="saveDockerImage()" class="compact-btn" style="background-color: #17a2b8; color: white;">
+                            <i class="fas fa-save"></i> Save Image
+                        </button>
+                        <button onclick="deployToProduction()" class="compact-btn" style="background-color: #dc3545; color: white;">
+                            <i class="fas fa-rocket"></i> Auto Deploy (Hub)
+                        </button>
+                        <button onclick="deployToProduction(1)" class="compact-btn" style="background-color: #ff9800; color: white;" title="Bypass Rebuild & Push">
+                            <i class="fas fa-bolt"></i> Quick Deploy
+                        </button>
+                        <button onclick="showDeploymentCommands()" class="compact-btn" style="background-color: #28a745; color: white;">
+                            <i class="fas fa-code"></i> Show Commands
+                        </button>
+                    </div>
+
+                    <!-- Hidden Collapsible Commands View -->
+                    <div id="quick-commands" style="display: none; font-size: 11px; font-family: monospace; background-color: #222; color: #00ff00; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto; margin-top: 10px;">
+                        <div style="margin-bottom: 6px; font-weight: bold; color: #ffc107;">→ Workstation Compilation & Hub Push Commands</div>
+                        <div style="margin-left: 10px; margin-bottom: 4px; color: #ccc;">Build & Run Local Dev:</div>
+                        <div style="margin-left: 10px; margin-bottom: 6px; background-color:#111; padding: 4px; cursor: pointer;" onclick="copyToClipboard('docker compose build web-dev && docker compose up -d --force-recreate web-dev')">
+                            docker compose build web-dev && docker compose up -d --force-recreate web-dev
+                        </div>
+                        <div style="margin-left: 10px; margin-bottom: 4px; color: #ccc;">Build Prod Container:</div>
+                        <div style="margin-left: 10px; margin-bottom: 6px; background-color:#111; padding: 4px; cursor: pointer;" onclick="copyToClipboard('cd Comserv && docker compose -f docker-compose.prod.yml build')">
+                            cd Comserv && docker compose -f docker-compose.prod.yml build
+                        </div>
+                        <div style="margin-left: 10px; margin-bottom: 4px; color: #ccc;">Push Container to Hub:</div>
+                        <div style="margin-left: 10px; margin-bottom: 6px; background-color:#111; padding: 4px; cursor: pointer;" onclick="copyToClipboard('docker compose -f docker-compose.prod.yml push')">
+                            docker compose -f docker-compose.prod.yml push
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Embedded SSH Terminal -->
+            <div class="compact-card" style="border: 1px solid #444;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('ssh-terminal-section')" style="background-color: #1e1e1e; color: #00ff00;">
+                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-ssh-terminal-section" style="margin-right: 8px;"></i>
+                            <i class="fas fa-terminal" style="margin-right: 8px;"></i>
+                            Interactive SSH Terminal
+                        </span>
+                        <span class="badge-pill" style="background-color: #00ff00; color: #1e1e1e;">EMBEDDED</span>
+                    </h4>
+                </div>
+                <div id="ssh-terminal-section" class="compact-card-body collapsible-content" style="padding: 10px; background-color: #111;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="font-size: 10px; font-weight: bold; color: #00ff00; display: block; margin-bottom: 2px;">SSH Target:</label>
+                            <input type="text" id="ssh-terminal-target" value="ubuntu@192.168.1.126" style="width: 100%; padding: 4px 6px; font-size: 11px; background: #000; border: 1px solid #333; color: #00ff00; border-radius: 4px; height: 24px;">
+                        </div>
+                        <div>
+                            <label style="font-size: 10px; font-weight: bold; color: #00ff00; display: block; margin-bottom: 2px;">SSH Password:</label>
+                            <div style="position: relative;">
+                                <input type="password" id="ssh-terminal-password" placeholder="Password" style="width: 100%; padding: 4px 6px; padding-right: 30px; font-size: 11px; background: #000; border: 1px solid #333; color: #00ff00; border-radius: 4px; height: 24px;">
+                                <button onclick="toggleSSHTerminalPassword()" type="button" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #00ff00; font-size: 10px; padding: 0;">
+                                    <i id="ssh-terminal-password-eye" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                        <button id="ssh-connect-btn" onclick="connectSSHTerminal()" class="compact-btn" style="background-color: #28a745; color: white; height: 24px; padding: 2px 10px; font-size: 11px;">Connect</button>
+                        <button id="ssh-disconnect-btn" onclick="disconnectSSHTerminal()" disabled class="compact-btn" style="background-color: #dc3545; color: white; height: 24px; padding: 2px 10px; font-size: 11px;">Disconnect</button>
+                        <span id="ssh-connection-status" style="color: #ccc; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-circle" style="color: #6c757d;"></i> Offline
+                        </span>
+                    </div>
+                    <div id="ssh-terminal-container" style="background-color: #000; border: 1px solid #333; border-radius: 4px; height: 300px; padding: 5px;">
+                        <div id="ssh-xterm-terminal"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Console -->
+            <div class="compact-card">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('output-console-section')" style="background-color: #f8f9fa;">
+                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-output-console-section" style="margin-right: 8px;"></i>
+                            <i class="icon-log" style="margin-right: 8px; color: #6c757d;"></i>
+                            Output / Terminal Logs
+                        </span>
+                        <button onclick="event.stopPropagation(); clearOutput();" class="compact-btn" style="background-color: #6c757d; color: white;">Clear</button>
+                    </h4>
+                </div>
+                <div id="output-console-section" class="compact-card-body collapsible-content">
+                    <div id="last-deploy-banner" style="display:none; margin-bottom: 8px; padding: 4px 8px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; font-size: 11px; font-family: monospace;">
+                        <strong>Last log:</strong> <span id="last-deploy-file"></span>
+                        <button onclick="loadHistoryIntoOutput()" style="margin-left: 8px; padding: 1px 4px; font-size: 10px; background-color:#0066cc; color:white; border:none; border-radius:3px; cursor:pointer;">Load</button>
+                    </div>
+                    <div id="output-box" style="background-color: #222; border: 1px solid #333; border-radius: 4px; padding: 8px; 
+                        font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; color: #fff;">
+                        Ready...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Strategic Deployment Plan & File Tracking Matrix -->
+        <div class="dashboard-col-right">
+            <!-- Strategic Plan Card (Normally Closed) -->
+            <div class="compact-card" style="border: 2px solid #0056b3;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('strategic-roadmap')" style="background-color: #e8f4fd; border-bottom: 1px solid #b3d7ff; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #0056b3; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-strategic-roadmap" style="margin-right: 8px;"></i>
+                            <i class="fas fa-map-marked-alt"></i> Strategic Deployment Roadmap & Steps
+                        </span>
+                    </h4>
+                    <span class="badge-pill" style="background-color: #0056b3;">ACTIVE PIPELINE</span>
+                </div>
+                <div id="strategic-roadmap" class="compact-card-body collapsible-content" style="padding: 10px 12px;">
+                    <p style="margin: 0 0 10px 0; font-size: 11px; line-height: 1.4; color: #555;">
+                        This system transitions the Catalyst web server away from fragile bare-metal processes into an isolated, self-healing, multi-node configuration.
+                    </p>
+
+                    <!-- Step 1 -->
+                    <div class="pipeline-step healthy">
+                        <div class="pipeline-step-header">
+                            <span style="color: #1e5a1e;"><i class="fas fa-check-circle"></i> Step 1: Starman-in-Docker Configuration</span>
+                            <span class="badge-pill badge-healthy">HEALTHY</span>
+                        </div>
+                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
+                            <strong>Goal:</strong> Standardize environment. Starman runs natively <em>inside</em> the Docker container, isolating libraries from host system scripts.
+                            <br><strong>Verification:</strong> Station container listens on port 3000, separating runtime execution from host.
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="pipeline-step progress">
+                        <div class="pipeline-step-header">
+                            <span style="color: #856404;"><i class="fas fa-spinner fa-spin"></i> Step 2: Automated Deployment & Host Migration</span>
+                            <span class="badge-pill badge-progress" style="background-color: #ffc107; color: #333; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: bold;">TESTING PENDING</span>
+                        </div>
+                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
+                            <strong>Goal:</strong> Zero port collision. Remote <code>deploy.sh</code> stops host systemd <code>starman.service</code>, parses database connections, and splits secrets into <code>/home/ubuntu/.comserv/secrets/dbi/*.json</code>.
+                            <br><strong>Verification:</strong> Run "Quick Deploy" or "Auto Deploy (Hub)" to target server, verifying zero-downtime startup. (Note: Currently running pre-docker code from Feb 4, testing is pending).
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="pipeline-step progress">
+                        <div class="pipeline-step-header">
+                            <span style="color: #856404;"><i class="fas fa-spinner fa-spin"></i> Step 3: Clone Production 2 VM on Proxmox 710</span>
+                            <span class="badge-pill badge-progress">50% DONE</span>
+                        </div>
+                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
+                            <strong>Goal:</strong> Create a full-cloned testing playground VM. Production 2 mirrors Prod 1 but remains independent.
+                            <br><strong>Verification:</strong> Allocate discrete IP/NIC inside Dell Proxmox VE, then test deploying the container directly onto Production 2 first.
+                        </div>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="pipeline-step planned">
+                        <div class="pipeline-step-header">
+                            <span style="color: #0f6674;"><i class="fas fa-route"></i> Step 4: Dynamic OPNsense Traffic Redirection</span>
+                            <span class="badge-pill badge-planned">PLANNED</span>
+                        </div>
+                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
+                            <strong>Goal:</strong> Setup OPNsense gateway load-balancing. Public traffic goes to Production 1, while newly-updated staging containers are tested on Production 2.
+                            <br><strong>Verification:</strong> HAProxy continuously probes <code>http://[IP]:5000/health</code>, performing instant failover to Production 2 (or workstation) if Prod 1 returns an error.
+                        </div>
+                    </div>
+
+                    <!-- Step 5 -->
+                    <div class="pipeline-step k8s">
+                        <div class="pipeline-step-header">
+                            <span style="color: #4c118e;"><i class="fas fa-dharmachakra"></i> Step 5: Kubernetes (K8s) Cluster Integration Node</span>
+                            <span class="badge-pill badge-k8s">K8s ROADMAP</span>
+                        </div>
+                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
+                            <strong>Goal:</strong> <strong>Optimal K8s Integration Point:</strong> Once single-container setups on Prod 1 & 2 are validated, deploy lightweight <strong>K3s / MicroK8s</strong> on our Proxmox nodes. Wrap Compose setups into Helm charts.
+                            <br><strong>Verification:</strong> K8s natively manages high-availability replication, self-healing liveness probes, automated rollbacks, and centralized secret vault sync.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Step-by-Step Setup Guide (Normally Closed) -->
+            <div class="compact-card" style="border: 1px solid #28a745;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('manual-setup-guide')" style="background-color: #e8f5e9; border-bottom: 1px solid #c8e6c9; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #1b5e20; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-manual-setup-guide" style="margin-right: 8px;"></i>
+                            <i class="fas fa-list-ol"></i> Manual Step-by-Step Setup Guide
+                        </span>
+                    </h4>
+                    <span class="badge-pill" style="background-color: #28a745; color: white;">MANUAL SETUP</span>
+                </div>
+                <div id="manual-setup-guide" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px; line-height: 1.4; color: #333;">
+                    <p style="margin: 0 0 10px 0; color: #555;">Follow these exact manual steps to deploy the Docker container to Production if the automated script fails.</p>
+                    
+                    <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px;">
+                        <li>
+                            <strong>Build Container Locally</strong>: Compile the production Docker image on the Workstation.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">cd /home/shanta/.zenflow/worktrees/docker-5c15/Comserv && docker compose -f docker-compose.prod.yml build</pre>
+                        </li>
+                        <li>
+                            <strong>Push Image to Docker Hub</strong>: Upload the compiled layers to the shared hub.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">docker compose -f docker-compose.prod.yml push</pre>
+                        </li>
+                        <li>
+                            <strong>Stop Host-Side Services on Server</strong>: SSH to remote host and free up port 5000.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl stop starman.service && sudo systemctl disable starman.service"</pre>
+                        </li>
+                        <li>
+                            <strong>Pull Image on Server</strong>: Fetch the latest image from Docker Hub on the remote server.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml pull"</pre>
+                        </li>
+                        <li>
+                            <strong>Launch Container on Server</strong>: Start the production container in detached mode.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml up -d --force-recreate"</pre>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Emergency Host Starman Fallback (Normally Closed) -->
+            <div class="compact-card" style="border: 1px solid #dc3545;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('emergency-fallback-guide')" style="background-color: #fdf2f2; border-bottom: 1px solid #f5c6cb; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #721c24; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-emergency-fallback-guide" style="margin-right: 8px;"></i>
+                            <i class="fas fa-exclamation-triangle"></i> Emergency Host Starman Fallback
+                        </span>
+                    </h4>
+                    <span class="badge-pill" style="background-color: #dc3545; color: white;">EMERGENCY BYPASS</span>
+                </div>
+                <div id="emergency-fallback-guide" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px; line-height: 1.4; color: #333;">
+                    <div style="background-color: #fdf2f2; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                        <div style="flex: 1 1 250px;">
+                            <strong style="color: #721c24; font-size: 12px;"><i class="fas fa-play"></i> Automated Fallback Action</strong>
+                            <p style="margin: 3px 0 0 0; color: #721c24; font-size: 11px;">Triggers the fallback sequence via SSH: stops the container, releases port 5000, updates symlinks, resets systemd counters, and starts Starman on the host.</p>
+                        </div>
+                        <button onclick="startHostStarman()" class="btn btn-danger btn-sm" style="background-color: #dc3545; border-color: #dc3545; color: white; font-weight: bold; padding: 6px 15px; cursor: pointer; border-radius: 4px;">
+                            <i class="fas fa-play"></i> Start Host Starman Service Now
+                        </button>
+                    </div>
+
+                    <p style="margin: 0 0 10px 0; color: #555;">If the Docker container continuously becomes unhealthy or fails to recover, run these command-line steps to stop the container and switch back to the host-side Starman service.</p>
+                    
+                    <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px;">
+                        <li>
+                            <strong>Stop & Remove the Docker Container</strong>:
+                            <pre id="emergency-cmd-stop-compose" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down"</pre>
+                            Alternative direct docker force stop command if compose is stuck:
+                            <pre id="emergency-cmd-stop-direct" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "docker stop comserv2-web-prod && docker rm comserv2-web-prod"</pre>
+                        </li>
+                        <li>
+                            <strong>Reset Failed systemd Counters and Start Starman Service</strong>:
+                            <pre id="emergency-cmd-start-starman" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service"</pre>
+                        </li>
+                        <li>
+                            <strong>Verify Host-side Starman Service Health</strong>:
+                            <pre id="emergency-cmd-status-starman" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl status starman.service"</pre>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- File and Directory Reference Card (Normally Closed) -->
+            <div class="compact-card" style="border: 1px solid #17a2b8;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('file-reference-map')" style="background-color: #e3f2fd; border-bottom: 1px solid #bbeeeb; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #0c5460; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-file-reference-map" style="margin-right: 8px;"></i>
+                            <i class="fas fa-folder-open"></i> File Tracking & Reference Map
+                        </span>
+                    </h4>
+                    <span class="badge-pill" style="background-color: #17a2b8;">FILE SYSTEM</span>
+                </div>
+                <div id="file-reference-map" class="compact-card-body collapsible-content" style="padding: 6px 10px;">
+                    <table class="file-table" style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #ddd; text-align: left;">
+                                <th style="padding: 4px;">File / Asset</th>
+                                <th style="padding: 4px;">Git Tracking</th>
+                                <th style="padding: 4px;">Path & Location</th>
+                                <th style="padding: 4px;">Purpose / Role</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="comserv_server.psgi: Catalyst PSGI entry point for Starman. Executed inside the container, this script enables ReverseProxy to pass correct headers (Client IP, SSL status) forward from the OPNsense / HAProxy gateway, preventing routing collisions." style="cursor: help;">comserv_server.psgi</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/comserv_server.psgi</code></td>
+                                <td style="padding: 4px;" title="Catalyst entry point executed by Starman within the container.">Core PSGI start wrapper.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="deploy.sh: Remote server orchestration script. When triggered, it stops bare-metal host starman.service, backs up running containers (keeping last 2), pulls the new image, starts it, runs health checks, and on failure automatically rolls back to backup and restarts host services, sending log notifications to the admin." style="cursor: help;">deploy.sh</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/deploy.sh</code></td>
+                                <td style="padding: 4px;" title="Automates remote server port freeing, database file splitting, and starting docker.">Remote host recovery/orchestration.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="deploy_docker_to_production.pl: Workstation SSH wrapper script. Steps: 1. Compiles the 'web-prod' image locally. 2. Pushes image to Docker Hub. 3. Copies deploy.sh and docker-compose.server.yml to the remote host. 4. Executes deploy.sh over SSH. 5. Streams all stdout/stderr logs live to the workstation dashboard." style="cursor: help;">deploy_docker_to_production.pl</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/deploy_docker_to_production.pl</code></td>
+                                <td style="padding: 4px;" title="Perl SSH wrapper that compiles, builds, and pushes Docker images to the production server.">Local SSH deployment wrapper.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="Dockerfile: Two-stage container build spec. Stage 1 compiles external CPAN dependencies using native development tools. Stage 2 copies the compiled binaries, sets up the restricted 'comserv' system user, and configures the container to execute Starman in a fully secured, isolated sandbox environment." style="cursor: help;">Dockerfile</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/Dockerfile</code></td>
+                                <td style="padding: 4px;" title="Blueprint for building the application's multi-stage Docker container with runtime Perl environment.">Two-stage packaging blueprint.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="docker-compose.prod.yml: Workstation build configuration. Dictates the precise build arguments, target platforms, and environment tags required to package comserv-web-prod locally on development machines before pushing the verified image layers to the centralized Docker Hub." style="cursor: help;">docker-compose.prod.yml</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/docker-compose.prod.yml</code></td>
+                                <td style="padding: 4px;" title="Configuration used on workstations to compile and push production-ready containers.">Compose build/push blueprint.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="docker-compose.server.yml: Production server compose runtime. Binds the container's isolated port 5000 directly to the host network interface, mounts active NFS volumes to persist user uploads, workshop assets, and system logs, and enforces automated, multi-attempt restart policies." style="cursor: help;">docker-compose.server.yml</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/docker-compose.server.yml</code></td>
+                                <td style="padding: 4px;" title="Configuration used on production servers to orchestrate containers and map port 5000.">Compose schema for running on servers.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="docker_containers.tt: The management dashboard template. It provides real-time WebSockets SSH terminal feeds, triggers compilation/deployment REST endpoints, visualizes active container health checks, and lists strategic and manual recovery roadmap guides." style="cursor: help;">docker_containers.tt</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/root/admin/docker_containers.tt</code></td>
+                                <td style="padding: 4px;" title="Template of this interactive deployment panel providing deployment, logging, and status tracking.">Interactive deployment dashboard.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="db_config.json: Host-side raw database connections (not committed)." style="cursor: help;">db_config.json</strong></td>
+                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Host)</span></td>
+                                <td style="padding: 4px;"><code>/opt/comserv/Comserv/db_config.json</code></td>
+                                <td style="padding: 4px;" title="Host-side secrets file containing database connection details.">Host raw DB connections.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="ssh_credentials.json: Workstation deployment secrets & SSH credentials." style="cursor: help;">ssh_credentials.json</strong></td>
+                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Local)</span></td>
+                                <td style="padding: 4px;"><code>~/.comserv/secrets/ssh_credentials.json</code></td>
+                                <td style="padding: 4px;" title="Local workstation deployment configurations and server passwords.">Workstation SSH deployment secrets.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title=".env: Contains runtime environment variables, ports, and feature flags." style="cursor: help;">.env</strong></td>
+                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Host)</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/.env</code></td>
+                                <td style="padding: 4px;" title="Environment variables file managing host-side overrides.">Runtime environment variables.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Docker Diagnostics & Central Fallback Status (Normally Closed) -->
+            <div class="compact-card" style="border: 2px solid #28a745; margin-top: 15px;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('docker-diagnostics-card')" style="background-color: #e8f5e9; border-bottom: 1px solid #c8e6c9; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #1b5e20; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-docker-diagnostics-card" style="margin-right: 8px;"></i>
+                            <i class="fas fa-heartbeat"></i> Diagnostics & Central Fallback Status
+                        </span>
+                    </h4>
+                    <button class="compact-btn" onclick="event.stopPropagation(); loadDiagnostics();" style="background-color: #28a745; color: white;">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div id="docker-diagnostics-card" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px;">
+                    <div id="diagnostics-loader" style="text-align: center; color: #666; padding: 15px 0;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading system diagnostics...
+                    </div>
+                    <div id="diagnostics-content" style="display: none;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div style="background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                                <strong style="color: #333;"><i class="fas fa-dharmachakra"></i> Docker Compose Status:</strong>
+                                <div id="diag-compose" style="margin-top: 4px; font-family: monospace; white-space: pre-wrap; word-break: break-all;"></div>
+                            </div>
+                            <div style="background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                                <strong style="color: #333;"><i class="fas fa-plug"></i> Starman Service / Port Binding:</strong>
+                                <div id="diag-starman" style="margin-top: 4px; font-family: monospace; font-size: 10px; max-height: 80px; overflow-y: auto; white-space: pre-wrap;"></div>
+                                <div style="margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap;" id="diag-ports"></div>
+                                <div style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 8px;">
+                                    <button class="btn btn-danger btn-xs" onclick="startHostStarman()" style="font-size: 10px; padding: 3px 8px; font-weight: bold; background-color: #dc3545; border: none; color: white; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#bd2130'" onmouseout="this.style.backgroundColor='#dc3545'">
+                                        <i class="fas fa-exclamation-triangle"></i> Emergency Fallback: Start Host Starman
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 10px; background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                            <strong style="color: #333;"><i class="fas fa-code-branch"></i> Git Repository Status:</strong>
+                            <div id="diag-git" style="margin-top: 4px; font-family: monospace; white-space: pre-wrap; max-height: 100px; overflow-y: auto; background-color: #222; color: #00ff00; padding: 6px; border-radius: 4px;"></div>
+                        </div>
+
+                        <div style="margin-bottom: 10px; background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                            <strong style="color: #333;"><i class="fas fa-history"></i> Available Recovery Backups (comserv-web-prod):</strong>
+                            <div id="diag-backups" style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;"></div>
+                        </div>
+
+                        <div style="background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                            <strong style="color: #333;"><i class="fas fa-hdd"></i> Host System Resources:</strong>
+                            <table style="width: 100%; margin-top: 4px; font-family: monospace;">
+                                <tr><td style="width: 80px; color:#555;">Disk Space:</td><td id="diag-disk" style="word-break: break-all;"></td></tr>
+                                <tr><td style="color:#555;">Memory:</td><td id="diag-mem" style="word-break: break-all;"></td></tr>
+                                <tr><td style="color:#555;">Uptime:</td><td id="diag-uptime" style="word-break: break-all;"></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Host System Statistics Footer Status Bar -->
+    <div class="compact-card" style="margin-top: 20px; border-top: 3px solid #0066cc; background-color: #f8f9fa;">
+        <div class="compact-card-body" style="padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; font-size: 12px; color: #333;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-server" style="color: #0066cc; font-size: 14px;"></i>
+                <strong>Host System Stats:</strong>
+                <span id="footer-host-badge" class="badge-pill" style="background-color: #0066cc; color: white; padding: 1px 6px; border-radius: 3px; font-weight: bold; font-size: 10px;">WORKSTATION</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <div>
+                    <i class="fas fa-clock" style="color: #28a745;"></i> 
+                    <strong>Uptime:</strong> <span id="footer-uptime" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+                <div>
+                    <i class="fas fa-hdd" style="color: #17a2b8;"></i> 
+                    <strong>Disk Usage:</strong> <span id="footer-disk" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+                <div>
+                    <i class="fas fa-memory" style="color: #ffc107;"></i> 
+                    <strong>Memory:</strong> <span id="footer-mem" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+            </div>
+            <div style="font-size: 11px; color: #666; font-style: italic;">
+                Last Refreshed: <span id="footer-last-refresh">N/A</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Results Modal Popup -->
+    <div id="result-modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div style="background-color: #fff; margin: auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; max-height: 85vh;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 id="modal-title" style="margin: 0; font-size: 16px; font-weight: bold; color: #333; display: flex; align-items: center; gap: 6px;">Action Status</h3>
+                <span onclick="closeResultModal()" style="color: #aaa; font-size: 24px; font-weight: bold; cursor: pointer; line-height: 1;" onmouseover="this.style.color='#000'" onmouseout="this.style.color='#aaa'">&times;</span>
+            </div>
+            <div id="modal-body" style="font-size: 12px; line-height: 1.4; overflow-y: auto; max-height: 50vh; white-space: pre-wrap; font-family: monospace; background-color: #1e1e1e; color: #f8f8f2; padding: 12px; border-radius: 4px; border: 1px solid #333; word-break: break-all;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid #eee;">
+                <button onclick="closeResultModal()" style="padding: 6px 15px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; background-color: #0066cc; color: white; border: none;">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+    [% END %]
+</div>
+
+<script>
+    // Toggle collapsible sections
+    function toggleSection(sectionId) {
+        const content = document.getElementById(sectionId);
+        const chevron = document.getElementById('chevron-' + sectionId);
+        
+        if (content && chevron) {
+            content.classList.toggle('expanded');
+            chevron.classList.toggle('expanded');
+            
+            if (content.classList.contains('expanded')) {
+                if (sectionId === 'volumes-status') {
+                    refreshVolumes();
+                } else if (sectionId === 'container-status') {
+                    refreshContainers();
+                } else if (sectionId === 'docker-diagnostics-card') {
+                    loadDiagnostics();
+                }
+            }
+        }
+    }
+
+
+</script>
+
+<script>
+    const outputBox = document.getElementById('output-box');
+    const containersList = document.getElementById('containers-list');
+    let containersData = [];
+
+    function showResultPopup(title, content, isSuccess) {
+        const modal = document.getElementById('result-modal');
+        const mTitle = document.getElementById('modal-title');
+        const mBody = document.getElementById('modal-body');
+        if (modal && mTitle && mBody) {
+            let prefix = '🟢 ';
+            if (isSuccess === 'loading') {
+                prefix = '⏳ ';
+            } else if (!isSuccess) {
+                prefix = '🔴 ';
+            }
+            mTitle.innerHTML = prefix + title;
+            mBody.textContent = content;
+            modal.style.display = 'flex';
+        } else {
+            alert(title + ':\n' + content);
+        }
+    }
+
+    function closeResultModal() {
+        const modal = document.getElementById('result-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function appendOutput(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        outputBox.textContent += `[${timestamp}] ${message}\n`;
+        outputBox.scrollTop = outputBox.scrollHeight;
+    }
+
+    // Wrapper for all admin AJAX calls.
+    // Handles: session expiry (302 → login page HTML), server errors (5xx HTML), network errors.
+    function safeFetch(url, options) {
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        if (url.indexOf('target=') === -1) {
+            url += (url.indexOf('?') === -1 ? '?' : '&') + 'target=' + encodeURIComponent(target);
+        }
+        const opts = Object.assign({ credentials: 'same-origin', redirect: 'manual' }, options || {});
+        return fetch(url, opts).then(function(response) {
+            if (response.type === 'opaqueredirect' || response.status === 0 ||
+                (response.status >= 300 && response.status < 400)) {
+                appendOutput('✗ Session expired — reload the page (Ctrl+Shift+R) and log in again.');
+                return Promise.reject(new Error('session-expired'));
+            }
+            if (!response.ok) {
+                appendOutput(`✗ Server error (HTTP ${response.status}) — check server logs.`);
+                return Promise.reject(new Error(`HTTP ${response.status}`));
+            }
+            return response;
+        });
+    }
+
+    function clearOutput() {
+        outputBox.textContent = 'Ready for commands...\n';
+    }
+
+    function getSelectedService() {
+        const select = document.getElementById('service-select');
+        const service = select.value;
+        if (!service) {
+            alert('Please select a service');
+            return null;
+        }
+        return service;
+    }
+
+    function getStateColor(state) {
+        const stateColors = {
+            'running': '#28a745',
+            'up': '#28a745',
+            'exited': '#dc3545',
+            'exit': '#dc3545',
+            'restarting': '#ffc107',
+            'paused': '#6c757d',
+            'created': '#17a2b8',
+            'not_created': '#6c757d',
+            'unknown': '#6c757d'
+        };
+        return stateColors[state.toLowerCase()] || '#6c757d';
+    }
+
+    function getStateIcon(state) {
+        const stateIcons = {
+            'running': '▶',
+            'up': '▶',
+            'exited': '■',
+            'exit': '■',
+            'restarting': '↻',
+            'paused': '❚❚',
+            'created': '○',
+            'not_created': '○',
+            'unknown': '?'
+        };
+        return stateIcons[state.toLowerCase()] || '?';
+    }
+
+    let _lastDeployContent = '';
+
+    function loadDeployHistory() {
+        fetch('/admin/docker-deploy-history', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.latest_file) {
+                    _lastDeployContent = data.latest_content || '';
+                    const fname = data.latest_file.split('/').pop();
+                    document.getElementById('last-deploy-file').textContent = fname;
+                    document.getElementById('last-deploy-banner').style.display = 'block';
+                }
+            })
+            .catch(() => {});
+    }
+
+    function loadHistoryIntoOutput() {
+        if (_lastDeployContent) {
+            outputBox.textContent = '=== Last Deploy Log ===\n' + _lastDeployContent;
+            outputBox.scrollTop = outputBox.scrollHeight;
+        }
+    }
+
+    function loadSavedCredentials() {
+        fetch('/admin/docker-load-credentials', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.ssh_password) {
+                    document.getElementById('ssh-password').value = data.ssh_password;
+                    document.getElementById('production-host').value = data.ssh_target || 'ubuntu@192.168.1.126';
+                    document.getElementById('ssh-port').value = data.ssh_port || 22;
+                    if (document.getElementById('ssh-terminal-target'))
+                        document.getElementById('ssh-terminal-target').value = data.ssh_target || 'ubuntu@192.168.1.126';
+                    if (document.getElementById('ssh-terminal-password'))
+                        document.getElementById('ssh-terminal-password').value = data.ssh_password;
+                }
+            })
+            .catch(() => {});
+    }
+
+    function loadDiagnostics() {
+        const loader = document.getElementById('diagnostics-loader');
+        const content = document.getElementById('diagnostics-content');
+        if (loader) loader.style.display = 'block';
+        if (content) content.style.display = 'none';
+
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        safeFetch(`/admin/docker-diagnostics?target=${target}`)
+            .then(r => r.json())
+            .then(data => {
+                if (loader) loader.style.display = 'none';
+                if (!data || !data.success || !data.diagnostics) {
+                    if (content) {
+                        content.style.display = 'block';
+                        content.innerHTML = `<div style="color: #dc3545; padding: 10px; text-align: center;">Error loading diagnostics: ${data?.error || 'Unknown error'}</div>`;
+                    }
+                    return;
+                }
+
+                const d = data.diagnostics;
+                if (content) content.style.display = 'block';
+
+                // 1. Docker Compose
+                const compEl = document.getElementById('diag-compose');
+                if (compEl) {
+                    const isInstalled = d.compose_status && d.compose_status.indexOf('Not installed') === -1 && d.compose_status.indexOf('ERROR') === -1;
+                    compEl.innerHTML = `<span style="color: ${isInstalled ? '#28a745' : '#dc3545'}; font-weight: bold;">${isInstalled ? '🟢 Installed & Active' : '🔴 Not Detected / Error'}</span><br><span style="color: #666; font-size: 10px;">${d.compose_status || 'Unknown'}</span>`;
+                }
+
+                // 2. Starman Process Status
+                const starEl = document.getElementById('diag-starman');
+                if (starEl) {
+                    starEl.textContent = d.starman_status || 'No starman processes found';
+                }
+
+                // 3. Ports
+                const portsEl = document.getElementById('diag-ports');
+                if (portsEl) {
+                    portsEl.innerHTML = '';
+                    const monitored = ['3000', '3001', '5000'];
+                    monitored.forEach(port => {
+                        const active = d.active_ports && d.active_ports.includes(port);
+                        portsEl.innerHTML += `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 3px; font-size: 10px; background-color: ${active ? '#d4edda' : '#f8d7da'}; color: ${active ? '#155724' : '#721c24'}; border: 1px solid ${active ? '#c3e6cb' : '#f5c6cb'};">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: ${active ? '#28a745' : '#dc3545'};"></span>
+                            Port ${port}: ${active ? 'Bound' : 'Closed'}
+                        </span>`;
+                    });
+                }
+
+                // 4. Git
+                const gitEl = document.getElementById('diag-git');
+                if (gitEl) {
+                    gitEl.textContent = d.git_status || 'Unknown';
+                }
+
+                // 5. Backups
+                const backupsEl = document.getElementById('diag-backups');
+                if (backupsEl) {
+                    backupsEl.innerHTML = '';
+                    if (d.backups && d.backups.length > 0) {
+                        d.backups.forEach(backup => {
+                            backupsEl.innerHTML += `<div style="font-family: monospace; font-size: 10px; background: #e9ecef; padding: 4px 8px; border-radius: 3px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                                <span>📦 ${backup}</span>
+                                <span class="badge-pill" style="background-color: #17a2b8; font-size: 9px; padding: 1px 4px; border-radius: 2px; color: white;">ROLLBACK TARGET</span>
+                            </div>`;
+                        });
+                    } else {
+                        backupsEl.innerHTML = '<div style="color: #666; font-style: italic;">No recovery backup images found.</div>';
+                    }
+                }
+
+                // 6. Host Resources
+                const diskEl = document.getElementById('diag-disk');
+                if (diskEl) diskEl.textContent = d.disk || 'N/A';
+                const memEl = document.getElementById('diag-mem');
+                if (memEl) memEl.textContent = d.memory || 'N/A';
+                const uptimeEl = document.getElementById('diag-uptime');
+                if (uptimeEl) uptimeEl.textContent = d.uptime || 'N/A';
+
+                // Update horizontal footer status bar
+                const footerHostBadge = document.getElementById('footer-host-badge');
+                if (footerHostBadge) {
+                    footerHostBadge.textContent = (target || 'workstation').toUpperCase();
+                }
+                const footerUptime = document.getElementById('footer-uptime');
+                if (footerUptime) footerUptime.textContent = d.uptime || 'N/A';
+                const footerDisk = document.getElementById('footer-disk');
+                if (footerDisk) footerDisk.textContent = d.disk || 'N/A';
+                const footerMem = document.getElementById('footer-mem');
+                if (footerMem) footerMem.textContent = d.memory || 'N/A';
+                const footerRefresh = document.getElementById('footer-last-refresh');
+                if (footerRefresh) footerRefresh.textContent = new Date().toLocaleTimeString();
+            })
+            .catch(err => {
+                if (loader) loader.style.display = 'none';
+                if (content) {
+                    content.style.display = 'block';
+                    content.innerHTML = `<div style="color: #dc3545; padding: 10px; text-align: center;">Network/Server error loading diagnostics: ${err.message}</div>`;
+                }
+            });
+    }
+
+    function startHostStarman() {
+        const target = document.getElementById('docker-target-select')?.value || 'production1';
+        if (!confirm(`Are you sure you want to perform an Emergency Fallback and start Starman on host ${target}?\n\nThis will stop any running web container on port 5000 and run Starman on the host.`)) {
+            return;
+        }
+
+        showResultPopup('Starting Host Starman...', 'Connecting via SSH to host and triggering Starman startup sequence...\nThis may take up to 15 seconds.', 'loading');
+
+        fetch(`/admin/docker-start-starman?target=${target}`, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showResultPopup('Success', 'Host Starman started successfully:\n\n' + (data.message || ''), true);
+                    loadDiagnostics();
+                } else {
+                    showResultPopup('Error Starting Starman', data.error || 'Unknown error occurred.', false);
+                }
+            })
+            .catch(err => {
+                showResultPopup('Network Error', err.message || 'Network connection failed.', false);
+            });
+    }
+
+    function updateEmergencyCommands(target) {
+        let ip = '192.168.1.126';
+        if (target === 'production2') {
+            ip = '192.168.1.127';
+        } else if (target === 'workstation') {
+            ip = 'localhost';
+        }
+        
+        const stopCompose = document.getElementById('emergency-cmd-stop-compose');
+        if (stopCompose) {
+            if (target === 'workstation') {
+                stopCompose.innerText = 'cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down';
+            } else {
+                stopCompose.innerText = `ssh ubuntu@${ip} "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down"`;
+            }
+        }
+        
+        const stopDirect = document.getElementById('emergency-cmd-stop-direct');
+        if (stopDirect) {
+            if (target === 'workstation') {
+                stopDirect.innerText = 'docker stop comserv2-web-prod && docker rm comserv2-web-prod';
+            } else {
+                stopDirect.innerText = `ssh ubuntu@${ip} "docker stop comserv2-web-prod && docker rm comserv2-web-prod"`;
+            }
+        }
+        
+        const startStarman = document.getElementById('emergency-cmd-start-starman');
+        if (startStarman) {
+            if (target === 'workstation') {
+                startStarman.innerText = 'sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service';
+            } else {
+                startStarman.innerText = `ssh ubuntu@${ip} "sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service"`;
+            }
+        }
+        
+        const statusStarman = document.getElementById('emergency-cmd-status-starman');
+        if (statusStarman) {
+            if (target === 'workstation') {
+                statusStarman.innerText = 'sudo systemctl status starman.service';
+            } else {
+                statusStarman.innerText = `ssh ubuntu@${ip} "sudo systemctl status starman.service"`;
+            }
+        }
+    }
+
+    function onTargetChange() {
+        const targetSelect = document.getElementById('docker-target-select');
+        const targetText = targetSelect ? targetSelect.options[targetSelect.selectedIndex].text : 'Workstation';
+        const display = document.getElementById('target-info-display');
+        if (display) {
+            display.innerHTML = `Active System: <strong>${targetText}</strong>`;
+        }
+        
+        const targetVal = targetSelect ? targetSelect.value : 'workstation';
+        updateEmergencyCommands(targetVal);
+
+        appendOutput(`\n📡 Switched active system target to: ${targetText}\n`);
+        
+        refreshContainers();
+        loadDiagnostics();
+        
+        const volSection = document.getElementById('volumes-status');
+        if (volSection && volSection.classList.contains('expanded')) {
+            refreshVolumes();
+        }
+    }
+
+    function refreshContainers() {
+        containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>';
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+
+        fetch(`/admin/docker-list?target=${target}`, { credentials: 'same-origin', redirect: 'manual' })
+            .then(function(response) {
+                if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
+                    containersList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    return null;
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                if (!data) return;
+                if (!data.success) {
+                    containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
+                    return;
+                }
+
+                containersData = data.containers;
+                displayContainers(data.containers, data.host);
+                displayBackups(data.backups);
+                updateServiceDropdown(data.containers);
+            })
+            .catch(error => {
+                containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading containers: ${error.message}</p>`;
+            });
+    }
+
+    function displayBackups(backups) {
+        const backupsList = document.getElementById('backups-list');
+        if (!backupsList) return;
+        if (!backups || backups.length === 0) {
+            backupsList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center; font-size: 11px; margin: 5px 0;">No backups found</p>';
+            return;
+        }
+
+        let html = '';
+        backups.forEach(backup => {
+            html += `
+                <div style="border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 10px; background-color: rgba(255,255,255,0.88); display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <div style="font-size: 12px; color: var(--text-color, #333); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-archive" style="color: #6c757d;"></i>
+                        <strong>${backup}</strong>
+                    </div>
+                </div>`;
+        });
+        backupsList.innerHTML = html;
+    }
+
+    function refreshVolumes() {
+        const volumesList = document.getElementById('volumes-list');
+        volumesList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading volume information...</p>';
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+
+        fetch(`/admin/docker-volumes?target=${target}`, { credentials: 'same-origin', redirect: 'manual' })
+            .then(function(response) {
+                if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
+                    volumesList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    return null;
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                if (!data) return;
+                if (!data.success) {
+                    volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
+                    return;
+                }
+                displayVolumes(data.volumes);
+            })
+            .catch(error => {
+                volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading volumes: ${error.message}</p>`;
+            });
+    }
+
+    function displayVolumes(volumes) {
+        const volumesList = document.getElementById('volumes-list');
+        if (!volumes || volumes.length === 0) {
+            volumesList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">No volumes found</p>';
+            return;
+        }
+
+        let html = '';
+        volumes.forEach(vol => {
+            const isNfs    = vol.is_nfs === true || vol.is_nfs == 1;
+            const typeLabel = isNfs ? 'NFS' : (vol.driver || 'local');
+            const typeColor = isNfs ? '#17a2b8' : '#6c757d';
+            const typeIcon  = isNfs ? '🌐' : '💾';
+
+            const mountDisplay = vol.mountpoint
+                ? `<div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 4px;"><strong>Mountpoint:</strong> <code style="font-size: 11px;">${vol.mountpoint}</code></div>`
+                : '';
+
+            const nfsDetail = isNfs
+                ? `<div style="font-size: 12px; color: #17a2b8; margin-bottom: 4px;">
+                       <strong>NFS Server:</strong> ${vol.nfs_server || 'unknown'}
+                       &nbsp;|&nbsp;
+                       <strong>Export:</strong> ${vol.nfs_device || 'unknown'}
+                   </div>`
+                : '';
+
+            const labelsDisplay = vol.labels
+                ? `<div style="font-size: 11px; color: #999; margin-bottom: 4px;"><strong>Labels:</strong> ${vol.labels}</div>`
+                : '';
+
+            html += `
+                <div style="border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 12px; background-color: rgba(255,255,255,0.88);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <strong style="font-size: 14px;">${typeIcon} ${vol.name}</strong>
+                        <span style="background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">${typeLabel}</span>
+                    </div>
+                    ${nfsDetail}
+                    ${mountDisplay}
+                    ${labelsDisplay}
+                    <div style="font-size: 11px; color: #999;"><strong>Scope:</strong> ${vol.scope || 'local'}</div>
+                </div>`;
+        });
+
+        volumesList.innerHTML = html;
+    }
+
+    function displayContainers(containers, host) {
+        if (!containers || containers.length === 0) {
+            containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">No containers found</p>';
+            return;
+        }
+
+        const hostLabel = host ? `<div style="margin-bottom:10px;padding:6px 10px;background: var(--bg-secondary, #e9ecef);border-radius:4px;font-size:13px;"><strong>Server:</strong> ${host}</div>` : '';
+        let html = hostLabel;
+        containers.forEach(container => {
+            const stateColor = getStateColor(container.state);
+            const stateIcon = getStateIcon(container.state);
+            const isRunning = ['running', 'up'].includes((container.state||'').toLowerCase());
+            const displayName = container.name || container.id || '(unnamed)';
+            const healthBadge = container.status && container.status.includes('healthy') && !container.status.includes('unhealthy')
+                ? '<span style="background: var(--success-color, #28a745);color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">healthy</span>'
+                : container.status && container.status.includes('unhealthy')
+                ? '<span style="background: var(--danger-color, #dc3545);color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">unhealthy</span>'
+                : '';
+
+            html += `
+                <div style="border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 15px; background-color: rgba(255,255,255,0.88);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0 0 5px 0; color: var(--text-color, #333);">
+                                <span style="color: ${stateColor}; margin-right: 8px;">${stateIcon}</span>
+                                ${displayName}${healthBadge}
+                            </h4>
+                            <div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 3px;">
+                                <strong>Image:</strong> ${container.image || ''}
+                            </div>
+                            ${(function() {
+                                if (container.image_tags && container.image_tags.length > 0) {
+                                    const activeTags = container.image_tags.filter(t => t !== '<none>');
+                                    if (activeTags.length > 0) {
+                                        const backupTags = activeTags.filter(t => t.startsWith('backup-'));
+                                        if (backupTags.length > 0) {
+                                            if (activeTags.includes('latest')) {
+                                                return `<div style="font-size: 12px; margin-bottom: 6px;"><span style="background-color: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; border-left: 4px solid #ff922b; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-exclamation-triangle" style="color: #ff922b;"></i> ACTIVE FAILOVER: Running ${backupTags.join(', ')} (tagged as latest)</span></div>`;
+                                            } else {
+                                                return `<div style="font-size: 12px; margin-bottom: 6px;"><span style="background-color: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; border-left: 4px solid #dc3545; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-history" style="color: #dc3545;"></i> ROLLED BACK: Running ${backupTags.join(', ')}</span></div>`;
+                                            }
+                                        } else {
+                                            return `<div style="font-size: 12px; margin-bottom: 3px;"><span style="background-color: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 11px;"><i class="fas fa-check-circle"></i> Running LATEST image</span></div>`;
+                                        }
+                                    }
+                                }
+                                return '';
+                            })()}
+                            <div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 3px;">
+                                <strong>ID:</strong> <code>${container.id || ''}</code>
+                                &nbsp;|&nbsp;<strong>Status:</strong> ${container.status || container.state || ''}
+                            </div>
+                            ${container.ports ? `<div style="font-size:12px;color: var(--text-muted-color, #666);margin-bottom:3px;"><strong>Ports:</strong> ${container.ports}</div>` : ''}
+                            ${container.build_info ? `
+                                <div style="font-size: 12px; color: var(--text-muted-color, #555); margin-bottom: 5px; margin-top: 5px; background-color: #f1f3f5; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #007bff; display: inline-block;">
+                                    <i class="fas fa-code-branch" style="color: #007bff; margin-right: 4px;"></i>
+                                    <strong>Build:</strong> <span>${container.build_info.build_date || 'N/A'}</span>
+                                    &nbsp;|&nbsp;
+                                    <strong>Commit:</strong> <code style="font-weight: bold; color: #111;">${container.build_info.commit ? container.build_info.commit.substring(0, 8) : 'N/A'}</code>
+                                    ${container.build_info.branch ? `&nbsp;|&nbsp;<strong>Branch:</strong> <span style="color: #28a745;">${container.build_info.branch}</span>` : ''}
+                                    ${container.build_info.build_host ? `&nbsp;|&nbsp;<strong>Built On:</strong> <span style="color: #6c757d;">${container.build_info.build_host}</span>` : ''}
+                                </div>
+                            ` : ''}
+                            <div style="font-size: 12px; margin-top: 3px;">
+                                <span style="background-color: ${stateColor}; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;">
+                                    ${(container.state||'unknown').toUpperCase()}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                            ${container.state === 'not_created' ? `
+                                <button onclick="createContainerDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🚀 Create & Start
+                                </button>
+                            ` : isRunning ? `
+                                <button onclick="stopContainerDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ■ Stop
+                                </button>
+                                <button onclick="restartContainerDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ↻ Restart
+                                </button>
+                                <button onclick="viewLogsDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    📋 Logs
+                                </button>
+                            ` : `
+                                <button onclick="startContainerDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ▶ Start
+                                </button>
+                                <button onclick="viewLogsDirect('${container.name}')"
+                                    style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    📋 Logs
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        containersList.innerHTML = html;
+    }
+
+    function updateServiceDropdown(containers) {
+        const select = document.getElementById('service-select');
+        // Clear existing options except the first two
+        while (select.options.length > 2) {
+            select.remove(2);
+        }
+
+        containers.forEach(container => {
+            const option = document.createElement('option');
+            option.value = container.name;
+            option.textContent = container.name;
+            select.appendChild(option);
+        });
+    }
+
+    function createContainerDirect(service) {
+        appendOutput(`Creating and starting ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Create & Start ${service}`, `⏳ Creating and starting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        safeFetch(`/admin/docker-up/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} created and started successfully!\n` + out);
+                    showResultPopup(`Create & Start ${service}`, `✓ ${service} created and started successfully!\n\n${out}`, true);
+                    setTimeout(refreshContainers, 2000);
+                } else {
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to create ${service}:\n` + err);
+                    showResultPopup(`Create & Start ${service} Failed`, `✗ Failed to create ${service}:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function startContainerDirect(service) {
+        appendOutput(`Starting ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Start ${service}`, `⏳ Starting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        safeFetch(`/admin/docker-start/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} started successfully!\n` + out);
+                    showResultPopup(`Start ${service}`, `✓ ${service} started successfully!\n\n${out}`, true);
+                    setTimeout(refreshContainers, 1000);
+                } else {
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to start ${service}:\n` + err);
+                    showResultPopup(`Start ${service} Failed`, `✗ Failed to start ${service}:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function stopContainerDirect(service) {
+        if (!confirm(`Are you sure you want to stop ${service}?`)) {
+            return;
+        }
+
+        appendOutput(`Stopping ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Stop ${service}`, `⏳ Stopping ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        safeFetch(`/admin/docker-stop/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} stopped successfully!\n` + out);
+                    showResultPopup(`Stop ${service}`, `✓ ${service} stopped successfully!\n\n${out}`, true);
+                    setTimeout(refreshContainers, 1000);
+                } else {
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to stop ${service}:\n` + err);
+                    showResultPopup(`Stop ${service} Failed`, `✗ Failed to stop ${service}:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function restartContainerDirect(service) {
+        if (!confirm(`Are you sure you want to restart ${service}?`)) {
+            return;
+        }
+
+        appendOutput(`Restarting ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Restart ${service}`, `⏳ Restarting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        safeFetch(`/admin/docker-restart/${service}?force=0`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} restarted successfully!\n` + out);
+                    showResultPopup(`Restart ${service}`, `✓ ${service} restarted successfully!\n\n${out}`, true);
+                    setTimeout(refreshContainers, 2000);
+                } else {
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to restart ${service}:\n` + err);
+                    showResultPopup(`Restart ${service} Failed`, `✗ Failed to restart ${service}:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function viewLogsDirect(service) {
+        const lines = prompt('How many lines of logs to display? (default: 50)', '50');
+        if (lines === null) return;
+
+        appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Logs for ${service}`, `⏳ Fetching last ${lines} lines of logs for ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        safeFetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.output || data.error === '') {
+                    const out = data.output || 'No logs available';
+                    appendOutput(`Logs for ${service}:\n` + out);
+                    showResultPopup(`Logs for ${service} (Last ${lines} Lines)`, out, true);
+                } else if (data.error) {
+                    appendOutput(`Error getting logs:\n` + data.error);
+                    showResultPopup(`Logs for ${service} Failed`, `Error getting logs:\n\n${data.error}`, false);
+                } else {
+                    appendOutput('Unable to retrieve logs');
+                    showResultPopup(`Logs for ${service} Failed`, 'Unable to retrieve logs', false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    let rebuildPollTimer = null;
+    let rebuildLastLen   = 0;
+
+    function _startRebuildPoll(service, autoStart) {
+        rebuildLastLen = 0;
+        rebuildPollTimer = setInterval(async () => {
+            try {
+                const resp = await safeFetch(`/admin/docker-rebuild-status/${service}`);
+                const data = await resp.json();
+                const full = data.output || '';
+                if (full.length > rebuildLastLen) {
+                    const newText = full.slice(rebuildLastLen);
+                    rebuildLastLen = full.length;
+                    appendOutput(newText);
+                }
+                if (data.done) {
+                    clearInterval(rebuildPollTimer);
+                    rebuildPollTimer = null;
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    if (data.exit_code === 0) {
+                        appendOutput(`✓ ${service} rebuilt successfully!\n`);
+                        if (autoStart) {
+                            appendOutput(`⏳ Starting ${service}...\n`);
+                            const sr = await safeFetch(`/admin/docker-up/${service}`);
+                            const sd = await sr.json();
+                            appendOutput(sd.success ? `✓ ${service} started.\n` : `✗ Start failed.\n`);
+                        }
+                        setTimeout(() => { refreshContainers(); enableRebuildButtons(); }, 2000);
+                    } else {
+                        appendOutput(`✗ Build failed (exit ${data.exit_code}).\n`);
+                        enableRebuildButtons();
+                    }
+                }
+            } catch(e) {
+                clearInterval(rebuildPollTimer);
+                rebuildPollTimer = null;
+                appendOutput(`Poll error: ${e.message}\n`);
+                enableRebuildButtons();
+            }
+        }, 5000);
+    }
+
+    function _doRebuild(service, autoStart) {
+        disableRebuildButtons();
+        appendOutput(`⏳ Rebuilding ${service}... (runs in background, updates every 5s)\n`);
+        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        safeFetch(`/admin/docker-rebuild/${service}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`Build started (PID tracked). Streaming output...\n`);
+                    _startRebuildPoll(service, autoStart);
+                } else {
+                    appendOutput(`✗ Could not start build: ${data.error || 'Unknown error'}\n`);
+                    enableRebuildButtons();
+                }
+            })
+            .catch(err => {
+                appendOutput(`✗ Request error: ${err.message}\n`);
+                enableRebuildButtons();
+            });
+    }
+
+    function rebuildContainerDirect(service) {
+        if (!confirm(`Rebuild ${service}? This takes ~8 minutes. The build runs in the background — you can watch progress here.`)) return;
+        _doRebuild(service, true);
+    }
+
+    function disableRebuildButtons() {
+        document.querySelectorAll('button[onclick*="rebuild"]').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+        });
+    }
+
+    function enableRebuildButtons() {
+        document.querySelectorAll('button[onclick*="rebuild"]').forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        });
+    }
+
+    function rebuildContainer() {
+        const service = getSelectedService();
+        if (!service) return;
+        if (!confirm(`Rebuild ${service}? This takes ~8 minutes. The build runs in the background — you can watch progress here.`)) return;
+        _doRebuild(service, false);
+    }
+
+    function pruneDockerSystem() {
+        if (!confirm('Remove all stopped containers, dangling images, and unused networks? This will free up disk space.')) {
+            return;
+        }
+
+        appendOutput(`⏳ Cleaning up Docker system...\n`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup("Docker System Cleanup", `⏳ Pruning unused Docker objects on target: ${target.toUpperCase()}...\n\nThis may take several seconds. Please wait.`, 'loading');
+
+        safeFetch('/admin/docker-prune')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    const out = data.output || 'No output';
+                    appendOutput(`✓ Cleanup complete!\n\n` + out);
+                    showResultPopup("Docker Cleanup Complete", `✓ Cleanup complete!\n\n${out}`, true);
+                    setTimeout(refreshContainers, 1000);
+                } else {
+                    const err = data.error || 'Unknown error';
+                    appendOutput(`✗ Cleanup failed:\n${err}\n`);
+                    showResultPopup("Docker Cleanup Failed", `✗ Cleanup failed:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function showDiskUsage() {
+        appendOutput(`⏳ Fetching Docker disk usage...\n`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup("Docker Disk Usage", `⏳ Querying Docker df stats on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        safeFetch('/admin/docker-system-df')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    const out = data.output || 'No data available';
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`💾 Docker Disk Usage:\n\n` + out);
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    showResultPopup("Docker Disk Usage Status", out, true);
+                } else {
+                    const err = data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to get disk usage:\n${err}\n`);
+                    showResultPopup("Fetch Disk Usage Failed", `✗ Failed to get disk usage:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function checkStatus() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        appendOutput(`Checking status for: ${service}`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Status for ${service}`, `⏳ Checking container status on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        const url = service === 'all' ? '/admin/docker-status/all' : `/admin/docker-status/${service}`;
+
+        safeFetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    const out = data.output || data.stdout || 'No output';
+                    appendOutput('Status output:\n' + out);
+                    showResultPopup(`Status for ${service}`, out, true);
+                } else {
+                    const err = data.error || data.stderr || 'Unknown error';
+                    appendOutput('Error: ' + err);
+                    showResultPopup(`Status for ${service} Failed`, `Error:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput('Error: ' + error.message);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function restartContainer() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        const force = document.getElementById('force-restart').checked;
+
+        if (!confirm(`Are you sure you want to restart ${service}?`)) {
+            return;
+        }
+
+        appendOutput(`Restarting ${service}${force ? ' (force mode)' : ''}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Restart ${service}`, `⏳ Restarting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        const url = `/admin/docker-restart/${service}?force=${force ? 1 : 0}`;
+
+        safeFetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const out = data.stdout || data.output || '';
+                    appendOutput('✓ Restart successful!\n' + out);
+                    showResultPopup(`Restart ${service}`, `✓ Restart successful!\n\n${out}`, true);
+                    setTimeout(refreshContainers, 2000);
+                } else {
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput('✗ Restart failed:\n' + err);
+                    showResultPopup(`Restart ${service} Failed`, `✗ Restart failed:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput('Error: ' + error.message);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function viewLogs() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        const lines = prompt('How many lines of logs to display? (default: 50)', '50');
+        if (lines === null) return;
+
+        appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Logs for ${service}`, `⏳ Fetching last ${lines} lines of logs for ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        const url = `/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`;
+
+        safeFetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.output || data.error === '') {
+                    const out = data.output || 'No logs available';
+                    appendOutput('Logs:\n' + out);
+                    showResultPopup(`Logs for ${service} (Last ${lines} Lines)`, out, true);
+                } else if (data.error) {
+                    appendOutput('Error getting logs:\n' + data.error);
+                    showResultPopup(`Logs for ${service} Failed`, `Error getting logs:\n\n${data.error}`, false);
+                } else {
+                    appendOutput('Unable to retrieve logs');
+                    showResultPopup(`Logs for ${service} Failed`, 'Unable to retrieve logs', false);
+                }
+            })
+            .catch(error => {
+                appendOutput('Error: ' + error.message);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function saveDockerImage() {
+        const service = document.getElementById('deploy-service-select').value;
+        
+        if (!confirm(`Save ${service} Docker image to local tar file?`)) {
+            return;
+        }
+
+        appendOutput(`⏳ Saving Docker image: ${service}...\n`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Save Docker Image`, `⏳ Exporting ${service} image to tar archive on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
+
+        safeFetch(`/admin/docker-save-image/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ Image saved successfully!\n`);
+                    appendOutput(`Location: ${data.tar_file}\n`);
+                    appendOutput(data.output || '');
+                    showResultPopup(`Save Docker Image`, `✓ Image saved successfully!\n\nLocation: ${data.tar_file}\n\n${data.output || ''}`, true);
+                } else {
+                    const err = data.error || data.output || 'Unknown error';
+                    appendOutput(`✗ Failed to save image:\n${err}\n`);
+                    showResultPopup(`Save Docker Image Failed`, `✗ Failed to save image:\n\n${err}`, false);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+                showResultPopup("Error", error.message, false);
+            });
+    }
+
+    function updateSSHTarget() {
+        const select = document.getElementById('ssh-target-select');
+        const input = document.getElementById('production-host');
+        
+        if (select.value !== 'custom') {
+            input.value = select.value;
+        }
+    }
+
+    function togglePasswordVisibility() {
+        const passwordField = document.getElementById('ssh-password');
+        const eyeIcon = document.getElementById('password-eye-icon');
+        
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            eyeIcon.className = 'fas fa-eye-slash';
+        } else {
+            passwordField.type = 'password';
+            eyeIcon.className = 'fas fa-eye';
+        }
+    }
+
+    function updateSSHStatusIndicator(status) {
+        const indicator = document.getElementById('ssh-status-indicator');
+        if (!indicator) return;
+        
+        if (status === 'success') {
+            indicator.style.backgroundColor = '#28a745';
+            indicator.style.borderColor = '#1e7e34';
+            indicator.title = 'SSH connection successful';
+        } else if (status === 'failed') {
+            indicator.style.backgroundColor = '#dc3545';
+            indicator.style.borderColor = '#c82333';
+            indicator.title = 'SSH connection failed';
+        } else if (status === 'testing') {
+            indicator.style.backgroundColor = '#ffc107';
+            indicator.style.borderColor = '#e0a800';
+            indicator.title = 'Testing connection...';
+        } else {
+            indicator.style.backgroundColor = '#ccc';
+            indicator.style.borderColor = '#999';
+            indicator.title = 'Not tested';
+        }
+    }
+
+    function testSSHConnection(event) {
+        // Prevent any default form submission behavior
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const sshPort = document.getElementById('ssh-port').value;
+        const sshPassword = document.getElementById('ssh-password').value;
+
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return false;
+        }
+
+        if (!sshPassword) {
+            alert('Please enter SSH password to test connection');
+            return false;
+        }
+
+        // Update indicator to testing state
+        updateSSHStatusIndicator('testing');
+
+        // Expand output console if collapsed
+        const outputSection = document.getElementById('output-console-section');
+        const outputChevron = document.getElementById('chevron-output-console-section');
+        if (outputSection && !outputSection.classList.contains('expanded')) {
+            outputSection.classList.add('expanded');
+            if (outputChevron) outputChevron.classList.add('expanded');
+        }
+
+        appendOutput(`\n${'='.repeat(80)}\n`);
+        appendOutput(`🔌 Testing SSH connection to ${sshTarget}:${sshPort}...\n`);
+        appendOutput(`${'='.repeat(80)}\n`);
+        
+        const formData = new FormData();
+        formData.append('ssh_target', sshTarget);
+        formData.append('ssh_port', sshPort);
+        formData.append('ssh_password', sshPassword);
+        formData.append('save_credentials', 'yes');
+
+        safeFetch('/admin/docker-test-ssh', {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                appendOutput(`\n`);
+                if (data.success) {
+                    appendOutput(`✅ SSH CONNECTION SUCCESSFUL\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput(data.output || 'Connection OK\n');
+                    if (data.credentials_saved) {
+                        appendOutput(`\n✓ Credentials saved to ${data.credentials_path}\n`);
+                    }
+                    updateSSHStatusIndicator('success');
+                } else {
+                    appendOutput(`❌ SSH CONNECTION FAILED\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput((data.output || data.error || 'Unknown error') + '\n');
+                    updateSSHStatusIndicator('failed');
+                }
+                appendOutput(`${'='.repeat(80)}\n\n`);
+            })
+            .catch(error => {
+                appendOutput(`\n❌ CONNECTION TEST ERROR\n`);
+                appendOutput(`${'='.repeat(80)}\n`);
+                appendOutput(`Error: ${error.message}\n`);
+                appendOutput(`${'='.repeat(80)}\n\n`);
+                updateSSHStatusIndicator('failed');
+            });
+
+        return false; // Prevent any form submission
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            // Show temporary success message
+            const msg = document.createElement('div');
+            msg.textContent = '✓ Copied to clipboard!';
+            msg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: var(--success-color, #28a745); color: white; padding: 12px 24px; border-radius: 4px; z-index: 10000; font-weight: bold;';
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 2000);
+        }).catch(err => {
+            alert('Failed to copy: ' + err);
+        });
+    }
+
+    // SSH Terminal WebSocket connection
+    let sshTerminal = null;
+    let sshWebSocket = null;
+    let sshFitAddon = null;
+
+    function updateSSHConnectionStatus(status, message) {
+        const statusDiv = document.getElementById('ssh-connection-status');
+        const connectBtn = document.getElementById('ssh-connect-btn');
+        const disconnectBtn = document.getElementById('ssh-disconnect-btn');
+        
+        if (status === 'connected') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #28a745;"></i> ' + message;
+            connectBtn.disabled = true;
+            connectBtn.style.opacity = '0.5';
+            connectBtn.style.cursor = 'not-allowed';
+            disconnectBtn.disabled = false;
+            disconnectBtn.style.opacity = '1';
+            disconnectBtn.style.cursor = 'pointer';
+        } else if (status === 'connecting') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #ffc107;"></i> ' + message;
+            connectBtn.disabled = true;
+            connectBtn.style.opacity = '0.5';
+            connectBtn.style.cursor = 'not-allowed';
+        } else if (status === 'error') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #dc3545;"></i> ' + message;
+            connectBtn.disabled = false;
+            connectBtn.style.opacity = '1';
+            connectBtn.style.cursor = 'pointer';
+            disconnectBtn.disabled = true;
+            disconnectBtn.style.opacity = '0.5';
+            disconnectBtn.style.cursor = 'not-allowed';
+        } else {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: var(--text-muted-color, #6c757d);"></i> Disconnected';
+            connectBtn.disabled = false;
+            connectBtn.style.opacity = '1';
+            connectBtn.style.cursor = 'pointer';
+            disconnectBtn.disabled = true;
+            disconnectBtn.style.opacity = '0.5';
+            disconnectBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    function toggleSSHTerminalPassword() {
+        const passwordField = document.getElementById('ssh-terminal-password');
+        const eyeIcon = document.getElementById('ssh-terminal-password-eye');
+        
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            eyeIcon.className = 'fas fa-eye-slash';
+        } else {
+            passwordField.type = 'password';
+            eyeIcon.className = 'fas fa-eye';
+        }
+    }
+
+    function connectSSHTerminal() {
+        // Try terminal section fields first, fallback to production deployment fields
+        let sshTarget = document.getElementById('ssh-terminal-target').value.trim();
+        let sshPassword = document.getElementById('ssh-terminal-password').value;
+        
+        // If terminal fields are empty, use production deployment fields
+        if (!sshTarget) {
+            sshTarget = document.getElementById('production-host').value.trim();
+        }
+        if (!sshPassword) {
+            sshPassword = document.getElementById('ssh-password').value;
+        }
+        
+        const sshPort = document.getElementById('ssh-port').value || 22;
+
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host) in either SSH Terminal section or Production Deployment section above');
+            return;
+        }
+
+        if (!sshPassword) {
+            alert('Please enter SSH password in the field above, or use "Test Connection" in Production Deployment section to save credentials');
+            return;
+        }
+
+        updateSSHConnectionStatus('connecting', 'Connecting...');
+
+        // Initialize xterm.js terminal
+        if (!sshTerminal) {
+            sshTerminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                theme: {
+                    background: '#000000',
+                    foreground: '#00ff00'
+                },
+                rows: 30,
+                cols: 100
+            });
+
+            sshFitAddon = new FitAddon.FitAddon();
+            sshTerminal.loadAddon(sshFitAddon);
+
+            const terminalContainer = document.getElementById('ssh-xterm-terminal');
+            sshTerminal.open(terminalContainer);
+            sshFitAddon.fit();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                if (sshFitAddon) {
+                    sshFitAddon.fit();
+                }
+            });
+        }
+
+        // Build WebSocket URL
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/admin/docker-ssh-terminal?ssh_target=${encodeURIComponent(sshTarget)}&ssh_port=${sshPort}&ssh_password=${encodeURIComponent(sshPassword)}`;
+
+        // Create WebSocket connection
+        sshWebSocket = new WebSocket(wsUrl);
+
+        sshWebSocket.onopen = function() {
+            updateSSHConnectionStatus('connected', 'Connected');
+            sshTerminal.writeln('\r\n\x1b[32m✓ Connected to ' + sshTarget + '\x1b[0m\r\n');
+        };
+
+        sshWebSocket.onmessage = function(event) {
+            if (event.data instanceof Blob) {
+                event.data.arrayBuffer().then(buffer => {
+                    const text = new TextDecoder().decode(buffer);
+                    sshTerminal.write(text);
+                });
+            } else {
+                sshTerminal.write(event.data);
+            }
+        };
+
+        sshWebSocket.onerror = function(error) {
+            updateSSHConnectionStatus('error', 'Connection Error');
+            sshTerminal.writeln('\r\n\x1b[31m✗ Connection error\x1b[0m\r\n');
+        };
+
+        sshWebSocket.onclose = function() {
+            updateSSHConnectionStatus('disconnected', 'Disconnected');
+            sshTerminal.writeln('\r\n\x1b[33m✓ Connection closed\x1b[0m\r\n');
+            sshWebSocket = null;
+        };
+
+        // Send keyboard input to WebSocket
+        sshTerminal.onData(data => {
+            if (sshWebSocket && sshWebSocket.readyState === WebSocket.OPEN) {
+                sshWebSocket.send(data);
+            }
+        });
+    }
+
+    function disconnectSSHTerminal() {
+        if (sshWebSocket) {
+            sshWebSocket.close();
+            sshWebSocket = null;
+        }
+        updateSSHConnectionStatus('disconnected', 'Disconnected');
+    }
+
+    function showDeploymentCommands() {
+        const service = document.getElementById('deploy-service-select').value;
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const imageName = `comserv2-${service}`;
+
+        appendOutput(`\n${'='.repeat(80)}\n`);
+        appendOutput(`📋 MANUAL DEPLOYMENT COMMANDS\n`);
+        appendOutput(`${'='.repeat(80)}\n`);
+        appendOutput(`Service: ${service}\n`);
+        appendOutput(`Target: ${sshTarget}\n`);
+        appendOutput(`Image: ${imageName}\n`);
+        appendOutput(`${'='.repeat(80)}\n\n`);
+
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`OPTION 1: Direct Copy via SSH Pipe (Recommended - No temp files)\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Step 1: Verify local image tag + capture image ID\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
+        appendOutput(`docker images | grep ${imageName}\n\n`);
+
+        appendOutput(`# Step 2: Transfer image directly via SSH pipe (latest tag)\n`);
+        appendOutput(`docker save ${imageName}:latest | ssh ${sshTarget} "docker load"\n\n`);
+
+        appendOutput(`# Step 3: SSH to production and verify image ID matches local\n`);
+        appendOutput(`ssh ${sshTarget}\n\n`);
+        appendOutput(`# On production server:\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
+        appendOutput(`cd /opt/comserv/Comserv\n\n`);
+
+        appendOutput(`# Stop old container\n`);
+        appendOutput(`docker compose stop ${service}\n\n`);
+
+        appendOutput(`# Start new container (force recreate)\n`);
+        appendOutput(`docker compose up -d --force-recreate ${service}\n\n`);
+
+        appendOutput(`# Verify it's running\n`);
+        appendOutput(`docker compose ps\n`);
+        appendOutput(`docker logs comserv-${service} --tail=50 --follow\n\n`);
+
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`OPTION 2: File Transfer Method (If SSH pipe fails)\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Step 1: Save image to tar file (latest tag)\n`);
+        appendOutput(`docker save -o /tmp/${imageName}.tar ${imageName}:latest\n\n`);
+
+        appendOutput(`# Step 2: Copy to production server\n`);
+        appendOutput(`scp /tmp/${imageName}.tar ${sshTarget}:/tmp/\n\n`);
+
+        appendOutput(`# Step 3: SSH to production and verify image ID matches local\n`);
+        appendOutput(`ssh ${sshTarget}\n\n`);
+        appendOutput(`# On production server:\n`);
+        appendOutput(`docker load -i /tmp/${imageName}.tar\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
+        appendOutput(`cd /opt/comserv/Comserv\n`);
+        appendOutput(`docker compose stop ${service}\n`);
+        appendOutput(`docker compose up -d --force-recreate ${service}\n`);
+        appendOutput(`docker compose ps\n\n`);
+
+        appendOutput(`# Cleanup\n`);
+        appendOutput(`rm /tmp/${imageName}.tar\n\n`);
+
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`BACKUP & ROLLBACK\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Before deployment, remove old backup then create new one (keeps only 1):\n`);
+        appendOutput(`ssh ${sshTarget} "docker images ${imageName} --format '{{.Tag}}' | grep '^backup-' | xargs -I{} docker rmi ${imageName}:{} 2>/dev/null || true"\n`);
+        appendOutput(`ssh ${sshTarget} "docker commit comserv2-web-prod ${imageName}:backup-prev"\n\n`);
+
+        appendOutput(`# If deployment fails, rollback:\n`);
+        appendOutput(`ssh ${sshTarget}\n`);
+        appendOutput(`cd ~/PycharmProjects/comserv2\n`);
+        appendOutput(`docker compose stop ${service}\n`);
+        appendOutput(`docker tag ${imageName}:backup-TIMESTAMP ${imageName}:latest\n`);
+        appendOutput(`docker compose up -d ${service}\n\n`);
+
+        appendOutput(`${'='.repeat(80)}\n`);
+        appendOutput(`NOTE: Use 'docker compose' (space), not 'docker-compose' (hyphen)\n`);
+        appendOutput(`${'='.repeat(80)}\n\n`);
+    }
+
+    function deployToProduction(deployMode) {
+        var isQuick = (deployMode === 1 || deployMode === 'quick') ? '1' : '0';
+        var url = '/admin/docker/deploy_form?quick_deploy=' + isQuick;
+        
+        var popup = window.open(
+            url,
+            'docker_deploy',
+            'width=720,height=540,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no'
+        );
+        if (popup) {
+            popup.focus();
+            window.addEventListener('message', function onMsg(e) {
+                if (e.data && e.data.type === 'deploy_done') {
+                    window.removeEventListener('message', onMsg);
+                    var msg = e.data.success ? '✅ Deploy complete — check the log for details.' : '⚠️ Deploy had errors — review the popup log before closing.';
+                    alert(msg);
+                    location.reload();
+                }
+            });
+        } else {
+            alert('⚠ Popup blocked — allow popups for this site and try again.');
+        }
+    }
+
+    function openSSHTerminal() {
+        const sshTarget = document.getElementById('production-host').value.trim();
+        
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return;
+        }
+
+        // Open SSH terminal in new window on port 3001
+        const terminalUrl = `http://workstation.local:3001/?ssh=${encodeURIComponent(sshTarget)}`;
+        const terminalWindow = window.open(
+            terminalUrl,
+            'SSH Terminal - ' + sshTarget,
+            'width=1000,height=600,menubar=no,toolbar=no,location=no,status=no'
+        );
+
+        if (terminalWindow) {
+            appendOutput(`\n🖥️ SSH Terminal opened in new window: ${sshTarget}\n`);
+            appendOutput(`URL: ${terminalUrl}\n`);
+            appendOutput(`If window was blocked, allow popups and try again.\n\n`);
+        } else {
+            alert('Popup blocked! Please allow popups for this site.\n\nAlternatively, manually open: ' + terminalUrl);
+        }
+    }
+
+    function openSSHTerminalWindow() {
+        const terminalUrl = 'http://workstation.local:3001/';
+        
+        const termWin = window.open(
+            terminalUrl,
+            'SSH Terminal - ubuntu@192.168.1.126',
+            'width=1200,height=700,menubar=no,toolbar=no,location=no,scrollbars=yes'
+        );
+
+        if (termWin) {
+            appendOutput(`\n🖥️ SSH Terminal opened in new window\n`);
+            appendOutput(`URL: ${terminalUrl}\n`);
+            appendOutput(`Target: ubuntu@192.168.1.126\n\n`);
+        } else {
+            alert('Popup blocked! Please allow popups for this site.\n\nAlternatively, open manually: ' + terminalUrl);
+        }
+    }
+
+    function embedSSHTerminal() {
+        const embedDiv = document.getElementById('ssh-terminal-embed');
+        const iframe = document.getElementById('ssh-terminal-iframe');
+        const sshTarget = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
+        
+        const parts = sshTarget.split('@');
+        const username = parts[0] || 'ubuntu';
+        const hostname = parts[1] || '192.168.1.126';
+        
+        iframe.src = `http://workstation.local:3001/?hostname=${encodeURIComponent(hostname)}&username=${encodeURIComponent(username)}`;
+        embedDiv.style.display = 'block';
+
+        // Expand SSH terminal section
+        const sshSection = document.getElementById('ssh-terminal-section');
+        const sshChevron = document.getElementById('chevron-ssh-terminal-section');
+        if (sshSection && !sshSection.classList.contains('expanded')) {
+            sshSection.classList.add('expanded');
+            if (sshChevron) sshChevron.classList.add('expanded');
+        }
+
+        appendOutput(`\n🖥️ SSH Terminal embedded below\n`);
+        appendOutput(`Target: ${sshTarget}\n\n`);
+    }
+
+    // Initialize - load containers on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic emergency fallback commands with default target
+        const targetSelect = document.getElementById('docker-target-select');
+        const defaultTarget = targetSelect ? targetSelect.value : 'workstation';
+        updateEmergencyCommands(defaultTarget);
+
+        refreshContainers();
+        refreshVolumes();
+        loadSavedCredentials();
+        loadDeployHistory();
+        loadDiagnostics();
+
+        // Auto-check SSH terminal service status
+        checkSSHTerminalService();
+    });
+</script>
+
+<style>
+    .card {
+        border: 1px solid var(--border-color, #ddd);
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .card-header {
+        border-radius: 4px 4px 0 0;
+    }
+
+    .card-body {
+        background-color: rgba(255,255,255,0.88);
+    }
+
+    .alert {
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+    }
+
+    .alert-warning {
+        color: #856404;
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+    }
+
+    button:hover {
+        opacity: 0.9;
+    }
+
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    h1 {
+        color: var(--text-color, #333);
+        margin-bottom: 20px;
+    }
+
+    h3 {
+        color: var(--text-color, #333);
+    }
+</style>
