@@ -32,10 +32,7 @@
         username: 'You',
         activeModel: null,
         isGuest: true,
-        isMemberOrAbove: false,
-        ollamaReachable: false,
         isAdmin: false,
-        isEditor: false,
         isDevMode: false,           // true only on local development machine
         userModelOverride: false,   // true when user manually picks a model
         modelTiers: {
@@ -50,105 +47,8 @@
         supportLastMsgId: 0,        // last message id seen in support chat
         supportPollTimer: null,     // setInterval handle for support chat polling
         siteName: '',                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
-        userNavLinks: [],            // DB private links + shortcuts for chat "open X"
         isUnloading: false
     };
-
-    // True only for off-site http(s) URLs — not same-origin absolute links
-    function _isExternalNavUrl(url) {
-        if (!url || typeof url !== 'string') return false;
-        const trimmed = url.trim();
-        if (!/^https?:\/\//i.test(trimmed)) return false;
-        try {
-            return new URL(trimmed, window.location.href).origin !== window.location.origin;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    function _resolveNavUrl(url) {
-        if (!url) return '';
-        try {
-            return new URL(String(url).trim(), window.location.href).href;
-        } catch (e) {
-            return '';
-        }
-    }
-
-    function _shouldOpenNavInNewTab(url, target) {
-        if (target === '_blank') return true;
-        if (target === '_self') return false;
-        return _isExternalNavUrl(url);
-    }
-
-    function _initNavChoiceClicks() {
-        if (document.body && document.body.dataset.lcNavChoicesBound) return;
-        if (document.body) document.body.dataset.lcNavChoicesBound = '1';
-        document.addEventListener('click', function(e) {
-            const a = e.target.closest('.lc-nav-choice');
-            if (!a) return;
-            e.preventDefault();
-            const url = a.getAttribute('data-url');
-            const target = a.getAttribute('data-target') || '_blank';
-            if (url) _openNavUrl(url, target);
-        });
-    }
-
-    function _renderSimpleMarkdownLinks(text) {
-        if (!text) return '';
-        var out = String(text).replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, label, url) {
-            var t = _isExternalNavUrl(url) ? '_blank' : '_self';
-            return '<a href="' + _escH(url) + '" target="' + t + '" rel="noopener noreferrer" class="lc-nav-choice" data-url="' + _escH(url) + '" data-target="' + t + '">' + _escH(label) + '</a>';
-        });
-        return out.replace(/\n/g, '<br>');
-    }
-
-    function _formatNavChoiceHtml(matches) {
-        var html = '<p class="lc-nav-prompt">Multiple pages match — pick one:</p><ul class="lc-nav-choices">';
-        matches.slice(0, 8).forEach(function(m) {
-            var title = _escH(m.name || m.label || _navLinkHostKey(m.url));
-            var url = m.url || '';
-            var navTarget = m.target || (_isExternalNavUrl(url) ? '_blank' : '_self');
-            html += '<li><a href="#" class="lc-nav-choice" data-url="' + _escH(url) + '" data-target="' + _escH(navTarget) + '">' + title + '</a></li>';
-        });
-        html += '</ul>';
-        return html;
-    }
-
-    function _openNavUrl(url, target) {
-        const abs = _resolveNavUrl(url);
-        if (!abs) return;
-        const useNewWindow = _shouldOpenNavInNewTab(abs, target);
-        const dest = useNewWindow ? 'noopener' : '';
-        if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
-            if (useNewWindow) {
-                window.opener.open(abs, '_blank', 'noopener,noreferrer');
-            } else {
-                window.opener.location.href = abs;
-            }
-            return;
-        }
-        if (useNewWindow) {
-            window.open(abs, '_blank', 'noopener,noreferrer');
-        } else {
-            state.isUnloading = true;
-            if (state.currentAbortCtrl) {
-                try { state.currentAbortCtrl.abort(); } catch (e) {}
-            }
-            window.location.href = abs;
-        }
-    }
-
-    function loadUserNavLinks() {
-        return fetch('/navigation/user_nav_links', { method: 'GET', credentials: 'include' })
-            .then(function(r) { return r.ok ? r.json() : { success: false }; })
-            .then(function(data) {
-                if (data.success && data.links) {
-                    state.userNavLinks = data.links;
-                }
-            })
-            .catch(function() {});
-    }
     
     window.addEventListener('beforeunload', function() {
         state.isUnloading = true;
@@ -559,27 +459,30 @@
             }
         }
         
-        // Longest-prefix match so /admin/plan beats /admin and /admin/schema_compare
-        // beats a bare /admin pattern on another agent.
-        const pathLower = pathname.toLowerCase();
-        let bestAgent = null;
-        let bestLen = -1;
+        // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
             if (agent.local_only && !state.isDevMode) continue;
+            
+            // Check if any URL pattern matches the current pathname (case-insensitive)
+            const pathLower = pathname.toLowerCase();
             for (const pattern of agent.url_patterns) {
-                if (pattern === '*') continue;
-                const patLower = pattern.toLowerCase();
-                const isMatch = pathLower === patLower || pathLower.startsWith(patLower + '/');
-                if (isMatch && patLower.length > bestLen) {
-                    bestLen = patLower.length;
-                    bestAgent = agent;
+                let isMatch = false;
+                
+                if (pattern === '*') {
+                    // Wildcard matches everything (use as fallback)
+                    isMatch = true;
+                } else {
+                    // Exact match or prefix match, case-insensitive
+                    const patLower = pattern.toLowerCase();
+                    isMatch = pathLower === patLower || pathLower.startsWith(patLower);
+                }
+                
+                if (isMatch) {
+                    console.debug(`Agent selected for ${pathname}: ${agent.id}`);
+                    return agent;
                 }
             }
-        }
-        if (bestAgent) {
-            console.debug(`Agent selected for ${pathname}: ${bestAgent.id} (prefix len ${bestLen})`);
-            return bestAgent;
         }
         
         // Fallback to general agent if no specific match
@@ -611,15 +514,6 @@
     // Extract visible text content from the current page for context
     function extractPageContent() {
         const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
-        var prefix = '';
-        var gcalLegend = document.getElementById('gcal-legend-bar');
-        if (gcalLegend) {
-            var calHelp = gcalLegend.getAttribute('data-calendar-help') || gcalLegend.getAttribute('title') || '';
-            var calText = (gcalLegend.textContent || '').replace(/\s+/g, ' ').trim();
-            if (calHelp || calText) {
-                prefix = '[Daily Schedule calendar UI] ' + calHelp + (calText ? (' Legend: ' + calText) : '') + ' ';
-            }
-        }
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article', '.container'];
         for (const sel of contentSelectors) {
             const el = document.querySelector(sel);
@@ -628,14 +522,14 @@
             clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
             const text = clone.textContent.replace(/\s+/g, ' ').trim();
             if (text.length > 200) {
-                return (prefix + text).substring(0, 6000);
+                return text.substring(0, 6000);
             }
         }
         // Fallback: body text
         const bodyClone = document.body.cloneNode(true);
         bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
         const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
-        return (prefix + bodyText).substring(0, 4000);
+        return bodyText.substring(0, 4000);
     }
 
     // Extract all meaningful links from the current page (nav menu + quick links + content links)
@@ -745,93 +639,6 @@
         
         return context;
     }
-
-    function _canUseMediaFeatures() {
-        return !state.isGuest;
-    }
-
-    function _setA11yStatus(msg) {
-        var el = document.getElementById('audio-transcribe-status');
-        if (!el) return;
-        el.textContent = msg || '';
-        el.style.display = msg ? '' : 'none';
-    }
-
-    function _updateMediaToolbarVisibility() {
-        var canUse = _canUseMediaFeatures();
-        ['photo-upload-btn', 'audio-upload-btn', 'mic-record-btn'].forEach(function(id) {
-            var btn = document.getElementById(id);
-            if (btn) btn.style.display = canUse ? '' : 'none';
-        });
-        var voiceBtn = document.getElementById('voice-mode-btn');
-        if (voiceBtn && voiceBtn.dataset.capable === '1') {
-            voiceBtn.style.display = canUse ? '' : 'none';
-        }
-    }
-
-    function _bindFilePickerButton(btnId, inputId, handler) {
-        var btn = document.getElementById(btnId);
-        var input = document.getElementById(inputId);
-        if (!btn || !input) return;
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!_canUseMediaFeatures()) {
-                _setA11yStatus('Please sign in to upload files or use voice.');
-                return;
-            }
-            try { input.value = ''; } catch (err) {}
-            try {
-                input.click();
-            } catch (err) {
-                _setA11yStatus('Could not open file picker. Try a different browser.');
-            }
-        });
-        input.addEventListener('change', function(e) {
-            var file = e.target.files && e.target.files[0];
-            if (file) handler(file);
-            try { e.target.value = ''; } catch (err) {}
-        });
-    }
-
-    function _shouldAutoSendTranscript() {
-        var cb = document.getElementById('auto-send-transcript');
-        return !!(cb && cb.checked);
-    }
-
-    function _preferGrokForImage() {
-        var sel = document.getElementById('ai-provider');
-        if (!sel) return;
-        for (var i = 0; i < sel.options.length; i++) {
-            var val = sel.options[i].value || '';
-            if (val.indexOf('grok|') === 0) {
-                sel.value = val;
-                state.selectedProvider = val;
-                state.userModelOverride = true;
-                _setA11yStatus('Switched to Grok for image analysis.');
-                return;
-            }
-        }
-        _setA11yStatus('Photo attached — select a Grok model for best image analysis.');
-    }
-
-    function _initWidgetAccessibilityOptions() {
-        var autoCb = document.getElementById('auto-send-transcript');
-        if (autoCb) {
-            var saved = localStorage.getItem('ai_widget_auto_send');
-            autoCb.checked = saved !== '0';
-            autoCb.addEventListener('change', function() {
-                localStorage.setItem('ai_widget_auto_send', autoCb.checked ? '1' : '0');
-            });
-        }
-        if (window.AI_WIDGET_POPUP) {
-            var welcome = document.querySelector('#chat-messages .system-message');
-            if (welcome) {
-                welcome.textContent = 'Use Voice for hands-free chat (AI speaks replies). Record or upload audio for hive inspection transcripts. Upload a Photo to build an inventory list from items in the image.';
-            }
-        }
-        _updateMediaToolbarVisibility();
-    }
     
     // Create chat widget elements
     function createChatWidget() {
@@ -867,6 +674,7 @@
                 '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
                 '<a id="conversations-link" class="chat-header-icon-btn" href="/ai/conversations" title="View all conversations" target="_self">📋 History</a>' +
                 '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
+                '<button id="voice-mode-btn" class="chat-header-icon-btn" title="Voice conversation mode — speak to AI, AI speaks back" style="display:none;">🔊</button>' +
                 '<button id="dock-chat-inline" class="chat-header-icon-btn" title="Dock chat on this page">⊞</button>' +
                 '<button id="detach-chat" class="chat-header-icon-btn" title="Open in separate window (move to another monitor)">⤢</button>' +
                 '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
@@ -901,12 +709,7 @@
             '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
               '<option value="auto">⚡ Auto</option>' +
             '</select>' +
-            '<label for="conversation-selector" style="font-size:0.82em;color:#555;margin-left:6px;">Chat:</label>' +
-            '<select id="conversation-selector" title="Select past conversation to resume" style="font-size:0.82em;max-width:110px;">' +
-              '<option value="">Current Chat</option>' +
-            '</select>' +
-            '<button id="widget-new-chat-btn" class="chat-header-icon-btn" title="New conversation" style="margin-left:2px;font-size:1.1em;border:1px solid #ccc;border-radius:4px;padding:1px 5px;background:#fff;color:#000;">✏️</button>' +
-            '<label for="ai-provider" style="margin-left:6px;">Model:</label>' +
+            '<label for="ai-provider">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
@@ -932,21 +735,16 @@
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
             '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
-            '<div id="audio-transcribe-status" class="chat-a11y-status" role="status" aria-live="polite" aria-atomic="true" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--table-header-bg,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
+            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--table-header-bg,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
             '<div id="local-audio-backups-container" style="display:none;padding:5px;border:1px solid var(--border-color,#ccc);border-radius:4px;background:var(--background-color,#fff);margin-bottom:4px;font-size:0.85em;"></div>' +
-            '<div id="chat-a11y-toolbar" class="chat-a11y-toolbar">' +
-              '<button type="button" id="voice-mode-btn" class="chat-a11y-btn" title="Voice conversation — speak to AI, hear replies" aria-label="Voice conversation mode" style="display:none;">🔊 <span class="chat-a11y-label">Voice</span></button>' +
-              '<button type="button" id="mic-record-btn" class="chat-a11y-btn" title="Record voice — tap to start, tap again to stop" aria-label="Record voice for transcription" style="display:none;">🎤 <span class="chat-a11y-label">Record</span></button>' +
-              '<button type="button" id="photo-upload-btn" class="chat-a11y-btn" title="Upload a photo for AI analysis (inventory, inspections)" aria-label="Upload photo" style="display:none;">📷 <span class="chat-a11y-label">Photo</span></button>' +
-              '<button type="button" id="audio-upload-btn" class="chat-a11y-btn" title="Upload saved audio file for transcription" aria-label="Upload audio file" style="display:none;">📂 <span class="chat-a11y-label">Audio</span></button>' +
-              '<label class="chat-auto-send-label" title="Send transcript automatically after transcription"><input type="checkbox" id="auto-send-transcript" checked> <span class="chat-a11y-label">Auto-send</span></label>' +
-            '</div>' +
-            '<input type="file" id="image-file-input" class="chat-file-input-hidden" accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" tabindex="-1" aria-hidden="true">' +
-            '<input type="file" id="audio-file-input" class="chat-file-input-hidden" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac" tabindex="-1" aria-hidden="true">' +
-            '<div class="chat-input-row" style="display:flex;gap:3px;align-items:stretch;">' +
-            '<textarea id="message-input" style="flex:1;" placeholder="Type or use Voice / Record / Photo / Audio above…" aria-label="Message to AI"></textarea>' +
-            '<button id="send-message" style="flex:0 0 auto;min-width:56px;min-height:44px;" aria-label="Send message">Send</button>' +
-            '</div>';
+            '<div style="display:flex;gap:3px;align-items:stretch;">' +
+            '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
+            '<div style="display:flex;flex-direction:column;gap:3px;">' +
+            '<label id="attach-image-btn" title="Attach image or upload audio file (or paste image with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*,audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<label id="attach-audio-btn" title="Upload a saved audio file (.mp3, .m4a, .wav, .ogg, .webm) for transcription" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio file">📂<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
+            '<button id="send-message" style="flex:1;">Send</button>' +
+            '</div></div>';
 
         // Resize handle (bottom-right corner)
         const resizeHandle = document.createElement('div');
@@ -965,16 +763,13 @@
         chatPanel.appendChild(resizeHandle);
 
         // ── Populate provider dropdown ────────────────────────────────────────
-        loadUserNavLinks();
         fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
             .then(r => r.json())
             .then(function(data) {
                 if (data.success) {
                     if (data.username)  state.username   = data.username;
-                    if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
+                    if (data.is_admin)  state.isAdmin    = !!data.is_admin;
                     if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
-                    if (data.is_member_or_above !== undefined) state.isMemberOrAbove = !!data.is_member_or_above;
-                    if (data.ollama_reachable !== undefined) state.ollamaReachable = !!data.ollama_reachable;
                     if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
                 }
                 if (data.success && data.providers && data.providers.length > 0) {
@@ -993,7 +788,7 @@
                                     })
                                 : [
                                     { val: 'grok|grok-4.3',               label: 'Grok 4.3 (xAI)' },
-                                    { val: 'grok|grok-build-0.1',         label: 'Grok Build 0.1 (xAI)' }
+                                    { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -1041,7 +836,7 @@
                                     const sorted = chatModels.slice().sort(function(a, b) {
                                         return modelSizeScore(a.id) - modelSizeScore(b.id);
                                     });
-                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
+                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
                                     const pool   = usable.length > 0 ? usable : sorted; // fallback if all tiny
                                     state.modelTiers.small  = 'ollama|' + pool[0].id;
                                     state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
@@ -1074,7 +869,11 @@
                     loadAgentsConfig().then(function() { populateAgentPicker(); });
                 }
 
-                _updateMediaToolbarVisibility();
+                // Show/hide image attach based on admin role
+                var attachBtn = document.getElementById('attach-image-btn');
+                if (attachBtn) {
+                    attachBtn.style.display = state.isAdmin ? '' : 'none';
+                }
             })
             .catch(function() {});
 
@@ -1206,11 +1005,10 @@
                 const prev = document.getElementById('chat-img-preview');
                 if (prev) {
                     prev.style.display = 'block';
-                    prev.innerHTML = '<img src="' + dataUrl + '" alt="Attached photo preview" style="max-height:80px;max-width:120px;border-radius:4px;border:1px solid #ccc;vertical-align:middle;">' +
-                        ' <button type="button" title="Remove image" aria-label="Remove attached photo" onclick="_clearPendingImage()" style="font-size:1em;border:none;background:none;cursor:pointer;color:#c00;">✕</button>' +
+                    prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:80px;max-width:120px;border-radius:4px;border:1px solid #ccc;vertical-align:middle;">' +
+                        ' <button type="button" title="Remove image" onclick="_clearPendingImage()" style="font-size:1em;border:none;background:none;cursor:pointer;color:#c00;">✕</button>' +
                         ' <small style="color:#666;">' + (file.name || 'image') + '</small>';
                 }
-                _setA11yStatus('Photo attached: ' + (file.name || 'image') + '. Press Send when ready.');
             };
             reader.readAsDataURL(file);
         }
@@ -1236,21 +1034,6 @@
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        const widgetNewChatBtn = document.getElementById('widget-new-chat-btn');
-        if (widgetNewChatBtn) {
-            widgetNewChatBtn.addEventListener('click', function() { resetConversation(); });
-        }
-        const convSelector = document.getElementById('conversation-selector');
-        if (convSelector) {
-            convSelector.addEventListener('change', function(e) {
-                const val = e.target.value;
-                if (val) {
-                    loadConversation(val);
-                } else {
-                    resetConversation();
-                }
-            });
-        }
         var dockBtn = document.getElementById('dock-chat-inline');
         if (dockBtn) {
             dockBtn.addEventListener('click', function() {
@@ -1290,25 +1073,36 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
         document.getElementById('message-input').addEventListener('paste', function(e) {
-            if (!_canUseMediaFeatures()) return;
+            if (!state.isAdmin) return;
             const items = (e.clipboardData || window.clipboardData).items;
             for (var i = 0; i < items.length; i++) {
                 if (items[i].type.indexOf('image') !== -1) {
                     e.preventDefault();
                     _setPendingImage(items[i].getAsFile());
-                    _preferGrokForImage();
                     break;
                 }
             }
         });
-        _bindFilePickerButton('photo-upload-btn', 'image-file-input', function(file) {
-            _setPendingImage(file);
-            _preferGrokForImage();
+        document.getElementById('image-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                const file = e.target.files[0];
+                if (file.type && file.type.startsWith('audio/')) {
+                    _transcribeAudioFile(file);
+                } else if (file.name && /\.(mp3|m4a|wav|ogg|webm)$/i.test(file.name)) {
+                    _transcribeAudioFile(file);
+                } else {
+                    _setPendingImage(file);
+                }
+                e.target.value = '';
+            }
         });
-        _bindFilePickerButton('audio-upload-btn', 'audio-file-input', function(file) {
-            _transcribeAudioFile(file);
+
+        document.getElementById('audio-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                _transcribeAudioFile(e.target.files[0]);
+                e.target.value = '';
+            }
         });
-        _initWidgetAccessibilityOptions();
 
         (function _initMicRecorder() {
             var micBtn = document.getElementById('mic-record-btn');
@@ -1403,8 +1197,8 @@
                             _transcribeAudioFile(file);
                         });
 
-                        micBtn.innerHTML = '🎤 <span class="chat-a11y-label">Record</span>';
-                        micBtn.title = 'Record voice — tap to start, tap again to stop. No time limit.';
+                        micBtn.textContent = '🎤';
+                        micBtn.title = 'Record voice inspection — click to start, click again to stop. No time limit.';
                         micBtn.style.background = '';
                         var _statusEl = document.getElementById('audio-transcribe-status');
                         if (_statusEl) { _statusEl.textContent = '⏳ Recording stopped (' + elapsed + ') — uploading…'; }
@@ -1413,7 +1207,7 @@
                     _mediaRec.start(1000);
                     _requestWakeLock();
                     _recStart = Date.now();
-                    micBtn.innerHTML = '⏹ <span class="chat-a11y-label">Stop</span>';
+                    micBtn.textContent = '⏹';
                     micBtn.title = 'Stop recording';
                     micBtn.style.background = '#ffd0d0';
 
@@ -1451,10 +1245,7 @@
             var _voiceBtn  = document.getElementById('voice-mode-btn');
             if (!_voiceBtn) return;
 
-            if (_hasTTS || _SpeechRec || _hasVAD) {
-                _voiceBtn.dataset.capable = '1';
-                if (_canUseMediaFeatures()) _voiceBtn.style.display = '';
-            }
+            if (_hasTTS || _SpeechRec || _hasVAD) { _voiceBtn.style.display = ''; }
 
             var _voiceActive = false;
             var _recog       = null;
@@ -1652,7 +1443,7 @@
                 window.speechSynthesis.cancel();
                 if (_recog) { try { _recog.abort(); } catch(e){} _recog = null; }
                 _stopVAD();
-                _voiceBtn.innerHTML = '🔊 <span class="chat-a11y-label">Voice</span>';
+                _voiceBtn.textContent = '🔊';
                 _voiceBtn.style.background = '';
                 _voiceBtn.title = 'Voice conversation mode — speak to AI, AI speaks back';
                 _setVoiceStatus('');
@@ -1660,15 +1451,11 @@
 
             _voiceBtn.addEventListener('click', function() {
                 if (_voiceActive) { _stopVoiceMode(); return; }
-                if (!_canUseMediaFeatures()) {
-                    _setA11yStatus('Please sign in to use voice conversation.');
-                    return;
-                }
                 if (!_SpeechRec && !_hasVAD) {
                     if (!_hasTTS) { alert('Your browser does not support voice features. Please use Chrome, Edge, Safari, or Firefox.'); return; }
                 }
                 _voiceActive = true;
-                _voiceBtn.innerHTML = '🔇 <span class="chat-a11y-label">Stop</span>';
+                _voiceBtn.textContent = '🔇';
                 _voiceBtn.style.background = '#d0ffd0';
                 _voiceBtn.title = 'Voice mode ON — click to stop';
                 _startListening();
@@ -1803,21 +1590,19 @@
         .then(data => {
             if (data.success && data.conversations) {
                 const selector = document.getElementById('conversation-selector');
-                if (selector) {
-                    // Clear existing options except first one
-                    selector.innerHTML = '<option value="">Current Chat</option>';
-                    
-                    // Add conversations to dropdown
-                    data.conversations.forEach(conv => {
-                        const option = document.createElement('option');
-                        option.value = conv.id;
-                        option.textContent = `${conv.title} (${conv.message_count} msgs)`;
-                        if (state.currentConversationId && conv.id === state.currentConversationId) {
-                            option.selected = true;
-                        }
-                        selector.appendChild(option);
-                    });
-                }
+                // Clear existing options except first one
+                selector.innerHTML = '<option value="">Current Chat</option>';
+                
+                // Add conversations to dropdown
+                data.conversations.forEach(conv => {
+                    const option = document.createElement('option');
+                    option.value = conv.id;
+                    option.textContent = `${conv.title} (${conv.message_count} msgs)`;
+                    if (state.currentConversationId && conv.id === state.currentConversationId) {
+                        option.selected = true;
+                    }
+                    selector.appendChild(option);
+                });
                 
                 console.debug('Loaded', data.conversations.length, 'conversations');
             }
@@ -1905,8 +1690,6 @@
             if (data.username)              state.username   = data.username;
             if (data.is_admin !== undefined) state.isAdmin   = !!data.is_admin;
             if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
-            if (data.is_member_or_above !== undefined) state.isMemberOrAbove = !!data.is_member_or_above;
-            if (data.ollama_reachable !== undefined) state.ollamaReachable = !!data.ollama_reachable;
             if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
             // Hide provider selector and history button for guests / non-admins
@@ -1930,7 +1713,7 @@
                                 const sorted = chatModels.slice().sort(function(a, b) {
                                     return modelSizeScore(a.id) - modelSizeScore(b.id);
                                 });
-                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
+                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
                                 const pool   = usable.length > 0 ? usable : sorted;
                                 state.modelTiers.small  = 'ollama|' + pool[0].id;
                                 state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
@@ -1963,14 +1746,14 @@
                             const sorted = chatModels.slice().sort(function(a, b) {
                                 return modelSizeScore(a.id) - modelSizeScore(b.id);
                             });
-                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
+                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
                             const pool   = usable.length > 0 ? usable : sorted;
                             state.modelTiers.small  = 'ollama|' + pool[0].id;
                             state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
                             state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                         }
-                        // Only show usable (≥2B) models in dropdown; hide toy models
-                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 2; });
+                        // Only show usable (≥3B) models in dropdown; hide toy models
+                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 3; });
                         const listModels = displayModels.length > 0 ? displayModels : chatModels;
                         listModels.forEach(function(m) {
                             const opt = document.createElement('option');
@@ -1997,7 +1780,7 @@
                             })
                         : [
                             { val: 'grok|grok-4.3',               label: 'Grok 4.3' },
-                            { val: 'grok|grok-build-0.1',         label: 'Grok Build 0.1' }
+                            { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast' }
                         ];
                     grokModels.forEach(function(m) {
                         const opt = document.createElement('option');
@@ -2362,14 +2145,6 @@
     
     // Function to query AI and get response
     function queryAI(prompt, imageData) {
-        if (prompt && NAV_RE.test(prompt.trim())) {
-            const messageInput = document.getElementById('message-input') || document.getElementById('user-input');
-            _handleNavCommand(prompt, messageInput, function() {
-                _navCommandNoMatch(prompt, messageInput);
-            });
-            return;
-        }
-
         try {
             sessionStorage.setItem('ai_pending_query', JSON.stringify({
                 prompt: prompt,
@@ -2462,15 +2237,6 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage, imageData) {
-        if (prompt && NAV_RE.test(String(prompt).trim())) {
-            if (loadingMessage && loadingMessage.parentNode) loadingMessage.parentNode.removeChild(loadingMessage);
-            const messageInput = document.getElementById('message-input') || document.getElementById('user-input');
-            _handleNavCommand(prompt, messageInput, function() {
-                _navCommandNoMatch(prompt, messageInput);
-            });
-            return;
-        }
-
         const _agentId = (state.pageContext && state.pageContext.agent_id) || '';
         let _agentSys = (state.pageContext && state.pageContext.system_prompt) || '';
 
@@ -3320,35 +3086,16 @@
             statusIndicator.textContent = 'AI Error';
             statusIndicator.className = 'chat-status error';
 
-            const isTimeout = error.name === 'AbortError' && !state.isUnloading;
-            const isUnloadAbort = error.name === 'AbortError' && state.isUnloading;
-            const isNetworkFailure = !isUnloadAbort && (
-                error.name === 'TypeError'
-                || /NetworkError|Failed to fetch|fetch resource|Load failed|ECONNREFUSED/i.test(error.message || '')
-            );
+            const isTimeout = error.name === 'AbortError';
             const ollamaTimeout = isTimeout && isOllama;
-            const onLoginPage = /^\/user\/login/i.test(window.location.pathname || '');
-            let msg;
-            if (isUnloadAbort) {
-                console.debug('[AI] Fetch aborted during page navigation — suppressing error UI');
-                return;
-            }
-            if (isTimeout) {
-                msg = 'Request timed out after ' + (clientTimeoutMs / 1000) + 's.'
+            const msg = isTimeout
+                ? 'Request timed out after ' + (clientTimeoutMs / 1000) + 's.'
                     + (ollamaTimeout
                         ? ' The local Ollama model is overloaded or too large for the current hardware. Try switching to a cloud provider (Grok) for instant responses.'
-                        : ' The AI server may be busy.');
-            } else if (isNetworkFailure) {
-                msg = 'Could not reach the AI server'
-                    + (onLoginPage ? ' while on the login page' : '')
-                    + '. This often happens when the page navigated away mid-request, the server restarted, or the connection dropped. Please try again.';
-            } else {
-                msg = 'AI request failed: ' + (error.message || 'unknown error') + '. Please try again.';
-            }
+                        : ' The AI server may be busy.')
+                : 'Network error: ' + error.message + '. Please try again.';
 
-            _liveStep('❌', isTimeout
-                ? ('Client timed out after ' + (clientTimeoutMs/1000) + 's')
-                : (isNetworkFailure ? ('Connection failed: ' + (error.message || 'unreachable')) : ('Error: ' + (error.message || 'unknown'))));
+            _liveStep('❌', (isTimeout ? 'Client timed out after ' + (clientTimeoutMs/1000) + 's' : 'Network error: ' + error.message));
             liveSum.textContent = '⚠️ AI Thinking — ' + (isTimeout ? 'Timeout' : 'Network Error')
                 + ' Trace (' + liveBody.children.length + ' steps)';
             liveThinkEl.className = 'ai-thinking';
@@ -3451,19 +3198,6 @@
     // Pick the best provider string for a given complexity tier
     function autoSelectProvider(complexity) {
         const t = state.modelTiers;
-        const agentId = (state.pageContext && state.pageContext.agent_id) || '';
-        const memberOllamaAgents = /^(helpdesk|documentation|general)$/;
-
-        // Members and above: keep helpdesk/navigation on local Ollama when available.
-        if (state.isMemberOrAbove && state.ollamaReachable) {
-            if (complexity === 'nav' || complexity === 'simple') {
-                return t.small || t.medium || state.selectedProvider;
-            }
-            if (memberOllamaAgents.test(agentId)) {
-                return t.medium || t.large || t.small || state.selectedProvider;
-            }
-        }
-
         if (complexity === 'nav' || complexity === 'simple') {
             return t.small || t.medium || state.selectedProvider;
         }
@@ -3540,51 +3274,9 @@
         { url: '/Apiary/HiveManagement', concepts: ['manage hives', 'my hives', 'hive list', 'hive overview'] },
     ];
 
-    // URLs that must not be offered to non-admin users (information disclosure risk).
-    function isAdminOnlyNavUrl(url) {
-        const path = (url || '').replace(/^https?:\/\/[^/]+/i, '');
-        return /^\/admin(\/|$)/i.test(path)
-            || /^\/file\//i.test(path)
-            || /^\/site(\/|$)/i.test(path)
-            || /^\/themeadmin/i.test(path)
-            || /^\/log$/i.test(path)
-            || /^\/chat\/admin/i.test(path)
-            || /^\/ai\/models/i.test(path)
-            || /^\/navigation\/manage_links/i.test(path);
-    }
-
-    function isAdminNavIntent(message) {
-        if (!message || state.isAdmin) return false;
-        const stripped = String(message)
-            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|show me|take me to the|go to the)\s+/i, '')
-            .replace(/^(the|a|an)\s+/i, '')
-            .replace(/[^\w\s]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .toLowerCase();
-        return stripped === 'admin'
-            || /^admin\b/.test(stripped)
-            || /\badmin\s+(panel|dashboard|settings|users|logs|area|section|page)\b/.test(stripped);
-    }
-
-    function denyAdminNav(message, messageInput) {
-        addMessage(message, 'user-message');
-        if (messageInput) messageInput.value = '';
-        persistMessages();
-        addMessage(
-            'That section requires administrator privileges. '
-            + 'If you need help, visit [HelpDesk](' + window.location.origin + '/HelpDesk) '
-            + 'or contact your site administrator.',
-            'ai-message'
-        );
-        persistMessages();
-        return true;
-    }
-
     // Static nav entries always available regardless of current page links.
     // Keyed by label (lowercase) → path. Merged into the nav map at build time.
     // The origin is prepended at runtime so they work on any host.
-    // adminOnly: true — hidden from non-admin users in resolveNavIntent fast path.
     var STATIC_NAV = [
         { label: 'ai conversations',           url: '/ai/conversations' },
         { label: 'ai conversations / chat history', url: '/ai/conversations' },
@@ -3594,9 +3286,9 @@
         { label: 'ai',                         url: '/ai' },
         { label: 'manage api keys',            url: '/ai/manage_api_keys' },
         { label: 'api keys',                   url: '/ai/manage_api_keys' },
-        { label: 'manage ai models',           url: '/ai/models', adminOnly: true },
-        { label: 'ai models',                  url: '/ai/models', adminOnly: true },
-        { label: 'models',                     url: '/ai/models', adminOnly: true },
+        { label: 'manage ai models',           url: '/ai/models' },
+        { label: 'ai models',                  url: '/ai/models' },
+        { label: 'models',                     url: '/ai/models' },
         { label: 'helpdesk',                   url: '/HelpDesk' },
         { label: 'help desk',                  url: '/HelpDesk' },
         { label: 'submit a ticket',            url: '/HelpDesk/ticket/new' },
@@ -3604,63 +3296,37 @@
         { label: 'todos',                      url: '/todo' },
         { label: 'projects',                   url: '/project' },
         { label: 'daily plan',                 url: '/planning/daily' },
-        { label: 'newsletters',                url: '/newsletters' },
-        { label: 'newsletter',                 url: '/newsletters' },
-        { label: 'newsletter archive',         url: '/newsletters' },
-        { label: 'read newsletter',            url: '/newsletters' },
-        { label: 'mail',                       url: '/mail' },
-        { label: 'mail dashboard',             url: '/mail' },
-        { label: 'subscribe',                  url: '/mail/subscribe' },
-        { label: 'mailing list',               url: '/mail/subscribe' },
-        { label: 'join mailing list',          url: '/mail/subscribe' },
-        { label: 'my subscriptions',           url: '/mail/my_subscriptions' },
-        { label: 'email subscriptions',        url: '/mail/my_subscriptions' },
-        { label: 'manage newsletters',         url: '/mail/newsletters', adminOnly: true },
-        { label: 'create newsletter',          url: '/mail/newsletter/create', adminOnly: true },
-        { label: 'new newsletter',             url: '/mail/newsletter/create', adminOnly: true },
         { label: 'documentation',              url: '/Documentation' },
         { label: 'encyclopedia',               url: '/ENCY' },
         { label: 'ency',                       url: '/ENCY' },
-        { label: 'admin',                      url: '/admin', adminOnly: true },
-        { label: 'admin dashboard',            url: '/admin', adminOnly: true },
-        { label: 'schema compare',             url: '/admin/schema_compare', adminOnly: true,
-          aliases: ['schema', 'schema comparison', 'schema_compare', 'compare schema', 'schema compare & migration'] },
-        { label: 'admin users',                url: '/admin/users', adminOnly: true },
-        { label: 'users',                      url: '/admin/users', adminOnly: true },
-        { label: 'admin logs',                 url: '/admin/logs', adminOnly: true },
-        { label: 'logs',                       url: '/admin/logs', adminOnly: true },
-        { label: 'system info',                url: '/admin/system_info', adminOnly: true },
-        { label: 'ssh terminal',               url: '/admin/ssh_terminal', adminOnly: true,
-          aliases: ['terminal', 'system terminal', 'shell', 'command line', 'system shell'] },
-        { label: 'preview upcoming changes',   url: '/admin/dev-preview', adminOnly: true,
-          aliases: ['dev preview', 'preview changes', 'upcoming changes', 'preview site', 'preview dev', 'workstation preview', 'see dev changes'] },
-        { label: 'dev preview',                url: '/admin/dev-preview', adminOnly: true },
-        { label: 'admin settings',             url: '/admin/settings', adminOnly: true },
-        { label: 'settings',                   url: '/admin/settings', adminOnly: true },
-        { label: 'docker containers',          url: '/admin/docker-containers', adminOnly: true },
-        { label: 'docker',                     url: '/admin/docker-containers', adminOnly: true },
-        { label: 'opnsense',                   url: '/admin/infrastructure/opnsense', adminOnly: true,
-          aliases: ['opn sense', 'opn-sense', 'opsence', 'opnsence', 'opnsense gateway', 'opnsense dashboard', 'opnsense firewall', 'gateway dashboard'] },
-        { label: 'opnsense gateway',           url: '/admin/infrastructure/opnsense', adminOnly: true },
-        { label: 'opnsense dashboard',         url: '/admin/infrastructure/opnsense', adminOnly: true },
-        { label: 'gateway management',         url: '/admin/infrastructure/opnsense', adminOnly: true },
-        { label: 'infrastructure',             url: '/admin/infrastructure', adminOnly: true },
-        { label: 'application dns',            url: '/admin/dns', adminOnly: true },
-        { label: 'dns zones',                  url: '/admin/dns', adminOnly: true },
-        { label: 'gateway plan',               url: '/Documentation/system/GatewayPlan' },
-        { label: 'security scan',              url: '/admin/security-scan', adminOnly: true },
-        { label: 'link crawler',               url: '/admin/security-scan', adminOnly: true },
-        { label: 'crawler',                    url: '/admin/security-scan', adminOnly: true },
-        { label: 'link checker',               url: '/admin/security-scan', adminOnly: true },
-        { label: 'check links',                url: '/admin/security-scan', adminOnly: true },
-        { label: 'broken links',               url: '/admin/security-scan', adminOnly: true },
-        { label: 'git pull',                   url: '/admin/git_pull', adminOnly: true },
-        { label: 'planning admin',             url: '/admin/planning', adminOnly: true },
+        { label: 'admin',                      url: '/admin' },
+        { label: 'admin dashboard',            url: '/admin' },
+        { label: 'schema compare',             url: '/admin/schema_compare' },
+        { label: 'schema comparison',          url: '/admin/schema_compare' },
+        { label: 'schema_compare',             url: '/admin/schema_compare' },
+        { label: 'compare schema',             url: '/admin/schema_compare' },
+        { label: 'admin users',                url: '/admin/users' },
+        { label: 'users',                      url: '/admin/users' },
+        { label: 'admin logs',                 url: '/admin/logs' },
+        { label: 'logs',                       url: '/admin/logs' },
+        { label: 'system info',                url: '/admin/system_info' },
+        { label: 'admin settings',             url: '/admin/settings' },
+        { label: 'settings',                   url: '/admin/settings' },
+        { label: 'docker containers',          url: '/admin/docker-containers' },
+        { label: 'docker',                     url: '/admin/docker-containers' },
+        { label: 'security scan',              url: '/admin/security-scan' },
+        { label: 'link crawler',               url: '/admin/security-scan' },
+        { label: 'crawler',                    url: '/admin/security-scan' },
+        { label: 'link checker',               url: '/admin/security-scan' },
+        { label: 'check links',                url: '/admin/security-scan' },
+        { label: 'broken links',               url: '/admin/security-scan' },
+        { label: 'git pull',                   url: '/admin/git_pull' },
+        { label: 'planning admin',             url: '/admin/planning' },
         { label: 'workshops',                  url: '/workshop' },
         { label: 'membership',                 url: '/membership' },
-        { label: 'navigation',                 url: '/navigation/manage_links', adminOnly: true },
-        { label: 'manage navigation',          url: '/navigation/manage_links', adminOnly: true },
-        { label: 'manage links',               url: '/navigation/manage_links', adminOnly: true },
+        { label: 'navigation',                 url: '/navigation/manage_links' },
+        { label: 'manage navigation',          url: '/navigation/manage_links' },
+        { label: 'manage links',               url: '/navigation/manage_links' },
         { label: 'home',                       url: '/' },
         { label: 'main menu',                  url: '/' },
         { label: 'bmaster',                    url: '/BMaster' },
@@ -3713,30 +3379,9 @@
     //      - Relative: "  - Label: /path/to/page"   (agent nav-guide style)
     function buildNavigationMap() {
         const origin = window.location.origin;
-        const map = [];
-        STATIC_NAV
-            .filter(function(e) {
-                var canPrivilegedNav = state.isAdmin || state.isEditor;
-                return canPrivilegedNav || (!e.adminOnly && !isAdminOnlyNavUrl(e.url));
-            })
-            .forEach(function(e) {
-                const abs = origin + e.url;
-                const target = e.target || '_self';
-                map.push({ label: e.label, url: abs, target: target });
-                (e.aliases || []).forEach(function(alias) {
-                    map.push({ label: alias, url: abs, target: target });
-                });
-            });
-        if (state.userNavLinks && state.userNavLinks.length) {
-            state.userNavLinks.forEach(function(l) {
-                if (!l.label || !l.url) return;
-                const abs = _isExternalNavUrl(l.url) ? l.url : (origin + (l.url.startsWith('/') ? l.url : '/' + l.url));
-                if (!map.some(function(e) { return e.label === l.label && e.url === abs; })) {
-                    const navTarget = l.target || (_isExternalNavUrl(abs) ? '_blank' : '_self');
-                    map.push({ label: l.label, url: abs, target: navTarget, name: l.name });
-                }
-            });
-        }
+        const map = STATIC_NAV.map(function(e) {
+            return { label: e.label, url: origin + e.url };
+        });
         const prompt = (state.pageContext && state.pageContext.system_prompt) || '';
         const reAbs = /^[ \t]*(?:-[ \t]+)?(.+?):\s*(https?:\/\/[^\s]+)$/gm;
         const reRel = /^[ \t]*-[ \t]+(.+?):\s*(\/[^\s(→,]+)/gm;
@@ -3745,18 +3390,16 @@
             const label = m[1].trim().toLowerCase();
             const url   = m[2].trim();
             if (label.length > 80 || /^\[/.test(label)) continue;
-            if (!state.isAdmin && isAdminOnlyNavUrl(url)) continue;
             if (!map.some(function(e) { return e.label === label; })) {
-                map.push({ label, url, target: '_self' });
+                map.push({ label, url });
             }
         }
         while ((m = reRel.exec(prompt)) !== null) {
             const label = m[1].trim().toLowerCase();
             const url   = origin + m[2].trim().replace(/\s.*$/, '');
             if (label.length > 80 || /^\[/.test(label) || /^(step|pass|when|if|for|do|use|note|the|a |an |this|it |your|their|all|any|each|always|never|only|also)/.test(label)) continue;
-            if (!state.isAdmin && isAdminOnlyNavUrl(url)) continue;
             if (!map.some(function(e) { return e.label === label; })) {
-                map.push({ label, url, target: '_self' });
+                map.push({ label, url });
             }
         }
 
@@ -3779,10 +3422,8 @@
                     try {
                         const urlObj = new URL(trimmedHref, targetDoc.baseURI || window.location.href);
                         const resolvedUrl = urlObj.href;
-                        if (!state.isAdmin && isAdminOnlyNavUrl(resolvedUrl)) return;
                         if (!map.some(function(e) { return e.label === label; })) {
-                            const domTarget = el.getAttribute('target') || (_isExternalNavUrl(resolvedUrl) ? '_blank' : '_self');
-                            map.push({ label: label, url: resolvedUrl, target: domTarget });
+                            map.push({ label: label, url: resolvedUrl });
                         }
                     } catch(urlErr) {
                         // ignore malformed URLs
@@ -3826,171 +3467,6 @@
         });
     }
 
-    function _normalizeNavUrl(url) {
-        if (!url) return '';
-        try {
-            const u = new URL(url, window.location.origin);
-            return (u.origin + u.pathname).replace(/\/$/, '') || u.origin;
-        } catch (e) {
-            return String(url).split('#')[0].split('?')[0].replace(/\/$/, '');
-        }
-    }
-
-    function _navLinkHostKey(url) {
-        if (!url) return '';
-        try {
-            const u = new URL(url, window.location.origin);
-            if (u.protocol === 'http:' || u.protocol === 'https:') {
-                var host = u.hostname.replace(/^www\./i, '').toLowerCase();
-                return u.port ? host + ':' + u.port : host;
-            }
-            return ('path:' + u.pathname.replace(/\/$/, '').split('/').filter(Boolean)[0] || '').toLowerCase();
-        } catch (e) {
-            const s = String(url);
-            if (/^https?:\/\//i.test(s)) {
-                return s.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '').toLowerCase();
-            }
-            if (s.charAt(0) === '/') return 'path:' + (s.split('/').filter(Boolean)[0] || '').toLowerCase();
-            return s.toLowerCase();
-        }
-    }
-
-    function _navUrlPreferenceScore(url) {
-        var score = 0;
-        var host = _navLinkHostKey(url);
-        if (/\.local:\d+/i.test(host)) score += 45;
-        if (/\.local$/i.test(host) && !/:\d+/.test(host)) score -= 40;
-        if (/^https:\/\//i.test(url) && !/\.local/i.test(url)) score += 10;
-        if (/workstation\.local/i.test(url)) score -= 80;
-        if (url && url.charAt(0) === '/') score -= 60;
-        return score;
-    }
-
-    function _navMatchScore(item, query) {
-        const label = (item && item.label) || '';
-        const q = query || '';
-        if (!label) return 0;
-        if (label === q) return 100;
-        if (label.startsWith(q)) return 85;
-        if (q.startsWith(label)) return 75;
-        const words = q.split(/\s+/).filter(function(w) { return w.length > 0; });
-        if (words.length && words.every(function(w) { return label.indexOf(w) >= 0; })) {
-            return 65 + Math.min(10, words.length * 2);
-        }
-        return Math.max(0, 50 - _editDist(q, label));
-    }
-
-    // Collapse http/https duplicates per destination; keep ve7tit.local:3000 and ve7tit.com separate
-    function _dedupeNavMatchesByUrl(matches, query) {
-        if (!matches || !matches.length) return matches;
-        const best = {};
-        matches.forEach(function(m) {
-            var url = m.url || '';
-            if (/\.local$/i.test(url) && !/:\d+/.test(url)) return;
-            const destKey = _navLinkHostKey(url);
-            if (!destKey) return;
-            const score = _navMatchScore(m, query) + _navUrlPreferenceScore(url);
-            if (!best[destKey] || score > best[destKey].score) {
-                best[destKey] = { item: m, score: score };
-            }
-        });
-        const out = Object.keys(best).map(function(k) { return best[k].item; });
-        out.sort(function(a, b) {
-            return (_navMatchScore(b, query) + _navUrlPreferenceScore(b.url))
-                - (_navMatchScore(a, query) + _navUrlPreferenceScore(a.url));
-        });
-        return out;
-    }
-
-    function _finalizeNavMatches(matches, query) {
-        const deduped = _dedupeNavMatchesByUrl(matches, query);
-        if (!deduped || deduped.length <= 1) return deduped;
-        return deduped;
-    }
-
-    function _phraseLooksLikeOpnsense(text) {
-        const compact = (text || '').toLowerCase().replace(/[^a-z]/g, '');
-        if (compact.length < 4) return false;
-        if (/opnsense|opsense|opsence|opnsence|opense|opensense/.test(compact)) return true;
-        if (/^opn/.test(compact) && /(?:sense|sence)$/.test(compact)) return true;
-        return false;
-    }
-
-    function _findOpnsenseProjectIdFromContext() {
-        const prompt = (state.pageContext && state.pageContext.system_prompt) || '';
-        const m = prompt.match(/\[ID=(\d+)\]\s*OpnSense\b/i);
-        if (m) return m[1];
-        const m2 = prompt.match(/\[ID=(\d+)\][^\n]*opn\s*-?\s*sense/i);
-        if (m2) return m2[1];
-        if (state.userNavLinks && state.userNavLinks.length) {
-            for (var i = 0; i < state.userNavLinks.length; i++) {
-                var lnk = state.userNavLinks[i];
-                if (!lnk || !lnk.url) continue;
-                if (!/\/project\/details\?project_id=\d+/i.test(lnk.url)) continue;
-                if (_phraseLooksLikeOpnsense(lnk.label || '') || _phraseLooksLikeOpnsense(lnk.name || '')) {
-                    var pid = lnk.url.match(/project_id=(\d+)/i);
-                    if (pid) return pid[1];
-                }
-            }
-        }
-        return null;
-    }
-
-    function _isOpnsenseNavIntent(message) {
-        if (!message) return false;
-        const m = message.replace(/['']/g, "'").toLowerCase();
-        if (/\bproject\b/.test(m)
-            && !/\b(dashboard|gateway|firewall|admin|infrastructure|management)\b/.test(m)
-            && _phraseLooksLikeOpnsense(m)) {
-            return false;
-        }
-        const stripped = m.replace(/^(?:goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|show me|take me to the|go to the)\s+/i, '')
-            .replace(/^(?:the|a|an)\s+/i, '').trim();
-        if (_phraseLooksLikeOpnsense(stripped) || _phraseLooksLikeOpnsense(m)) return true;
-        return /\b(open|show|go to|take me to|navigate to|visit|display|browse)\b/.test(m)
-            && /\bopn/.test(m) && /\b(?:sense|sence)\b/.test(m);
-    }
-
-    function _executeOpnsenseNav(message, messageInput) {
-        const gatewayUrl = '/admin/infrastructure/opnsense';
-        const projectId = _findOpnsenseProjectIdFromContext();
-        const destinations = [
-            { url: gatewayUrl, target: '_self', label: 'OPNsense Gateway Dashboard' }
-        ];
-        if (projectId) {
-            destinations.push({
-                url: '/project/details?project_id=' + projectId,
-                target: '_blank',
-                label: 'OpnSense Project'
-            });
-        }
-
-        addMessage(message, 'user-message');
-        if (messageInput) messageInput.value = '';
-        persistMessages();
-
-        destinations.forEach(function(dest, idx) {
-            setTimeout(function() {
-                _openNavUrl(_resolveNavUrl(dest.url), dest.target);
-            }, idx * 350);
-        });
-
-        let navHtml = '<p>Opening <strong>OPNsense Gateway</strong>';
-        if (projectId) {
-            navHtml += ' and <strong>OpnSense project</strong> (new tab)';
-        }
-        navHtml += '.</p><ul class="lc-nav-choices">';
-        destinations.forEach(function(dest) {
-            const abs = _resolveNavUrl(dest.url);
-            navHtml += '<li><a href="' + _escH(abs) + '" target="' + _escH(dest.target) + '" rel="noopener noreferrer">'
-                + _escH(dest.label) + '</a></li>';
-        });
-        navHtml += '</ul>';
-        addMessage(navHtml, 'ai-message', true);
-        persistMessages();
-        return true;
-    }
-
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
@@ -4004,21 +3480,21 @@
         const map = buildNavigationMap();
         const words = q.split(/\s+/);
         const exact  = map.filter(function(item) { return item.label === q; });
-        if (exact.length) return _finalizeNavMatches(exact, q);
+        if (exact.length) return exact;
         const starts = map.filter(function(item) { return item.label.startsWith(q) || q.startsWith(item.label); });
-        if (starts.length) return _finalizeNavMatches(starts, q);
+        if (starts.length) return starts;
         const partial = map.filter(function(item) {
             return words.every(function(w) { return item.label.includes(w); })
                 || item.label.split(/\s+/).some(function(w) { return words.includes(w) && w.length > 3; });
         });
-        if (partial.length) return _finalizeNavMatches(partial, q);
+        if (partial.length) return partial;
         // Typo-tolerant fallback: fuzzy match each query word against label words
         const fuzzy = map.filter(function(item) {
             const labelWords = item.label.split(/\s+/);
             return words.filter(function(w) { return w.length >= 3; })
                 .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
         });
-        if (fuzzy.length) return _finalizeNavMatches(fuzzy, q);
+        if (fuzzy.length) return fuzzy;
         // Concept synonym fallback: match query against NAV_CONCEPT_GROUPS synonyms.
         // Catches natural-language phrases like "medicinal plants", "nectar plants", etc.
         const _origin3 = window.location.origin;
@@ -4037,198 +3513,25 @@
     // that should be answered by the AI, not treated as navigation commands.
     const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|take me to the|go to the)\s+(.+)/i;
 
-    function _navLinksToMatch(link) {
-        if (!link || !link.url) return null;
-        const origin = window.location.origin;
-        const abs = /^https?:\/\//i.test(link.url)
-            ? link.url
-            : origin + (link.url.startsWith('/') ? link.url : '/' + link.url);
-        return {
-            label: link.label || link.name || '',
-            name: link.name || link.label || '',
-            url: abs,
-            target: link.target || '_self'
-        };
-    }
-
-    function _navPhraseFromMessage(message) {
-        const navParts = message && message.match(NAV_RE);
-        return navParts
-            ? navParts[2].replace(/^(the|a|an)\s+/i, '').trim()
-            : (message || '').replace(/[^\w.\-]+/g, ' ').trim();
-    }
-
-    function _navCommandNoMatch(message, messageInput) {
-        const phrase = _navPhraseFromMessage(message) || message;
-        addMessage(message, 'user-message');
-        if (messageInput) messageInput.value = '';
-        persistMessages();
-        var manageUrl = window.location.origin + '/navigation/manage_links';
-        addMessage(
-            '<p>No navigation link matched <strong>' + _escH(phrase) + '</strong>. '
-            + 'Chat nav auto-indexes your site menu links (filtered by role), saved shortcuts, '
-            + 'and pages observed during prior AI sessions. '
-            + 'If this page should be reachable by name, add it in '
-            + '<a href="' + _escH(manageUrl) + '" target="_self">Manage Links</a> '
-            + '(menu, submenu, site scope CSC or All). '
-            + 'Navigation commands are not sent to the AI.</p>',
-            'ai-message',
-            true
-        );
-        persistMessages();
-    }
-
-    function _executeOpnsenseNavBundle(message, messageInput, serverLinks) {
-        const gatewayUrl = '/admin/infrastructure/opnsense';
-        const destinations = [{ url: gatewayUrl, target: '_self', label: 'OPNsense Gateway Dashboard', name: 'OPNsense Gateway Dashboard' }];
-        if (serverLinks && serverLinks.length) {
-            serverLinks.forEach(function(l) {
-                if (!l || !l.url) return;
-                if (l.url.indexOf('/admin/infrastructure/opnsense') >= 0) return;
-                destinations.push({
-                    url: l.url,
-                    target: l.target || '_blank',
-                    label: l.label || l.name || l.url,
-                    name: l.name || l.label || l.url
-                });
-            });
-        } else {
-            const projectId = _findOpnsenseProjectIdFromContext();
-            if (projectId) {
-                destinations.push({
-                    url: '/project/details?project_id=' + projectId,
-                    target: '_blank',
-                    label: 'OpnSense Project',
-                    name: 'OpnSense Project'
-                });
-            }
-        }
-        addMessage(message, 'user-message');
-        if (messageInput) messageInput.value = '';
-        persistMessages();
-        destinations.forEach(function(dest, idx) {
-            setTimeout(function() {
-                _openNavUrl(_resolveNavUrl(dest.url), dest.target);
-            }, idx * 350);
-        });
-        let navHtml = '<p>Opening <strong>OPNsense Gateway</strong>';
-        if (destinations.length > 1) navHtml += ' and related project (new tab)';
-        navHtml += '.</p><ul class="lc-nav-choices">';
-        destinations.forEach(function(dest) {
-            const abs = _resolveNavUrl(dest.url);
-            navHtml += '<li><a href="' + _escH(abs) + '" target="' + _escH(dest.target) + '" rel="noopener noreferrer">'
-                + _escH(dest.name || dest.label) + '</a></li>';
-        });
-        navHtml += '</ul>';
-        addMessage(navHtml, 'ai-message', true);
-        persistMessages();
-        return true;
-    }
-
-    // Refresh user nav links, try client resolve, then server match — calls onNoMatch if nothing found
-    function _handleNavCommand(message, messageInput, onNoMatch) {
-        const done = (typeof onNoMatch === 'function') ? onNoMatch : function() {};
-        loadUserNavLinks().then(function() {
-            const navParts = message && message.match(NAV_RE);
-            const phrase = navParts
-                ? navParts[2].replace(/^(the|a|an)\s+/i, '').trim()
-                : message.replace(/[^\w.\-]+/g, ' ').trim();
-            if (state.isAdmin && _phraseLooksLikeOpnsense(phrase)) {
-                return fetch('/navigation/match_user_nav_link?phrase=' + encodeURIComponent(phrase), {
-                    method: 'GET',
-                    credentials: 'include'
-                })
-                .then(function(r) { return r.ok ? r.json() : { success: false }; })
-                .then(function(data) {
-                    if (data.success) {
-                        _executeOpnsenseNavBundle(message, messageInput, data.links || (data.link ? [data.link] : null));
-                    } else {
-                        _executeOpnsenseNav(message, messageInput);
-                    }
-                })
-                .catch(function() { _executeOpnsenseNav(message, messageInput); });
-            }
-            const matches = resolveNavIntent(message);
-            if (matches && matches.length >= 1) {
-                _executeNavMatch(message, messageInput, matches);
-                return;
-            }
-            if (!phrase || phrase.length < 2) {
-                done();
-                return;
-            }
-            return fetch('/navigation/match_ai_shortcut?phrase=' + encodeURIComponent(phrase), {
-                method: 'GET',
-                credentials: 'include'
-            })
-            .then(function(r) { return r.ok ? r.json() : { success: false }; })
-            .then(function(scData) {
-                if (scData.success && scData.shortcut) {
-                    const sc = scData.shortcut;
-                    _executeNavMatch(message, messageInput, [_navLinksToMatch({
-                        label: sc.label,
-                        name: sc.label,
-                        url: sc.url,
-                        target: '_blank'
-                    })]);
-                    return;
-                }
-                return fetch('/navigation/match_user_nav_link?phrase=' + encodeURIComponent(phrase), {
-                    method: 'GET',
-                    credentials: 'include'
-                })
-                .then(function(r) { return r.ok ? r.json() : { success: false }; })
-                .then(function(data) {
-                    if (data.success && data.multi && data.links && data.links.length) {
-                        _executeOpnsenseNavBundle(message, messageInput, data.links);
-                        return;
-                    }
-                    const m = data.success && data.link ? _navLinksToMatch(data.link) : null;
-                    if (m) {
-                        _executeNavMatch(message, messageInput, [m]);
-                    } else {
-                        done();
-                    }
-                });
-            })
-            .catch(function() { done(); });
-        }).catch(function() { done(); });
-    }
-
     // Helper: handle a resolved navigation match — announce and navigate
     function _executeNavMatch(message, messageInput, matches) {
-        _initNavChoiceClicks();
-        const allowed = (matches || []).filter(function(m) {
-            return state.isAdmin || !isAdminOnlyNavUrl(m.url);
-        });
         addMessage(message, 'user-message');
-        if (messageInput) messageInput.value = '';
+        messageInput.value = '';
         persistMessages();
-        if (!allowed.length) {
-            addMessage(
-                'That section requires administrator privileges. '
-                + 'If you need help, visit [HelpDesk](' + window.location.origin + '/HelpDesk) '
-                + 'or contact your site administrator.',
-                'ai-message'
-            );
-            persistMessages();
-            return true;
-        }
-        matches = allowed;
-        matches = _finalizeNavMatches(matches, _navPhraseFromMessage(message));
         if (matches.length === 1) {
-            const m0 = matches[0];
-            const navTarget = m0.target || (_isExternalNavUrl(m0.url) ? '_blank' : '_self');
-            const openHint = _shouldOpenNavInNewTab(m0.url, navTarget) ? ' (new tab)' : '';
-            const linkLabel = _escH(m0.name || m0.label || _navLinkHostKey(m0.url));
-            const navHtml = '<p>Navigating to <a href="#" class="lc-nav-choice" data-url="' + _escH(m0.url) + '" data-target="' + _escH(navTarget) + '">' + linkLabel + '</a>' + _escH(openHint) + '</p>';
-            addMessage(navHtml, 'ai-message', true);
+            addMessage('Navigating to [' + matches[0].label + '](' + matches[0].url + ')', 'ai-message');
             persistMessages();
             setTimeout(function() {
-                _openNavUrl(m0.url, navTarget);
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = matches[0].url;
+                } else {
+                    window.location.href = matches[0].url;
+                }
             }, 600);
         } else {
-            addMessage(_formatNavChoiceHtml(matches), 'ai-message', true);
+            const listMsg = 'Multiple pages match — which one did you mean?\n'
+                + matches.slice(0, 8).map(function(m) { return '- [' + m.label + '](' + m.url + ')'; }).join('\n');
+            addMessage(listMsg, 'ai-message');
             persistMessages();
         }
         return true;
@@ -4549,21 +3852,15 @@
             && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(message);
 
         // Client-side navigation interception — no AI round-trip needed (skip if image-only)
-        if (isAdminNavIntent(message)) {
-            denyAdminNav(message, messageInput);
-            return;
-        }
-        if (state.isAdmin && _isOpnsenseNavIntent(message)) {
-            _executeOpnsenseNav(message, messageInput);
-            return;
-        }
-        // 1. Explicit nav keyword: "open X", "go to X", etc. — never send to AI without trying server link match
+        // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
         const navMatch = !_isEncyNav && message && message.match(NAV_RE);
         if (navMatch) {
-            _handleNavCommand(message, messageInput, function() {
-                _navCommandNoMatch(message, messageInput);
-            });
-            return;
+            const matches = resolveNavIntent(message);
+            if (matches && matches.length >= 1) {
+                _executeNavMatch(message, messageInput, matches);
+                return;
+            }
+            // No local match — fall through to AI
         }
 
         // 2. Bare page-name navigation (voice-control ready): short message (≤5 words)
@@ -4597,11 +3894,8 @@
             return;
         }
 
-        _sendMessageToAI(message, messageInput);
-    }
-
-    function _sendMessageToAI(message, messageInput) {
         // FAQ fast-path: instant canned answer for common support questions.
+        // Fires before queryAI so the user never waits on Ollama for trivial questions.
         if (message && !state.pendingImage) {
             for (var _fqi = 0; _fqi < STATIC_FAQ.length; _fqi++) {
                 if (STATIC_FAQ[_fqi].match.test(message)) {
@@ -4616,6 +3910,7 @@
             }
         }
 
+        // Build display message (text + optional thumbnail)
         let displayHtml = message ? _escapeHtml(message) : '';
         if (state.pendingImage) {
             displayHtml += (displayHtml ? '<br>' : '') +
@@ -4626,11 +3921,7 @@
         const imgForRequest = state.pendingImage || null;
         window._clearPendingImage();
         persistMessages();
-        var imagePrompt = message;
-        if (!imagePrompt && imgForRequest) {
-            imagePrompt = 'Please identify items in this photo and list them as an inventory (name, quantity if visible, notes).';
-        }
-        queryAI(imagePrompt || '(image attached)', imgForRequest);
+        queryAI(message || '(image attached)', imgForRequest);
     }
 
     function _escapeHtml(s) {
@@ -5034,19 +4325,11 @@
                 inputEl.focus();
             }
             var diarizedNote = data.diarized ? ' (speakers separated)' : '';
-            if (_shouldAutoSendTranscript()) {
-                if (statusEl) {
-                    statusEl.textContent = '✅ Transcript ready — sending…';
-                }
-                addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ') — auto-sending', 'system-message');
-                setTimeout(function() { sendMessage(); }, 300);
-            } else {
-                if (statusEl) {
-                    statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + diarizedNote + ') — review and press Send';
-                    setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 10000);
-                }
-                addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
+            if (statusEl) {
+                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + diarizedNote + ') — review and press Send';
+                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 10000);
             }
+            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
 
             if (backupId) {
                 _deleteAudioBackup(backupId).then(_renderLocalAudioBackups);
@@ -5475,45 +4758,18 @@
             return;
         }
 
-        // navigate_multi: open several URLs (e.g. OPNsense gateway + project)
-        if (actionObj.action === 'navigate_multi') {
-            const multiUrls = actionObj.urls || (actionObj.params && actionObj.params.urls) || [];
-            if (!multiUrls.length) return;
-            const allowed = multiUrls.filter(function(u) {
-                const navUrl = (u && (u.url || u)) || '';
-                return state.isAdmin || !isAdminOnlyNavUrl(navUrl);
-            });
-            if (!allowed.length) {
-                addMessage('That section requires administrator privileges.', 'ai-message');
-                return;
-            }
-            allowed.forEach(function(u, idx) {
-                const navUrl = (u && (u.url || u)) || '';
-                const navTarget = (u && u.target) || '_self';
-                setTimeout(function() {
-                    executeAIAction({ action: 'navigate', url: navUrl, target: navTarget });
-                }, idx * 350);
-            });
-            return;
-        }
-
         // navigate: open a URL in a new tab without any pre-fill
         if (actionObj.action === 'navigate') {
             const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
             if (navUrl) {
-                if (!state.isAdmin && isAdminOnlyNavUrl(navUrl)) {
-                    addMessage(
-                        'That section requires administrator privileges.',
-                        'ai-message'
-                    );
-                    return;
-                }
-                const abs = _resolveNavUrl(navUrl);
-                const navTarget = (actionObj.params && actionObj.params.target) || actionObj.target
-                    || (_isExternalNavUrl(abs) ? '_blank' : '_self');
+                const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
                 const _navSi = document.getElementById('chat-status');
                 if (_navSi) { _navSi.textContent = '\uD83D\uDD17 Opening: ' + navUrl; _navSi.className = 'chat-status connected'; }
-                _openNavUrl(abs, navTarget);
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = abs;
+                } else {
+                    window.location.href = abs;
+                }
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
                 const lbl = document.createElement('div');
@@ -5536,16 +4792,7 @@
             const nfUrl    = actionObj.url    || (actionObj.params && actionObj.params.url);
             const nfFields = actionObj.fields || (actionObj.params && actionObj.params.fields) || {};
             if (nfUrl) {
-                if (!state.isAdmin && isAdminOnlyNavUrl(nfUrl)) {
-                    addMessage(
-                        'That section requires administrator privileges.',
-                        'ai-message'
-                    );
-                    return;
-                }
-                const abs = _resolveNavUrl(nfUrl);
-                const nfTarget = (actionObj.params && actionObj.params.target) || actionObj.target
-                    || (_isExternalNavUrl(abs) ? '_blank' : '_self');
+                const abs = nfUrl.startsWith('http') ? nfUrl : (window.location.origin + (nfUrl.startsWith('/') ? nfUrl : '/' + nfUrl));
                 try {
                     localStorage.setItem('ai_pending_fill', JSON.stringify({
                         url:     nfUrl,
@@ -5553,7 +4800,11 @@
                         ts:      Date.now()
                     }));
                 } catch(e) { console.warn('localStorage write failed', e); }
-                _openNavUrl(abs, nfTarget);
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = abs;
+                } else {
+                    window.location.href = abs;
+                }
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
                 const lbl = document.createElement('div');
@@ -5666,8 +4917,6 @@
             messageElement.innerHTML = text;
         } else if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
             messageElement.innerHTML = AIUtils.formatMessageContent(text);
-        } else if (className === 'ai-message' && /\[.+\]\(.+\)/.test(text)) {
-            messageElement.innerHTML = _renderSimpleMarkdownLinks(text);
         } else {
             messageElement.textContent = text;
         }
@@ -5713,11 +4962,8 @@
             if (cfg.username) state.username = cfg.username;
             if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
             if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
-            if (cfg.isEditor !== undefined) state.isEditor = !!cfg.isEditor;
             if (cfg.siteName) state.siteName = cfg.siteName;
         }
-
-        loadUserNavLinks();
 
         // If this /ai page was opened by detaching the widget, honour the original
         // page path and title so the same agent context is used.
@@ -5795,20 +5041,37 @@
             }
 
             // Client-side navigation interception
-            if (isAdminNavIntent(prompt)) {
-                denyAdminNav(prompt, input);
-                return;
-            }
             // Skip for ENCY agent nav — handled by fast path inside sendAIRequest
             const _pmAgentId = (state.pageContext && state.pageContext.agent_id) || '';
             const _pmIsEncyNav = (_pmAgentId === 'ency' || (state.pageContext && (state.pageContext.page_path || '').startsWith('/ENCY')))
                 && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(prompt);
             const navMatch = !_pmIsEncyNav && prompt.match(NAV_RE);
             if (navMatch) {
-                _handleNavCommand(prompt, input, function() {
-                    _navCommandNoMatch(prompt, input);
-                });
-                return;
+                const matches = resolveNavIntent(prompt);
+                if (matches && matches.length === 1) {
+                    addMessage(prompt, 'user-message');
+                    input.value = '';
+                    persistMessages();
+                    addMessage('Navigating to [' + matches[0].label + '](' + matches[0].url + ')', 'ai-message');
+                    persistMessages();
+                    setTimeout(function() {
+                        if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                            window.opener.location.href = matches[0].url;
+                        } else {
+                            window.location.href = matches[0].url;
+                        }
+                    }, 600);
+                    return;
+                } else if (matches && matches.length > 1) {
+                    addMessage(prompt, 'user-message');
+                    input.value = '';
+                    persistMessages();
+                    const listMsg = 'Multiple pages match — which did you mean?\n'
+                        + matches.slice(0, 8).map(function(m) { return '- [' + m.label + '](' + m.url + ')'; }).join('\n');
+                    addMessage(listMsg, 'ai-message');
+                    persistMessages();
+                    return;
+                }
             }
 
             addMessage(prompt, 'user-message');
@@ -5816,6 +5079,7 @@
             input.style.height = 'auto';
             persistMessages();
 
+            // Show send button loading state
             if (sendBtn) {
                 sendBtn.disabled = true;
                 const sp = sendBtn.querySelector('.button-spinner');
@@ -5977,20 +5241,17 @@
 
             /* In a detached popup window: fill the entire window so resize works naturally */
             body.ai-widget-popup .chat-panel {
-                position: fixed !important;
-                top: 38px !important;
-                left: 0 !important;
-                right: 0 !important;
-                bottom: 0 !important;
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
                 width: 100% !important;
-                height: calc(100vh - 38px) !important;
+                height: 100% !important;
                 max-width: 100% !important;
                 max-height: 100% !important;
                 min-width: 0 !important;
                 min-height: 0 !important;
-                border-radius: 0 !important;
-                box-shadow: none !important;
-                margin: 0 !important;
+                border-radius: 0;
+                box-shadow: none;
+                margin: 0;
             }
             body.ai-widget-popup .chat-input {
                 flex-shrink: 0;
@@ -6466,7 +5727,6 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
-        _initNavChoiceClicks();
 
         // When running inside the detached popup window, mark <body> so CSS can
         // override the chat panel to fill 100% of the window.

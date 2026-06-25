@@ -30,7 +30,7 @@ sub _deny_json {
 
 sub _ai_ctrl {
     my ($self, $c) = @_;
-    return $c->controller('AI');
+    return $c->model('AI')->config;
 }
 
 =head2 terminal_status
@@ -44,10 +44,10 @@ sub terminal_status :Local :Args(0) {
     $c->response->content_type('application/json');
 
     my $allowed = $self->_coding_workstation_allowed($c);
-    my $ai = $self->_ai_ctrl($c);
-    my $root = $ai ? $ai->_project_root_path($c) : '';
-    my $interactive_ws = $ai && $ai->can('_interactive_ws_available')
-        ? ($ai->_interactive_ws_available($c) ? 1 : 0) : 0;
+    my $cfg = $self->_ai_ctrl($c);
+    my $root = $cfg ? $cfg->_project_root_path($c) : '';
+    my $interactive_ws = $cfg && $cfg->can('_interactive_ws_available')
+        ? ($cfg->_interactive_ws_available($c) ? 1 : 0) : 0;
 
     $c->response->body(encode_json({
         success          => JSON::true,
@@ -92,20 +92,20 @@ sub run_command :Local :Args(0) {
         return;
     }
 
-    my $ai = $self->_ai_ctrl($c);
-    unless ($ai) {
+    my $cfg = $self->_ai_ctrl($c);
+    unless ($cfg) {
         $c->response->body(encode_json({ success => JSON::false, error => 'AI controller unavailable' }));
         return;
     }
 
-    my $root = $ai->_project_root_path($c);
+    my $root = $cfg->_project_root_path($c);
     chdir $root or do {
         $c->response->body(encode_json({ success => JSON::false, error => "Failed to chdir to project root: $!" }));
         return;
     };
 
-    my $api_key = $ai->_grok_cli_api_key($c);
-    my $home    = $ai->_grok_home();
+    my $api_key = $cfg->_grok_cli_api_key($c);
+    my $home    = $cfg->_grok_home();
 
     local $ENV{XAI_API_KEY} = $api_key if $api_key;
     local $ENV{GROK_API_KEY} = $api_key if $api_key;
@@ -146,11 +146,11 @@ sub _pty_resize {
 
 sub _coding_shell_env {
     my ($self, $c) = @_;
-    my $ai = $self->_ai_ctrl($c);
+    my $cfg = $self->_ai_ctrl($c);
     return {
-        root    => $ai ? $ai->_project_root_path($c) : '/home/shanta/PycharmProjects/comserv2',
-        home    => $ai ? $ai->_grok_home() : '/home/shanta',
-        api_key => $ai ? $ai->_grok_cli_api_key($c) : undef,
+        root    => $cfg ? $cfg->_project_root_path($c) : '/home/shanta/PycharmProjects/comserv2',
+        home    => $cfg ? $cfg->_grok_home() : '/home/shanta',
+        api_key => $cfg ? $cfg->_grok_cli_api_key($c) : undef,
     };
 }
 
