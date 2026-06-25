@@ -1106,7 +1106,7 @@ sub create :Local {
     # Validate required fields
     my @missing_fields = grep { !defined $params->{$_} || $params->{$_} eq '' } @required_fields;
     if (@missing_fields) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+        $self->logging->log_with_details($c,  'warn', __FILE__, __LINE__, 'create', 
             "Missing required fields: " . join(', ', @missing_fields));
         $c->stash->{error_msg} = "Missing required fields: " . join(', ', @missing_fields);
         $c->stash->{template} = 'todo/addtodo.tt';
@@ -1147,7 +1147,7 @@ sub create :Local {
         };
         if ($@) {
             $selected_project_id = 1; # Final fallback
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            $self->logging->log_with_details($c,  'warn', __FILE__, __LINE__, 'create', 
                 "Error finding default project, using fallback: $@");
         }
     } else {
@@ -1158,7 +1158,7 @@ sub create :Local {
                 "Using project ID: $selected_project_id, code: $project_code");
         };
         if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            $self->logging->log_with_details($c,  'warn', __FILE__, __LINE__, 'create', 
                 "Error fetching project: $@");
         }
     }
@@ -1179,7 +1179,7 @@ sub create :Local {
         }
     };
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+        $self->logging->log_with_details($c,  'warn', __FILE__, __LINE__, 'create', 
             "Date validation failed: $@");
         $c->stash->{error_msg} = "Invalid date: $@";
         $c->stash->{template} = 'todo/addtodo.tt';
@@ -1195,7 +1195,7 @@ sub create :Local {
     # Get user info
     my $user_id = $c->session->{user_id};
     unless ($user_id) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+        $self->logging->log_with_details($c,  'warn', __FILE__, __LINE__, 'create', 
             'User ID not found in session');
         $c->stash->{error_msg} = 'User not authenticated';
         $c->stash->{template} = 'user/login.tt';
@@ -1259,7 +1259,7 @@ sub create :Local {
     # Check for errors from eval
     if ($@) {
         my $error = $@;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+        $self->logging->log_with_details($c,  'warn', __FILE__, __LINE__, 'create', 
             "Failed to create todo: $error");
         $c->stash->{error_msg} = "Failed to create todo: $error";
         $c->stash->{template} = 'todo/addtodo.tt';

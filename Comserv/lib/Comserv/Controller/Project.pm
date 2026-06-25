@@ -279,8 +279,15 @@ sub project :Path('project') :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 
         "Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter");
 
+    # Read ?all=1 query parameter
+    my $show_all = $c->request->query_parameters->{all} ? 1 : 0;
     # Use the existing method to fetch projects with sub-projects (request full data including todos)
-    my $projects = $self->fetch_projects_with_subprojects($c, 1);
+    my $projects = $self->fetch_projects_with_subprojects($c, 1, $show_all);
+
+    # Provide a link for "Show All Projects" (bypasses parent_id filter)
+    my $all_link = $show_all
+        ? $c->uri_for($self->action_for('project'))
+        : $c->uri_for($self->action_for('project'), { all => 1 });
     
     # Enhance project data with additional fields needed for filtering
     $projects = $self->enhance_project_data($c, $projects);
@@ -291,6 +298,7 @@ sub project :Path('project') :Args(0) {
         role_filter => $role_filter,
         project_filter => $project_filter,
         priority_filter => $priority_filter,
+        all_link => $all_link,
         template => 'todo/project.tt', # Use the original template
         template_timestamp => time(), # Add a timestamp to force template reload
         success_message => 'Project priority display has been updated. All projects without a priority are now shown as Medium priority.',
@@ -442,10 +450,11 @@ sub details :Path('details') :Args(0) {
 # See the implementation there
 
 sub fetch_projects_with_subprojects :Private {
-    my ($self, $c, $full_data) = @_;
+    my ($self, $c, $full_data, $show_all) = @_;
     
     # Default to basic data (just names, IDs) unless explicitly requested
     $full_data //= 0;
+    $show_all  //= 0;
     
     # Log the start of the project-fetching subroutine
     $self->logging->log_with_details(
@@ -472,11 +481,31 @@ sub fetch_projects_with_subprojects :Private {
     # Sub-projects are fetched by parent_id (no sitename filter) so they appear regardless of sitename
     my @top_projects;
     eval {
-        my %search_cond = (parent_id => undef);
-        $search_cond{sitename} = $SiteName unless $is_csc_admin;
+        my %search_cond;
+        if ($show_all) {
+            %search_cond = ();
+        } else {
+            %search_cond = (
+                -or => [
+                    { parent_id => undef },
+                    { parent_id => 0 },
+                ]
+            );
+        }
+        unless ($show_all || $is_csc_admin) {
+            $search_cond{sitename} = $SiteName;
+        }
         @top_projects = $schema->resultset('Project')->search(
             \%search_cond,
-            { order_by => { -asc => 'name' } }
+            {
+                order_by => [
+                    { -asc => \[ 'COALESCE(parent_id, 0)' ] },
+                    { -asc => 'name' }
+                ],
+                # Conservative addition: prefetch project_dependencies so listings/calendar
+                # include dependency status without changing existing recursion logic.
+                prefetch => ['project_dependencies', 'depends_on_me']
+            }
         )->all;
     };
 

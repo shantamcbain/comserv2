@@ -80,6 +80,19 @@ __PACKAGE__->belongs_to(parent => 'Comserv::Model::Schema::Ency::Result::Project
 # Add a new relationship for the sub-projects
 __PACKAGE__->has_many(sub_projects => 'Comserv::Model::Schema::Ency::Result::Project', 'parent_id');
 __PACKAGE__->has_many(todos => 'Comserv::Model::Schema::Ency::Result::Todo', 'project_id', { cascade_delete => 1 });
+
+# --- Added for project_dependencies integration (conservative fix) ---
+# Projects this project depends on (outgoing dependencies)
+__PACKAGE__->has_many(
+    project_dependencies => 'Comserv::Model::Schema::Ency::Result::ProjectDependency',
+    'project_id'
+);
+# Projects that depend on this project (incoming dependencies)
+__PACKAGE__->has_many(
+    depends_on_me => 'Comserv::Model::Schema::Ency::Result::ProjectDependency',
+    'depends_on_id'
+);
+# --- End of added relationships ---
 __PACKAGE__->has_many(project_sites => 'Comserv::Model::Schema::Ency::Result::ProjectSite', 'project_id');
 __PACKAGE__->has_many(documentation_mappings => 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping', 'project_id');
 __PACKAGE__->has_many(

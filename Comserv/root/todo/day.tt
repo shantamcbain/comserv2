@@ -1349,14 +1349,18 @@ function gcalSiteFilterChange(sel) {
 function gcalApplyFilters() {
     var siteSel = document.getElementById('gcal-site-filter');
     var userSel = document.getElementById('gcal-user-filter');
+    var projSel = document.getElementById('gcal-project-filter');
     var filterSite = siteSel ? siteSel.value : '';
     var filterUser = userSel ? userSel.value : '';
+    var filterProj = projSel ? projSel.value : '';
     document.querySelectorAll('.gcal-ev').forEach(function(el) {
         var site = el.getAttribute('data-site') || '';
         var user = el.getAttribute('data-user') || '';
+        var proj = el.getAttribute('data-project-id') || '';
         var siteOk = !filterSite || site === filterSite;
         var userOk = !filterUser || user === filterUser;
-        el.style.display = (siteOk && userOk) ? '' : 'none';
+        var projOk = !filterProj || proj === filterProj;
+        el.style.display = (siteOk && userOk && projOk) ? '' : 'none';
     });
     gcalLayoutEvents();
     gcalBuildLegend();
@@ -1366,7 +1370,7 @@ function gcalApplyFilters() {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ site: filterSite, user: filterUser })
+            body: JSON.stringify({ site: filterSite, user: filterUser, project: filterProj })
         }).catch(function(){});
     }
 }
@@ -1767,6 +1771,21 @@ document.addEventListener('DOMContentLoaded', function() {
         [% END %]
     </select>
     [% END %]
+    <span style="font-size:0.82em;color:#70757a;white-space:nowrap;flex-shrink:0;">Project:</span>
+    <select id="gcal-project-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;min-width:140px;">
+        <option value="">All</option>
+        [% FOREACH proj IN planning_projects %]
+            [%# Only show projects that match the current site filter (or show all if no site filter) %]
+            [% IF !cal_filter_site || proj.sitename == cal_filter_site %]
+            <option value="[% proj.id %]"[% IF cal_filter_project == proj.id %] selected[% END %]>[% proj.name %]</option>
+            [% FOREACH sub IN proj.sub_projects %]
+            [% IF !cal_filter_site || sub.sitename == cal_filter_site %]
+            <option value="[% sub.id %]"[% IF cal_filter_project == sub.id %] selected[% END %]>&nbsp;&nbsp;└ [% sub.name %]</option>
+            [% END %]
+            [% END %]
+            [% END %]
+        [% END %]
+    </select>
     <span style="font-size:0.82em;color:#70757a;white-space:nowrap;flex-shrink:0;">User:</span>
     <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
@@ -1887,6 +1906,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  data-priority="[% tp %]"
                  data-site="[% ts %]"
                  data-user="[% tdev %]"
+                 data-project-id="[% todo.project_id || '' %]"
                  data-is-recurring="[% isrec %]"
                  data-todo-type="[% ttype %]"
                  data-is-fixed="[% isfixed %]"

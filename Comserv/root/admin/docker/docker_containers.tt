@@ -1,0 +1,81 @@
+[% META
+   title = 'Docker Container Management'
+   version = '1.1'
+   author = 'AI Assistant'
+   date = '2026-06-24'
+   last_modified = '2026-06-24'
+   category = 'admin'
+   tags = 'docker, containers, infrastructure'
+%]
+
+[% PageVersion = 'root/admin/docker/docker_containers.tt,v 1.1 2026/06/24 ai_assistant Exp ai_assistant ' %]
+
+<!-- xterm.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
+<div class="app-container">
+    <div class="page-header">
+        <h1><i class="icon-docker"></i> Docker Container Management</h1>
+        <a href="/admin/docker-containers-old" class="btn btn-secondary btn-sm">
+            <i class="fas fa-history"></i> Switch to Old View
+        </a>
+    </div>
+
+    [% IF !docker_available %]
+    <div class="alert alert-warning">
+        <strong>Notice:</strong> Docker container management is not available from within a Docker container.<br>
+        Use the host development server:
+        <a href="http://workstation.local:3001/admin/docker-containers" class="alert-link">Open on port 3001 →</a>
+    </div>
+    [% ELSE %]
+
+    <!-- Target Selector -->
+    <div class="card mb-3">
+        <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <label for="docker-target-select" class="form-label fw-bold mb-0">Docker System Target:</label>
+                <select id="docker-target-select" class="form-control form-control-sm w-auto" onchange="onTargetChange()">
+                    <option value="workstation" selected>Workstation (Local Host)</option>
+                    <option value="production1">Production 1 (192.168.1.126)</option>
+                    <option value="production2">Production 2 (192.168.1.127)</option>
+                </select>
+            </div>
+            <div id="target-info-display" class="text-muted small"></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column -->
+        <div class="col-lg-7">
+            <!-- Container Status Overview -->
+            <div class="content-section" style="margin-bottom: 20px;">
+                <div class="card">
+                    <div class="card-header collapsible-header" onclick="toggleSection('container-status')"
+                         style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
+                        <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                            <span>
+                                <i class="fas fa-chevron-right chevron-icon" id="chevron-container-status" style="margin-right: 10px; font-size: 0.8em;"></i>
+                                <i class="icon-list" style="margin-right: 10px;"></i>
+                                Container Status Overview
+                            </span>
+                            <button onclick="event.stopPropagation(); refreshContainers();" style="padding: 6px 12px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                <i class="icon-refresh"></i> Refresh
+                            </button>
+                        </h3>
+                    </div>
+                    <div id="container-status" class="card-body collapsible-content" style="padding: 20px; display: none;">
+                        <div id="containers-list" style="display: flex; flex-direction: column; gap: 10px;">
+                            <p style="color: var(--text-muted-color, #666); text-align: center;">Click Refresh or open this section to load containers.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    [% END %]
+</div>
+
+<script src="/static/js/docker_containers.js"></script>

@@ -6842,6 +6842,7 @@ sub session_details :Local :Args(0) {
         roles => $c->session->{roles} || [],
         is_dev => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
+    $c->detach;  # prevent default template rendering
 }
 
 sub get_conversation_list :Local :Args(0) {

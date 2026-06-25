@@ -451,15 +451,15 @@ sub seed_nav_submenu_catalog_dbh {
                     . 'WHERE category = ? AND sitename = ? AND submenu_id = ? LIMIT 1'
                 );
                 $check->execute( $category, 'All', $id );
-                next if $check->fetchrow_arrayref;
-
-                $dbh->do(
-                    'INSERT INTO nav_submenu_tb '
-                    . '(category, sitename, submenu_id, label, section_order, is_system, template_slot, status) '
-                    . 'VALUES (?, ?, ?, ?, ?, 1, ?, 1)',
-                    undef,
-                    $category, 'All', $id, $label, $order, $id,
-                );
+                if (!$check->fetchrow_arrayref) {
+                    $dbh->do(
+                        'INSERT INTO nav_submenu_tb '
+                        . '(category, sitename, submenu_id, label, section_order, is_system, template_slot, status) '
+                        . 'VALUES (?, ?, ?, ?, ?, 1, ?, 1)',
+                        undef,
+                        $category, 'All', $id, $label, $order, $id,
+                    );
+                }
             };
             $order += 10;
         }
@@ -1501,7 +1501,7 @@ sub get_pages {
     
     $status //= 2; # Default status is 2 (active)
     
-    $c->log->debug("Getting pages for menu: $menu, site: $site_name, status: $status");
+    # DISABLED: $c->log->debug("Getting pages for menu: $menu, site: $site_name, status: $status");
     
     # Initialize results array
     my @results;
@@ -1547,7 +1547,7 @@ sub get_pages {
         }
 
         @results = sort { ($a->{link_order} || 0) <=> ($b->{link_order} || 0) } @filtered;
-        $c->log->debug("Found " . scalar(@results) . " pages");
+        # DISABLED: $c->log->debug("Found " . scalar(@results) . " pages");
     };
     if ($@) {
         $c->log->error("Error getting pages: $@");
@@ -2854,177 +2854,7 @@ sub get_user_manageable_links {
 # Method to populate navigation data in the stash with caching
 sub populate_navigation_data {
     my ($self, $c) = @_;
-    
-    # Use eval to catch any errors
-    eval {
-        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-        my $username = $c->session->{username} || '';
-        $self->_ensure_nav_submenu_table($c);
-        
-        # Create cache key based on site and user
-        my $cache_key = "${site_name}_${username}";
-        my $current_time = time();
-        my $cache_ttl = 300; # 5 minutes cache
-        my $max_cache_age = 3600; # 1 hour max for the whole cache structure
-        
-        # Periodically clear the entire cache to prevent indefinite growth
-        if (($current_time - $self->_cache_timestamp) > $max_cache_age) {
-            $c->log->debug("Navigation cache exceeded max age, clearing all entries");
-            $self->_navigation_cache({});
-        }
-        
-        # Check if we have valid cached data
-        if ($self->_navigation_cache->{$cache_key} && 
-            ($current_time - $self->_cache_timestamp) < $cache_ttl) {
-            
-            # Use cached data (visibility flags always recomputed — cheap and schema-independent)
-            my $cached_data = $self->_navigation_cache->{$cache_key};
-            $c->stash->{$_} = $cached_data->{$_} for keys %$cached_data;
-            $c->stash->{show_hosted_nav} = $self->hosted_nav_visible($c);
-            my $sn_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
-            $c->stash->{show_features_nav} = ( $sn_lc eq 'csc' ) ? 1 : 0;
-            $c->log->debug("Using cached navigation data for site: $site_name");
-            return;
-        }
-        
-        $c->log->debug("Populating fresh navigation data for site: $site_name");
-        
-        # Set is_admin flag based on user roles
-        my $is_admin = 0;
-        my $root_controller = $c->controller('Root');
-        if ($root_controller->user_exists($c) && $c->session->{roles}) {
-            if (ref($c->session->{roles}) eq 'ARRAY') {
-                $is_admin = grep { lc($_) eq 'admin' } @{$c->session->{roles}};
-            } elsif (!ref($c->session->{roles})) {
-                $is_admin = ($c->session->{roles} =~ /\badmin\b/i) ? 1 : 0;
-            }
-        }
-        
-        # Also check the legacy group field
-        if (!$is_admin && $c->session->{group} && lc($c->session->{group}) eq 'admin') {
-            $is_admin = 1;
-        }
-        
-        # Set the is_admin flag in stash for use in templates
-        $c->stash->{is_admin} = $is_admin;
-        
-        # Only check tables once per application lifecycle
-        if (!$self->_tables_checked) {
-            $self->_ensure_navigation_tables_exist($c);
-            $self->_ensure_internal_links_public_visible_column($c);
-            $self->_ensure_hosting_list_publicly_column($c);
-            $self->_tables_checked(1);
-        }
-
-        # NEW menu system tables (CSC stock + site overrides) – ensure + seed on first use
-        $self->_ensure_menu_stock_tables($c);
-        
-        # Prepare data structure for caching
-        my $nav_data = {
-            is_admin => $is_admin
-        };
-        
-        # Merged public + user-private links per menu category (for themed dropdown partials)
-        my %nav_merged_links;
-        for my $cat (@MENU_LINK_CATEGORIES) {
-            next if $cat eq 'Admin_links' && !$is_admin;
-            $nav_merged_links{$cat} = $self->get_merged_menu_links($c, $cat, $site_name);
-        }
-        $nav_data->{nav_merged_links} = \%nav_merged_links;
-
-        # NEW: CSC stock catalog + basic effective site menu items (Phase 1 foundation)
-        # Full context/page/gating/merge with customs + drag order in later phases + editor.
-        eval {
-            $nav_data->{csc_stock_catalog} = $self->get_csc_stock_catalog($c);
-            $nav_data->{csc_stock_by_category} = {};
-            for my $cat (@MENU_LINK_CATEGORIES, 'Custom_top') {
-                $nav_data->{csc_stock_by_category}{$cat} = $self->get_csc_stock_catalog($c, $cat);
-            }
-            # Effective (stock + site overrides) for key menus – available in stash for debug/editor
-            $nav_data->{effective_menu_items} = {
-                Main_links   => $self->get_effective_stock_items_for_category($c, 'Main_links', $site_name),
-                HelpDesk_links => $self->get_effective_stock_items_for_category($c, 'HelpDesk_links', $site_name),
-                Admin_links  => $is_admin ? $self->get_effective_stock_items_for_category($c, 'Admin_links', $site_name) : [],
-            };
-        };
-        if ($@) {
-            $c->log->error("Phase1 menu_stock stash failed (non-fatal): $@");
-            $nav_data->{csc_stock_catalog} = [];
-            $nav_data->{effective_menu_items} = {};
-        }
-
-        # Legacy stash keys (public-only internal links)
-        $nav_data->{member_links} = $nav_merged_links{Member_links} // $self->get_internal_links($c, 'Member_links', $site_name);
-        $nav_data->{member_pages} = $self->get_pages($c, 'member', $site_name);
-        $nav_data->{main_links}   = $nav_merged_links{Main_links}   // $self->get_internal_links($c, 'Main_links', $site_name);
-        $nav_data->{main_pages}   = $self->get_pages($c, 'Main', $site_name);
-        $nav_data->{hosted_links} = $self->get_merged_hosted_menu_links( $c, $site_name );
-        my $hosted_merged = $nav_data->{hosted_links} || [];
-        $nav_data->{hosted_custom_links} = $self->filter_menu_links_by_submenu(
-            $hosted_merged, 'hosted_links', 'hosted_links', $c, $site_name
-        );
-        $nav_data->{hosted_pages_user_links} = $self->filter_menu_links_by_submenu(
-            $hosted_merged, 'hosted_pages', 'hosted_links', $c, $site_name
-        );
-        $nav_data->{hosted_top_links} = $self->filter_menu_links_by_submenu(
-            $hosted_merged, 'top', 'hosted_links', $c, $site_name
-        );
-        $nav_data->{hosted_sites_merged}   = $self->get_merged_hosted_sites_for_nav($c);
-        $nav_data->{hosted_resource_links} = $self->merge_hosted_resource_links($hosted_merged);
-        $nav_data->{show_hosted_nav}       = $self->hosted_nav_visible($c);
-        my $feat_sn_lc = lc( $c->stash->{SiteName} || $c->session->{SiteName} || '' );
-        $nav_data->{show_features_nav}     = ( $feat_sn_lc eq 'csc' ) ? 1 : 0;
-
-        if ($is_admin) {
-            my $admin_merged = $nav_merged_links{Admin_links}
-                // $self->get_merged_menu_links( $c, 'Admin_links', $site_name );
-            $nav_data->{admin_pages} = $self->get_admin_pages($c, $site_name);
-            $nav_data->{admin_links} = $admin_merged;
-            $nav_data->{admin_submenu_links} = $self->filter_menu_links_by_submenu(
-                $admin_merged, 'admin_links', 'admin_links', $c, $site_name
-            );
-            $nav_data->{admin_top_links} = $self->filter_menu_links_by_submenus(
-                $admin_merged, [qw(top cms_pages)], $c, $site_name
-            );
-            $nav_data->{admin_links_by_submenu} = $self->group_menu_links_by_submenu(
-                $admin_merged, 'Admin_links', $c, $site_name
-            );
-            $nav_data->{admin_custom_submenu_sections}
-                = $self->get_custom_submenu_sections( $c, 'Admin_links', $site_name );
-        }
-
-        # All private links for user dropdown and per-menu private rows (any site scope)
-        if ($root_controller->user_exists($c) && $username) {
-            my $private = $self->get_all_private_links_for_user( $c, $username );
-            for my $l (@$private) {
-                $l->{link_type} = 'private';
-                $l->{owner}     = $username;
-                $l->{can_edit}  = 1;
-            }
-            $nav_data->{private_links} = $private;
-            if ($is_admin) {
-                $nav_data->{admin_private_links} = [
-                    grep { ( $_->{category} // '' ) eq 'Admin_links' } @$private
-                ];
-            }
-        }
-        
-        # Cap cache size to prevent unbounded memory growth (max 50 entries)
-        if (scalar(keys %{$self->_navigation_cache}) >= 50) {
-            $self->_navigation_cache({});
-        }
-        # Cache the data
-        $self->_navigation_cache->{$cache_key} = $nav_data;
-        $self->_cache_timestamp($current_time);
-        
-        # Set stash data
-        $c->stash->{$_} = $nav_data->{$_} for keys %$nav_data;
-        
-        $c->log->debug("Navigation data populated and cached successfully");
-    };
-    if ($@) {
-        $c->log->error("Error populating navigation data: $@");
-    }
+    return;   # Dynamic navigation disabled - using old template menus
 }
 
 # Separate method for table existence checking (called only once)
@@ -4153,16 +3983,13 @@ sub clear_navigation_cache {
 # Auto method to populate navigation data for all requests
 sub auto :Private {
     my ($self, $c) = @_;
-    
-    # Use eval to catch any errors
+
     eval {
         $self->populate_navigation_data($c);
     };
     if ($@) {
         $c->log->error("Error in Navigation auto method: $@");
     }
-    
+
     return 1; # Allow the request to proceed
 }
-
-
