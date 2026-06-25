@@ -86,6 +86,18 @@
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
+            animation: none !important;
+        }
+        body.ai-widget-popup .chat-header > * {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
+        /* Final safety net: block any JS from hiding the header in popup mode */
+        body.ai-widget-popup .chat-header,
+        body.ai-widget-popup .chat-header[style] {
+            display: flex !important;
         }
 
         /* Form fill panel */
@@ -239,6 +251,46 @@
     </script>
     <script src="/static/js/ai-common.js?v=20260612a"></script>
     <script src="/static/js/local-chat.js?v=20260612j"></script>
+    <!-- Keep header visible forever in popup mode (overrides any 7-10s timeout in JS) -->
+    <script>
+    (function() {
+        var origSetTimeout = window.setTimeout;
+        window.setTimeout = function(fn, delay) {
+            // Block any setTimeout that would hide the header after ~7s
+            if (delay >= 6000 && delay <= 12000) {
+                // re-assert visibility right after the timeout would have fired
+                origSetTimeout(function() {
+                    var h = document.querySelector('.chat-header');
+                    if (h) {
+                        h.style.setProperty('display', 'flex', 'important');
+                        h.style.setProperty('visibility', 'visible', 'important');
+                        h.style.setProperty('opacity', '1', 'important');
+                    }
+                }, delay + 50);
+            }
+            return origSetTimeout.apply(this, arguments);
+        };
+
+        function forceHeaderVisible() {
+            var h = document.querySelector('.chat-header');
+            if (h) {
+                h.style.setProperty('display', 'flex', 'important');
+                h.style.setProperty('visibility', 'visible', 'important');
+                h.style.setProperty('opacity', '1', 'important');
+            }
+        }
+
+        // Poll until header exists, then keep it visible
+        var poll = setInterval(function() {
+            var h = document.querySelector('.chat-header');
+            if (h) {
+                clearInterval(poll);
+                forceHeaderVisible();
+                setInterval(forceHeaderVisible, 300);
+            }
+        }, 100);
+    })();
+    </script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Note: local-chat.js auto-opens the chat panel when AI_WIDGET_POPUP is true.
