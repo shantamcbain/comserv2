@@ -881,7 +881,63 @@
     [% END %]
 </div>
 
+<script>
+// Collapsible admin sections
+(function() {
+    function toggleSection(section) {
+        section.classList.toggle('expanded');
+    }
+
+    // Attach click handlers to all section headers
+    document.querySelectorAll('.admin-section .section-header').forEach(function(header) {
+        header.addEventListener('click', function(e) {
+            var section = header.closest('.admin-section');
+            if (section) toggleSection(section);
+        });
+    });
+
+    // Auto-expand if URL hash matches a section id
+    function expandFromHash() {
+        var hash = window.location.hash;
+        if (hash) {
+            var target = document.querySelector(hash);
+            if (target && target.classList.contains('admin-section')) {
+                target.classList.add('expanded');
+                // scroll into view smoothly
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }
+
+    // Run on load
+    window.addEventListener('load', expandFromHash);
+    // Also handle hash changes (back/forward nav)
+    window.addEventListener('hashchange', expandFromHash);
+})();
+</script>
+
 <style>
+/* Collapsible admin cards */
+.admin-section .section-content {
+    display: none;
+}
+.admin-section.expanded .section-content {
+    display: block;
+}
+.admin-section .section-header {
+    cursor: pointer;
+    user-select: none;
+}
+.admin-section .section-header::after {
+    content: ' ▶';
+    float: right;
+    font-size: 0.8em;
+    opacity: 0.6;
+}
+.admin-section.expanded .section-header::after {
+    content: ' ▼';
+}
+
 .admin-dashboard {
     max-width: 1400px;
     margin: 0 auto;
