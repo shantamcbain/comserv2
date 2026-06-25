@@ -1,0 +1,99 @@
+[%#
+  Shared todo row component for project listings and other compact views.
+  Provides consistent buttons: Log, Start, Done, Chat, Edit, View.
+
+  Required:
+    tc - todo object (record_id, subject, priority, status, sitename, etc.)
+
+  This is a simplified horizontal row version of todo_card.tt
+  intended for use inside project cards and similar compact contexts.
+%]
+<div class="todo-row d-flex align-items-center justify-content-between p-2 mb-1 border rounded"
+     style="background: var(--bg-secondary, #f8f9fa); font-size: 0.9em;">
+
+    <!-- Left: Subject + priority/status -->
+    <div class="d-flex align-items-center flex-grow-1 min-width-0">
+        <!-- Priority badge -->
+        <span class="badge mr-2"
+              style="[% IF tc.priority <= 2 %]background:#dc3545;color:#fff;
+                     [% ELSIF tc.priority <= 4 %]background:#fd7e14;color:#fff;
+                     [% ELSIF tc.priority <= 6 %]background:#ffc107;color:#333;
+                     [% ELSE %]background:#6c757d;color:#fff;[% END %]">
+            P[% tc.priority || 9 %]
+        </span>
+
+        <!-- Status badge -->
+        [% SET st = tc.status %]
+        <span class="badge mr-2"
+              style="[% IF st == 2 %]background:#17a2b8;color:#fff;
+                     [% ELSIF st == 3 OR st == 4 OR st == 'DONE' OR st == 'Completed' %]background:#28a745;color:#fff;
+                     [% ELSE %]background:#6c757d;color:#fff;[% END %]">
+            [% IF st == 2 %]In Progress
+            [% ELSIF st == 3 OR st == 4 OR st == 'DONE' OR st == 'Completed' %]Done
+            [% ELSE %]New[% END %]
+        </span>
+
+        <!-- Subject link -->
+        <a href="/todo/details?record_id=[% tc.record_id %]"
+           class="text-truncate font-weight-bold"
+           style="max-width: 300px; color: var(--text-color);">
+            [% tc.subject || '(No subject)' %]
+        </a>
+    </div>
+
+    <!-- Right: Action buttons -->
+    <div class="d-flex align-items-center flex-shrink-0" style="gap: 4px;">
+        <!-- View -->
+        <a href="/todo/details?record_id=[% tc.record_id %]"
+           class="btn btn-sm btn-outline-primary py-0 px-2"
+           style="font-size:0.75em;">View</a>
+
+        <!-- Log -->
+        <a href="/log/log_form?todo_record_id=[% tc.record_id %]"
+           class="btn btn-sm btn-outline-info py-0 px-2"
+           style="font-size:0.75em;">Log</a>
+
+        <!-- Start / Done (only show if admin) -->
+        [% IF c.session.roles.grep('admin').size %]
+            [% IF st != 3 AND st != 4 AND st != 'DONE' AND st != 'Completed' %]
+                <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
+                        class="btn btn-sm btn-outline-primary py-0 px-2"
+                        style="font-size:0.75em;">▶ Start</button>
+                <button onclick="doneWithLogTodoCard(this,[% tc.record_id %])"
+                        class="btn btn-sm btn-outline-success py-0 px-2"
+                        style="font-size:0.75em;">✓ Done</button>
+            [% END %]
+        [% END %]
+
+        <!-- Chat about this task (AI entry point) -->
+        <button onclick="chatAboutTodo([% tc.record_id %], '[% tc.subject | html %]')"
+                class="btn btn-sm btn-outline-secondary py-0 px-2"
+                style="font-size:0.75em;"
+                title="Chat with AI about this task">
+            💬 Chat
+        </button>
+
+        <!-- Edit -->
+        <a href="/todo/edit?record_id=[% tc.record_id %]"
+           class="btn btn-sm btn-outline-secondary py-0 px-2"
+           style="font-size:0.75em;">✏️ Edit</a>
+    </div>
+</div>
+
+<script>
+// AI Chat integration for todos
+function chatAboutTodo(recordId, subject) {
+    // Open the AI chat widget (assumes global openAiChat function exists)
+    if (typeof window.openAiChat === 'function') {
+        window.openAiChat({
+            context: 'todo',
+            record_id: recordId,
+            subject: subject,
+            prompt: `Help me with this task: ${subject}. What should I do next?`
+        });
+    } else {
+        // Fallback: open todo details with chat focus
+        window.location.href = `/todo/details?record_id=${recordId}&chat=1`;
+    }
+}
+</script>

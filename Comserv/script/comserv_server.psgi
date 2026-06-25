@@ -35,7 +35,13 @@ my $app = Comserv->psgi_app;
 
 my $wrapped = builder {
     enable 'ReverseProxy';
+
+    # Static file serving for the navigation/menu bar (CSS/JS) + general assets
+    # This must come BEFORE the main app so static requests are handled first
+    enable 'Plack::Middleware::Static',
+        path => qr{^/(static|css|js|images|favicon|root|assets)},
+        root => "$FindBin::Bin/..";
+
     $app;
 };
-
 return $wrapped;

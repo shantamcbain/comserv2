@@ -114,6 +114,19 @@
     </div>
 [% END %]
 
+<!-- Show All Projects link (bypasses parent_id filter) -->
+[% IF all_link %]
+<div class="mb-3">
+  <a href="[% all_link %]" class="btn btn-outline-primary btn-sm">
+    [% IF c.request.query_parameters.all %]
+      Show Normal View (Top-level only)
+    [% ELSE %]
+      Show All Projects (including orphans)
+    [% END %]
+  </a>
+</div>
+[% END %]
+
 <!-- Overall Project Summary -->
 [% IF overall_summary %]
 <div class="card mb-4 border-primary">
@@ -385,57 +398,13 @@
                         </div>
                     [% END %]
                     
-                    <!-- Associated Todos Section -->
+                    <!-- Associated Todos Section (now uses shared todo_row.tt) -->
                     [% IF project.todos && project.todos.size > 0 %]
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% project.todos.size %])</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Todo</th>
-                                        <th>Status</th>
-                                        <th>Priority</th>
-                                        <th>Start Date</th>
-                                        <th>Due Date</th>
-                                        <th>Time</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    [% FOREACH todo IN project.todos %]
-                                    <tr>
-                                        <td>
-                                            <form action="/todo/details" method="POST" style="display: inline;">
-                                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                                <button type="submit" class="btn btn-link p-0" style="text-decoration: none;">
-                                                    [% todo.subject %]
-                                                </button>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            [% SWITCH todo.status %]
-                                                [% CASE 1 %]<span class="badge badge-info">New</span>
-                                                [% CASE 2 %]<span class="badge badge-primary">In Progress</span>
-                                                [% CASE 3 %]<span class="badge badge-success">Completed</span>
-                                                [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
-                                            [% END %]
-                                        </td>
-                                        <td>
-                                            [% SWITCH todo.priority %]
-                                                [% CASE 1 %]<span class="badge badge-danger">High</span>
-                                                [% CASE 2 %]<span class="badge badge-warning">Medium</span>
-                                                [% CASE 3 %]<span class="badge badge-info">Low</span>
-                                                [% CASE DEFAULT %]<span class="badge badge-secondary">-</span>
-                                            [% END %]
-                                        </td>
-                                        <td>[% todo.start_date || '-' %]</td>
-                                        <td>[% todo.due_date || '-' %]</td>
-                                        <td>[% todo.accumulated_time || '0' %]h</td>
-                                    </tr>
-                                    [% END %]
-                                </tbody>
-                            </table>
-                        </div>
+                        [% FOREACH todo IN project.todos %]
+                            [% INCLUDE 'todo/todo_row.tt' tc=todo %]
+                        [% END %]
                     </div>
                     [% ELSE %]
                     <div class="mb-3">
@@ -648,51 +617,13 @@
                     </div>
                     [% END %]
 
-                    <!-- Associated Todos Section -->
+                    <!-- Associated Todos Section (now uses shared todo_row.tt) -->
                     [% IF subproject.todos && subproject.todos.size > 0 %]
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% subproject.todos.size %])</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Todo</th>
-                                        <th>Status</th>
-                                        <th>Priority</th>
-                                        <th>Due Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    [% FOREACH todo IN subproject.todos %]
-                                    <tr>
-                                        <td>
-                                            <a href="/todo/details?record_id=[% todo.record_id %]" class="text-decoration-none">
-                                                [% todo.subject.substr(0, 50) %][% IF todo.subject.length > 50 %]...[% END %]
-                                            </a>
-                                        </td>
-                                        <td>
-                                            [% SWITCH todo.status %]
-                                                [% CASE 1 %]<span class="badge badge-info">New</span>
-                                                [% CASE 2 %]<span class="badge badge-warning">In Progress</span>
-                                                [% CASE 3 %]<span class="badge badge-success">Completed</span>
-                                                [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
-                                            [% END %]
-                                        </td>
-                                        <td>
-                                            [% INCLUDE todo/priority_display.tt priority_value=todo.priority %]
-                                        </td>
-                                        <td>
-                                            [% IF todo.due_date %]
-                                                [% todo.due_date %]
-                                            [% ELSE %]
-                                                <span class="text-muted">No due date</span>
-                                            [% END %]
-                                        </td>
-                                    </tr>
-                                    [% END %]
-                                </tbody>
-                            </table>
-                        </div>
+                        [% FOREACH todo IN subproject.todos %]
+                            [% INCLUDE 'todo/todo_row.tt' tc=todo %]
+                        [% END %]
                     </div>
                     [% ELSE %]
                     <div class="mb-3">

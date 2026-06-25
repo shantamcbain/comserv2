@@ -226,15 +226,31 @@ around 'finalize_error' => sub {
         }
     }
 
-    # Log all unhandled errors with context
+    # Log all unhandled errors with context (deduplicated per session)
     eval {
         if ($c && $c->error && @{$c->error}) {
             my $error = $c->error->[0];
             my $error_msg = ref $error ? $error->message : "$error";
+            my $path = $c->req->path;
+            my $error_signature = join('|', $error_msg, $path);
+
+            # Check if this exact error was already shown in this session
+            my $seen = $c->session->{_seen_errors} || {};
+            if ($seen->{$error_signature}) {
+                # Already reported – suppress duplicate popup
+                $c->clear_errors;
+                $c->response->status(500);
+                $c->response->body("Internal Server Error");
+                return;
+            }
+
+            # Mark as seen for this session
+            $seen->{$error_signature} = 1;
+            $c->session->{_seen_errors} = $seen;
+
             my $logger = Comserv::Util::Logging->instance;
             my $session_id = $c->sessionid // 'no-session';
             my $user_id = $c->session->{user_id} // 'no-user';
-            my $path = $c->req->path;
 
             my %req = Comserv::Util::Logging::extract_request_info($c);
             my $ip       = $req{ip_address}    // '-';

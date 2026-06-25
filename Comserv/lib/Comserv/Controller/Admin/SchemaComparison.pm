@@ -16,16 +16,6 @@ use File::Path qw(make_path);
 use File::Spec;
 use File::Find;
 
-=head1 NAME
-
-Comserv::Controller::Admin::SchemaComparison - Schema Comparison and Synchronization Controller
-
-=head1 DESCRIPTION
-
-Dedicated controller for schema comparison and bidirectional synchronization between database tables and Result files.
-
-=cut
-
 sub begin :Private {
     my ($self, $c) = @_;
 
@@ -106,12 +96,6 @@ sub validate_database_environment {
     
     return { valid => 1, environment => $database_environment };
 }
-
-=head2 sync_table_to_result
-
-Sync database table field to Result file
-
-=cut
 
 sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(0) {
     my ($self, $c) = @_;
@@ -200,12 +184,6 @@ sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(
     $c->forward('View::JSON');
 }
 
-=head2 sync_primary_key_to_result
-
-Sync database primary key to Result file
-
-=cut
-
 sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_result') :Args(0) {
     my ($self, $c) = @_;
     
@@ -273,12 +251,6 @@ sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_res
     $c->forward('View::JSON');
 }
 
-=head2 sync_primary_key_to_table
-
-Sync Result file primary key to database table
-
-=cut
-
 sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_table') :Args(0) {
     my ($self, $c) = @_;
     
@@ -341,12 +313,6 @@ sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_tabl
     
     $c->forward('View::JSON');
 }
-
-=head2 sync_unique_constraint_to_table
-
-Sync Result file unique constraint to database table
-
-=cut
 
 sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constraint_to_table') :Args(0) {
     my ($self, $c) = @_;
@@ -411,12 +377,6 @@ sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constr
     
     $c->forward('View::JSON');
 }
-
-=head2 sync_unique_constraint_to_result
-
-Sync database unique constraint to Result file
-
-=cut
 
 sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_constraint_to_result') :Args(0) {
     my ($self, $c) = @_;
@@ -507,12 +467,6 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
     
     $c->forward('View::JSON');
 }
-
-=head2 sync_result_to_table
-
-Sync Result file field to database table
-
-=cut
 
 sub sync_table_name_to_result :Path('/schema-comparison/sync_table_name_to_result') :Args(0) {
     my ($self, $c) = @_;
@@ -660,12 +614,6 @@ sub sync_result_to_table :Path('/schema-comparison/sync_result_to_table') :Args(
     $c->forward('View::JSON');
 }
 
-=head2 create_result_from_table
-
-Generate Result file from database table
-
-=cut
-
 sub create_result_from_table :Path('/schema-comparison/create_result_from_table') :Args(0) {
     my ($self, $c) = @_;
     
@@ -764,12 +712,6 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     
     $c->forward('View::JSON');
 }
-
-=head2 create_table_from_result
-
-Generate database table from Result file
-
-=cut
 
 sub create_table_from_result :Path('/schema-comparison/create_table_from_result') :Args(0) {
     my ($self, $c) = @_;
@@ -956,12 +898,6 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
     $c->forward('View::JSON');
 }
 
-=head2 remove_field_from_result
-
-Remove a field definition from a Result file
-
-=cut
-
 sub remove_field_from_result :Path('/schema-comparison/remove_field_from_result') :Args(0) {
     my ($self, $c) = @_;
 
@@ -1057,12 +993,6 @@ sub remove_field_from_result :Path('/schema-comparison/remove_field_from_result'
     $c->forward('View::JSON');
 }
 
-=head2 remove_field_from_table
-
-Drop a column from the database table (ALTER TABLE DROP COLUMN)
-
-=cut
-
 sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') :Args(0) {
     my ($self, $c) = @_;
 
@@ -1120,12 +1050,6 @@ sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') 
     $c->forward('View::JSON');
 }
 
-=head2 get_table_field_info
-
-Get database table field information
-
-=cut
-
 sub get_table_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
     
@@ -1165,12 +1089,6 @@ sub get_table_field_info {
         enum_list => $enum_list
     };
 }
-
-=head2 get_result_field_info
-
-Get Result file field information
-
-=cut
 
 sub get_result_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
@@ -1215,12 +1133,6 @@ sub get_result_field_info {
         enum_list => ($info->{extra} && $info->{extra}->{list}) ? $info->{extra}->{list} : undef
     };
 }
-
-=head2 update_result_field_from_table
-
-Update Result file field from database table
-
-=cut
 
 sub update_result_field_from_table {
     my ($self, $c, $table_name, $field_name, $database, $table_field_info) = @_;
@@ -1287,12 +1199,6 @@ sub update_result_field_from_table {
     
     die "Could not update field '$field_name' in result file";
 }
-
-=head2 update_table_field_from_result
-
-Update database table field from Result file
-
-=cut
 
 sub update_table_field_from_result {
     my ($self, $c, $table_name, $field_name, $database, $result_field_info) = @_;
@@ -1370,12 +1276,6 @@ sub update_table_field_from_result {
     return $sql;
 }
 
-=head2 generate_result_file
-
-Generate Result file structure (helper)
-
-=cut
-
 sub generate_result_file {
     my ($self, $c) = @_;
     
@@ -1401,12 +1301,6 @@ sub generate_result_file {
         $c->flash->{error_msg} = $error;
     };
 }
-
-=head2 generate_result_file_content
-
-Generate Result file Perl code content
-
-=cut
 
 sub generate_result_file_content {
     my ($self, $table_name, $db_schema) = @_;
@@ -1476,12 +1370,6 @@ sub generate_result_file_content {
     return $content;
 }
 
-=head2 build_result_table_mapping
-
-Build mapping of table names to Result files
-
-=cut
-
 sub build_result_table_mapping {
     my ($self, $c, $database) = @_;
     # Delegated to single Parser impl (consolidation after refactor, uses fixed robust discovery)
@@ -1530,12 +1418,6 @@ sub extract_table_name_from_result_file {
     # Delegated (consolidation)
     return Comserv::Util::Schema::ResultParser->new->extract_table_name_from_result_file($file_path);
 }
-
-=head2 get_ency_table_schema
-
-Get schema info from Ency database
-
-=cut
 
 sub get_ency_table_schema {
     my ($self, $c, $table_name) = @_;
@@ -1616,12 +1498,6 @@ sub get_ency_table_schema {
     return $schema_info;
 }
 
-=head2 get_forager_table_schema
-
-Get schema info from Forager database
-
-=cut
-
 sub get_forager_table_schema {
     my ($self, $c, $table_name) = @_;
     
@@ -1701,12 +1577,6 @@ sub get_forager_table_schema {
     return $schema_info;
 }
 
-=head2 get_field_comparison
-
-AJAX endpoint to get detailed field comparison
-
-=cut
-
 sub get_field_comparison :Path('/schema-comparison/get_field_comparison') :Args(0) {
     my ($self, $c) = @_;
     
@@ -1751,12 +1621,6 @@ sub get_field_comparison :Path('/schema-comparison/get_field_comparison') :Args(
     
     $c->forward('View::JSON');
 }
-
-=head2 get_table_result_comparison_v2
-
-Compare table and result file schemas (v2)
-
-=cut
 
 sub get_table_result_comparison_v2 {
     my ($self, $c, $table_name, $database, $result_table_mapping) = @_;
@@ -1927,12 +1791,6 @@ sub get_table_result_comparison_v2 {
     
     return $comparison;
 }
-
-=head2 find_schema_differences
-
-Find high-level differences including PK and Unique constraints
-
-=cut
 
 sub find_schema_differences {
     my ($self, $db_schema, $result_schema, $actual_table_name) = @_;
@@ -2136,266 +1994,6 @@ sub parse_result_file_columns {
     return Comserv::Util::Schema::ResultParser->new->parse_result_file_columns($text);
 }
 
-=head2 clean_scalar_refs
-
-Recursively clean scalar references from data structures for JSON serialization
-
-# AJAX endpoint: Create result file from database table
-# WARNING: This is the NON-PREFERRED direction. The preferred workflow is:
-#   1. Create the Result file first (it is the authoritative schema definition)
-#   2. Then run create_table_from_result to create the DB table from the Result file
-# Creating a Result file from an existing table is a recovery/catch-up operation only.
-sub create_result_from_table :Chained('base') :PathPart('create-result-from-table') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $c->response->content_type('application/json; charset=utf-8');
-    
-    my $table_name = $c->req->param('table_name');
-    my $database = $c->req->param('database');
-    
-    unless ($table_name && $database) {
-        $c->response->body(encode_json({ error => 'Missing required parameters' }));
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_result_from_table',
-        "NON-PREFERRED DIRECTION: Creating Result file FROM table '$table_name'. "
-        . "Preferred workflow: create Result file first, then use create_table_from_result.");
-    
-    try {
-        my $schema = $database eq 'Ency' ? $c->model('DBEncy') : $c->model('DBForager');
-        
-        # Get table structure using internal DBI system
-        my $table_fields = $self->get_table_structure_via_model($c, $database, $table_name);
-        
-        unless (@$table_fields) {
-            $c->response->body(encode_json({ error => 'Table not found or has no fields' }));
-            return;
-        }
-        
-        # Create result file
-        my $result_file_content = $self->generate_result_file_content($table_name, $table_fields, $database);
-        my $result_file_path = $self->determine_result_file_path($c, $table_name, $database);
-        
-        # Ensure directory exists
-        my $result_dir = dirname($result_file_path);
-        make_path($result_dir) unless -d $result_dir;
-        
-        # Write result file
-        $self->_write_result_file_safe($result_file_path, $result_file_content);
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table', 
-            "Successfully created result file $result_file_path for table $table_name");
-        
-        $c->response->body(encode_json({
-            success => 1,
-            message => "Successfully created result file for $table_name",
-            file_path => $result_file_path,
-            fields_exported => scalar(@$table_fields),
-            workflow_warning => "NON-PREFERRED DIRECTION: Result file was generated from the database table. "
-                . "Review and correct the generated file — do not treat it as authoritative. "
-                . "Going forward, create the Result file first, then use 'Create Table from Result'.",
-            preferred_direction => "Result file first \x{2192} Create Table from Result",
-        }));
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_result_from_table', 
-            "Result file creation failed: $_");
-        $c->response->body(encode_json({ error => "Result file creation failed: $_" }));
-    };
-}
-
-# AJAX endpoint: Sync table schema to result file
-sub sync_table_to_result :Chained('base') :PathPart('sync-table-to-result') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $c->response->content_type('application/json; charset=utf-8');
-    
-    my $table_name = $c->req->param('table_name');
-    my $database = $c->req->param('database');
-    
-    unless ($table_name && $database) {
-        $c->response->body(encode_json({ error => 'Missing required parameters' }));
-        return;
-    }
-    
-    try {
-        my $result = $self->sync_table_to_result_file($c, $table_name, $database);
-        $c->response->body(encode_json($result));
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_table_to_result', 
-            "Table to result sync failed: $_");
-        $c->response->body(encode_json({ error => "Sync failed: $_" }));
-    };
-}
-
-# AJAX endpoint: Sync result file to table schema
-sub sync_result_to_table :Chained('base') :PathPart('sync-result-to-table') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $c->response->content_type('application/json; charset=utf-8');
-    
-    my $table_name = $c->req->param('table_name');
-    my $database = $c->req->param('database');
-    
-    unless ($table_name && $database) {
-        $c->response->body(encode_json({ error => 'Missing required parameters' }));
-        return;
-    }
-    
-    try {
-        my $result = $self->sync_result_to_table_schema($c, $table_name, $database);
-        $c->response->body(encode_json($result));
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_result_to_table', 
-            "Result to table sync failed: $_");
-        $c->response->body(encode_json({ error => "Sync failed: $_" }));
-    };
-}
-
-# Helper method: Sync table schema to result file
-sub sync_table_to_result_file {
-    my ($self, $c, $table_name, $database) = @_;
-    
-    my $schema = $database eq 'Ency' ? $c->model('DBEncy') : $c->model('DBForager');
-    
-    # Get current table structure using internal DBI system
-    my $table_fields = $self->get_table_structure_via_model($c, $database, $table_name);
-    
-    # Find or determine result file path
-    my $result_file_path = $self->find_result_file_for_table($c, $table_name);
-    $result_file_path ||= $self->determine_result_file_path($c, $table_name, $database);
-    
-    # Generate updated result file content
-    my $result_content = $self->generate_result_file_content($table_name, $table_fields, $database);
-    
-    # Backup existing file if it exists
-    if (-f $result_file_path) {
-        my $backup_path = $result_file_path . '.backup.' . time();
-        copy($result_file_path, $backup_path);
-    }
-    
-    # Ensure directory exists
-    my $result_dir = dirname($result_file_path);
-    make_path($result_dir) unless -d $result_dir;
-    
-    # Write updated result file
-    $self->_write_result_file_safe($result_file_path, $result_content);
-    
-    return {
-        success => 1,
-        message => "Successfully synchronized table $table_name to result file",
-        file_path => $result_file_path,
-        fields_synchronized => scalar(@$table_fields)
-    };
-}
-
-# Helper method: Sync result file to table schema
-sub sync_result_to_table_schema {
-    my ($self, $c, $table_name, $database) = @_;
-    
-    # Find result file
-    my $result_file_path = $self->find_result_file_for_table($c, $table_name);
-    
-    unless ($result_file_path && -f $result_file_path) {
-        return { error => "Result file not found for table $table_name" };
-    }
-    
-    # Parse result file fields
-    my $result_fields = $self->parse_result_file_fields($result_file_path);
-    
-    unless (@$result_fields) {
-        return { error => "No fields found in result file" };
-    }
-    
-    # Use DBSchemaManager to modify the table
-    my $db_manager = $c->model('DBSchemaManager');
-    my $schema_model = $database eq 'Ency' ? 'DBEncy' : 'DBForager';
-    
-    my $alter_result = $db_manager->sync_table_with_result_fields($table_name, $result_fields, $schema_model);
-    
-    return $alter_result;
-}
-
-# Helper method: Generate result file content from table structure
-sub generate_result_file_content {
-    my ($self, $table_name, $fields, $database) = @_;
-    
-    # Convert table name to class name
-    my $class_name = join('', map { ucfirst(lc($_)) } split(/_/, $table_name));
-    my $namespace = $database eq 'Ency' ? 'Comserv::Model::Schema::Ency::Result' : 'Comserv::Model::Schema::Forager::Result';
-    
-    my $content = qq{package ${namespace}::${class_name};
-
-use strict;
-use warnings;
-use base 'DBIx::Class::Core';
-
-__PACKAGE__->table('${table_name}');
-
-__PACKAGE__->add_columns(
-};
-
-    foreach my $field (@$fields) {
-        my $field_name = $field->{name};
-        my $data_type = $self->convert_mysql_to_dbic_type($field->{type});
-        
-        $content .= qq{    "${field_name}" => {
-        data_type => "${data_type}",
-        is_nullable => } . ($field->{null} eq 'YES' ? '1' : '0') . qq{,
-};
-        
-        # Add size if applicable
-        if ($field->{type} =~ /\((\d+)\)/) {
-            $content .= qq{        size => $1,
-};
-        }
-        
-        # Add default value if present
-        if (defined $field->{default} && $field->{default} ne '') {
-            $content .= qq{        default_value => '$field->{default}',
-};
-        }
-        
-        # Add auto_increment if present
-        if ($field->{extra} && $field->{extra} =~ /auto_increment/i) {
-            $content .= qq{        is_auto_increment => 1,
-};
-        }
-        
-        $content .= qq{    },
-};
-    }
-    
-    $content .= qq{);
-
-# Set primary key
-};
-    
-    # Find primary key fields
-    my @pk_fields = grep { $_->{key} eq 'PRI' } @$fields;
-    if (@pk_fields) {
-        my $pk_list = join(', ', map { qq{"$_->{name}"} } @pk_fields);
-        $content .= qq{__PACKAGE__->set_primary_key($pk_list);
-
-};
-    }
-    
-    $content .= qq{1;
-
-=head1 NAME
-
-${namespace}::${class_name} - Result class for '${table_name}' table
-
-=head1 DESCRIPTION
-
-Auto-generated DBIx::Class result class for the '${table_name}' table.
-Generated from database schema on } . strftime('%Y-%m-%d %H:%M:%S', localtime()) . qq{
-
-=cut
-
 sub clean_scalar_refs {
     my ($self, $data) = @_;
     
@@ -2443,17 +2041,6 @@ sub determine_result_file_path {
     my ($self, $c, $table_name, $database) = @_;
     return $self->get_result_file_path($c, $table_name, $database);
 }
-
-=head1 AUTHOR
-
-Shanta McBain
-
-=head1 LICENSE
-
-This library is free software. You can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
 
 sub _strip_fk_constraints {
     my ($sql) = @_;

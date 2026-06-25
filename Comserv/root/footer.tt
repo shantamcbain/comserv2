@@ -13,6 +13,23 @@
             <a href="/mail/subscribe" style="color: var(--link-color, #0066cc); text-decoration: none;">&#9993; Join Our Mailing List</a>
         [% END %]
     </p>
+
+    <!-- Hard-coded admin login (always visible, even if navigation is broken) -->
+    <p style="margin: 4px 0; font-size:0.85em;">
+        <a href="/login" style="color:#888; text-decoration:none;">Admin Login</a>
+        [% IF c.session.debug_mode == 1 %]
+            | Nav Mode:
+            <strong>
+                [% IF c.req.param('force_old_nav') %]
+                    Old (forced)
+                [% ELSIF c.req.cookies.force_old_nav %]
+                    Old (cookie)
+                [% ELSE %]
+                    [% IF c.config.USE_NEW_NAVIGATION %]New[% ELSE %]Old[% END %]
+                [% END %]
+            </strong>
+        [% END %]
+    </p>
 </div>
 
 [% IF c.session.debug_mode == 1 %]
