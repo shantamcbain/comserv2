@@ -1,0 +1,18 @@
+[%# Docker Management Card - Admin Dashboard Partial #]
+<div id="docker" class="admin-section theme-section">
+    <div class="section-header">
+        <h3><i class="fas fa-docker"></i> Docker</h3>
+    </div>
+    <div class="section-content">
+        <div class="admin-links">
+            <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                <i class="fas fa-cubes"></i>
+                <span>Docker Containers (Production)</span>
+            </a>
+            <a href="[% c.uri_for('/admin/docker-containers-old') %]" class="admin-link">
+                <i class="fas fa-flask"></i>
+                <span>Docker Containers (Development)</span>
+            </a>
+        </div>
+    </div>
+</div>
