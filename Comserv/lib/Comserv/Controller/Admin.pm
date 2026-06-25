@@ -7022,7 +7022,7 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
 
 
     $c->stash(
-        template => 'admin/docker_containers.tt',
+        template => 'admin/docker/docker_containers.tt',
         docker_available => $docker_available,
         authenticated => 1,
     );
