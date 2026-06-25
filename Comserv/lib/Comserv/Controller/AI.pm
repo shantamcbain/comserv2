@@ -222,14 +222,11 @@ sub index :Path :Args(0) {
                         project     => $proj_name,
                         edit_url    => "/todo/edit?record_id=" . $t->record_id,
                     };
+                    }
                 }
             }
-        };
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            'index', "task_todo lookup failed: $@") if $@;
-    }
 
-    # Set template variables
+            }
     $c->stash(
         template => 'ai/index.tt',
         page_title => 'AI Assistant',
@@ -5201,7 +5198,7 @@ sub _assess_response_quality {
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if index($lc_resp, $phrase) >= 0;
+        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -5443,7 +5440,7 @@ sub _pick_ollama_tier {
         # 2. Known family prefix
         unless ($score) {
             for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
             }
         }
         # 3. Generic hints

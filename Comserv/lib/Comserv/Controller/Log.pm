@@ -286,7 +286,9 @@ sub update :Path('/log/update') :Args(0) {
 sub log_form :Path('/log/log_form') :Args() {
     my ($self, $c) = @_;
 
-    unless ($c->session->{username} && $c->session->{username} ne 'anonymous') {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'log_form')) {
+        $c->flash->{error_msg} = 'You must be an administrator to create log entries.';
         $c->response->redirect($c->uri_for('/user/login'));
         $c->detach();
     }
@@ -637,8 +639,9 @@ sub create_log :Path('/log/create_log') :Args() {
 sub log_credits :Path('/log/credits') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{is_admin}) {
-        $c->flash->{error_msg} = 'Admin access required.';
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'log_credits')) {
+        $c->flash->{error_msg} = 'You must be an administrator to view log credits.';
         $c->res->redirect($c->uri_for('/'));
         $c->detach;
     }

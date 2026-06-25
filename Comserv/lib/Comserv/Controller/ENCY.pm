@@ -1,8 +1,15 @@
 package Comserv::Controller::ENCY;
 use Moose;
 use namespace::autoclean;
+
+# TODO (security hardening 2026-06-25):
+# - All 20 edit_/add_* methods still contain inline role checks.
+use Moose;
+use namespace::autoclean;
 use Comserv::Model::ENCYModel;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
+use Comserv::Util::AdminAuth;
 
 has 'logging' => (
     is => 'ro',

@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -21,7 +22,8 @@ sub admin_configure :Path('/admin/ai/configure') :Args(0) {
 sub models :Path('/ai/admin/models') :Args(0) {
     my ($self, $c) = @_;
     
-    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ai_admin_models')) {
         $c->flash->{error_msg} = 'You must be an administrator to access this area.';
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
@@ -71,16 +73,17 @@ sub models :Path('/ai/admin/models') :Args(0) {
 sub add_model :Path('/ai/admin/add_model') :Args(0) {
     my ($self, $c) = @_;
     
-    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ai_admin_add_model')) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
         return;
     }
-    
+
     $c->response->content_type('application/json');
-    
+
     my $params = $c->req->params;
-    
+
     unless ($params->{model_name} && $params->{api_endpoint} && $params->{role} && $params->{agent_type}) {
         $c->response->status(400);
         $c->response->body(encode_json({
@@ -139,7 +142,8 @@ sub add_model :Path('/ai/admin/add_model') :Args(0) {
 sub update_model :Path('/ai/admin/update_model') :Args(0) {
     my ($self, $c) = @_;
     
-    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ai_admin_update_model')) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
         return;
@@ -202,7 +206,8 @@ sub update_model :Path('/ai/admin/update_model') :Args(0) {
 sub delete_model :Path('/ai/admin/delete_model') :Args(0) {
     my ($self, $c) = @_;
     
-    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ai_admin_delete_model')) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
         return;
@@ -252,7 +257,8 @@ sub delete_model :Path('/ai/admin/delete_model') :Args(0) {
 sub agents :Path('/ai/admin/agents') :Args(0) {
     my ($self, $c) = @_;
     
-    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'ai_admin_agents')) {
         $c->response->redirect($c->uri_for('/'));
         return;
     }
