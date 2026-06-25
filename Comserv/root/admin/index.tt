@@ -155,7 +155,7 @@
 
         [%# Docker Management Card #]
         [% IF is_csc %]
-        [% INCLUDE 'admin/partials/docker_card.tt' %]
+        [% INCLUDE 'admin/docker_card.tt' %]
         [% END %]
 
         [% IF has_accounting %]
