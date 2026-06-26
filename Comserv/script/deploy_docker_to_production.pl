@@ -5,6 +5,7 @@ use warnings;
 use Getopt::Long;
 use File::Basename;
 use IPC::Run3;
+use JSON::PP qw(encode_json);
 
 my $target = 'production1'; # default target: production1 or production2
 my $production_host;
@@ -371,6 +372,41 @@ eval {
     
     unless ($healthy) {
         print "\n❌ Container timed out without becoming healthy\n";
+        
+        # Capture detailed diagnostics before rollback
+        my $failure_reason = "Health check timeout (30 attempts)";
+        my $health_status = ssh_exec("sudo docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'");
+        my $last_logs = ssh_exec("sudo docker logs --tail 50 $container_name 2>/dev/null | tail -30");
+        my $port_check = ssh_exec("sudo docker exec $container_name netstat -tlnp 2>/dev/null | grep -E '5000|3000' || echo 'No listener on 5000/3000'");
+        my $app_error = ssh_exec("sudo docker exec $container_name tail -30 /opt/comserv/log/error.log 2>/dev/null || echo 'No error.log found'");
+        
+        chomp($health_status, $last_logs, $port_check, $app_error);
+        
+        my $diag = {
+            timestamp => scalar(localtime),
+            container => $container_name,
+            reason => $failure_reason,
+            health_status => $health_status,
+            last_logs => $last_logs,
+            port_check => $port_check,
+            app_error => $app_error,
+            backup_tag => $backup_tag,
+        };
+        
+        # Write structured recovery log
+        my $recovery_log = '/tmp/comserv_recovery_history.json';
+        my $existing = ssh_exec("cat $recovery_log 2>/dev/null || echo '[]'");
+        $existing =~ s/^\s+|\s+$//g;
+        my $json = $existing eq '[]' ? '[]' : $existing;
+        # Simple append (Perl one-liner to keep it lightweight)
+        ssh_exec("echo '".encode_json([$diag])."' | sudo tee -a $recovery_log >/dev/null 2>&1 || true");
+        
+        print "\n[DIAGNOSTICS] Failure captured:\n";
+        print "  Reason: $failure_reason\n";
+        print "  Health: $health_status\n";
+        print "  Port: $port_check\n";
+        print "  Last logs (tail):\n$last_logs\n";
+        
         print "\n[ROLLBACK] Triggering emergency rollback...\n";
         
         # Stop and remove failed container

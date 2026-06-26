@@ -1,4 +1,4 @@
-package Comserv::Model::AI::ModelManager;
+package Comserv::Model::AI::Router;
 
 use Moose;
 use namespace::autoclean;
