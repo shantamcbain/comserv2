@@ -89,6 +89,7 @@
                             Container Status Overview
                         </span>
                         <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
+        loadBackupImages(targetVal);
                             <i class="icon-refresh"></i> Refresh
                         </button>
                     </h4>
@@ -110,6 +111,7 @@
                             Available Recovery Backups
                         </span>
                         <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
+        loadBackupImages(targetVal);
                             <i class="icon-refresh"></i> Refresh
                         </button>
                     </h4>
@@ -653,6 +655,15 @@
 
                         <div style="margin-bottom: 10px; background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
                             <strong style="color: #333;"><i class="fas fa-history"></i> Available Recovery Backups (comserv-web-prod):</strong>
+                        <div style="margin-bottom: 8px; background-color: #f0f0f0; padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc;">
+                            <strong style="color: #333;"><i class="fas fa-archive"></i> Available Backup Images (up to 4):</strong>
+                            <div id="backup-images-list" style="margin-top: 6px; font-size: 11px;"></div>
+                        </div>
+                        </div>
+
+                        <div style="margin-bottom: 10px; background-color: #fff3f3; padding: 6px 10px; border-radius: 4px; border: 1px solid #dc3545;">
+                            <strong style="color: #721c24;"><i class="fas fa-exclamation-triangle"></i> Recovery History (last failures & reasons):</strong>
+                            <div id="recovery-history" style="margin-top: 6px; font-size: 11px; font-family: monospace; max-height: 180px; overflow-y: auto; background: #1e1e1e; color: #f8f8f2; padding: 6px; border-radius: 3px;"></div>
                             <div id="diag-backups" style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;"></div>
                         </div>
 
@@ -731,6 +742,7 @@
                     refreshVolumes();
                 } else if (sectionId === 'container-status') {
                     refreshContainers();
+        loadBackupImages(targetVal);
                 } else if (sectionId === 'docker-diagnostics-card') {
                     loadDiagnostics();
                 }
@@ -787,7 +799,7 @@
         return fetch(url, opts).then(function(response) {
             if (response.type === 'opaqueredirect' || response.status === 0 ||
                 (response.status >= 300 && response.status < 400)) {
-                appendOutput('✗ Session expired — reload the page (Ctrl+Shift+R) and log in again.');
+                window.location.href = '/user/login?destination=' + encodeURIComponent(window.location.pathname);
                 return Promise.reject(new Error('session-expired'));
             }
             if (!response.ok) {
@@ -939,6 +951,35 @@
 
                 // 5. Backups
                 const backupsEl = document.getElementById('diag-backups');
+                // Recovery History fetch (detailed failure reasons)
+                const recoveryEl = document.getElementById('recovery-history');
+                if (recoveryEl) {
+                    recoveryEl.innerHTML = '<div style="color:#888">Loading recovery history...</div>';
+                    const targetHost = document.getElementById('docker-target-select') ? document.getElementById('docker-target-select').value : 'production1';
+                    fetch(`/admin/docker/recovery_history?host=${targetHost}&service=web-prod`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success && data.history && data.history.length > 0) {
+                                let html = '';
+                                data.history.slice().reverse().forEach((entry) => {
+                                    html += `<div style="margin-bottom:8px; border-left:3px solid #dc3545; padding-left:6px;">
+                                        <div style="color:#ff6b6b; font-weight:bold;">${entry.timestamp}</div>
+                                        <div><strong>Reason:</strong> ${entry.reason || 'unknown'}</div>
+                                        <div><strong>Health:</strong> ${entry.health_status || 'n/a'}</div>
+                                        <div><strong>Port check:</strong> ${entry.port_check || 'n/a'}</div>
+                                        <div style="color:#ffeb3b;"><strong>Backup used:</strong> ${entry.backup_tag || 'n/a'}</div>
+                                        <details style="margin-top:3px;"><summary style="cursor:pointer; color:#17a2b8; font-size:10px;">Show last logs</summary><pre style="font-size:9px; white-space:pre-wrap; max-height:80px; overflow:auto; background:#111; padding:4px; margin:2px 0;">${entry.last_logs || 'no logs captured'}</pre></details>
+                                    </div>`;
+                                });
+                                recoveryEl.innerHTML = html;
+                            } else {
+                                recoveryEl.innerHTML = '<div style="color:#888">No recovery events recorded yet.</div>';
+                            }
+                        })
+                        .catch(() => {
+                            recoveryEl.innerHTML = '<div style="color:#dc3545">Failed to load recovery history.</div>';
+                        });
+                }
                 if (backupsEl) {
                     backupsEl.innerHTML = '';
                     if (d.backups && d.backups.length > 0) {
@@ -1066,6 +1107,7 @@
         appendOutput(`\n📡 Switched active system target to: ${targetText}\n`);
         
         refreshContainers();
+        loadBackupImages(targetVal);
         loadDiagnostics();
         
         const volSection = document.getElementById('volumes-status');
@@ -1078,10 +1120,10 @@
         containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>';
         const target = document.getElementById('docker-target-select')?.value || 'workstation';
 
-        fetch(`/admin/docker-list?target=${target}`, { credentials: 'same-origin', redirect: 'manual' })
+        fetch(`/admin/docker/list?host=${target}`, { credentials: 'same-origin', redirect: 'manual' })
             .then(function(response) {
                 if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
-                    containersList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    window.location.href = '/user/login?destination=' + encodeURIComponent(window.location.pathname);
                     return null;
                 }
                 if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -1133,7 +1175,7 @@
         fetch(`/admin/docker-volumes?target=${target}`, { credentials: 'same-origin', redirect: 'manual' })
             .then(function(response) {
                 if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
-                    volumesList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    window.location.href = '/user/login?destination=' + encodeURIComponent(window.location.pathname);
                     return null;
                 }
                 if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -1269,6 +1311,15 @@
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                             ${container.state === 'not_created' ? `
+                                ${container.restart_count && container.restart_count > 0 ? 
+                                    `<span style="background-color: #dc3545; color: white; padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-left: 6px;">↻ ${container.restart_count} restarts</span>` : ""}
+                                ${container.exit_code && container.exit_code != "0" ? 
+                                    `<span style="background-color: #721c24; color: white; padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-left: 6px;">Exit: ${container.exit_code}</span>` : ""}
+                            </div>
+                            ${container.error_msg && container.error_msg.trim() ? 
+                                `<div style="font-size: 11px; color: #dc3545; margin-top: 2px;"><strong>Error:</strong> ${container.error_msg}</div>` : ""}
+                            ${container.finished_at && container.finished_at !== "0001-01-01T00:00:00Z" ? 
+                                `<div style="font-size: 10px; color: #888; margin-top: 1px;">Last exit: ${container.finished_at}</div>` : ""}
                                 <button onclick="createContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     🚀 Create & Start
@@ -1428,13 +1479,6 @@
             });
     }
 
-    function viewLogsDirect(service) {
-        const lines = prompt('How many lines of logs to display? (default: 50)', '50');
-        if (lines === null) return;
-
-        appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
-        const target = document.getElementById('docker-target-select')?.value || 'workstation';
-        showResultPopup(`Logs for ${service}`, `⏳ Fetching last ${lines} lines of logs for ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
             .then(response => response.json())
@@ -1485,6 +1529,7 @@
                             appendOutput(sd.success ? `✓ ${service} started.\n` : `✗ Start failed.\n`);
                         }
                         setTimeout(() => { refreshContainers(); enableRebuildButtons(); }, 2000);
+        loadBackupImages(targetVal);
                     } else {
                         appendOutput(`✗ Build failed (exit ${data.exit_code}).\n`);
                         enableRebuildButtons();
@@ -2213,6 +2258,7 @@
         updateEmergencyCommands(defaultTarget);
 
         refreshContainers();
+        loadBackupImages(targetVal);
         refreshVolumes();
         loadSavedCredentials();
         loadDeployHistory();
@@ -2269,3 +2315,98 @@
         color: var(--text-color, #333);
     }
 </style>
+
+    // Live log streaming popup
+    window.viewLogsDirect = function(service) {
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center;';
+        modal.innerHTML = `
+            <div style="background:#1e1e1e;color:#f8f8f2;width:92%;max-width:1000px;height:75vh;border-radius:8px;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+                <div style="padding:10px 16px;background:#2d2d2d;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #444;">
+                    <span style="font-weight:bold;font-size:14px;">📋 Live Logs — ${service}</span>
+                    <button onclick="this.closest('div[style*=\"position:fixed\"]').remove()" style="background:#dc3545;color:white;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;">Close</button>
+                </div>
+                <div id="live-log-body" style="flex:1;overflow-y:auto;padding:12px;font-family:monospace;font-size:12px;white-space:pre-wrap;background:#111;line-height:1.4;"></div>
+                <div style="padding:8px 16px;background:#2d2d2d;border-radius:0 0 8px 8px;font-size:11px;color:#888;display:flex;justify-content:space-between;">
+                    <span>Streaming docker logs (updates every 2s)</span>
+                    <span style="color:#ff6b6b;">Auto-scroll enabled</span>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const logBody = modal.querySelector('#live-log-body');
+        let lastContent = '';
+
+        function pollLogs() {
+            fetch(`/admin/docker/logs/${service}?lines=80`, { credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.output && data.output !== lastContent) {
+                        logBody.textContent = data.output;
+                        logBody.scrollTop = logBody.scrollHeight;
+                        lastContent = data.output;
+                    }
+                })
+                .catch(() => {});
+        }
+
+        pollLogs();
+        const interval = setInterval(pollLogs, 2000);
+
+        modal.addEventListener('remove', () => clearInterval(interval), { once: true });
+    };
+
+    // Fetch and display available backup images (up to 4)
+    window.loadBackupImages = function(host) {
+        const container = document.getElementById('backup-images-list');
+        if (!container) return;
+
+        container.innerHTML = '<div style="color:#888;font-size:11px;">Loading backups...</div>';
+
+        fetch(`/admin/docker/list?host=${host}`, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !data.containers) {
+                    container.innerHTML = '<div style="color:#dc3545;font-size:11px;">Failed to load backups</div>';
+                    return;
+                }
+
+                // Find all backup-* tags across containers
+                let backups = [];
+                data.containers.forEach(c => {
+                    if (c.image_tags) {
+                        c.image_tags.forEach(tag => {
+                            if (tag.startsWith('backup-') && !backups.includes(tag)) {
+                                backups.push(tag);
+                            }
+                        });
+                    }
+                });
+
+                // Limit to 4 most recent (assuming timestamp in tag)
+                backups = backups.sort().reverse().slice(0, 4);
+
+                if (backups.length === 0) {
+                    container.innerHTML = '<div style="color:#888;font-size:11px;">No backup images found</div>';
+                    return;
+                }
+
+                let html = '';
+                backups.forEach(tag => {
+                    html += `
+                        <div style="display:flex;justify-content:space-between;align-items:center;background:#2d2d2d;padding:4px 8px;border-radius:3px;margin-bottom:4px;">
+                            <span style="font-family:monospace;font-size:11px;color:#ffeb3b;">${tag}</span>
+                            <button onclick="startBackup('${tag}', '${host}')" 
+                                    style="background:#ff922b;color:white;border:none;padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;">
+                                Start
+                            </button>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            })
+            .catch(() => {
+                container.innerHTML = '<div style="color:#dc3545;font-size:11px;">Error loading backups</div>';
+            });
+    };

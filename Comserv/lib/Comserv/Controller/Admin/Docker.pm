@@ -2,7 +2,7 @@ package Comserv::Controller::Admin::Docker;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use JSON qw(encode_json);
+use JSON qw(encode_json decode_json);
 use DateTime;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
@@ -34,8 +34,7 @@ sub begin :Private {
     if ($action =~ /list|containers|restart|stop|start|up|down|logs|deploy_form|docker/) {
         unless ($self->_can_access_docker_widget($c)) {
             $c->stash->{error_msg} = "Docker container management widget is restricted. " .
-                "Available only to Shanta (CSC admin) on non-production servers. " .
-                "Use Daily Priorities deploy option instead.";
+                "Available only to admins/developers on non-production1 servers.";
             $c->res->redirect($c->uri_for('/admin/planning/DailyPlan'));
             $c->detach;
         }
@@ -74,13 +73,13 @@ sub _can_access_docker_widget {
     my $roles       = $c->session->{roles} || [];
 
     my $on_safe_server = $server_role ne 'production1';
-    my $is_shanta      = $username eq 'Shanta';
-    my $is_csc_admin   = $c->stash->{is_admin} &&
-                         (grep { lc($_) =~ /admin|csc/ } @$roles) &&
-                         (($c->stash->{SiteName} || $c->session->{SiteName} || '') eq 'CSC');
 
-    # ALL THREE must match before the widget is shown
-    return $on_safe_server && $is_shanta && $is_csc_admin;
+    # Allow any admin or developer on a safe server (workstation / production2)
+    my $is_admin_or_dev = $c->stash->{is_admin} ||
+                          (grep { lc($_) =~ /admin|developer/ } @$roles) ||
+                          ($username eq 'Shanta');   # legacy hard-coded user
+
+    return $on_safe_server && $is_admin_or_dev;
 }
 
 sub _csc_admin_check {
@@ -367,14 +366,95 @@ sub list :Path('/admin/docker/list') :Args(0) {
     my ($self, $c) = @_;
     
     unless ($self->_can_access_docker_widget($c)) {
-        $c->stash->{json} = { success => 0, error => 'Docker widget restricted to Shanta (CSC admin) on non-production1 servers. Use Daily Priorities.' };
+        $c->stash->{json} = { success => 0, error => 'Docker widget restricted to admins on non-production1 servers.' };
         $c->forward('View::JSON');
         return;
     }
     
-    my $result = $c->model('Docker')->list_containers();
+    my $host = $c->req->param('host') || 'workstation';
     
-    $c->stash->{json} = $result;
+    # === LOCAL WORKSTATION ===
+    if ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1') {
+        my $result = $c->model('Docker')->list_containers();
+        $result->{host} = 'workstation';
+        $c->stash->{json} = $result;
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # === REMOTE PRODUCTION HOSTS ===
+    my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
+    my $ssh_user = 'ubuntu';
+    
+    # Reuse the same credential system the rest of the app uses
+    # Call the method on the main Admin controller
+    my $admin_ctrl = $c->controller('Admin');
+    my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+    $ssh_pass ||= $ENV{SSHPASS} || '';
+    
+    unless ($ssh_pass) {
+        $c->stash->{json} = {
+            success => 0,
+            error   => "No SSH password found for $host (add it to ~/.comserv/secrets/ssh_credentials.json)",
+            host    => $host
+        };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    local $ENV{SSHPASS} = $ssh_pass;
+    my $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
+    
+    my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.Labels}}' 2>/dev/null || echo ''\"";
+    my $output = `$cmd 2>/dev/null` || '';
+    
+    my @containers;
+    foreach my $line (split /\n/, $output) {
+        next unless $line =~ /\|/;
+        my ($id, $name, $image, $status, $ports, $labels) = split /\|/, $line, 6;
+    
+        # Parse labels for build metadata
+        my %label_map;
+        foreach my $pair (split /,/, $labels // '') {
+            if ($pair =~ /^([^=]+)=(.*)$/) {
+                $label_map{$1} = $2;
+            }
+        }
+    
+        my $build_info = '';
+        if ($label_map{'org.opencontainers.image.created'} || $label_map{'com.comserv.build.date'}) {
+            my $date = $label_map{'org.opencontainers.image.created'} || $label_map{'com.comserv.build.date'};
+            my $commit = $label_map{'org.opencontainers.image.revision'} || $label_map{'com.comserv.build.commit'} || '';
+            my $branch = $label_map{'com.comserv.build.branch'} || '';
+            my $built_on = $label_map{'com.comserv.build.host'} || '';
+            $build_info = "Build: $date | Commit: $commit | Branch: $branch | Built On: $built_on";
+        }
+    
+        # Get detailed inspect data (restart count, health history, exit code)
+        my $inspect_cmd = "$ssh_prefix \"docker inspect --format '{{.RestartCount}}|{{.State.StartedAt}}|{{.State.FinishedAt}}|{{.State.ExitCode}}|{{.State.Error}}' $name 2>/dev/null || echo '0||||'\"";
+        my $inspect_out = `$inspect_cmd 2>/dev/null` || '0||||';
+        chomp $inspect_out;
+        my ($restart_count, $started_at, $finished_at, $exit_code, $error_msg) = split /\|/, $inspect_out, 5;
+        $restart_count ||= 0;
+    
+        push @containers, {
+            id => $id,
+            name => $name,
+            image => $image,
+            status => $status,
+            state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
+            ports => $ports || '',
+            compose_file => 'remote',
+            build_info => $build_info,
+            restart_count => int($restart_count),
+            started_at => $started_at,
+            finished_at => $finished_at,
+            exit_code => $exit_code,
+            error_msg => $error_msg,
+        };
+    }
+    
+    $c->stash->{json} = { success => 1, containers => \@containers, host => $host };
     $c->forward('View::JSON');
 }
 
@@ -465,6 +545,115 @@ sub up :Path('/admin/docker/up') :Args(1) {
     my $result = $c->model('Docker')->up_container($service);
     
     $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
+sub recovery_history :Path('/admin/docker/recovery_history') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $host = $c->req->param('host') || 'production1';
+    my $service = $c->req->param('service') || 'web-prod';
+    
+    # For now we read the JSON log file via SSH on the target host
+    my $ssh_host = $host eq 'production1' ? '192.168.1.126' : ($host eq 'production2' ? '192.168.1.127' : 'localhost');
+    my $ssh_user = 'ubuntu';
+    
+    my $admin_ctrl = $c->controller('Admin');
+    my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+    $ssh_pass ||= $ENV{SSHPASS} || '';
+    
+    unless ($ssh_pass) {
+        $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    local $ENV{SSHPASS} = $ssh_pass;
+    my $cmd = sprintf(qq(sshpass -e ssh -o StrictHostKeyChecking=no %s@%s 'cat /tmp/comserv_recovery_history.json 2>/dev/null || echo "[]"'), $ssh_user, $ssh_host);
+    
+    my $json = `$cmd 2>/dev/null` || '[]';
+    $json =~ s/^\s+|\s+$//g;
+    
+    my $history;
+    eval { $history = decode_json($json); };
+    $history = [] if $@ || ref($history) ne 'ARRAY';
+    
+    $c->stash->{json} = { success => 1, host => $host, service => $service, history => $history };
+    $c->forward('View::JSON');
+}
+
+sub start_backup :Path('/admin/docker/start_backup') :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->req->method eq 'POST') {
+        $c->stash->{json} = { success => 0, error => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $host = $c->req->param('host') || 'production1';
+    my $backup_tag = $c->req->param('backup_tag');
+    my $service = $c->req->param('service') || 'web-prod';
+    
+    unless ($backup_tag) {
+        $c->stash->{json} = { success => 0, error => 'backup_tag required' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $ssh_host = $host eq 'production1' ? '192.168.1.126' : ($host eq 'production2' ? '192.168.1.127' : 'localhost');
+    my $ssh_user = 'ubuntu';
+    
+    my $admin_ctrl = $c->controller('Admin');
+    my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+    $ssh_pass ||= $ENV{SSHPASS} || '';
+    
+    unless ($ssh_pass) {
+        $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    local $ENV{SSHPASS} = $ssh_pass;
+    my $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
+    
+    my $container_name = "comserv2-$service";
+    my $image_name = "comserv2-$service";
+    
+    # Stop + remove current container
+    my $stop_cmd = "$ssh_prefix \"sudo docker stop $container_name 2>/dev/null; sudo docker rm -f $container_name 2>/dev/null\"";
+    system($stop_cmd);
+    
+    # Start the selected backup
+    my $start_cmd = "$ssh_prefix \"sudo docker run -d --name $container_name --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e SYSTEM_IDENTIFIER=$host $image_name:$backup_tag\"";
+    my $output = `$start_cmd 2>&1`;
+    my $exit = $? >> 8;
+    
+    # Log the manual start
+    my $log_entry = {
+        timestamp => scalar(localtime),
+        container => $container_name,
+        reason => "Manual start of backup: $backup_tag",
+        health_status => 'manual',
+        last_logs => 'User-initiated failover via UI',
+        port_check => 'manual start',
+        app_error => '',
+        backup_tag => $backup_tag,
+    };
+    
+    my $recovery_log = '/tmp/comserv_recovery_history.json';
+    my $existing = `$ssh_prefix "cat $recovery_log 2>/dev/null || echo '[]'"` || '[]';
+    $existing =~ s/^\s+|\s+$//g;
+    
+    # Append log entry
+    my $append_cmd = "$ssh_prefix \"echo '".encode_json([$log_entry])."' | sudo tee -a $recovery_log >/dev/null 2>&1 || true\"";
+    system($append_cmd);
+    
+    if ($exit == 0) {
+        $c->stash->{json} = { success => 1, message => "Started backup $backup_tag", output => $output };
+    } else {
+        $c->stash->{json} = { success => 0, error => "Failed to start backup", output => $output };
+    }
     $c->forward('View::JSON');
 }
 
