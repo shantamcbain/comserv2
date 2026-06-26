@@ -89,7 +89,6 @@
                             Container Status Overview
                         </span>
                         <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
-        loadBackupImages(targetVal);
                             <i class="icon-refresh"></i> Refresh
                         </button>
                     </h4>
@@ -111,7 +110,6 @@
                             Available Recovery Backups
                         </span>
                         <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
-        loadBackupImages(targetVal);
                             <i class="icon-refresh"></i> Refresh
                         </button>
                     </h4>
@@ -742,7 +740,6 @@
                     refreshVolumes();
                 } else if (sectionId === 'container-status') {
                     refreshContainers();
-        loadBackupImages(targetVal);
                 } else if (sectionId === 'docker-diagnostics-card') {
                     loadDiagnostics();
                 }
@@ -1107,7 +1104,6 @@
         appendOutput(`\n📡 Switched active system target to: ${targetText}\n`);
         
         refreshContainers();
-        loadBackupImages(targetVal);
         loadDiagnostics();
         
         const volSection = document.getElementById('volumes-status');
@@ -1117,7 +1113,7 @@
     }
 
     function refreshContainers() {
-        containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>';
+        const cl = document.getElementById('containers-list'); if (cl) cl.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>';
         const target = document.getElementById('docker-target-select')?.value || 'workstation';
 
         fetch(`/admin/docker/list?host=${target}`, { credentials: 'same-origin', redirect: 'manual' })
@@ -1132,7 +1128,7 @@
             .then(data => {
                 if (!data) return;
                 if (!data.success) {
-                    containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
+                    const cl = document.getElementById('containers-list'); if (cl) cl.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
                     return;
                 }
 
@@ -1142,7 +1138,7 @@
                 updateServiceDropdown(data.containers);
             })
             .catch(error => {
-                containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading containers: ${error.message}</p>`;
+                const cl = document.getElementById('containers-list'); if (cl) cl.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading containers: ${error.message}</p>`;
             });
     }
 
@@ -1242,7 +1238,7 @@
 
     function displayContainers(containers, host) {
         if (!containers || containers.length === 0) {
-            containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">No containers found</p>';
+            const cl = document.getElementById('containers-list'); if (cl) cl.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">No containers found</p>';
             return;
         }
 
@@ -1353,7 +1349,7 @@
             `;
         });
 
-        containersList.innerHTML = html;
+        const cl = document.getElementById('containers-list'); if (cl) cl.innerHTML = html;
     }
 
     function updateServiceDropdown(containers) {
@@ -1529,7 +1525,6 @@
                             appendOutput(sd.success ? `✓ ${service} started.\n` : `✗ Start failed.\n`);
                         }
                         setTimeout(() => { refreshContainers(); enableRebuildButtons(); }, 2000);
-        loadBackupImages(targetVal);
                     } else {
                         appendOutput(`✗ Build failed (exit ${data.exit_code}).\n`);
                         enableRebuildButtons();
@@ -2258,7 +2253,6 @@
         updateEmergencyCommands(defaultTarget);
 
         refreshContainers();
-        loadBackupImages(targetVal);
         refreshVolumes();
         loadSavedCredentials();
         loadDeployHistory();
