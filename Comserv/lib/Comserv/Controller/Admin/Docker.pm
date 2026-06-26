@@ -702,7 +702,7 @@ sub docker_containers_working :Path('/admin/docker-containers-working') :Args(0)
     my $docker_available = ! -f '/.dockerenv';
 
     $c->stash(
-        template => 'admin/docker/docker_containers_legacy.tt',
+        template => 'admin/docker/docker_containers_working.tt',
         docker_available => $docker_available,
         authenticated => 1,
     );
