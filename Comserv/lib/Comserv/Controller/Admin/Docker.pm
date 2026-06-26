@@ -667,6 +667,83 @@ sub logs :Path('/admin/docker/logs') :Args(1) {
     $c->forward('View::JSON');
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Main container management pages (restored from Admin.pm)
+# These keep the exact URLs used in the admin dashboard and other templates.
+# ─────────────────────────────────────────────────────────────────────────────
+
+sub docker_containers :Path('/admin/docker-containers') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_csc_admin_check($c)) {
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker/docker_containers.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
+sub docker_containers_working :Path('/admin/docker-containers-working') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_csc_admin_check($c)) {
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker/docker_containers_legacy.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
+sub docker_containers_old :Path('/admin/docker-containers-old') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_csc_admin_check($c)) {
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker_containers_old.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
+sub docker_containers_legacy :Path('/admin/docker-containers-legacy') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_csc_admin_check($c)) {
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker/docker_containers_legacy.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
