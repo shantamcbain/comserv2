@@ -161,17 +161,17 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/docker-containers-working') %]" class="admin-link">
+                    <a href="[% c.uri_for('/admin/docker-containers-legacy') %]" class="admin-link" title="Live container status with health tracking and controls (current working version)">
                         <i class="fas fa-cubes"></i>
-                        <span>Docker Containers (Production)</span>
+                        <span>Docker Containers (Production / Working)</span>
                     </a>
-                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link" title="Slim modern view with deployment panel">
                         <i class="fas fa-flask"></i>
                         <span>Docker Containers (Development)</span>
                     </a>
-                    <a href="[% c.uri_for('/admin/docker-containers-old') %]" class="admin-link">
+                    <a href="[% c.uri_for('/admin/docker-containers-old') %]" class="admin-link" title="Legacy/working view with full recovery history and backup tools">
                         <i class="fas fa-archive"></i>
-                        <span>Docker Containers (Legacy)</span>
+                        <span>Docker Containers (Legacy / Full History)</span>
                     </a>
                 </div>
             </div>
@@ -548,7 +548,7 @@
                         <i class="fas fa-globe"></i>
                         <span>Hosting Accounts</span>
                     </a>
-                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link" title="Slim modern view with deployment panel">
                         <i class="fas fa-cubes"></i>
                         <span>Docker Containers</span>
                     </a>
