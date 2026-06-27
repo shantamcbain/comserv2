@@ -38,7 +38,7 @@
 
 <div class="app-container" style="margin: 20px auto; max-width: 1200px;">
     <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;">
-        <h1 style="margin: 0;"><i class="icon-docker"></i> Docker Container Management</h1>
+        <h1 style="margin: 0;"><i class="icon-docker"></i> Docker Container Management Working</h1>
         <div>
             <a href="/admin/docker-containers-old" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 6px 12px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; transition: background-color 0.2s;">
                 <i class="fas fa-history"></i> Switch to Old View (Scrolling Layout)
