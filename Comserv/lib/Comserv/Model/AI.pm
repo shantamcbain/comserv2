@@ -167,6 +167,19 @@ sub get_available_models {
     return $self->model_manager->get_available_models($c, %opts);
 }
 
+sub get_available_models {
+    my ($self, $c, %opts) = @_;
+
+    # Delegate to Router or ModelManager
+    my $router_result = $self->router ? $self->router->get_models($c, %opts) : {};
+
+    return {
+        local   => $router_result->{local} || [],
+        host    => $router_result->{host} || 'localhost',
+        port    => $router_result->{port} || 11434,
+        current_model => $router_result->{current} || 'llama3',
+    };
+}
 __PACKAGE__->meta->make_immutable;
 
 1;
