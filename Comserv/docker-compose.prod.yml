@@ -32,8 +32,8 @@ services:
       - /home/shanta/comserv-logs:/opt/comserv/root/log
       - /home/shanta/comserv-workshop:/data/nfs:rw
       - /home/shanta/comserv-sessions:/tmp/comserv/session:rw
-      - /home/shanta/comserv-cache:/cache:rw
-      - /home/shanta/comserv-cache:/tmp/comserv/cache:rw
+      - comserv_cache:/cache
+      - comserv_cache:/tmp/comserv/cache
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
       interval: 10s
@@ -45,3 +45,7 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+
+volumes:
+  comserv_cache:
+    driver: local

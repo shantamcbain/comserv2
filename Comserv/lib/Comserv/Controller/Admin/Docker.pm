@@ -324,65 +324,83 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     if ($pid == 0) {
-        # CHILD – perform the real 5-step deploy
+        # CHILD – perform the real 5-step deploy with live flushing
         open(my $log, '>>', $log_file) or exit 1;
-        select((select($log), $|=1)[0]);
+        $| = 1;                    # autoflush on STDOUT
+        select((select($log), $|=1)[0]);  # autoflush on log file
 
         my $repo = '/home/shanta/PycharmProjects/comserv2/Comserv';
         my $compose = 'docker-compose.prod.yml';
 
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger) ===\n";
+        $log->flush();
 
         # 1. Auto-commit (robust version)
         my $work_repo = '/home/shanta/PycharmProjects/comserv2';
         print $log "[".scalar(localtime)."] Step 1: Checking for uncommitted changes in $work_repo ...\n";
+        $log->flush();
 
         my $git_status = `cd '$work_repo' && git status --porcelain 2>&1`;
         my $git_status_exit = $? >> 8;
         print $log "git status exit=$git_status_exit\n";
         print $log "git status output:\n$git_status\n";
+        $log->flush();
 
         if ($git_status =~ /\S/ && $git_status_exit == 0) {
             print $log "[".scalar(localtime)."] Uncommitted changes detected – performing git add -A ...\n";
             my $add_out = `cd '$work_repo' && git add -A 2>&1`;
             print $log "git add output:\n$add_out\n";
+            $log->flush();
 
             my $commit_msg = "Auto-deploy commit before production push [".scalar(localtime)."]";
             my $commit_out = `cd '$work_repo' && git commit -m "$commit_msg" 2>&1`;
             my $commit_exit = $? >> 8;
             print $log "git commit exit=$commit_exit\n";
             print $log "git commit output:\n$commit_out\n";
+            $log->flush();
 
             if ($commit_exit == 0) {
                 print $log "[".scalar(localtime)."] Auto-commit successful.\n";
             } else {
                 print $log "[".scalar(localtime)."] WARNING: git commit returned non-zero (may be nothing to commit).\n";
             }
+            $log->flush();
         } else {
             print $log "[".scalar(localtime)."] No uncommitted changes (or git status failed) – skipping auto-commit.\n";
+            $log->flush();
         }
 
         # 2. Push
         print $log "[".scalar(localtime)."] Step 2: git push origin main...\n";
+        $log->flush();
         my $push = `cd $repo && git push origin main 2>&1`;
         print $log $push;
+        $log->flush();
 
-        # 3. Build
-        print $log "[".scalar(localtime)."] Step 3: docker compose build web-prod --no-cache...\n";
+        # 3. Build (with explicit progress markers)
+        print $log "[".scalar(localtime)."] [BUILD STARTED] docker compose build web-prod --no-cache...\n";
+        $log->flush();
         my $build = `cd $repo && docker compose -f $compose build web-prod --no-cache 2>&1`;
         print $log $build;
+        print $log "[".scalar(localtime)."] [BUILD FINISHED]\n";
+        $log->flush();
 
         # 4. Push to registry (real push)
         print $log "[".scalar(localtime)."] Step 4: docker compose push web-prod...\n";
+        $log->flush();
         my $push_img = `cd $repo && docker compose -f $compose push web-prod 2>&1`;
         print $log $push_img;
+        $log->flush();
 
         # 5. Restart
         print $log "[".scalar(localtime)."] Step 5: docker compose up -d web-prod...\n";
+        $log->flush();
         my $up = `cd $repo && docker compose -f $compose up -d web-prod 2>&1`;
         print $log $up;
+        $log->flush();
 
         print $log "[".scalar(localtime)."] === DEPLOY COMPLETE ===\n";
+        $log->flush();
         close($log);
         unlink($pid_file);
         exit 0;
@@ -421,9 +439,14 @@ sub deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
         }
     }
 
+    # Always return the FULL current log content (not incremental)
     my $output = '';
     if (-f $log_file) {
-        $output = do { open my $fh, '<', $log_file; local $/; <$fh> };
+        if (open my $fh, '<', $log_file) {
+            local $/;
+            $output = <$fh>;
+            close $fh;
+        }
     }
 
     $c->response->body(encode_json({
