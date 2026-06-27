@@ -413,6 +413,11 @@ sub get_external_models {
     return $self->model_manager->get_external_models($c);
 }
 
+sub get_api_keys {
+    my ($self, $c, $service) = @_;
+    return $self->router->get_api_keys($c, $service);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

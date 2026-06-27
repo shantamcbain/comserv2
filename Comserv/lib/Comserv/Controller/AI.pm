@@ -3608,8 +3608,24 @@ sub chat :Local :Args(0) {
 
 sub models :Path('models') :Args(0) {
     my ($self, $c) = @_;
-    $c->stash->{models} = $c->model('AI')->models($c);
-    # template or JSON
+
+    my $user_roles = $c->session->{roles} || [];
+    my $can_select_model = ref($user_roles)
+        ? (grep { /^(admin|developer)$/i } @$user_roles) : 0;
+
+    my $models_data = $c->model('AI')->get_available_models($c,
+        can_select_model => $can_select_model,
+        include_local    => 1,
+        include_external => 1,
+    );
+
+    my $api_keys = $c->model('AI')->get_api_keys($c);
+
+    $c->stash(
+        models       => $models_data,
+        api_keys     => $api_keys,
+        can_select_model => $can_select_model,
+    );
 }
 
 
