@@ -161,23 +161,6 @@ sub get_current_config {
     return $self->config->get_current_ollama_config($c, $can_select_model);
 }
 
-sub get_available_models {
-    my ($self, $c, %opts) = @_;
-
-    # For now, delegate to existing logic or Router
-    if ($self->can('router') && $self->router) {
-        return $self->router->get_models($c, %opts) || { local => [] };
-    }
-
-    # Fallback
-    return {
-        local => [],
-        host => 'localhost',
-        port => 11434,
-        current_model => 'llama3'
-    };
-}
-
 sub _build_page_navigation_hint {
     my ($self, $base_url, $page_path, $page_title, $role) = @_;
 
@@ -417,6 +400,13 @@ sub _get_learned_navigation_additions {
     };
     return $out;
 }
+# Model management (extracted from Controller::AI)
+# Thin controllers should call: $c->model('AI')->models($c)
+sub models {
+    my ($self, $c, %opts) = @_;
+    return $self->router->models($c, %opts);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

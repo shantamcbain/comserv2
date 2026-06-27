@@ -3649,31 +3649,12 @@ sub chat :Local :Args(0) {
 
 
 
-sub models :Local :Args(0) {
+sub models :Path('models') :Args(0) {
     my ($self, $c) = @_;
-
-    my $can_select_model = 0;
-    my $user_roles = $c->session->{roles} || [];
-    if (!ref($user_roles)) {
-        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
-    }
-    $can_select_model = grep { $_ =~ /^(admin|developer)$/i } @$user_roles;
-
-    unless ($can_select_model) {
-        $c->response->redirect($c->uri_for('/ai'));
-        return;
-    }
-
-    # Delegate to Model
-    my $data = $c->model('AI')->get_model_management_data($c);
-
-    $c->stash(
-        template => 'ai/models.tt',
-        page_title => 'AI Model Management',
-        %$data,
-        can_select_model => $can_select_model,
-    );
+    $c->stash->{models} = $c->model('AI')->models($c);
+    # template or JSON
 }
+
 
 sub pull_model :Local :Args(0) {
     my ($self, $c) = @_;
