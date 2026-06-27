@@ -436,6 +436,39 @@ sub list :Path('/admin/docker/list') :Args(0) {
     }
     
     $c->stash->{json} = { success => 1, containers => \@containers, host => $host };
+  # === Backup Images as Selectable Containers ===
+my @backups = ();
+my $img_cmd = ($host eq 'workstation')
+    ? 'docker images --filter "reference=*backup*" --format "{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}" 2>/dev/null'
+    : qq{$ssh_prefix "docker images --filter 'reference=*backup*' --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}' 2>/dev/null"};
+
+my $img_out = `$img_cmd` || '';
+foreach my $line (split /\n/, $img_out) {
+    next unless $line =~ /\|/;
+    my ($repo, $tag, $id, $created, $size) = split /\|/, $line, 5;
+    next unless $tag && $tag =~ /^backup-/;
+    push @backups, {
+        id => $id,
+        name => "$repo:$tag",
+        image => "$repo:$tag",
+        tag => $tag,
+        state => 'backup',
+        status => 'Available Backup',
+        is_backup => 1,
+        created => $created,
+        size => $size || '',
+    };
+}
+
+my @all_entries = (@containers, @backups);
+
+$c->stash->{json} = {
+    success => 1,
+    containers => \@containers,
+    backups => \@backups,
+    all_entries => \@all_entries,
+    host => $host
+};
     $c->forward('View::JSON');
 }
 
