@@ -407,6 +407,12 @@ sub models {
     return $self->router->models($c, %opts);
 }
 
+# Model listing - delegated to ModelManager
+sub get_available_models {
+    my ($self, $c, %opts) = @_;
+    return $self->model_manager->get_available_models($c, %opts);
+}
+
 # Thin delegation for external (Grok/xAI etc.) models used in index page
 sub get_external_models {
     my ($self, $c) = @_;
