@@ -177,6 +177,7 @@ sub get_available_models {
         current_model => 'llama3'
     };
 }
+
 sub _build_page_navigation_hint {
     my ($self, $base_url, $page_path, $page_title, $role) = @_;
 

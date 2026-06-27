@@ -3651,7 +3651,7 @@ sub chat :Local :Args(0) {
 
 sub models :Local :Args(0) {
     my ($self, $c) = @_;
-    
+
     my $can_select_model = 0;
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
@@ -3664,17 +3664,14 @@ sub models :Local :Args(0) {
         return;
     }
 
+    # Delegate to Model
+    my $data = $c->model('AI')->get_model_management_data($c);
+
     $c->stash(
         template => 'ai/models.tt',
         page_title => 'AI Model Management',
-        servers => [],
-        installed_models => [
-            { name => 'llama3.2', label => 'Llama 3.2 (Local)' },
-            { name => 'llama3', label => 'Llama 3 (Local)' },
-        ],
-        available_models => [],
+        %$data,
         can_select_model => $can_select_model,
-        info_msg => 'Model management is being moved to the Model layer. Local models are shown as fallback.',
     );
 }
 
