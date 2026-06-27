@@ -464,10 +464,11 @@ sub shell_run_command :Path('/admin/shell_run_command') :Args(0) {
         return;
     };
 
-    my $api_key = $cfg->_grok_cli_api_key($c);
+    my $ai = $c->controller('AI');
+    my $api_key = $ai ? $ai->_grok_cli_api_key($c) : undef;
     local $ENV{XAI_API_KEY}  = $api_key if $api_key;
     local $ENV{GROK_API_KEY}  = $api_key if $api_key;
-    local $ENV{HOME}          = $cfg->_grok_home() || $ENV{HOME};
+    local $ENV{HOME}          = $ai ? $ai->_grok_home() : $ENV{HOME};
     local $ENV{USER}          = 'shanta';
     local $ENV{LOGNAME}       = 'shanta';
     local $ENV{PATH}          = join ':', grep { $_ && -d $_ }
