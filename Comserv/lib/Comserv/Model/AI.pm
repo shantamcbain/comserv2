@@ -161,23 +161,22 @@ sub get_current_config {
     return $self->config->get_current_ollama_config($c, $can_select_model);
 }
 
-# === Safe model listing (the fix for the crashy UserApiKeys + metadata code) ===
-
-
 sub get_available_models {
     my ($self, $c, %opts) = @_;
 
-    # Delegate to Router or ModelManager
-    my $router_result = $self->router ? $self->router->get_models($c, %opts) : {};
+    # For now, delegate to existing logic or Router
+    if ($self->can('router') && $self->router) {
+        return $self->router->get_models($c, %opts) || { local => [] };
+    }
 
+    # Fallback
     return {
-        local   => $router_result->{local} || [],
-        host    => $router_result->{host} || 'localhost',
-        port    => $router_result->{port} || 11434,
-        current_model => $router_result->{current} || 'llama3',
+        local => [],
+        host => 'localhost',
+        port => 11434,
+        current_model => 'llama3'
     };
 }
-
 __PACKAGE__->meta->make_immutable;
 
 1;
