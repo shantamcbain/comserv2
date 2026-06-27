@@ -314,11 +314,9 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     my $log_file = '/tmp/comserv_deploy.log';
     my $pid_file = '/tmp/comserv_deploy.pid';
 
-    # Clean previous run
     unlink $log_file;
     unlink $pid_file;
 
-    # Fork background worker
     my $pid = fork();
     if (!defined $pid) {
         $c->response->body(encode_json({ success => 0, message => 'fork failed' }));
@@ -326,55 +324,56 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     if ($pid == 0) {
-        # CHILD: perform the actual deploy
+        # CHILD – perform the real 5-step deploy
         open(my $log, '>>', $log_file) or exit 1;
-        select((select($log), $|=1)[0]);  # autoflush
+        select((select($log), $|=1)[0]);
 
-        my $start = time();
+        my $repo = '/home/shanta/PycharmProjects/comserv2/Comserv';
+        my $compose = 'docker-compose.prod.yml';
+
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger) ===\n";
 
-        # 1. Auto-commit any uncommitted changes
+        # 1. Auto-commit
         print $log "[".scalar(localtime)."] Step 1: Checking for uncommitted changes...\n";
-        my $git_status = `cd /home/shanta/PycharmProjects/comserv2/Comserv && git status --porcelain 2>&1`;
-        if ($git_status =~ /\S/) {
-            print $log "[".scalar(localtime)."] Uncommitted changes found – auto-committing...\n";
-            system('cd /home/shanta/PycharmProjects/comserv2/Comserv && git add -A && git commit -m "auto-deploy: ' . localtime() . '" 2>&1 >> ' . $log_file);
-            print $log "[".scalar(localtime)."] Commit done.\n";
+        my $status = `cd $repo && git status --porcelain 2>&1`;
+        if ($status =~ /\S/) {
+            print $log "[".scalar(localtime)."] Uncommitted changes found – committing...\n";
+            system("cd $repo && git add . && git commit -m 'Auto-deploy commit '.localtime() 2>&1 >> $log_file");
+            print $log "[".scalar(localtime)."] Commit complete.\n";
         } else {
             print $log "[".scalar(localtime)."] Working tree clean.\n";
         }
 
         # 2. Push
         print $log "[".scalar(localtime)."] Step 2: git push origin main...\n";
-        my $push_out = `cd /home/shanta/PycharmProjects/comserv2/Comserv && git push origin main 2>&1`;
-        print $log $push_out;
+        my $push = `cd $repo && git push origin main 2>&1`;
+        print $log $push;
 
         # 3. Build
-        print $log "[".scalar(localtime)."] Step 3: Building Docker image...\n";
-        my $build_out = `cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml build web-prod 2>&1`;
-        print $log $build_out;
+        print $log "[".scalar(localtime)."] Step 3: docker compose build web-prod --no-cache...\n";
+        my $build = `cd $repo && docker compose -f $compose build web-prod --no-cache 2>&1`;
+        print $log $build;
 
-        # 4. Push to registry (if configured)
-        print $log "[".scalar(localtime)."] Step 4: Pushing image to registry (if Hub deploy)...\n";
-        # Placeholder: add docker push commands here when registry is set up
+        # 4. Push to registry (real push)
+        print $log "[".scalar(localtime)."] Step 4: docker compose push web-prod...\n";
+        my $push_img = `cd $repo && docker compose -f $compose push web-prod 2>&1`;
+        print $log $push_img;
 
-        # 5. Restart containers
-        print $log "[".scalar(localtime)."] Step 5: Restarting production containers...\n";
-        my $restart_out = `cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml up -d web-prod 2>&1`;
-        print $log $restart_out;
+        # 5. Restart
+        print $log "[".scalar(localtime)."] Step 5: docker compose up -d web-prod...\n";
+        my $up = `cd $repo && docker compose -f $compose up -d web-prod 2>&1`;
+        print $log $up;
 
-        my $elapsed = time() - $start;
-        print $log "[".scalar(localtime)."] === DEPLOY COMPLETE in ${elapsed}s ===\n";
-
+        print $log "[".scalar(localtime)."] === DEPLOY COMPLETE ===\n";
         close($log);
         unlink($pid_file);
         exit 0;
     }
 
-    # PARENT: write PID and return immediately
+    # PARENT
     open(my $pf, '>', $pid_file); print $pf $pid; close($pf);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy',
-        "Background deploy started (pid=$pid, trigger=$trigger)");
+        "Background deploy started (pid=$pid)");
 
     $c->response->body(encode_json({ success => 1, message => 'Background deploy started' }));
 }
@@ -390,11 +389,29 @@ sub deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
 
     $c->response->content_type('application/json; charset=utf-8');
 
-    # For now we have no background job tracking, so always report completed.
+    my $pid_file = '/tmp/comserv_deploy.pid';
+    my $log_file = '/tmp/comserv_deploy.log';
+
+    my $is_running = 0;
+    if (-f $pid_file) {
+        my $pid = do { open my $fh, '<', $pid_file; local $/; <$fh> };
+        chomp $pid;
+        if ($pid && kill 0, $pid) {
+            $is_running = 1;
+        } else {
+            unlink $pid_file;   # stale
+        }
+    }
+
+    my $output = '';
+    if (-f $log_file) {
+        $output = do { open my $fh, '<', $log_file; local $/; <$fh> };
+    }
+
     $c->response->body(encode_json({
         success    => 1,
-        is_running => 0,
-        message    => 'No active deploy job (placeholder)'
+        is_running => $is_running ? 1 : 0,
+        output     => $output,
     }));
 }
 

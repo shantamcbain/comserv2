@@ -79,8 +79,10 @@ ENV COMSERV_LOG_DIR=/opt/comserv
 
 # Create directories
 RUN mkdir -p /opt/comserv/root/log /opt/comserv/root/session \
-    /opt/comserv/backups /opt/comserv/.cpanm && \
-    chown -R comserv:comserv /opt/comserv
+    /opt/comserv/backups /opt/comserv/.cpanm \
+    /cache/tt /cache/session /tmp/comserv/cache && \
+    chown -R comserv:comserv /opt/comserv /cache /tmp/comserv && \
+    chmod -R 755 /cache /tmp/comserv
 
 # Create marker file to prevent runtime module re-installation
 # (all modules are pre-installed in build stage)
