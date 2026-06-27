@@ -16,7 +16,7 @@
 # Created: 2025-01-15
 # Last Updated: 2025-01-28
 
-package Comserv::Controller::AI;
+package Comserv::Controller::AI::AI;
 use Moose;
 use namespace::autoclean;
 use Try::Tiny;
