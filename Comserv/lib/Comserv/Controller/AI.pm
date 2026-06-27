@@ -3609,32 +3609,30 @@ sub chat :Local :Args(0) {
 sub models :Path('models') :Args(0) {
     my ($self, $c) = @_;
 
+    # Normalize roles safely (string or array)
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
-    my $can_manage = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^(admin|developer)$/i } @$user_roles : 0;
+    my $can_select_model = ref($user_roles) eq 'ARRAY'
+        ? (grep { /^(admin|developer)$/i } @$user_roles) : 0;
 
     my $models_data = $c->model('AI')->get_available_models($c,
-        can_select_model => $can_manage,
+        can_select_model => $can_select_model,
         include_local    => 1,
         include_external => 1,
     );
 
     my $api_keys = $c->model('AI')->get_api_keys($c);
 
-    my $has_grok_key = grep { $_->{provider} eq 'grok' } @$models_data;
-
-    # Add external / Grok models via ModelManager or direct
-    my $external = $c->model('AI')->get_external_models($c) || [];
+    my $has_grok_key = scalar(grep { ($_->{provider} || '') eq 'grok' } @$models_data);
 
     $c->stash(
         models_data        => $models_data,
         models             => $models_data,   # legacy alias
-        external_models    => $external,
         api_keys           => $api_keys,
-        can_select_model   => $can_manage,
-        has_api_key        => scalar(@$external) > 0,
+        can_select_model   => $can_select_model,
+        has_api_key        => $has_grok_key,
         api_keys_configured => scalar(@$api_keys),
     );
 }
@@ -3875,11 +3873,7 @@ sub test_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
-=head2 remove_model
 
-Remove (delete) an installed Ollama model from a specific server.
-
-=cut
 
 sub remove_model :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4032,12 +4026,7 @@ sub remove_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
-=head2 unload_model
 
-Force-unload a model from Ollama memory (keep_alive=0).
-Requires admin/developer role.  Accepts JSON body: { model, host, port }
-
-=cut
 
 sub unload_model :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4086,12 +4075,7 @@ sub unload_model :Local :Args(0) {
     $c->response->body(encode_json($result));
 }
 
-=head2 running_models
 
-Return the list of models currently loaded in Ollama memory (/api/ps).
-Requires admin/developer role.
-
-=cut
 
 sub running_models :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4121,11 +4105,7 @@ sub running_models :Local :Args(0) {
     $c->response->body(encode_json({ success => JSON::true, models => $running }));
 }
 
-=head2 check_status
 
-Check Ollama service connectivity. Returns JSON status.
-
-=cut
 
 sub check_status :Local :Args(0) {
     my ($self, $c) = @_;
