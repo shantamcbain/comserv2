@@ -3664,16 +3664,17 @@ sub models :Local :Args(0) {
         return;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'models', "User accessing AI models interface");
-
     $c->stash(
         template => 'ai/models.tt',
         page_title => 'AI Model Management',
         servers => [],
-        installed_models => [],
+        installed_models => [
+            { name => 'llama3.2', label => 'Llama 3.2 (Local)' },
+            { name => 'llama3', label => 'Llama 3 (Local)' },
+        ],
         available_models => [],
         can_select_model => $can_select_model,
-        error_msg => 'Ollama model listing is temporarily disabled to prevent hangs. Models can be managed via the main /ai page for now.',
+        info_msg => 'Model management is being moved to the Model layer. Local models are shown as fallback.',
     );
 }
 
@@ -3805,11 +3806,7 @@ sub pull_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
-=head2 test_model
 
-Test a specific model on a server to verify it works correctly.
-
-=cut
 
 sub test_model :Local :Args(0) {
     my ($self, $c) = @_;
