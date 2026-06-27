@@ -3609,16 +3609,11 @@ sub chat :Local :Args(0) {
 sub models :Path('models') :Args(0) {
     my ($self, $c) = @_;
 
-    # Normalize roles the same way as in index()
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
-
-    my $can_manage = 0;
-    if (ref($user_roles) eq 'ARRAY') {
-        $can_manage = grep { $_ =~ /^(admin|developer)$/i } @$user_roles;
-    }
+    my $can_manage = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^(admin|developer)$/i } @$user_roles : 0;
 
     my $models_data = $c->model('AI')->get_available_models($c,
         can_select_model => $can_manage,
