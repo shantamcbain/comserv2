@@ -333,15 +333,33 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger) ===\n";
 
-        # 1. Auto-commit
-        print $log "[".scalar(localtime)."] Step 1: Checking for uncommitted changes...\n";
-        my $status = `cd $repo && git status --porcelain 2>&1`;
-        if ($status =~ /\S/) {
-            print $log "[".scalar(localtime)."] Uncommitted changes found – committing...\n";
-            system("cd $repo && git add . && git commit -m 'Auto-deploy commit '.localtime() 2>&1 >> $log_file");
-            print $log "[".scalar(localtime)."] Commit complete.\n";
+        # 1. Auto-commit (robust version)
+        my $work_repo = '/home/shanta/PycharmProjects/comserv2';
+        print $log "[".scalar(localtime)."] Step 1: Checking for uncommitted changes in $work_repo ...\n";
+
+        my $git_status = `cd '$work_repo' && git status --porcelain 2>&1`;
+        my $git_status_exit = $? >> 8;
+        print $log "git status exit=$git_status_exit\n";
+        print $log "git status output:\n$git_status\n";
+
+        if ($git_status =~ /\S/ && $git_status_exit == 0) {
+            print $log "[".scalar(localtime)."] Uncommitted changes detected – performing git add -A ...\n";
+            my $add_out = `cd '$work_repo' && git add -A 2>&1`;
+            print $log "git add output:\n$add_out\n";
+
+            my $commit_msg = "Auto-deploy commit before production push [".scalar(localtime)."]";
+            my $commit_out = `cd '$work_repo' && git commit -m "$commit_msg" 2>&1`;
+            my $commit_exit = $? >> 8;
+            print $log "git commit exit=$commit_exit\n";
+            print $log "git commit output:\n$commit_out\n";
+
+            if ($commit_exit == 0) {
+                print $log "[".scalar(localtime)."] Auto-commit successful.\n";
+            } else {
+                print $log "[".scalar(localtime)."] WARNING: git commit returned non-zero (may be nothing to commit).\n";
+            }
         } else {
-            print $log "[".scalar(localtime)."] Working tree clean.\n";
+            print $log "[".scalar(localtime)."] No uncommitted changes (or git status failed) – skipping auto-commit.\n";
         }
 
         # 2. Push
