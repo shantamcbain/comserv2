@@ -106,6 +106,62 @@ sub get_models {
         current_model => 'llama3.2',
     };
 }
+# Provider registry with cost/speed/privacy metadata
+sub get_provider_registry {
+    my $self = shift;
+
+    return {
+        ollama => {
+            name => 'Ollama (Local)',
+            cost => 0,
+            speed => 'medium',
+            privacy => 'high',
+            priority => 10,
+        },
+        grok => {
+            name => 'Grok (xAI)',
+            cost => 'medium',
+            speed => 'high',
+            privacy => 'medium',
+            priority => 8,
+        },
+        openrouter => {
+            name => 'OpenRouter',
+            cost => 'low',
+            speed => 'high',
+            privacy => 'low',
+            priority => 6,
+        },
+    };
+}
+
+# Enhanced get_models with provider support
+sub get_models {
+    my ($self, $c, %opts) = @_;
+
+    my $can_select_model = $opts{can_select_model} || 0;
+    my $registry = $self->get_provider_registry();
+
+    my $local_models = [
+        { name => 'llama3.2', label => 'Llama 3.2 (Local Ollama)', provider => 'ollama' },
+        { name => 'llama3',   label => 'Llama 3 (Local Ollama)', provider => 'ollama' },
+        { name => 'gemma2',   label => 'Gemma 2 (Local Ollama)', provider => 'ollama' },
+    ];
+
+    my $external_models = $can_select_model ? [
+        { name => 'grok-4-fast-reasoning', label => 'Grok 4 Fast (xAI)', provider => 'grok' },
+        { name => 'openrouter-mixtral', label => 'Mixtral via OpenRouter', provider => 'openrouter' },
+    ] : [];
+
+    return {
+        local         => $local_models,
+        external      => $external_models,
+        host          => 'localhost',
+        port          => 11434,
+        current_model => 'llama3.2',
+        registry      => $registry,
+    };
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

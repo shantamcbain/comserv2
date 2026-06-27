@@ -1,22 +1,5 @@
-# AI.pm - Catalyst Controller for AI/Ollama interactions
-#
-# This controller provides web interfaces for interacting with Ollama LLM models.
-# It includes both interactive web forms and API endpoints for AI query processing.
-#
-# Features:
-# - Interactive AI interface with AJAX submission
-# - JSON API endpoints for integration
-# - Real-time Ollama status checking
-# - System prompt and format customization
-# - Comprehensive logging with Comserv standards
-# - Authentication on all endpoints
-# - Error handling with Try::Tiny
-#
-# Author: AI Assistant
-# Created: 2025-01-15
-# Last Updated: 2025-01-28
-
 package Comserv::Controller::AI;
+
 use Moose;
 use namespace::autoclean;
 use Try::Tiny;
@@ -24,6 +7,7 @@ use JSON;
 use Template;
 use DateTime;
 use LWP::UserAgent;
+
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
@@ -32,8 +16,6 @@ use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller' }
 
-
-
 has 'logging' => (
     is => 'ro',
     lazy => 1,
@@ -41,6 +23,7 @@ has 'logging' => (
     documentation => 'Logging instance for standardized logging'
 );
 
+# Rest of your code...
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
