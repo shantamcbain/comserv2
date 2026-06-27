@@ -102,17 +102,19 @@ function startPolling() {
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.success) {
-                    consecutiveErrors = 0; // reset on success
+                    consecutiveErrors = 0;
+                    
+                    // Always replace console with full latest output for reliable streaming
                     if (data.output && data.output !== lastContent) {
-                        var newContent = data.output.substring(lastContent.length);
-                        if (newContent) {
-                            con.appendChild(document.createTextNode(newContent));
-                            con.scrollTop = con.scrollHeight;
-                            logOutput += newContent;
-                            lastContent = data.output;
-                            window.scrollTo(0, document.body.scrollHeight);
-                        }
+                        // Clear and rebuild console with full content
+                        con.innerHTML = '';
+                        con.appendChild(document.createTextNode(data.output));
+                        con.scrollTop = con.scrollHeight;
+                        logOutput = data.output;
+                        lastContent = data.output;
+                        window.scrollTo(0, document.body.scrollHeight);
                     }
+                    
                     if (!data.is_running) {
                         clearInterval(pollingTimer);
                         pollingTimer = null;
@@ -141,7 +143,7 @@ function startPolling() {
                     }
                 }
             });
-    }, 1000);
+    }, 500);  // Poll every 500ms for more responsive live streaming
 }
 
 function cancelAndSave() {

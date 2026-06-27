@@ -325,6 +325,21 @@ eval {
     ssh_exec("sudo docker volume create --driver local --opt type=nfs --opt o='$nfs_opts' --opt device=':$nfs_log_path' comserv2_comserv-logs 2>/dev/null || echo 'Volume comserv2_comserv-logs already exists'");
     ssh_exec("sudo docker volume create --driver local --opt type=nfs --opt o='$nfs_opts' --opt device=':$nfs_workshop_path' comserv2_workshop_files_nfs 2>/dev/null || echo 'Volume comserv2_workshop_files_nfs already exists'");
     print "✓ Volumes ready\n";
+
+    # Step 5d: Ensure named Docker volume 'comserv_cache' exists on target server (portable, survives deploys)
+    print "[CACHE VOLUME] Ensuring Docker volume 'comserv_cache' exists on production...\n";
+    my $vol_check = ssh_exec("sudo docker volume inspect comserv_cache 2>/dev/null || echo 'MISSING'");
+    if ($vol_check =~ /MISSING/) {
+        print "  Volume missing — creating named volume comserv_cache...\n";
+        my $create_result = ssh_exec("sudo docker volume create comserv_cache && echo 'VOLUME_CREATED'");
+        if ($create_result =~ /VOLUME_CREATED/) {
+            print "✓ Named volume 'comserv_cache' created successfully\n";
+        } else {
+            print "⚠ Failed to create volume: $create_result\n";
+        }
+    } else {
+        print "✓ Named volume 'comserv_cache' already exists\n";
+    }
     
     # Step 6: Start new container
     print "[START] Launching new container...\n";
