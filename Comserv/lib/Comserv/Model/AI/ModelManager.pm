@@ -86,7 +86,7 @@ sub get_available_models {
     # --- External providers via UserApiKeys (the part that used to crash) ---
     if ($include_external) {
         my $user_id = $c->session->{user_id};
-        next unless $user_id;
+    return () unless $user_id;
 
         eval {
             my $schema = $c->model('DBEncy')->schema;
@@ -202,6 +202,23 @@ sub _default_models_for_service {
 
     return ();
 }
+
+=head2 get_external_models
+
+Thin wrapper that returns only external (non-local) models.
+Used by Controller::AI::index to populate the external dropdown.
+
+=cut
+
+sub get_external_models {
+    my ($self, $c) = @_;
+    my $all = $self->get_available_models($c,
+        include_local    => 0,
+        include_external => 1,
+    );
+    return grep { $_->{external} } @$all;
+}
+
 
 1;
 
