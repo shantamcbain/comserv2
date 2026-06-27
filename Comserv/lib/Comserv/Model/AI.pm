@@ -162,10 +162,7 @@ sub get_current_config {
 }
 
 # === Safe model listing (the fix for the crashy UserApiKeys + metadata code) ===
-sub get_available_models {
-    my ($self, $c, %opts) = @_;
-    return $self->model_manager->get_available_models($c, %opts);
-}
+
 
 sub get_available_models {
     my ($self, $c, %opts) = @_;
@@ -180,6 +177,7 @@ sub get_available_models {
         current_model => $router_result->{current} || 'llama3',
     };
 }
+
 __PACKAGE__->meta->make_immutable;
 
 1;
