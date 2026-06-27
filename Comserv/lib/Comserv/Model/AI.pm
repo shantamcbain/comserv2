@@ -101,6 +101,24 @@ has 'model_manager' => (
     },
 );
 
+# Central role-based AI router (like OpenRouter but with membership levels,
+# manual override for devs/admins, cost/speed/privacy balancing).
+# Thin controllers should call: $c->model('AI')->route(...)
+has 'router' => (
+    is      => 'ro',
+    lazy    => 1,
+    default => sub {
+        require Comserv::Model::AI::Router;
+        Comserv::Model::AI::Router->new;
+    },
+);
+
+# Public delegation method for controllers
+sub route {
+    my ($self, $c, %args) = @_;
+    return $self->router->route_request($c, %args);
+}
+
 # Convenience delegation methods (controller can call $c->model('AI')->chat(...) etc.)
 sub chat_message {
     my ($self, $c, %args) = @_;
