@@ -294,6 +294,50 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
     $c->response->body(encode_json({ success => 1, log_id => $log_id, title => $title }));
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Deploy-to-production endpoint called by deploy_form.tt JS (POST /admin/docker-deploy-to-production)
+# Starts a background (or placeholder) deploy and returns success immediately.
+# The JS then polls /admin/docker-deploy-status until is_running becomes false.
+# ─────────────────────────────────────────────────────────────────────────────
+sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($self->_can_access_docker_widget($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => 0, message => 'CSC admin only' }));
+        return;
+    }
+
+    # Placeholder: in a real implementation you would fork a background job here.
+    # For now we just log the request and return success so the JS polling can proceed.
+    my $trigger = $c->req->body_params->{trigger_source} || 'manual';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy',
+        "docker_deploy_to_production triggered (source=$trigger)");
+
+    $c->response->body(encode_json({ success => 1, message => 'Deploy started (placeholder)' }));
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deploy status endpoint (polled by deploy_form.tt JS)
+# Returns whether a background deploy is still running.
+# Minimal implementation: always reports not-running (no background job tracked yet).
+# Extend later with a real job queue / PID file if needed.
+# ─────────────────────────────────────────────────────────────────────────────
+sub deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    # For now we have no background job tracking, so always report completed.
+    $c->response->body(encode_json({
+        success    => 1,
+        is_running => 0,
+        message    => 'No active deploy job (placeholder)'
+    }));
+}
+
 sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
     my ($self, $c) = @_;
 
@@ -366,109 +410,100 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
 
 sub list :Path('/admin/docker/list') :Args(0) {
     my ($self, $c) = @_;
-    
+
     unless ($self->_can_access_docker_widget($c)) {
         $c->stash->{json} = { success => 0, error => 'Docker widget restricted to admins on non-production1 servers.' };
         $c->forward('View::JSON');
         return;
     }
-    
+
     my $host = $c->req->param('host') || 'workstation';
-    
-    # === LOCAL WORKSTATION / LOCALHOST ===
+
+    my @containers = ();
+
+    my $ssh_prefix;  # Declare early
+
     if ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1') {
         my $output = `docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo ''`;
-
-        my @containers;
         foreach my $line (split /\n/, $output) {
-            next unless $line =~ /\|/; 
+            next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
-
             push @containers, {
-                id     => $id,
-                name   => $name,
-                image  => $image,
+                id => $id,
+                name => $name,
+                image => $image,
                 status => $status,
-                state  => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
-                ports  => $ports || '',
+                state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
+                ports => $ports || '',
             };
         }
+    } else {
+        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
+        my $ssh_user = 'ubuntu';
 
-        $c->stash->{json} = { success => 1, containers => \@containers, host => $host };
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    # === REMOTE PRODUCTION HOSTS (simple command, same as localhost) ===
-    my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
-    my $ssh_user = 'ubuntu';
-    
-    my $admin_ctrl = $c->controller('Admin');
-    my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
-    $ssh_pass ||= $ENV{SSHPASS} || '';
-    
-    unless ($ssh_pass) {
-        $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    local $ENV{SSHPASS} = $ssh_pass;
-    my $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
-    
-    # Exact same simple command used for localhost (no sudo, no extra fields)
-    my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo ''\"";
-    my $output = `$cmd 2>/dev/null` || '';
-    
-    my @containers;
-    foreach my $line (split /\n/, $output) {
-        next unless $line =~ /\|/; 
-        my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
+        my $admin_ctrl = $c->controller('Admin');
+        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        $ssh_pass ||= $ENV{SSHPASS} || '';
 
-        push @containers, {
-            id     => $id,
-            name   => $name,
-            image  => $image,
-            status => $status,
-            state  => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
-            ports  => $ports || '',
+        unless ($ssh_pass) {
+            $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
+            $c->forward('View::JSON');
+            return;
+        }
+
+        local $ENV{SSHPASS} = $ssh_pass;
+        $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
+
+        my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo ''\"";
+        my $output = `$cmd 2>/dev/null` || '';
+
+        foreach my $line (split /\n/, $output) {
+            next unless $line =~ /\|/;
+            my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
+            push @containers, {
+                id => $id,
+                name => $name,
+                image => $image,
+                status => $status,
+                state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
+                ports => $ports || '',
+            };
+        }
+    }
+
+    # Backup Images
+    my @backups = ();
+    my $img_cmd = ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1')
+        ? 'docker images --filter "reference=*backup*" --format "{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}" 2>/dev/null'
+        : qq{$ssh_prefix "docker images --filter 'reference=*backup*' --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}' 2>/dev/null"};
+
+    my $img_out = `$img_cmd` || '';
+    foreach my $line (split /\n/, $img_out) {
+        next unless $line =~ /\|/;
+        my ($repo, $tag, $id, $created, $size) = split /\|/, $line, 5;
+        next unless $tag && $tag =~ /^backup-/;
+        push @backups, {
+            id => $id,
+            name => "$repo:$tag",
+            image => "$repo:$tag",
+            tag => $tag,
+            state => 'backup',
+            status => 'Available Backup',
+            is_backup => 1,
+            created => $created,
+            size => $size || '',
         };
     }
-    
-    $c->stash->{json} = { success => 1, containers => \@containers, host => $host };
-  # === Backup Images as Selectable Containers ===
-my @backups = ();
-my $img_cmd = ($host eq 'workstation')
-    ? 'docker images --filter "reference=*backup*" --format "{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}" 2>/dev/null'
-    : qq{$ssh_prefix "docker images --filter 'reference=*backup*' --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}' 2>/dev/null"};
 
-my $img_out = `$img_cmd` || '';
-foreach my $line (split /\n/, $img_out) {
-    next unless $line =~ /\|/;
-    my ($repo, $tag, $id, $created, $size) = split /\|/, $line, 5;
-    next unless $tag && $tag =~ /^backup-/;
-    push @backups, {
-        id => $id,
-        name => "$repo:$tag",
-        image => "$repo:$tag",
-        tag => $tag,
-        state => 'backup',
-        status => 'Available Backup',
-        is_backup => 1,
-        created => $created,
-        size => $size || '',
+    my @all_entries = (@containers, @backups);
+
+    $c->stash->{json} = {
+        success => 1,
+        containers => \@containers,
+        backups => \@backups,
+        all_entries => \@all_entries,
+        host => $host
     };
-}
-
-my @all_entries = (@containers, @backups);
-
-$c->stash->{json} = {
-    success => 1,
-    containers => \@containers,
-    backups => \@backups,
-    all_entries => \@all_entries,
-    host => $host
-};
     $c->forward('View::JSON');
 }
 

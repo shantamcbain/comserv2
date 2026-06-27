@@ -1,4 +1,5 @@
 package Comserv::Model::Schema::Ency::Result::MenuItem;
+# NEW MENU DISABLED - do not auto-create (legacy Menu / CustomMenu used by default)
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->table('menu_items');

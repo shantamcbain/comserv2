@@ -298,8 +298,19 @@ around 'finalize_error' => sub {
 
 __PACKAGE__->_initialize_database_config();
 __PACKAGE__->setup();
-__PACKAGE__->_initialize_ai_chat_schema();
-__PACKAGE__->_initialize_session_schema();
+
+# All schema initialization wrapped in non-fatal eval blocks
+# App must start even if some tables are missing
+
+eval { __PACKAGE__->_initialize_ai_chat_schema(); };
+if ($@) {
+    warn "Non-fatal: _initialize_ai_chat_schema failed: $@\n";
+}
+
+eval { __PACKAGE__->_initialize_session_schema(); };
+if ($@) {
+    warn "Non-fatal: _initialize_session_schema failed: $@\n";
+}
 
 # LAYER 2.5: Sanitize session ID from cookie — strip any non-hex characters
 # that could be injected (e.g. HTML entities like &#39; from attackers).
@@ -421,12 +432,15 @@ sub _initialize_database_config {
 sub _initialize_ai_chat_schema {
     my $class = shift;
     
+    # NEW MENU DISABLED by default – forces legacy Menu / CustomMenu navigation
+    $class->config->{use_new_menu} = 0;
+    
     eval {
         use Comserv::Util::Logging;
         my $log = Comserv::Util::Logging->instance;
         
         $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_ai_chat_schema',
-            'Checking AI Chat schema tables...');
+            'Checking AI Chat schema tables... (use_new_menu=0 → legacy menu forced)');
         
         # Names must match DBIx::Class Result ->table() values, not documentation labels.
         my @ai_chat_tables = (
@@ -460,24 +474,28 @@ sub _initialize_ai_chat_schema {
         }
         
         $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_ai_chat_schema',
-            'AI Chat schema check complete.');
+            'AI Chat schema check complete. (legacy menu active)');
     };
-    
     if ($@) {
-        warn "Warning during AI Chat schema initialization: $@\n";
+        warn "Non-fatal: _initialize_ai_chat_schema check failed: $@\n";
     }
     
-    # Ensure AI usage logging table for customer billing + capacity monitoring
+    # All ensure_* calls wrapped non-fatally
     eval { $class->_ensure_ai_usage_log_table(); };
-    if ($@) {
-        warn "Warning: Could not ensure ai_usage_logs table: $@\n";
-    }
+    if ($@) { warn "Non-fatal: _ensure_ai_usage_log_table: $@\n"; }
 
     eval { $class->_ensure_ai_navigation_shortcuts_table(); };
+    if ($@) { warn "Non-fatal: _ensure_ai_navigation_shortcuts_table: $@\n"; }
+
     eval { $class->_ensure_nav_submenu_table(); };
-    if ($@) {
-        warn "Warning: Could not ensure ai_navigation_shortcuts table: $@\n";
-    }
+    if ($@) { warn "Non-fatal: _ensure_nav_submenu_table: $@\n"; }
+
+    eval {
+        use Comserv::Util::Logging;
+        my $log = Comserv::Util::Logging->instance;
+        $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_ai_chat_schema',
+            'Schema init complete (non-fatal mode)');
+    };
 
     return 1;
 }
@@ -576,8 +594,15 @@ sub _ensure_ai_usage_log_table {
         }
     };
     if ($@) {
-        warn "Failed to ensure ai_usage_logs schema: $@\n";
+        warn "Non-fatal: _ensure_ai_usage_log_table failed: $@\n";
     }
+
+    eval {
+        use Comserv::Util::Logging;
+        my $log = Comserv::Util::Logging->instance;
+        $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_ensure_ai_usage_log_table',
+            'Schema init complete (non-fatal mode)');
+    };
     return 1;
 }
 
