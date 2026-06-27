@@ -3652,190 +3652,30 @@ sub chat :Local :Args(0) {
 sub models :Local :Args(0) {
     my ($self, $c) = @_;
     
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'models', "Unauthorized access attempt to AI models");
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-    
-    my $username = $c->session->{username};
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-        'models', "User accessing AI models interface");
-    
-    # Determine user permissions for viewing all servers
+    my $can_select_model = 0;
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
-    my $can_select_model = 0;
-    if (ref($user_roles) eq 'ARRAY') {
-        $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
-    }
-    
-    # Initialize servers data structure for multiple Ollama servers
-    my $servers = [];
-    
-    # Configure servers from comserv.conf <Ollama> block
-    my $ollama_cfg2   = $c->config->{Ollama} || {};
-    my $cfg_host      = $ollama_cfg2->{host}          || 'localhost';
-    my $cfg_fallback  = $ollama_cfg2->{fallback_host} || $cfg_host;
-    my $cfg_port      = $ollama_cfg2->{port}          || 11434;
+    $can_select_model = grep { $_ =~ /^(admin|developer)$/i } @$user_roles;
 
-    my @server_configs;
-    if ($can_select_model) {
-        @server_configs = (
-            { name => "Local ($cfg_host)",    host => $cfg_host,     port => $cfg_port, location => 'Primary' },
-        );
-        if ($cfg_fallback ne $cfg_host) {
-            push @server_configs,
-                { name => "Fallback ($cfg_fallback)", host => $cfg_fallback, port => $cfg_port, location => 'Fallback' };
-        }
-    } else {
-        @server_configs = (
-            { name => 'AI Server', host => $cfg_host, port => $cfg_port, location => 'Primary' }
-        );
+    unless ($can_select_model) {
+        $c->response->redirect($c->uri_for('/ai'));
+        return;
     }
-    
-    foreach my $config (@server_configs) {
-        my $server_info = {
-            name => $config->{name},
-            host => $config->{host},
-            port => $config->{port},
-            location => $config->{location},
-            connected => 0,
-            error => undef,
-            available_models => [],
-            installed_models => [],
-            show_details => $can_select_model  # Whether to show technical details
-        };
-        
-        # Try to connect to each server and get model information
-        my $ollama = $c->model('Ollama');
-        my $orig_timeout;
-        try {
-            if ($ollama) {
-                # Configure for this specific server
-                $ollama->host($config->{host});
-                $ollama->port($config->{port});
-                $ollama->clear_endpoint;  # Force rebuild of endpoint URL
-                
-                # Set a short timeout for connection check and listing to prevent blocking
-                $orig_timeout = $ollama->timeout;
-                $ollama->timeout(3);
-                
-                # Test connection first
-                if ($ollama->check_connection()) {
-                    $server_info->{connected} = 1;
-                    
-                    # Get installed models
-                    my $installed = $ollama->list_models();
-                    if ($installed && ref($installed) eq 'ARRAY') {
-                        $server_info->{installed_models} = $installed;
-                        
-                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                            'models', "Retrieved " . scalar(@$installed) . " installed models from $config->{host}:$config->{port}");
-                    } else {
-                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                            'models', "Failed to get installed models from $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
-                    }
-                    
-                    # Get available models (static catalog), then exclude already-installed ones
-                    my $available = $ollama->list_available_models();
-                    if ($available && ref($available) eq 'ARRAY') {
-                        # Build a set of installed base names (strip tag) for fast lookup
-                        my %installed_names;
-                        for my $m (@{ $server_info->{installed_models} || [] }) {
-                            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
-                            $n =~ s/:.*$//;   # strip tag (e.g. "llama3.1:latest" → "llama3.1")
-                            $installed_names{$n} = 1;
-                            $installed_names{$m->{name} || $m} = 1 if ref($m);  # also full name
-                        }
-                        my @not_installed = grep {
-                            my $aname = ref($_) ? ($_->{name} || '') : ($_ || '');
-                            (my $abase = $aname) =~ s/:.*$//;
-                            !$installed_names{$aname} && !$installed_names{$abase};
-                        } @$available;
-                        $server_info->{available_models} = \@not_installed;
 
-                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                            'models', "Catalog: " . scalar(@$available) . " total, "
-                                . scalar(@not_installed) . " not yet installed");
-                    }
-                } else {
-                    $server_info->{error} = "Connection test failed: " . ($ollama->last_error || 'unknown error');
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                        'models', "Connection test failed for $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
-                }
-                
-                # Restore original timeout
-                $ollama->timeout($orig_timeout) if defined $orig_timeout;
-            } else {
-                $server_info->{error} = "Failed to load Ollama model";
-            }
-        } catch {
-            if ($ollama && defined $orig_timeout) {
-                $ollama->timeout($orig_timeout);
-            }
-            $server_info->{error} = "Connection failed: $_";
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                'models', "Failed to connect to server $config->{host}:$config->{port}: $_");
-        };
-        
-        push @$servers, $server_info;
-    }
-    
-    # Fetch user's API keys
-    my @user_api_keys;
-    try {
-        my $schema = $c->model('DBEncy')->schema;
-        my $user_id = $c->session->{user_id};
-        
-        if ($user_id) {
-            my $keys_rs = $schema->resultset('UserApiKeys')->search(
-                { user_id => $user_id, is_active => '1' },
-                { order_by => { -asc => 'service' } }
-            );
-            
-            foreach my $key ($keys_rs->all) {
-                push @user_api_keys, {
-                    id => $key->id,
-                    service => $key->service,
-                    created_at => $key->created_at->strftime('%Y-%m-%d'),
-                    has_key => $key->api_key_encrypted ? 1 : 0
-                };
-            }
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'models', "Found " . scalar(@user_api_keys) . " API keys for user $username");
-        }
-    } catch {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'models', "Failed to fetch user API keys: $_");
-    };
-    
-    # Set template variables
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'models', "User accessing AI models interface");
+
     $c->stash(
         template => 'ai/models.tt',
-        page_title => 'AI Models',
-        username => $username,
-        servers => $servers,
+        page_title => 'AI Model Management',
+        servers => [],
+        installed_models => [],
+        available_models => [],
         can_select_model => $can_select_model,
-        servers_json => encode_json($servers || []),
-        user_api_keys => \@user_api_keys
+        error_msg => 'Ollama model listing is temporarily disabled to prevent hangs. Models can be managed via the main /ai page for now.',
     );
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'models', "AI models interface loaded for user: $username (can_select: " . ($can_select_model ? 'yes' : 'no') . ") with " . scalar(@$servers) . " servers configured");
 }
-
-=head2 pull_model
-
-Pull (download) a model from Ollama library on a specific server.
-
-=cut
 
 sub pull_model :Local :Args(0) {
     my ($self, $c) = @_;
