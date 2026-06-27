@@ -92,51 +92,8 @@ sub index :Path :Args(0) {
         }
     }
 
-    # Check if user has external API keys configured (grok, openai, etc.)
-    my @external_models;
-    my $user_id = $c->session->{user_id};
-    if ($user_id) {
-        try {
-            my $schema = $c->model('DBEncy')->schema;
-            my $grok_key;
-            if ($can_select_model) {
-                $grok_key = $schema->resultset('UserApiKeys')->search(
-                    { user_id => $user_id, service => 'grok', is_active => '1' }
-                )->first;
-                unless ($grok_key) {
-                    $grok_key = $schema->resultset('UserApiKeys')->search(
-                        { service => 'grok', is_active => '1' }
-                    )->first;
-                }
-            } else {
-                $grok_key = $schema->resultset('UserApiKeys')->search(
-                    { user_id => $user_id, service => 'grok', is_active => '1' }
-                )->first;
-            }
-            if ($grok_key && $grok_key->api_key_encrypted) {
-                my $meta = $grok_key->get_metadata() || {};
-                my $synced = $meta->{available_models};
-                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
-                    foreach my $m (@$synced) {
-                        my $id = $m->{id} || $m->{name} || '';
-                        next unless $id;
-                        next if $id =~ /^(grok-imagine|grok-.*video)/i;
-                        (my $label = $id) =~ s/-/ /g;
-                        $label = ucfirst($label) . ' (xAI)';
-                        push @external_models, { name => $id, provider => 'grok', label => $label };
-                    }
-                } else {
-                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
-                }
-            }
-        } catch {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                'index', "Failed to fetch user API keys: $_");
-        };
-    }
+    # External models now come from the model layer (safe, cached, no hangs)
+    my @external_models = $c->model('AI')->get_external_models($c);
 
     my $popup_mode = $c->request->param('popup') ? 1 : 0;
 

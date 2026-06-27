@@ -407,6 +407,12 @@ sub models {
     return $self->router->models($c, %opts);
 }
 
+# Thin delegation for external (Grok/xAI etc.) models used in index page
+sub get_external_models {
+    my ($self, $c) = @_;
+    return $self->model_manager->get_external_models($c);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
