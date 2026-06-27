@@ -86,26 +86,7 @@ sub _log_usage {
         "Used provider: $provider");
 }
 
-sub get_models {
-    my ($self, $c, %opts) = @_;
 
-    my $can_select_model = $opts{can_select_model} || 0;
-
-    # Local Ollama models (expand this list as needed)
-    my $local_models = [
-        { name => 'llama3.2', label => 'Llama 3.2 (Local Ollama)' },
-        { name => 'llama3',   label => 'Llama 3 (Local Ollama)' },
-        { name => 'gemma2',   label => 'Gemma 2 (Local Ollama)' },
-        { name => 'phi3',     label => 'Phi 3 (Local Ollama)' },
-    ];
-
-    return {
-        local         => $local_models,
-        host          => 'localhost',
-        port          => 11434,
-        current_model => 'llama3.2',
-    };
-}
 # Provider registry with cost/speed/privacy metadata
 sub get_provider_registry {
     my $self = shift;
@@ -162,6 +143,18 @@ sub get_models {
         registry      => $registry,
     };
 }
+sub get_model_management_data {
+    my ($self, $c) = @_;
+
+    my $ollama = $c->model('Ollama');
+    my $installed = $ollama->list_models() || [];
+
+    return {
+        installed_models => $installed,
+        servers => [{ host => 'localhost', port => 11434 }],
+    };
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
