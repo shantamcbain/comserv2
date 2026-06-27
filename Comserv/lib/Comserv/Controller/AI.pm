@@ -32,18 +32,7 @@ use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller' }
 
-=head1 NAME
 
-Comserv::AI - Catalyst Controller for AI/Ollama interactions
-
-=head1 DESCRIPTION
-
-This controller provides web interfaces for interacting with Ollama LLM models.
-It supports both interactive web forms and JSON API endpoints.
-
-=head1 ATTRIBUTES
-
-=cut
 
 has 'logging' => (
     is => 'ro',
@@ -52,130 +41,183 @@ has 'logging' => (
     documentation => 'Logging instance for standardized logging'
 );
 
-=head1 METHODS
 
-=head2 index
 
-Main AI interface page with interactive query form.
-
-=cut
-
-sub index :Path :Args(0) {
+sub conversations :Local :Args(0) {
     my ($self, $c) = @_;
-    
+
     # Determine if user is authenticated or guest
     my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
     my $guest_session_id = $c->session->{guest_session_id};
-    
-    # If not logged in, create guest session for accessing the UI
-    unless ($username) {
+    my $is_guest = 0;
+
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
+
         unless ($guest_session_id) {
             use Data::UUID;
             my $ug = Data::UUID->new;
             $guest_session_id = $ug->create_str();
             $c->session->{guest_session_id} = $guest_session_id;
         }
+
+        $user_id = 199;
         $username = "Guest-" . substr($guest_session_id, 0, 8);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-            'index', "Guest user accessing AI interface: $username");
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'conversations', "Guest user accessing conversations: $username");
     }
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-        'index', "User accessing AI interface");
-    
-    # Determine user permissions for model/server selection
+
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
-        # If roles is a string, convert it to array
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
-    my $can_select_model = 0;
-    if (ref($user_roles) eq 'ARRAY') {
-        $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
-    }
-    
-    # Get or set the current Ollama configuration
-    my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
+    my $is_admin = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^admin$/i } @$user_roles : 0;
 
-    # Fetch external models via the Model facade (delegation)
-    my $all_models = $c->model('AI')->get_available_models($c, can_select_model => $can_select_model);
-    my @external_models = grep { $_->{external} } @$all_models;
+    my $view_all = (!$is_guest && $is_admin && ($c->req->params->{view_all} || $c->req->params->{view} eq 'all')) ? 1 : 0;
 
-    # Debug log
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "Models loaded: " . scalar(@$installed_models) . " Ollama + " . scalar(@external_models) . " external");
-    # popup=1 means the /ai page was opened as a detached popup from the widget.
-    # In that mode, suppress the site navigation / header / footer so the window
-    # is a clean standalone chat interface.
-    my $popup_mode = $c->request->param('popup') ? 1 : 0;
+    my $page_title = $view_all ? 'All Conversations (Admin)' : 'My Conversations';
 
-    # task_id=N: opened from a todo "Chat about this task" link.
-    # Look up the todo and pass it to the template so the welcome screen can
-    # show what the user is supposed to be working on.
-    my $task_id  = $c->request->param('task_id') || '';
-    my $task_todo = undef;
-    if ($task_id && $task_id =~ /^\d+$/) {
-        eval {
-            my $schema = $c->model('DBEncy')->schema;
-            if ($schema) {
-                my $t = $schema->resultset('Todo')->find($task_id);
-                if ($t) {
-                    my $s = $t->status // 0;
-                    my $status_label = $s == 1 ? 'New'
-                                     : $s == 2 ? 'In Progress'
-                                     : $s == 3 ? 'Done'
-                                     : "status=$s";
-                    # Resolve project name
-                    my $proj_name = '';
-                    eval {
-                        if ($t->project_id) {
-                            my $p = $schema->resultset('Project')->find($t->project_id);
-                            $proj_name = $p->name if $p;
-                        }
-                    };
-                    $task_todo = {
-                        record_id   => $t->record_id,
-                        subject     => $t->subject     // 'Untitled',
-                        description => $t->description // '',
-                        status      => $status_label,
-                        priority    => $t->priority    // '',
-                        due_date    => $t->due_date    // '',
-                        project     => $proj_name,
-                        edit_url    => "/todo/edit?record_id=" . $t->record_id,
-                    };
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'conversations', "Fetching conversations for user: $username (view_all=$view_all, is_admin=$is_admin)");
+
+    my @conversations;
+    my $total_conversations = 0;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+
+        my $search_criteria = $view_all ? {} : { user_id => $user_id };
+
+        my $count_rs = $schema->resultset('AiConversation')->search($search_criteria);
+        $total_conversations = $count_rs->count;
+
+        my $conv_rs = $schema->resultset('AiConversation')->search(
+            $search_criteria,
+            { order_by => { -desc => 'created_at' } }
+        );
+
+        my @conv_rows = $conv_rs->all;
+
+        foreach my $conv (@conv_rows) {
+            my $skip = 0;
+            try {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                    'conversations', "Processing conversation ID=" . $conv->id);
+
+                if ($is_guest) {
+                    my $conv_metadata = {};
+                    if ($conv->metadata) {
+                        try {
+                            $conv_metadata = decode_json($conv->metadata);
+                        } catch {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                'conversations', "Failed to parse metadata for ID=" . $conv->id);
+                        };
+                    }
+
+                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                        $skip = 1;
                     }
                 }
-            }
 
-            }
+                return if $skip;   # Safe skip instead of 'next' inside try
+
+                # Process messages and build data (rest of your original code)
+                my @messages = $conv->ai_messages->all;
+                my $message_count = scalar(@messages);
+
+                my $preview = '';
+                if (@messages > 0) {
+                    my $user_msg = '';
+                    my $ai_msg = '';
+                    foreach my $msg (@messages) {
+                        if ($msg->role eq 'user' && !$user_msg) {
+                            $user_msg = $msg->content;
+                        }
+                        if ($msg->role eq 'assistant' && !$ai_msg) {
+                            $ai_msg = $msg->content;
+                        }
+                        last if $user_msg && $ai_msg;
+                    }
+
+                    if ($user_msg) {
+                        $preview = "Q: " . substr($user_msg, 0, 60);
+                        $preview .= '...' if length($user_msg) > 60;
+                        if ($ai_msg) {
+                            $preview .= " | A: " . substr($ai_msg, 0, 40);
+                            $preview .= '...' if length($ai_msg) > 40;
+                        }
+                    } else {
+                        my $latest_message = $conv->get_latest_message;
+                        $preview = $latest_message ? substr($latest_message->content, 0, 100) : '';
+                    }
+                }
+
+                my $display_username = 'Unknown';
+                if ($conv->user) {
+                    $display_username = $conv->user->username;
+                }
+
+                my @message_data = map {
+                    {
+                        id => $_->id,
+                        conversation_id => $_->conversation_id,
+                        user_id => $_->user_id,
+                        role => $_->role,
+                        content => $_->content,
+                        created_at => $_->created_at,
+                        agent_type => $_->agent_type || 'chat',
+                        model_used => $_->model_used || '',
+                        ip_address => $_->ip_address || '',
+                        user_role => $_->user_role || '',
+                        metadata => $_->metadata || '{}'
+                    }
+                } @messages;
+
+                my $conv_data = {
+                    id => $conv->id,
+                    user_id => $conv->user_id,
+                    username => $display_username,
+                    title => $conv->get_display_title,
+                    created_at => $conv->created_at,
+                    updated_at => $conv->updated_at,
+                    message_count => $message_count,
+                    status => $conv->status,
+                    preview => $preview,
+                    messages => \@message_data
+                };
+
+                push @conversations, $conv_data;
+
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'conversations', "Error processing conversation ID=" . ($conv->id // 'unknown') . ": $_");
+            };
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'conversations', "Retrieved $total_conversations conversations. Final array size: " . scalar(@conversations));
+
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'conversations', "Failed to fetch conversations: $error");
+    };
+
     $c->stash(
-        template => 'ai/index.tt',
-        page_title => 'AI Assistant',
+        template => 'ai/conversations.tt',
+        page_title => $page_title,
+        conversations => \@conversations,
+        total_conversations => $total_conversations,
         username => $username,
-        can_select_model => $can_select_model,
-        current_host => $current_host,
-        current_port => $current_port,
-        current_model => $current_model,
-        installed_models => $installed_models,
-        external_models => \@external_models,
-        ai_popup_mode => $popup_mode,
-        task_todo => $task_todo,
-        ai_quota_warning => $c->stash->{ai_quota_warning},
+        is_admin => $is_admin,
+        view_all => $view_all,
+        is_guest => $is_guest
     );
-
-    # Debug log for model dropdown (Ollama + external)
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "Models loaded: " . scalar(@$installed_models) . " Ollama + " . scalar(@external_models) . " external");
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
-
-=head2 template_editor
-
-Admin-only page for reviewing and applying AI-proposed TT2 template edits.
-
-=cut
 
 sub template_editor :Local :Args(0) {
     my ($self, $c) = @_;
@@ -6351,123 +6393,98 @@ sub server_status : Local {
     $c->response->body($response);
 }
 
-=head2 conversations
 
-Display all saved conversations for the current user with optional filters.
-
-=cut
 
 sub conversations :Local :Args(0) {
     my ($self, $c) = @_;
-    
+
     # Determine if user is authenticated or guest
     my $username = $c->session->{username};
     my $user_id = $c->session->{user_id};
     my $guest_session_id = $c->session->{guest_session_id};
     my $is_guest = 0;
-    
+
     # If not logged in, create guest session
     if (!$username) {
         $is_guest = 1;
-        
-        # Create a unique guest session ID if not already present
+
         unless ($guest_session_id) {
             use Data::UUID;
             my $ug = Data::UUID->new;
             $guest_session_id = $ug->create_str();
             $c->session->{guest_session_id} = $guest_session_id;
         }
-        
-        # Use guest user (ID 199)
+
         $user_id = 199;
         $username = "Guest-" . substr($guest_session_id, 0, 8);
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'conversations', "Guest user accessing conversations: $username");
     }
-    
+
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
     my $is_admin = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^admin$/i } @$user_roles : 0;
-    
-    # Guests cannot view all conversations
+
     my $view_all = (!$is_guest && $is_admin && ($c->req->params->{view_all} || $c->req->params->{view} eq 'all')) ? 1 : 0;
-    
+
     my $page_title = $view_all ? 'All Conversations (Admin)' : 'My Conversations';
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
         'conversations', "Fetching conversations for user: $username (view_all=$view_all, is_admin=$is_admin)");
-    
+
     my @conversations;
     my $total_conversations = 0;
-    
+
     try {
         my $schema = $c->model('DBEncy')->schema;
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'conversations', "DEBUG: user_id=$user_id, view_all=$view_all, is_admin=$is_admin");
-        
+
         my $search_criteria = $view_all ? {} : { user_id => $user_id };
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'conversations', "DEBUG: Search criteria: " . ($view_all ? "no filter (all conversations)" : "user_id=$user_id"));
-        
+
         my $count_rs = $schema->resultset('AiConversation')->search($search_criteria);
         $total_conversations = $count_rs->count;
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'conversations', "DEBUG: Query returned count=$total_conversations, about to iterate");
-        
+
         my $conv_rs = $schema->resultset('AiConversation')->search(
             $search_criteria,
-            { 
-                order_by => { -desc => 'created_at' }
-            }
+            { order_by => { -desc => 'created_at' } }
         );
-        
+
         my @conv_rows = $conv_rs->all;
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'conversations', "DEBUG: Got all rows, count = " . scalar(@conv_rows));
-        
+
         foreach my $conv (@conv_rows) {
+            my $skip = 0;
             try {
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'conversations', "Processing conversation ID=" . $conv->id);
-                
-                # For guests, only show conversations that belong to this guest session
+
                 if ($is_guest) {
                     my $conv_metadata = {};
                     if ($conv->metadata) {
                         try {
                             $conv_metadata = decode_json($conv->metadata);
                         } catch {
-                            # Metadata parsing failed, skip this conversation
-                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                                'conversations', "Failed to parse conversation metadata for ID=" . $conv->id);
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                'conversations', "Failed to parse metadata for ID=" . $conv->id);
                         };
                     }
-                    
-                    # Check if this conversation belongs to this guest session
+
                     unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
-                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                            'conversations', "Skipping conversation ID=" . $conv->id . " - not owned by this guest session");
-                        next;
+                        $skip = 1;
                     }
                 }
-                
+
+                return if $skip;   # Safe skip instead of 'next' inside try
+
+                # Process messages and build data (rest of your original code)
                 my @messages = $conv->ai_messages->all;
                 my $message_count = scalar(@messages);
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    'conversations', "  - Found $message_count messages");
-                
+
                 my $preview = '';
                 if (@messages > 0) {
                     my $user_msg = '';
                     my $ai_msg = '';
-                    
                     foreach my $msg (@messages) {
                         if ($msg->role eq 'user' && !$user_msg) {
                             $user_msg = $msg->content;
@@ -6477,50 +6494,45 @@ sub conversations :Local :Args(0) {
                         }
                         last if $user_msg && $ai_msg;
                     }
-                    
+
                     if ($user_msg) {
                         $preview = "Q: " . substr($user_msg, 0, 60);
-                        if (length($user_msg) > 60) {
-                            $preview .= '...';
-                        }
+                        $preview .= '...' if length($user_msg) > 60;
                         if ($ai_msg) {
                             $preview .= " | A: " . substr($ai_msg, 0, 40);
-                            if (length($ai_msg) > 40) {
-                                $preview .= '...';
-                            }
+                            $preview .= '...' if length($ai_msg) > 40;
                         }
                     } else {
                         my $latest_message = $conv->get_latest_message;
                         $preview = $latest_message ? substr($latest_message->content, 0, 100) : '';
                     }
                 }
-                
-                my $username = 'Unknown';
+
+                my $display_username = 'Unknown';
                 if ($conv->user) {
-                    $username = $conv->user->username;
+                    $display_username = $conv->user->username;
                 }
-                
-                my @message_data;
-                foreach my $msg (@messages) {
-                    push @message_data, {
-                        id => $msg->id,
-                        conversation_id => $msg->conversation_id,
-                        user_id => $msg->user_id,
-                        role => $msg->role,
-                        content => $msg->content,
-                        created_at => $msg->created_at,
-                        agent_type => $msg->agent_type || 'chat',
-                        model_used => $msg->model_used || '',
-                        ip_address => $msg->ip_address || '',
-                        user_role => $msg->user_role || '',
-                        metadata => $msg->metadata || '{}'
-                    };
-                }
-                
+
+                my @message_data = map {
+                    {
+                        id => $_->id,
+                        conversation_id => $_->conversation_id,
+                        user_id => $_->user_id,
+                        role => $_->role,
+                        content => $_->content,
+                        created_at => $_->created_at,
+                        agent_type => $_->agent_type || 'chat',
+                        model_used => $_->model_used || '',
+                        ip_address => $_->ip_address || '',
+                        user_role => $_->user_role || '',
+                        metadata => $_->metadata || '{}'
+                    }
+                } @messages;
+
                 my $conv_data = {
                     id => $conv->id,
                     user_id => $conv->user_id,
-                    username => $username,
+                    username => $display_username,
                     title => $conv->get_display_title,
                     created_at => $conv->created_at,
                     updated_at => $conv->updated_at,
@@ -6529,43 +6541,24 @@ sub conversations :Local :Args(0) {
                     preview => $preview,
                     messages => \@message_data
                 };
-                
+
                 push @conversations, $conv_data;
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    'conversations', "  - Pushed to array. Total now: " . scalar(@conversations));
+
             } catch {
-                my $error = $_;
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                    'conversations', "Error processing conversation: $error");
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'conversations', "Error processing conversation ID=" . ($conv->id // 'unknown') . ": $_");
             };
         }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-            'conversations', "Retrieved $total_conversations conversations. Array size: " . scalar(@conversations));
-        
-        if (scalar(@conversations) == 0 && $total_conversations > 0) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                'conversations', "WARNING: Count says $total_conversations conversations but array is empty!");
-        }
-        
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'conversations', "Retrieved $total_conversations conversations. Final array size: " . scalar(@conversations));
+
     } catch {
         my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             'conversations', "Failed to fetch conversations: $error");
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'conversations', "Stack trace: " . $error);
     };
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'conversations', "FINAL: Stashing conversations. Count=$total_conversations, Array size=" . scalar(@conversations));
-    
-    foreach my $idx (0 .. $#conversations) {
-        my $conv = $conversations[$idx];
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'conversations', "  [$idx] ID=" . $conv->{id} . ", Title=" . $conv->{title} . ", Messages=" . $conv->{message_count});
-    }
-    
+
     $c->stash(
         template => 'ai/conversations.tt',
         page_title => $page_title,
@@ -6578,11 +6571,7 @@ sub conversations :Local :Args(0) {
     );
 }
 
-=head2 conversation
 
-Display a single conversation by ID.
-
-=cut
 
 sub conversation :Local :Args(1) {
     my ($self, $c, $conv_id) = @_;
@@ -6695,11 +6684,7 @@ sub conversation :Local :Args(1) {
     );
 }
 
-=head2 conversation_delete
 
-Delete a conversation by ID.
-
-=cut
 
 sub conversation_delete :Path('conversation') :Args(2) {
     my ($self, $c, $conv_id, $action) = @_;
