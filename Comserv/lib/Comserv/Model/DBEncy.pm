@@ -179,15 +179,8 @@ sub COMPONENT {
     my $instance = $self->next::method($app, $args);
 
     if ($db_type eq 'sqlite') {
-        eval {
-            $instance->schema->deploy({ add_drop_tables => 0 });
-            $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
-                "DBEncy SQLite fallback: schema deployed successfully.");
-        };
-        if ($@) {
-            $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
-                "DBEncy SQLite fallback: schema deploy encountered errors (tables may already exist): $@");
-        }
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy SQLite: Skipping auto-deploy (tables should pre-exist).");
     }
 
     return $instance;
@@ -312,43 +305,23 @@ sub create_table_from_result {
     my $result = $sth->fetch;
 
     # Check if the table exists
-    if (!$result) {
-        # The table does not exist, create it
-        # table_name may carry '/' subdir separators; convert to '::' for a valid Perl class path
-        (my $result_path = $table_name) =~ s{/}{::}g;
-        my $result_class = "Comserv::Model::Schema::Ency::Result::$result_path";
-        eval "require $result_class";
-        if ($@) {
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not load $result_class: $@. Table name: $table_name");
-            return;
-        }
-
-        # Get the columns from the result class
-        my $columns_info = $result_class->columns_info;
-        my %columns = %$columns_info if ref $columns_info eq 'HASH';
-
-        # Log the table properties before the table creation process starts
-        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table properties for $table_name: " . Dumper($columns_info));
-
-        # Define the structure of the table
-        my $source = $schema->source($table_name);
-        $source->add_columns(%columns);
-        $source->set_primary_key($result_class->primary_columns);
-
-        # Deploy the table
-        my $deploy_result = $schema->deploy({ sources => [$table_name] });
-
-        if ($deploy_result) {
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name deployed successfully.");
-            return 1;  # Return 1 to indicate that the table creation was successful
-        } else {
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Failed to deploy table $table_name.");
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Deployment details: " . Dumper($deploy_result) . ". Table name: $table_name");
-            return 0;  # Return 0 to indicate that the table creation failed but didn't raise an exception
-        }
-    } else {
+    if ($result) {
         $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name already exists.");
-        return 1;  # Return 1 to indicate that the table already exists
+        return 1;
     }
+
+    # Table does not exist → log warning, do NOT deploy
+    $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": WARNING: Table $table_name does not exist. Skipping auto-creation (tables must pre-exist).");
+
+    # Any future schema operations must be wrapped in eval
+    eval {
+        # Example placeholder for future safe schema work (currently disabled)
+        # $schema->deploy(...) would go here, but is intentionally skipped
+    };
+    if ($@) {
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Non-fatal schema error for $table_name: $@");
+    }
+
+    return 0;   # Indicate table was not created (but no exception raised)
 }
 1;

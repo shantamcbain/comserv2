@@ -145,21 +145,33 @@ sub get_table_columns {
 sub initialize_schema {
     my ($self, $config) = @_;
 
-    # Fixed DSN format for MySQL - most common format
     my $data_source_name = "DBI:mysql:database=$config->{database};host=$config->{host};port=$config->{port}";
 
-    my $database_handle = DBI->connect($data_source_name, $config->{username}, $config->{password},
-        { RaiseError => 1, AutoCommit => 1 });
+    my $database_handle;
+    eval {
+        $database_handle = DBI->connect($data_source_name, $config->{username}, $config->{password},
+            { RaiseError => 0, AutoCommit => 1, PrintError => 0 });
+    };
+    return unless $database_handle;
 
-    # Load appropriate schema file based on database type
     my $schema_file = $self->get_schema_file($config->{db_type});
+    return unless -f $schema_file;
 
-    # Execute schema creation
-    my @statements = split /;/, read_file($schema_file);
+    my $sql_content;
+    eval { $sql_content = read_file($schema_file); };
+    return unless $sql_content;
 
+    my @statements = split /;/, $sql_content;
     for my $statement (@statements) {
+        $statement =~ s/^\s+|\s+$//g;
         next unless $statement =~ /\S/;
-        $database_handle->do($statement) or die $database_handle->errstr;
+        eval {
+            $database_handle->do($statement);
+        };
+        if ($@ && $@ !~ /already exists|Duplicate/i) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'initialize_schema',
+                "Non-fatal error in initialize_schema: $@");
+        }
     }
 }
 
@@ -229,47 +241,41 @@ sub create_table_from_sql {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_sql', 
         "Starting table creation from SQL file: $sql_file_path for database: $database");
     
-    # Get database configuration
     my $db_config;
     if ($database eq 'ENCY') {
         $db_config = $self->db_config->{shanta_ency};
     } elsif ($database eq 'FORAGER') {
         $db_config = $self->db_config->{shanta_forager};
     } else {
-        die "Unknown database: $database";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_sql', "Unknown database: $database");
+        return { executed_count => 0, total_statements => 0, results => [] };
     }
     
-    # Connect to database
     my $dsn = "DBI:mysql:database=$db_config->{database};host=$db_config->{host};port=$db_config->{port}";
-    my $dbh = DBI->connect($dsn, $db_config->{username}, $db_config->{password}, {
-        RaiseError => 1,
-        AutoCommit => 1,
-        mysql_enable_utf8 => 1
-    }) or die "Cannot connect to database: $DBI::errstr";
-    
-    # Read SQL file
-    my $sql_content;
+    my $dbh;
     eval {
-        $sql_content = read_file($sql_file_path);
+        $dbh = DBI->connect($dsn, $db_config->{username}, $db_config->{password}, {
+            RaiseError => 0, AutoCommit => 1, PrintError => 0, mysql_enable_utf8 => 1
+        });
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_sql', 
-            "Failed to read SQL file: $@");
-        die "Failed to read SQL file: $@";
+    return { executed_count => 0, total_statements => 0, results => [] } unless $dbh;
+    
+    my $sql_content;
+    eval { $sql_content = read_file($sql_file_path); };
+    if ($@ || !$sql_content) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_sql', "Failed to read SQL file");
+        $dbh->disconnect();
+        return { executed_count => 0, total_statements => 0, results => [] };
     }
     
-    # Split and execute SQL statements
     my @statements = split /;/, $sql_content;
     my $executed_count = 0;
     my @results;
     
     foreach my $statement (@statements) {
-        $statement =~ s/^\s+|\s+$//g; # Trim whitespace
-        next unless $statement; # Skip empty statements
-        next if $statement =~ /^--/; # Skip comments
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_table_from_sql', 
-            "Executing SQL: " . substr($statement, 0, 100) . "...");
+        $statement =~ s/^\s+|\s+$//g;
+        next unless $statement;
+        next if $statement =~ /^--/;
         
         eval {
             $dbh->do($statement);
@@ -277,23 +283,20 @@ sub create_table_from_sql {
             push @results, { status => 'success', statement => substr($statement, 0, 100) . '...' };
         };
         if ($@) {
-            my $error = $@;
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_table_from_sql', 
-                "Warning executing statement: $error");
-            push @results, { status => 'warning', statement => substr($statement, 0, 100) . '...', error => $error };
+            my $err = $@;
+            if ($err =~ /already exists|Duplicate/i) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_table_from_sql',
+                    "Table/statement already exists – skipping: " . substr($statement, 0, 80));
+                push @results, { status => 'skipped', statement => substr($statement, 0, 100) . '...', reason => 'already exists' };
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_table_from_sql', "Non-fatal error: $err");
+                push @results, { status => 'warning', statement => substr($statement, 0, 100) . '...', error => $err };
+            }
         }
     }
     
     $dbh->disconnect();
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_sql', 
-        "Completed table creation. Executed $executed_count statements");
-    
-    return {
-        executed_count => $executed_count,
-        total_statements => scalar(@statements),
-        results => \@results
-    };
+    return { executed_count => $executed_count, total_statements => scalar(@statements), results => \@results };
 }
 
 # Create page table specifically
@@ -376,97 +379,77 @@ sub table_exists {
 sub create_table_from_fields {
     my ($self, $table_name, $fields, $schema_model, $dbh) = @_;
     
-    my $result = {
-        success => 0,
-        error => ''
-    };
+    my $result = { success => 0, error => '' };
     
-    try {
-        my $should_disconnect = 0;
-        
-        # Use provided dbh or create a new connection
-        unless ($dbh) {
-            # Get database configuration
-            my $db_config;
-            if ($schema_model eq 'DBEncy') {
-                $db_config = $self->db_config->{shanta_ency};
-            } elsif ($schema_model eq 'DBForager') {
-                $db_config = $self->db_config->{shanta_forager};
-            } else {
-                $result->{error} = "Unknown schema model: $schema_model";
-                return $result;
-            }
-            
-            # Connect to database
-            my $dsn = "DBI:mysql:database=$db_config->{database};host=$db_config->{host};port=$db_config->{port}";
+    # Always check if table already exists first
+    if ($self->table_exists(undef, ($schema_model eq 'DBEncy' ? 'ENCY' : 'FORAGER'), $table_name)) {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'create_table_from_fields',
+            "Table $table_name already exists – skipping creation");
+        $result->{success} = 1;
+        $result->{message} = "Table $table_name already exists";
+        return $result;
+    }
+    
+    my $should_disconnect = 0;
+    unless ($dbh) {
+        my $db_config;
+        if ($schema_model eq 'DBEncy')      { $db_config = $self->db_config->{shanta_ency}; }
+        elsif ($schema_model eq 'DBForager') { $db_config = $self->db_config->{shanta_forager}; }
+        else { $result->{error} = "Unknown schema model: $schema_model"; return $result; }
+
+        my $dsn = "DBI:mysql:database=$db_config->{database};host=$db_config->{host};port=$db_config->{port}";
+        eval {
             $dbh = DBI->connect($dsn, $db_config->{username}, $db_config->{password}, {
-                RaiseError => 1,
-                AutoCommit => 1,
-                mysql_enable_utf8 => 1
-            }) or die "Cannot connect to database: $DBI::errstr";
-            
-            $should_disconnect = 1;
+                RaiseError => 0, AutoCommit => 1, PrintError => 0, mysql_enable_utf8 => 1
+            });
+        };
+        return $result unless $dbh;
+        $should_disconnect = 1;
+    }
+
+    # Prefer IF NOT EXISTS
+    my $sql = "CREATE TABLE IF NOT EXISTS `$table_name` (\n";
+    my @field_definitions = ();
+    my @primary_keys = ();
+
+    foreach my $field (@$fields) {
+        my $field_def = "`$field->{name}` ";
+        my $mysql_type = $self->convert_dbic_to_mysql_type($field->{type});
+        $field_def .= $mysql_type;
+        if ($field->{size}) { $field_def .= "($field->{size})"; }
+        unless ($field->{nullable}) { $field_def .= " NOT NULL"; }
+        if (defined $field->{default}) { $field_def .= " DEFAULT '$field->{default}'"; }
+        if ($field->{is_auto_increment}) {
+            $field_def .= " AUTO_INCREMENT";
+            push @primary_keys, $field->{name};
         }
-        
-        # Build CREATE TABLE statement
-        my $sql = "CREATE TABLE `$table_name` (\n";
-        my @field_definitions = ();
-        my @primary_keys = ();
-        
-        foreach my $field (@$fields) {
-            my $field_def = "`$field->{name}` ";
-            
-            # Convert DBIx::Class types to MySQL types
-            my $mysql_type = $self->convert_dbic_to_mysql_type($field->{type});
-            $field_def .= $mysql_type;
-            
-            # Add size if specified
-            if ($field->{size}) {
-                $field_def .= "($field->{size})";
-            }
-            
-            # Add NOT NULL if specified
-            unless ($field->{nullable}) {
-                $field_def .= " NOT NULL";
-            }
-            
-            # Add default value if specified
-            if (defined $field->{default}) {
-                $field_def .= " DEFAULT '$field->{default}'";
-            }
-            
-            # Add auto_increment if specified
-            if ($field->{is_auto_increment}) {
-                $field_def .= " AUTO_INCREMENT";
-                push @primary_keys, $field->{name};
-            }
-            
-            push @field_definitions, $field_def;
-        }
-        
-        $sql .= join(",\n", @field_definitions);
-        
-        # Add primary key constraint if we have primary keys
-        if (@primary_keys) {
-            $sql .= ",\nPRIMARY KEY (`" . join('`, `', @primary_keys) . "`)";
-        }
-        
-        $sql .= "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        
-        # Execute the CREATE TABLE statement
+        push @field_definitions, $field_def;
+    }
+
+    $sql .= join(",\n", @field_definitions);
+    if (@primary_keys) {
+        $sql .= ",\nPRIMARY KEY (`" . join('`, `', @primary_keys) . "`)";
+    }
+    $sql .= "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+    eval {
         $dbh->do($sql);
-        
-        if ($should_disconnect) {
-            $dbh->disconnect();
-        }
-        
         $result->{success} = 1;
         $result->{message} = "Table $table_name created successfully";
-        
-    } catch {
-        $result->{error} = "Failed to create table: $_";
     };
-    
+    if ($@) {
+        if ($@ =~ /already exists|Duplicate/i) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'create_table_from_fields',
+                "Table $table_name already exists (caught in do()): skipping");
+            $result->{success} = 1;
+            $result->{message} = "Table already existed";
+        } else {
+            $result->{error} = "Failed to create table: $@";
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'create_table_from_fields', $result->{error});
+        }
+    }
+
+    $dbh->disconnect() if $should_disconnect;
     return $result;
 }
 
@@ -749,35 +732,24 @@ sub extract_table_name_from_result_file {
 # Create AI Chat tables from Result classes if they don't exist
 # Called from startup behavior to auto-create missing tables
 # $dbh parameter is the database handle from DBEncy schema
+#
+# NEW MENU DISABLED: Explicitly skip 'menu_items' / 'MenuItem' to force legacy Menu/CustomMenu
 sub create_ai_chat_tables_from_results {
     my ($self, $c, $dbh) = @_;
     
-    my $result = {
-        created => [],
-        skipped => [],
-        errors => [],
-        success => 1
-    };
+    my $result = { created => [], skipped => [], errors => [], success => 1 };
     
-    # Find the app root directory
     my $app_root;
     my $bin_dir = $FindBin::Bin;
     if ($bin_dir =~ /\/script$/) {
         $app_root = dirname($bin_dir);
     } else {
-        if (-f "$bin_dir/Comserv/db_config.json") {
-            $app_root = "$bin_dir/Comserv";
-        } elsif (-f "$bin_dir/db_config.json") {
-            $app_root = $bin_dir;
-        } elsif (-f dirname($bin_dir) . "/Comserv/db_config.json") {
-            $app_root = dirname($bin_dir) . "/Comserv";
-        } else {
-            $app_root = dirname($bin_dir) . "/Comserv";
-        }
+        if (-f "$bin_dir/Comserv/db_config.json") { $app_root = "$bin_dir/Comserv"; }
+        elsif (-f "$bin_dir/db_config.json")      { $app_root = $bin_dir; }
+        elsif (-f dirname($bin_dir)."/Comserv/db_config.json") { $app_root = dirname($bin_dir)."/Comserv"; }
+        else { $app_root = dirname($bin_dir)."/Comserv"; }
     }
     
-    # Map of Result file paths for AI Chat tables (with absolute paths)
-    # NOTE: AiConversation must come before AiMessage (parent/child relationship)
     my @result_files = (
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm",
@@ -791,49 +763,43 @@ sub create_ai_chat_tables_from_results {
     );
     
     unless ($dbh) {
-        push @{$result->{errors}}, "No database handle provided for table creation";
+        push @{$result->{errors}}, "No database handle provided";
         $result->{success} = 0;
         return $result;
     }
     
-    # Check each Result file and create table if missing
     foreach my $result_file (@result_files) {
         my $table_name = $self->extract_table_name_from_result_file($result_file);
-        
-        # Check if table exists
-        my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
-        $sth->execute($table_name);
-        my $exists = $sth->fetchrow_arrayref();
-        
-        if ($exists) {
+
+        # NEW MENU DISABLED: Force legacy Menu/CustomMenu – never auto-create menu_items
+        if ($table_name =~ /^menu_items?$/i || $table_name =~ /^MenuItem$/i) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'create_ai_chat_tables_from_results',
+                "Skipping new menu_items table (legacy menu forced)");
             push @{$result->{skipped}}, $table_name;
             next;
         }
-        
-        # Parse fields from Result file
-        my $fields = $self->parse_result_file_fields($result_file);
-        
-        if (!@$fields) {
-            push @{$result->{errors}}, "No fields found in Result file: $result_file";
-            $result->{success} = 0;
+
+        # Check existence first
+        my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
+        $sth->execute($table_name);
+        if ($sth->fetchrow_arrayref()) {
+            push @{$result->{skipped}}, $table_name;
             next;
         }
-        
-        # Create the table, passing the existing dbh
+
+        my $fields = $self->parse_result_file_fields($result_file);
+        if (!@$fields) {
+            push @{$result->{errors}}, "No fields in $result_file";
+            next;
+        }
+
         my $create_result = $self->create_table_from_fields($table_name, $fields, 'DBEncy', $dbh);
-        
         if ($create_result->{success}) {
             push @{$result->{created}}, $table_name;
-            if ($c) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_ai_chat_tables_from_results',
-                    "Created table '$table_name' from Result class");
-            }
         } else {
-            push @{$result->{errors}}, "Failed to create table '$table_name': $create_result->{error}";
-            $result->{success} = 0;
+            push @{$result->{errors}}, "Failed $table_name: $create_result->{error}";
         }
     }
-    
     return $result;
 }
 
