@@ -3621,10 +3621,15 @@ sub models :Path('models') :Args(0) {
 
     my $api_keys = $c->model('AI')->get_api_keys($c);
 
+    my $has_grok_key = grep { $_->{provider} eq 'grok' } @$models_data;
+
     $c->stash(
-        models       => $models_data,
-        api_keys     => $api_keys,
-        can_select_model => $can_select_model,
+        models_data        => $models_data,
+        models             => $models_data,   # legacy alias
+        api_keys           => $api_keys,
+        can_select_model   => $can_select_model,
+        has_api_key        => $has_grok_key,
+        api_keys_configured => scalar(@$api_keys),
     );
 }
 
