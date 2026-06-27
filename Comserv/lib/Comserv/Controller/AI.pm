@@ -241,7 +241,11 @@ sub index :Path :Args(0) {
         task_todo => $task_todo,
         ai_quota_warning => $c->stash->{ai_quota_warning},
     );
-    
+
+    # Debug log for model dropdown (Ollama + external)
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Models loaded: " . scalar(@$installed_models) . " Ollama + " . scalar(@external_models) . " external");
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
