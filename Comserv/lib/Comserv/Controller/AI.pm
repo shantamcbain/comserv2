@@ -6860,10 +6860,12 @@ Returns JSON with the synced model list.
 
 sub sync_models :Local :Args(0) {
     my ($self, $c) = @_;
-    $c->response->content_type('application/json');
 
     my $result = $c->model('AI')->router->sync_models($c);
-    $c->response->body(encode_json($result));
+
+    $c->stash->{current_view} = 'JSON';
+    $c->stash->{json} = $result;
+    $c->forward( $c->view('JSON') );
 }
 
 
