@@ -97,92 +97,13 @@ sub index :Path :Args(0) {
     # Get or set the current Ollama configuration
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
 
-    # Filter installed Ollama models by membership-allowed models for non-privileged users
-    unless ($can_select_model) {
-        my $user_id = $c->session->{user_id};
-        my $site_id = $c->session->{SiteID};
-        if ($user_id && $site_id && $installed_models && @$installed_models) {
-            eval {
-                my $allowed = $c->model('Membership')->get_allowed_ai_models($c, $user_id, $site_id);
-                if ($allowed && @$allowed) {
-                    my %allowed_set = map { $_ => 1 } @$allowed;
-                    my @filtered = grep {
-                        my $name = ref($_) ? ($_->{name} || '') : ($_ || '');
-                        $allowed_set{$name};
-                    } @$installed_models;
-                    $installed_models = \@filtered if @filtered;
-                }
-            };
-            if (my $err = $@) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                    'index', "Could not filter AI models by membership: $err");
-            }
-        }
-    }
+    # Fetch external models via the Model facade (delegation)
+    my $all_models = $c->model('AI')->get_available_models($c, can_select_model => $can_select_model);
+    my @external_models = grep { $_->{external} } @$all_models;
 
-    # Wire quota check for harmony with plans (early, non-blocking for now to avoid surprising users)
-    # Shows a hint if the user is approaching or over their plan's free daily local AI calls.
-    if (!$can_select_model && $c->session->{user_id} && $c->session->{SiteID}) {
-        eval {
-            my $m = $c->model('Membership');
-            my ($within, $used, $quota) = $m->is_ai_call_within_free_quota($c, $c->session->{SiteID}, 'ollama', $c->session->{user_id});
-            if ($quota > 0 && !$within) {
-                $c->stash->{ai_quota_warning} = "Your plan's free daily AI allowance ($quota local calls) has been reached. Additional local calls and all Grok/xAI usage are tracked for billing / overage.";
-            } elsif ($quota > 0 && $used > ($quota * 0.8)) {
-                $c->stash->{ai_quota_warning} = "Approaching your plan's free daily AI limit ($used / $quota).";
-            }
-        };
-    }
-
-    # Check if user has external API keys configured (grok, openai, etc.)
-    # Admins can use any active key, other users only their own key
-    my @external_models;
-    my $user_id = $c->session->{user_id};
-    if ($user_id) {
-        try {
-            my $schema = $c->model('DBEncy')->schema;
-            my $grok_key;
-            if ($can_select_model) {
-                # Admins: use their own key first, fall back to any active key
-                $grok_key = $schema->resultset('UserApiKeys')->search(
-                    { user_id => $user_id, service => 'grok', is_active => '1' }
-                )->first;
-                unless ($grok_key) {
-                    $grok_key = $schema->resultset('UserApiKeys')->search(
-                        { service => 'grok', is_active => '1' }
-                    )->first;
-                }
-            } else {
-                $grok_key = $schema->resultset('UserApiKeys')->search(
-                    { user_id => $user_id, service => 'grok', is_active => '1' }
-                )->first;
-            }
-            if ($grok_key && $grok_key->api_key_encrypted) {
-                # Use synced models from metadata if available, else hardcoded fallback
-                my $meta = $grok_key->get_metadata() || {};
-                my $synced = $meta->{available_models};
-                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
-                    foreach my $m (@$synced) {
-                        my $id = $m->{id} || $m->{name} || '';
-                        next unless $id;
-                        next if $id =~ /^(grok-imagine|grok-.*video)/i;  # skip image/video models
-                        (my $label = $id) =~ s/-/ /g;
-                        $label = ucfirst($label) . ' (xAI)';
-                        push @external_models, { name => $id, provider => 'grok', label => $label };
-                    }
-                } else {
-                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
-                }
-            }
-        } catch {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                'index', "Failed to fetch user API keys: $_");
-        };
-    }
-
+    # Debug log
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Models loaded: " . scalar(@$installed_models) . " Ollama + " . scalar(@external_models) . " external");
     # popup=1 means the /ai page was opened as a detached popup from the widget.
     # In that mode, suppress the site navigation / header / footer so the window
     # is a clean standalone chat interface.
