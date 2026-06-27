@@ -2602,16 +2602,7 @@ sub result :Local :Args(0) {
     );
 }
 
-=head2 chat
 
-Chat endpoint for conversational AI with history support. Delegates to Ollama model's chat method.
-
-Parameters:
-- prompt (required): User's message
-- model (optional): Specific model to use
-- history (optional): Conversation history array
-
-=cut
 
 sub chat :Local :Args(0) {
     my ($self, $c) = @_;
@@ -3673,11 +3664,7 @@ sub chat :Local :Args(0) {
     $c->response->body($json_response);
 }
 
-=head2 models
 
-Ollama model management interface showing available and installed models across configured servers.
-
-=cut
 
 sub models :Local :Args(0) {
     my ($self, $c) = @_;
@@ -6347,11 +6334,7 @@ sub _select_model_for_context {
     return 'llama3.1:latest';
 }
 
-=head2 _get_current_ollama_config
 
-Private method to determine current Ollama configuration with automatic fallback.
-
-=cut
 
 sub _get_current_ollama_config {
     my ($self, $c, $can_select_model) = @_;
