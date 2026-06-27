@@ -310,13 +310,73 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
-    # Placeholder: in a real implementation you would fork a background job here.
-    # For now we just log the request and return success so the JS polling can proceed.
     my $trigger = $c->req->body_params->{trigger_source} || 'manual';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy',
-        "docker_deploy_to_production triggered (source=$trigger)");
+    my $log_file = '/tmp/comserv_deploy.log';
+    my $pid_file = '/tmp/comserv_deploy.pid';
 
-    $c->response->body(encode_json({ success => 1, message => 'Deploy started (placeholder)' }));
+    # Clean previous run
+    unlink $log_file;
+    unlink $pid_file;
+
+    # Fork background worker
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ success => 0, message => 'fork failed' }));
+        return;
+    }
+
+    if ($pid == 0) {
+        # CHILD: perform the actual deploy
+        open(my $log, '>>', $log_file) or exit 1;
+        select((select($log), $|=1)[0]);  # autoflush
+
+        my $start = time();
+        print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger) ===\n";
+
+        # 1. Auto-commit any uncommitted changes
+        print $log "[".scalar(localtime)."] Step 1: Checking for uncommitted changes...\n";
+        my $git_status = `cd /home/shanta/PycharmProjects/comserv2/Comserv && git status --porcelain 2>&1`;
+        if ($git_status =~ /\S/) {
+            print $log "[".scalar(localtime)."] Uncommitted changes found – auto-committing...\n";
+            system('cd /home/shanta/PycharmProjects/comserv2/Comserv && git add -A && git commit -m "auto-deploy: ' . localtime() . '" 2>&1 >> ' . $log_file);
+            print $log "[".scalar(localtime)."] Commit done.\n";
+        } else {
+            print $log "[".scalar(localtime)."] Working tree clean.\n";
+        }
+
+        # 2. Push
+        print $log "[".scalar(localtime)."] Step 2: git push origin main...\n";
+        my $push_out = `cd /home/shanta/PycharmProjects/comserv2/Comserv && git push origin main 2>&1`;
+        print $log $push_out;
+
+        # 3. Build
+        print $log "[".scalar(localtime)."] Step 3: Building Docker image...\n";
+        my $build_out = `cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml build web-prod 2>&1`;
+        print $log $build_out;
+
+        # 4. Push to registry (if configured)
+        print $log "[".scalar(localtime)."] Step 4: Pushing image to registry (if Hub deploy)...\n";
+        # Placeholder: add docker push commands here when registry is set up
+
+        # 5. Restart containers
+        print $log "[".scalar(localtime)."] Step 5: Restarting production containers...\n";
+        my $restart_out = `cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml up -d web-prod 2>&1`;
+        print $log $restart_out;
+
+        my $elapsed = time() - $start;
+        print $log "[".scalar(localtime)."] === DEPLOY COMPLETE in ${elapsed}s ===\n";
+
+        close($log);
+        unlink($pid_file);
+        exit 0;
+    }
+
+    # PARENT: write PID and return immediately
+    open(my $pf, '>', $pid_file); print $pf $pid; close($pf);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy',
+        "Background deploy started (pid=$pid, trigger=$trigger)");
+
+    $c->response->body(encode_json({ success => 1, message => 'Background deploy started' }));
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
