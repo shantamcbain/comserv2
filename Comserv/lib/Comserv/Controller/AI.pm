@@ -41,7 +41,138 @@ has 'logging' => (
     documentation => 'Logging instance for standardized logging'
 );
 
+sub index :Path :Args(0) {
+    my ($self, $c) = @_;
 
+    # Determine if user is authenticated or guest
+    my $username = $c->session->{username};
+    my $guest_session_id = $c->session->{guest_session_id};
+
+    unless ($username) {
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'index', "Guest user accessing AI interface: $username");
+    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'index', "User accessing AI interface");
+
+    # Determine user permissions
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_select_model = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+    }
+
+    # === FIXED: Use Model facade for model listing ===
+    my $model_data = $c->model('AI')->get_available_models($c,
+        can_select_model => $can_select_model
+    );
+
+    my $installed_models = $model_data->{local} || $model_data->{installed} || [];
+    my $current_host     = $model_data->{host} || 'localhost';
+    my $current_port     = $model_data->{port} || 11434;
+    my $current_model    = $model_data->{current_model} || 'llama3';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        sprintf("Models loaded: %d local Ollama", scalar(@$installed_models)));
+
+    # Filter installed Ollama models by membership-allowed models for non-privileged users
+    unless ($can_select_model) {
+        my $user_id = $c->session->{user_id};
+        my $site_id = $c->session->{SiteID};
+        if ($user_id && $site_id && $installed_models && @$installed_models) {
+            eval {
+                my $allowed = $c->model('Membership')->get_allowed_ai_models($c, $user_id, $site_id);
+                if ($allowed && @$allowed) {
+                    my %allowed_set = map { $_ => 1 } @$allowed;
+                    my @filtered = grep {
+                        my $name = ref($_) ? ($_->{name} || '') : ($_ || '');
+                        $allowed_set{$name};
+                    } @$installed_models;
+                    $installed_models = \@filtered if @filtered;
+                }
+            };
+            if (my $err = $@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'index', "Could not filter AI models by membership: $err");
+            }
+        }
+    }
+
+    # Check if user has external API keys configured (grok, openai, etc.)
+    my @external_models;
+    my $user_id = $c->session->{user_id};
+    if ($user_id) {
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $grok_key;
+            if ($can_select_model) {
+                $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+                unless ($grok_key) {
+                    $grok_key = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                }
+            } else {
+                $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+            }
+            if ($grok_key && $grok_key->api_key_encrypted) {
+                my $meta = $grok_key->get_metadata() || {};
+                my $synced = $meta->{available_models};
+                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
+                    foreach my $m (@$synced) {
+                        my $id = $m->{id} || $m->{name} || '';
+                        next unless $id;
+                        next if $id =~ /^(grok-imagine|grok-.*video)/i;
+                        (my $label = $id) =~ s/-/ /g;
+                        $label = ucfirst($label) . ' (xAI)';
+                        push @external_models, { name => $id, provider => 'grok', label => $label };
+                    }
+                } else {
+                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                }
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'index', "Failed to fetch user API keys: $_");
+        };
+    }
+
+    my $popup_mode = $c->request->param('popup') ? 1 : 0;
+
+    $c->stash(
+        template => 'ai/index.tt',
+        page_title => 'AI Assistant',
+        username => $username,
+        can_select_model => $can_select_model,
+        current_host => $current_host,
+        current_port => $current_port,
+        current_model => $current_model,
+        installed_models => $installed_models,
+        external_models => \@external_models,
+        ai_popup_mode => $popup_mode,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'index', "AI interface loaded for user: $username (local models: " . scalar(@$installed_models) . ", external: " . scalar(@external_models) . ")");
+}
 
 sub conversations :Local :Args(0) {
     my ($self, $c) = @_;
@@ -233,15 +364,7 @@ sub template_editor :Local :Args(0) {
     );
 }
 
-=head2 widget
 
-Renders a self-contained, layout-free popup window for the chat widget.
-Opened by the "expand to separate window" button so users can move the
-chat to a second monitor without the page being obscured.  No site
-navigation, header, or footer is included — the response is a complete
-minimal HTML document.
-
-=cut
 
 sub widget :Local :Args(0) {
     my ($self, $c) = @_;
@@ -287,12 +410,7 @@ sub widget :Local :Args(0) {
     $c->detach;
 }
 
-=head2 editing_widget
 
-Shanta / CSC admin code editor with integrated AI chat (Cursor-like workspace).
-Development machines only.  Renders layout-free HTML (same pattern as widget).
-
-=cut
 
 sub editing_widget :Local :Args(0) {
     my ($self, $c) = @_;
@@ -331,11 +449,6 @@ sub editing_widget :Local :Args(0) {
     $c->response->redirect($dest);
 }
 
-=head2 editing_widget_popup
-
-Detached popup window — no site layout, no floating chat widget. Same as /ai/widget for chat.
-
-=cut
 
 sub editing_widget_popup :Local :Args(0) {
     my ($self, $c) = @_;
@@ -368,11 +481,7 @@ sub editing_widget_popup :Local :Args(0) {
     $c->detach;
 }
 
-=head2 editor_config
 
-JSON config for the floating code editor (enabled flag, grok CLI path).
-
-=cut
 
 sub editor_config :Local :Args(0) {
     my ($self, $c) = @_;
@@ -420,12 +529,7 @@ sub editor_config :Local :Args(0) {
     }));
 }
 
-=head2 grok_cli
 
-Run the local `grok` CLI (same auth as Cursor/Grok Build), not Comserv's xAI API layer.
-POST JSON: { prompt, cwd (optional) }
-
-=cut
 
 sub grok_cli :Local :Args(0) {
     my ($self, $c) = @_;
