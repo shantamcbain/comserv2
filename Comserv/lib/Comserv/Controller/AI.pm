@@ -3609,12 +3609,19 @@ sub chat :Local :Args(0) {
 sub models :Path('models') :Args(0) {
     my ($self, $c) = @_;
 
+    # Normalize roles the same way as in index()
     my $user_roles = $c->session->{roles} || [];
-    my $can_select_model = ref($user_roles)
-        ? (grep { /^(admin|developer)$/i } @$user_roles) : 0;
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+
+    my $can_manage = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_manage = grep { $_ =~ /^(admin|developer)$/i } @$user_roles;
+    }
 
     my $models_data = $c->model('AI')->get_available_models($c,
-        can_select_model => $can_select_model,
+        can_select_model => $can_manage,
         include_local    => 1,
         include_external => 1,
     );
@@ -3623,12 +3630,16 @@ sub models :Path('models') :Args(0) {
 
     my $has_grok_key = grep { $_->{provider} eq 'grok' } @$models_data;
 
+    # Add external / Grok models via ModelManager or direct
+    my $external = $c->model('AI')->get_external_models($c) || [];
+
     $c->stash(
         models_data        => $models_data,
         models             => $models_data,   # legacy alias
+        external_models    => $external,
         api_keys           => $api_keys,
-        can_select_model   => $can_select_model,
-        has_api_key        => $has_grok_key,
+        can_select_model   => $can_manage,
+        has_api_key        => scalar(@$external) > 0,
         api_keys_configured => scalar(@$api_keys),
     );
 }
