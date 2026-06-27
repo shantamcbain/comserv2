@@ -31,7 +31,7 @@ sub begin :Private {
     # 1. Server must NOT be production1 (widget only on safe servers like workstation)
     # 2. Username must be 'Shanta'
     # 3. Must be CSC admin
-    if ($action =~ /list|containers|restart|stop|start|up|down|logs|deploy_form|docker/) {
+    if ($action =~ /^(list|restart|stop|start|up|down|logs|deploy_form|docker)$/ || $action =~ /containers_(working|old|legacy)$/) {
         unless ($self->_can_access_docker_widget($c)) {
             $c->stash->{error_msg} = "Docker container management widget is restricted. " .
                 "Available only to admins/developers on non-production1 servers.";
@@ -72,9 +72,11 @@ sub _can_access_docker_widget {
     my $username    = $c->session->{username} || '';
     my $roles       = $c->session->{roles} || [];
 
+    # Safe servers: workstation, production2, and any non-production1 environment
+    # Also treat 'unknown' as safe (common on development laptops)
     my $on_safe_server = $server_role ne 'production1';
 
-    # Allow any admin or developer on a safe server (workstation / production2)
+    # Allow any admin or developer on a safe server
     my $is_admin_or_dev = $c->stash->{is_admin} ||
                           (grep { lc($_) =~ /admin|developer/ } @$roles) ||
                           ($username eq 'Shanta');   # legacy hard-coded user
@@ -106,7 +108,7 @@ sub _csc_admin_check {
 
 sub deploy_form :Path('/admin/docker/deploy_form') :Args(0) {
     my ($self, $c) = @_;
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->response->status(403);
         $c->response->body('<html><body><p>CSC admin only</p></body></html>');
         return;
@@ -120,7 +122,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
 
     $c->response->content_type('application/json; charset=utf-8');
 
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, message => 'CSC admin only' }));
         return;
@@ -238,7 +240,7 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
 
     $c->response->content_type('application/json; charset=utf-8');
 
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, message => 'CSC admin only' }));
         return;
@@ -297,7 +299,7 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
 
     $c->response->content_type('application/json; charset=utf-8');
 
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, message => 'CSC admin only' }));
         return;
@@ -373,31 +375,40 @@ sub list :Path('/admin/docker/list') :Args(0) {
     
     my $host = $c->req->param('host') || 'workstation';
     
-    # === LOCAL WORKSTATION ===
+    # === LOCAL WORKSTATION / LOCALHOST ===
     if ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1') {
-        my $result = $c->model('Docker')->list_containers();
-        $result->{host} = 'workstation';
-        $c->stash->{json} = $result;
+        my $output = `docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo ''`;
+
+        my @containers;
+        foreach my $line (split /\n/, $output) {
+            next unless $line =~ /\|/; 
+            my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
+
+            push @containers, {
+                id     => $id,
+                name   => $name,
+                image  => $image,
+                status => $status,
+                state  => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
+                ports  => $ports || '',
+            };
+        }
+
+        $c->stash->{json} = { success => 1, containers => \@containers, host => $host };
         $c->forward('View::JSON');
         return;
     }
     
-    # === REMOTE PRODUCTION HOSTS ===
+    # === REMOTE PRODUCTION HOSTS (simple command, same as localhost) ===
     my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
     my $ssh_user = 'ubuntu';
     
-    # Reuse the same credential system the rest of the app uses
-    # Call the method on the main Admin controller
     my $admin_ctrl = $c->controller('Admin');
     my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
     $ssh_pass ||= $ENV{SSHPASS} || '';
     
     unless ($ssh_pass) {
-        $c->stash->{json} = {
-            success => 0,
-            error   => "No SSH password found for $host (add it to ~/.comserv/secrets/ssh_credentials.json)",
-            host    => $host
-        };
+        $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
         $c->forward('View::JSON');
         return;
     }
@@ -405,52 +416,22 @@ sub list :Path('/admin/docker/list') :Args(0) {
     local $ENV{SSHPASS} = $ssh_pass;
     my $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
     
-    my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.Labels}}' 2>/dev/null || echo ''\"";
+    # Exact same simple command used for localhost (no sudo, no extra fields)
+    my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo ''\"";
     my $output = `$cmd 2>/dev/null` || '';
     
     my @containers;
     foreach my $line (split /\n/, $output) {
-        next unless $line =~ /\|/;
-        my ($id, $name, $image, $status, $ports, $labels) = split /\|/, $line, 6;
-    
-        # Parse labels for build metadata
-        my %label_map;
-        foreach my $pair (split /,/, $labels // '') {
-            if ($pair =~ /^([^=]+)=(.*)$/) {
-                $label_map{$1} = $2;
-            }
-        }
-    
-        my $build_info = '';
-        if ($label_map{'org.opencontainers.image.created'} || $label_map{'com.comserv.build.date'}) {
-            my $date = $label_map{'org.opencontainers.image.created'} || $label_map{'com.comserv.build.date'};
-            my $commit = $label_map{'org.opencontainers.image.revision'} || $label_map{'com.comserv.build.commit'} || '';
-            my $branch = $label_map{'com.comserv.build.branch'} || '';
-            my $built_on = $label_map{'com.comserv.build.host'} || '';
-            $build_info = "Build: $date | Commit: $commit | Branch: $branch | Built On: $built_on";
-        }
-    
-        # Get detailed inspect data (restart count, health history, exit code)
-        my $inspect_cmd = "$ssh_prefix \"docker inspect --format '{{.RestartCount}}|{{.State.StartedAt}}|{{.State.FinishedAt}}|{{.State.ExitCode}}|{{.State.Error}}' $name 2>/dev/null || echo '0||||'\"";
-        my $inspect_out = `$inspect_cmd 2>/dev/null` || '0||||';
-        chomp $inspect_out;
-        my ($restart_count, $started_at, $finished_at, $exit_code, $error_msg) = split /\|/, $inspect_out, 5;
-        $restart_count ||= 0;
-    
+        next unless $line =~ /\|/; 
+        my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
+
         push @containers, {
-            id => $id,
-            name => $name,
-            image => $image,
+            id     => $id,
+            name   => $name,
+            image  => $image,
             status => $status,
-            state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
-            ports => $ports || '',
-            compose_file => 'remote',
-            build_info => $build_info,
-            restart_count => int($restart_count),
-            started_at => $started_at,
-            finished_at => $finished_at,
-            exit_code => $exit_code,
-            error_msg => $error_msg,
+            state  => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
+            ports  => $ports || '',
         };
     }
     
@@ -675,7 +656,7 @@ sub logs :Path('/admin/docker/logs') :Args(1) {
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
@@ -693,7 +674,7 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
 sub docker_containers_working :Path('/admin/docker-containers-working') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
@@ -711,7 +692,7 @@ sub docker_containers_working :Path('/admin/docker-containers-working') :Args(0)
 sub docker_containers_old :Path('/admin/docker-containers-old') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
@@ -729,7 +710,7 @@ sub docker_containers_old :Path('/admin/docker-containers-old') :Args(0) {
 sub docker_containers_legacy :Path('/admin/docker-containers-legacy') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($self->_csc_admin_check($c)) {
+    unless ($self->_can_access_docker_widget($c)) {
         $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;

@@ -6726,10 +6726,6 @@ sub generate_result_file_content {
     return $content;
 }
 
-=head2 Docker Container Management Routes
-
-=cut
-
 sub _docker_env {
     my $home = $ENV{HOME} || '/home/shanta';
     my @candidates = (
@@ -7942,16 +7938,7 @@ sub pages :Path('/admin/pages') :Args(0) {
     );
 }
 
-=head1 AUTHOR
 
-Shanta McBain
-
-=head1 LICENSE
-
-This library is free software. You can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
 
 use Comserv::Util::DevServerControl;
 use Comserv::Util::BranchServerControl;
