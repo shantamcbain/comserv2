@@ -18,11 +18,6 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance },
 );
 
-=head1 NAME
-
-Comserv::Model::AI::Router - Central router for AI requests
-
-=cut
 
 sub route_request {
     my ($self, $c, %args) = @_;
@@ -91,6 +86,26 @@ sub _log_usage {
         "Used provider: $provider");
 }
 
+sub get_models {
+    my ($self, $c, %opts) = @_;
+
+    my $can_select_model = $opts{can_select_model} || 0;
+
+    # Local Ollama models (expand this list as needed)
+    my $local_models = [
+        { name => 'llama3.2', label => 'Llama 3.2 (Local Ollama)' },
+        { name => 'llama3',   label => 'Llama 3 (Local Ollama)' },
+        { name => 'gemma2',   label => 'Gemma 2 (Local Ollama)' },
+        { name => 'phi3',     label => 'Phi 3 (Local Ollama)' },
+    ];
+
+    return {
+        local         => $local_models,
+        host          => 'localhost',
+        port          => 11434,
+        current_model => 'llama3.2',
+    };
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

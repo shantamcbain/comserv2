@@ -951,16 +951,7 @@ sub _find_grok_binary {
     return undef;
 }
 
-=head2 generate
 
-API endpoint for AI query processing. Returns JSON responses.
-
-Parameters:
-- prompt (required): User's question or prompt
-- format (optional): Response format ('json' or default text)  
-- system (optional): System prompt to set AI behavior
-
-=cut
 
 sub generate :Local :Args(0) {
     my ($self, $c) = @_;
@@ -2387,22 +2378,13 @@ sub generate :Local :Args(0) {
     $c->response->body($json_response);
 }
 
-=head2 query_form
-
-Alternative form-based query interface.
-
-=cut
 
 sub query_form :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->redirect($c->uri_for('/ai'), 301);
 }
 
-=head2 result
 
-Form submission handler that displays results in template.
-
-=cut
 
 sub result :Local :Args(0) {
     my ($self, $c) = @_;
@@ -11712,19 +11694,7 @@ sub usage :Local :Args(0) {
     );
 }
 
-=head2 grok_balance
 
-Returns live (or best-effort) usage/balance info from the xAI API for the
-configured Grok key (prefers the current user's key from UserApiKeys if present).
-
-Also includes a summary of our internal tracking from ai_usage_logs for Grok calls
-(tokens, estimated cost, recent activity).
-
-This lets operators see exactly where they stand with xAI credits and trigger
-refill alerts or usage caution.
-
-Frontend can call this from /ai/usage or a dedicated button.
-=cut
 
 sub grok_balance :Local :Args(0) {
     my ($self, $c) = @_;
@@ -11943,11 +11913,7 @@ sub grok_balance :Local :Args(0) {
     
 }
 
-=head2 _estimate_ai_cost_usd
 
-Rough cost estimator for paid providers. Returns 0 for local (ollama).
-Prices are approximate and for monitoring/billing estimates only; update as provider pricing changes.
-=cut
 
 sub _estimate_ai_cost_usd {
     my ($self, $provider, $model, $prompt_tokens, $completion_tokens) = @_;
