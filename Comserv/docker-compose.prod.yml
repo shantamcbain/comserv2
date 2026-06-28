@@ -1,4 +1,34 @@
 services:
+  config-db:
+    image: mariadb:10.11
+    container_name: comserv2-config-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-changeme}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-comserv}
+      MARIADB_USER: ${MARIADB_USER:-comserv}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
+    volumes:
+      - comserv2_config_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: comserv2-redis
+    restart: unless-stopped
+    volumes:
+      - comserv2_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   web-prod:
     build:
       context: .
@@ -29,13 +59,17 @@ services:
       - "5000:5000"
     volumes:
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - /home/shanta/comserv-logs:/opt/comserv/root/log
-      - /home/shanta/comserv-workshop:/data/nfs:rw
-      - /home/shanta/comserv-sessions:/tmp/comserv/session:rw
-      - comserv_cache:/cache
-      - comserv_cache:/tmp/comserv/cache
-      - comserv-temp:/tmp/comserv/temp
-      - comserv-themes:/opt/comserv/root/themes
+      # New named volumes
+      - comserv2_logs:/opt/comserv/root/log
+      - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_sessions:/tmp/comserv/session:rw
+      - comserv2_cache:/cache
+      - comserv2_cache:/tmp/comserv/cache
+      - comserv2_temp:/tmp/comserv/temp
+      - comserv2_themes:/opt/comserv/root/themes
+      - comserv2_whisper_venv:/opt/comserv/whisper_venv
+      - comserv2_cpan_cache:/root/.cpan
+      # Legacy bind mounts (keep or migrate)
       - /root/static:/opt/comserv/root/static
       - /root/LegacyStaticPages:/opt/comserv/root/LegacyStaticPages
     healthcheck:
@@ -51,9 +85,16 @@ services:
         max-file: "5"
 
 volumes:
-  comserv_cache:
-    driver: local
-  comserv-temp:
-    driver: local
-  comserv-themes:
-    driver: local
+  # Core persistent data
+  comserv2_config_db_data:     # MariaDB / MySQL
+  comserv2_redis_data:
+  comserv2_logs:               # Application logs
+  comserv2_sessions:
+  comserv2_workshop_files:     # NFS-backed or local for uploads/workshops
+  comserv2_whisper_venv:       # Shared across envs
+  comserv2_cpan_cache:         # Perl dependencies
+
+  # Optional / dev-only
+  comserv2_temp:
+  comserv2_themes:
+  comserv2_cache:

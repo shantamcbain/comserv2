@@ -1,0 +1,95 @@
+# NFS override for production - mounts core data volumes over NFS
+# Usage: docker compose -f docker-compose.prod.yml -f docker-compose.prod.nfs.yml up -d
+
+services:
+  config-db:
+    volumes:
+      - comserv2_config_db_data:/var/lib/mysql
+
+  redis:
+    volumes:
+      - comserv2_redis_data:/data
+
+  web-prod:
+    volumes:
+      # Core data volumes over NFS
+      - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_logs:/opt/comserv/root/log:rw
+      - comserv2_sessions:/tmp/comserv/session:rw
+      - comserv2_whisper_venv:/opt/comserv/whisper_venv:rw
+      - comserv2_cpan_cache:/root/.cpan:rw
+      - comserv2_cache:/cache:rw
+      - comserv2_temp:/tmp/comserv/temp:rw
+      - comserv2_themes:/opt/comserv/root/themes:rw
+
+volumes:
+  comserv2_config_db_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/config_db_data"
+
+  comserv2_redis_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/redis_data"
+
+  comserv2_logs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/logs"
+
+  comserv2_sessions:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/sessions"
+
+  comserv2_workshop_files:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/workshop_files"
+
+  comserv2_whisper_venv:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/whisper_venv"
+
+  comserv2_cpan_cache:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/cpan_cache"
+
+  # Optional / dev-only (can stay local or also be NFS)
+  comserv2_temp:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/temp"
+
+  comserv2_themes:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/themes"
+
+  comserv2_cache:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/mnt/data/comserv2/cache"
