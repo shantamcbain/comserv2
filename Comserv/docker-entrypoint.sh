@@ -15,9 +15,9 @@ if [ "$ENVIRONMENT" = "production" ] || [ "$ENVIRONMENT" = "staging" ]; then
     echo "→ Starting with Starman (production-grade server)"
 
     # Ensure cache directories are writable
-    mkdir -p /cache/tt /cache/session /tmp/comserv/cache
-    chown -R comserv:comserv /cache /tmp/comserv 2>/dev/null || true
-    chmod -R 755 /cache /tmp/comserv 2>/dev/null || true
+    mkdir -p /cache/tt /cache/session /tmp/comserv/cache /opt/comserv/root/themes /tmp/comserv/temp
+    chown -R comserv:comserv /cache /tmp/comserv /opt/comserv/root/themes /tmp/comserv/temp 2>/dev/null || true
+    chmod -R 755 /cache /tmp/comserv /opt/comserv/root/themes /tmp/comserv/temp 2>/dev/null || true
 
     # Use the canonical production PSGI (has Static middleware for menu CSS/JS)
     PSGI_FILE="script/comserv_server.psgi"

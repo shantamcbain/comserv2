@@ -67,6 +67,12 @@ volumes:
     driver: local
   comserv-staging-backups:
     driver: local
+  comserv-themes:
+    driver: local
+  comserv-temp:
+    driver: local
+  comserv-cache:
+    driver: local
 
 networks:
   comserv-staging-network:
