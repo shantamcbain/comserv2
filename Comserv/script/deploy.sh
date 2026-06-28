@@ -747,6 +747,33 @@ export COMSERV_LOGS_DIR
 export NFS_DATA_DIR
 export WORKSHOP_LOCAL_DIR
 
+# ── Volume Normalization (run once before first standardized deploy) ───────
+# Ensures production uses only comserv2_* named volumes.
+# Run this block manually on a fresh production server or when migrating.
+normalize_volumes() {
+    echo "=== Volume Normalization ==="
+    echo "Checking for legacy comserv_* volumes to migrate..."
+
+    # Legacy volumes that may exist from old deployments
+    LEGACY_VOLUMES="comserv_cache comserv-temp comserv-themes comserv-logs comserv-sessions comserv-workshop comserv-whisper comserv-cpan"
+
+    for VOL in $LEGACY_VOLUMES; do
+        if docker volume inspect "$VOL" >/dev/null 2>&1; then
+            echo "  Found legacy volume: $VOL"
+            # Example migration (uncomment and adjust paths as needed):
+            # docker run --rm -v $VOL:/old -v comserv2_$(echo $VOL | sed 's/comserv_//'):/new alpine cp -a /old/. /new/
+            # docker volume rm "$VOL"
+            echo "  (Migration command ready - review before running)"
+        fi
+    done
+
+    echo "Standardized comserv2_* volumes will be created automatically by docker compose."
+    echo "=== Volume Normalization Complete ==="
+}
+
+# Call normalization on every deploy (safe - only logs, does not delete)
+normalize_volumes
+
 # ── Disk space report ────────────────────────────────────────────────────────
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk before: $DISK_BEFORE"
