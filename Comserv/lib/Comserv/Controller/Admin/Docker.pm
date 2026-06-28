@@ -645,11 +645,63 @@ sub list :Path('/admin/docker/list') :Args(0) {
 
     my @all_entries = (@containers, @backups);
 
+    # === Persistent Data Volumes (cache, backup, temp, workshop) ===
+    my @volumes = ();
+    my $vol_cmd = ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1')
+        ? 'docker volume ls --format "{{.Name}}" 2>/dev/null'
+        : qq{$ssh_prefix "docker volume ls --format '{{.Name}}' 2>/dev/null"};
+
+    my $vol_out = `\$vol_cmd` || '';
+    foreach my $vname (split /\n/, $vol_out) {
+        next unless $vname =~ /comserv/i;
+        my $inspect_cmd = ($host eq 'workstation' || $host eq 'localhost')
+            ? "docker volume inspect \$vname 2>/dev/null"
+            : qq{$ssh_prefix "docker volume inspect \$vname 2>/dev/null"};
+        my $inspect_json = `\$inspect_cmd` || '[]';
+        my $vdata;
+        eval { $vdata = decode_json($inspect_json); };
+        next if $@ || ref($vdata) ne 'ARRAY' || !@$vdata;
+        my $vi = $vdata->[0];
+
+        my $created = $vi->{CreatedAt} || '';
+        my $mountpoint = $vi->{Mountpoint} || '';
+        my $driver = $vi->{Driver} || 'local';
+
+        # Try to get size (best effort)
+        my $size = 'unknown';
+        if ($mountpoint) {
+            my $size_cmd = ($host eq 'workstation')
+                ? "du -sh \$mountpoint 2>/dev/null | cut -f1"
+                : qq{$ssh_prefix "du -sh \$mountpoint 2>/dev/null | cut -f1"};
+            $size = `\$size_cmd` || 'unknown';
+            chomp $size;
+        }
+
+        my $is_cache = $vname =~ /cache/i;
+        my $is_backup = $vname =~ /backup/i;
+        my $is_temp = $vname =~ /temp/i;
+        my $is_workshop = $vname =~ /workshop/i;
+
+        push @volumes, {
+            name => $vname,
+            driver => $driver,
+            created => $created,
+            mountpoint => $mountpoint,
+            size => $size,
+            is_cache => $is_cache ? 1 : 0,
+            is_backup => $is_backup ? 1 : 0,
+            is_temp => $is_temp ? 1 : 0,
+            is_workshop => $is_workshop ? 1 : 0,
+            highlight => ($is_cache || $is_backup) ? 1 : 0,
+        };
+    }
+
     $c->stash->{json} = {
         success => 1,
         containers => \@containers,
         backups => \@backups,
         all_entries => \@all_entries,
+        volumes => \@volumes,
         host => $host
     };
     $c->forward('View::JSON');
