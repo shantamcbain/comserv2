@@ -213,18 +213,14 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         push @lines, "git pull exited with code $git_exit" if $git_exit;
         $success = 0 if $git_exit;
 
-        # === Step: Stop + rename old container as dated backup ===
-        my $date_tag = `date +%Y-%m-%d_%H%M%S`;
-        chomp $date_tag;
-        my $backup_name = "${container}-backup-$date_tag";
-
-        push @lines, "[${\scalar localtime}] === Stopping old container: $container ===";
-        my $stop_out = `docker stop $container 2>&1 || true`;
-        push @lines, $stop_out;
-
-        push @lines, "[${\scalar localtime}] === Renaming to backup: $backup_name ===";
-        my $rename_out = `docker rename $container $backup_name 2>&1 || true`;
-        push @lines, $rename_out;
+        # === Step: Create dated backup via Model (Catalyst norm) ===
+        push @lines, "[${\scalar localtime}] === Creating dated backup of $container ===";
+        my $backup_result = $c->model('Docker')->create_dated_backup($container);
+        if ($backup_result->{success}) {
+            push @lines, "[${\scalar localtime}] Backup created: $backup_result->{backup_name}";
+        } else {
+            push @lines, "[${\scalar localtime}] Backup step skipped or failed";
+        }
 
         # === Volume Normalization (ensure comserv2_* volumes) ===
         push @lines, "[${\scalar localtime}] === Normalizing volumes (comserv2_* standard) ===";
@@ -576,6 +572,17 @@ sub list :Path('/admin/docker/list') :Args(0) {
         foreach my $line (split /\n/, $output) {
             next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
+            # Detect dated backup containers
+            my $is_backup_container = ($name =~ /backup|bk-?\d{8}/i) ? 1 : 0;
+
+            # Get image creation date
+            my $img_created = '';
+            my $img_inspect = `docker inspect --format='{{.Created}}' "$image" 2>/dev/null | head -1`;
+            if ($img_inspect) {
+                chomp $img_inspect;
+                $img_created = $img_inspect;
+            }
+
             push @containers, {
                 id => $id,
                 name => $name,
@@ -583,6 +590,8 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 status => $status,
                 state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
                 ports => $ports || '',
+                is_backup_container => $is_backup_container,
+                image_created => $img_created,
             };
         }
     } else {
@@ -608,6 +617,17 @@ sub list :Path('/admin/docker/list') :Args(0) {
         foreach my $line (split /\n/, $output) {
             next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
+            # Detect dated backup containers
+            my $is_backup_container = ($name =~ /backup|bk-?\d{8}/i) ? 1 : 0;
+
+            # Get image creation date
+            my $img_created = '';
+            my $img_inspect = `docker inspect --format='{{.Created}}' "$image" 2>/dev/null | head -1`;
+            if ($img_inspect) {
+                chomp $img_inspect;
+                $img_created = $img_inspect;
+            }
+
             push @containers, {
                 id => $id,
                 name => $name,
@@ -615,6 +635,8 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 status => $status,
                 state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
                 ports => $ports || '',
+                is_backup_container => $is_backup_container,
+                image_created => $img_created,
             };
         }
     }
@@ -903,6 +925,37 @@ sub start_backup :Path('/admin/docker/start_backup') :Args(0) {
     } else {
         $c->stash->{json} = { success => 0, error => "Failed to start backup", output => $output };
     }
+    $c->forward('View::JSON');
+}
+
+sub delete :Path('/admin/docker/delete') :Args(1) {
+    my ($self, $c, $name) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->stash->{json} = { success => 0, stderr => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    unless ($self->_can_access_docker_widget($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin only' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $force = $c->req->param('force') || 0;
+    my $cmd = $force ? "docker rm -f \"$name\" 2>&1" : "docker rm \"$name\" 2>&1";
+    my $output = `\$cmd`;
+    my $exit = $? >> 8;
+
+    $self->logging->log_with_details($c, $exit == 0 ? 'info' : 'error', __FILE__, __LINE__, 'docker_delete',
+        "Deleted container: $name (force=$force)");
+
+    $c->stash->{json} = {
+        success => $exit == 0 ? 1 : 0,
+        output => $output,
+        message => $exit == 0 ? "Container $name removed" : "Failed to remove $name"
+    };
     $c->forward('View::JSON');
 }
 

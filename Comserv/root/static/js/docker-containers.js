@@ -132,6 +132,8 @@
                             ${c.restart_count > 0 ? `<li><strong>Restarts:</strong> ${c.restart_count}</li>` : ''}
                             ${c.build_info ? `<li><strong>Build:</strong> ${c.build_info}</li>` : ''}
                             ${c.is_backup ? `<li><span style="color:#dc3545; font-weight:bold;">BACKUP CONTAINER</span></li>` : ''}
+                            ${c.is_backup_container ? `<li><span style="color:#dc3545; font-weight:bold;">DATED BACKUP</span></li>` : ''}
+                            ${c.image_created ? `<li><strong>Image Created:</strong> ${c.image_created}</li>` : ''}
                         </ul>
                     </div>
                     <div style="margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
@@ -140,6 +142,9 @@
                             <button class="btn btn-sm btn-danger" onclick="restartContainer('${c.name}')">Restart</button>
                         ` : `
                             <button class="btn btn-sm btn-success" onclick="startContainer('${c.name}')">Start</button>
+                            ${c.is_backup_container || c.state === 'exited' ? `
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteContainer('${c.name}', true)">Delete</button>
+                            ` : ''}
                         `}
                         <button class="btn btn-sm btn-info" onclick="viewLogs('${c.name}')">Logs</button>
                     </div>
@@ -214,6 +219,28 @@
     window.viewLogs = function(name) {
         // TODO: open logs modal or navigate
         alert(`Logs for ${name} not yet implemented in minimal version.`);
+    };
+
+    window.deleteContainer = function(name, force = false) {
+        const msg = force 
+            ? `Force delete container ${name}? This cannot be undone.`
+            : `Delete container ${name}?`;
+        if (!confirm(msg)) return;
+
+        fetch(`/admin/docker/delete/${encodeURIComponent(name)}?force=${force ? 1 : 0}`, {
+            method: 'POST',
+            credentials: 'same-origin'
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Container deleted');
+                refreshContainers();
+            } else {
+                alert('Delete failed: ' + (data.message || data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => alert('Delete error: ' + err.message));
     };
 
     // === Auto-initialize on page load ===
