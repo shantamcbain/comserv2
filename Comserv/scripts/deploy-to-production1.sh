@@ -172,26 +172,28 @@ post_deploy_tasks() {
 # Interactive menu (only two options)
 show_menu() {
     echo ""
-    echo "Comserv Production Deployment Options:"
-    echo "1) Build & test locally only (no deploy)"
-    echo "2) Full production deploy (build + push + deploy to production1)"
+    echo "Type [1] for FULL DEPLOY (Primary Choice):"
+    echo "  - Rebuilds and pushes a new image to Docker Hub, then restarts the production server container."
+    echo ""
+    echo "Type [2] for Build & test locally only (no deploy):"
+    echo "  - Builds and tests the production image locally but does not push or deploy."
     echo ""
     read -rp "Select option [1-2]: " choice
     case "$choice" in
         1)
-            log "User selected: Build & test locally only"
-            build_and_test_locally
-            log "Local build & test completed successfully. No deployment performed."
-            ;;
-        2)
-            log "User selected: Full production deploy"
+            log "User selected: FULL DEPLOY"
             build_and_test_locally
             push_image
             deploy_to_production
             health_check_and_rollback
             cleanup_old_containers
             post_deploy_tasks
-            log "=== Deployment SUCCESSFUL ==="
+            log "=== FULL DEPLOY SUCCESSFUL ==="
+            ;;
+        2)
+            log "User selected: Build & test locally only"
+            build_and_test_locally
+            log "Local build & test completed successfully. No deployment performed."
             ;;
         *)
             echo "Invalid selection. Please enter 1 or 2."
