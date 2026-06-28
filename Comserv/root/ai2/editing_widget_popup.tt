@@ -24,18 +24,22 @@
     </style>
 </head>
 <body>
-    <!-- Top Header -->
+    <!-- Top Header (PyCharm style) -->
     <div class="header">
         <label>Branch:
-            <select><option>main</option><option>ai2-refactor</option></select>
+            <select>
+                [% FOREACH b IN branches %]
+                    <option [% IF b == 'main' %]selected[% END %]>[% b | html %]</option>
+                [% END %]
+            </select>
         </label>
-        <button>Merge</button>
+        <button onclick="alert('Merge functionality coming soon')">Merge</button>
 
         <label style="margin-left:auto">Model:
             <select>
-                <option>[% selected_model | html %]</option>
-                <option>grok-beta</option>
-                <option>ollama/llama3</option>
+                [% FOREACH m IN recommended_models %]
+                    <option [% IF m == selected_model %]selected[% END %]>[% m | html %]</option>
+                [% END %]
             </select>
         </label>
     </div>
@@ -52,6 +56,49 @@
             <button style="width:100%">Commit Changes</button>
             <div style="margin-top:12px"><strong>Terminal</strong></div>
             <div style="background:#1e1f22;height:80px;font-size:0.8em;padding:4px;">$ git status</div>
+
+            <!-- Editor Settings / Theme Complement -->
+            <details style="margin-top:16px;background:#2b2b2b;border-radius:4px;padding:6px 8px;">
+                <summary style="cursor:pointer;color:#fff;font-weight:bold;">⚙️ Editor Settings</summary>
+                <div style="margin-top:8px;font-size:0.85em;color:#ccc;">
+                    <label style="display:block;margin:4px 0;">Theme:
+                        <select id="theme-select" onchange="applyEditorSettings()">
+                            <option value="dark">Dark (PyCharm)</option>
+                            <option value="light">Light</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </label>
+
+                    <label style="display:block;margin:4px 0;">Font Size:
+                        <select id="font-size" onchange="applyEditorSettings()">
+                            <option value="12">12px</option>
+                            <option value="14" selected>14px</option>
+                            <option value="16">16px</option>
+                            <option value="18">18px</option>
+                        </select>
+                    </label>
+
+                    <label style="display:block;margin:4px 0;">
+                        <input type="checkbox" id="line-numbers" checked onchange="applyEditorSettings()"> Line Numbers
+                    </label>
+
+                    <label style="display:block;margin:4px 0;">AI Diff Intensity:
+                        <select id="diff-intensity" onchange="applyEditorSettings()">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </label>
+
+                    <label style="display:block;margin:4px 0;">Suggestion Style:
+                        <select id="suggestion-style" onchange="applyEditorSettings()">
+                            <option value="buttons">Approve/Reject Buttons</option>
+                            <option value="inline">Inline +/-</option>
+                            <option value="minimal">Minimal</option>
+                        </select>
+                    </label>
+                </div>
+            </details>
         </div>
 
         <!-- Main Editor Area -->
@@ -89,6 +136,58 @@
     </div>
 
     <script>
+        // Apply editor settings from the collapsible settings panel
+        function applyEditorSettings() {
+            const theme = document.getElementById('theme-select').value;
+            const fontSize = document.getElementById('font-size').value;
+            const lineNumbers = document.getElementById('line-numbers').checked;
+            const diffIntensity = document.getElementById('diff-intensity').value;
+            const suggestionStyle = document.getElementById('suggestion-style').value;
+
+            const editorContent = document.querySelector('.editor-content');
+            const diffPane = document.querySelector('.diff-pane');
+
+            // Theme
+            if (theme === 'light') {
+                editorContent.style.background = '#f5f5f5';
+                editorContent.style.color = '#222';
+            } else if (theme === 'custom') {
+                editorContent.style.background = '#1a1a2e';
+                editorContent.style.color = '#eaeaea';
+            } else {
+                editorContent.style.background = '#1e1f22';
+                editorContent.style.color = '#ddd';
+            }
+
+            // Font size
+            editorContent.style.fontSize = fontSize + 'px';
+
+            // Line numbers (simple visual indicator)
+            if (lineNumbers) {
+                editorContent.style.borderLeft = '3px solid #555';
+                editorContent.style.paddingLeft = '16px';
+            } else {
+                editorContent.style.borderLeft = 'none';
+                editorContent.style.paddingLeft = '12px';
+            }
+
+            // Diff intensity
+            if (diffPane) {
+                if (diffIntensity === 'low') {
+                    diffPane.style.opacity = '0.6';
+                } else if (diffIntensity === 'high') {
+                    diffPane.style.opacity = '1';
+                    diffPane.style.fontWeight = 'bold';
+                } else {
+                    diffPane.style.opacity = '0.9';
+                    diffPane.style.fontWeight = 'normal';
+                }
+            }
+
+            // Suggestion style (placeholder for future UI)
+            console.log('Suggestion style set to:', suggestionStyle);
+        }
+
         // Future: load Ace editor, wire chat to /ai2/chat, etc.
         console.log('AI2 editing popup ready – model: [% selected_model | html %]');
     </script>
