@@ -356,7 +356,13 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         select((select($log), $|=1)[0]);  # autoflush on log file
 
         my $repo = '/home/shanta/PycharmProjects/comserv2/Comserv';
-        my $compose = 'docker-compose.prod.yml';
+        # Use the full standardized stack (root + prod + optional NFS)
+        my $base_compose = "$repo/docker-compose.yml";
+        my $prod_compose = "$repo/docker-compose.prod.yml";
+        my $nfs_compose  = "$repo/docker-compose.prod.nfs.yml";
+        my @compose_files = ('-f', $base_compose, '-f', $prod_compose);
+        if (-f $nfs_compose) { push @compose_files, '-f', $nfs_compose; }
+        my $compose_args = join(' ', @compose_files);
 
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger) ===\n";
         $log->flush();
@@ -404,24 +410,24 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $log->flush();
 
         # 3. Build (with explicit progress markers)
-        print $log "[".scalar(localtime)."] [BUILD STARTED] docker compose build web-prod --no-cache...\n";
+        print $log "[".scalar(localtime)."] [BUILD STARTED] docker compose $compose_args build web-prod --no-cache...\n";
         $log->flush();
-        my $build = `cd $repo && docker compose -f $compose build web-prod --no-cache 2>&1`;
+        my $build = `cd $repo && docker compose $compose_args build web-prod --no-cache 2>&1`;
         print $log $build;
         print $log "[".scalar(localtime)."] [BUILD FINISHED]\n";
         $log->flush();
 
         # 4. Push to registry (real push)
-        print $log "[".scalar(localtime)."] Step 4: docker compose push web-prod...\n";
+        print $log "[".scalar(localtime)."] Step 4: docker compose $compose_args push web-prod...\n";
         $log->flush();
-        my $push_img = `cd $repo && docker compose -f $compose push web-prod 2>&1`;
+        my $push_img = `cd $repo && docker compose $compose_args push web-prod 2>&1`;
         print $log $push_img;
         $log->flush();
 
         # 5. Restart
-        print $log "[".scalar(localtime)."] Step 5: docker compose up -d web-prod...\n";
+        print $log "[".scalar(localtime)."] Step 5: docker compose $compose_args up -d web-prod...\n";
         $log->flush();
-        my $up = `cd $repo && docker compose -f $compose up -d web-prod 2>&1`;
+        my $up = `cd $repo && docker compose $compose_args up -d web-prod 2>&1`;
         print $log $up;
         $log->flush();
 
