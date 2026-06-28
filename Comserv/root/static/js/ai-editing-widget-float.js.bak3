@@ -1,0 +1,3078 @@
+/**
+ * Floating AI Code Editor — file tree (not Comserv /ai/chat by default).
+ * Toggle: window.AEW.open() / AEW.close() / AEW.toggle()
+ */
+(function() {
+    'use strict';
+
+    if (window.AEW && window.AEW._loaded) return;
+
+    var state = {
+        enabled: false,
+        open: false,
+        inline: false,
+        popupWindow: null,
+        currentPath: '',
+        currentContent: '',
+        dirty: false,
+        chatHistory: [],
+        conversationTurns: [],
+        conversationId: null,
+        backend: 'grok_cli',
+        treeExpanded: {},
+        treeSeq: 0,
+        fileIndex: [],
+        fileIndexLoading: false,
+        modelTiers: { small: '', large: '' },
+        ollamaReachable: false,
+        ollamaHost: '',
+        codingTerminalAllowed: false,
+        codingTerminalWs: '/coding/terminal_ws',
+        cliMode: 'http',
+        interactiveWsAvailable: false,
+        cliTool: 'grok',
+        editorConfig: null,
+        currentAbortCtrl: null,
+    };
+
+    function q(sel, root) {
+        return (root || document).querySelector(sel);
+    }
+
+    function setStatus(msg, type) {
+        var el = q('#aew-status');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.color = type === 'err' ? '#f48771' : (type === 'ok' ? '#89d185' : '#888');
+    }
+
+    function ajaxFetchOpts(opts) {
+        opts = opts || {};
+        opts.credentials = 'include';
+        opts.headers = opts.headers || {};
+        if (!opts.headers['X-Requested-With']) {
+            opts.headers['X-Requested-With'] = 'XMLHttpRequest';
+        }
+        return opts;
+    }
+
+    function ajaxFetch(url, opts) {
+        return fetch(url, ajaxFetchOpts(opts));
+    }
+
+    function fetchJson(url, opts) {
+        return ajaxFetch(url, opts).then(function(r) {
+            if (!r.ok) {
+                return r.text().then(function(body) {
+                    var msg = 'HTTP ' + r.status;
+                    try {
+                        var parsed = JSON.parse(body);
+                        if (parsed.error) msg += ': ' + parsed.error;
+                    } catch (e) {
+                        if (body && body.length < 200) msg += ': ' + body;
+                    }
+                    throw new Error(msg);
+                });
+            }
+            return r.json();
+        });
+    }
+
+    function isRetryableFetchError(err) {
+        var msg = String(err && err.message ? err.message : err);
+        return /NetworkError|Failed to fetch|fetch resource|Empty response from server/i.test(msg);
+    }
+
+    function waitForDevServer(attempt) {
+        var delay = Math.min(4000, 1200 * attempt);
+        return new Promise(function(resolve) { setTimeout(resolve, delay); })
+            .then(function() {
+                return ajaxFetch('/ai/editor_config').then(function(r) {
+                    if (!r.ok) throw new Error('dev server not ready');
+                });
+            });
+    }
+
+    function fetchJsonWithRetry(url, fetchOpts, retryOpts) {
+        retryOpts = retryOpts || {};
+        var maxRetries = retryOpts.maxRetries != null ? retryOpts.maxRetries : 2;
+        var timeoutMs = retryOpts.timeoutMs;
+        var onStatus = retryOpts.onStatus;
+        var attempt = 0;
+
+        function doFetch() {
+            var opts = fetchOpts || {};
+            var abortCtrl;
+            var abortTimer;
+            if (timeoutMs) {
+                abortCtrl = new AbortController();
+                abortTimer = setTimeout(function() { abortCtrl.abort(); }, timeoutMs);
+                opts = Object.assign({}, opts, { signal: abortCtrl.signal });
+            }
+            return ajaxFetch(url, opts)
+                .then(function(r) {
+                    return r.text().then(function(text) {
+                        if (!text || !text.trim()) {
+                            throw new Error('Empty response from server (HTTP ' + r.status + ')');
+                        }
+                        try {
+                            var data = JSON.parse(text);
+                            if (!r.ok && data && !data.success && !data.error) {
+                                data.success = false;
+                                data.error = 'HTTP ' + r.status;
+                            }
+                            return data;
+                        } catch (e) {
+                            throw new Error('Server returned non-JSON (HTTP ' + r.status + '): '
+                                + text.slice(0, 300));
+                        }
+                    });
+                })
+                .catch(function(err) {
+                    if (err && err.name === 'AbortError') {
+                        throw new Error('Request timed out after '
+                            + Math.round(timeoutMs / 1000) + 's');
+                    }
+                    throw err;
+                })
+                .finally(function() {
+                    if (abortTimer) clearTimeout(abortTimer);
+                });
+        }
+
+        function run() {
+            return doFetch().catch(function(err) {
+                if (!isRetryableFetchError(err) || attempt >= maxRetries) {
+                    throw err;
+                }
+                attempt += 1;
+                if (onStatus) {
+                    onStatus('Connection dropped — retrying (' + attempt + '/' + maxRetries + ')…', '#ffc107');
+                }
+                return waitForDevServer(attempt).then(run);
+            });
+        }
+        return run();
+    }
+
+    function grokModelForRequest() {
+        var modelEl = q('#aew-model');
+        var selected = modelEl ? (modelEl.value || '') : '';
+        return (/grok/i.test(selected) ? selected : '');
+    }
+
+    function cliNetworkErrorHint(err) {
+        var msg = String(err && err.message ? err.message : err);
+        if (!/NetworkError|Failed to fetch|fetch resource|timed out/i.test(msg)) {
+            return msg;
+        }
+        return msg + '\n(Dev server may have restarted, or Grok CLI took too long over HTTP. '
+            + 'Retries are automatic — try again, or use the Chat tab with Ollama for faster replies.)';
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function loadPastConversations() {
+        var selectEl = q('#aew-conversation-select') || document.getElementById('aew-conversation-select');
+        if (!selectEl) return;
+        ajaxFetch('/ai/get_conversation_list')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success && data.conversations) {
+                    selectEl.innerHTML = '<option value="">-- Load Past Chat (DB) --</option>';
+                    data.conversations.forEach(function(conv) {
+                        var opt = document.createElement('option');
+                        opt.value = conv.id;
+                        var label = conv.title || conv.preview || 'Untitled';
+                        if (label.length > 40) {
+                            label = label.substring(0, 40) + '...';
+                        }
+                        opt.textContent = label + ' (' + conv.message_count + ' msgs)';
+                        selectEl.appendChild(opt);
+                    });
+                    if (state.conversationId) {
+                        selectEl.value = state.conversationId;
+                    }
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load past conversations', err);
+            });
+    }
+
+    function buildDom() {
+        if (q('#aew-launcher-wrap')) return;
+
+        var wrap = document.createElement('div');
+        wrap.id = 'aew-launcher-wrap';
+        wrap.innerHTML =
+            '<button type="button" id="aew-launcher" title="AI Code Editor">💻 Code</button>';
+
+        var panel = document.createElement('div');
+        panel.id = 'aew-panel';
+        panel.innerHTML =
+            '<div id="aew-panel-header">' +
+              '<span id="aew-drag-handle" title="Drag">⠿</span>' +
+              '<button type="button" class="aew-btn" id="aew-toggle-files" title="Show/hide file tree (Ctrl+B)">📁</button>' +
+              '<span id="aew-panel-title">AI Code Editor</span>' +
+              '<span id="aew-panel-sub">Local CLI · floating</span>' +
+              '<select id="aew-backend" title="AI backend" style="font-size:0.72rem;margin-left:6px;">' +
+                '<option value="grok_cli">AI Code Editor CLI (Cursor)</option>' +
+                '<option value="comserv">Comserv AI (Ollama/Grok API)</option>' +
+              '</select>' +
+              '<select id="aew-branch" title="Git Branch" style="font-size:0.72rem;margin-left:6px;max-width:140px;">' +
+                '<option value="">Loading branches...</option>' +
+              '</select>' +
+              '<select id="aew-model" title="Select AI Model" style="font-size:0.72rem;margin-left:6px;max-width:140px;background:#1e1e1e;color:#ccc;border:1px solid #3c3c3c;border-radius:2px;">' +
+                '<option value="">Loading models...</option>' +
+              '</select>' +
+              '<button type="button" class="aew-btn" id="aew-popout" title="Open in separate window (move to another monitor)">⤢</button>' +
+              '<button type="button" class="aew-btn" id="aew-dock-inline" title="Dock inline on this page">⊞</button>' +
+              '<button type="button" class="aew-btn" id="aew-close">✕</button>' +
+            '</div>' +
+            '<div id="aew-panel-body" class="aew-panel-body">' +
+              '<aside class="aew-files" id="aew-files-pane">' +
+                '<div style="padding:0.3rem;display:flex;gap:0.25rem;align-items:center;">' +
+                  '<button type="button" class="aew-btn" id="aew-refresh-tree" title="Refresh tree and load index">↻</button>' +
+                  '<button type="button" class="aew-btn" id="aew-new-file-btn" title="Create a new file" style="font-weight:bold;">+</button>' +
+                  '<button type="button" class="aew-btn" id="aew-delete-file-btn" title="Delete current file" style="font-weight:bold;">–</button>' +
+                  '<button type="button" class="aew-btn" id="aew-rebuild-index-btn" title="Rebuild whole file index" style="font-size:0.7rem;padding:0.2rem 0.4rem;">Rebuild</button>' +
+                  '<button type="button" class="aew-btn aew-btn-primary" id="aew-save-btn">Save</button>' +
+                  '<button type="button" class="aew-btn" id="aew-revert-btn" title="Emergency Revert to Main branch (Discards all unsaved and uncommitted changes via Git/SSH)" style="background:#cc3333;color:#fff;font-size:0.7rem;padding:0.2rem 0.4rem;border:1px solid #990000;border-radius:2px;cursor:pointer;">Revert to Main</button>' +
+                '</div>' +
+                '<div style="padding:0 0.3rem 0.3rem 0.3rem;">' +
+                  '<input type="text" id="aew-tree-search" placeholder="Search files..." style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:0.2rem;background:#1e1e1e;color:#ccc;border:1px solid #3c3c3c;border-radius:2px;margin-top:0.2rem;">' +
+                '</div>' +
+                '<div class="aew-tree" id="aew-tree"></div>' +
+              '</aside>' +
+              '<div class="aew-splitter aew-splitter-v" id="aew-split-files" title="Drag to resize file tree"></div>' +
+              '<section class="aew-editor-pane">' +
+                '<div style="padding:0.25rem 0.4rem;font-size:0.72rem;color:#9cdcfe;" id="aew-editor-path">—</div>' +
+                '<textarea class="aew-editor" id="aew-editor" spellcheck="false"></textarea>' +
+              '</section>' +
+              '<div class="aew-splitter aew-splitter-v" id="aew-split-chat" title="Drag to resize chat panel"></div>' +
+              '<aside class="aew-chat-pane" id="aew-aside-pane">' +
+                '<div class="aew-tabs-header">' +
+                  '<button type="button" class="aew-tab-btn active" id="aew-tab-chat">💬 Chat</button>' +
+                  '<button type="button" class="aew-tab-btn" id="aew-tab-deploy">🚀 Deploy</button>' +
+                  '<button type="button" class="aew-tab-btn" id="aew-tab-cli">💻 CLI</button>' +
+                '</div>' +
+                '<div id="aew-tab-chat-content" class="aew-tab-content active-tab">' +
+                  '<div class="aew-chat-history-bar" style="display:flex; gap:4px; padding:2px; background:#222; border-bottom:1px solid #3c3c3c;">' +
+                    '<select id="aew-conversation-select" style="flex:1.2; font-size:0.7rem; padding:1px; background:#1e1e1e; color:#ccc; border:1px solid #444; border-radius:2px; min-width:0;">' +
+                      '<option value="">-- Load Past Chat (DB) --</option>' +
+                    '</select>' +
+                    '<select id="aew-chat-history-select" style="flex:1; font-size:0.7rem; padding:1px; background:#1e1e1e; color:#ccc; border:1px solid #444; border-radius:2px; min-width:0;">' +
+                      '<option value="">-- Active Chat (Show All) --</option>' +
+                    '</select>' +
+                  '</div>' +
+                  '<div class="aew-messages" id="aew-messages"></div>' +
+                  '<div class="aew-input-row">' +
+                    '<textarea id="aew-chat-input" rows="2" placeholder="Ask AI Code Editor…"></textarea>' +
+                    '<button type="button" class="aew-btn aew-btn-primary" id="aew-send-btn">Send</button>' +
+                  '</div>' +
+                  '<div class="aew-status" id="aew-status"></div>' +
+                '</div>' +
+                '<div id="aew-tab-deploy-content" class="aew-tab-content">' +
+                  '<div class="aew-deploy-form">' +
+                    '<div class="aew-form-group">' +
+                      '<label>Git Commit Message:</label>' +
+                      '<textarea id="aew-deploy-commit-msg" rows="2" placeholder="Enter commit message for on-demand commit..."></textarea>' +
+                    '</div>' +
+                    '<div class="aew-form-group-row">' +
+                      '<div class="aew-form-group">' +
+                        '<label>Target Host:</label>' +
+                        '<select id="aew-deploy-target">' +
+                          '<option value="production1">Production 1 (Live)</option>' +
+                          '<option value="production2">Production 2 (Staging)</option>' +
+                        '</select>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div class="aew-form-group-row checkbox-row">' +
+                      '<label><input type="checkbox" id="aew-deploy-vols"> Recreate Volumes</label>' +
+                      '<label><input type="checkbox" id="aew-deploy-noroll"> No Rollback</label>' +
+                    '</div>' +
+                    '<div class="aew-deploy-actions">' +
+                      '<button type="button" class="aew-btn aew-btn-success" id="aew-btn-commit-deploy">Commit & Deploy</button>' +
+                      '<button type="button" class="aew-btn" id="aew-btn-deploy-only">Deploy Only</button>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="aew-terminal-container">' +
+                    '<div class="aew-terminal-header">' +
+                      '<span>Terminal Console Output</span>' +
+                      '<button type="button" class="aew-btn-clear" id="aew-terminal-clear">Clear</button>' +
+                    '</div>' +
+                    '<pre class="aew-terminal-console" id="aew-terminal-console">Ready to deploy...</pre>' +
+                  '</div>' +
+                '</div>' +
+                '<div id="aew-tab-cli-content" class="aew-tab-content">' +
+                  '<div class="aew-cli-panel" id="aew-cli-http-panel">' +
+                    '<div class="aew-cli-header">' +
+                      '<span id="aew-cli-status">Remote CLI (HTTP)</span>' +
+                      '<label class="aew-cli-tool-label">Tool' +
+                        '<select id="aew-cli-tool" class="aew-cli-select">' +
+                          '<option value="grok">Grok CLI</option>' +
+                          '<option value="ollama">Ollama</option>' +
+                          '<option value="shell">Shell</option>' +
+                        '</select>' +
+                      '</label>' +
+                      '<select id="aew-cli-ollama-model" class="aew-cli-select" style="display:none;"></select>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-clear" title="Clear output">Clear</button>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-pty-switch" title="Interactive PTY (Twiggy :3001)" style="display:none;">PTY</button>' +
+                    '</div>' +
+                    '<div class="aew-cli-help" id="aew-cli-http-help">' +
+                      '<strong>HTTP CLI</strong> — Grok, Ollama, and shell over HTTPS. Works remotely on ' +
+                      '<code>workstation.local:3000</code> / <code>workstation.zero:3000</code>. ' +
+                      'Grok uses xAI API when the local binary is unavailable.' +
+                    '</div>' +
+                    '<div class="aew-cli-history-container">' +
+                      '<pre class="aew-cli-output" id="aew-cli-output">Ready. Pick Grok, Ollama, or Shell, then enter a prompt or command.</pre>' +
+                    '</div>' +
+                    '<div class="aew-cli-input-row">' +
+                      '<textarea id="aew-cli-input" rows="2" placeholder="Grok prompt, Ollama question, or shell command (e.g. ls -la lib)"></textarea>' +
+                      '<button type="button" class="aew-btn aew-btn-primary" id="aew-btn-cli-run">Run</button>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="aew-cli-panel" id="aew-cli-pty-panel" style="display:none;">' +
+                    '<div class="aew-cli-header">' +
+                      '<span id="aew-cli-pty-status">Workstation PTY</span>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-reconnect" title="Reconnect shell">Reconnect</button>' +
+                      '<button type="button" class="aew-btn" id="aew-cli-http-switch" title="Back to HTTP CLI">HTTP</button>' +
+                    '</div>' +
+                    '<div class="aew-cli-help" id="aew-cli-help">' +
+                      '<strong>Twiggy required:</strong> Interactive PTY needs WebSockets. ' +
+                      '<code id="aew-cli-cmd">cd Comserv &amp;&amp; CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r</code> ' +
+                      '<button type="button" class="aew-btn" id="aew-cli-copy-cmd" title="Copy start command">Copy</button>' +
+                      '<span class="aew-cli-help-note"> · Open <code>http://workstation.local:3001</code> as Shanta</span>' +
+                    '</div>' +
+                    '<div class="aew-cli-terminal-wrap" id="aew-cli-terminal-wrap">' +
+                      '<div id="aew-cli-terminal"></div>' +
+                    '</div>' +
+                    '<div class="aew-cli-denied" id="aew-cli-denied" style="display:none;">' +
+                      'PTY terminal requires Shanta on <strong>workstation.local</strong>, <strong>workstation.zero</strong>, or <strong>172.30.131.126</strong>.' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+              '</aside>' +
+            '</div>' +
+            '<div id="aew-resize-edge-right" title="Resize width"></div>' +
+            '<div id="aew-resize-edge-bottom" title="Resize height"></div>' +
+            '<div id="aew-resize-handle" title="Resize (drag corner)"></div>';
+
+        document.body.appendChild(wrap);
+        document.body.appendChild(panel);
+
+        var deployPollingInterval = null;
+
+        function pollDeployProgress() {
+            ajaxFetch('/ai/deploy_progress')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var consoleEl = q('#aew-terminal-console');
+                    if (consoleEl && data.content) {
+                        consoleEl.textContent = data.content;
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+                    if (data.done) {
+                        if (deployPollingInterval) {
+                            clearInterval(deployPollingInterval);
+                            deployPollingInterval = null;
+                        }
+                        q('#aew-btn-commit-deploy').disabled = false;
+                        q('#aew-btn-deploy-only').disabled = false;
+                    }
+                })
+                .catch(function() {
+                    if (deployPollingInterval) {
+                        clearInterval(deployPollingInterval);
+                        deployPollingInterval = null;
+                    }
+                    q('#aew-btn-commit-deploy').disabled = false;
+                    q('#aew-btn-deploy-only').disabled = false;
+                });
+        }
+
+        function runDeploy(withCommit) {
+            var commitMsg = withCommit ? q('#aew-deploy-commit-msg').value.trim() : '';
+            if (withCommit && !commitMsg) {
+                alert('Please enter a commit message for on-demand commit.');
+                return;
+            }
+
+            var target = q('#aew-deploy-target').value;
+            var recreateVols = q('#aew-deploy-vols').checked ? 1 : 0;
+            var noRollback = q('#aew-deploy-noroll').checked ? 1 : 0;
+
+            q('#aew-btn-commit-deploy').disabled = true;
+            q('#aew-btn-deploy-only').disabled = true;
+
+            var consoleEl = q('#aew-terminal-console');
+            if (consoleEl) {
+                consoleEl.textContent = 'Initializing connection to deployment backend...\n';
+            }
+
+            var body = 'target=' + encodeURIComponent(target) +
+                       '&commit_msg=' + encodeURIComponent(commitMsg) +
+                       '&recreate_volumes=' + recreateVols +
+                       '&no_rollback=' + noRollback;
+
+            ajaxFetch('/ai/deploy_docker', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (deployPollingInterval) clearInterval(deployPollingInterval);
+                    deployPollingInterval = setInterval(pollDeployProgress, 1000);
+                } else {
+                    if (consoleEl) {
+                        consoleEl.textContent += 'Error starting deployment: ' + (data.error || 'Unknown error') + '\n';
+                    }
+                    q('#aew-btn-commit-deploy').disabled = false;
+                    q('#aew-btn-deploy-only').disabled = false;
+                }
+            })
+            .catch(function(e) {
+                if (consoleEl) {
+                    consoleEl.textContent += 'Network error: ' + e + '\n';
+                }
+                q('#aew-btn-commit-deploy').disabled = false;
+                q('#aew-btn-deploy-only').disabled = false;
+            });
+        }
+
+        q('#aew-tab-chat').onclick = function() {
+            q('#aew-tab-chat').classList.add('active');
+            q('#aew-tab-deploy').classList.remove('active');
+            q('#aew-tab-cli').classList.remove('active');
+            q('#aew-tab-chat-content').classList.add('active-tab');
+            q('#aew-tab-deploy-content').classList.remove('active-tab');
+            q('#aew-tab-cli-content').classList.remove('active-tab');
+        };
+
+        q('#aew-tab-deploy').onclick = function() {
+            q('#aew-tab-deploy').classList.add('active');
+            q('#aew-tab-chat').classList.remove('active');
+            q('#aew-tab-cli').classList.remove('active');
+            q('#aew-tab-deploy-content').classList.add('active-tab');
+            q('#aew-tab-chat-content').classList.remove('active-tab');
+            q('#aew-tab-cli-content').classList.remove('active-tab');
+        };
+
+        var cliTerminal = null;
+        var cliFitAddon = null;
+        var cliWebSocket = null;
+        var cliScriptsLoaded = false;
+        var cliHttpInitialized = false;
+
+        function appendCliOutput(text) {
+            var outputEl = q('#aew-cli-output');
+            if (!outputEl) return;
+            outputEl.textContent += text;
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+
+        function setCliHttpStatus(text, color) {
+            var el = q('#aew-cli-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color || '#9cdcfe';
+        }
+
+        function updateCliToolUi() {
+            var toolEl = q('#aew-cli-tool');
+            var modelEl = q('#aew-cli-ollama-model');
+            if (!toolEl) return;
+            state.cliTool = toolEl.value || 'grok';
+            if (modelEl) {
+                modelEl.style.display = state.cliTool === 'ollama' ? 'inline-block' : 'none';
+            }
+            var inputEl = q('#aew-cli-input');
+            if (inputEl) {
+                if (state.cliTool === 'grok') {
+                    inputEl.placeholder = 'Grok prompt (uses xAI API or local grok binary)';
+                } else if (state.cliTool === 'ollama') {
+                    inputEl.placeholder = 'Question for Ollama (via Comserv AI backend)';
+                } else {
+                    inputEl.placeholder = 'Shell command in project root (e.g. ls -la lib, git status)';
+                }
+            }
+        }
+
+        function switchCliPanel(mode) {
+            state.cliMode = mode === 'pty' ? 'pty' : 'http';
+            var httpPanel = q('#aew-cli-http-panel');
+            var ptyPanel = q('#aew-cli-pty-panel');
+            if (httpPanel) httpPanel.style.display = state.cliMode === 'http' ? 'flex' : 'none';
+            if (ptyPanel) ptyPanel.style.display = state.cliMode === 'pty' ? 'flex' : 'none';
+            if (state.cliMode === 'pty') {
+                setTimeout(function() { initCliPtyTerminal(); }, 50);
+            } else {
+                disconnectCliTerminal();
+                var inputEl = q('#aew-cli-input');
+                if (inputEl) inputEl.focus();
+            }
+        }
+
+        function runHttpCli() {
+            var inputEl = q('#aew-cli-input');
+            var runBtn = q('#aew-btn-cli-run');
+            if (!inputEl || !runBtn) return;
+            var text = (inputEl.value || '').trim();
+            if (!text) return;
+
+            inputEl.disabled = true;
+            runBtn.disabled = true;
+            var tool = state.cliTool || (q('#aew-cli-tool') || {}).value || 'grok';
+            var prefix = tool === 'grok' ? 'grok> ' : (tool === 'ollama' ? 'ollama> ' : '$ ');
+            appendCliOutput('\n' + prefix + text + '\n');
+            setCliHttpStatus('Running…', '#ffc107');
+
+            var done = function() {
+                inputEl.disabled = false;
+                runBtn.disabled = false;
+                inputEl.value = '';
+                inputEl.focus();
+                setCliHttpStatus('Remote CLI (HTTP)', '#9cdcfe');
+            };
+
+            if (tool === 'grok') {
+                var grokModel = grokModelForRequest();
+                setCliHttpStatus('Grok/xAI API running…', '#ffc107');
+                fetchJsonWithRetry('/ai/grok_cli', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: text,
+                        model: grokModel || undefined,
+                        http_cli: 1,
+                    }),
+                }, {
+                    timeoutMs: 200000,
+                    maxRetries: 2,
+                    onStatus: setCliHttpStatus,
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        appendCliOutput((data.response || data.stdout || '(no output)') + '\n');
+                        if (data.backend) appendCliOutput('[backend: ' + data.backend + ']\n');
+                    } else {
+                        var err = data.error || 'Grok failed';
+                        if (data.hint) err += '\n' + data.hint;
+                        if (data.stderr) err += '\n' + data.stderr;
+                        appendCliOutput('Error: ' + err + '\n');
+                    }
+                })
+                .catch(function(e) {
+                    appendCliOutput('Network error: ' + cliNetworkErrorHint(e) + '\n');
+                })
+                .finally(done);
+                return;
+            }
+
+            if (tool === 'ollama') {
+                var ollamaModelEl = q('#aew-cli-ollama-model');
+                var ollamaModel = ollamaModelEl ? ollamaModelEl.value : '';
+                if (!ollamaModel && state.modelTiers.small) ollamaModel = state.modelTiers.small;
+                setCliHttpStatus('Ollama running…', '#ffc107');
+                fetchJsonWithRetry('/ai/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: text,
+                        provider: 'ollama',
+                        model: ollamaModel || undefined,
+                        agent_id: 'coding',
+                    }),
+                }, {
+                    timeoutMs: 120000,
+                    maxRetries: 2,
+                    onStatus: setCliHttpStatus,
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        appendCliOutput((data.response || data.text || '(no output)') + '\n');
+                        if (data.model) appendCliOutput('[model: ' + data.model + ']\n');
+                    } else {
+                        appendCliOutput('Error: ' + (data.error || 'Ollama request failed') + '\n');
+                    }
+                })
+                .catch(function(e) {
+                    appendCliOutput('Network error: ' + cliNetworkErrorHint(e) + '\n');
+                })
+                .finally(done);
+                return;
+            }
+
+            setCliHttpStatus('Running shell command…', '#ffc107');
+            fetchJsonWithRetry('/ai/run_command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'command=' + encodeURIComponent(text),
+            }, {
+                timeoutMs: 120000,
+                maxRetries: 2,
+                onStatus: setCliHttpStatus,
+            })
+            .then(function(data) {
+                if (data.success) {
+                    appendCliOutput((data.output || '(no output)') + '\n[exit ' + data.exit_code + ']\n');
+                } else {
+                    appendCliOutput('Error: ' + (data.error || 'Command failed') + '\n');
+                }
+            })
+            .catch(function(e) {
+                appendCliOutput('Network error: ' + cliNetworkErrorHint(e) + '\n');
+            })
+            .finally(done);
+        }
+
+        function updateCliHttpHelp() {
+            var help = q('#aew-cli-http-help');
+            if (!help) return;
+            var cfg = state.editorConfig || {};
+            var parts = [
+                '<strong>HTTP CLI</strong> — Grok, Ollama, and shell over HTTPS. Works remotely on ',
+                '<code>workstation.local:3000</code> / <code>workstation.zero:3000</code>.'
+            ];
+            if (cfg.grok_mode === 'xai_api') {
+                parts.push(' <strong>Grok CLI</strong> uses xAI API (ignores the header Ollama model dropdown).');
+            } else if (cfg.grok_cli) {
+                parts.push(' <strong>Grok CLI</strong> uses xAI API when configured; header model dropdown is for Chat/Ollama only.');
+            } else {
+                parts.push(' <strong>Grok CLI</strong> needs an xAI API key at /ai/manage_api_keys.');
+            }
+            if (cfg.ollama_reachable && cfg.ollama_host) {
+                parts.push(' Ollama: ' + escapeHtml(cfg.ollama_host) + ':' + (cfg.ollama_port || 11434) + '.');
+            } else {
+                parts.push(' Ollama via Comserv backend (host may be unreachable from Docker).');
+            }
+            if (!cfg.interactive_ws_available) {
+                parts.push(' Shell runs in the app container on :3000; use PTY on :3001 for host shell.');
+            }
+            help.innerHTML = parts.join('');
+        }
+
+        function initCliHttp() {
+            if (cliHttpInitialized) {
+                updateCliToolUi();
+                updateCliHttpHelp();
+                return;
+            }
+            cliHttpInitialized = true;
+            updateCliHttpHelp();
+            var toolEl = q('#aew-cli-tool');
+            if (toolEl) {
+                toolEl.onchange = updateCliToolUi;
+                toolEl.value = state.cliTool || 'grok';
+            }
+            updateCliToolUi();
+            var runBtn = q('#aew-btn-cli-run');
+            if (runBtn) runBtn.onclick = runHttpCli;
+            var inputEl = q('#aew-cli-input');
+            if (inputEl) {
+                inputEl.onkeydown = function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        runHttpCli();
+                    }
+                };
+            }
+            var clearBtn = q('#aew-cli-clear');
+            if (clearBtn) {
+                clearBtn.onclick = function() {
+                    var outputEl = q('#aew-cli-output');
+                    if (outputEl) outputEl.textContent = 'Ready.\n';
+                };
+            }
+            var ptySwitch = q('#aew-cli-pty-switch');
+            if (ptySwitch) {
+                ptySwitch.style.display = state.interactiveWsAvailable ? 'inline-block' : 'none';
+                ptySwitch.onclick = function() { switchCliPanel('pty'); };
+            }
+            var httpSwitch = q('#aew-cli-http-switch');
+            if (httpSwitch) httpSwitch.onclick = function() { switchCliPanel('http'); };
+        }
+
+        function initCliPanel() {
+            if (!state.enabled) return;
+            initCliHttp();
+            if (state.cliMode === 'pty' && state.interactiveWsAvailable) {
+                switchCliPanel('pty');
+            } else {
+                switchCliPanel('http');
+            }
+        }
+
+        function getFitAddonCtor() {
+            if (window.FitAddon && window.FitAddon.FitAddon) return window.FitAddon.FitAddon;
+            if (typeof window.FitAddon === 'function') return window.FitAddon;
+            return null;
+        }
+
+        function loadCliScripts(cb) {
+            if (cliScriptsLoaded && window.Terminal && getFitAddonCtor()) {
+                cb();
+                return;
+            }
+            var pending = 0;
+            function done() {
+                pending--;
+                if (pending <= 0) {
+                    cliScriptsLoaded = !!(window.Terminal && getFitAddonCtor());
+                    cb();
+                }
+            }
+            function addCss(href) {
+                if (document.querySelector('link[href="' + href + '"]')) return;
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = href;
+                document.head.appendChild(link);
+            }
+            function addScript(src, onload) {
+                if (document.querySelector('script[src="' + src + '"]')) {
+                    onload();
+                    return;
+                }
+                pending++;
+                var s = document.createElement('script');
+                s.src = src;
+                s.onload = function() { done(); onload(); };
+                s.onerror = function() { done(); onload(); };
+                document.head.appendChild(s);
+            }
+            addCss('https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css');
+            addScript('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js', function() {});
+            addScript('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js', function() {});
+            if (pending === 0) {
+                cliScriptsLoaded = !!(window.Terminal && getFitAddonCtor());
+                cb();
+            }
+        }
+
+        function focusCliTerminal() {
+            if (!cliTerminal) return;
+            try {
+                cliTerminal.focus();
+                var ta = q('#aew-cli-terminal .xterm-helper-textarea');
+                if (ta) ta.focus();
+            } catch (e) {}
+        }
+
+        function fitCliTerminal() {
+            if (!cliFitAddon || !cliTerminal) return;
+            try {
+                cliFitAddon.fit();
+                if (cliTerminal.cols < 2 || cliTerminal.rows < 2) {
+                    var wrap = q('#aew-cli-terminal-wrap');
+                    if (wrap && wrap.clientHeight > 0) {
+                        cliFitAddon.fit();
+                    }
+                }
+                cliTerminal.refresh(0, cliTerminal.rows - 1);
+                sendCliResize();
+            } catch (e) {}
+        }
+
+        function setCliStatus(text, color) {
+            var el = q('#aew-cli-pty-status') || q('#aew-cli-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color || '#9cdcfe';
+        }
+
+        function showCliHelp(show) {
+            var help = q('#aew-cli-help');
+            if (!help) return;
+            help.style.display = show ? 'block' : 'none';
+        }
+
+        function copyCliStartCmd() {
+            var cmdEl = q('#aew-cli-cmd');
+            var text = cmdEl ? cmdEl.textContent : 'cd Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r';
+            function done(ok) {
+                var btn = q('#aew-cli-copy-cmd');
+                if (!btn) return;
+                var prev = btn.textContent;
+                btn.textContent = ok ? 'Copied!' : 'Copy failed';
+                setTimeout(function() { btn.textContent = prev; }, 1500);
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() { done(true); }).catch(function() { done(false); });
+                return;
+            }
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                done(true);
+            } catch (e) {
+                done(false);
+            }
+        }
+
+        function disconnectCliTerminal() {
+            if (cliWebSocket) {
+                try { cliWebSocket.close(); } catch (e) {}
+                cliWebSocket = null;
+            }
+            setCliStatus('Disconnected', '#888');
+        }
+
+        function sendCliResize() {
+            if (!cliWebSocket || cliWebSocket.readyState !== WebSocket.OPEN || !cliTerminal) return;
+            if (cliTerminal.cols < 2 || cliTerminal.rows < 2) return;
+            var payload = JSON.stringify({
+                type: 'resize',
+                cols: cliTerminal.cols,
+                rows: cliTerminal.rows
+            });
+            cliWebSocket.send('\x01' + payload);
+        }
+
+        function writeCliOutput(data) {
+            if (!cliTerminal || data == null) return;
+            if (data instanceof ArrayBuffer) {
+                cliTerminal.write(new Uint8Array(data));
+            } else if (data instanceof Blob) {
+                data.arrayBuffer().then(function(buffer) {
+                    cliTerminal.write(new Uint8Array(buffer));
+                });
+            } else {
+                cliTerminal.write(data);
+            }
+        }
+
+        function bindCliSocketHandlers(ws) {
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = function() {
+                setCliStatus('Connected — click terminal, then type', '#39ff14');
+                showCliHelp(false);
+                setTimeout(function() {
+                    fitCliTerminal();
+                    sendCliResize();
+                    focusCliTerminal();
+                }, 150);
+            };
+
+            ws.onmessage = function(event) {
+                writeCliOutput(event.data);
+            };
+
+            ws.onerror = function() {
+                setCliStatus('Connection error — start Twiggy dev server', '#ff6b6b');
+                showCliHelp(true);
+                if (cliTerminal) cliTerminal.writeln('\r\n\x1b[31m✗ Terminal connection error\x1b[0m');
+            };
+
+            ws.onclose = function(ev) {
+                var reason = (ev && ev.code) ? (' (' + ev.code + (ev.reason ? ': ' + ev.reason : '') + ')') : '';
+                setCliStatus('Disconnected' + reason, '#888');
+                showCliHelp(true);
+                cliWebSocket = null;
+            };
+        }
+
+        function connectCliTerminal() {
+            if (!state.codingTerminalAllowed) {
+                setCliStatus('Not available on this host', '#ff6b6b');
+                return;
+            }
+            if (cliWebSocket && (cliWebSocket.readyState === WebSocket.OPEN || cliWebSocket.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+            if (cliWebSocket) {
+                try { cliWebSocket.close(); } catch (e) {}
+                cliWebSocket = null;
+            }
+            setCliStatus('Connecting…', '#ffc107');
+
+            var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var wsPath = (state.codingTerminalWs || '/coding/terminal_ws');
+            var wsUrl = protocol + '//' + window.location.host + wsPath;
+
+            try {
+                cliWebSocket = new WebSocket(wsUrl);
+                bindCliSocketHandlers(cliWebSocket);
+            } catch (e) {
+                setCliStatus('WebSocket failed: ' + e, '#ff6b6b');
+            }
+        }
+
+        function initCliPtyTerminal() {
+            var wrap = q('#aew-cli-terminal-wrap');
+            var denied = q('#aew-cli-denied');
+            if (!wrap) return;
+
+            if (!state.codingTerminalAllowed) {
+                wrap.style.display = 'none';
+                if (denied) denied.style.display = 'block';
+                setCliStatus('Shanta @ workstation only', '#ff6b6b');
+                showCliHelp(true);
+                return;
+            }
+
+            if (denied) denied.style.display = 'none';
+            wrap.style.display = 'flex';
+            showCliHelp(true);
+
+            loadCliScripts(function() {
+                var FitAddonCtor = getFitAddonCtor();
+                if (!window.Terminal || !FitAddonCtor) {
+                    setCliStatus('xterm.js failed to load', '#ff6b6b');
+                    return;
+                }
+
+                if (!cliTerminal) {
+                    cliTerminal = new Terminal({
+                        cursorBlink: true,
+                        disableStdin: false,
+                        fontSize: 12,
+                        fontFamily: 'Consolas, Menlo, Monaco, "Courier New", monospace',
+                        theme: {
+                            background: '#000000',
+                            foreground: '#39ff14',
+                            cursor: '#39ff14'
+                        },
+                        scrollback: 5000
+                    });
+                    cliFitAddon = new FitAddonCtor();
+                    cliTerminal.loadAddon(cliFitAddon);
+                    cliTerminal.onData(function(data) {
+                        if (cliWebSocket && cliWebSocket.readyState === WebSocket.OPEN) {
+                            cliWebSocket.send(data);
+                        }
+                    });
+                    cliTerminal.onResize(function(size) {
+                        if (cliWebSocket && cliWebSocket.readyState === WebSocket.OPEN) {
+                            var payload = JSON.stringify({
+                                type: 'resize',
+                                cols: size.cols,
+                                rows: size.rows
+                            });
+                            cliWebSocket.send('\x01' + payload);
+                        }
+                    });
+                    cliTerminal.attachCustomKeyEventHandler(function() {
+                        return true;
+                    });
+                    var container = q('#aew-cli-terminal');
+                    if (container) {
+                        cliTerminal.open(container);
+                        container.addEventListener('mousedown', function(e) {
+                            e.stopPropagation();
+                            focusCliTerminal();
+                        });
+                        container.addEventListener('click', function() {
+                            focusCliTerminal();
+                        });
+                    }
+                    var wrap = q('#aew-cli-terminal-wrap');
+                    if (wrap) {
+                        wrap.addEventListener('mousedown', function(e) {
+                            e.stopPropagation();
+                            focusCliTerminal();
+                        });
+                    }
+                }
+
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        fitCliTerminal();
+                        connectCliTerminal();
+                        focusCliTerminal();
+                    });
+                });
+            });
+        }
+
+        q('#aew-tab-cli').onclick = function() {
+            q('#aew-tab-cli').classList.add('active');
+            q('#aew-tab-chat').classList.remove('active');
+            q('#aew-tab-deploy').classList.remove('active');
+            q('#aew-tab-cli-content').classList.add('active-tab');
+            q('#aew-tab-chat-content').classList.remove('active-tab');
+            q('#aew-tab-deploy-content').classList.remove('active-tab');
+            setTimeout(function() {
+                initCliPanel();
+            }, 50);
+        };
+
+        q('#aew-cli-copy-cmd').onclick = copyCliStartCmd;
+
+        q('#aew-cli-reconnect').onclick = function() {
+            if (!state.codingTerminalAllowed) {
+                ajaxFetch('/coding/terminal_status')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        state.codingTerminalAllowed = !!data.allowed;
+                        state.interactiveWsAvailable = !!data.interactive_ws_available;
+                        state.cliMode = data.cli_mode || state.cliMode;
+                        if (!data.allowed) {
+                            setCliStatus('Denied: use workstation.local or workstation.zero', '#ff6b6b');
+                            return;
+                        }
+                        initCliPtyTerminal();
+                    })
+                    .catch(function() { initCliPtyTerminal(); });
+                return;
+            }
+            disconnectCliTerminal();
+            setTimeout(function() {
+                initCliPtyTerminal();
+            }, 100);
+        };
+
+        window.addEventListener('resize', function() {
+            if (q('#aew-tab-cli-content') && q('#aew-tab-cli-content').classList.contains('active-tab')) {
+                fitCliTerminal();
+            }
+        });
+
+        q('#aew-terminal-clear').onclick = function() {
+            var consoleEl = q('#aew-terminal-console');
+            if (consoleEl) consoleEl.textContent = 'Ready to deploy...';
+        };
+
+        q('#aew-btn-commit-deploy').onclick = function() {
+            runDeploy(true);
+        };
+
+        q('#aew-btn-deploy-only').onclick = function() {
+            runDeploy(false);
+        };
+
+        q('#aew-launcher').onclick = function() { AEW.open(); };
+        q('#aew-close').onclick = function() { AEW.close(); };
+        q('#aew-popout').onclick = function() { AEW.openPopup(); };
+        q('#aew-dock-inline').onclick = function() {
+            if (window.AEW_POPUP_MODE) {
+                window.opener && window.opener.AEW && window.opener.AEW.open({ inline: true });
+                window.close();
+                return;
+            }
+            AEW.open({ inline: true });
+        };
+        q('#aew-save-btn').onclick = saveFile;
+        q('#aew-refresh-tree').onclick = refreshTree;
+
+        var newFileBtn = q('#aew-new-file-btn');
+        if (newFileBtn) {
+            newFileBtn.onclick = function() {
+                var path = prompt("Enter new file path relative to project root (e.g. lib/Comserv/Controller/MyTest.pm):");
+                if (!path) return;
+                path = path.trim();
+                if (!path) return;
+                setStatus("Creating " + path + "...");
+                ajaxFetch("/ai/create_file", {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'path=' + encodeURIComponent(path)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        setStatus("Created file: " + path, "ok");
+                        loadFileIndex().then(function() {
+                            refreshTree();
+                            loadFile(path);
+                        });
+                    } else {
+                        setStatus("Create failed: " + (data.error || "unknown"), "err");
+                    }
+                })
+                .catch(function(err) {
+                    setStatus("Create error: " + err, "err");
+                });
+            };
+        }
+
+        var deleteFileBtn = q('#aew-delete-file-btn');
+        if (deleteFileBtn) {
+            deleteFileBtn.onclick = function() {
+                if (!state.currentPath) {
+                    alert("Please open a file first to delete it.");
+                    return;
+                }
+                if (!confirm("Are you sure you want to permanently delete " + state.currentPath + "?")) {
+                    return;
+                }
+                var path = state.currentPath;
+                setStatus("Deleting " + path + "...");
+                ajaxFetch("/ai/delete_file", {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'path=' + encodeURIComponent(path)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        setStatus("Deleted file: " + path, "ok");
+                        state.currentPath = '';
+                        state.currentContent = '';
+                        state.dirty = false;
+                        q('#aew-editor').value = '';
+                        q('#aew-editor-path').textContent = '—';
+                        loadFileIndex().then(function() {
+                            refreshTree();
+                        });
+                    } else {
+                        setStatus("Delete failed: " + (data.error || "unknown"), "err");
+                    }
+                })
+                .catch(function(err) {
+                    setStatus("Delete error: " + err, "err");
+                });
+            };
+        }
+
+        var rebuildIndexBtn = q('#aew-rebuild-index-btn');
+        if (rebuildIndexBtn) {
+            rebuildIndexBtn.onclick = function() {
+                setStatus("Rebuilding file index...");
+                fetchJson("/ai/rebuild_file_index")
+                    .then(function(data) {
+                        if (data.success) {
+                            state.fileIndex = data.files || [];
+                            setStatus("Rebuilt file index with " + state.fileIndex.length + " files", "ok");
+                            refreshTree();
+                        } else {
+                            setStatus("Rebuild failed: " + (data.error || "unknown"), "err");
+                        }
+                    })
+                    .catch(function(err) {
+                        setStatus("Rebuild error: " + err, "err");
+                    });
+            };
+        }
+
+        var revertBtn = q('#aew-revert-btn');
+        if (revertBtn) {
+            revertBtn.onclick = function() {
+                if (!confirm("⚠️ WARNING: This will discard all unsaved/uncommitted changes and revert /home/shanta/PycharmProjects/comserv2 to the 'main' branch. Continue?")) {
+                    return;
+                }
+                setStatus("Reverting codebase to main...", "info");
+                ajaxFetch("/ai/revert_to_main", { method: 'POST' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            setStatus("Successfully reverted to main!", "ok");
+                            alert(data.message + "\n\nGit Output:\n" + data.output);
+                            loadBranches();
+                            if (window.AEW && AEW.refreshTree) {
+                                AEW.refreshTree();
+                            }
+                        } else {
+                            setStatus("Revert failed: " + data.error, "err");
+                            alert("Revert failed: " + data.error);
+                        }
+                    })
+                    .catch(function(err) {
+                        setStatus("Revert network error: " + err, "err");
+                        alert("Revert network error: " + err);
+                    });
+            };
+        }
+
+        var searchInput = q('#aew-tree-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                filterTree();
+            });
+        }
+        q('#aew-send-btn').onclick = function() {
+            var t = q('#aew-chat-input').value.trim();
+            if (!t) return;
+            q('#aew-chat-input').value = '';
+            sendChat(t);
+        };
+        q('#aew-chat-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); q('#aew-send-btn').click(); }
+        });
+        q('#aew-backend').onchange = function() {
+            state.backend = q('#aew-backend').value;
+            addMsg('Backend: ' + state.backend, 'system');
+        };
+
+        function loadBranches() {
+            var selectEl = q('#aew-branch');
+            if (!selectEl) return;
+            ajaxFetch('/ai/list_branches')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success && data.branches) {
+                        selectEl.innerHTML = '';
+                        data.branches.forEach(function(b) {
+                            var opt = document.createElement('option');
+                            opt.value = b.name;
+                            opt.textContent = b.name;
+                            if (b.current) {
+                                opt.selected = true;
+                            }
+                            selectEl.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Failed to load branches', err);
+                });
+        }
+
+        q('#aew-branch').onchange = function() {
+            var branch = this.value;
+            if (!branch) return;
+            if (!confirm('Are you sure you want to switch to branch "' + branch + '"? Unsaved changes may be lost.')) {
+                loadBranches();
+                return;
+            }
+            setStatus('Switching branch...', 'info');
+            ajaxFetch('/ai/switch_branch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'branch=' + encodeURIComponent(branch)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    setStatus('Switched branch successfully', 'ok');
+                    loadBranches();
+                    if (window.AEW && AEW.refreshTree) {
+                        AEW.refreshTree();
+                    }
+                } else {
+                    setStatus('Error: ' + data.error, 'err');
+                    loadBranches();
+                }
+            })
+            .catch(function(e) {
+                setStatus('Network error: ' + e, 'err');
+                loadBranches();
+            });
+        };
+
+        loadBranches();
+        q('#aew-chat-history-select').onchange = function() {
+            renderConversation();
+        };
+
+        var convSel = q('#aew-conversation-select');
+        if (convSel) {
+            convSel.onchange = function() {
+                var convId = this.value;
+                if (!convId) {
+                    state.conversationId = null;
+                    state.chatHistory = [];
+                    state.conversationTurns = [];
+                    updateHistoryDropdown();
+                    renderConversation();
+                    return;
+                }
+                setStatus('Loading past chat ' + convId + '...', 'info');
+                ajaxFetch('/ai/get_conversation_messages/' + convId)
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success && data.messages) {
+                            state.conversationId = convId;
+                            state.chatHistory = [];
+                            state.conversationTurns = [];
+                            
+                            var lastUser = null;
+                            data.messages.forEach(function(msg) {
+                                state.chatHistory.push({
+                                    role: msg.role,
+                                    content: msg.content
+                                });
+                                
+                                if (msg.role === 'user') {
+                                    lastUser = msg.content;
+                                } else if (msg.role === 'assistant' && lastUser !== null) {
+                                    var turnIndex = state.conversationTurns.length + 1;
+                                    state.conversationTurns.push({
+                                        id: turnIndex,
+                                        user: lastUser,
+                                        ai: msg.content
+                                    });
+                                    lastUser = null;
+                                }
+                            });
+                            
+                            setStatus('Loaded past chat successfully', 'ok');
+                            updateHistoryDropdown();
+                            renderConversation();
+                        } else {
+                            setStatus('Failed to load past chat: ' + (data.error || 'unknown'), 'err');
+                        }
+                    })
+                    .catch(function(err) {
+                        setStatus('Network error loading chat: ' + err, 'err');
+                    });
+            };
+        }
+
+        q('#aew-editor').addEventListener('input', function() {
+            state.dirty = q('#aew-editor').value !== state.currentContent;
+        });
+
+        initDrag(panel);
+        initResize(panel);
+        initSplitters(panel);
+    }
+
+    function populateModels(cfg) {
+        var selectEl = q('#aew-model');
+        if (!selectEl) return;
+        selectEl.innerHTML = '';
+
+        if (cfg.installed_models && cfg.installed_models.length > 0) {
+            var localGrp = document.createElement('optgroup');
+            localGrp.label = 'Ollama (Local)';
+            cfg.installed_models.forEach(function(m) {
+                var opt = document.createElement('option');
+                opt.value = m.name;
+                var label = m.name;
+                if (m.details && m.details.parameter_size) {
+                    label += ' (' + m.details.parameter_size + ')';
+                }
+                opt.textContent = label;
+                if (m.name === cfg.current_model) {
+                    opt.selected = true;
+                }
+                localGrp.appendChild(opt);
+            });
+            selectEl.appendChild(localGrp);
+        }
+
+        if (cfg.external_models && cfg.external_models.length > 0) {
+            var extGrp = document.createElement('optgroup');
+            extGrp.label = 'xAI (Grok)';
+            cfg.external_models.forEach(function(m) {
+                var opt = document.createElement('option');
+                opt.value = m.name;
+                opt.textContent = m.label;
+                if (m.name === cfg.current_model) {
+                    opt.selected = true;
+                }
+                extGrp.appendChild(opt);
+            });
+            if (extGrp.childElementCount) {
+                selectEl.appendChild(extGrp);
+            }
+        } else if (cfg.enabled && cfg.grok_sync_hint) {
+            var hintGrp = document.createElement('optgroup');
+            hintGrp.label = 'xAI (Grok)';
+            var hintOpt = document.createElement('option');
+            hintOpt.value = '';
+            hintOpt.textContent = '(no xAI models — sync at /ai/models)';
+            hintOpt.disabled = true;
+            hintGrp.appendChild(hintOpt);
+            selectEl.appendChild(hintGrp);
+        }
+
+        if (!selectEl.childElementCount) {
+            selectEl.innerHTML = '<option value="">No models available</option>';
+        }
+    }
+
+    function populateCliOllamaModels(cfg) {
+        var modelEl = q('#aew-cli-ollama-model');
+        if (!modelEl) return;
+        modelEl.innerHTML = '';
+        var models = (cfg && cfg.installed_models) || [];
+        if (!models.length && cfg && cfg.current_model) {
+            models = [cfg.current_model];
+        }
+        if (!models.length) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '(default model)';
+            modelEl.appendChild(opt);
+            return;
+        }
+        models.forEach(function(m) {
+            var name = (typeof m === 'string') ? m : (m.name || m.model || '');
+            if (!name) return;
+            var opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            if (cfg.current_model && name === cfg.current_model) opt.selected = true;
+            modelEl.appendChild(opt);
+        });
+    }
+
+    function initDrag(panel) {
+        var handle = q('#aew-panel-header');
+        var dragging = false, sx, sy, st, sl;
+        handle.addEventListener('mousedown', function(e) {
+            if (e.target.closest('button,select,textarea')) return;
+            dragging = true;
+            sx = e.clientX; sy = e.clientY;
+            var r = panel.getBoundingClientRect();
+            panel.style.bottom = 'auto';
+            panel.style.left = r.left + 'px';
+            panel.style.top = r.top + 'px';
+            st = r.top; sl = r.left;
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', function(e) {
+            if (!dragging) return;
+            panel.style.top = (st + e.clientY - sy) + 'px';
+            panel.style.left = (sl + e.clientX - sx) + 'px';
+        });
+        document.addEventListener('mouseup', function() { dragging = false; });
+    }
+
+    function anchorPanelTopLeft(panel) {
+        var r = panel.getBoundingClientRect();
+        panel.style.bottom = 'auto';
+        panel.style.right = 'auto';
+        panel.style.top = r.top + 'px';
+        panel.style.left = r.left + 'px';
+        return { top: r.top, left: r.left };
+    }
+
+    function applyPanelSize(panel, w, h) {
+        var minW = 400, minH = 280;
+        var maxW = window.innerWidth - 20;
+        var maxH = window.innerHeight - 20;
+        var left = parseFloat(panel.style.left);
+        if (!isFinite(left)) left = panel.getBoundingClientRect().left;
+        var top = parseFloat(panel.style.top);
+        if (!isFinite(top)) top = panel.getBoundingClientRect().top;
+        maxW = Math.max(minW, Math.min(maxW, window.innerWidth - left - 8));
+        maxH = Math.max(minH, Math.min(maxH, window.innerHeight - top - 8));
+        panel.style.width = Math.max(minW, Math.min(maxW, w)) + 'px';
+        panel.style.height = Math.max(minH, Math.min(maxH, h)) + 'px';
+    }
+
+    function persistPanelSize(panel) {
+        try {
+            sessionStorage.setItem('aew_panel_size', JSON.stringify({
+                w: panel.offsetWidth,
+                h: panel.offsetHeight
+            }));
+        } catch (err) { /* ignore */ }
+    }
+
+    function restorePanelSize(panel) {
+        if (window.AEW_POPUP_MODE) return;
+        try {
+            var raw = sessionStorage.getItem('aew_panel_size');
+            if (!raw) return;
+            var sz = JSON.parse(raw);
+            if (sz && sz.w && sz.h) {
+                anchorPanelTopLeft(panel);
+                applyPanelSize(panel, sz.w, sz.h);
+            }
+        } catch (err) { /* ignore */ }
+    }
+
+    function initSplitters(panel) {
+        var filesPane = q('#aew-files-pane');
+        var chatPane = q('#aew-aside-pane');
+        var splitFiles = q('#aew-split-files');
+        var splitChat = q('#aew-split-chat');
+        var toggleBtn = q('#aew-toggle-files');
+
+        function setLayoutVar(name, px) {
+            panel.style.setProperty(name, Math.round(px) + 'px');
+        }
+
+        function readLayoutVar(name, fallback) {
+            var raw = panel.style.getPropertyValue(name);
+            if (!raw) return fallback;
+            var n = parseFloat(raw);
+            return isFinite(n) ? n : fallback;
+        }
+
+        function persistLayout() {
+            try {
+                sessionStorage.setItem('aew_panel_layout', JSON.stringify({
+                    filesW: readLayoutVar('--aew-files-width', filesPane ? filesPane.offsetWidth : 200),
+                    chatW: readLayoutVar('--aew-chat-width', chatPane ? chatPane.offsetWidth : 300),
+                    filesCollapsed: panel.classList.contains('aew-files-collapsed')
+                }));
+            } catch (err) { /* ignore */ }
+        }
+
+        function restoreLayout() {
+            try {
+                var raw = sessionStorage.getItem('aew_panel_layout');
+                if (!raw) return;
+                var layout = JSON.parse(raw);
+                if (layout.filesW) setLayoutVar('--aew-files-width', layout.filesW);
+                if (layout.chatW) setLayoutVar('--aew-chat-width', layout.chatW);
+                if (layout.filesCollapsed) {
+                    panel.classList.add('aew-files-collapsed');
+                    if (toggleBtn) {
+                        toggleBtn.textContent = '📂';
+                        toggleBtn.title = 'Show file tree (Ctrl+B)';
+                    }
+                }
+            } catch (err) { /* ignore */ }
+        }
+
+        function updateFilesToggleUi() {
+            if (!toggleBtn) return;
+            var collapsed = panel.classList.contains('aew-files-collapsed');
+            toggleBtn.textContent = collapsed ? '📂' : '📁';
+            toggleBtn.title = (collapsed ? 'Show' : 'Hide') + ' file tree (Ctrl+B)';
+            toggleBtn.classList.toggle('aew-btn-active', !collapsed);
+        }
+
+        function toggleFilesPane() {
+            panel.classList.toggle('aew-files-collapsed');
+            updateFilesToggleUi();
+            persistLayout();
+        }
+
+        if (toggleBtn) {
+            toggleBtn.onclick = function(e) {
+                e.stopPropagation();
+                toggleFilesPane();
+            };
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (!(e.ctrlKey || e.metaKey) || String(e.key).toLowerCase() !== 'b') return;
+            var p = q('#aew-panel');
+            if (!p || (!p.classList.contains('open') && !window.AEW_POPUP_MODE)) return;
+            if (e.target && e.target.closest && !e.target.closest('#aew-panel')) return;
+            e.preventDefault();
+            toggleFilesPane();
+        });
+
+        function bindSplitter(handle, mode) {
+            if (!handle) return;
+            var dragging = false;
+            var sx = 0;
+            var startW = 0;
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dragging = true;
+                sx = e.clientX;
+                handle.classList.add('aew-splitter-active');
+                document.body.classList.add('aew-resizing', 'aew-resizing-col');
+                if (mode === 'files') {
+                    startW = readLayoutVar('--aew-files-width', filesPane.offsetWidth || 200);
+                } else {
+                    startW = readLayoutVar('--aew-chat-width', chatPane.offsetWidth || 300);
+                }
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!dragging) return;
+                if (mode === 'files') {
+                    if (panel.classList.contains('aew-files-collapsed')) return;
+                    setLayoutVar('--aew-files-width', Math.max(120, Math.min(520, startW + e.clientX - sx)));
+                } else {
+                    setLayoutVar('--aew-chat-width', Math.max(200, Math.min(640, startW - (e.clientX - sx))));
+                }
+            });
+            document.addEventListener('mouseup', function() {
+                if (!dragging) return;
+                dragging = false;
+                handle.classList.remove('aew-splitter-active');
+                document.body.classList.remove('aew-resizing', 'aew-resizing-col');
+                persistLayout();
+            });
+        }
+
+        restoreLayout();
+        updateFilesToggleUi();
+        bindSplitter(splitFiles, 'files');
+        bindSplitter(splitChat, 'chat');
+    }
+
+    function initResize(panel) {
+        if (window.AEW_POPUP_MODE) return;
+        var rh = q('#aew-resize-handle');
+        var edgeR = q('#aew-resize-edge-right');
+        var edgeB = q('#aew-resize-edge-bottom');
+        var resizing = false, mode = 'both', sx, sy, sw, sh;
+
+        function startResize(e, resizeMode) {
+            e.stopPropagation();
+            e.preventDefault();
+            anchorPanelTopLeft(panel);
+            resizing = true;
+            mode = resizeMode || 'both';
+            sx = e.clientX;
+            sy = e.clientY;
+            sw = panel.offsetWidth;
+            sh = panel.offsetHeight;
+            document.body.style.userSelect = 'none';
+            document.body.classList.add('aew-resizing');
+        }
+
+        function onMove(e) {
+            if (!resizing) return;
+            var nw = sw + (mode === 'height' ? 0 : e.clientX - sx);
+            var nh = sh + (mode === 'width' ? 0 : e.clientY - sy);
+            applyPanelSize(panel, nw, nh);
+        }
+
+        function endResize() {
+            if (!resizing) return;
+            resizing = false;
+            document.body.style.userSelect = '';
+            document.body.classList.remove('aew-resizing');
+            persistPanelSize(panel);
+        }
+
+        if (rh) {
+            rh.addEventListener('mousedown', function(e) { startResize(e, 'both'); });
+            rh.addEventListener('touchstart', function(e) {
+                if (!e.touches || !e.touches[0]) return;
+                startResize(e.touches[0], 'both');
+            }, { passive: false });
+        }
+        if (edgeR) {
+            edgeR.addEventListener('mousedown', function(e) { startResize(e, 'width'); });
+        }
+        if (edgeB) {
+            edgeB.addEventListener('mousedown', function(e) { startResize(e, 'height'); });
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', endResize);
+        document.addEventListener('touchmove', function(e) {
+            if (!resizing || !e.touches || !e.touches[0]) return;
+            onMove(e.touches[0]);
+        }, { passive: false });
+        document.addEventListener('touchend', endResize);
+    }
+
+    function formatMessageHtml(text) {
+        if (!text) return '';
+        var escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        var codeBlocks = [];
+        escaped = escaped.replace(/```([a-zA-Z0-9_\-#\+]*)\n([\s\S]*?)```/g, function(match, lang, code) {
+            var placeholder = '___CODEBLOCK_' + codeBlocks.length + '___';
+            codeBlocks.push('<pre class="aew-pre-code"><code class="language-' + escapeHtml(lang) + '">' + code + '</code></pre>');
+            return placeholder;
+        });
+
+        escaped = escaped.replace(/\[READ_FILE:\s*([^\]]+)\]/gi, function(match, path) {
+            var cleanPath = path.trim();
+            return '<button type="button" class="aew-btn-inline-tool" onclick="window.AEW.loadFile(\'' + cleanPath.replace(/'/g, "\\'") + '\')">📄 Load: ' + escapeHtml(cleanPath) + '</button>';
+        });
+
+        escaped = escaped.replace(/\[RUN_COMMAND:\s*([^\]]+)\]/gi, function(match, cmd) {
+            var cleanCmd = cmd.trim();
+            return '<button type="button" class="aew-btn-inline-tool run-cmd-btn" onclick="window.AEW.runApprovedCommand(\'' + cleanCmd.replace(/'/g, "\\'") + '\')">💻 Run: <code>' + escapeHtml(cleanCmd) + '</code></button>';
+        });
+
+        escaped = escaped.replace(/\[SEARCH_GREP:\s*([^\]]+)\]/gi, function(match, pattern) {
+            var cleanPattern = pattern.trim();
+            return '<button type="button" class="aew-btn-inline-tool search-grep-btn" onclick="window.AEW.runApprovedGrep(\'' + cleanPattern.replace(/'/g, "\\'") + '\')">🔍 Search: ' + escapeHtml(cleanPattern) + '</button>';
+        });
+
+        escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+        escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/\n/g, '<br>');
+
+        codeBlocks.forEach(function(block, idx) {
+            escaped = escaped.replace('___CODEBLOCK_' + idx + '___', block);
+        });
+
+        return escaped;
+    }
+
+    function runApprovedCommand(cmd) {
+        if (!confirm('Execute command on server?\n\n' + cmd)) return;
+        setStatus('Running command…');
+        addMsg('Running: ' + cmd, 'system');
+        ajaxFetch('/ai/run_command', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'command=' + encodeURIComponent(cmd),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var outText = 'Command output (exit code: ' + data.exit_code + '):\n' + (data.output || '(no output)');
+                addMsg(outText, 'system');
+                setStatus('Command complete', 'ok');
+            } else {
+                addMsg('Error: ' + data.error, 'system');
+                setStatus('Command failed', 'err');
+            }
+        })
+        .catch(function(e) {
+            addMsg('Command request failed: ' + e, 'system');
+            setStatus('Command error', 'err');
+        });
+    }
+
+    function runApprovedGrep(pattern) {
+        var cmd = 'grep -rn -I --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=logs ' + shellEscape(pattern) + ' .';
+        runApprovedCommand(cmd);
+    }
+
+    function shellEscape(s) {
+        return '"' + s.replace(/(["\\])/g, '\\$1') + '"';
+    }
+
+    function parseFixBlock(raw) {
+        var re = /##\s*FIX:\s*([^\n\r]+)[\r\n]+```[^\n\r]*\n([\s\S]*?)```/i;
+        var m = raw.match(re);
+        if (!m) return null;
+        return { path: m[1].trim(), content: m[2] };
+    }
+
+    function showFixPanel(fix) {
+        var box = q('#aew-messages');
+        if (!box) return;
+        var panel = document.createElement('div');
+        panel.className = 'aew-fix-panel';
+        panel.innerHTML = '<strong>Proposed fix:</strong> ' + escapeHtml(fix.path)
+            + '<pre class="aew-pre-code">' + escapeHtml(fix.content.slice(0, 2000)) + (fix.content.length > 2000 ? '\n…' : '') + '</pre>';
+        var applyBtn = document.createElement('button');
+        applyBtn.className = 'aew-btn aew-btn-success';
+        applyBtn.textContent = 'Apply Fix';
+        applyBtn.style.marginTop = '4px';
+        applyBtn.onclick = function() {
+            if (!confirm('Apply AI fix to ' + fix.path + '?')) return;
+            ajaxFetch('/ai/apply_fix', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'path=' + encodeURIComponent(fix.path)
+                    + '&content=' + encodeURIComponent(fix.content),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    addMsg('Applied fix to ' + fix.path, 'system');
+                    if (fix.path === state.currentPath) {
+                        state.currentContent = fix.content;
+                        state.dirty = false;
+                        var ed = q('#aew-editor');
+                        if (ed) ed.value = fix.content;
+                    }
+                    setStatus('Fix applied', 'ok');
+                } else {
+                    setStatus('Apply failed: ' + data.error, 'err');
+                }
+            });
+        };
+        panel.appendChild(applyBtn);
+        box.appendChild(panel);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function addMsg(text, role, isHtml) {
+        var box = q('#aew-messages');
+        if (!box) return;
+        var d = document.createElement('div');
+        d.className = 'aew-msg aew-msg-' + role;
+        d.innerHTML = isHtml ? text : formatMessageHtml(text);
+        box.appendChild(d);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function renderConversation() {
+        var box = q('#aew-messages');
+        if (!box) return;
+        box.innerHTML = '';
+        var selectEl = q('#aew-chat-history-select');
+        var selectedVal = selectEl ? selectEl.value : '';
+        if (selectedVal) {
+            var turnId = parseInt(selectedVal, 10);
+            var turn = state.conversationTurns.find(function(t) { return t.id === turnId; });
+            if (turn) {
+                var dUser = document.createElement('div');
+                dUser.className = 'aew-msg aew-msg-user';
+                dUser.innerHTML = formatMessageHtml(turn.user);
+                box.appendChild(dUser);
+                var dAi = document.createElement('div');
+                dAi.className = 'aew-msg aew-msg-ai';
+                dAi.innerHTML = formatMessageHtml(turn.ai);
+                box.appendChild(dAi);
+            }
+        } else {
+            if (!window.AEW_POPUP_MODE) {
+                var dSys = document.createElement('div');
+                dSys.className = 'aew-msg aew-msg-system';
+                dSys.innerHTML = formatMessageHtml('Inline dock — use ⤢ for a separate window (recommended).');
+                box.appendChild(dSys);
+            }
+            state.chatHistory.forEach(function(m) {
+                var d = document.createElement('div');
+                d.className = 'aew-msg aew-msg-' + m.role;
+                d.innerHTML = formatMessageHtml(m.content);
+                box.appendChild(d);
+            });
+        }
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function updateHistoryDropdown() {
+        var selectEl = q('#aew-chat-history-select');
+        if (!selectEl) return;
+        selectEl.innerHTML = '<option value="">-- Active Conversation (Show All) --</option>';
+        state.conversationTurns.forEach(function(turn) {
+            var opt = document.createElement('option');
+            opt.value = turn.id;
+            var label = turn.user.replace(/\s+/g, ' ').trim();
+            if (label.length > 35) {
+                label = label.substring(0, 35) + '...';
+            }
+            opt.textContent = 'Q: ' + label;
+            selectEl.appendChild(opt);
+        });
+    }
+
+    function applySearchIfActive() {
+        var searchInput = q('#aew-tree-search');
+        if (searchInput && searchInput.value.trim()) {
+            filterTree();
+        }
+    }
+
+    function searchFilesRemote(query, limit) {
+        var url = '/ai/search_files?q=' + encodeURIComponent(query);
+        if (limit) url += '&limit=' + encodeURIComponent(limit);
+        return fetchJson(url);
+    }
+
+    function loadFileIndex() {
+        if (state.fileIndexLoading) {
+            return Promise.resolve({ success: true, files: state.fileIndex });
+        }
+        state.fileIndexLoading = true;
+        return fetchJson('/ai/get_file_index')
+            .then(function(data) {
+                if (data.success) {
+                    state.fileIndex = data.files || [];
+                    if (state.fileIndex.length) {
+                        setStatus('File index: ' + state.fileIndex.length + ' files', 'ok');
+                    }
+                } else if (data.error) {
+                    setStatus('File index: ' + data.error, 'err');
+                }
+                return data;
+            })
+            .catch(function(err) {
+                console.error("Failed to load file index:", err);
+                setStatus('File index load failed — use search box or chat "find filename"', 'err');
+                return { success: false, error: String(err) };
+            })
+            .finally(function() {
+                state.fileIndexLoading = false;
+                applySearchIfActive();
+            });
+    }
+
+    function extractFileFindQuery(text) {
+        var t = String(text || '').trim();
+        var m = t.match(/^(?:please\s+|can you\s+)?(?:find|locate|search(?:\s+for)?|where\s+is|open|show)\s+(?:the\s+)?(.+)$/i);
+        return m ? m[1].trim() : '';
+    }
+
+    function levenshtein(a, b) {
+        a = a || '';
+        b = b || '';
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        var row = [];
+        for (var j = 0; j <= b.length; j++) row[j] = j;
+        for (var i = 1; i <= a.length; i++) {
+            var prev = i;
+            for (var j = 1; j <= b.length; j++) {
+                var cur = row[j];
+                var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+                row[j] = Math.min(prev + 1, row[j - 1] + 1, row[j] + cost);
+                prev = cur;
+            }
+        }
+        return row[b.length];
+    }
+
+    function formatFileFindReply(query, files, fuzzy) {
+        if (!files || !files.length) {
+            var none = 'No files matching "' + query + '" in the project index.';
+            if (/dailyplan/i.test(query)) {
+                none += '\n\nPlanning does NOT use root/DailyPlan.tt.'
+                    + '\nTry route lookup: the live template is root/admin/planning/DailyPlan.tt'
+                    + '\n(route /planning/daily, controller Planning.pm → daily()).';
+            } else {
+                none += '\nTry the Search files box above the tree.';
+            }
+            return none;
+        }
+        var lines = [];
+        if (fuzzy) {
+            lines.push('No exact match for "' + query + '" — showing close matches:', '');
+        } else {
+            lines.push('Found ' + files.length + ' match(es) for "' + query + '":', '');
+        }
+        files.forEach(function(path, i) {
+            var tag = (path === 'root/admin/planning/DailyPlan.tt') ? ' ← live /planning/daily' : '';
+            lines.push((i + 1) + '. ' + path + tag);
+        });
+        if (/dailyplan/i.test(query)) {
+            lines.push('', 'Live route: /planning/daily → root/admin/planning/DailyPlan.tt');
+            lines.push('(root/DailyPlan.tt does not exist — do not use that path.)');
+        }
+        lines.push('', 'Say: open ' + files[0].split('/').pop() + ' — or click Load in the tree.');
+        return lines.join('\n');
+    }
+
+    function extractRouteFromQuestion(text) {
+        var t = String(text || '');
+        if (/\/plan[n]?ing\/daily\b/i.test(t) || /\bplan[n]?ing\/daily\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        if (/\b(?:open|show|load|edit|find|view)\s+(?:the\s+)?(?:daily\s*plan(?:ning)?(?:\s+page)?|planning(?:\s+(?:page|daily|module|feature))?)\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        if (/\b(?:what|which)\b.*\b(?:\.tt|template|file)\b.*\b(?:planning|daily\s*plan)\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        if (/\bDailyPlan\.tt\b/i.test(t) && /\b(?:open|planning|route|what|which|file|template|find)\b/i.test(t)) {
+            return '/planning/daily';
+        }
+        var m = t.match(/(\/[a-z][a-z0-9_\/-]{2,})/i);
+        if (m && /(?:\.tt|template|route|return|what|which|file|url|path)/i.test(t)) {
+            return m[1].replace(/\/+$/, '');
+        }
+        return '';
+    }
+
+    function formatRouteReply(data, opts) {
+        opts = opts || {};
+        if (!data.success) {
+            if (data.guessed_templates && data.guessed_templates.length) {
+                return 'Route ' + data.route + ' — no exact mapping. Guessed templates:\n'
+                    + data.guessed_templates.map(function(p, i) { return (i + 1) + '. ' + p; }).join('\n');
+            }
+            return 'Could not map route ' + (data.route || '') + ' to a template.';
+        }
+        var lines = [];
+        if (opts.reason === 'no_index_match') {
+            lines.push('File search found no index match — looked up controller route instead:', '');
+        }
+        lines.push('Route: ' + data.route);
+        lines.push('Template: ' + data.template);
+        lines.push('Controller: ' + (data.controller || '—'));
+        if (data.note) lines.push('Note: ' + data.note);
+        if (data.related && data.related.length) {
+            lines.push('', 'Related copies (not the live route):');
+            data.related.forEach(function(p, i) { lines.push('  ' + (i + 1) + '. ' + p); });
+        }
+        if (data.route === '/planning/daily') {
+            lines.push('', 'root/DailyPlan.tt does NOT exist. Use the template path above.');
+        }
+        if (opts.autoOpen && data.template) {
+            lines.push('', 'Opening ' + data.template + '…');
+        } else {
+            lines.push('', 'Say: open ' + data.template.split('/').pop());
+        }
+        return lines.join('\n');
+    }
+
+    function resolveRouteAndReply(route, opts) {
+        opts = opts || {};
+        setStatus('Resolving route ' + route + '…');
+        return fetchJson('/ai/resolve_route?path=' + encodeURIComponent(route))
+            .then(function(data) {
+                var reply = formatRouteReply(data, opts);
+                addMsg(reply, 'ai');
+                state.chatHistory.push({ role: 'assistant', content: reply });
+                updateHistoryDropdown();
+                setStatus(data.success ? 'Route resolved locally' : 'Route lookup incomplete',
+                    data.success ? 'ok' : 'err');
+                if (data.template) {
+                    var searchInput = q('#aew-tree-search');
+                    if (searchInput) {
+                        searchInput.value = data.template.split('/').pop();
+                        filterTree();
+                    }
+                    if (opts.autoOpen) {
+                        loadFile(data.template);
+                    }
+                }
+                return true;
+            })
+            .catch(function(err) {
+                addMsg('Route lookup error: ' + err, 'system');
+                setStatus(String(err), 'err');
+                return true;
+            });
+    }
+
+    function tryLocalRouteLookup(userText) {
+        var route = extractRouteFromQuestion(userText);
+        if (!route) return null;
+        var autoOpen = /\b(?:open|load|show|edit)\b/i.test(userText);
+        return resolveRouteAndReply(route, { autoOpen: autoOpen, userText: userText });
+    }
+
+    function tryLocalFileFind(userText) {
+        var query = extractFileFindQuery(userText);
+        if (!query) return null;
+
+        function renderResults(files, fuzzy) {
+            var reply = formatFileFindReply(query, files, fuzzy);
+            addMsg(reply, 'ai');
+            state.chatHistory.push({ role: 'assistant', content: reply });
+            updateHistoryDropdown();
+            setStatus('Found ' + files.length + ' file(s) locally (no AI call)', 'ok');
+            if (files.length >= 1) {
+                var searchInput = q('#aew-tree-search');
+                if (searchInput) {
+                    searchInput.value = files[0].split('/').pop();
+                    filterTree();
+                }
+            }
+        }
+
+        setStatus('Searching files for "' + query + '"…');
+        return searchFilesRemote(query, 50).then(function(data) {
+            if (!data.success) {
+                addMsg('File search failed: ' + (data.error || 'unknown'), 'system');
+                setStatus(data.error || 'search failed', 'err');
+                return true;
+            }
+            var files = data.files || [];
+            if (!files.length && /dailyplan/i.test(query)) {
+                return resolveRouteAndReply('/planning/daily', {
+                    reason: 'no_index_match',
+                    autoOpen: /\b(?:open|load|show)\b/i.test(userText),
+                });
+            }
+            renderResults(files, data.fuzzy);
+            if (files.length === 1 && /\b(?:open|load|show)\b/i.test(userText)) {
+                loadFile(files[0]);
+            }
+            return true;
+        }).catch(function(err) {
+            addMsg('File search error: ' + err + '\nUse the Search files box above the tree.', 'system');
+            setStatus(String(err), 'err');
+            return true;
+        });
+    }
+
+    function scoreFileMatch(path, query) {
+        var lower = path.toLowerCase();
+        var name = lower.split('/').pop();
+        if (name === query) return 100;
+        if (name.indexOf(query) === 0) return 80;
+        if (name.indexOf(query) !== -1) return 60;
+        if (lower.indexOf(query) !== -1) return 40;
+        if (query.length >= 4 && name) {
+            var dist = levenshtein(name, query);
+            var maxLen = Math.max(name.length, query.length);
+            var sim = 1 - (dist / maxLen);
+            if (sim >= 0.72) return Math.floor(30 + 20 * sim);
+        }
+        return 0;
+    }
+
+    function filterTree() {
+        var searchInput = q('#aew-tree-search');
+        var query = ((searchInput || {}).value || '').toLowerCase().trim();
+        var root = q('#aew-tree');
+        if (!root) return;
+
+        // If no query, restore standard tree directory structure
+        if (!query) {
+            root.innerHTML = '';
+            appendTreeEntries(root, '', 0, state.treeSeq);
+            return;
+        }
+
+        if (!state.fileIndex || state.fileIndex.length === 0) {
+            root.innerHTML = '';
+            var loading = document.createElement('div');
+            loading.className = 'aew-tree-hint';
+            loading.style.padding = '0.5rem';
+            loading.style.color = '#888';
+            loading.style.fontSize = '0.72rem';
+            loading.textContent = 'Searching...';
+            root.appendChild(loading);
+            searchFilesRemote(query, 80).then(function(data) {
+                if (data.success && data.files && data.files.length) {
+                    state.fileIndex = data.files;
+                    filterTree();
+                    return;
+                }
+                return loadFileIndex().then(function() {
+                    if (searchInput && searchInput.value.trim()) {
+                        filterTree();
+                    }
+                });
+            }).catch(function() {
+                return loadFileIndex().then(function() {
+                    if (searchInput && searchInput.value.trim()) {
+                        filterTree();
+                    }
+                });
+            });
+            return;
+        }
+
+        // Whole-project matched file search in state.fileIndex
+        var matched = state.fileIndex
+            .map(function(path) {
+                return { path: path, score: scoreFileMatch(path, query) };
+            })
+            .filter(function(item) { return item.score > 0; })
+            .sort(function(a, b) {
+                return b.score - a.score || a.path.localeCompare(b.path);
+            })
+            .map(function(item) { return item.path; });
+
+        // Render matched files as a flat list
+        root.innerHTML = '';
+        if (matched.length === 0) {
+            var empty = document.createElement('div');
+            empty.className = 'aew-tree-hint';
+            empty.style.padding = '0.5rem';
+            empty.style.color = '#888';
+            empty.style.fontSize = '0.72rem';
+            empty.textContent = 'No files found matching "' + query + '"';
+            root.appendChild(empty);
+            return;
+        }
+
+        matched.forEach(function(path) {
+            var row = document.createElement('div');
+            row.className = 'aew-tree-item';
+            row.dataset.rel = path;
+            // Get the filename only for display name
+            var name = path.split('/').pop();
+            row.dataset.name = name;
+            if (path === state.currentPath) row.classList.add('active');
+            
+            // Show file icon and name, with path in small font or parentheses
+            row.innerHTML = '📄 ' + escapeHtml(name) + ' <span style="font-size:0.65rem;color:#777;margin-left:4px;">(' + escapeHtml(path) + ')</span>';
+            row.title = path;
+
+            row.onclick = function(ev) {
+                ev.stopPropagation();
+                loadFile(path);
+            };
+
+            root.appendChild(row);
+        });
+    }
+
+    function markTreeActive() {
+        var root = q('#aew-tree');
+        if (!root) return;
+        root.querySelectorAll('.aew-tree-item').forEach(function(row) {
+            row.classList.toggle('active', row.dataset.rel === state.currentPath);
+        });
+    }
+
+    function appendTreeEntries(container, dir, depth, seq) {
+        dir = (dir == null || dir === undefined) ? '' : String(dir);
+        if (/HASH\s*\(\s*0x/i.test(dir) || dir.indexOf('::') >= 0) {
+            setStatus('Invalid folder path — refresh the tree (↻)', 'err');
+            return Promise.resolve();
+        }
+        var loadGen = (container._aewLoadGen || 0) + 1;
+        container._aewLoadGen = loadGen;
+        container.innerHTML = '';
+        return fetchJson('/ai/list_dir?rel=' + encodeURIComponent(dir))
+            .then(function(data) {
+                if (seq !== state.treeSeq || loadGen !== container._aewLoadGen) return;
+                if (!data.success) {
+                    var msg = data.error || 'list_dir failed';
+                    if (data.hint) msg += ' — ' + data.hint;
+                    if (data.project_root) msg += ' (root: ' + data.project_root + ')';
+                    setStatus(msg, 'err');
+                    if (!dir) {
+                        container.innerHTML = '<div class="aew-tree-hint">' + escapeHtml(msg) + '</div>';
+                    }
+                    return;
+                }
+                if (data.project_root) state.projectRoot = data.project_root;
+                (data.entries || []).forEach(function(ent) {
+                    var row = document.createElement('div');
+                    row.className = 'aew-tree-item' + (ent.type === 'dir' ? ' dir' : '');
+                    row.dataset.rel = ent.path;
+                    row.dataset.name = ent.name;
+                    if (ent.path === state.currentPath) row.classList.add('active');
+                    var open = ent.type === 'dir' && state.treeExpanded[ent.path];
+                    row.innerHTML = (ent.type === 'dir' ? (open ? '📂 ' : '📁 ') : '📄 ') + escapeHtml(ent.name);
+
+                    var childBox = null;
+                    if (ent.type === 'dir') {
+                        childBox = document.createElement('div');
+                        childBox.className = 'aew-tree-children';
+                        childBox.dataset.rel = ent.path;
+                        if (!state.treeExpanded[ent.path]) childBox.style.display = 'none';
+                    }
+
+                    row.onclick = function(ev) {
+                        ev.stopPropagation();
+                        if (ent.type === 'dir' && childBox) {
+                            state.treeExpanded[ent.path] = !state.treeExpanded[ent.path];
+                            var openNow = state.treeExpanded[ent.path];
+                            row.innerHTML = (openNow ? '📂 ' : '📁 ') + escapeHtml(row.dataset.name);
+                            if (state.treeExpanded[ent.path]) {
+                                childBox.style.display = '';
+                                appendTreeEntries(childBox, ent.path, depth + 1, state.treeSeq);
+                            } else {
+                                childBox.style.display = 'none';
+                            }
+                        } else {
+                            loadFile(ent.path);
+                        }
+                    };
+
+                    container.appendChild(row);
+                    if (childBox) {
+                        container.appendChild(childBox);
+                        if (state.treeExpanded[ent.path]) {
+                            appendTreeEntries(childBox, ent.path, depth + 1, seq);
+                        }
+                    }
+                });
+            });
+    }
+
+    function refreshTree() {
+        var root = q('#aew-tree');
+        if (!root) return;
+        state.treeSeq += 1;
+        var seq = state.treeSeq;
+        if (!state.treeExpanded || Object.keys(state.treeExpanded).length === 0) {
+            state.treeExpanded = { lib: true };
+        }
+        var searchInput = q('#aew-tree-search');
+        var hasSearch = searchInput && searchInput.value.trim();
+        if (!hasSearch) {
+            root.innerHTML = '';
+            appendTreeEntries(root, '', 0, seq);
+        }
+        loadFileIndex();
+    }
+
+    function loadFile(path, lineNum) {
+        if (state.dirty && !confirm('Discard unsaved changes?')) return;
+        setStatus('Loading…');
+        fetchJson('/ai/read_file?path=' + encodeURIComponent(path) + '&limit=800')
+            .then(function(data) {
+                if (!data.success) {
+                    var errMsg = 'File not found: ' + path;
+                    if (data.error) errMsg += ' — ' + data.error;
+                    setStatus(errMsg, 'err');
+                    addMsg(errMsg, 'system');
+                    if (/dailyplan/i.test(path) || path === 'root/DailyPlan.tt') {
+                        addMsg('Planning uses root/admin/planning/DailyPlan.tt (route /planning/daily). '
+                            + 'Resolving from controller…', 'system');
+                        resolveRouteAndReply('/planning/daily', { autoOpen: true });
+                    }
+                    return;
+                }
+                state.currentPath = data.path;
+                state.currentContent = data.content;
+                state.dirty = false;
+                q('#aew-editor').value = data.content;
+                q('#aew-editor-path').textContent = data.path;
+                setStatus('Loaded', 'ok');
+                markTreeActive();
+                if (lineNum) {
+                    setTimeout(function() {
+                        scrollToLine(lineNum);
+                    }, 50);
+                }
+            })
+            .catch(function(err) {
+                var errMsg = 'Failed to load ' + path + ': ' + err;
+                setStatus(errMsg, 'err');
+                addMsg(errMsg, 'system');
+            });
+    }
+
+    function verifyAndLoadFile(path) {
+        fetchJson('/ai/read_file?path=' + encodeURIComponent(path) + '&limit=50')
+            .then(function(data) {
+                if (data.success) {
+                    loadFile(path);
+                    return;
+                }
+                addMsg('AI suggested a file that does not exist: ' + path, 'system');
+                if (/dailyplan/i.test(path) || path === 'root/DailyPlan.tt') {
+                    addMsg('Correct path: root/admin/planning/DailyPlan.tt via /planning/daily (Planning.pm).', 'system');
+                    resolveRouteAndReply('/planning/daily', { autoOpen: true });
+                }
+            })
+            .catch(function(err) {
+                addMsg('Could not verify file ' + path + ': ' + err, 'system');
+            });
+    }
+
+    function scrollToLine(lineNum) {
+        var textarea = q('#aew-editor');
+        if (!textarea || !lineNum) return;
+        var lines = textarea.value.split('\n');
+        var targetLine = parseInt(lineNum, 10);
+        if (isNaN(targetLine) || targetLine < 1 || targetLine > lines.length) return;
+        var charIndex = 0;
+        for (var i = 0; i < targetLine - 1; i++) {
+            charIndex += lines[i].length + 1;
+        }
+        textarea.focus();
+        textarea.setSelectionRange(charIndex, charIndex + (lines[targetLine - 1] || '').length);
+        var lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 16;
+        textarea.scrollTop = (targetLine - 1) * lineHeight - (textarea.clientHeight / 2);
+    }
+
+    function detectPageErrorSource() {
+        var doc = document;
+        try {
+            if (window.AEW_POPUP_MODE && window.opener && !window.opener.closed) {
+                doc = window.opener.document;
+            }
+        } catch (e) {}
+
+        var fileTd = Array.from(doc.querySelectorAll('td, th')).find(function(el) {
+            var text = el.textContent.trim();
+            return text === 'File:' || text.indexOf('File:') >= 0;
+        });
+        if (!fileTd) return null;
+
+        var pathTd = fileTd.nextElementSibling;
+        if (!pathTd) return null;
+
+        var fullPath = pathTd.textContent.trim();
+        if (!fullPath) return null;
+
+        var parts = fullPath.split(':');
+        var rawPath = parts[0];
+        var lineNum = '';
+        if (parts[1] && /^\d+$/.test(parts[1].trim())) {
+            lineNum = parts[1].trim();
+        }
+
+        var match = rawPath.match(/(?:^|\/)(lib|root|sql|script|t)\/(.+)$/);
+        var path = '';
+        if (match) {
+            path = match[1] + '/' + match[2];
+        } else {
+            path = rawPath;
+        }
+
+        var subject = '';
+        var subjectTh = Array.from(doc.querySelectorAll('th, td')).find(function(el) {
+            return el.textContent.trim().toLowerCase() === 'subject';
+        });
+        if (subjectTh && subjectTh.nextElementSibling) {
+            subject = subjectTh.nextElementSibling.textContent.trim();
+        }
+
+        var desc = '';
+        var descTh = Array.from(doc.querySelectorAll('th, td')).find(function(el) {
+            return el.textContent.trim().toLowerCase() === 'description';
+        });
+        if (descTh && descTh.nextElementSibling) {
+            desc = descTh.nextElementSibling.textContent.trim();
+        }
+
+        return {
+            path: path,
+            lineNum: lineNum,
+            subject: subject,
+            description: desc
+        };
+    }
+
+    function applyErrorSource(errInfo) {
+        if (!errInfo || !errInfo.path) return;
+        loadFile(errInfo.path, errInfo.lineNum);
+        var promptText = "I encountered an error:\n" +
+                         "File: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : "") + "\n";
+        if (errInfo.subject) {
+            promptText += "Subject: " + errInfo.subject + "\n";
+        }
+        if (errInfo.description) {
+            promptText += "Details:\n" + errInfo.description + "\n";
+        }
+        promptText += "\nPlease analyze the code around the error source and help me fix it.";
+        var input = q('#aew-chat-input') || document.getElementById('aew-chat-input');
+        if (input) {
+            input.value = promptText;
+            input.focus();
+        }
+        addMsg("Detected error source on parent page. Loaded file: " + errInfo.path + (errInfo.lineNum ? " (line " + errInfo.lineNum + ")" : ""), "system");
+    }
+
+    function checkForErrorSourceAndLoad() {
+        var errInfo = null;
+        try {
+            errInfo = detectPageErrorSource();
+        } catch (e) {}
+
+        if (errInfo && errInfo.path) {
+            applyErrorSource(errInfo);
+        } else if (window.AEW_POPUP_MODE) {
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'AEW_REQUEST_ERROR_SOURCE' }, '*');
+            } else if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'AEW_REQUEST_ERROR_SOURCE' }, '*');
+            }
+        }
+    }
+
+    window.addEventListener('message', function(event) {
+        if (!event || !event.data) return;
+        if (event.data.type === 'AEW_REQUEST_ERROR_SOURCE') {
+            var errInfo = null;
+            try {
+                errInfo = detectPageErrorSource();
+            } catch (e) {}
+            if (errInfo && event.source) {
+                event.source.postMessage({
+                    type: 'AEW_RESPONSE_ERROR_SOURCE',
+                    errorSource: errInfo
+                }, '*');
+            }
+        } else if (event.data.type === 'AEW_RESPONSE_ERROR_SOURCE') {
+            applyErrorSource(event.data.errorSource);
+        }
+    });
+
+    function saveFile() {
+        if (!state.currentPath) return;
+        var content = q('#aew-editor').value;
+        ajaxFetch('/ai/apply_fix', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'path=' + encodeURIComponent(state.currentPath) + '&content=' + encodeURIComponent(content),
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.success) {
+                state.currentContent = content;
+                state.dirty = false;
+                setStatus('Saved', 'ok');
+            } else {
+                setStatus(data.error, 'err');
+            }
+        });
+    }
+
+    function buildPrompt(userText) {
+        var parts = [];
+        if (state.chatHistory.length) {
+            parts.push('--- Conversation ---\n');
+            state.chatHistory.slice(-10).forEach(function(m) {
+                parts.push((m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n');
+            });
+            parts.push('--- End ---\n\n');
+        }
+        if (state.currentPath && state.currentContent) {
+            parts.push('[FILE: ' + state.currentPath + ']\n```\n' + state.currentContent + '\n```\n[/FILE]\n\n');
+        }
+        parts.push('User: ' + userText);
+        return parts.join('');
+    }
+
+    function buildGrokCliPrompt(userText) {
+        var parts = [];
+        var turns = state.chatHistory.filter(function(m) {
+            return (m.role === 'user' || m.role === 'assistant')
+                && m.content && !/^Error:/i.test(m.content);
+        }).slice(-4);
+        if (turns.length) {
+            turns.forEach(function(m) {
+                parts.push((m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n\n');
+            });
+        }
+        if (state.currentPath && state.currentContent) {
+            var snippet = state.currentContent;
+            if (snippet.length > 12000) {
+                snippet = snippet.slice(0, 12000) + '\n... (truncated)';
+            }
+            parts.push('[FILE: ' + state.currentPath + ']\n```\n' + snippet + '\n```\n\n');
+        }
+        parts.push(userText);
+        return parts.join('');
+    }
+
+    function openerContext() {
+        var path = window.location.pathname;
+        var title = document.title || '';
+        try {
+            if (window.opener && !window.opener.closed) {
+                path = window.opener.location.pathname || path;
+                title = window.opener.document.title || title;
+            }
+        } catch (e) { /* cross-origin */ }
+        return { page_path: path, page_title: title };
+    }
+
+    function sendChatGrokCli(prompt) {
+        setStatus('AI Code Editor running…');
+        q('#aew-send-btn').disabled = true;
+        var ctx = openerContext();
+        var grokOpts = { timeoutMs: 660000, maxRetries: 2 };
+        var grokBody = {
+            prompt: prompt,
+            page_path: ctx.page_path,
+            page_title: ctx.page_title,
+            model: grokModelForRequest() || undefined,
+        };
+        if (state.conversationId) {
+            grokBody.conversation_id = state.conversationId;
+        }
+        return fetchAiJson('/ai/grok_cli', grokBody, grokOpts);
+    }
+
+    function isErrorDiagnosisRequest(text) {
+        return /\[(?:Error|ERROR|WARN)\]|AI query failed|Grok query failed|Grok chat failed|\.pm:\d+\]|\.pm line \d+|generate -|chat -|410 Gone|no longer available|Automatic error todo/i.test(String(text || ''));
+    }
+
+    function pickEditorModel(userText) {
+        var modelEl = q('#aew-model');
+        var selected = modelEl ? modelEl.value : '';
+        if (state.ollamaReachable && isErrorDiagnosisRequest(userText)) {
+            return state.modelTiers.large || state.modelTiers.small || selected;
+        }
+        return selected;
+    }
+
+    function pickGrokModel() {
+        var cfg = state.editorConfig || {};
+        var models = cfg.external_models || [];
+        if (!models.length) return "";
+        var i, n, names = [];
+        for (i = 0; i < models.length; i++) {
+            n = models[i].name || "";
+            names.push(n);
+            if (/code|fast/i.test(n)) return n;
+        }
+        // Prefer a good-but-cheap Grok model if present
+        var cheapGood = names.find(function(m){ return /grok-3-mini|mini|cheap/i.test(m); });
+        if (cheapGood) return cheapGood;
+        return names[0] || "";
+    }
+
+    function editorCapabilities() {
+        var cfg = state.editorConfig || {};
+        return {
+            ollama: !!state.ollamaReachable,
+            grokApi: !!(cfg.grok_api_available || (cfg.external_models && cfg.external_models.length)),
+            grokCli: !!(cfg.grok_cli && cfg.grok_mode !== 'xai_api'),
+            small: state.modelTiers.small || '',
+            large: state.modelTiers.large || '',
+        };
+    }
+
+    function pickEditorRoute(userText) {
+        var tier = classifyEditorQuery(userText);
+        var cap = editorCapabilities();
+        if (tier === 'local') {
+            return { tier: 'local' };
+        }
+        if (tier === 'simple' && cap.ollama && cap.small) {
+            return { backend: 'comserv', method: 'quick', agent: 'coding', model: cap.small, label: 'Ollama quick' };
+        }
+        if (isErrorDiagnosisRequest(userText)) {
+            if (cap.ollama && cap.large) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: cap.large, label: 'Ollama (errors)' };
+            }
+            if (cap.grokApi) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel(), label: 'Grok API (errors)' };
+            }
+        }
+        if (tier === 'complex') {
+            if (cap.grokApi) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel() || pickEditorModel(userText), label: 'Grok API' };
+            }
+            if (cap.ollama && cap.large) {
+                return { backend: 'comserv', method: 'chat', agent: 'coding', model: cap.large, label: 'Ollama large' };
+            }
+        }
+        if (cap.ollama) {
+            return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickEditorModel(userText), label: 'Ollama' };
+        }
+        if (cap.grokApi) {
+            return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel(), label: 'Grok API' };
+        }
+        if (cap.grokCli) {
+            return { backend: 'grok_cli', method: 'cli', agent: 'coding', label: 'Grok CLI' };
+        }
+        return { backend: 'comserv', method: 'chat', agent: 'coding', model: pickEditorModel(userText), label: 'Comserv AI' };
+    }
+
+    function classifyEditorQuery(msg) {
+        var m = String(msg || '').trim();
+        if (!m) return 'simple';
+        if (/^(?:please\s+)?(?:find|search|locate|where is|what .tt|open |list |grep )/i.test(m)) return 'local';
+        if (/^\/[a-z]/i.test(m) || /\b(route|template).*(for|return|serves?)\b/i.test(m)) return 'local';
+        if (/\b(?:open|show|load)\s+(?:the\s+)?(?:daily\s*plan|planning)\b/i.test(m)) return 'local';
+        if (/\bDailyPlan\.tt\b/i.test(m)) return 'local';
+        if (isErrorDiagnosisRequest(m)) return 'complex';
+        var words = m.split(/\s+/);
+        if (/\b(refactor|implement|fix bug|debug|write code|explain in detail|compare|analyze|architect)\b/i.test(m)) {
+            return 'complex';
+        }
+        if (words.length < 12 && /^(what|where|who|how do|is there|can i|list|give me|show me)/i.test(m)) {
+            return 'simple';
+        }
+        if (words.length > 22) return 'complex';
+        return 'medium';
+    }
+
+    function fetchAiJsonOnce(url, body, opts) {
+        opts = opts || {};
+        var timeoutMs = opts.timeoutMs || 660000;
+        var abortCtrl = new AbortController();
+        state.currentAbortCtrl = abortCtrl;
+        var abortTimer = setTimeout(function() { abortCtrl.abort(); }, timeoutMs);
+        var progressPoller = null;
+        if (opts.pollProgress) {
+            progressPoller = setInterval(function() {
+                ajaxFetch('/ai/chat_progress')
+                    .then(function(r) { return r.ok ? r.json() : null; })
+                    .then(function(d) {
+                        if (!d || !d.steps || !d.steps.length) return;
+                        var last = d.steps[d.steps.length - 1];
+                        if (last) setStatus(last.slice(0, 120) + '…');
+                        if (d.done) {
+                            clearInterval(progressPoller);
+                            progressPoller = null;
+                        }
+                    })
+                    .catch(function() {});
+            }, 3000);
+        }
+        return ajaxFetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: abortCtrl.signal,
+        })
+        .then(function(r) {
+            return r.text().then(function(text) {
+                if (!text || !text.trim()) {
+                    throw new Error('Empty response from server (HTTP ' + r.status + ')');
+                }
+                try {
+                    var data = JSON.parse(text);
+                    if (!r.ok && data && !data.success && !data.error) {
+                        data.success = false;
+                        data.error = 'HTTP ' + r.status;
+                    }
+                    return data;
+                } catch (e) {
+                    throw new Error('Server returned non-JSON (HTTP ' + r.status + '): '
+                        + text.slice(0, 300));
+                }
+            });
+        })
+        .catch(function(err) {
+            if (err && err.name === 'AbortError') {
+                throw new Error('Request timed out — try Ollama model or a shorter prompt.');
+            }
+            throw err;
+        })
+        .finally(function() {
+            clearTimeout(abortTimer);
+            if (progressPoller) clearInterval(progressPoller);
+            state.currentAbortCtrl = null;
+            q('#aew-send-btn').disabled = false;
+        });
+    }
+
+    function fetchAiJson(url, body, opts) {
+        opts = opts || {};
+        var maxRetries = opts.maxRetries != null ? opts.maxRetries : 2;
+        var attempt = 0;
+        function run() {
+            return fetchAiJsonOnce(url, body, opts).catch(function(err) {
+                if (!isRetryableFetchError(err) || attempt >= maxRetries) {
+                    throw err;
+                }
+                attempt += 1;
+                setStatus('Connection dropped — waiting for dev server (retry '
+                    + attempt + '/' + maxRetries + ')…', 'info');
+                return waitForDevServer(attempt).then(run);
+            });
+        }
+        return run();
+    }
+
+    function sendChatQuick(userText) {
+        setStatus('Ollama quick…');
+        q('#aew-send-btn').disabled = true;
+        var model = state.modelTiers.small || '';
+        return fetchAiJson('/ai/quick_chat', {
+            prompt: userText,
+            model: model || undefined,
+            history: state.chatHistory.slice(-6),
+        }, { timeoutMs: 120000 }).then(function(data) {
+            if (!data.success) {
+                data.error = data.error || 'quick_chat failed';
+                if (data.hint) data.error += '\n' + data.hint;
+            }
+            return data;
+        });
+    }
+
+    function sendChatComserv(prompt, userText, route) {
+        route = route || pickEditorRoute(userText || prompt);
+        if (route.method === 'quick') {
+            return sendChatQuick(userText || prompt);
+        }
+        setStatus((route.label || 'Comserv AI') + '…');
+        q('#aew-send-btn').disabled = true;
+        return fetchAiJson('/ai/chat', {
+            prompt: prompt,
+            agent_id: route.agent || 'coding',
+            model: route.model || undefined,
+            history: state.chatHistory.slice(-20),
+            page_path: window.location.pathname,
+            conversation_id: state.conversationId || undefined,
+        }, { timeoutMs: route.method === 'quick' ? 120000 : 660000, pollProgress: route.method !== 'quick' });
+    }
+
+    function executeEditorRoute(userText, route) {
+        var full = buildPrompt(userText);
+        if (route.backend === 'grok_cli') {
+            return sendChatGrokCli(buildGrokCliPrompt(userText));
+        }
+        return sendChatComserv(full, userText, route);
+    }
+
+    function sendChat(userText) {
+        var selectEl = q('#aew-chat-history-select');
+        if (selectEl && selectEl.value !== '') {
+            selectEl.value = '';
+            renderConversation();
+        }
+        addMsg(userText, 'user');
+        state.chatHistory.push({ role: 'user', content: userText });
+
+        var routeLookup = tryLocalRouteLookup(userText);
+        if (routeLookup) {
+            routeLookup.then(function(handled) {
+                if (handled) return;
+                var fileFind = tryLocalFileFind(userText);
+                if (fileFind) {
+                    fileFind.then(function(h2) { if (!h2) sendChatToBackend(userText); });
+                } else {
+                    sendChatToBackend(userText);
+                }
+            });
+            return;
+        }
+        var fileFind = tryLocalFileFind(userText);
+        if (fileFind) {
+            fileFind.then(function(handled) {
+                if (!handled) sendChatToBackend(userText);
+            });
+            return;
+        }
+        sendChatToBackend(userText);
+    }
+
+    function sendChatToBackend(userText) {
+        var route = pickEditorRoute(userText);
+        if (state.backend === 'comserv' && route.backend === 'grok_cli') {
+            route = pickEditorRoute(userText);
+            if (route.backend === 'grok_cli') {
+                var cap = editorCapabilities();
+                if (cap.ollama || cap.grokApi) {
+                    route = cap.ollama
+                        ? { backend: 'comserv', method: 'chat', agent: 'coding', model: pickEditorModel(userText), label: 'Ollama' }
+                        : { backend: 'comserv', method: 'chat', agent: 'coding', model: pickGrokModel(), label: 'Grok API' };
+                }
+            }
+        }
+        setStatus('Using ' + (route.label || route.backend || 'auto'));
+        var req = executeEditorRoute(userText, route);
+        req.then(function(data) {
+            if (!data.success) {
+                var err = data.error || 'failed';
+                if (data.hint) err += '\n' + data.hint;
+                if (data.stderr) err += '\n' + data.stderr;
+                if (data.grok) err += '\n(binary: ' + data.grok + ', cwd: ' + (data.cwd || '?') + ')';
+                addMsg('Error: ' + err, 'system');
+                setStatus(data.error || 'grok error', 'err');
+                return;
+            }
+            var reply = data.response || '';
+            addMsg(reply, 'ai');
+            state.chatHistory.push({ role: 'assistant', content: reply });
+
+            if (data.conversation_id) {
+                state.conversationId = data.conversation_id;
+                loadPastConversations();
+            }
+
+            var turnIndex = state.conversationTurns.length + 1;
+            state.conversationTurns.push({
+                id: turnIndex,
+                user: userText,
+                ai: reply
+            });
+            updateHistoryDropdown();
+
+            var backendLabel;
+            if (data.backend === 'grok_api') {
+                backendLabel = 'Grok xAI API';
+            } else if (data.backend === 'ollama_quick') {
+                backendLabel = 'Ollama quick' + (data.ollama_host ? ' @' + data.ollama_host : '');
+            } else {
+                backendLabel = data.backend || route.label || state.backend;
+            }
+            setStatus(backendLabel + ' done', 'ok');
+            var rf = reply.match(/\[READ_FILE:\s*([^\]]+)\]/i);
+            if (rf) verifyAndLoadFile(rf[1].trim());
+
+            var fix = parseFixBlock(reply);
+            if (fix) showFixPanel(fix);
+        }).catch(function(e) {
+            var errMsg = String(e);
+            if (/NetworkError|Failed to fetch|fetch resource|aborted|timed out/i.test(errMsg)
+                && route.backend !== 'comserv' && state.ollamaReachable) {
+                setStatus('Retrying with Comserv AI + Ollama…', 'info');
+                var fallback = {
+                    backend: 'comserv',
+                    method: isErrorDiagnosisRequest(userText) || classifyEditorQuery(userText) === 'complex'
+                        ? 'chat' : 'quick',
+                    agent: 'coding',
+                    model: state.modelTiers.large || state.modelTiers.small || pickEditorModel(userText),
+                    label: 'Ollama fallback'
+                };
+                return executeEditorRoute(userText, fallback).then(function(data) {
+                    if (!data.success) throw new Error(data.error || 'fallback failed');
+                    addMsg(data.response || '', 'ai');
+                    state.chatHistory.push({ role: 'assistant', content: data.response || '' });
+                    setStatus('Ollama fallback done', 'ok');
+                });
+            }
+            var hint = '';
+            if (/NetworkError|Failed to fetch|fetch resource|aborted|timed out/i.test(errMsg)) {
+                hint = '\n\nLikely cause: the dev server restarted (auto-reload after Save, or manual restart) while this request was in flight.';
+                hint += '\nFix: wait a few seconds and send again — retries are automatic.';
+                hint += '\nIf it keeps failing on the workstation: bash script/restart_dev_server.sh';
+                hint += '\nOr open the editor directly: '
+                    + window.location.origin + '/ai2/editing_widget_popup';
+            }
+            addMsg('Network error: ' + errMsg + hint, 'system');
+            setStatus(errMsg, 'err');
+        });
+    }
+
+    function ensureOnBody() {
+        var panel = q('#aew-panel');
+        var wrap = q('#aew-launcher-wrap');
+        if (panel && panel.parentNode !== document.body) {
+            document.body.appendChild(panel);
+        }
+        if (wrap && wrap.parentNode !== document.body) {
+            document.body.appendChild(wrap);
+        }
+    }
+
+    function openPanel() {
+        buildDom();
+        ensureOnBody();
+        var panel = q('#aew-panel');
+        panel.classList.add('open');
+        restorePanelSize(panel);
+        state.open = true;
+        state.inline = true;
+        document.body.classList.add('aew-inline-open');
+        sessionStorage.setItem('aew_open', 'inline');
+        if (!q('#aew-messages').childElementCount && !window.AEW_POPUP_MODE) {
+            addMsg('Inline dock — use ⤢ for a separate window (recommended).', 'system');
+        }
+        refreshTree();
+        checkForErrorSourceAndLoad();
+        loadPastConversations();
+    }
+
+    function closePanel() {
+        var p = q('#aew-panel');
+        if (p) p.classList.remove('open');
+        state.open = false;
+        state.inline = false;
+        document.body.classList.remove('aew-inline-open');
+        sessionStorage.removeItem('aew_open');
+    }
+
+    function openPopup() {
+        if (state.popupWindow && !state.popupWindow.closed) {
+            state.popupWindow.focus();
+            return;
+        }
+        closePanel();
+        var w = 920, h = 640;
+        var left = Math.max(0, window.screenX + window.outerWidth - w - 40);
+        var top  = Math.max(0, window.screenY + 40);
+        state.popupWindow = window.open(
+            '/ai2/editing_widget_popup',
+            'AIEditor',
+            'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top +
+            ',resizable=yes,menubar=no,toolbar=no,location=no,status=no'
+        );
+        if (!state.popupWindow) {
+            addMsg('Popup blocked — allow popups or use ⊞ to dock inline.', 'system');
+            openPanel();
+        }
+    }
+
+    function open(opts) {
+        opts = opts || {};
+        if (window.AEW_POPUP_MODE || opts.popup) {
+            openPanel();
+            return;
+        }
+        if (opts.inline || sessionStorage.getItem('aew_open') === 'inline') {
+            openPanel();
+        } else {
+            openPopup();
+        }
+    }
+
+    window.AEW = {
+        _loaded: true,
+        open: open,
+        openPopup: openPopup,
+        openPopupAI2: openPopupAI2,
+        openInline: function() { open({ inline: true }); },
+        close: function() {
+            closePanel();
+            if (state.popupWindow && !state.popupWindow.closed) {
+                state.popupWindow.close();
+            }
+        },
+        toggle: function() {
+            if (state.popupWindow && !state.popupWindow.closed) {
+                state.popupWindow.focus();
+            } else if (state.open) {
+                closePanel();
+            } else {
+                open();
+            }
+        },
+        loadFile: loadFile,
+        refreshTree: refreshTree,
+        runApprovedCommand: runApprovedCommand,
+        runApprovedGrep: runApprovedGrep,
+    };
+
+    fetchJson('/ai/editor_config').then(function(cfg) {
+        if (!cfg.success || !cfg.enabled) return;
+        state.enabled = true;
+        state.ollamaReachable = !!cfg.ollama_reachable;
+        state.ollamaHost = cfg.ollama_host || '';
+        state.codingTerminalAllowed = !!cfg.coding_terminal_allowed;
+        state.codingTerminalWs = cfg.coding_terminal_ws || '/coding/terminal_ws';
+        state.editorConfig = cfg;
+        state.cliMode = cfg.cli_mode || (cfg.interactive_ws_available ? 'pty' : 'http');
+        state.interactiveWsAvailable = !!cfg.interactive_ws_available;
+        if (!state.interactiveWsAvailable) state.cliMode = 'http';
+        if (cfg.model_tiers) {
+            state.modelTiers.small = cfg.model_tiers.small || '';
+            state.modelTiers.large = cfg.model_tiers.large || '';
+        }
+        buildDom();
+        populateModels(cfg);
+        populateCliOllamaModels(cfg);
+        loadPastConversations();
+        var diagHtml = '<details style="font-size:0.75rem; color:#dcdcaa; cursor:pointer;">' +
+            '<summary style="font-weight:bold; outline:none; color:#dcdcaa;">🔌 Remote Connection Info (Click to Expand)</summary>' +
+            '<div style="margin-top:6px; padding:6px; background:#111; border:1px solid #444; border-radius:3px; color:#ccc; font-family:monospace; line-height:1.4;">';
+        if (cfg.grok_cli) {
+            var authNote = cfg.grok_auth ? (' auth=' + cfg.grok_auth) : '';
+            var modeNote = cfg.grok_mode === 'xai_api'
+                ? ' — uses xAI API (works from tablet/remote; no local CLI)'
+                : ' — local CLI (workstation only)';
+            diagHtml += '<strong>Grok:</strong> ' + escapeHtml(cfg.grok_cli) + escapeHtml(authNote) + escapeHtml(modeNote) + '<br>';
+        }
+        if (cfg.remote_ok) {
+            if (cfg.zerotier_dns_note) {
+                diagHtml += '<strong>ZeroTier DNS:</strong> ' + escapeHtml(cfg.zerotier_dns_note) + '<br>';
+            }
+            if (cfg.editor_url_workstation_zero) {
+                diagHtml += '<strong>Dev (ZT hostname):</strong> ' + escapeHtml(cfg.editor_url_workstation_zero) + '<br>';
+            }
+            if (cfg.editor_url_zerotier) {
+                diagHtml += '<strong>Dev (ZT IP):</strong> ' + escapeHtml(cfg.editor_url_zerotier) + '<br>';
+            }
+            diagHtml += '<strong>LAN hostname:</strong> ' + escapeHtml(cfg.editor_url_lan || 'http://workstation.local:3001/ai2/editing_widget_popup') + '<br>';
+            if (cfg.ssh_tunnel_cmd) {
+                diagHtml += '<strong>SSH:</strong> <code>' + escapeHtml(cfg.ssh_tunnel_cmd) + '</code><br>';
+                diagHtml += '<strong>Tunnel browser:</strong> ' + escapeHtml(cfg.editor_url_tunnel || 'http://workstation.local:3001/ai2/editing_widget_popup') + '<br>';
+                diagHtml += '<strong>Hosts Hint:</strong> ' + escapeHtml(cfg.tunnel_hosts_hint || 'Tablet hosts: 127.0.0.1 workstation.local') + '<br>';
+            }
+            if (cfg.ssh_tunnel_cmd_named) {
+                diagHtml += '<strong>SSH alias:</strong> <code>' + escapeHtml(cfg.ssh_tunnel_cmd_named) + '</code> (Host ' + escapeHtml(cfg.ssh_config_host || 'comserv-aew') + ')<br>';
+            }
+            diagHtml += '<span style="color:#ffaa00;">⚠️ Do not use raw IP 192.168.1.199 — not a configured site domain.</span><br>';
+        }
+        if (cfg.project_root) {
+            diagHtml += '<strong>Project root:</strong> ' + escapeHtml(cfg.project_root) + ' — expand lib/ or root/ in the tree.<br>';
+        }
+        diagHtml += '</div></details>';
+        addMsg(diagHtml, 'system', true);
+
+        if (cfg.grok_sync_hint) {
+            diagHtml += '<strong>xAI:</strong> ' + escapeHtml(cfg.grok_sync_hint) + '<br>';
+        }
+        if (cfg.ollama_reachable && cfg.ollama_host) {
+            diagHtml += '<strong>Ollama:</strong> ' + escapeHtml(cfg.ollama_host) + ':' + (cfg.ollama_port || 11434);
+            if (cfg.model_tiers && cfg.model_tiers.small) {
+                diagHtml += ' (quick: ' + escapeHtml(cfg.model_tiers.small) + ')';
+            }
+            diagHtml += '<br>';
+        } else if (cfg.ollama_hosts && cfg.ollama_hosts.length) {
+            diagHtml += '<strong>Ollama hosts to try:</strong> ' + escapeHtml(cfg.ollama_hosts.join(', ')) + '<br>';
+        }
+
+        state.backend = 'comserv';
+        if (!cfg.ollama_reachable && !cfg.grok_api_available && cfg.default_backend === 'grok_cli') {
+            state.backend = 'grok_cli';
+        }
+        var be = q('#aew-backend');
+        if (be) be.value = state.backend;
+        if (window.AEW_POPUP_MODE) {
+            checkForErrorSourceAndLoad();
+            return;
+        }
+        if (sessionStorage.getItem('aew_open') === 'inline') openPanel();
+        if (window.location.search.match(/open_aew=(?:1|popup)/)) openPopup();
+        if (window.location.search.indexOf('open_aew=inline') >= 0) openPanel();
+    }).catch(function(err) {
+        var msg = String(err);
+        var isFetch = /NetworkError|Failed to fetch|fetch resource|HTTP \d{3}/i.test(msg);
+        if (window.AEW_POPUP_MODE && isFetch) {
+            document.body.innerHTML = '<div style="padding:24px;font-family:system-ui;color:#f48771;background:#1e1e1e;min-height:100vh">'
+                + '<h2 style="color:#fff">AI Code Editor — cannot reach dev server</h2>'
+                + '<p>Open this page on your dev hostname (e.g. <code>dev.computersystemconsulting.ca</code>), not a raw IP.</p>'
+                + '<p>On the workstation, restart Starman: <code>CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3001 -r</code></p>'
+                + '<p style="color:#888">' + escapeHtml(msg) + '</p></div>';
+        } else {
+            console.error('AI Code Editor init failed:', err);
+            if (window.AEW_POPUP_MODE) {
+                addMsg('Editor init error: ' + msg, 'system');
+            }
+        }
+    });
+})();
