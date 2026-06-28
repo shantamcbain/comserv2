@@ -12,6 +12,8 @@ use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller' }
 
+__PACKAGE__->config(namespace => 'ai2');
+
 # ===================================================================
 # AI2 Controller - Clean, thin HTTP layer
 # All business logic delegated to Model::AI2::*
@@ -51,6 +53,24 @@ sub models :Local :Args(0) {
 }
 
 # Add more thin actions as needed (chat, sync, etc.)
+
+# PyCharm-like AI Code Editor popup (new clean system)
+sub editing_widget_popup :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'ai2_editing_widget_popup', "AI2 code editor popup opened");
+
+    # Placeholder model selection via Router (will be wired to Model::AI2::Router)
+    my $selected_model = eval { $c->model('AI2::Router')->select_best_model($c) } || 'grok-beta';
+
+    $c->stash(
+        template       => 'ai2/editing_widget_popup.tt',
+        page_title     => 'AI Code Editor (AI2)',
+        selected_model => $selected_model,
+        # Future: pass file tree, open files, etc. from Model layer
+    );
+}
 
 __PACKAGE__->meta->make_immutable;
 
