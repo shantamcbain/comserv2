@@ -1,4 +1,24 @@
 services:
+  # Development services - uses comserv2_* named volumes for consistency
+  config-db:
+    image: mariadb:10.11
+    container_name: comserv2-config-db-dev
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-devroot}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-comserv_dev}
+      MARIADB_USER: ${MARIADB_USER:-comserv}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-devpass}
+    volumes:
+      - comserv2_config_db_data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: comserv2-redis-dev
+    restart: unless-stopped
+    volumes:
+      - comserv2_redis_data:/data
+
   web-dev:
     build:
       context: .
@@ -36,12 +56,15 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-  comserv-themes:
-    driver: local
-  comserv-temp:
-    driver: local
-  comserv-cache:
-    driver: local
+      # Core comserv2_* named volumes (standardized across all environments)
+      - comserv2_logs:/opt/comserv/root/log
+      - comserv2_workshop_files:/opt/comserv/workshop_resources
+      - comserv2_sessions:/tmp/comserv/session
+      - comserv2_whisper_venv:/opt/comserv/whisper_venv
+      - comserv2_cpan_cache:/root/.cpan
+      - comserv2_cache:/cache
+      - comserv2_temp:/tmp/comserv/temp
+      - comserv2_themes:/opt/comserv/root/themes
       # Source code for hot reload during development
       - ./lib:/opt/comserv/lib:delegated
       - ./script:/opt/comserv/script:delegated
@@ -67,9 +90,24 @@ services:
         max-file: "3"
 
 volumes:
-  comserv-themes:
+  # Standardized comserv2_* named volumes (shared with prod/staging)
+  comserv2_config_db_data:
     driver: local
-  comserv-temp:
+  comserv2_redis_data:
     driver: local
-  comserv-cache:
+  comserv2_logs:
+    driver: local
+  comserv2_sessions:
+    driver: local
+  comserv2_workshop_files:
+    driver: local
+  comserv2_whisper_venv:
+    driver: local
+  comserv2_cpan_cache:
+    driver: local
+  comserv2_temp:
+    driver: local
+  comserv2_themes:
+    driver: local
+  comserv2_cache:
     driver: local
