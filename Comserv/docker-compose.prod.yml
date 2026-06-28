@@ -53,3 +53,7 @@ services:
 volumes:
   comserv_cache:
     driver: local
+  comserv-temp:
+    driver: local
+  comserv-themes:
+    driver: local
