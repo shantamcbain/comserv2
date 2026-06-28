@@ -67,6 +67,10 @@ sub editing_widget_popup :Local :Args(0) {
     my $recommended_models = $router ? $router->get_recommended_models($c) : ['grok-beta','ollama/llama3','ollama/codellama'];
     my $branches = $router ? $router->get_available_branches($c) : ['main','ai2-refactor','feature/ai2-popup'];
 
+    # Sort branches: current branch first, then alphabetically
+    my $current_branch = 'main';
+    @$branches = sort { $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b } @$branches;
+
     $c->stash(
         template            => 'ai2/editing_widget_popup.tt',
         selected_model      => $selected_model,
