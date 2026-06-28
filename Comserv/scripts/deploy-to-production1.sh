@@ -169,17 +169,42 @@ post_deploy_tasks() {
     ' || log "Post-deploy tasks completed with warnings"
 }
 
+# Interactive menu (only two options)
+show_menu() {
+    echo ""
+    echo "Comserv Production Deployment Options:"
+    echo "1) Build & test locally only (no deploy)"
+    echo "2) Full production deploy (build + push + deploy to production1)"
+    echo ""
+    read -rp "Select option [1-2]: " choice
+    case "$choice" in
+        1)
+            log "User selected: Build & test locally only"
+            build_and_test_locally
+            log "Local build & test completed successfully. No deployment performed."
+            ;;
+        2)
+            log "User selected: Full production deploy"
+            build_and_test_locally
+            push_image
+            deploy_to_production
+            health_check_and_rollback
+            cleanup_old_containers
+            post_deploy_tasks
+            log "=== Deployment SUCCESSFUL ==="
+            ;;
+        *)
+            echo "Invalid selection. Please enter 1 or 2."
+            exit 1
+            ;;
+    esac
+    log "Full log saved to: $LOG_FILE"
+}
+
 # Main
 main() {
     log "=== Comserv Production Deployment Started ==="
-    build_and_test_locally
-    push_image
-    deploy_to_production
-    health_check_and_rollback
-    cleanup_old_containers
-    post_deploy_tasks
-    log "=== Deployment SUCCESSFUL ==="
-    log "Full log saved to: $LOG_FILE"
+    show_menu
 }
 
 main "$@"

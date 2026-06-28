@@ -89,9 +89,9 @@ fi
 rm -f /var/run/supervisor.sock /var/run/supervisord.pid
 
 # Ensure log, session, and backup directories exist and are writable by comserv user
-mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
-chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
-chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups 2>/dev/null || true
+mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor /opt/comserv/root/themes /tmp/comserv/temp /cache /tmp/comserv/cache
+chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor /opt/comserv/root/themes /tmp/comserv/temp /cache /tmp/comserv/cache
+chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /opt/comserv/root/themes /tmp/comserv/temp /cache /tmp/comserv/cache 2>/dev/null || true
 
 # Create base supervisord.conf if missing or empty
 if [ ! -s /etc/supervisor/supervisord.conf ]; then

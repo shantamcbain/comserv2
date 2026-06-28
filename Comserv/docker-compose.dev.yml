@@ -36,6 +36,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+  comserv-themes:
+    driver: local
+  comserv-temp:
+    driver: local
+  comserv-cache:
+    driver: local
       # Source code for hot reload during development
       - ./lib:/opt/comserv/lib:delegated
       - ./script:/opt/comserv/script:delegated
@@ -59,3 +65,11 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  comserv-themes:
+    driver: local
+  comserv-temp:
+    driver: local
+  comserv-cache:
+    driver: local
