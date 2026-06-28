@@ -1703,8 +1703,8 @@ function openDeployPopup(todoId) {
         "Choose Deployment Method:\n\n" +
         "Type [1] for FULL DEPLOY (Primary Choice):\n" +
         "  - Rebuilds and pushes a new image to Docker Hub, then restarts the production server container.\n\n" +
-        "Type [2] for QUICK DEPLOY:\n" +
-        "  - Bypasses compiling/uploading. Immediately triggers the deploy script to stop blocking host processes and restart the container.\n\n" +
+        "Type [2] for Build & test locally only (no deploy):\n" +
+        "  - Builds and tests the production image locally but does not push or deploy.\n\n" +
         "Type [C] or press [Cancel] to Abort.",
         "1"
     );

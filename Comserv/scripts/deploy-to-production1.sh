@@ -136,7 +136,7 @@ health_check_and_rollback() {
 }
 
 rollback() {
-    log "Performing rollback..."
+    progress "Rollback initiated – restoring previous healthy container"
     ssh "${PROD_USER}@${PROD_HOST}" bash -s <<EOF
         docker stop $CONTAINER_NAME || true
         docker rm $CONTAINER_NAME || true
@@ -205,6 +205,14 @@ show_menu() {
 
 # Main
 main() {
+    # Parse --verbose flag
+    for arg in "$@"; do
+        if [ "$arg" = "--verbose" ] || [ "$arg" = "-v" ]; then
+            VERBOSE=true
+            echo "[VERBOSE MODE ENABLED]"
+        fi
+    done
+
     log "=== Comserv Production Deployment Started ==="
     show_menu
 }

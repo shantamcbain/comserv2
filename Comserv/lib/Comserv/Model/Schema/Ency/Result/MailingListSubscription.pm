@@ -58,12 +58,7 @@ __PACKAGE__->add_columns(id => {
         data_type     => 'tinyint',
         default_value => 1,
     },
-    status => {
-        data_type     => 'varchar',
-        size          => 20,
-        default_value => 'subscribed',
-        is_nullable   => 0,
-    },
+    # status column removed - does not exist in DB table
     unsubscribed_at => {
         data_type   => 'timestamp',
         is_nullable => 1,
