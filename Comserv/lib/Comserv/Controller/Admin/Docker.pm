@@ -190,9 +190,10 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         push @lines, "Remote deploy on workstation exited with code $exit_code";
         $success = ($exit_code == 0);
     } else {
-        # Safe server (workstation etc.): run locally
+        # Safe server (workstation etc.): run locally with dated container backup
         my $repo_path    = '/home/shanta/PycharmProjects/comserv2';
         my $compose_file = "$repo_path/Comserv/docker-compose.prod.yml";
+        my $container    = 'comserv-web-prod';
 
         push @lines, "[${\scalar localtime}] === git pull ===";
         my $git_out  = `cd '$repo_path' && git pull 2>&1`;
@@ -201,19 +202,32 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         push @lines, "git pull exited with code $git_exit" if $git_exit;
         $success = 0 if $git_exit;
 
-        push @lines, "[${\scalar localtime}] === docker compose down + up (new container) ===";
-        my $docker_result = $c->model('Docker')->restart_containers(
-            services     => ['web-prod'],
-            force        => 1,
-            compose_file => $compose_file,
-        );
-        push @lines, $docker_result->{stdout} if $docker_result->{stdout};
-        push @lines, $docker_result->{stderr} if $docker_result->{stderr};
-        push @lines, "command: " . ($docker_result->{command} || 'n/a');
-        unless ($docker_result->{success}) {
-            $success = 0;
-            push @lines, "docker compose exited with errors";
-        }
+        # === Step: Stop + rename old container as dated backup ===
+        my $date_tag = `date +%Y-%m-%d_%H%M%S`;
+        chomp $date_tag;
+        my $backup_name = "${container}-backup-$date_tag";
+
+        push @lines, "[${\scalar localtime}] === Stopping old container: $container ===";
+        my $stop_out = `docker stop $container 2>&1 || true`;
+        push @lines, $stop_out;
+
+        push @lines, "[${\scalar localtime}] === Renaming to backup: $backup_name ===";
+        my $rename_out = `docker rename $container $backup_name 2>&1 || true`;
+        push @lines, $rename_out;
+
+        # === Build new image ===
+        push @lines, "[${\scalar localtime}] === Building new image (web-prod) ===";
+        my $build_out = `cd '$repo_path/Comserv' && docker compose -f '$compose_file' build web-prod --no-cache 2>&1`;
+        push @lines, $build_out;
+        if ($? >> 8) { $success = 0; }
+
+        # === Start new container ===
+        push @lines, "[${\scalar localtime}] === Starting new container ===";
+        my $up_out = `cd '$repo_path/Comserv' && docker compose -f '$compose_file' up -d web-prod 2>&1`;
+        push @lines, $up_out;
+        if ($? >> 8) { $success = 0; }
+
+        push @lines, "[${\scalar localtime}] Local deploy sequence complete.";
     }
 
     my $elapsed = time() - $t0;
