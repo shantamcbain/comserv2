@@ -68,6 +68,14 @@
                         <div id="containers-list">
                             <p>Click Refresh or open this section to load containers.</p>
                         </div>
+
+                        <!-- Persistent Data Volumes Section -->
+                        <div id="volumes-section" style="margin-top: 30px; display: none;">
+                            <h4 style="margin-bottom: 12px; color: var(--text-color);">
+                                <i class="fas fa-database"></i> Persistent Data Volumes
+                            </h4>
+                            <div id="volumes-list"></div>
+                        </div>
                     </div>
                 </div>
             </div>

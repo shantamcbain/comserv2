@@ -79,6 +79,9 @@
                 throw new Error(data.error || 'Unknown error');
             }
             renderContainers(container, data.containers || [], host);
+            if (data.volumes && data.volumes.length) {
+                renderVolumes(data.volumes, host);
+            }
         })
         .catch(err => {
             container.innerHTML = `
@@ -146,6 +149,49 @@
 
         html += `</div>`;
         containerEl.innerHTML = html;
+    }
+
+    // === Render Persistent Data Volumes ===
+    function renderVolumes(volumes, host) {
+        const section = document.getElementById('volumes-section');
+        const list = document.getElementById('volumes-list');
+        if (!section || !list) return;
+
+        if (!volumes.length) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+
+        let html = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">`;
+
+        volumes.forEach(v => {
+            const highlightStyle = v.highlight ? 'border: 2px solid #28a745; background: #f0fff4;' : 'border: 1px solid var(--border-color, #ddd);';
+            const badges = [];
+            if (v.is_cache) badges.push('<span style="background:#28a745;color:white;padding:1px 6px;border-radius:3px;font-size:0.75em;">CACHE</span>');
+            if (v.is_backup) badges.push('<span style="background:#dc3545;color:white;padding:1px 6px;border-radius:3px;font-size:0.75em;">BACKUP</span>');
+            if (v.is_temp) badges.push('<span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;font-size:0.75em;">TEMP</span>');
+            if (v.is_workshop) badges.push('<span style="background:#17a2b8;color:white;padding:1px 6px;border-radius:3px;font-size:0.75em;">WORKSHOP</span>');
+
+            html += `
+                <div class="card" style="${highlightStyle} border-radius: 8px; padding: 12px; background: var(--card-bg, #fff);">
+                    <div style="margin-bottom: 8px;">
+                        <strong style="font-size: 0.95rem; word-break: break-all;">${v.name}</strong>
+                        ${badges.length ? `<div style="margin-top:4px;">${badges.join(' ')}</div>` : ''}
+                    </div>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-muted-color, #555);">
+                        <li><strong>Driver:</strong> ${v.driver}</li>
+                        <li><strong>Created:</strong> ${v.created || 'unknown'}</li>
+                        <li><strong>Size:</strong> ${v.size}</li>
+                        <li style="word-break: break-all;"><strong>Mount:</strong> <code style="font-size:0.75em">${v.mountpoint}</code></li>
+                    </ul>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        list.innerHTML = html;
     }
 
     // === Placeholder Action Functions (can be expanded later) ===

@@ -30,8 +30,6 @@
 #                -f docker-compose.prod.nfs.yml up -d
 # =============================================================================
 
-version: '3.9'
-
 services:
   config-db:
     image: mariadb:10.11
