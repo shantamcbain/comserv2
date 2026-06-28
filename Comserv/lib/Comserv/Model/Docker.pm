@@ -57,6 +57,43 @@ sub check_container_status {
     return $self->docker_manager->check_container_status($service);
 }
 
+# === New methods for Container Status Overview ===
+
+sub delete_container {
+    my ($self, $name, $force) = @_;
+    my $cmd = $force ? "docker rm -f \"$name\" 2>&1" : "docker rm \"$name\" 2>&1";
+    my $output = `\$cmd`;
+    my $exit = $? >> 8;
+    return {
+        success => $exit == 0,
+        output  => $output,
+        message => $exit == 0 ? "Container $name removed" : "Failed to remove $name"
+    };
+}
+
+sub create_dated_backup {
+    my ($self, $container_name) = @_;
+    my $date_tag = `date +%Y%m%d_%H%M%S`;
+    chomp $date_tag;
+    my $backup_name = "${container_name}-bk-${date_tag}";
+
+    my $stop = `docker stop "$container_name" 2>&1 || true`;
+    my $rename = `docker rename "$container_name" "$backup_name" 2>&1 || true`;
+
+    return {
+        success => 1,
+        backup_name => $backup_name,
+        output => "Stopped and renamed to $backup_name"
+    };
+}
+
+sub get_image_created {
+    my ($self, $image) = @_;
+    my $out = `docker inspect --format='{{.Created}}' "$image" 2>/dev/null | head -1`;
+    chomp $out if $out;
+    return $out || '';
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
