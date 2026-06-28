@@ -3162,6 +3162,65 @@ sub _get_db_menu {
     return \@menu;
 }
 
+# --- DB-driven menu helpers (fixed / added) ---
+sub _has_db_menu_data {
+    my ($self, $c) = @_;
+    my $site = $self->_current_site($c);
+    my $count = $c->model('DBEncy')->resultset('SiteMenuOverride')->search({
+        site_name   => $site,
+        is_included => 1,
+    })->count;
+    return $count > 0;
+}
+
+sub build_visual_menu {
+    my ($self, $c) = @_;
+    my $site = $self->_current_site($c);
+    my $menu = [];
+
+    eval {
+        my $ov_rs   = $c->model('DBEncy')->resultset('SiteMenuOverride');
+        my $stock_rs= $c->model('DBEncy')->resultset('MenuStock');
+        my $link_rs = $c->model('DBEncy')->resultset('InternalLinksTb');
+
+        my $overrides = $ov_rs->search({
+            site_name   => $site,
+            is_included => 1,
+        }, { order_by => ['custom_category', 'sort_order'] });
+
+        while (my $ov = $overrides->next) {
+            my $entry = {
+                stock_key   => $ov->stock_key,
+                category    => $ov->custom_category,
+                submenu     => $ov->custom_submenu,
+                sort_order  => $ov->sort_order,
+            };
+            if ($ov->stock_id) {
+                my $stock = $stock_rs->find($ov->stock_id);
+                $entry->{label} = $stock->default_label if $stock;
+                $entry->{url}   = $stock->default_url   if $stock;
+            } elsif ($ov->stock_key =~ /^link-(\d+)$/) {
+                my $link = $link_rs->find($1);
+                next unless $link;
+                $entry->{label} = $link->name;
+                $entry->{url}   = $link->url;
+            }
+            push @$menu, $entry;
+        }
+    };
+    if ($@) {
+        $c->log->error("build_visual_menu error: $@");
+    }
+    return $menu;
+}
+
+# Force DB mode (remove legacy toggle / make DB the only mode)
+sub _force_db_menu {
+    my ($self, $c) = @_;
+    $c->stash->{use_db_menu}  = 1;
+    $c->session->{use_db_menu}= 1;
+}
+
 # Runtime toggle for admin users (legacy <-> db)
 sub toggle_menu_mode :Path('/navigation/toggle_menu_mode') :Args(0) {
     my ($self, $c) = @_;

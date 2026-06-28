@@ -34,6 +34,10 @@ services:
       - /home/shanta/comserv-sessions:/tmp/comserv/session:rw
       - comserv_cache:/cache
       - comserv_cache:/tmp/comserv/cache
+      - comserv-temp:/tmp/comserv/temp
+      - comserv-themes:/opt/comserv/root/themes
+      - /root/static:/opt/comserv/root/static
+      - /root/LegacyStaticPages:/opt/comserv/root/LegacyStaticPages
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
       interval: 10s
