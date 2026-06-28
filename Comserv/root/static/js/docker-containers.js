@@ -133,7 +133,8 @@
                             ${c.build_info ? `<li><strong>Build:</strong> ${c.build_info}</li>` : ''}
                             ${c.is_backup ? `<li><span style="color:#dc3545; font-weight:bold;">BACKUP CONTAINER</span></li>` : ''}
                             ${c.is_backup_container ? `<li><span style="color:#dc3545; font-weight:bold;">DATED BACKUP</span></li>` : ''}
-                            ${c.image_created ? `<li><strong>Image Created:</strong> ${c.image_created}</li>` : ''}
+                            ${c.is_backup_container && c.container_created ? `<li><strong>Backup Created:</strong> ${c.container_created}</li>` : ''}
+                            ${c.image_created && !c.is_backup_container ? `<li><strong>Image Created:</strong> ${c.image_created}</li>` : ''}
                         </ul>
                     </div>
                     <div style="margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;">

@@ -322,30 +322,44 @@ sub get_system_identifier {
                 $identifier = 'production-container';
             }
         } else {
-            # Outside container: resolve by LAN IP
+            # Outside container: resolve by LAN IP + explicit hostname check
             my %IP_NAMES = (
-                '192.168.1.126' => 'production-host',
-                '192.168.1.199' => 'workstation-host',
+                '192.168.1.126' => 'production1',
+                '192.168.1.199' => 'workstation',
             );
+            my $detected_ip = '';
             eval {
                 require Socket;
                 socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0) or die;
                 connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8'))) or die;
                 my $local = getsockname($sock);
                 my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
-                my $ip = Socket::inet_ntoa($local_ip_packed);
-                if (exists $IP_NAMES{$ip}) {
-                    $identifier = $IP_NAMES{$ip};
+                $detected_ip = Socket::inet_ntoa($local_ip_packed);
+                if (exists $IP_NAMES{$detected_ip}) {
+                    $identifier = $IP_NAMES{$detected_ip};
                 }
             };
-            
-            # Fallback to hostname if IP-based lookup failed or wasn't mapped
+
+            # Also check hostname explicitly (critical for production1)
+            unless ($identifier) {
+                eval {
+                    require Sys::Hostname;
+                    my $hn = Sys::Hostname::hostname();
+                    if ($hn =~ /production1|prod1/i || $ENV{PRODUCTION1}) {
+                        $identifier = 'production1';
+                    } elsif ($hn =~ /workstation|dev/i) {
+                        $identifier = 'workstation';
+                    }
+                };
+            }
+
+            # Fallback to hostname or IP if still unknown
             unless ($identifier) {
                 eval {
                     require Sys::Hostname;
                     $identifier = Sys::Hostname::hostname();
                 };
-                $identifier //= 'unknown-host';
+                $identifier ||= $detected_ip || 'unknown-host';
             }
         }
     }

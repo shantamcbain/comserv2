@@ -94,6 +94,14 @@ sub get_image_created {
     return $out || '';
 }
 
+# Return container creation timestamp (for backup containers)
+sub get_container_created {
+    my ($self, $container_name) = @_;
+    my $out = `docker inspect --format='{{.Created}}' "$container_name" 2>/dev/null | head -1`;
+    chomp $out if $out;
+    return $out || '';
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
