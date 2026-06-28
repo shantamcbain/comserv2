@@ -1,73 +1,25 @@
-[%# 
-  Navigation/Menu.tt
-  Single menu renderer.
-  - If user/site has opted into DB-driven menus (use_db_menu = 1) → render from DB (server-side, zero JS).
-  - Otherwise → fall back to the original static TopDropList*.tt includes (true legacy, minimal resources).
-
-  Admin toggle (runtime + edit mode) is injected only for admins.
-#]
-
-[% SET use_db = c.session.use_db_menu || c.stash.use_db_menu || 0 %]
-
-[%# Admin-only menu mode toggle (visible in top menu) %]
-[% IF is_admin %]
-<li class="horizontal-dropdown admin-menu-toggle">
-    <a href="#" class="dropbtn" title="Toggle top menu mode (Admin only)">
-        <i class="fas fa-exchange-alt"></i> Menu
-    </a>
-    <ul class="dropdown-content" style="min-width:220px;">
-        <li style="padding:4px 12px; font-size:0.9em; color:#666; border-bottom:1px solid #eee;">
-            Current: <strong>[% use_db ? 'DB-Driven' : 'Legacy Static' %]</strong>
-        </li>
-        <li>
-            <a href="/navigation/toggle_menu_mode?mode=legacy" 
-               style="display:block; padding:6px 12px; text-decoration:none; color:inherit;">
-                → Legacy (static .tt, no JS)
-            </a>
-        </li>
-        <li>
-            <a href="/navigation/toggle_menu_mode?mode=db" 
-               style="display:block; padding:6px 12px; text-decoration:none; color:inherit;">
-                → DB-Driven (server render)
-            </a>
-        </li>
-        <li style="border-top:1px solid #eee; margin-top:4px; padding-top:4px;">
-            <a href="/navigation/manage" 
-               style="display:block; padding:6px 12px; text-decoration:none; color:#007bff; font-weight:bold;">
-                <i class="fas fa-edit"></i> Edit Menu
-            </a>
-        </li>
-    </ul>
+[%# LEGACY MENU ONLY – static includes, no DB-driven menu, no toggle %]
+<li class="horizontal-dropdown">
+    <a href="[% c.stash.nav_back_url || c.session.nav_back_url || '/' %]" class="dropbtn nav-back-link" data-nav-back="1">Back</a>
 </li>
+[% INCLUDE 'Navigation/TopDropListMain.tt' %]
+[% IF c.stash.show_features_nav || c.stash.SiteName == 'CSC' %][% INCLUDE 'Navigation/TopDropListFeatures.tt' %][% END %]
+[% IF site_has_shop || c.stash.enabled_modules.ecommerce %][% INCLUDE 'Navigation/TopDropListShop.tt' %][% END %]
+[% INCLUDE 'Navigation/TopDropListLogin.tt' %]
+[% IF c.stash.show_hosted_nav %][% INCLUDE 'Navigation/TopDropListHosted.tt' %][% END %]
+[% INCLUDE 'Navigation/TopDropListMember.tt' %]
+[% INCLUDE 'Navigation/TopDropListENCY.tt' %]
+[% INCLUDE 'Navigation/TopDropListWeather.tt' %]
+[% IF is_admin %]
+    [% INCLUDE 'Navigation/admintopmenu.tt' %]
 [% END %]
-
-[% IF use_db %]
-    [%# DB-driven path – pure server render, no JS dropdown logic required %]
-    [% INCLUDE 'Navigation/DBMenu.tt' %]
-[% ELSE %]
-    [%# True legacy static includes (original behaviour) %]
-    <li class="horizontal-dropdown">
-        <a href="[% c.stash.nav_back_url || c.session.nav_back_url || '/' %]" class="dropbtn nav-back-link" data-nav-back="1">Back</a>
-    </li>
-    [% INCLUDE 'Navigation/TopDropListMain.tt' %]
-    [% IF c.stash.show_features_nav || c.stash.SiteName == 'CSC' %][% INCLUDE 'Navigation/TopDropListFeatures.tt' %][% END %]
-    [% IF site_has_shop || c.stash.enabled_modules.ecommerce %][% INCLUDE 'Navigation/TopDropListShop.tt' %][% END %]
-    [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
-    [% IF c.stash.show_hosted_nav %][% INCLUDE 'Navigation/TopDropListHosted.tt' %][% END %]
-    [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-    [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
-    [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
-    [% IF is_admin %]
-        [% INCLUDE 'Navigation/admintopmenu.tt' %]
-    [% END %]
-    [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
-    [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
-    [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
-    [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
-    [% IF c.stash.enabled_modules.item('brew') || c.stash.enabled_modules.brew || c.stash.brew_addon_active || c.stash.is_brew_host %]
-        [% INCLUDE 'Navigation/TopDropListBrew.tt' %]
-    [% END %]
-    [% IF c.stash.enabled_modules.item('printing_3d') %]
-        [% INCLUDE 'Navigation/TopDropList3d.tt' %]
-    [% END %]
+[% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
+[% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+[% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
+[% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
+[% IF c.stash.enabled_modules.item('brew') || c.stash.enabled_modules.brew || c.stash.brew_addon_active || c.stash.is_brew_host %]
+    [% INCLUDE 'Navigation/TopDropListBrew.tt' %]
+[% END %]
+[% IF c.stash.enabled_modules.item('printing_3d') %]
+    [% INCLUDE 'Navigation/TopDropList3d.tt' %]
 [% END %]
