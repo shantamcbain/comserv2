@@ -61,9 +61,13 @@
     </script>
     <script src="/static/js/ai-common.js?v=[% cv %]"></script>
     <script src="/static/js/local-chat.js?v=[% cv %]"></script>
+    <!-- HTMX for clean server-driven interactions -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     [% IF c.stash.show_code_editor_widget %]
     <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
     <script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
+    [%# HTMX floating Code button + modal for AI2 editor %]
+    [% INCLUDE 'ai2/_code_editor_button.tt' %]
     [% END %]
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->

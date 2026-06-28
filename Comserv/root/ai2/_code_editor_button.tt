@@ -1,0 +1,9 @@
+[%# Floating 💻 Code button — opens AI2 editor in a real draggable browser window %]
+<div id="ai2-code-btn"
+     style="position:fixed;bottom:20px;left:20px;z-index:9999;">
+    <button onclick="window.open('/ai2/editing_widget_popup','AIEditor','width=1400,height=900,resizable=yes,scrollbars=yes');return false;"
+            class="btn btn-primary"
+            style="border-radius:50%;width:48px;height:48px;font-size:1.4em;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+        💻
+    </button>
+</div>

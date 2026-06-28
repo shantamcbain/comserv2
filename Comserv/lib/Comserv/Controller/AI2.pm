@@ -61,15 +61,20 @@ sub editing_widget_popup :Local :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'ai2_editing_widget_popup', "AI2 code editor popup opened");
 
-    # Placeholder model selection via Router (will be wired to Model::AI2::Router)
-    my $selected_model = eval { $c->model('AI2::Router')->select_best_model($c) } || 'grok-beta';
+    my $router = eval { $c->model('AI2::Router') } || undef;
+
+    my $selected_model = $router ? $router->select_best_model($c) : 'grok-beta';
+    my $recommended_models = $router ? $router->get_recommended_models($c) : ['grok-beta','ollama/llama3','ollama/codellama'];
+    my $branches = $router ? $router->get_available_branches($c) : ['main','ai2-refactor','feature/ai2-popup'];
 
     $c->stash(
-        template       => 'ai2/editing_widget_popup.tt',
-        page_title     => 'AI Code Editor (AI2)',
-        selected_model => $selected_model,
-        # Future: pass file tree, open files, etc. from Model layer
+        template            => 'ai2/editing_widget_popup.tt',
+        selected_model      => $selected_model,
+        recommended_models  => $recommended_models,
+        branches            => $branches,
+        no_wrapper          => 1,
     );
+    # Catalyst will render the fragment into the dialog
 }
 
 __PACKAGE__->meta->make_immutable;
