@@ -1,5 +1,22 @@
-package Comserv::Controller::AI;
+# AI.pm - Catalyst Controller for AI/Ollama interactions
+#
+# This controller provides web interfaces for interacting with Ollama LLM models.
+# It includes both interactive web forms and API endpoints for AI query processing.
+#
+# Features:
+# - Interactive AI interface with AJAX submission
+# - JSON API endpoints for integration
+# - Real-time Ollama status checking
+# - System prompt and format customization
+# - Comprehensive logging with Comserv standards
+# - Authentication on all endpoints
+# - Error handling with Try::Tiny
+#
+# Author: AI Assistant
+# Created: 2025-01-15
+# Last Updated: 2025-01-28
 
+package Comserv::Controller::AI;
 use Moose;
 use namespace::autoclean;
 use Try::Tiny;
@@ -7,7 +24,6 @@ use JSON;
 use Template;
 use DateTime;
 use LWP::UserAgent;
-
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
@@ -16,6 +32,19 @@ use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller' }
 
+=head1 NAME
+
+Comserv::Controller::AI - Catalyst Controller for AI/Ollama interactions
+
+=head1 DESCRIPTION
+
+This controller provides web interfaces for interacting with Ollama LLM models.
+It supports both interactive web forms and JSON API endpoints.
+
+=head1 ATTRIBUTES
+
+=cut
+
 has 'logging' => (
     is => 'ro',
     lazy => 1,
@@ -23,14 +52,22 @@ has 'logging' => (
     documentation => 'Logging instance for standardized logging'
 );
 
-# Rest of your code...
+=head1 METHODS
+
+=head2 index
+
+Main AI interface page with interactive query form.
+
+=cut
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
-
+    
     # Determine if user is authenticated or guest
     my $username = $c->session->{username};
     my $guest_session_id = $c->session->{guest_session_id};
-
+    
+    # If not logged in, create guest session for accessing the UI
     unless ($username) {
         unless ($guest_session_id) {
             use Data::UUID;
@@ -39,35 +76,26 @@ sub index :Path :Args(0) {
             $c->session->{guest_session_id} = $guest_session_id;
         }
         $username = "Guest-" . substr($guest_session_id, 0, 8);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'index', "Guest user accessing AI interface: $username");
     }
-
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'index', "User accessing AI interface");
-
-    # Determine user permissions
+    
+    # Determine user permissions for model/server selection
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
+        # If roles is a string, convert it to array
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
     my $can_select_model = 0;
     if (ref($user_roles) eq 'ARRAY') {
         $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
     }
-
-    # === FIXED: Use Model facade for model listing ===
-    my $model_data = $c->model('AI')->get_available_models($c,
-        can_select_model => $can_select_model
-    );
-
-    my $installed_models = $model_data->{local} || $model_data->{installed} || [];
-    my $current_host     = $model_data->{host} || 'localhost';
-    my $current_port     = $model_data->{port} || 11434;
-    my $current_model    = $model_data->{current_model} || 'llama3';
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-        sprintf("Models loaded: %d local Ollama", scalar(@$installed_models)));
+    
+    # Get or set the current Ollama configuration
+    my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
 
     # Filter installed Ollama models by membership-allowed models for non-privileged users
     unless ($can_select_model) {
@@ -92,11 +120,116 @@ sub index :Path :Args(0) {
         }
     }
 
-    # External models now come from the model layer (safe, cached, no hangs)
-    my @external_models = $c->model('AI')->get_external_models($c);
+    # Wire quota check for harmony with plans (early, non-blocking for now to avoid surprising users)
+    # Shows a hint if the user is approaching or over their plan's free daily local AI calls.
+    if (!$can_select_model && $c->session->{user_id} && $c->session->{SiteID}) {
+        eval {
+            my $m = $c->model('Membership');
+            my ($within, $used, $quota) = $m->is_ai_call_within_free_quota($c, $c->session->{SiteID}, 'ollama', $c->session->{user_id});
+            if ($quota > 0 && !$within) {
+                $c->stash->{ai_quota_warning} = "Your plan's free daily AI allowance ($quota local calls) has been reached. Additional local calls and all Grok/xAI usage are tracked for billing / overage.";
+            } elsif ($quota > 0 && $used > ($quota * 0.8)) {
+                $c->stash->{ai_quota_warning} = "Approaching your plan's free daily AI limit ($used / $quota).";
+            }
+        };
+    }
 
+    # Check if user has external API keys configured (grok, openai, etc.)
+    # Admins can use any active key, other users only their own key
+    my @external_models;
+    my $user_id = $c->session->{user_id};
+    if ($user_id) {
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $grok_key;
+            if ($can_select_model) {
+                # Admins: use their own key first, fall back to any active key
+                $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+                unless ($grok_key) {
+                    $grok_key = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                }
+            } else {
+                $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+            }
+            if ($grok_key && $grok_key->api_key_encrypted) {
+                # Use synced models from metadata if available, else hardcoded fallback
+                my $meta = $grok_key->get_metadata() || {};
+                my $synced = $meta->{available_models};
+                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
+                    foreach my $m (@$synced) {
+                        my $id = $m->{id} || $m->{name} || '';
+                        next unless $id;
+                        next if $id =~ /^(grok-imagine|grok-.*video)/i;  # skip image/video models
+                        (my $label = $id) =~ s/-/ /g;
+                        $label = ucfirst($label) . ' (xAI)';
+                        push @external_models, { name => $id, provider => 'grok', label => $label };
+                    }
+                } else {
+                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                }
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'index', "Failed to fetch user API keys: $_");
+        };
+    }
+
+    # popup=1 means the /ai page was opened as a detached popup from the widget.
+    # In that mode, suppress the site navigation / header / footer so the window
+    # is a clean standalone chat interface.
     my $popup_mode = $c->request->param('popup') ? 1 : 0;
 
+    # task_id=N: opened from a todo "Chat about this task" link.
+    # Look up the todo and pass it to the template so the welcome screen can
+    # show what the user is supposed to be working on.
+    my $task_id  = $c->request->param('task_id') || '';
+    my $task_todo = undef;
+    if ($task_id && $task_id =~ /^\d+$/) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $t = $schema->resultset('Todo')->find($task_id);
+                if ($t) {
+                    my $s = $t->status // 0;
+                    my $status_label = $s == 1 ? 'New'
+                                     : $s == 2 ? 'In Progress'
+                                     : $s == 3 ? 'Done'
+                                     : "status=$s";
+                    # Resolve project name
+                    my $proj_name = '';
+                    eval {
+                        if ($t->project_id) {
+                            my $p = $schema->resultset('Project')->find($t->project_id);
+                            $proj_name = $p->name if $p;
+                        }
+                    };
+                    $task_todo = {
+                        record_id   => $t->record_id,
+                        subject     => $t->subject     // 'Untitled',
+                        description => $t->description // '',
+                        status      => $status_label,
+                        priority    => $t->priority    // '',
+                        due_date    => $t->due_date    // '',
+                        project     => $proj_name,
+                        edit_url    => "/todo/edit?record_id=" . $t->record_id,
+                    };
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'index', "task_todo lookup failed: $@") if $@;
+    }
+
+    # Set template variables
     $c->stash(
         template => 'ai/index.tt',
         page_title => 'AI Assistant',
@@ -108,187 +241,19 @@ sub index :Path :Args(0) {
         installed_models => $installed_models,
         external_models => \@external_models,
         ai_popup_mode => $popup_mode,
+        task_todo => $task_todo,
+        ai_quota_warning => $c->stash->{ai_quota_warning},
     );
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-        'index', "AI interface loaded for user: $username (local models: " . scalar(@$installed_models) . ", external: " . scalar(@external_models) . ")");
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
 
-sub conversations :Local :Args(0) {
-    my ($self, $c) = @_;
+=head2 template_editor
 
-    # Determine if user is authenticated or guest
-    my $username = $c->session->{username};
-    my $user_id = $c->session->{user_id};
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest = 0;
+Admin-only page for reviewing and applying AI-proposed TT2 template edits.
 
-    # If not logged in, create guest session
-    if (!$username) {
-        $is_guest = 1;
-
-        unless ($guest_session_id) {
-            use Data::UUID;
-            my $ug = Data::UUID->new;
-            $guest_session_id = $ug->create_str();
-            $c->session->{guest_session_id} = $guest_session_id;
-        }
-
-        $user_id = 199;
-        $username = "Guest-" . substr($guest_session_id, 0, 8);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-            'conversations', "Guest user accessing conversations: $username");
-    }
-
-    my $user_roles = $c->session->{roles} || [];
-    if (!ref($user_roles)) {
-        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
-    }
-    my $is_admin = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^admin$/i } @$user_roles : 0;
-
-    my $view_all = (!$is_guest && $is_admin && ($c->req->params->{view_all} || $c->req->params->{view} eq 'all')) ? 1 : 0;
-
-    my $page_title = $view_all ? 'All Conversations (Admin)' : 'My Conversations';
-
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-        'conversations', "Fetching conversations for user: $username (view_all=$view_all, is_admin=$is_admin)");
-
-    my @conversations;
-    my $total_conversations = 0;
-
-    try {
-        my $schema = $c->model('DBEncy')->schema;
-
-        my $search_criteria = $view_all ? {} : { user_id => $user_id };
-
-        my $count_rs = $schema->resultset('AiConversation')->search($search_criteria);
-        $total_conversations = $count_rs->count;
-
-        my $conv_rs = $schema->resultset('AiConversation')->search(
-            $search_criteria,
-            { order_by => { -desc => 'created_at' } }
-        );
-
-        my @conv_rows = $conv_rs->all;
-
-        foreach my $conv (@conv_rows) {
-            my $skip = 0;
-            try {
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                    'conversations', "Processing conversation ID=" . $conv->id);
-
-                if ($is_guest) {
-                    my $conv_metadata = {};
-                    if ($conv->metadata) {
-                        try {
-                            $conv_metadata = decode_json($conv->metadata);
-                        } catch {
-                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                                'conversations', "Failed to parse metadata for ID=" . $conv->id);
-                        };
-                    }
-
-                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
-                        $skip = 1;
-                    }
-                }
-
-                return if $skip;   # Safe skip instead of 'next' inside try
-
-                # Process messages and build data (rest of your original code)
-                my @messages = $conv->ai_messages->all;
-                my $message_count = scalar(@messages);
-
-                my $preview = '';
-                if (@messages > 0) {
-                    my $user_msg = '';
-                    my $ai_msg = '';
-                    foreach my $msg (@messages) {
-                        if ($msg->role eq 'user' && !$user_msg) {
-                            $user_msg = $msg->content;
-                        }
-                        if ($msg->role eq 'assistant' && !$ai_msg) {
-                            $ai_msg = $msg->content;
-                        }
-                        last if $user_msg && $ai_msg;
-                    }
-
-                    if ($user_msg) {
-                        $preview = "Q: " . substr($user_msg, 0, 60);
-                        $preview .= '...' if length($user_msg) > 60;
-                        if ($ai_msg) {
-                            $preview .= " | A: " . substr($ai_msg, 0, 40);
-                            $preview .= '...' if length($ai_msg) > 40;
-                        }
-                    } else {
-                        my $latest_message = $conv->get_latest_message;
-                        $preview = $latest_message ? substr($latest_message->content, 0, 100) : '';
-                    }
-                }
-
-                my $display_username = 'Unknown';
-                if ($conv->user) {
-                    $display_username = $conv->user->username;
-                }
-
-                my @message_data = map {
-                    {
-                        id => $_->id,
-                        conversation_id => $_->conversation_id,
-                        user_id => $_->user_id,
-                        role => $_->role,
-                        content => $_->content,
-                        created_at => $_->created_at,
-                        agent_type => $_->agent_type || 'chat',
-                        model_used => $_->model_used || '',
-                        ip_address => $_->ip_address || '',
-                        user_role => $_->user_role || '',
-                        metadata => $_->metadata || '{}'
-                    }
-                } @messages;
-
-                my $conv_data = {
-                    id => $conv->id,
-                    user_id => $conv->user_id,
-                    username => $display_username,
-                    title => $conv->get_display_title,
-                    created_at => $conv->created_at,
-                    updated_at => $conv->updated_at,
-                    message_count => $message_count,
-                    status => $conv->status,
-                    preview => $preview,
-                    messages => \@message_data
-                };
-
-                push @conversations, $conv_data;
-
-            } catch {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-                    'conversations', "Error processing conversation ID=" . ($conv->id // 'unknown') . ": $_");
-            };
-        }
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-            'conversations', "Retrieved $total_conversations conversations. Final array size: " . scalar(@conversations));
-
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'conversations', "Failed to fetch conversations: $error");
-    };
-
-    $c->stash(
-        template => 'ai/conversations.tt',
-        page_title => $page_title,
-        conversations => \@conversations,
-        total_conversations => $total_conversations,
-        username => $username,
-        is_admin => $is_admin,
-        view_all => $view_all,
-        is_guest => $is_guest
-    );
-}
+=cut
 
 sub template_editor :Local :Args(0) {
     my ($self, $c) = @_;
@@ -304,7 +269,15 @@ sub template_editor :Local :Args(0) {
     );
 }
 
+=head2 widget
 
+Renders a self-contained, layout-free popup window for the chat widget.
+Opened by the "expand to separate window" button so users can move the
+chat to a second monitor without the page being obscured.  No site
+navigation, header, or footer is included — the response is a complete
+minimal HTML document.
+
+=cut
 
 sub widget :Local :Args(0) {
     my ($self, $c) = @_;
@@ -350,7 +323,12 @@ sub widget :Local :Args(0) {
     $c->detach;
 }
 
+=head2 editing_widget
 
+Shanta / CSC admin code editor with integrated AI chat (Cursor-like workspace).
+Development machines only.  Renders layout-free HTML (same pattern as widget).
+
+=cut
 
 sub editing_widget :Local :Args(0) {
     my ($self, $c) = @_;
@@ -389,6 +367,11 @@ sub editing_widget :Local :Args(0) {
     $c->response->redirect($dest);
 }
 
+=head2 editing_widget_popup
+
+Detached popup window — no site layout, no floating chat widget. Same as /ai/widget for chat.
+
+=cut
 
 sub editing_widget_popup :Local :Args(0) {
     my ($self, $c) = @_;
@@ -421,7 +404,11 @@ sub editing_widget_popup :Local :Args(0) {
     $c->detach;
 }
 
+=head2 editor_config
 
+JSON config for the floating code editor (enabled flag, grok CLI path).
+
+=cut
 
 sub editor_config :Local :Args(0) {
     my ($self, $c) = @_;
@@ -469,7 +456,12 @@ sub editor_config :Local :Args(0) {
     }));
 }
 
+=head2 grok_cli
 
+Run the local `grok` CLI (same auth as Cursor/Grok Build), not Comserv's xAI API layer.
+POST JSON: { prompt, cwd (optional) }
+
+=cut
 
 sub grok_cli :Local :Args(0) {
     my ($self, $c) = @_;
@@ -891,7 +883,16 @@ sub _find_grok_binary {
     return undef;
 }
 
+=head2 generate
 
+API endpoint for AI query processing. Returns JSON responses.
+
+Parameters:
+- prompt (required): User's question or prompt
+- format (optional): Response format ('json' or default text)  
+- system (optional): System prompt to set AI behavior
+
+=cut
 
 sub generate :Local :Args(0) {
     my ($self, $c) = @_;
@@ -2318,13 +2319,22 @@ sub generate :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 query_form
+
+Alternative form-based query interface.
+
+=cut
 
 sub query_form :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->redirect($c->uri_for('/ai'), 301);
 }
 
+=head2 result
 
+Form submission handler that displays results in template.
+
+=cut
 
 sub result :Local :Args(0) {
     my ($self, $c) = @_;
@@ -2542,7 +2552,16 @@ sub result :Local :Args(0) {
     );
 }
 
+=head2 chat
 
+Chat endpoint for conversational AI with history support. Delegates to Ollama model's chat method.
+
+Parameters:
+- prompt (required): User's message
+- model (optional): Specific model to use
+- history (optional): Conversation history array
+
+=cut
 
 sub chat :Local :Args(0) {
     my ($self, $c) = @_;
@@ -3604,39 +3623,199 @@ sub chat :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 models
 
+Ollama model management interface showing available and installed models across configured servers.
 
-sub models :Path('models') :Args(0) {
+=cut
+
+sub models :Local :Args(0) {
     my ($self, $c) = @_;
-
-    # Safe roles normalization (fixes the string "4" ARRAY ref error)
+    
+    # Check authentication
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'models', "Unauthorized access attempt to AI models");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'models', "User accessing AI models interface");
+    
+    # Determine user permissions for viewing all servers
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
-    my $can_select_model = ref($user_roles) eq 'ARRAY'
-        ? scalar(grep { /^(admin|developer)$/i } @$user_roles) : 0;
+    my $can_select_model = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+    }
+    
+    # Initialize servers data structure for multiple Ollama servers
+    my $servers = [];
+    
+    # Configure servers from comserv.conf <Ollama> block
+    my $ollama_cfg2   = $c->config->{Ollama} || {};
+    my $cfg_host      = $ollama_cfg2->{host}          || 'localhost';
+    my $cfg_fallback  = $ollama_cfg2->{fallback_host} || $cfg_host;
+    my $cfg_port      = $ollama_cfg2->{port}          || 11434;
 
-    my $models_data = $c->model('AI')->get_available_models($c,
-        can_select_model => $can_select_model,
-        include_local    => 1,
-        include_external => 1,
-    );
+    my @server_configs;
+    if ($can_select_model) {
+        @server_configs = (
+            { name => "Local ($cfg_host)",    host => $cfg_host,     port => $cfg_port, location => 'Primary' },
+        );
+        if ($cfg_fallback ne $cfg_host) {
+            push @server_configs,
+                { name => "Fallback ($cfg_fallback)", host => $cfg_fallback, port => $cfg_port, location => 'Fallback' };
+        }
+    } else {
+        @server_configs = (
+            { name => 'AI Server', host => $cfg_host, port => $cfg_port, location => 'Primary' }
+        );
+    }
+    
+    foreach my $config (@server_configs) {
+        my $server_info = {
+            name => $config->{name},
+            host => $config->{host},
+            port => $config->{port},
+            location => $config->{location},
+            connected => 0,
+            error => undef,
+            available_models => [],
+            installed_models => [],
+            show_details => $can_select_model  # Whether to show technical details
+        };
+        
+        # Try to connect to each server and get model information
+        my $ollama = $c->model('Ollama');
+        my $orig_timeout;
+        try {
+            if ($ollama) {
+                # Configure for this specific server
+                $ollama->host($config->{host});
+                $ollama->port($config->{port});
+                $ollama->clear_endpoint;  # Force rebuild of endpoint URL
+                
+                # Set a short timeout for connection check and listing to prevent blocking
+                $orig_timeout = $ollama->timeout;
+                $ollama->timeout(3);
+                
+                # Test connection first
+                if ($ollama->check_connection()) {
+                    $server_info->{connected} = 1;
+                    
+                    # Get installed models
+                    my $installed = $ollama->list_models();
+                    if ($installed && ref($installed) eq 'ARRAY') {
+                        $server_info->{installed_models} = $installed;
+                        
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                            'models', "Retrieved " . scalar(@$installed) . " installed models from $config->{host}:$config->{port}");
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                            'models', "Failed to get installed models from $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
+                    }
+                    
+                    # Get available models (static catalog), then exclude already-installed ones
+                    my $available = $ollama->list_available_models();
+                    if ($available && ref($available) eq 'ARRAY') {
+                        # Build a set of installed base names (strip tag) for fast lookup
+                        my %installed_names;
+                        for my $m (@{ $server_info->{installed_models} || [] }) {
+                            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
+                            $n =~ s/:.*$//;   # strip tag (e.g. "llama3.1:latest" → "llama3.1")
+                            $installed_names{$n} = 1;
+                            $installed_names{$m->{name} || $m} = 1 if ref($m);  # also full name
+                        }
+                        my @not_installed = grep {
+                            my $aname = ref($_) ? ($_->{name} || '') : ($_ || '');
+                            (my $abase = $aname) =~ s/:.*$//;
+                            !$installed_names{$aname} && !$installed_names{$abase};
+                        } @$available;
+                        $server_info->{available_models} = \@not_installed;
 
-    my $api_keys = $c->model('AI')->get_api_keys($c) || [];
-
-    my $has_grok_key = scalar(grep { ($_->{provider} || '') eq 'grok' } @$models_data);
-
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                            'models', "Catalog: " . scalar(@$available) . " total, "
+                                . scalar(@not_installed) . " not yet installed");
+                    }
+                } else {
+                    $server_info->{error} = "Connection test failed: " . ($ollama->last_error || 'unknown error');
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                        'models', "Connection test failed for $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
+                }
+                
+                # Restore original timeout
+                $ollama->timeout($orig_timeout) if defined $orig_timeout;
+            } else {
+                $server_info->{error} = "Failed to load Ollama model";
+            }
+        } catch {
+            if ($ollama && defined $orig_timeout) {
+                $ollama->timeout($orig_timeout);
+            }
+            $server_info->{error} = "Connection failed: $_";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'models', "Failed to connect to server $config->{host}:$config->{port}: $_");
+        };
+        
+        push @$servers, $server_info;
+    }
+    
+    # Fetch user's API keys
+    my @user_api_keys;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $user_id = $c->session->{user_id};
+        
+        if ($user_id) {
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => '1' },
+                { order_by => { -asc => 'service' } }
+            );
+            
+            foreach my $key ($keys_rs->all) {
+                push @user_api_keys, {
+                    id => $key->id,
+                    service => $key->service,
+                    created_at => $key->created_at->strftime('%Y-%m-%d'),
+                    has_key => $key->api_key_encrypted ? 1 : 0
+                };
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'models', "Found " . scalar(@user_api_keys) . " API keys for user $username");
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'models', "Failed to fetch user API keys: $_");
+    };
+    
+    # Set template variables
     $c->stash(
-        models_data        => $models_data,
-        models             => $models_data,   # legacy
-        api_keys           => $api_keys,
-        can_select_model   => $can_select_model,
-        has_api_key        => $has_grok_key,
-        api_keys_configured => scalar(@$api_keys),
+        template => 'ai/models.tt',
+        page_title => 'AI Models',
+        username => $username,
+        servers => $servers,
+        can_select_model => $can_select_model,
+        servers_json => encode_json($servers || []),
+        user_api_keys => \@user_api_keys
     );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'models', "AI models interface loaded for user: $username (can_select: " . ($can_select_model ? 'yes' : 'no') . ") with " . scalar(@$servers) . " servers configured");
 }
 
+=head2 pull_model
+
+Pull (download) a model from Ollama library on a specific server.
+
+=cut
 
 sub pull_model :Local :Args(0) {
     my ($self, $c) = @_;
@@ -3766,7 +3945,11 @@ sub pull_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 test_model
 
+Test a specific model on a server to verify it works correctly.
+
+=cut
 
 sub test_model :Local :Args(0) {
     my ($self, $c) = @_;
@@ -3873,7 +4056,11 @@ sub test_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 remove_model
 
+Remove (delete) an installed Ollama model from a specific server.
+
+=cut
 
 sub remove_model :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4026,7 +4213,12 @@ sub remove_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 unload_model
 
+Force-unload a model from Ollama memory (keep_alive=0).
+Requires admin/developer role.  Accepts JSON body: { model, host, port }
+
+=cut
 
 sub unload_model :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4075,7 +4267,12 @@ sub unload_model :Local :Args(0) {
     $c->response->body(encode_json($result));
 }
 
+=head2 running_models
 
+Return the list of models currently loaded in Ollama memory (/api/ps).
+Requires admin/developer role.
+
+=cut
 
 sub running_models :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4105,7 +4302,11 @@ sub running_models :Local :Args(0) {
     $c->response->body(encode_json({ success => JSON::true, models => $running }));
 }
 
+=head2 check_status
 
+Check Ollama service connectivity. Returns JSON status.
+
+=cut
 
 sub check_status :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4177,6 +4378,11 @@ sub check_status :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 set_host
+
+Switch the Ollama server host (admin/developer/editor only).
+
+=cut
 
 sub set_host :Local :Args(0) {
     my ($self, $c) = @_;
@@ -4995,7 +5201,7 @@ sub _assess_response_quality {
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
+        return 'poor' if index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -5237,7 +5443,7 @@ sub _pick_ollama_tier {
         # 2. Known family prefix
         unless ($score) {
             for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
             }
         }
         # 3. Generic hints
@@ -5772,6 +5978,15 @@ sub _is_usable_app_link {
     return 1;
 }
 
+=head2 _record_learned_link
+
+Persist a discovered link into the learning system (repurposes learned_data with convention).
+This allows "if it succeeds" persistence: useful new links the user visits while chatting
+(or that appear on pages during AI use) get remembered across sessions and can be promoted
+into future navigation guides.
+
+Call this when we extract links from page content the user is actively using with the AI.
+=cut
 
 sub _record_learned_link {
     my ($self, $c, $href, $label, $source_page) = @_;
@@ -5812,6 +6027,207 @@ sub _record_learned_link {
     }
 }
 
+=head2 _get_learned_navigation_additions
+
+Pull recently / frequently observed links from the learning store and format them
+as a small "Dynamically learned / observed while using AI" section.
+These survive prompt budget stripping better if we keep the list small.
+=cut
+
+sub _get_learned_navigation_additions {
+    my ($self, $c, $max) = @_;
+    $max //= 8;
+    return '' unless $c;
+
+    my $out = '';
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return '' unless $schema;
+
+        my @rows = $schema->resultset('LearnedData')->search(
+            { file => 'ai_discovered_link', word => { like => 'ai_link:%' } },
+            { order_by => { -desc => 'frequency' }, rows => $max }
+        )->all;
+
+        my @items;
+        for my $r (@rows) {
+            my $w = $r->word || '';
+            $w =~ s/^ai_link://;
+            next unless $w =~ /^\//;
+            my $f = $r->frequency || 1;
+            push @items, "  - (observed $f×) $w";
+        }
+        if (@items) {
+            $out = "\nDynamically learned links (observed on pages during recent AI chats — use when relevant):\n"
+                 . join("\n", @items) . "\n";
+        }
+    };
+    return $out;
+}
+
+=head2 _build_page_navigation_hint
+
+Build a page-specific navigation hint to append to the system prompt.
+Returns an empty string when no relevant context can be determined.
+
+  $base_url  - application base URL (no trailing slash)
+  $page_path - URL path of the page the user is currently on
+  $page_title - display title of the current page
+  $role      - 'admin', 'user', or 'guest'
+
+=cut
+
+sub _build_page_navigation_hint {
+    my ($self, $base_url, $page_path, $page_title, $role) = @_;
+
+    return '' unless $page_path;
+
+    my $context_label = $page_title ? "\"$page_title\" ($page_path)" : $page_path;
+    my $hint = "\n\nThe user is currently viewing: $context_label.\n";
+
+    if ($page_path =~ m{/HelpDesk/ticket/new}i) {
+        if ($role eq 'admin') {
+            $hint .= "NOTE: This page has a HelpDesk pre-screening form, but you are an admin user.\n"
+                   . "Answer questions about projects, todos, system state, and application features normally.\n"
+                   . "Only switch to support pre-screening mode if the user explicitly describes a support problem.\n";
+        } else {
+            $hint .= "SUPPORT PRE-SCREENING MODE:\n"
+                   . "The user has navigated to the 'Create New Ticket' page but has been invited to\n"
+                   . "try the AI assistant FIRST before submitting a ticket.\n"
+                   . "Your goal is to RESOLVE the user's issue so they do NOT need to submit a ticket.\n"
+                   . "- Listen carefully to their problem description.\n"
+                   . "- Provide clear, actionable step-by-step solutions.\n"
+                   . "- Check the Knowledge Base: $base_url/HelpDesk/kb\n"
+                   . "- If you solve the issue, say so clearly and tell them no ticket is needed.\n"
+                   . "- If you CANNOT resolve it after trying, acknowledge this and tell them:\n"
+                   . "  'It looks like this needs human support. Click \"Skip AI — Submit Ticket Directly\" on the page to open the ticket form.'\n"
+                   . "Do NOT refuse to help or just redirect them to submit a ticket without genuinely trying to solve the problem first.\n";
+        }
+    } elsif ($page_path =~ m{/HelpDesk}i) {
+        $hint .= "Navigation context — HelpDesk:\n"
+               . "- Submit a new ticket: $base_url/HelpDesk/ticket/new\n"
+               . "- Check ticket status: $base_url/HelpDesk/ticket/status\n"
+               . "- Knowledge Base: $base_url/HelpDesk/kb\n"
+               . "- Contact support: $base_url/HelpDesk/contact\n";
+        $hint .= "- Admin panel: $base_url/HelpDesk/admin\n" if $role eq 'admin';
+    } elsif ($page_path =~ m{/Documentation}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Documentation section (admin):\n"
+                   . "- You may edit or create documentation pages.\n"
+                   . "- Related sections: Daily Plans, Master Plan, Architecture docs.\n"
+                   . "- To manage plans: $base_url/planning/daily\n"
+                   . "- To view all docs: $base_url/Documentation\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Documentation section:\n"
+                   . "- You can read documentation pages and follow internal links.\n"
+                   . "- To search the encyclopedia: $base_url/ency/search?q=TERM\n"
+                   . "- To view all docs: $base_url/Documentation\n";
+        } else {
+            $hint .= "Navigation context — Documentation section (guest):\n"
+                   . "- Public documentation is available for reading.\n"
+                   . "- Log in for full access and editing capabilities.\n";
+        }
+    } elsif ($page_path =~ m{/workshop}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Workshops (admin):\n"
+                   . "- You can create, edit, and manage workshop entries.\n"
+                   . "- Active workshops: $base_url/workshop/list_active\n"
+                   . "- All workshops: $base_url/workshop/list\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Workshops:\n"
+                   . "- You can view and participate in workshops.\n"
+                   . "- Active workshops: $base_url/workshop/list_active\n";
+        } else {
+            $hint .= "Navigation context — Workshops (guest):\n"
+                   . "- Public workshop information is available for viewing.\n"
+                   . "- Log in to participate or manage workshops.\n";
+        }
+    } elsif ($page_path =~ m{/todo}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Todo / Task Management (admin):\n"
+                   . "- You can view, create, assign, and close tasks across all projects.\n"
+                   . "- All tasks: $base_url/todo/list\n"
+                   . "- Project-specific: $base_url/todo/list?project_id=N (use real numeric ID from live project data — never literal 'ID')\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Todo / Task Management:\n"
+                   . "- You can view tasks assigned to you and update their status.\n"
+                   . "- Your tasks: $base_url/todo/list\n";
+        } else {
+            $hint .= "Navigation context — Tasks (guest):\n"
+                   . "- Log in to view and manage tasks.\n";
+        }
+    } elsif ($page_path =~ m{/project}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Projects (admin):\n"
+                   . "- You can create, edit, and archive projects.\n"
+                   . "- All projects: $base_url/project/list\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Projects:\n"
+                   . "- You can view projects you are a member of.\n"
+                   . "- Projects: $base_url/project/list\n";
+        } else {
+            $hint .= "Navigation context — Projects (guest):\n"
+                   . "- Log in to view project information.\n";
+        }
+    } elsif ($page_path =~ m{/Inventory/consignment}i) {
+        $hint .= "Navigation context — Consignment Tracking:\n"
+               . "Consignment = sending items to a partner store; partner sells them and keeps a commission.\n"
+               . "- Consignment list:        $base_url/Inventory/consignment\n"
+               . "- Create new consignment:  $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:    $base_url/Inventory/consignment/partners\n"
+               . "- View/settle:             $base_url/Inventory/consignment/view/<id>\n"
+               . "- Full docs:               $base_url/Documentation/Inventory/consignment\n"
+               . "WORKFLOW: 1) Set up a partner at /Inventory/consignment/partners\n"
+               . "2) Create batch at /Inventory/consignment/new — select partner, enter items + qty + retail price\n"
+               . "3) View consignment to print slip or settle when partner pays\n"
+               . "4) On settlement: enter qty sold and qty returned per line; optionally post GL entry\n"
+               . "Partners: Monashee Arts Council (Lumby), Monashee Coop (30% commission)\n";
+    } elsif ($page_path =~ m{/Inventory}i) {
+        $hint .= "Navigation context — Inventory:\n"
+               . "- Inventory dashboard:    $base_url/Inventory\n"
+               . "- Items list:             $base_url/Inventory/items\n"
+               . "- Add item:               $base_url/Inventory/item/add\n"
+               . "- Suppliers:              $base_url/Inventory/suppliers\n"
+               . "- Supplier invoices:      $base_url/Inventory/invoice\n"
+               . "- New invoice:            $base_url/Inventory/invoice/new\n"
+               . "- Stock transactions:     $base_url/Inventory/stock/transactions\n"
+               . "- Customer sales:         $base_url/Inventory/sales\n"
+               . "- Consignments:           $base_url/Inventory/consignment\n"
+               . "- New consignment:        $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:   $base_url/Inventory/consignment/partners\n"
+               . "- Consignment docs:       $base_url/Documentation/Inventory/consignment\n";
+    } elsif ($page_path =~ m{/Accounting}i) {
+        $hint .= "Navigation context — Accounting:\n"
+               . "- Accounting dashboard:   $base_url/Accounting\n"
+               . "- Chart of accounts:      $base_url/Accounting/coa\n"
+               . "- General ledger:         $base_url/Accounting/gl\n"
+               . "- Consignment settlement posts GL: DR AR + Commission / CR Sales Revenue\n"
+               . "- For consignment management go to: $base_url/Inventory/consignment\n";
+    } elsif ($page_path =~ m{/ency}i) {
+        $hint .= "Navigation context — Encyclopedia:\n"
+                . "- Search for information: $base_url/ency/search?q=TERM\n";
+        $hint .= "- As an admin you can add and edit encyclopedia entries.\n" if $role eq 'admin';
+    } elsif ($page_path =~ m{/ai}i) {
+        $hint .= "Navigation context — AI Assistant:\n"
+               . "- You are currently in the AI chat interface.\n";
+        if ($role eq 'admin') {
+            $hint .= "- Admin: manage AI models at $base_url/ai/models\n"
+                   . "- Manage API keys at $base_url/ai/manage_api_keys\n";
+        }
+    }
+
+    return $hint;
+}
+
+=head2 _select_model_for_context
+
+Choose the best installed Ollama model for a given agent/page context.
+
+  chat / helpdesk / ency / bmaster  → prefer llama3.1 (instruction-tuned chat)
+  code / developer / docker         → prefer starcoder2 or qwen-coder
+  fallback                          → first installed model, then hardcoded default
+
+=cut
 
 sub _select_model_for_context {
     my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
@@ -5881,9 +6297,80 @@ sub _select_model_for_context {
     return 'llama3.1:latest';
 }
 
+=head2 _get_current_ollama_config
 
+Private method to determine current Ollama configuration with automatic fallback.
 
+=cut
 
+sub _get_current_ollama_config {
+    my ($self, $c, $can_select_model) = @_;
+
+    # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
+    my $ollama_cfg      = $c->config->{Ollama} || {};
+    my $primary_host    = $ollama_cfg->{host}          || '192.168.1.199';
+    my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
+    my $config_port     = $ollama_cfg->{port}          || 11434;
+    # Never silently fall back to localhost — production Docker has no local Ollama.
+    # If fallback is localhost/127.0.0.1 and primary is a real host, keep primary.
+    if ($fallback_host =~ /^(localhost|127\.0\.0\.1)$/i && $primary_host !~ /^(localhost|127\.0\.0\.1)$/i) {
+        $fallback_host = $primary_host;
+    }
+
+    my $ollama = $c->model('Ollama');
+    my $current_host  = $primary_host;
+    my $current_port  = $config_port;
+    my $current_model = 'llama3.1:latest';
+    my $installed_models = [];
+
+    # Session override (admin/privileged users can switch host via /ai/models UI)
+    if ($can_select_model && $c->session->{ollama_host}) {
+        $current_host = $c->session->{ollama_host};
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            '_get_current_ollama_config', "Using session preferred host: $current_host");
+    } else {
+        # Try primary host; fall back to fallback_host if unreachable
+        my $test = Comserv::Model::Ollama->new(host => $primary_host, port => $config_port, timeout => 3);
+        if ($test && $test->check_connection()) {
+            $current_host = $primary_host;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Primary host $primary_host available");
+        } elsif ($fallback_host ne $primary_host) {
+            $current_host = $fallback_host;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Primary host $primary_host unavailable, using fallback $fallback_host");
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Ollama host $primary_host is not reachable");
+        }
+    }
+    
+    # Configure the ollama model with the determined host
+    try {
+        $ollama->set_host($current_host);
+        $ollama->port($config_port);
+        $current_port = $config_port;
+        $current_model = $ollama->model;
+        
+        # Quick connection check (uses 3s timeout via temporary UA)
+        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => $config_port, timeout => 3);
+        if ($check_ollama && $check_ollama->check_connection()) {
+            my $models = $ollama->list_models();
+            $installed_models = $models if $models && ref($models) eq 'ARRAY';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Ollama configured: $current_host:$current_port, model: $current_model, installed models: " . scalar(@$installed_models));
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Ollama unavailable at $current_host - no local models available");
+        }
+            
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            '_get_current_ollama_config', "Failed to configure Ollama: $_");
+    };
+    
+    return ($current_host, $current_port, $current_model, $installed_models);
+}
 
 sub server_status : Local {
     my ($self, $c) = @_;
@@ -5942,11 +6429,238 @@ sub server_status : Local {
     $c->response->body($response);
 }
 
+=head2 conversations
 
+Display all saved conversations for the current user with optional filters.
 
+=cut
 
+sub conversations :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Determine if user is authenticated or guest
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
+        
+        # Create a unique guest session ID if not already present
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        
+        # Use guest user (ID 199)
+        $user_id = 199;
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'conversations', "Guest user accessing conversations: $username");
+    }
+    
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $is_admin = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^admin$/i } @$user_roles : 0;
+    
+    # Guests cannot view all conversations
+    my $view_all = (!$is_guest && $is_admin && ($c->req->params->{view_all} || $c->req->params->{view} eq 'all')) ? 1 : 0;
+    
+    my $page_title = $view_all ? 'All Conversations (Admin)' : 'My Conversations';
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'conversations', "Fetching conversations for user: $username (view_all=$view_all, is_admin=$is_admin)");
+    
+    my @conversations;
+    my $total_conversations = 0;
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: user_id=$user_id, view_all=$view_all, is_admin=$is_admin");
+        
+        my $search_criteria = $view_all ? {} : { user_id => $user_id };
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: Search criteria: " . ($view_all ? "no filter (all conversations)" : "user_id=$user_id"));
+        
+        my $count_rs = $schema->resultset('AiConversation')->search($search_criteria);
+        $total_conversations = $count_rs->count;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: Query returned count=$total_conversations, about to iterate");
+        
+        my $conv_rs = $schema->resultset('AiConversation')->search(
+            $search_criteria,
+            { 
+                order_by => { -desc => 'created_at' }
+            }
+        );
+        
+        my @conv_rows = $conv_rs->all;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: Got all rows, count = " . scalar(@conv_rows));
+        
+        foreach my $conv (@conv_rows) {
+            try {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'conversations', "Processing conversation ID=" . $conv->id);
+                
+                # For guests, only show conversations that belong to this guest session
+                if ($is_guest) {
+                    my $conv_metadata = {};
+                    if ($conv->metadata) {
+                        try {
+                            $conv_metadata = decode_json($conv->metadata);
+                        } catch {
+                            # Metadata parsing failed, skip this conversation
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                                'conversations', "Failed to parse conversation metadata for ID=" . $conv->id);
+                        };
+                    }
+                    
+                    # Check if this conversation belongs to this guest session
+                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                            'conversations', "Skipping conversation ID=" . $conv->id . " - not owned by this guest session");
+                        next;
+                    }
+                }
+                
+                my @messages = $conv->ai_messages->all;
+                my $message_count = scalar(@messages);
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'conversations', "  - Found $message_count messages");
+                
+                my $preview = '';
+                if (@messages > 0) {
+                    my $user_msg = '';
+                    my $ai_msg = '';
+                    
+                    foreach my $msg (@messages) {
+                        if ($msg->role eq 'user' && !$user_msg) {
+                            $user_msg = $msg->content;
+                        }
+                        if ($msg->role eq 'assistant' && !$ai_msg) {
+                            $ai_msg = $msg->content;
+                        }
+                        last if $user_msg && $ai_msg;
+                    }
+                    
+                    if ($user_msg) {
+                        $preview = "Q: " . substr($user_msg, 0, 60);
+                        if (length($user_msg) > 60) {
+                            $preview .= '...';
+                        }
+                        if ($ai_msg) {
+                            $preview .= " | A: " . substr($ai_msg, 0, 40);
+                            if (length($ai_msg) > 40) {
+                                $preview .= '...';
+                            }
+                        }
+                    } else {
+                        my $latest_message = $conv->get_latest_message;
+                        $preview = $latest_message ? substr($latest_message->content, 0, 100) : '';
+                    }
+                }
+                
+                my $username = 'Unknown';
+                if ($conv->user) {
+                    $username = $conv->user->username;
+                }
+                
+                my @message_data;
+                foreach my $msg (@messages) {
+                    push @message_data, {
+                        id => $msg->id,
+                        conversation_id => $msg->conversation_id,
+                        user_id => $msg->user_id,
+                        role => $msg->role,
+                        content => $msg->content,
+                        created_at => $msg->created_at,
+                        agent_type => $msg->agent_type || 'chat',
+                        model_used => $msg->model_used || '',
+                        ip_address => $msg->ip_address || '',
+                        user_role => $msg->user_role || '',
+                        metadata => $msg->metadata || '{}'
+                    };
+                }
+                
+                my $conv_data = {
+                    id => $conv->id,
+                    user_id => $conv->user_id,
+                    username => $username,
+                    title => $conv->get_display_title,
+                    created_at => $conv->created_at,
+                    updated_at => $conv->updated_at,
+                    message_count => $message_count,
+                    status => $conv->status,
+                    preview => $preview,
+                    messages => \@message_data
+                };
+                
+                push @conversations, $conv_data;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'conversations', "  - Pushed to array. Total now: " . scalar(@conversations));
+            } catch {
+                my $error = $_;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'conversations', "Error processing conversation: $error");
+            };
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'conversations', "Retrieved $total_conversations conversations. Array size: " . scalar(@conversations));
+        
+        if (scalar(@conversations) == 0 && $total_conversations > 0) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'conversations', "WARNING: Count says $total_conversations conversations but array is empty!");
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'conversations', "Failed to fetch conversations: $error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'conversations', "Stack trace: " . $error);
+    };
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'conversations', "FINAL: Stashing conversations. Count=$total_conversations, Array size=" . scalar(@conversations));
+    
+    foreach my $idx (0 .. $#conversations) {
+        my $conv = $conversations[$idx];
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "  [$idx] ID=" . $conv->{id} . ", Title=" . $conv->{title} . ", Messages=" . $conv->{message_count});
+    }
+    
+    $c->stash(
+        template => 'ai/conversations.tt',
+        page_title => $page_title,
+        conversations => \@conversations,
+        total_conversations => $total_conversations,
+        username => $username,
+        is_admin => $is_admin,
+        view_all => $view_all,
+        is_guest => $is_guest
+    );
+}
 
+=head2 conversation
 
+Display a single conversation by ID.
+
+=cut
 
 sub conversation :Local :Args(1) {
     my ($self, $c, $conv_id) = @_;
@@ -6059,7 +6773,11 @@ sub conversation :Local :Args(1) {
     );
 }
 
+=head2 conversation_delete
 
+Delete a conversation by ID.
+
+=cut
 
 sub conversation_delete :Path('conversation') :Args(2) {
     my ($self, $c, $conv_id, $action) = @_;
@@ -6124,7 +6842,6 @@ sub session_details :Local :Args(0) {
         roles => $c->session->{roles} || [],
         is_dev => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
-    $c->detach;  # prevent default template rendering
 }
 
 sub get_conversation_list :Local :Args(0) {
@@ -6842,13 +7559,142 @@ Returns JSON with the synced model list.
 sub sync_models :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $result = $c->model('AI')->router->sync_models($c);
+    $c->response->content_type('application/json');
 
-    $c->stash->{current_view} = 'JSON';
-    $c->stash->{json} = $result;
-    $c->forward( $c->view('JSON') );
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $user_id  = $c->session->{user_id};
+    my $service  = $c->request->params->{service} || 'grok';
+
+    my $user_roles_sync = $c->session->{roles} || [];
+    if (!ref($user_roles_sync)) {
+        $user_roles_sync = [split(/\s*,\s*/, $user_roles_sync)] if $user_roles_sync;
+    }
+    my $is_admin_sync = ref($user_roles_sync) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer)$/i } @$user_roles_sync : 0;
+
+    unless ($is_admin_sync) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        return;
+    }
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+
+        # Find the API key record (user's own first, then any active)
+        my $key_obj = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id, service => $service, is_active => '1' }
+        )->first;
+        unless ($key_obj) {
+            $key_obj = $schema->resultset('UserApiKeys')->search(
+                { service => $service, is_active => '1' }
+            )->first;
+        }
+
+        unless ($key_obj && $key_obj->api_key_encrypted) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "No active $service API key found. Please add one first."
+            }));
+            return;
+        }
+
+        my $api_key = $key_obj->get_api_key() || '';
+        unless ($api_key) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Failed to decrypt $service API key. Please re-save it."
+            }));
+            return;
+        }
+
+        # Provider endpoint map
+        my %models_endpoint = (
+            grok    => 'https://api.x.ai/v1/models',
+            openai  => 'https://api.openai.com/v1/models',
+        );
+
+        my $endpoint = $models_endpoint{lc($service)};
+        unless ($endpoint) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Model sync not supported for service: $service"
+            }));
+            return;
+        }
+
+        # Fetch models from the provider
+        require LWP::UserAgent;
+        require HTTP::Request;
+        my $ua = LWP::UserAgent->new(timeout => 15);
+        $ua->agent('Comserv/1.0');
+        my $req = HTTP::Request->new(GET => $endpoint);
+        $req->header('Authorization' => "Bearer $api_key");
+        $req->header('Content-Type'  => 'application/json');
+
+        my $resp = $ua->request($req);
+
+        unless ($resp->is_success) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'sync_models', "Failed to fetch models from $service: " . $resp->status_line);
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Provider returned error: " . $resp->status_line
+            }));
+            return;
+        }
+
+        my $data = eval { decode_json($resp->content) };
+        if ($@) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Invalid JSON from provider" }));
+            return;
+        }
+
+        # Extract model list (OpenAI-compatible format: data[].id)
+        my @models;
+        if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
+            foreach my $m (@{$data->{data}}) {
+                next unless $m->{id};
+                push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
+            }
+        }
+
+        # Sort models alphabetically
+        @models = sort { $a->{id} cmp $b->{id} } @models;
+
+        # Store model list in metadata of the key record
+        my $existing_meta = $key_obj->get_metadata() || {};
+        $existing_meta->{available_models} = \@models;
+        $existing_meta->{models_synced_at} = time();
+        $key_obj->set_metadata($existing_meta);
+        $key_obj->update;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'sync_models', "Synced " . scalar(@models) . " models for service $service");
+
+        $c->response->body(encode_json({
+            success => JSON::true,
+            service => $service,
+            models  => \@models,
+            count   => scalar(@models)
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'sync_models', "Error syncing models: $_");
+        $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
+    };
 }
 
+=head2 project_conversations
+
+JSON endpoint: returns recent AI conversations for a given project_id.
+
+=cut
 
 sub project_conversations :Local :Args(0) {
     my ($self, $c) = @_;
@@ -10854,7 +11700,19 @@ sub usage :Local :Args(0) {
     );
 }
 
+=head2 grok_balance
 
+Returns live (or best-effort) usage/balance info from the xAI API for the
+configured Grok key (prefers the current user's key from UserApiKeys if present).
+
+Also includes a summary of our internal tracking from ai_usage_logs for Grok calls
+(tokens, estimated cost, recent activity).
+
+This lets operators see exactly where they stand with xAI credits and trigger
+refill alerts or usage caution.
+
+Frontend can call this from /ai/usage or a dedicated button.
+=cut
 
 sub grok_balance :Local :Args(0) {
     my ($self, $c) = @_;
@@ -11073,7 +11931,11 @@ sub grok_balance :Local :Args(0) {
     
 }
 
+=head2 _estimate_ai_cost_usd
 
+Rough cost estimator for paid providers. Returns 0 for local (ollama).
+Prices are approximate and for monitoring/billing estimates only; update as provider pricing changes.
+=cut
 
 sub _estimate_ai_cost_usd {
     my ($self, $provider, $model, $prompt_tokens, $completion_tokens) = @_;
