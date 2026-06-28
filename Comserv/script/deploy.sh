@@ -748,26 +748,55 @@ export NFS_DATA_DIR
 export WORKSHOP_LOCAL_DIR
 
 # ── Volume Normalization (run once before first standardized deploy) ───────
-# Ensures production uses only comserv2_* named volumes.
-# Run this block manually on a fresh production server or when migrating.
+# Ensures production uses only clean comserv2_* named volumes.
+# Handles hybrid names like comserv2_comserv-*, comserv_comserv2_*, etc.
 normalize_volumes() {
-    echo "=== Volume Normalization ==="
-    echo "Checking for legacy comserv_* volumes to migrate..."
+    echo "=== Volume Normalization (comserv2_* clean names) ==="
+    echo "Scanning for messy/hybrid volume names..."
 
-    # Legacy volumes that may exist from old deployments
-    LEGACY_VOLUMES="comserv_cache comserv-temp comserv-themes comserv-logs comserv-sessions comserv-workshop comserv-whisper comserv-cpan"
+    # Exact mapping of messy names → clean comserv2_* names
+    declare -A MIGRATION_MAP=(
+        ["comserv2_comserv-logs"]="comserv2_logs"
+        ["comserv2_comserv-sessions"]="comserv2_sessions"
+        ["comserv_comserv2_cache"]="comserv2_cache"
+        ["comserv_comserv2_cpan_cache"]="comserv2_cpan_cache"
+        ["comserv_comserv2_logs"]="comserv2_logs"
+        ["comserv_comserv2_sessions"]="comserv2_sessions"
+        ["comserv_comserv2_temp"]="comserv2_temp"
+        ["comserv_comserv2_themes"]="comserv2_themes"
+        ["comserv_comserv2_whisper_venv"]="comserv2_whisper_venv"
+        ["comserv_comserv2_workshop_files"]="comserv2_workshop_files"
+        ["comserv_comserv_cache"]="comserv2_cache"
+        ["comserv_comserv-config-db-data"]="comserv2_config_db_data"
+        ["comserv_comserv-prod-backups"]="comserv2_workshop_files"
+        ["comserv_comserv-prod-logs"]="comserv2_logs"
+        ["comserv_comserv-prod-sessions"]="comserv2_sessions"
+        ["comserv_comserv-temp"]="comserv2_temp"
+        ["comserv_comserv-themes"]="comserv2_themes"
+        ["comserv2_whisper-venv"]="comserv2_whisper_venv"
+        ["comserv2_workshop_files_nfs"]="comserv2_workshop_files"
+        ["comserv2_mysql_data"]="comserv2_config_db_data"
+    )
 
-    for VOL in $LEGACY_VOLUMES; do
-        if docker volume inspect "$VOL" >/dev/null 2>&1; then
-            echo "  Found legacy volume: $VOL"
-            # Example migration (uncomment and adjust paths as needed):
-            # docker run --rm -v $VOL:/old -v comserv2_$(echo $VOL | sed 's/comserv_//'):/new alpine cp -a /old/. /new/
-            # docker volume rm "$VOL"
-            echo "  (Migration command ready - review before running)"
+    for OLD_NAME in "${!MIGRATION_MAP[@]}"; do
+        NEW_NAME="${MIGRATION_MAP[$OLD_NAME]}"
+        if docker volume inspect "$OLD_NAME" >/dev/null 2>&1; then
+            if ! docker volume inspect "$NEW_NAME" >/dev/null 2>&1; then
+                echo "  Migrating: $OLD_NAME → $NEW_NAME"
+                docker run --rm \
+                    -v "$OLD_NAME:/old" \
+                    -v "$NEW_NAME:/new" \
+                    alpine sh -c "cp -a /old/. /new/" 2>/dev/null || true
+            else
+                echo "  Target exists, skipping copy: $NEW_NAME (old: $OLD_NAME)"
+            fi
+            echo "  Removing legacy volume: $OLD_NAME"
+            docker volume rm "$OLD_NAME" 2>/dev/null || true
         fi
     done
 
-    echo "Standardized comserv2_* volumes will be created automatically by docker compose."
+    echo "Clean comserv2_* volume list after normalization:"
+    docker volume ls --format '{{.Name}}' | grep '^comserv2_' | sort
     echo "=== Volume Normalization Complete ==="
 }
 
