@@ -34,7 +34,27 @@ sub get_recommended_models {
 }
 sub get_available_branches {
     my ($self, $c) = @_;
-    return ['main', 'develop', 'feature/ai2-editor'];
+
+    try {
+        my $project_root = $c->path_to('')->stringify;
+        chdir $project_root or die "Cannot chdir to $project_root: $!";
+
+        my @branches = `git branch --format='%(refname:short)' 2>&1`;
+        chdir $ENV{'PWD'};  # restore
+
+        if ($? != 0) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_available_branches', "Git failed: @branches");
+            return ['main'];  # fallback
+        }
+
+        chomp @branches;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_available_branches', "Found branches: " . join(', ', @branches));
+
+        return \@branches || ['main'];
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_available_branches', "Exception: $_");
+        return ['main'];  # safe fallback
+    };
 }
 # Placeholder for models
 sub get_available_models {
