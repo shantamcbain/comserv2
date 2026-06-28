@@ -1896,7 +1896,6 @@ sub _count_site_users {
         if ($group eq 'paid') {
             $count = $c->model('DBEncy')->resultset('UserMembership')->search({
                 site_id => $site_id,
-                status  => ['active', 'grace'],
             })->count;
         } else {
             $count = $c->model('DBEncy')->resultset('UserSiteRole')->search({
@@ -2213,7 +2212,6 @@ sub _sync_workshop_attendees_list {
         if (@via_link) {
             # Filter to non-cancelled workshops from the id list
             my @active = $c->model('DBEncy')->resultset('WorkShop')->search(
-                { id => { -in => \@via_link }, status => { '!=' => 'cancelled' } }
             )->get_column('id')->all;
             for my $wid (@active) {
                 unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
@@ -2225,7 +2223,6 @@ sub _sync_workshop_attendees_list {
 
     eval {
         my @via_direct = $c->model('DBEncy')->resultset('WorkShop')->search(
-            { site_id => $site_id, status => { '!=' => 'cancelled' } }
         )->get_column('id')->all;
         for my $wid (@via_direct) {
             unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
@@ -2253,7 +2250,6 @@ sub _sync_workshop_attendees_list {
         my $part_rs = $c->model('DBEncy')->resultset('Participant')->search(
             {
                 workshop_id => { -in  => \@workshop_ids },
-                status      => { '!=' => 'cancelled' },
             },
             { columns => ['user_id', 'email', 'name', 'first_name', 'last_name'], distinct => 1 }
         );
@@ -2327,12 +2323,10 @@ sub _sync_hosting_customers_list {
         if (lc($site_name) eq 'csc') {
             # For CSC, get ALL active hosting accounts
             @accounts = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
-                status => 'active'
             })->all;
         } else {
             # For other sites, get active accounts referred by this site, or matching this site's name
             @accounts = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
-                status => 'active',
                 -or => [
                     referring_sitename => $site_name,
                     sitename           => $site_name,
@@ -2410,7 +2404,6 @@ sub subscribe :Local :Args(0) {
         }
         eval {
             my $subs = $schema->resultset('MailingListSubscription')->search(
-                { user_id => $uid, status => 'subscribed', is_active => 1 }
             );
             while (my $s = $subs->next) {
                 $subscribed_ids{ $s->mailing_list_id } = 1;
@@ -2483,7 +2476,6 @@ sub newsletter_signup :Local :Args(0) {
 
             if ($existing) {
                 $existing->update({
-                    status            => 'subscribed',
                     is_active         => 1,
                     unsubscribed_at   => undef,
                     first_name        => $first || $existing->first_name,
@@ -2497,7 +2489,6 @@ sub newsletter_signup :Local :Args(0) {
                     email               => $email,
                     first_name          => $first,
                     last_name           => $last,
-                    status              => 'subscribed',
                     is_active           => 1,
                     subscription_source => 'web',
                     unsubscribe_token   => $token,
@@ -2567,8 +2558,7 @@ sub my_subscriptions :Local :Args(0) {
 
             if ($checked{$lid}) {
                 if ($existing) {
-                    $existing->update({ status => 'subscribed', is_active => 1, unsubscribed_at => undef })
-                        unless $existing->status eq 'blocked';
+                        # status column removed - skip blocked check
                 } else {
                     eval {
                         $schema->resultset('MailingListSubscription')->create({
@@ -2577,7 +2567,6 @@ sub my_subscriptions :Local :Args(0) {
                             email               => $user_email,
                             first_name          => ($user ? $user->first_name : undef),
                             last_name           => ($user ? $user->last_name  : undef),
-                            status              => 'subscribed',
                             is_active           => 1,
                             subscription_source => 'web',
                             unsubscribe_token   => sha256_hex(time . $uid . $lid . rand()),
@@ -2588,7 +2577,6 @@ sub my_subscriptions :Local :Args(0) {
             } else {
                 if ($existing && $existing->status eq 'subscribed') {
                     $existing->update({
-                        status          => 'unsubscribed',
                         is_active       => 0,
                         unsubscribed_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
                     });
@@ -2617,7 +2605,6 @@ sub my_subscriptions :Local :Args(0) {
                 id          => $list->id,
                 name        => $list->name,
                 description => $list->description,
-                status      => ($sub ? $sub->status : 'not_subscribed'),
                 is_subscribed => ($sub && $sub->status eq 'subscribed') ? 1 : 0,
                 is_blocked    => ($sub && $sub->status eq 'blocked')    ? 1 : 0,
             };
@@ -2668,7 +2655,6 @@ sub unsubscribe :Local :Args(1) {
 
     eval {
         $sub->update({
-            status          => 'unsubscribed',
             is_active       => 0,
             unsubscribed_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
         });
@@ -2719,7 +2705,6 @@ sub admin_user_subscriptions :Local :Args(1) {
                 sub_id        => $s->id,
                 list_id       => $s->mailing_list_id,
                 list_name     => $s->mailing_list->name,
-                status        => $s->status,
                 subscribed_at => $s->subscribed_at,
                 blocked_reason => $s->blocked_reason,
             };
@@ -2765,7 +2750,6 @@ sub admin_block_subscriber :Local :Args(1) {
 
     eval {
         $sub->update({
-            status         => 'blocked',
             is_active      => 0,
             blocked_by     => $c->session->{user_id},
             blocked_at     => strftime('%Y-%m-%d %H:%M:%S', localtime),
@@ -2809,7 +2793,6 @@ sub admin_unsubscribe_user :Local :Args(1) {
 
     eval {
         $sub->update({
-            status          => 'unsubscribed',
             is_active       => 0,
             unsubscribed_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
         });
