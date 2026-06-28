@@ -583,6 +583,12 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 $img_created = $img_inspect;
             }
 
+            # For backup containers also fetch container creation time
+            my $container_created = '';
+            if ($is_backup_container) {
+                $container_created = $c->model('Docker')->get_container_created($name);
+            }
+
             push @containers, {
                 id => $id,
                 name => $name,
@@ -592,6 +598,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 ports => $ports || '',
                 is_backup_container => $is_backup_container,
                 image_created => $img_created,
+                container_created => $container_created,
             };
         }
     } else {
@@ -628,6 +635,12 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 $img_created = $img_inspect;
             }
 
+            # For backup containers also fetch container creation time
+            my $container_created = '';
+            if ($is_backup_container) {
+                $container_created = $c->model('Docker')->get_container_created($name);
+            }
+
             push @containers, {
                 id => $id,
                 name => $name,
@@ -637,6 +650,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 ports => $ports || '',
                 is_backup_container => $is_backup_container,
                 image_created => $img_created,
+                container_created => $container_created,
             };
         }
     }

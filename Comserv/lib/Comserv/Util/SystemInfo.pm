@@ -47,113 +47,52 @@ Returns the IP address of the server
 
 sub get_server_ip {
     my $ip;
-    
-    # Method 0: Operator-supplied override via env var.
-    # Used in Docker where the container IP is internal and meaningless to admins.
-    # Set CATALYST_SERVER_IP=192.168.1.x in the .env file alongside docker-compose.
+
+    # Method 0: Operator-supplied override via env var (highest priority)
     if ($ENV{CATALYST_SERVER_IP} && $ENV{CATALYST_SERVER_IP} ne '') {
         return $ENV{CATALYST_SERVER_IP};
     }
-    
-    # Try multiple methods to get the server IP
-    
-    # Method 1: Check for Docker environment and get container IP
+
+    # Method 1: Use the OS routing table to find the IP used for outbound traffic
+    # This works on any machine without hard-coded IPs.
     eval {
-        # In Docker, check the primary network interface (usually eth0 or similar)
-        # We can identify Docker by checking for /.dockerenv file
-        if (-f '/.dockerenv') {
-            # We're in Docker - try to get the container's IP
-            my $output = `ip addr show 2>/dev/null`;
-            if ($output) {
-                # Look for the first non-loopback IPv4 address
-                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+)\/\d+/g) {
-                    my $found_ip = $1;
-                    # Skip localhost addresses
-                    if ($found_ip ne '127.0.0.1') {
-                        $ip = $found_ip;
-                        last;
-                    }
-                }
-            }
+        # Try modern 'ip route' first (Linux)
+        my $out = `ip route get 1.1.1.1 2>/dev/null | awk '/src/ {print \$7; exit}'`;
+        chomp $out;
+        if ($out && $out =~ /^\d+\.\d+\.\d+\.\d+$/ && $out ne '127.0.0.1') {
+            $ip = $out;
         }
     };
-    
-    # Method 2: Use Socket to get IP from hostname
-    if (!$ip) {
+
+    # Method 2: Fallback – parse 'hostname -I' (works on most Linux distros)
+    unless ($ip) {
         eval {
-            my $hostname = hostname();
-            $ip = inet_ntoa(scalar gethostbyname($hostname || 'localhost'));
-            
-            # Skip localhost addresses
-            if ($ip eq '127.0.0.1' || $ip eq '::1') {
-                $ip = undef;
+            my $out = `hostname -I 2>/dev/null | awk '{print \$1}'`;
+            chomp $out;
+            if ($out && $out =~ /^\d+\.\d+\.\d+\.\d+$/ && $out ne '127.0.0.1') {
+                $ip = $out;
             }
         };
     }
-    
-    if ($@ || !$ip) {
-        # Method 3: Parse ifconfig/ip addr output
+
+    # Method 3: Socket trick (connect to public DNS, read local address)
+    unless ($ip) {
         eval {
-            my $cmd = -x '/sbin/ifconfig' ? '/sbin/ifconfig' : 
-                     (-x '/bin/ifconfig' ? '/bin/ifconfig' : 
-                     (-x '/usr/bin/ip' ? '/usr/bin/ip addr' : ''));
-            
-            if ($cmd) {
-                my $output = `$cmd`;
-                # Look for non-loopback IPv4 addresses
-                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+).*?(?:netmask|Mask|\/)/g) {
-                    my $found_ip = $1;
-                    # Skip localhost addresses
-                    if ($found_ip ne '127.0.0.1') {
-                        $ip = $found_ip;
-                        last;
-                    }
-                }
-                
-                # If no IPv4 address found, try IPv6
-                if (!$ip && $output =~ /inet6 (?:addr:)?([0-9a-f:]+)/) {
-                    my $found_ip = $1;
-                    # Skip localhost addresses
-                    if ($found_ip ne '::1') {
-                        $ip = $found_ip;
-                    }
-                }
-            }
+            socket(my $sock, PF_INET, SOCK_DGRAM, 0) or die;
+            connect($sock, sockaddr_in(53, inet_aton('8.8.8.8')));
+            my $local = getsockname($sock);
+            my (undef, $addr) = sockaddr_in($local);
+            $ip = inet_ntoa($addr);
+            close($sock);
+            $ip = undef if $ip eq '127.0.0.1';
         };
     }
-    
-    # Method 4: Try to get IP by connecting to a public server
-    if ($@ || !$ip) {
-        eval {
-            # Create a UDP socket
-            socket(my $socket, PF_INET, SOCK_DGRAM, 0) or die "socket: $!";
-            # We don't actually connect, just set the destination
-            connect($socket, sockaddr_in(53, inet_aton("8.8.8.8")));
-            # Get our own sockaddr_in
-            my $sockaddr = getsockname($socket);
-            # Extract the IP
-            my ($port, $address) = sockaddr_in($sockaddr);
-            $ip = inet_ntoa($address);
-            close($socket);
-            
-            # Skip localhost addresses
-            if ($ip eq '127.0.0.1' || $ip eq '::1') {
-                $ip = undef;
-            }
-        };
-    }
-    
-    # Log any errors
+
     if ($@) {
-        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_server_ip', "Error getting server IP: $@");
+        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_server_ip', "Error: $@");
     }
-    
-    # CRITICAL: Ensure return value is never empty string - must be valid IP or 'Unknown'
-    # Don't return undef or empty values as they display as blank in templates
-    if (!$ip || $ip eq '') {
-        return 'Unknown';
-    }
-    return $ip;
+
+    return $ip || 'Unknown';
 }
 
 =head2 get_system_info
