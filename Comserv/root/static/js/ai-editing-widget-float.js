@@ -2871,7 +2871,7 @@
                 hint += '\nFix: wait a few seconds and send again — retries are automatic.';
                 hint += '\nIf it keeps failing on the workstation: bash script/restart_dev_server.sh';
                 hint += '\nOr open the editor directly: '
-                    + window.location.origin + '/ai/editing_widget_popup';
+                    + window.location.origin + '/ai2/editing_widget_popup';
             }
             addMsg('Network error: ' + errMsg + hint, 'system');
             setStatus(errMsg, 'err');
@@ -2926,8 +2926,8 @@
         var left = Math.max(0, window.screenX + window.outerWidth - w - 40);
         var top  = Math.max(0, window.screenY + 40);
         state.popupWindow = window.open(
-            '/ai/editing_widget_popup',
-            'aew-grok-editor',
+            '/ai2/editing_widget_popup',
+            'AIEditor',
             'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top +
             ',resizable=yes,menubar=no,toolbar=no,location=no,status=no'
         );
@@ -2954,6 +2954,7 @@
         _loaded: true,
         open: open,
         openPopup: openPopup,
+        openPopupAI2: openPopupAI2,
         openInline: function() { open({ inline: true }); },
         close: function() {
             closePanel();
@@ -3015,10 +3016,10 @@
             if (cfg.editor_url_zerotier) {
                 diagHtml += '<strong>Dev (ZT IP):</strong> ' + escapeHtml(cfg.editor_url_zerotier) + '<br>';
             }
-            diagHtml += '<strong>LAN hostname:</strong> ' + escapeHtml(cfg.editor_url_lan || 'http://workstation.local:3001/ai/editing_widget_popup') + '<br>';
+            diagHtml += '<strong>LAN hostname:</strong> ' + escapeHtml(cfg.editor_url_lan || 'http://workstation.local:3001/ai2/editing_widget_popup') + '<br>';
             if (cfg.ssh_tunnel_cmd) {
                 diagHtml += '<strong>SSH:</strong> <code>' + escapeHtml(cfg.ssh_tunnel_cmd) + '</code><br>';
-                diagHtml += '<strong>Tunnel browser:</strong> ' + escapeHtml(cfg.editor_url_tunnel || 'http://workstation.local:3001/ai/editing_widget_popup') + '<br>';
+                diagHtml += '<strong>Tunnel browser:</strong> ' + escapeHtml(cfg.editor_url_tunnel || 'http://workstation.local:3001/ai2/editing_widget_popup') + '<br>';
                 diagHtml += '<strong>Hosts Hint:</strong> ' + escapeHtml(cfg.tunnel_hosts_hint || 'Tablet hosts: 127.0.0.1 workstation.local') + '<br>';
             }
             if (cfg.ssh_tunnel_cmd_named) {
