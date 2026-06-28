@@ -182,7 +182,8 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         # The workstation has the full source, docker build context, and rights.
         # We trigger the main deploy script on workstation (which will then push to prod if needed).
         my $workstation_host = 'workstation.local';  # or 192.168.1.199
-        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' script/deploy_docker_to_production.pl --target=production1 2>&1";
+        # Use standardized compose files + volume normalization via main deploy.sh
+        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' DEPLOY_MODE=prod script/deploy.sh 2>&1";
         my $ssh_cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@$workstation_host \"$cmd\"";
         my $remote_output = `$ssh_cmd`;
         my $exit_code = $? >> 8;
@@ -191,9 +192,19 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         $success = ($exit_code == 0);
     } else {
         # Safe server (workstation etc.): run locally with dated container backup
+        # Using standardized comserv2_* volume compose files
         my $repo_path    = '/home/shanta/PycharmProjects/comserv2';
-        my $compose_file = "$repo_path/Comserv/docker-compose.prod.yml";
+        my $base_compose = "$repo_path/Comserv/docker-compose.yml";
+        my $prod_compose = "$repo_path/Comserv/docker-compose.prod.yml";
+        my $nfs_compose  = "$repo_path/Comserv/docker-compose.prod.nfs.yml";
         my $container    = 'comserv-web-prod';
+
+        # Determine compose file list
+        my @compose_files = ('-f', $base_compose, '-f', $prod_compose);
+        if (-f $nfs_compose && $server_role eq 'production1') {
+            push @compose_files, '-f', $nfs_compose;
+        }
+        my $compose_args = join(' ', @compose_files);
 
         push @lines, "[${\scalar localtime}] === git pull ===";
         my $git_out  = `cd '$repo_path' && git pull 2>&1`;
@@ -215,15 +226,20 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         my $rename_out = `docker rename $container $backup_name 2>&1 || true`;
         push @lines, $rename_out;
 
+        # === Volume Normalization (ensure comserv2_* volumes) ===
+        push @lines, "[${\scalar localtime}] === Normalizing volumes (comserv2_* standard) ===";
+        my $norm_out = `cd '$repo_path/Comserv' && docker compose $compose_args config --quiet 2>&1 || true`;
+        push @lines, $norm_out;
+
         # === Build new image ===
         push @lines, "[${\scalar localtime}] === Building new image (web-prod) ===";
-        my $build_out = `cd '$repo_path/Comserv' && docker compose -f '$compose_file' build web-prod --no-cache 2>&1`;
+        my $build_out = `cd '$repo_path/Comserv' && docker compose $compose_args build web-prod --no-cache 2>&1`;
         push @lines, $build_out;
         if ($? >> 8) { $success = 0; }
 
         # === Start new container ===
         push @lines, "[${\scalar localtime}] === Starting new container ===";
-        my $up_out = `cd '$repo_path/Comserv' && docker compose -f '$compose_file' up -d web-prod 2>&1`;
+        my $up_out = `cd '$repo_path/Comserv' && docker compose $compose_args up -d web-prod 2>&1`;
         push @lines, $up_out;
         if ($? >> 8) { $success = 0; }
 
