@@ -3609,13 +3609,13 @@ sub chat :Local :Args(0) {
 sub models :Path('models') :Args(0) {
     my ($self, $c) = @_;
 
-    # Normalize roles safely (string or array)
+    # Safe roles normalization (fixes the string "4" ARRAY ref error)
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
     my $can_select_model = ref($user_roles) eq 'ARRAY'
-        ? (grep { /^(admin|developer)$/i } @$user_roles) : 0;
+        ? scalar(grep { /^(admin|developer)$/i } @$user_roles) : 0;
 
     my $models_data = $c->model('AI')->get_available_models($c,
         can_select_model => $can_select_model,
@@ -3623,13 +3623,13 @@ sub models :Path('models') :Args(0) {
         include_external => 1,
     );
 
-    my $api_keys = $c->model('AI')->get_api_keys($c);
+    my $api_keys = $c->model('AI')->get_api_keys($c) || [];
 
     my $has_grok_key = scalar(grep { ($_->{provider} || '') eq 'grok' } @$models_data);
 
     $c->stash(
         models_data        => $models_data,
-        models             => $models_data,   # legacy alias
+        models             => $models_data,   # legacy
         api_keys           => $api_keys,
         can_select_model   => $can_select_model,
         has_api_key        => $has_grok_key,
@@ -4177,11 +4177,6 @@ sub check_status :Local :Args(0) {
     $c->response->body($json_response);
 }
 
-=head2 set_host
-
-Switch the Ollama server host (admin/developer/editor only).
-
-=cut
 
 sub set_host :Local :Args(0) {
     my ($self, $c) = @_;
