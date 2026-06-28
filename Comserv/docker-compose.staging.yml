@@ -1,6 +1,26 @@
 version: '3.9'
 
 services:
+  # Staging services - uses comserv2_* named volumes for consistency
+  config-db:
+    image: mariadb:10.11
+    container_name: comserv2-config-db-staging
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-stagingroot}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-comserv_staging}
+      MARIADB_USER: ${MARIADB_USER:-comserv}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-stagingpass}
+    volumes:
+      - comserv2_config_db_data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: comserv2-redis-staging
+    restart: unless-stopped
+    volumes:
+      - comserv2_redis_data:/data
+
   web-staging:
     build:
       context: .
@@ -35,10 +55,15 @@ services:
       - ./t:/opt/comserv/t:ro
       # Config (read-only)
       - ./db_config.json:/opt/comserv/db_config.json:ro
-      # Persistent volumes for logs and sessions
-      - comserv-staging-logs:/opt/comserv/root/log
-      - comserv-staging-sessions:/opt/comserv/root/session
-      - comserv-staging-backups:/opt/comserv/backups
+      # Standardized comserv2_* named volumes
+      - comserv2_logs:/opt/comserv/root/log
+      - comserv2_sessions:/opt/comserv/root/session
+      - comserv2_workshop_files:/opt/comserv/backups
+      - comserv2_whisper_venv:/opt/comserv/whisper_venv
+      - comserv2_cpan_cache:/root/.cpan
+      - comserv2_cache:/cache
+      - comserv2_temp:/tmp/comserv/temp
+      - comserv2_themes:/opt/comserv/root/themes
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
       interval: 30s
@@ -61,17 +86,26 @@ services:
           memory: 1G
 
 volumes:
-  comserv-staging-logs:
+  # Standardized comserv2_* named volumes (shared with prod/dev)
+  comserv2_config_db_data:
     driver: local
-  comserv-staging-sessions:
+  comserv2_redis_data:
     driver: local
-  comserv-staging-backups:
+  comserv2_logs:
     driver: local
-  comserv-themes:
+  comserv2_sessions:
     driver: local
-  comserv-temp:
+  comserv2_workshop_files:
     driver: local
-  comserv-cache:
+  comserv2_whisper_venv:
+    driver: local
+  comserv2_cpan_cache:
+    driver: local
+  comserv2_temp:
+    driver: local
+  comserv2_themes:
+    driver: local
+  comserv2_cache:
     driver: local
 
 networks:
