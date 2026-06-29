@@ -1,6 +1,7 @@
 [%# root/ai2/editing_widget_popup.tt
    PyCharm-like AI Code Editor popup for AI2 system
    Layout: header + left sidebar + main editor + right chat
+   Enhanced with Ace Editor + AJAX file loading + auto-refresh (4s polling)
 %]
 <!DOCTYPE html>
 <html>
@@ -12,7 +13,6 @@
         .header { background:#2b2b2b; color:#fff; padding:6px 12px; display:flex; align-items:center; gap:12px; }
         .header select, .header button { font-size:0.9em; }
 
-        /* PyCharm dark theme for dropdowns */
         select {
             background-color: #313335;
             color: #ddd;
@@ -28,7 +28,6 @@
         .main { display:flex; flex:1; overflow:hidden; }
         .sidebar { width:220px; background:#313335; color:#ccc; padding:8px; overflow:auto; border-right:1px solid #555; }
 
-        /* Higher contrast Projects list */
         .sidebar ul { padding-left: 8px; margin: 4px 0; }
         .sidebar ul li {
             padding: 3px 6px;
@@ -43,8 +42,8 @@
         }
 
         .editor-area { flex:1; display:flex; flex-direction:column; }
-        .editor-tabs { background:#2b2b2b; padding:4px 8px; color:#aaa; }
-        .editor-content { flex:1; background:#1e1f22; color:#ddd; padding:12px; font-family:monospace; }
+        .editor-tabs { background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between; }
+        .editor-content { flex:1; background:#1e1f22; color:#ddd; padding:0; font-family:monospace; position:relative; }
         .diff-pane { height:140px; background:#2b2b2b; color:#0f0; padding:8px; border-top:1px solid #555; font-size:0.85em; }
         .chat-sidebar { width:320px; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555; }
         .chat-header { padding:6px 10px; background:#2b2b2b; font-weight:bold; }
@@ -53,10 +52,10 @@
     </style>
 </head>
 <body>
-    <!-- Top Header (PyCharm style) -->
+    <!-- Top Header -->
     <div class="header">
         <label>Branch:
-            <select>
+            <select id="branch-select">
                 [% FOREACH b IN branches %]
                     <option [% IF b == 'main' %]selected[% END %]>[% b | html %]</option>
                 [% END %]
@@ -65,16 +64,21 @@
         <button onclick="alert('Merge functionality coming soon')">Merge</button>
 
         <label style="margin-left:auto">Model:
-            <select>
+            <select id="model-select">
                 [% FOREACH m IN recommended_models %]
                     <option [% IF m == selected_model %]selected[% END %]>[% m | html %]</option>
                 [% END %]
             </select>
         </label>
+
+        <!-- Manual Refresh Button -->
+        <button id="refresh-btn" style="margin-left:12px;background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
+            ↻ Refresh
+        </button>
     </div>
 
     <div class="main">
-        <!-- Left Sidebar: File tree / Commit / Terminal -->
+        <!-- Left Sidebar -->
         <div class="sidebar">
             <div><strong>Projects</strong></div>
             <ul style="list-style:none;padding-left:12px;margin:4px 0;">
@@ -86,7 +90,7 @@
             <div style="margin-top:12px"><strong>Terminal</strong></div>
             <div style="background:#1e1f22;height:80px;font-size:0.8em;padding:4px;">$ git status</div>
 
-            <!-- Editor Settings / Theme Complement -->
+            <!-- Editor Settings -->
             <details style="margin-top:16px;background:#2b2b2b;border-radius:4px;padding:6px 8px;">
                 <summary style="cursor:pointer;color:#fff;font-weight:bold;">⚙️ Editor Settings</summary>
                 <div style="margin-top:8px;font-size:0.85em;color:#ccc;">
@@ -97,7 +101,6 @@
                             <option value="custom">Custom</option>
                         </select>
                     </label>
-
                     <label style="display:block;margin:4px 0;">Font Size:
                         <select id="font-size" onchange="applyEditorSettings()">
                             <option value="12">12px</option>
@@ -106,25 +109,8 @@
                             <option value="18">18px</option>
                         </select>
                     </label>
-
                     <label style="display:block;margin:4px 0;">
                         <input type="checkbox" id="line-numbers" checked onchange="applyEditorSettings()"> Line Numbers
-                    </label>
-
-                    <label style="display:block;margin:4px 0;">AI Diff Intensity:
-                        <select id="diff-intensity" onchange="applyEditorSettings()">
-                            <option value="low">Low</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                        </select>
-                    </label>
-
-                    <label style="display:block;margin:4px 0;">Suggestion Style:
-                        <select id="suggestion-style" onchange="applyEditorSettings()">
-                            <option value="buttons">Approve/Reject Buttons</option>
-                            <option value="inline">Inline +/-</option>
-                            <option value="minimal">Minimal</option>
-                        </select>
                     </label>
                 </div>
             </details>
@@ -133,11 +119,12 @@
         <!-- Main Editor Area -->
         <div class="editor-area">
             <div class="editor-tabs">
-                editing_widget_popup.tt &nbsp; | &nbsp; AI2.pm
+                <span>editing_widget_popup.tt &nbsp; | &nbsp; AI2.pm</span>
+                <span id="file-status" style="font-size:11px;color:#888;"></span>
             </div>
             <div class="editor-content">
-                <!-- Placeholder for Ace/CodeMirror -->
-                <textarea style="width:100%;height:100%;background:#1e1f22;color:#ddd;border:none;resize:none;font-family:monospace;" spellcheck="false"># TODO: load real file content here</textarea>
+                <!-- Ace Editor Container -->
+                <div id="ace-editor" style="width:100%;height:100%;"></div>
             </div>
             <!-- Live AI Diff Pane -->
             <div class="diff-pane">
@@ -155,7 +142,6 @@
         <div class="chat-sidebar">
             <div class="chat-header">AI Chat (Router-selected)</div>
             <div class="chat-messages">
-                <!-- Placeholder messages -->
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
             <div class="chat-input">
@@ -164,19 +150,114 @@
         </div>
     </div>
 
+    <!-- Status bar for auto-refresh -->
+    <div style="background:#007acc;color:white;font-size:11px;padding:2px 8px;text-align:right;">
+        <span id="auto-refresh-status">Auto-refresh: ON (4s)</span>
+        <span id="last-modified" style="margin-left:12px;color:#a0d2ff;"></span>
+    </div>
+
+    <!-- Ace Editor CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.js"></script>
+
     <script>
-        // Apply editor settings from the collapsible settings panel
+        // ===================================================================
+        // Ace Editor + AJAX + Auto-refresh (detects external PyCharm edits)
+        // ===================================================================
+        (function() {
+            const editorEl = document.getElementById('ace-editor');
+            const refreshBtn = document.getElementById('refresh-btn');
+            const statusEl = document.getElementById('file-status');
+            const mtimeEl = document.getElementById('last-modified');
+
+            let currentFilePath = '[% file_path || "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/AI2.pm" %]';
+            let lastMtime = null;
+            let autoRefreshTimer = null;
+
+            // Initialize Ace
+            const editor = ace.edit(editorEl);
+            editor.setTheme("ace/theme/twilight");
+            editor.session.setMode("ace/mode/perl");
+            editor.setOptions({
+                fontSize: "14px",
+                showPrintMargin: false,
+                wrap: true,
+                enableBasicAutocompletion: true,
+                enableLiveAutocompletion: true
+            });
+
+            // ----------------------------------------------------------------
+            // AJAX: Load file content
+            // ----------------------------------------------------------------
+            async function loadFileContent(path) {
+                try {
+                    const res = await fetch(`/ai2/load_file?path=${encodeURIComponent(path)}`);
+                    if (!res.ok) throw new Error('Failed to load file');
+                    const data = await res.json();
+                    editor.setValue(data.content || '', -1);
+                    lastMtime = data.mtime;
+                    mtimeEl.textContent = `Last modified: ${new Date(lastMtime * 1000).toLocaleTimeString()}`;
+                    statusEl.textContent = `Loaded: ${path.split('/').pop()}`;
+                } catch (err) {
+                    console.error('loadFileContent error:', err);
+                    statusEl.textContent = 'Error loading file';
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // AJAX: Get current mtime (for change detection)
+            // ----------------------------------------------------------------
+            async function getFileMtime(path) {
+                try {
+                    const res = await fetch(`/ai2/file_checksum?path=${encodeURIComponent(path)}`);
+                    if (!res.ok) return null;
+                    const data = await res.json();
+                    return data.mtime || null;
+                } catch (err) {
+                    console.error('getFileMtime error:', err);
+                    return null;
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // Manual refresh button
+            // ----------------------------------------------------------------
+            refreshBtn.addEventListener('click', () => {
+                loadFileContent(currentFilePath);
+            });
+
+            // ----------------------------------------------------------------
+            // AUTO-REFRESH LOGIC
+            // Every 4 seconds we ask the server for the file's mtime.
+            // If it differs from what we last saw, the file was changed
+            // outside the browser (e.g. PyCharm saved it) → reload content.
+            // ----------------------------------------------------------------
+            function startAutoRefresh() {
+                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+                autoRefreshTimer = setInterval(async () => {
+                    const newMtime = await getFileMtime(currentFilePath);
+                    if (newMtime && newMtime !== lastMtime) {
+                        console.log('[AI2] External change detected, reloading...');
+                        await loadFileContent(currentFilePath);
+                    }
+                }, 4000);
+            }
+
+            // Boot
+            loadFileContent(currentFilePath).then(() => {
+                startAutoRefresh();
+            });
+
+            window.AI2Editor = editor; // for debugging
+        })();
+
+        // Existing settings function (kept)
         function applyEditorSettings() {
             const theme = document.getElementById('theme-select').value;
             const fontSize = document.getElementById('font-size').value;
             const lineNumbers = document.getElementById('line-numbers').checked;
-            const diffIntensity = document.getElementById('diff-intensity').value;
-            const suggestionStyle = document.getElementById('suggestion-style').value;
 
             const editorContent = document.querySelector('.editor-content');
-            const diffPane = document.querySelector('.diff-pane');
-
-            // Theme
             if (theme === 'light') {
                 editorContent.style.background = '#f5f5f5';
                 editorContent.style.color = '#222';
@@ -187,11 +268,7 @@
                 editorContent.style.background = '#1e1f22';
                 editorContent.style.color = '#ddd';
             }
-
-            // Font size
             editorContent.style.fontSize = fontSize + 'px';
-
-            // Line numbers (simple visual indicator)
             if (lineNumbers) {
                 editorContent.style.borderLeft = '3px solid #555';
                 editorContent.style.paddingLeft = '16px';
@@ -199,25 +276,8 @@
                 editorContent.style.borderLeft = 'none';
                 editorContent.style.paddingLeft = '12px';
             }
-
-            // Diff intensity
-            if (diffPane) {
-                if (diffIntensity === 'low') {
-                    diffPane.style.opacity = '0.6';
-                } else if (diffIntensity === 'high') {
-                    diffPane.style.opacity = '1';
-                    diffPane.style.fontWeight = 'bold';
-                } else {
-                    diffPane.style.opacity = '0.9';
-                    diffPane.style.fontWeight = 'normal';
-                }
-            }
-
-            // Suggestion style (placeholder for future UI)
-            console.log('Suggestion style set to:', suggestionStyle);
         }
 
-        // Future: load Ace editor, wire chat to /ai2/chat, etc.
         console.log('AI2 editing popup ready – model: [% selected_model | html %]');
     </script>
 </body>
