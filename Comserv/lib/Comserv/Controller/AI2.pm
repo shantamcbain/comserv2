@@ -81,6 +81,69 @@ sub editing_widget_popup :Local :Args(0) {
     # Catalyst will render the fragment into the dialog
 }
 
+# -------------------------------------------------------------------
+# Secure file loading for the AI2 editor
+# -------------------------------------------------------------------
+
+# GET /ai2/load_file?path=...
+sub load_file :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $rel_path = $c->req->param('path') || '';
+    my $root     = $c->path_to('');
+    my $full     = $root->file($rel_path)->absolute;
+
+    # Security: must be inside project root
+    unless ($full =~ /^\Q$root\E/) {
+        $c->res->status(403);
+        $c->res->body('Forbidden');
+        return;
+    }
+    unless (-e $full) {
+        $c->res->status(404);
+        $c->res->body('Not found');
+        return;
+    }
+
+    my $content = $full->slurp;
+    my $mtime   = (stat($full))[9];
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        path    => "$full",
+        content => $content,
+        mtime   => $mtime,
+    }));
+}
+
+# GET /ai2/file_checksum?path=...
+sub file_checksum :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $rel_path = $c->req->param('path') || '';
+    my $root     = $c->path_to('');
+    my $full     = $root->file($rel_path)->absolute;
+
+    unless ($full =~ /^\Q$root\E/) {
+        $c->res->status(403);
+        $c->res->body('Forbidden');
+        return;
+    }
+    unless (-e $full) {
+        $c->res->status(404);
+        $c->res->body('Not found');
+        return;
+    }
+
+    my $mtime = (stat($full))[9];
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        path  => "$full",
+        mtime => $mtime,
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
