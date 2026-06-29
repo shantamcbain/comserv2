@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>🐳 Docker Hub Deploy</title>
+<title>🐳 Docker Deploy</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; display: flex; flex-direction: column; }
@@ -26,20 +26,65 @@
   .btn-view:not([href]) { display: none; }
   #spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Choice screen styles */
+  .choice-container { padding: 20px; }
+  .choice-title { color: #58a6ff; margin-bottom: 16px; font-size: 1.1em; }
+  .choice-option { 
+    background: #21262d; 
+    border: 1px solid #30363d; 
+    padding: 12px 16px; 
+    margin: 8px 0; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    transition: all 0.2s;
+  }
+  .choice-option:hover { background: #30363d; border-color: #58a6ff; }
+  .choice-option .label { font-weight: bold; color: #c9d1d9; }
+  .choice-option .desc { color: #8b949e; font-size: 0.85em; margin-top: 4px; }
+  .choice-cancel { color: #f85149; margin-top: 20px; }
 </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>🐳 Docker Hub Deploy</h1>
-  <span id="status-badge" class="running"><span id="spinner"></span> Starting…</span>
+  <h1>🐳 Docker Deploy</h1>
+  <span id="status-badge" class="running"><span id="spinner"></span> Ready</span>
 </div>
 
-<pre id="console"><span class="info">Initialising deploy log…</span>
-<span class="dim">Step 0a: any uncommitted workstation changes will be auto-committed and pushed before production is updated.</span>
-</pre>
+<!-- Choice Screen -->
+<div id="choice-screen" class="choice-container">
+  <div class="choice-title">Choose Deployment Method</div>
 
-<div id="footer">
+  <div class="choice-option" onclick="startDeploy('production1')">
+    <div class="label">[1] FULL DEPLOY → production1</div>
+    <div class="desc">Rebuilds and pushes a new image to Docker Hub, then restarts the production1 server container.</div>
+  </div>
+
+  <div class="choice-option" onclick="startDeploy('production2')">
+    <div class="label">[2] FULL DEPLOY → production2</div>
+    <div class="desc">Rebuilds and pushes a new image to Docker Hub, then restarts the production2 server container.</div>
+  </div>
+
+  <div class="choice-option" onclick="startDeploy('workstation')">
+    <div class="label">[3] FULL DEPLOY → workstation</div>
+    <div class="desc">Deploys to the local workstation (useful for testing).</div>
+  </div>
+
+  <div class="choice-option" onclick="startDeploy('local-test')">
+    <div class="label">[B] Build &amp; test locally only (no deploy)</div>
+    <div class="desc">Builds and tests the production image locally but does not push or deploy.</div>
+  </div>
+
+  <div class="choice-option choice-cancel" onclick="cancelDeploy()">
+    <div class="label">[C] Cancel / Abort</div>
+  </div>
+</div>
+
+<!-- Live Log Screen (hidden until choice is made) -->
+<pre id="console" style="display:none;"></pre>
+
+<div id="footer" style="display:none;">
   <input id="notes" type="text" placeholder="Notes for this deploy log (optional)…">
   <button id="btn-cancel" class="btn" style="background: #dc3545; color: white;" onclick="cancelAndSave()">🛑 Abort &amp; Save</button>
   <button id="btn-close" class="btn btn-close" disabled onclick="closeLog()">📋 Close &amp; Save Log</button>
@@ -50,24 +95,20 @@
 var logId         = null;
 var logOutput     = '';
 var todoRecordId  = (new URLSearchParams(window.location.search)).get('todo_record_id') || '';
-var quickDeploy   = (new URLSearchParams(window.location.search)).get('quick_deploy') || '0';
 var pollingTimer  = null;
 var lastContent   = '';
 var consecutiveErrors = 0;
+var chosenTarget  = null;
 
 var con = document.getElementById('console');
 
-function appendLine(text, cls) {
-    if (cls) {
-        var span = document.createElement('span');
-        span.className = cls;
-        span.textContent = text + '\n';
-        con.appendChild(span);
-    } else {
-        con.appendChild(document.createTextNode(text + '\n'));
-    }
+function showFullLog(newOutput) {
+    if (!newOutput || newOutput === lastContent) return;
+    con.innerHTML = '';
+    con.appendChild(document.createTextNode(newOutput));
     con.scrollTop = con.scrollHeight;
-    logOutput += text + '\n';
+    logOutput = newOutput;
+    lastContent = newOutput;
     window.scrollTo(0, document.body.scrollHeight);
 }
 
@@ -103,18 +144,9 @@ function startPolling() {
             .then(function(data) {
                 if (data.success) {
                     consecutiveErrors = 0;
-                    
-                    // Always replace console with full latest output for reliable streaming
                     if (data.output && data.output !== lastContent) {
-                        // Clear and rebuild console with full content
-                        con.innerHTML = '';
-                        con.appendChild(document.createTextNode(data.output));
-                        con.scrollTop = con.scrollHeight;
-                        logOutput = data.output;
-                        lastContent = data.output;
-                        window.scrollTo(0, document.body.scrollHeight);
+                        showFullLog(data.output);
                     }
-                    
                     if (!data.is_running) {
                         clearInterval(pollingTimer);
                         pollingTimer = null;
@@ -130,7 +162,7 @@ function startPolling() {
                         if (window.opener && window.opener.postMessage) {
                             window.opener.postMessage({ type: 'deploy_done', success: 1 }, '*');
                         }
-                        alert('✅ Docker Hub deploy complete — review log and close the window to save.');
+                        alert('✅ Docker deploy complete — review log and close the window to save.');
                     }
                 }
             })
@@ -138,31 +170,20 @@ function startPolling() {
                 if (e.message !== 'session-expired') {
                     appendLine('Polling error: ' + e.message, 'err');
                     consecutiveErrors++;
-                    if (consecutiveErrors >= 5) {
-                        appendLine('\n⚠️ Multiple network errors detected. The server might be restarting or unreachable. You can use "Abort & Save" to save progress.', 'err');
-                    }
                 }
             });
-    }, 500);  // Poll every 500ms for more responsive live streaming
+    }, 500);
 }
 
-function cancelAndSave() {
-    if (confirm("Are you sure you want to abort polling, save the partial deploy log, and close this planning entry?")) {
-        if (pollingTimer) {
-            clearInterval(pollingTimer);
-            pollingTimer = null;
-        }
-        appendLine('\n🛑 DEPLOYMENT ABORTED/CANCELLED BY USER', 'err');
-        setStatus('error', '🛑 Aborted');
-        
-        var cancelBtn = document.getElementById('btn-cancel');
-        if (cancelBtn) cancelBtn.disabled = true;
-        
-        closeLog();
-    }
-}
+function startDeploy(target) {
+    chosenTarget = target;
+    document.getElementById('choice-screen').style.display = 'none';
+    document.getElementById('console').style.display = 'block';
+    document.getElementById('footer').style.display = 'flex';
 
-window.addEventListener('load', function() {
+    setStatus('running', 'Deploying to ' + target + '…');
+
+    // Create log entry first
     safeFetch('/admin/docker/init_log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -170,51 +191,44 @@ window.addEventListener('load', function() {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-        if (!d.success) {
-            appendLine('⚠ Log creation failed: ' + (d.message || 'unknown'), 'err');
-        } else {
-            logId = d.log_id;
-            if (logId) {
-                document.getElementById('btn-view').href = '/log/details?record_id=' + logId;
-            }
-        }
-        appendLine('[' + new Date().toLocaleTimeString() + '] Log created — starting Hub deploy…', 'info');
-        setStatus('running', 'Deploying…');
+        if (d.success) logId = d.log_id;
+        appendLine('[' + new Date().toLocaleTimeString() + '] Log created — starting deploy to ' + target + '…', 'info');
 
-        var bodyParams = [];
-        if (quickDeploy)  { bodyParams.push('quick_deploy=' + encodeURIComponent(quickDeploy)); }
-        if (todoRecordId) { bodyParams.push('todo_record_id=' + encodeURIComponent(todoRecordId)); }
-        if (logId)        { bodyParams.push('deploy_log_id=' + encodeURIComponent(logId)); }
+        var bodyParams = 'target=' + encodeURIComponent(target);
+        if (todoRecordId) bodyParams += '&todo_record_id=' + encodeURIComponent(todoRecordId);
 
         return safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: bodyParams.join('&')
+            body: bodyParams
         });
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.success) {
-            appendLine('Background deploy process started.', 'ok');
+            appendLine('Background deploy process started for ' + target + '.', 'ok');
             appendLine('Streaming output…', 'info');
             startPolling();
         } else {
             appendLine('❌ Failed to start deploy: ' + (data.error || 'unknown error'), 'err');
             setStatus('error', '❌ Failed');
             document.getElementById('btn-close').disabled = false;
-            if (window.opener && window.opener.postMessage) {
-                window.opener.postMessage({ type: 'deploy_done', success: 0 }, '*');
-            }
-            alert('⚠️ Docker Hub deploy failed to start — review output for details.');
-        }
-    })
-    .catch(function(e) {
-        if (e.message !== 'session-expired') {
-            setStatus('error', '❌ Error');
-            document.getElementById('btn-close').disabled = false;
         }
     });
-});
+}
+
+function cancelDeploy() {
+    window.close();
+}
+
+function cancelAndSave() {
+    if (confirm("Are you sure you want to abort?")) {
+        if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+        appendLine('\n🛑 DEPLOYMENT ABORTED/CANCELLED BY USER', 'err');
+        setStatus('error', '🛑 Aborted');
+        closeLog();
+    }
+}
 
 function closeLog() {
     var notes    = (document.getElementById('notes') || {}).value || '';

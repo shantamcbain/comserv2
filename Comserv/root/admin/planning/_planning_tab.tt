@@ -1,0 +1,454 @@
+    <!-- TAB: PLANNING — Project→Plan hierarchy; DB-driven for all sites; CSC also sees legacy Planning.tt -->
+    <div id="planning" class="tab-content">
+
+        [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
+        [% SET view_sitename = filter_site || plan_sitename %]
+
+        [%# 25002500 Branch server launcher (CSC admin/developer, or any .local/.zero dev domain) 25002500 %]
+        [% IF (is_admin && is_csc) || is_local_domain %]
+        [% SET cur_branch = c.stash.app_workflow || 'main' %]
+        [% SET host       = c.req.uri.host %]
+        [% SET scheme     = c.req.uri.scheme %]
+
+        [%# Static branch → port map (matches Planning.tt overview) %]
+        [% SET bp = {
+            'planning-system-continue-from-pl-bdac'    => 4001,
+            'aichatsystem-ef4e'                        => 4010,
+            'schema-managment-system-7eb3'             => 4002,
+            'infrastructuremanagement-d133'             => 4003,
+            'workshops-7d21'                           => 4004,
+            'users-e5b8'                               => 4005,
+            'new-task-bb05'                            => 4006,
+            'unified-mail-system-site-managed-2c53'    => 4007,
+            'membership-1304'                          => 4008,
+            'pointsystem-3230'                         => 4009,
+            'cssthemes-9195'                           => 4011,
+            'ency-53b0'                                => 4012,
+            'helpdesk-7217'                            => 4013,
+            'healthplanning-9db9'                      => 4014,
+            'productionserverhealth-82fb'              => 4015,
+            'security-764f'                            => 4016,
+            'documentation-9122'                       => 4017,
+            'api-bc05'                                 => 4018,
+            'bmaster-f0fd'                             => 4019,
+            'aichatsystem-planning-system-int-f187'    => 4020,
+            'inventory-system-104a'                    => 4021,
+            '3dprinting-use-this-as-the-branc-41f3'    => 4030,
+            'developer-time-logging-points-ba-542a'    => 4022,
+            'page-management-system-implement-41a1'    => 4023,
+        } %]
+
+        [%# All known branch servers for the overview panel %]
+        [% SET all_branches = [
+            { name => 'main',                                   port => 3001, label => 'MAIN',                url => '/planning/daily', cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r' },
+            { name => 'planning-system-continue-from-pl-bdac',  port => 4001, label => 'PlanningSystem',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4001 -r' },
+            { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4010 -r' },
+            { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4002 -r' },
+            { name => 'infrastructuremanagement-d133',           port => 4003, label => 'InfrastructureMgmt', url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/infrastructuremanagement-d133/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4003 -r' },
+            { name => 'workshops-7d21',                         port => 4004, label => 'WorkShops',           url => '/workshop',       cmd => 'cd /home/shanta/.zenflow/worktrees/workshops-7d21/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4004 -r' },
+            { name => 'users-e5b8',                             port => 4005, label => 'Users',               url => '/user/dashboard', cmd => 'cd /home/shanta/.zenflow/worktrees/users-e5b8/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4005 -r' },
+            { name => 'new-task-bb05',                          port => 4006, label => 'FileManagement',      url => '/admin/planning', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-bb05/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4006 -r' },
+            { name => 'unified-mail-system-site-managed-2c53',  port => 4007, label => 'UnifiedMail',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/unified-mail-system-site-managed-2c53/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4007 -r' },
+            { name => 'membership-1304',                        port => 4008, label => 'Membership',          url => '/membership',     cmd => 'cd /home/shanta/.zenflow/worktrees/membership-1304/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4008 -r' },
+            { name => 'pointsystem-3230',                       port => 4009, label => 'PointSystem',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/pointsystem-3230/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4009 -r' },
+            { name => 'cssthemes-9195',                         port => 4011, label => 'CssThemes',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/cssthemes-9195/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4011 -r' },
+            { name => 'ency-53b0',                              port => 4012, label => 'ENCY',                url => '/ENCY',           cmd => 'cd /home/shanta/.zenflow/worktrees/ency-53b0/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4012 -r' },
+            { name => 'helpdesk-7217',                          port => 4013, label => 'HelpDesk',            url => '/HelpDesk',       cmd => 'cd /home/shanta/.zenflow/worktrees/helpdesk-7217/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4013 -r' },
+            { name => 'healthplanning-9db9',                    port => 4014, label => 'HealthPlanning',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/healthplanning-9db9/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4014 -r' },
+            { name => 'productionserverhealth-82fb',            port => 4015, label => 'ProdServerHealth',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/productionserverhealth-82fb/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4015 -r' },
+            { name => 'security-764f',                          port => 4016, label => 'Security',            url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/security-764f/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4016 -r' },
+            { name => 'documentation-9122',                     port => 4017, label => 'Documentation',       url => '/Documentation',  cmd => 'cd /home/shanta/.zenflow/worktrees/documentation-9122/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4017 -r' },
+            { name => 'api-bc05',                               port => 4018, label => 'APISystem',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/api-bc05/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4018 -r' },
+            { name => 'bmaster-f0fd',                           port => 4019, label => 'BMaster',             url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/bmaster-f0fd/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4019 -r' },
+            { name => 'aichatsystem-planning-system-int-f187',  port => 4020, label => 'AIChatPlanInt',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-planning-system-int-f187/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4020 -r' },
+            { name => 'inventory-system-104a',                  port => 4021, label => 'InventorySystem',     url => '/Inventory',      cmd => 'cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4021 -r' },
+            { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4030 -r' },
+            { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4022 -r' },
+            { name => 'page-management-system-implement-41a1',  port => 4023, label => 'PageManagement',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/page-management-system-implement-41a1/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4023 -r' },
+            { name => 'docker-5c15',                            port => 4024, label => 'Docker',               url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/docker-5c15/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4024 -r' },
+        ] %]
+
+        [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
+        [%# host may include port (e.g. bmast.local:4001) so match without $ anchor %]
+        [% SET is_workstation = (host.match('\.local(?::\d+)?$') || host.match('\.zero(?::\d+)?$') || host.match('^localhost')) ? 1 : 0 %]
+
+        <div style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
+            <div style="background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));padding:8px 14px;border-radius:6px 6px 0 0;font-weight:bold;color:#fd7e14;display:flex;justify-content:space-between;align-items:center;">
+                <span>🌿 Branch Servers
+                    [% IF cur_branch && cur_branch != 'main' %]
+                    — currently on <code style="font-size:1em;">[% cur_branch %]</code>
+                    [% END %]
+                </span>
+                <span style="color:var(--text-muted-color);font-size:0.9em;">▾</span>
+            </div>
+            <div style="padding:10px 14px;">
+
+                [%# Quick-open dropdown — shown on ALL hosts %]
+                [%# On workstation.local: opens branch on workstation using the branch port %]
+                [%# On other hosts: opens branch on workstation.local (dev machine) using branch port %]
+                [% SET open_host = is_workstation ? host : 'workstation.local' %]
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <label for="bs-select" style="font-weight:bold;color:#fd7e14;white-space:nowrap;">Open branch:</label>
+                    <select id="bs-select" style="flex:1;min-width:180px;padding:4px 8px;border:1px solid #fd7e14;border-radius:4px;font-family:monospace;font-size:0.9em;">
+                        <option value="">— select a branch —</option>
+                        [% FOREACH b IN all_branches %]
+                        <option value="[% scheme %]://[% open_host %]:[% b.port %][% b.url %]"
+                            [% IF b.name == cur_branch %]selected[% END %]>
+                            [% b.label %] :[% b.port %][% IF b.name == cur_branch %] ←[% END %]
+                        </option>
+                        [% END %]
+                    </select>
+                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value)window.open(s.value,'_blank');})()"
+                            style="padding:5px 14px;background:#fd7e14;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;white-space:nowrap;">
+                        Open →
+                    </button>
+                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value){var url=s.value;var m=url.match(/:(\d+)/);if(m){fetch('/admin/branch_server_action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=stop&branch=main&port='+m[1]}).then(()=>alert('Stop requested'))}}})()"
+                            style="padding:5px 10px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;white-space:nowrap;">
+                        Stop
+                    </button>
+                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value){var url=s.value;var m=url.match(/:(\d+)/);if(m){fetch('/admin/branch_server_action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=restart&branch=main&port='+m[1]}).then(()=>alert('Restart requested'))}}})()"
+                            style="padding:5px 10px;background:#ffc107;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;white-space:nowrap;">
+                        Restart
+                    </button>
+                </div>
+
+                [%# Full branch table — workstation.local only %]
+                [% IF is_workstation %]
+                [% IF cur_branch && cur_branch != 'main' %]
+                [% SET cur_port = bp.$cur_branch || '????' %]
+                <div style="margin-bottom:10px;padding:6px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <span style="font-weight:bold;color:#fd7e14;">▶ Current branch:</span>
+                    <code>[% cur_branch %]</code>
+                    <span style="color:var(--text-muted-color);">port [% cur_port %]</span>
+                    <a href="[% scheme %]://[% host %]:[% cur_port %]/Documentation/DailyPlan" target="_blank"
+                       style="padding:3px 10px;background:#fd7e14;color:#fff;border-radius:3px;text-decoration:none;">Open →</a>
+                </div>
+                [% END %]
+                <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
+                    <tr style="border-bottom:1px solid var(--border-color);">
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Port</th>
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Start Command</th>
+                        <th style="padding:4px 8px;"></th>
+                    </tr>
+                    [% FOREACH b IN all_branches %]
+                    <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
+                        <td style="padding:5px 8px;white-space:nowrap;"><code>[% b.label %]</code>
+                            [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
+                        </td>
+                        <td style="padding:5px 8px;white-space:nowrap;"><code>:[% b.port %]</code></td>
+                        <td style="padding:5px 8px;">
+                            <code style="font-size:0.82em;user-select:all;cursor:text;color:var(--text-muted-color);">[% b.cmd %]</code>
+                        </td>
+                        <td style="padding:5px 8px;white-space:nowrap;">
+                            <button onclick="smartOpenBranch('[% b.name %]', [% b.port %], '[% scheme %]://[% host %]:[% b.port %][% b.url %]')"
+                                    style="padding:2px 8px;background:var(--primary-color);color:#fff;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Open</button>
+                            <button onclick="branchAction('stop', '[% b.name %]', [% b.port %])"
+                                    style="padding:2px 6px;background:#dc3545;color:#fff;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Stop</button>
+                            <button onclick="branchAction('restart', '[% b.name %]', [% b.port %])"
+                                    style="padding:2px 6px;background:#ffc107;color:#000;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Restart</button>
+                        </td>
+                    </tr>
+                    [% END %]
+                </table>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+
+        [%# ── Header row ── %]
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
+            <h2 style="margin:0;font-size:1.2em;">
+                📁 Projects &amp; Plans:
+                [% IF is_csc && !filter_site %]All Sites[% ELSE %][% view_sitename %][% END %]
+            </h2>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                [% IF is_csc %]
+                <a href="#planning" onclick="switchTab(event,'planning');return false;"
+                   style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;">[text view ↓]</a>
+                [% END %]
+                [% IF is_admin %]
+                <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:5px 12px;border-radius:4px;text-decoration:none;font-size:0.85em;">+ New Plan</a>
+                [% END %]
+                <a href="/todo" style="padding:5px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.85em;color:var(--text-color);">Todos</a>
+            </div>
+        </div>
+
+        [%# ── CSC admin: SiteName filter toggle (from stash plan_sitenames) ── %]
+        [% IF is_csc && plan_sitenames && plan_sitenames.size %]
+        <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:0.85em;">
+            <span style="color:var(--text-muted-color);font-weight:bold;">Filter:</span>
+            <a href="/planning/daily#planning"
+               style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
+               [% IF !filter_site %]background:var(--primary-color);color:var(--button-text-color,#fff)[% ELSE %]color:var(--text-color)[% END %]">All</a>
+            [% FOREACH sname IN plan_sitenames %]
+            [% NEXT UNLESS sname %]
+            <a href="/planning/daily?filter_site=[% sname %]#planning"
+               style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
+               [% IF filter_site == sname %]background:var(--primary-color);color:var(--button-text-color,#fff)[% ELSE %]color:var(--text-color)[% END %]">
+                [% sname %]
+            </a>
+            [% END %]
+        </div>
+        [% END %]
+
+        [%# ── Project search filter ── %]
+        <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
+            <input type="text" id="project-search" placeholder="🔍 Search projects by name, site, or status…"
+                oninput="filterProjects(this.value)"
+                style="flex:1;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;font-size:0.88em;background:var(--bg-color);color:var(--text-color);">
+            <button onclick="document.getElementById('project-search').value='';filterProjects('');"
+                style="padding:5px 10px;border:1px solid var(--border-color);border-radius:4px;background:transparent;color:var(--text-muted-color);cursor:pointer;font-size:0.85em;">✕</button>
+        </div>
+        <script>
+        function filterProjects(q) {
+            q = q.toLowerCase().trim();
+            var cards = document.querySelectorAll('.project-card');
+            var headers = document.querySelectorAll('.site-group-header');
+            cards.forEach(function(card) {
+                var text = card.textContent.toLowerCase();
+                card.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
+            });
+            headers.forEach(function(h) {
+                var next = h.nextElementSibling;
+                var visible = false;
+                while (next && !next.classList.contains('site-group-header')) {
+                    if (next.classList.contains('project-card') && next.style.display !== 'none') visible = true;
+                    next = next.nextElementSibling;
+                }
+                h.style.display = (!q || visible) ? '' : 'none';
+            });
+        }
+        </script>
+
+        [%# ── Project → Plan hierarchy (from stash planning_projects) ── %]
+        [% IF planning_projects && planning_projects.size %]
+        [% IF is_admin %]
+        <div id="project-reorder-bar" style="display:none;padding:8px 12px;background:color-mix(in srgb,var(--primary-color) 12%,var(--bg-color));border:1px solid var(--primary-color);border-radius:4px;margin-bottom:10px;font-size:0.85em;align-items:center;gap:12px;">
+            <span>⇅ Drag rows to reorder projects</span>
+            <button id="save-order-btn" onclick="saveProjectOrder()" style="padding:3px 12px;background:var(--primary-color);color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Save Order</button>
+            <span id="save-order-msg" style="color:green;display:none;">✓ Saved</span>
+        </div>
+        [% END %]
+        <div id="project-sortable-list">
+        [% SET current_site_label = '' %]
+        [% SET in_site_group = 0 %]
+        [% FOREACH proj IN planning_projects %]
+            [%# Site group collapsible container for CSC all-sites view %]
+            [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
+            [% IF in_site_group %]</details>[% END %]
+            [% SET current_site_label = proj.sitename %]
+            [% SET in_site_group = 1 %]
+            <details class="site-group" style="margin-bottom:6px;">
+                <summary class="site-group-header" style="padding:4px 10px;background:color-mix(in srgb,var(--primary-color) 20%,var(--bg-color));color:var(--text-color);border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
+                    <span>🌐 [% proj.sitename %]</span>
+                    <span style="font-size:0.9em;opacity:0.8;">▾</span>
+                </summary>
+            [% END %]
+
+            [%# Project card %]
+            <details data-project-id="[% proj.id %]" draggable="[% is_admin ? 'true' : 'false' %]"
+                style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;margin-bottom:10px;"
+                class="project-card" open>
+                <summary style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none;">
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        [% IF is_admin %]<span class="drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--text-muted-color);font-size:1.1em;user-select:none;" onclick="event.stopPropagation()">⠿</span>[% END %]
+                        <strong>[% proj.name %]</strong>
+                        [% IF proj.project_code %]<span style="font-size:0.8em;color:var(--text-muted-color);margin-left:6px;">[% proj.project_code %]</span>[% END %]
+                        [% IF proj.developer_name %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">· [% proj.developer_name %]</span>[% END %]
+                    </span>
+                    <span style="display:flex;gap:6px;align-items:center;">
+                        [% IF proj.status %]
+                        <span style="padding:1px 7px;border-radius:3px;font-size:0.75em;font-weight:bold;
+                            [% IF proj.status == 'In-Process' || proj.status == 'active' %]background:#17a2b8;color:#fff
+                            [% ELSIF proj.status == 'Completed' || proj.status == 'completed' %]background: var(--success-color, #28a745);color:#fff
+                            [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
+                            [% proj.status %]
+                        </span>
+                        [% END %]
+                        <a href="/project/details?project_id=[% proj.id %]" style="font-size:0.78em;color:var(--primary-color);text-decoration:none;" onclick="event.stopPropagation()">Details</a>
+                    </span>
+                </summary>
+                <div style="padding:0 14px 12px;">
+                    [% IF proj.description %]
+                    <div style="font-size:0.85em;color:var(--text-color);margin:6px 0 10px;">[% proj.description %]</div>
+                    [% END %]
+
+                    [%# Sub-projects (from proj.sub_projects set by controller) %]
+                    [% IF proj.sub_projects && proj.sub_projects.size %]
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-size:0.82em;color:var(--text-muted-color);padding:3px 0;">
+                            📂 [% proj.sub_projects.size %] sub-project[% proj.sub_projects.size > 1 ? 's' : '' %]
+                        </summary>
+                        <div style="margin:4px 0 8px 10px;border-left:2px solid var(--border-color);padding-left:10px;">
+                            [% FOREACH sub IN proj.sub_projects %]
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+                                <span style="font-size:0.82em;">
+                                    <a href="/project/details?project_id=[% sub.id %]" style="color:var(--text-color);text-decoration:none;">[% sub.name %]</a>
+                                    [% IF sub.project_code %]<span style="color:var(--text-muted-color);font-size:0.9em;"> [% sub.project_code %]</span>[% END %]
+                                </span>
+                                [% IF sub.status %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
+                                    [% IF sub.status == 'In-Process' || sub.status == 'active' %]background:#17a2b8;color:#fff
+                                    [% ELSIF sub.status == 'Completed' || sub.status == 'completed' %]background: var(--success-color, #28a745);color:#fff
+                                    [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
+                                    [% sub.status %]
+                                </span>
+                                [% END %]
+                            </div>
+                            [% END %]
+                        </div>
+                    </details>
+                    [% END %]
+
+                    [%# Plans linked to this project (from proj.linked_plans set by controller) %]
+                    [% IF proj.linked_plans && proj.linked_plans.size %]
+                    <div style="margin-left:8px;border-left:2px solid var(--primary-color);padding-left:10px;">
+                        [% FOREACH pln IN proj.linked_plans %]
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-color);">
+                            <div>
+                                <a href="/admin/plan/[% pln.id %]" style="font-weight:bold;font-size:0.9em;color:var(--primary-color);text-decoration:none;">[% pln.plan_name %]</a>
+                                [% IF pln.due_date %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">due [% pln.due_date %]</span>[% END %]
+                            </div>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                [% IF pln.priority %]<span style="font-size:0.78em;color:var(--text-muted-color);">P[% pln.priority %]</span>[% END %]
+                                <span style="padding:1px 6px;border-radius:3px;font-size:0.72em;font-weight:bold;
+                                    [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color: var(--text-color, #333)[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% pln.status || 'active' %]
+                                </span>
+                                <a href="/admin/plan/[% pln.id %]" style="font-size:0.78em;color:var(--primary-color);">View</a>
+                            </div>
+                        </div>
+                        [% END %]
+                    </div>
+                    [% ELSE %]
+                    <div style="font-size:0.82em;color:var(--text-muted-color);margin:4px 0 6px;">
+                        No plans linked.
+                        [% IF is_admin %]
+                        <a href="/admin/plan/create?project_id=[% proj.id %]" style="color:var(--primary-color);margin-left:6px;">+ New Plan</a>
+                        [% IF all_plans && all_plans.size %]
+                        &nbsp;·&nbsp;
+                        <span style="color:var(--text-muted-color);">Link existing plan:
+                            <span title="A Plan is a time-boxed sprint or theme (e.g. 'Q2 2026 Planning Migration'). A Project is the long-running system or feature. Linking a plan to this project associates that sprint's goals with this project. You can link multiple plans to one project." style="cursor:help;color:var(--primary-color);">ⓘ</span>
+                        </span>
+                        <select id="link-plan-[% proj.id %]" style="font-size:0.8em;padding:2px 4px;border:1px solid var(--border-color);border-radius:3px;margin:0 4px;">
+                            <option value="">— select plan —</option>
+                            [% FOREACH ap IN all_plans %]
+                            <option value="[% ap.id %]">[% ap.plan_name %] [% IF ap.sitename %]([% ap.sitename %])[% END %]</option>
+                            [% END %]
+                        </select>
+                        <button onclick="linkPlanToProject(this, [% proj.id %])"
+                            style="font-size:0.78em;padding:2px 8px;border:1px solid var(--primary-color);border-radius:3px;background:transparent;color:var(--primary-color);cursor:pointer;">
+                            Link
+                        </button>
+                        [% END %]
+                        [% END %]
+                    </div>
+                    [% END %]
+                </div>
+            </details>
+        [% END %]
+        [% IF in_site_group %]</details>[% END %]
+        </div>[%# end #project-sortable-list %]
+
+        [%# ── Standalone plans (not linked to any project) ── %]
+        [% IF orphan_plans && orphan_plans.size %]
+        <div style="margin-top:20px;">
+            <h3 style="font-size:0.95em;color:var(--text-muted-color);margin-bottom:8px;">📋 Standalone Plans (not yet linked to a project)</h3>
+            [% FOREACH pln IN orphan_plans %]
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <a href="/admin/plan/[% pln.id %]" style="font-weight:bold;color:var(--primary-color);text-decoration:none;">[% pln.plan_name %]</a>
+                    <span style="font-size:0.8em;color:var(--text-muted-color);margin-left:8px;">[% pln.sitename %]</span>
+                    [% IF pln.plan_description %]<div style="font-size:0.82em;color:var(--text-color);margin-top:3px;">[% pln.plan_description | truncate(100) %]</div>[% END %]
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                    <span style="padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;
+                        [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color: var(--text-color, #333)[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                        [% pln.status || 'active' %]
+                    </span>
+                    <a href="/admin/plan/[% pln.id %]" style="font-size:0.82em;color:var(--primary-color);">View</a>
+                    [% IF is_admin %]<a href="/admin/plan/[% pln.id %]/edit" style="font-size:0.82em;color:var(--primary-color);">Edit</a>[% END %]
+                </div>
+            </div>
+            [% END %]
+        </div>
+        [% END %]
+
+        [% ELSE %]
+        <div style="text-align:center;padding:40px;color:var(--text-muted-color);">
+            <p>No projects found for <strong>[% IF is_csc && !filter_site %]All Sites[% ELSE %][% view_sitename %][% END %]</strong>.</p>
+            [% IF is_admin %]
+            <p>Add a project at <a href="/project/addproject" style="color:var(--primary-color);">/project/addproject</a>, then it will appear here.</p>
+            <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:8px 18px;border-radius:4px;text-decoration:none;">Create the first plan</a>
+            [% END %]
+        </div>
+        [% END %]
+
+    [%# ── Cross-project dependency map ───────────────────────────────────── %]
+    [% IF project_deps && project_deps.size %]
+    <div style="margin-top:28px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #dc3545;">
+            <h3 style="margin:0;font-size:1em;">🔗 Cross-Project Dependencies ([% project_deps.size %] active)</h3>
+            [% IF is_admin %]
+            <a href="/project/dependency_form" style="font-size:0.8em;color:var(--primary-color);">+ Manage Dependencies</a>
+            [% END %]
+        </div>
+        <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:10px;">
+            Projects that cannot proceed until their dependency delivers. Resolve blockers in order.
+            [% IF dep_auto_resolved %]
+            <span style="margin-left:10px;padding:1px 7px;border-radius:3px;background: var(--success-color, #28a745);color:#fff;">✓ [% dep_auto_resolved %] auto-resolved</span>
+            [% END %]
+            [% IF dep_auto_detected %]
+            <span style="margin-left:6px;padding:1px 7px;border-radius:3px;background:#17a2b8;color:#fff;">+ [% dep_auto_detected %] auto-detected</span>
+            [% END %]
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border-color);background:var(--bg-secondary);">
+                    <th style="text-align:left;padding:6px 10px;color:#6f42c1;">🔗 Must Deliver First (Boosted ↑)</th>
+                    <th style="text-align:center;padding:6px 4px;color:var(--text-muted-color);">Type</th>
+                    <th style="text-align:left;padding:6px 10px;color:var(--text-muted-color);">Waiting Project</th>
+                    <th style="text-align:left;padding:6px 10px;color:var(--text-muted-color);">Reason</th>
+                    [% IF is_admin %]<th style="padding:6px 4px;"></th>[% END %]
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH dep IN project_deps %]
+            <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:7px 10px;font-weight:bold;">
+                    <a href="/project/details?project_id=[% dep.depends_on_id %]" style="color:#6f42c1;text-decoration:none;font-weight:bold;" title="This project is prioritized — others are waiting on it">
+                        [% dep.depends_on_name || 'Project #' _ dep.depends_on_id %]
+                    </a>
+                    <div style="font-size:0.75em;color:var(--text-muted-color);font-weight:normal;">must deliver first</div>
+                </td>
+                <td style="padding:7px 4px;text-align:center;">
+                    [% IF dep.dependency_type == 'blocks' %]
+                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Hard block — cannot start until dependency delivers">🔒 blocks</span>
+                    [% ELSE %]
+                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background:#fd7e14;color:#fff;" title="Soft requirement">⚠ requires</span>
+                    [% END %]
+                </td>
+                <td style="padding:7px 10px;">
+                    <a href="/project/details?project_id=[% dep.project_id %]" style="color:var(--text-color);text-decoration:none;" title="This project is waiting — cannot proceed until dependency delivers">
+                        [% dep.project_name || 'Project #' _ dep.project_id %]
+                    </a>
+                    <div style="font-size:0.75em;color:var(--text-muted-color);">waiting to proceed</div>
+                </td>
+                <td style="padding:7px 10px;color:var(--text-muted-color);font-size:0.9em;">[% dep.description | truncate(80) %]</td>
+                [% IF is_admin %]
+                <td style="padding:7px 4px;text-align:center;">
+                    <button onclick="resolveDep([% dep.id %], this)"
+                        style="font-size:0.72em;padding:2px 7px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark this dependency as resolved">✓ Resolved</button>
+                </td>
+                [% END %]
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% END %]
+
+    </div>
+
+    <!-- TAB: GANTT VIEW (all sites — DB-driven project timeline) -->
