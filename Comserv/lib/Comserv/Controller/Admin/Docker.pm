@@ -227,6 +227,30 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         my $norm_out = `cd '$repo_path/Comserv' && docker compose $compose_args config --quiet 2>&1 || true`;
         push @lines, $norm_out;
 
+        # === Consistency Check (all servers must use the same comserv2_* volumes) ===
+        my @canonical_volumes = qw(
+            comserv2_config_db_data comserv2_redis_data comserv2_logs
+            comserv2_sessions comserv2_workshop_files comserv2_whisper_venv
+            comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
+        );
+        my $config_out = `cd '$repo_path/Comserv' && docker compose $compose_args config 2>/dev/null`;
+        my %seen;
+        while ($config_out =~ /comserv2_\w+/g) { $seen{$&} = 1; }
+        my @missing = grep { !$seen{$_} } @canonical_volumes;
+        my @extra   = grep { !grep { $_ eq $seen{$_} } @canonical_volumes } sort keys %seen;  # any comserv2_* not in canonical
+
+        if (@missing || @extra) {
+            my $err = "VOLUME INCONSISTENCY DETECTED\n  Missing: " . join(', ', @missing) .
+                      "\n  Extra:   " . join(', ', @extra);
+            push @lines, "[${\scalar localtime}] ERROR: $err";
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'docker_deploy', $err);
+            # Abort deploy
+            $c->response->body(encode_json({ success => 0, message => 'Volume inconsistency', output => join("\n", @lines) })) if $c;
+            exit 1;
+        } else {
+            push @lines, "[${\scalar localtime}] Volume consistency check passed (all comserv2_* volumes present).";
+        }
+
         # === Build new image ===
         push @lines, "[${\scalar localtime}] === Building new image (web-prod) ===";
         my $build_out = `cd '$repo_path/Comserv' && docker compose $compose_args build web-prod --no-cache 2>&1`;
@@ -350,92 +374,28 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     if ($pid == 0) {
-        # CHILD – perform the real 5-step deploy with live flushing
+        # CHILD – delegate everything to DockerDeploy utility
         open(my $log, '>>', $log_file) or exit 1;
-        $| = 1;                    # autoflush on STDOUT
-        select((select($log), $|=1)[0]);  # autoflush on log file
+        $| = 1;
+        select((select($log), $|=1)[0]);
 
-        my $repo = '/home/shanta/PycharmProjects/comserv2/Comserv';
-        # Use the full standardized stack (root + prod + optional NFS)
-        my $base_compose = "$repo/docker-compose.yml";
-        my $prod_compose = "$repo/docker-compose.prod.yml";
-        my $nfs_compose  = "$repo/docker-compose.prod.nfs.yml";
-        my @compose_files = ('-f', $base_compose, '-f', $prod_compose);
-        if (-f $nfs_compose) { push @compose_files, '-f', $nfs_compose; }
-        my $compose_args = join(' ', @compose_files);
-
+        # Write the very first line immediately so the UI sees activity
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger) ===\n";
         $log->flush();
 
-        # 1. Auto-commit (robust version)
-        my $work_repo = '/home/shanta/PycharmProjects/comserv2';
-        print $log "[".scalar(localtime)."] Step 1: Checking for uncommitted changes in $work_repo ...\n";
-        $log->flush();
+        my $target = $c->req->body_params->{target} || 'production1';
 
-        my $git_status = `cd '$work_repo' && git status --porcelain 2>&1`;
-        my $git_status_exit = $? >> 8;
-        print $log "git status exit=$git_status_exit\n";
-        print $log "git status output:\n$git_status\n";
-        $log->flush();
+        my $deployer = Comserv::Util::DockerDeploy->new(
+            log_fh   => $log,
+            logging  => $self->logging,
+            trigger  => $trigger,
+            target   => $target,
+        );
+        my ($success, $msg) = $deployer->deploy_to_target();
 
-        if ($git_status =~ /\S/ && $git_status_exit == 0) {
-            print $log "[".scalar(localtime)."] Uncommitted changes detected – performing git add -A ...\n";
-            my $add_out = `cd '$work_repo' && git add -A 2>&1`;
-            print $log "git add output:\n$add_out\n";
-            $log->flush();
-
-            my $commit_msg = "Auto-deploy commit before production push [".scalar(localtime)."]";
-            my $commit_out = `cd '$work_repo' && git commit -m "$commit_msg" 2>&1`;
-            my $commit_exit = $? >> 8;
-            print $log "git commit exit=$commit_exit\n";
-            print $log "git commit output:\n$commit_out\n";
-            $log->flush();
-
-            if ($commit_exit == 0) {
-                print $log "[".scalar(localtime)."] Auto-commit successful.\n";
-            } else {
-                print $log "[".scalar(localtime)."] WARNING: git commit returned non-zero (may be nothing to commit).\n";
-            }
-            $log->flush();
-        } else {
-            print $log "[".scalar(localtime)."] No uncommitted changes (or git status failed) – skipping auto-commit.\n";
-            $log->flush();
-        }
-
-        # 2. Push
-        print $log "[".scalar(localtime)."] Step 2: git push origin main...\n";
-        $log->flush();
-        my $push = `cd $repo && git push origin main 2>&1`;
-        print $log $push;
-        $log->flush();
-
-        # 3. Build (with explicit progress markers)
-        print $log "[".scalar(localtime)."] [BUILD STARTED] docker compose $compose_args build web-prod --no-cache...\n";
-        $log->flush();
-        my $build = `cd $repo && docker compose $compose_args build web-prod --no-cache 2>&1`;
-        print $log $build;
-        print $log "[".scalar(localtime)."] [BUILD FINISHED]\n";
-        $log->flush();
-
-        # 4. Push to registry (real push)
-        print $log "[".scalar(localtime)."] Step 4: docker compose $compose_args push web-prod...\n";
-        $log->flush();
-        my $push_img = `cd $repo && docker compose $compose_args push web-prod 2>&1`;
-        print $log $push_img;
-        $log->flush();
-
-        # 5. Restart
-        print $log "[".scalar(localtime)."] Step 5: docker compose $compose_args up -d web-prod...\n";
-        $log->flush();
-        my $up = `cd $repo && docker compose $compose_args up -d web-prod 2>&1`;
-        print $log $up;
-        $log->flush();
-
-        print $log "[".scalar(localtime)."] === DEPLOY COMPLETE ===\n";
-        $log->flush();
         close($log);
         unlink($pid_file);
-        exit 0;
+        exit($success ? 0 : 1);
     }
 
     # PARENT
