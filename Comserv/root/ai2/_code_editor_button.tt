@@ -1,4 +1,4 @@
-[%# Floating 💻 Code button — opens AI2 editor in a real draggable browser window %]
+[%# Floating 💻 Code button — unchanged %]
 <div id="ai2-code-btn"
      style="position:fixed;bottom:20px;left:20px;z-index:9999;">
     <button onclick="window.open('/ai2/editing_widget_popup','AIEditor','width=1400,height=900,resizable=yes,scrollbars=yes');return false;"
@@ -7,3 +7,57 @@
         💻
     </button>
 </div>
+
+[%# Left PyCharm-style vertical toolbar (Project, Commit, Terminal, Settings) %]
+<div id="ai2-left-toolbar"
+     style="position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:9998;display:flex;flex-direction:column;gap:4px;">
+
+    <!-- Project -->
+    <button hx-get="/ai2/right_dock_project"
+            hx-target="#aew-right-dock"
+            hx-swap="innerHTML"
+            hx-on::after-swap="document.body.classList.add('aew-right-open')"
+            style="background:#313335;color:#bbb;border:1px solid #555;padding:10px 8px;cursor:pointer;">
+        📁
+    </button>
+
+    <!-- Commit -->
+    <button hx-get="/ai2/right_dock_commit"
+            hx-target="#aew-right-dock"
+            hx-swap="innerHTML"
+            hx-on::after-swap="document.body.classList.add('aew-right-open')"
+            style="background:#313335;color:#bbb;border:1px solid #555;padding:10px 8px;cursor:pointer;">
+        🔀
+    </button>
+
+    <!-- Terminal -->
+    <button hx-get="/ai2/right_dock_terminal"
+            hx-target="#aew-right-dock"
+            hx-swap="innerHTML"
+            hx-on::after-swap="document.body.classList.add('aew-right-open')"
+            style="background:#313335;color:#bbb;border:1px solid #555;padding:10px 8px;cursor:pointer;">
+        💻
+    </button>
+
+    <!-- Settings -->
+    <button hx-get="/ai2/right_dock_settings"
+            hx-target="#aew-right-dock"
+            hx-swap="innerHTML"
+            hx-on::after-swap="document.body.classList.add('aew-right-open')"
+            style="background:#313335;color:#bbb;border:1px solid #555;padding:10px 8px;cursor:pointer;">
+        ⚙️
+    </button>
+</div>
+
+<style>
+    #aew-right-dock {
+        position:fixed;right:-420px;top:0;bottom:0;width:420px;
+        background:#2b2b2b;border-left:1px solid #555;
+        transition:right 0.3s cubic-bezier(0.4,0,0.2,1);
+        z-index:9997;overflow:auto;
+    }
+    body.aew-right-open #aew-right-dock { right:0; }
+    body.aew-right-open .main-content-wrapper { margin-right:420px; transition:margin-right 0.3s; }
+</style>
+
+<div id="aew-right-dock"></div>

@@ -179,4 +179,9 @@
     [% IF c.session.user_id %]
     <script src="/static/js/user-prefs.js?v=[% cv %]"></script>
     [% END %]
+
+    <!-- Universal UI helpers (accordion, toggle, etc.) - available on every page -->
+    <script src="/static/js/ui.js?v=[% cv %]"></script>
+
+    <!-- End of universal includes -->
 </head>
