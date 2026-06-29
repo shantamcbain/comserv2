@@ -24,7 +24,36 @@
         }
     };
 
-    // Optional: expose a more advanced version later if needed
-    // window.toggleSectionWithChevron = function(sectionId, chevronId) { ... };
+    /**
+     * Toggle the AI Editor right dock panel.
+     * Loads AI content into #aew-right-dock if not already present.
+     */
+    window.toggleAIEditorRightPanel = function() {
+        const dock = document.getElementById('aew-right-dock');
+        if (!dock) return;
+
+        // If AI editor already open, close it
+        if (document.body.classList.contains('aew-right-open')) {
+            document.body.classList.remove('aew-right-open');
+            return;
+        }
+
+        // If AEW global exists, use it
+        if (window.AEW && typeof window.AEW.open === 'function') {
+            window.AEW.open({ mode: 'right' });
+        } else {
+            // Fallback: fetch the AI editor popup content
+            fetch('/ai2/editing_widget_popup')
+                .then(r => r.text())
+                .then(html => {
+                    dock.innerHTML = html;
+                    document.body.classList.add('aew-right-open');
+                })
+                .catch(() => {
+                    // Final fallback: open popup window
+                    window.open('/ai2/editing_widget_popup', 'AIEditor', 'width=1400,height=900,resizable=yes,scrollbars=yes');
+                });
+        }
+    };
 
 })();
