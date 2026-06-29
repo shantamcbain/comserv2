@@ -8,9 +8,15 @@
     </button>
 </div>
 
-[%# Left PyCharm-style vertical toolbar (Project, Commit, Terminal, Settings) %]
+[%# Left PyCharm-style vertical toolbar (AI Editor + Project, Commit, Terminal, Settings) %]
 <div id="ai2-left-toolbar"
      style="position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:9998;display:flex;flex-direction:column;gap:4px;">
+
+    <!-- AI Editor (prominent, top) -->
+    <button onclick="window.toggleAIEditorRightPanel && window.toggleAIEditorRightPanel()"
+            style="background:#0e639c;color:#fff;border:1px solid #555;padding:14px 10px;cursor:pointer;transition:all .15s ease;font-size:1.1em;font-weight:600;">
+        💻 AI
+    </button>
 
     <!-- Project -->
     <button hx-get="/ai2/right_dock_project"
