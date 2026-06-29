@@ -462,7 +462,7 @@
 
         console.log('AI2 editing popup ready – model: [% selected_model | html %]');
 
-// Sidebar panel logic (JetBrains-style icon bar)
+// Sidebar panel logic (JetBrains-style icon bar) using global toggleSection()
 let currentPanel = null;
 
 function showSidebarPanel(name) {
@@ -474,7 +474,7 @@ function showSidebarPanel(name) {
     document.querySelectorAll('.sidebar-icon').forEach(el => el.classList.remove('active'));
 
     if (currentPanel === name) {
-        // Toggle off
+        // Toggle off using global helper
         panelsContainer.style.display = 'none';
         currentPanel = null;
         return;
@@ -482,7 +482,12 @@ function showSidebarPanel(name) {
 
     // Hide all, show target
     allPanels.forEach(p => p.style.display = 'none');
-    target.style.display = 'block';
+    if (typeof window.toggleSection === 'function') {
+        // Use global helper for consistency (even though we show/hide manually here)
+        window.toggleSection(target.id);
+    } else {
+        target.style.display = 'block';
+    }
     panelsContainer.style.display = 'block';
     currentPanel = name;
 

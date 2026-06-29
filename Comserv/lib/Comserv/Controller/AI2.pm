@@ -81,6 +81,13 @@ sub editing_widget_popup :Local :Args(0) {
     # Catalyst will render the fragment into the dialog
 }
 
+# Right-side docked editor panels (PyCharm-style tool windows)
+sub right_dock_panel   :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_panel.tt',   no_wrapper=>1); }
+sub right_dock_project :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_project.tt', no_wrapper=>1); }
+sub right_dock_commit  :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_commit.tt',  no_wrapper=>1); }
+sub right_dock_terminal:Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_terminal.tt',no_wrapper=>1); }
+sub right_dock_settings:Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_settings.tt',no_wrapper=>1); }
+
 # -------------------------------------------------------------------
 # Secure file loading for the AI2 editor
 # -------------------------------------------------------------------
