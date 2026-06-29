@@ -1,7 +1,6 @@
 [%# root/ai2/editing_widget_popup.tt
    PyCharm-like AI Code Editor popup for AI2 system
-   Layout: header + left sidebar + main editor + right chat
-   Enhanced with Ace Editor + AJAX file loading + auto-refresh (4s polling)
+   Professional sidebar matching PyCharm dark theme
 %]
 <!DOCTYPE html>
 <html>
@@ -9,8 +8,8 @@
     <meta charset="utf-8">
     <title>[% page_title | html %]</title>
     <style>
-        body { font-family: system-ui, sans-serif; margin:0; display:flex; flex-direction:column; height:100vh; }
-        .header { background:#2b2b2b; color:#fff; padding:6px 12px; display:flex; align-items:center; gap:12px; }
+        body { font-family: system-ui, sans-serif; margin:0; display:flex; flex-direction:column; height:100vh; background:#1e1f22; color:#ddd; }
+        .header { background:#2b2b2b; color:#fff; padding:6px 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #555; }
         .header select, .header button { font-size:0.9em; }
 
         select {
@@ -20,35 +19,28 @@
             padding: 2px 6px;
             border-radius: 3px;
         }
-        select option {
-            background-color: #313335;
-            color: #ddd;
-        }
 
         .main { display:flex; flex:1; overflow:hidden; }
-        .sidebar { width:220px; background:#313335; color:#ccc; padding:8px; overflow:auto; border-right:1px solid #555; }
+        .sidebar { width:240px; background:#313335; color:#bbb; padding:0; border-right:1px solid #555; display:flex; flex-direction:column; font-size:13px; }
 
-        .sidebar ul { padding-left: 8px; margin: 4px 0; }
-        .sidebar ul li {
-            padding: 3px 6px;
-            margin: 2px 0;
-            border-radius: 3px;
-            color: #ddd;
-            cursor: default;
-        }
-        .sidebar ul li:hover {
-            background-color: #3c3f41;
-            color: #fff;
-        }
+        .sidebar-section { padding:8px 0; border-bottom:1px solid #444; }
+        .sidebar-section h4 { margin:0 0 4px 12px; font-size:11px; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
 
-        .editor-area { flex:1; display:flex; flex-direction:column; }
-        .editor-tabs { background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between; }
-        .editor-content { flex:1; background:#1e1f22; color:#ddd; padding:0; font-family:monospace; position:relative; }
-        .diff-pane { height:140px; background:#2b2b2b; color:#0f0; padding:8px; border-top:1px solid #555; font-size:0.85em; }
-        .chat-sidebar { width:320px; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555; }
-        .chat-header { padding:6px 10px; background:#2b2b2b; font-weight:bold; }
-        .chat-messages { flex:1; padding:8px; overflow:auto; font-size:0.9em; }
-        .chat-input { padding:6px; border-top:1px solid #555; }
+        .file-tree { list-style:none; padding:0; margin:0; }
+        .file-tree li { padding:2px 12px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+        .file-tree li:hover { background:#3c3f41; }
+        .file-tree li.active { background:#0e639c; color:white; }
+
+        .commit-btn { margin:0 12px; width:calc(100% - 24px); background:#0e639c; color:white; border:none; padding:6px; border-radius:3px; cursor:pointer; font-size:12px; }
+        .commit-panel { background:#2b2b2b; margin:8px 12px; padding:8px; border-radius:4px; }
+        .commit-panel textarea { width:100%; height:60px; background:#1e1f22; color:#ddd; border:1px solid #555; border-radius:3px; font-size:12px; resize:vertical; }
+        .commit-panel button { margin-top:6px; width:100%; background:#0e639c; color:white; border:none; padding:4px 10px; border-radius:3px; cursor:pointer; font-size:12px; }
+        .commit-panel button#cancel-commit-btn { background:#555; }
+
+        .terminal { background:#1e1f22; font-family:monospace; font-size:11px; padding:6px 12px; margin:0 12px; border:1px solid #444; border-radius:3px; }
+        .terminal-header { cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:0 12px; }
+
+        .status-bar { background:#007acc; color:white; font-size:11px; padding:2px 8px; display:flex; justify-content:space-between; }
     </style>
 </head>
 <body>
@@ -71,63 +63,97 @@
             </select>
         </label>
 
-        <!-- Manual Refresh Button -->
         <button id="refresh-btn" style="margin-left:12px;background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
             ↻ Refresh
         </button>
     </div>
 
     <div class="main">
-        <!-- Left Sidebar -->
+        <!-- ==================== LEFT SIDEBAR ==================== -->
         <div class="sidebar">
-            <div><strong>Projects</strong></div>
-            <ul style="list-style:none;padding-left:12px;margin:4px 0;">
-                <li>📁 lib/Comserv</li>
-                <li>📁 root/ai2</li>
-            </ul>
-            <div style="margin-top:12px"><strong>Commit</strong></div>
-            <button style="width:100%">Commit Changes</button>
-            <div style="margin-top:12px"><strong>Terminal</strong></div>
-            <div style="background:#1e1f22;height:80px;font-size:0.8em;padding:4px;">$ git status</div>
+
+            <!-- Projects / File Tree -->
+            <div class="sidebar-section">
+                <h4>PROJECTS</h4>
+                <ul class="file-tree">
+                    <li data-path="lib/Comserv/Controller/AI2.pm" class="file-item">📄 AI2.pm</li>
+                    <li data-path="root/ai2/editing_widget_popup.tt" class="file-item active">📄 editing_widget_popup.tt</li>
+                    <li style="padding-left:28px; color:#888;">📁 models/</li>
+                    <li style="padding-left:28px; color:#888;">📁 views/</li>
+                </ul>
+            </div>
+
+            <!-- Commit Section -->
+            <div class="sidebar-section">
+                <h4>GIT</h4>
+                <button id="commit-btn" class="commit-btn">Commit Changes</button>
+
+                <!-- Commit Panel (hidden by default) -->
+                <div id="commit-panel" class="commit-panel" style="display:none;">
+                    <div style="font-size:11px; color:#888; margin-bottom:4px;">Staged Changes</div>
+                    <ul style="margin:4px 0; padding-left:16px; font-size:12px; color:#ddd;">
+                        <li>editing_widget_popup.tt</li>
+                    </ul>
+                    <textarea id="commit-message" placeholder="Commit message..."></textarea>
+                    <button id="do-commit-btn">Commit</button>
+                    <button id="cancel-commit-btn">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Terminal (expandable) -->
+            <div class="sidebar-section">
+                <div class="terminal-header" onclick="toggleTerminal()">
+                    <h4 style="margin:0;">TERMINAL</h4>
+                    <span id="terminal-toggle">▼</span>
+                </div>
+                <div id="terminal-content" class="terminal" style="display:block;">
+                    $ git status<br>
+                    On branch main<br>
+                    Your branch is up to date.<br>
+                    Changes not staged for commit:<br>
+                    &nbsp;&nbsp;modified: editing_widget_popup.tt
+                </div>
+            </div>
 
             <!-- Editor Settings -->
-            <details style="margin-top:16px;background:#2b2b2b;border-radius:4px;padding:6px 8px;">
-                <summary style="cursor:pointer;color:#fff;font-weight:bold;">⚙️ Editor Settings</summary>
-                <div style="margin-top:8px;font-size:0.85em;color:#ccc;">
-                    <label style="display:block;margin:4px 0;">Theme:
-                        <select id="theme-select" onchange="applyEditorSettings()">
-                            <option value="dark">Dark (PyCharm)</option>
-                            <option value="light">Light</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                    </label>
-                    <label style="display:block;margin:4px 0;">Font Size:
-                        <select id="font-size" onchange="applyEditorSettings()">
-                            <option value="12">12px</option>
-                            <option value="14" selected>14px</option>
-                            <option value="16">16px</option>
-                            <option value="18">18px</option>
-                        </select>
-                    </label>
-                    <label style="display:block;margin:4px 0;">
-                        <input type="checkbox" id="line-numbers" checked onchange="applyEditorSettings()"> Line Numbers
-                    </label>
-                </div>
-            </details>
+            <div class="sidebar-section" style="flex:1;">
+                <details open>
+                    <summary style="cursor:pointer;color:#fff;font-weight:bold;font-size:12px; padding:0 12px;">⚙️ Editor Settings</summary>
+                    <div style="margin-top:8px;font-size:0.85em;color:#ccc; padding:0 12px;">
+                        <label style="display:block;margin:4px 0;">Theme:
+                            <select id="theme-select" onchange="applyEditorSettings()">
+                                <option value="dark">Dark (PyCharm)</option>
+                                <option value="light">Light</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </label>
+                        <label style="display:block;margin:4px 0;">Font Size:
+                            <select id="font-size" onchange="applyEditorSettings()">
+                                <option value="12">12px</option>
+                                <option value="14" selected>14px</option>
+                                <option value="16">16px</option>
+                            </select>
+                        </label>
+                        <label style="display:block;margin:4px 0;">
+                            <input type="checkbox" id="line-numbers" checked onchange="applyEditorSettings()"> Line Numbers
+                        </label>
+                    </div>
+                </details>
+            </div>
+
         </div>
 
-        <!-- Main Editor Area -->
-        <div class="editor-area">
-            <div class="editor-tabs">
+        <!-- ==================== MAIN EDITOR ==================== -->
+        <div class="editor-area" style="flex:1; display:flex; flex-direction:column;">
+            <div class="editor-tabs" style="background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between;">
                 <span>editing_widget_popup.tt &nbsp; | &nbsp; AI2.pm</span>
                 <span id="file-status" style="font-size:11px;color:#888;"></span>
             </div>
-            <div class="editor-content">
-                <!-- Ace Editor Container -->
+            <div class="editor-content" style="flex:1; position:relative;">
                 <div id="ace-editor" style="width:100%;height:100%;"></div>
             </div>
-            <!-- Live AI Diff Pane -->
-            <div class="diff-pane">
+            <!-- AI Diff Pane -->
+            <div class="diff-pane" style="height:140px; background:#2b2b2b; color:#0f0; padding:8px; border-top:1px solid #555; font-size:0.85em;">
                 <strong>AI Suggestion (+/- diff)</strong><br>
                 <span style="color:#0f0">+ new line added by AI</span><br>
                 <span style="color:#f66">- old line removed</span>
@@ -139,30 +165,30 @@
         </div>
 
         <!-- Right Chat Sidebar -->
-        <div class="chat-sidebar">
-            <div class="chat-header">AI Chat (Router-selected)</div>
-            <div class="chat-messages">
+        <div class="chat-sidebar" style="width:320px; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555;">
+            <div class="chat-header" style="padding:6px 10px; background:#2b2b2b; font-weight:bold;">AI Chat (Router-selected)</div>
+            <div class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
-            <div class="chat-input">
+            <div class="chat-input" style="padding:6px; border-top:1px solid #555;">
                 <input type="text" style="width:100%" placeholder="Ask AI...">
             </div>
         </div>
     </div>
 
-    <!-- Status bar for auto-refresh -->
-    <div style="background:#007acc;color:white;font-size:11px;padding:2px 8px;text-align:right;">
+    <!-- Status bar -->
+    <div class="status-bar">
         <span id="auto-refresh-status">Auto-refresh: ON (4s)</span>
-        <span id="last-modified" style="margin-left:12px;color:#a0d2ff;"></span>
+        <span id="last-modified" style="color:#a0d2ff;"></span>
     </div>
 
-    <!-- Ace Editor CDN -->
+    <!-- Ace Editor -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.js"></script>
 
     <script>
         // ===================================================================
-        // Ace Editor + AJAX + Auto-refresh (detects external PyCharm edits)
+        // Ace Editor + File loading + Auto-refresh
         // ===================================================================
         (function() {
             const editorEl = document.getElementById('ace-editor');
@@ -170,11 +196,10 @@
             const statusEl = document.getElementById('file-status');
             const mtimeEl = document.getElementById('last-modified');
 
-            let currentFilePath = '[% file_path || "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/AI2.pm" %]';
+            let currentFilePath = '[% file_path || "root/ai2/editing_widget_popup.tt" %]';
             let lastMtime = null;
             let autoRefreshTimer = null;
 
-            // Initialize Ace
             const editor = ace.edit(editorEl);
             editor.setTheme("ace/theme/twilight");
             editor.session.setMode("ace/mode/perl");
@@ -186,9 +211,6 @@
                 enableLiveAutocompletion: true
             });
 
-            // ----------------------------------------------------------------
-            // AJAX: Load file content
-            // ----------------------------------------------------------------
             async function loadFileContent(path) {
                 try {
                     const res = await fetch(`/ai2/load_file?path=${encodeURIComponent(path)}`);
@@ -198,15 +220,13 @@
                     lastMtime = data.mtime;
                     mtimeEl.textContent = `Last modified: ${new Date(lastMtime * 1000).toLocaleTimeString()}`;
                     statusEl.textContent = `Loaded: ${path.split('/').pop()}`;
+                    highlightActiveFile(path);
                 } catch (err) {
                     console.error('loadFileContent error:', err);
                     statusEl.textContent = 'Error loading file';
                 }
             }
 
-            // ----------------------------------------------------------------
-            // AJAX: Get current mtime (for change detection)
-            // ----------------------------------------------------------------
             async function getFileMtime(path) {
                 try {
                     const res = await fetch(`/ai2/file_checksum?path=${encodeURIComponent(path)}`);
@@ -214,24 +234,21 @@
                     const data = await res.json();
                     return data.mtime || null;
                 } catch (err) {
-                    console.error('getFileMtime error:', err);
                     return null;
                 }
             }
 
-            // ----------------------------------------------------------------
-            // Manual refresh button
-            // ----------------------------------------------------------------
-            refreshBtn.addEventListener('click', () => {
-                loadFileContent(currentFilePath);
-            });
+            function highlightActiveFile(path) {
+                document.querySelectorAll('.file-item').forEach(el => {
+                    el.classList.remove('active');
+                    if (el.dataset.path === path || el.textContent.includes(path.split('/').pop())) {
+                        el.classList.add('active');
+                    }
+                });
+            }
 
-            // ----------------------------------------------------------------
-            // AUTO-REFRESH LOGIC
-            // Every 4 seconds we ask the server for the file's mtime.
-            // If it differs from what we last saw, the file was changed
-            // outside the browser (e.g. PyCharm saved it) → reload content.
-            // ----------------------------------------------------------------
+            refreshBtn.addEventListener('click', () => loadFileContent(currentFilePath));
+
             function startAutoRefresh() {
                 if (autoRefreshTimer) clearInterval(autoRefreshTimer);
                 autoRefreshTimer = setInterval(async () => {
@@ -244,14 +261,61 @@
             }
 
             // Boot
-            loadFileContent(currentFilePath).then(() => {
-                startAutoRefresh();
-            });
+            loadFileContent(currentFilePath).then(() => startAutoRefresh());
 
-            window.AI2Editor = editor; // for debugging
+            window.AI2Editor = editor;
+            window.loadFileFromTree = loadFileContent;
         })();
 
-        // Existing settings function (kept)
+        // ==================== FILE TREE CLICK HANDLER ====================
+        document.querySelectorAll('.file-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const path = item.dataset.path;
+                if (path && window.loadFileFromTree) {
+                    window.loadFileFromTree(path);
+                }
+            });
+        });
+
+        // ==================== COMMIT UI ====================
+        const commitBtn = document.getElementById('commit-btn');
+        const commitPanel = document.getElementById('commit-panel');
+        const doCommitBtn = document.getElementById('do-commit-btn');
+        const cancelCommitBtn = document.getElementById('cancel-commit-btn');
+
+        commitBtn.addEventListener('click', () => {
+            commitPanel.style.display = commitPanel.style.display === 'none' ? 'block' : 'none';
+        });
+
+        doCommitBtn.addEventListener('click', () => {
+            const msg = document.getElementById('commit-message').value.trim();
+            if (!msg) {
+                alert('Please enter a commit message');
+                return;
+            }
+            alert('Commit created: ' + msg);
+            commitPanel.style.display = 'none';
+            document.getElementById('commit-message').value = '';
+        });
+
+        cancelCommitBtn.addEventListener('click', () => {
+            commitPanel.style.display = 'none';
+        });
+
+        // ==================== TERMINAL TOGGLE ====================
+        function toggleTerminal() {
+            const content = document.getElementById('terminal-content');
+            const toggle = document.getElementById('terminal-toggle');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                toggle.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                toggle.textContent = '▶';
+            }
+        }
+
+        // ==================== EDITOR SETTINGS ====================
         function applyEditorSettings() {
             const theme = document.getElementById('theme-select').value;
             const fontSize = document.getElementById('font-size').value;
