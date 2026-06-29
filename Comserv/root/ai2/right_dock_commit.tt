@@ -1,0 +1,30 @@
+[%# ai2/right_dock_commit.tt — PyCharm-style commit panel %]
+<div style="padding:12px;font-size:13px;">
+    <div style="margin-bottom:12px;">
+        <div style="font-weight:500;color:#ddd;margin-bottom:6px;">Changes (1 file)</div>
+        <label style="display:flex;align-items:center;margin-bottom:4px;">
+            <input type="checkbox" checked style="margin-right:8px;">
+            <span style="color:#4fc1ff;">T</span>
+            <span style="margin-left:6px;color:#ddd;">editing_widget_popup.tt</span>
+        </label>
+    </div>
+
+    <div style="margin-bottom:12px;">
+        <div style="font-weight:500;color:#ddd;margin-bottom:6px;">Unversioned Files (1 file)</div>
+        <label style="display:flex;align-items:center;">
+            <input type="checkbox" checked style="margin-right:8px;">
+            <span style="color:#f0c674;">JS</span>
+            <span style="margin-left:6px;color:#ddd;">commit-ui.js</span>
+        </label>
+    </div>
+
+    <textarea placeholder="feat: improve AI2 editor commit UI"
+              style="width:100%;height:70px;background:#1e1f22;color:#ddd;border:1px solid #555;border-radius:4px;padding:8px;resize:vertical;margin-bottom:10px;"></textarea>
+
+    <div style="display:flex;gap:8px;">
+        <button onclick="alert('Committed!');document.getElementById('aew-right-dock').innerHTML='';document.body.classList.remove('aew-right-open')"
+                style="flex:1;background:#0e639c;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Commit</button>
+        <button onclick="document.getElementById('aew-right-dock').innerHTML='';document.body.classList.remove('aew-right-open')"
+                style="flex:1;background:#555;color:white;border:none;padding:8px;border-radius:4px;cursor:pointer;">Cancel</button>
+    </div>
+</div>
