@@ -123,11 +123,37 @@
         }
     }
 
+    // Editor registry (for swappable editors)
+    const editors = {
+        ace: EditorAdapter,
+        // richtext: RichTextAdapter,   // TODO: add later
+    };
+
+    function registerEditor(name, AdapterClass) {
+        editors[name] = AdapterClass;
+    }
+
+    function getAvailableEditors() {
+        return Object.keys(editors);
+    }
+
+    function createEditor(name, containerId, options = {}) {
+        const Adapter = editors[name];
+        if (!Adapter) {
+            console.error(`[${NS}] Unknown editor: ${name}`);
+            return null;
+        }
+        return new Adapter(containerId, options);
+    }
+
     // Expose public API
     window.AI2EditorCore = {
         EditorAdapter,
         loadFileContent,
         getFileMtime,
+        registerEditor,
+        getAvailableEditors,
+        createEditor,
         NS
     };
 
