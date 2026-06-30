@@ -67,7 +67,7 @@
     <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
     <script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
     [%# HTMX floating Code button + modal for AI2 editor %]
-    [% INCLUDE 'ai2/_code_editor_button.tt' %]
+    [% INCLUDE 'ai2/editor/code_editor_button.tt' %]
     [% END %]
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->
