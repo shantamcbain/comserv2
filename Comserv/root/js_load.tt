@@ -121,12 +121,15 @@
 <script src="/static/js/user-prefs.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- AI2 Editor floating button (always loaded on normal pages) -->
+<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
+
 <!-- AI2 Editor Suite (only when popup widget is active) -->
-[% IF ai_popup_mode %]
+[% IF c.request.uri.match('/ai2/editing_widget_popup') %]
 <script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
-<!-- <script src="/static/js/ai2editor/dock.js?v=[% cv %]" defer></script> -->
-<!-- <script src="/static/js/ai2editor/ai-chat.js?v=[% cv %]" defer></script> -->
+<script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Other feature modules -->
