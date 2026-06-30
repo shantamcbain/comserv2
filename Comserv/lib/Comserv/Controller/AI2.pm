@@ -72,7 +72,7 @@ sub editing_widget_popup :Local :Args(0) {
     @$branches = sort { $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b } @$branches;
 
     $c->stash(
-        template            => 'ai2/editing_widget_popup.tt',
+        template            => 'ai2/editor/editing_widget_popup.tt',
         selected_model      => $selected_model,
         recommended_models  => $recommended_models,
         branches            => $branches,
@@ -82,11 +82,11 @@ sub editing_widget_popup :Local :Args(0) {
 }
 
 # Right-side docked editor panels (PyCharm-style tool windows)
-sub right_dock_panel   :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_panel.tt',   no_wrapper=>1); }
-sub right_dock_project :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_project.tt', no_wrapper=>1); }
-sub right_dock_commit  :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_commit.tt',  no_wrapper=>1); }
-sub right_dock_terminal:Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_terminal.tt',no_wrapper=>1); }
-sub right_dock_settings:Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/right_dock_settings.tt',no_wrapper=>1); }
+sub right_dock_panel   :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/editor/right_dock_panel.tt',   no_wrapper=>1); }
+sub right_dock_project :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/editor/right_dock_project.tt', no_wrapper=>1); }
+sub right_dock_commit  :Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/editor/right_dock_commit.tt',  no_wrapper=>1); }
+sub right_dock_terminal:Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/editor/right_dock_terminal.tt',no_wrapper=>1); }
+sub right_dock_settings:Local :Args(0) { my ($self,$c)=@_; $c->stash(template=>'ai2/editor/right_dock_settings.tt',no_wrapper=>1); }
 
 # -------------------------------------------------------------------
 # Secure file loading for the AI2 editor
