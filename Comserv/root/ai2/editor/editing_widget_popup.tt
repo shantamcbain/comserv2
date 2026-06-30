@@ -57,7 +57,7 @@
         <label style="margin-left:12px">Editor:
             <select id="editor-select">
                 <option value="ace">Ace</option>
-                <!-- <option value="richtext">Rich Text</option> -->
+                <option value="richtext">Rich Text</option>
             </select>
         </label>
 
