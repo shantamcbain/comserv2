@@ -52,6 +52,15 @@
             });
         }
 
+        // Editor switcher
+        const editorSelect = document.getElementById('editor-select');
+        if (editorSelect) {
+            editorSelect.addEventListener('change', () => {
+                const newEditor = editorSelect.value;
+                switchEditor(newEditor, containerId, statusEl, mtimeEl);
+            });
+        }
+
         // File tree click handlers
         document.querySelectorAll('.file-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -92,6 +101,19 @@
         } catch (err) {
             if (statusEl) statusEl.textContent = 'Error loading file';
         }
+    }
+
+    function switchEditor(editorName, containerId, statusEl, mtimeEl) {
+        if (editorAdapter) {
+            editorAdapter.destroy();
+        }
+        editorAdapter = window.AI2EditorCore.createEditor(editorName, containerId, {
+            fontSize: '14px'
+        });
+        if (currentFilePath && editorAdapter) {
+            loadAndDisplayFile(currentFilePath, statusEl, mtimeEl);
+        }
+        console.log(`[${NS}] Switched to editor: ${editorName}`);
     }
 
     function highlightActiveFile(path) {

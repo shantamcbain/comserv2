@@ -77,6 +77,7 @@ sub editing_widget_popup :Local :Args(0) {
         recommended_models  => $recommended_models,
         branches            => $branches,
         no_wrapper          => 1,
+        ai_popup_mode       => 1,   # triggers conditional loading of ai2editor/*.js in js_load.tt
     );
     # Catalyst will render the fragment into the dialog
 }

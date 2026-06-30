@@ -54,6 +54,13 @@
             </select>
         </label>
 
+        <label style="margin-left:12px">Editor:
+            <select id="editor-select">
+                <option value="ace">Ace</option>
+                <!-- <option value="richtext">Rich Text</option> -->
+            </select>
+        </label>
+
         <button id="refresh-btn" style="margin-left:12px;background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
             ↻ Refresh
         </button>
@@ -161,17 +168,6 @@
         <span id="last-modified" style="color:#a0d2ff;"></span>
     </div>
 
-    <!-- External Scripts (deferred, non-blocking) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.js" defer></script>
-
-    <!-- AI2 Editor Core + Popup logic -->
-    <script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
-    <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
-
-    <!-- Pass initial file path from TT -->
-    <script>
-        window.INITIAL_FILE_PATH = '[% file_path || "root/ai2/editor/editing_widget_popup.tt" %]';
-    </script>
+    <!-- Scripts loaded centrally via js_load.tt when ai_popup_mode is active -->
 </body>
 </html>
