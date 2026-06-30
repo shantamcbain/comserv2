@@ -1,6 +1,6 @@
 [%# ================================================================
     root/js_load.tt
-    CENTRAL JAVASCRIPT LOADING & CONSOLIDATION PLAN
+    Core loader - all JS centralized here
     ================================================================ %]
 
 [% META
@@ -9,11 +9,11 @@
     roles = "developer,admin,editor"
     TemplateType = "Documentation"
     category = "Documentation"
-    page_version = "0.02"
+    page_version = "0.03"
     last_updated = "2026-06-30"
 %]
 
-[% PageVersion = 'root/js_load.tt,v 0.02 2026-06-30 Shanta Exp shanta'; %]
+[% PageVersion = 'root/js_load.tt,v 0.03 2026-06-30 Shanta Exp shanta'; %]
 
 [% IF debug_mode == 1 %]
     [% PageVersion %]
@@ -72,10 +72,11 @@
 <!-- CONFIRMED PRESENT FILES (as of 2026-06-30) -->
 <!-- ================================================ -->
 <!-- common/ui.js          → present -->
+<!-- common/form-filler.js → present -->
+<!-- ai-common.js          → present -->
 <!-- ai2editor/core.js     → present -->
 <!-- ai2editor/popup.js    → present -->
 <!-- ai2editor/commit-ui.js → present -->
-<!-- ai-common.js          → present (root/static/js/) -->
 <!-- menu.js               → present -->
 <!-- local-chat.js         → present -->
 <!-- user-prefs.js         → present -->
@@ -88,19 +89,15 @@
 <!-- ================================================ -->
 <!-- common/api.js         → TODO -->
 <!-- common/events.js      → TODO -->
-<!-- common/form-filler.js → TODO -->
 <!-- ai2editor/dock.js     → TODO -->
 <!-- ai2editor/ai-chat.js  → TODO -->
-<!-- nav-back.js           → TODO (was in layout) -->
+<!-- nav-back.js           → TODO -->
 <!-- theme-class.js        → TODO -->
 <!-- switchpage.js         → TODO -->
 
-<!-- Core utilities & common functionality -->
+<!-- Core utilities & common functionality (early load) -->
 <script src="/static/js/common/ui.js?v=[% cv %]" defer></script>
-<!-- <script src="/static/js/common/api.js?v=[% cv %]" defer></script> -->
-<!-- <script src="/static/js/common/events.js?v=[% cv %]" defer></script> -->
-<!-- TODO: move applyFieldValue + postMessage logic here -->
-<!-- <script src="/static/js/common/form-filler.js?v=[% cv %]" defer></script> -->
+<script src="/static/js/common/form-filler.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-common.js?v=[% cv %]" defer></script>
 
 <!-- Theme class (moved from Header.tt) -->
