@@ -1,31 +1,12 @@
+[%# AI Editor Left Toolbar Cards - Launches editor widget (separate from chat widget). This toolbar can grow. %]
 [%# Floating 💻 Code button — unchanged %]
-<div id="ai2-code-btn"
-     style="position:fixed;bottom:20px;left:20px;z-index:9999;">
-    <button onclick="window.open('/ai2/editing_widget_popup','AIEditor','width=1400,height=900,resizable=yes,scrollbars=yes');return false;"
-            class="btn btn-primary"
-            style="border-radius:50%;width:48px;height:48px;font-size:1.4em;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
-        💻
-    </button>
-</div>
+
 
 [%# Left PyCharm-style vertical toolbar (AI Editor + Project, Commit, Terminal, Settings) %]
 <div id="ai2-left-toolbar"
      style="position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:9998;display:flex;flex-direction:column;gap:4px;">
 
-    <!-- AI Editor (prominent, top) -->
-    <button onclick="window.toggleAIEditorRightPanel && window.toggleAIEditorRightPanel()"
-            style="background:#0e639c;color:#fff;border:1px solid #555;padding:14px 10px;cursor:pointer;transition:all .15s ease;font-size:1.1em;font-weight:600;">
-        💻 AI
-    </button>
 
-    <!-- Project -->
-    <button hx-get="/ai2/right_dock_project"
-            hx-target="#aew-right-dock"
-            hx-swap="innerHTML"
-            hx-on::after-swap="document.body.classList.add('aew-right-open')"
-            style="background:#313335;color:#bbb;border:1px solid #555;padding:10px 8px;cursor:pointer;transition:all .15s ease;">
-        📁
-    </button>
 
     <!-- Commit -->
     <button hx-get="/ai2/right_dock_commit"
