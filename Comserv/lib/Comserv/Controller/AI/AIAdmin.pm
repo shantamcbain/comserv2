@@ -1,4 +1,4 @@
-package Comserv::Controller::AI::AIAdmin;
+package Comserv::AI::AIAdmin;
 use Moose;
 use namespace::autoclean;
 use Try::Tiny;

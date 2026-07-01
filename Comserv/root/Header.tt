@@ -93,13 +93,6 @@
     <!-- Theme overrides to ensure proper application -->
     <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css?v=[% cv %]">
 
-    <!-- Add theme class to body -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            document.body.classList.add('theme-[% theme_name %]');
-        });
-    </script>
-
     [% IF c.session.debug_mode == 1 %]
     <!-- Debug: Site name is [% SiteName %] -->
     [% END %]
@@ -149,34 +142,5 @@
     <!-- Admin-only styles -->
     <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
     [% END %]
-    [% IF is_admin && SiteName == 'CSC' && !is_dev_server %]
-    <!-- CSC-admin-only Health Monitoring (production only) -->
-    <script src="/static/js/HealthMonitor.js"></script>
-    [% END %]
-
-    <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
-    [%# Only load legacy menu JS when NOT using DB-driven menus (true legacy static includes need no JS) %]
-    [% UNLESS c.session.use_db_menu || c.stash.use_db_menu %]
-    <script src="/static/js/sub-menu.js"></script>
-    <script src="/static/js/menu.js"></script>
-    [% END %]
-    <script src="/static/js/back-to-top.js?v=[% cv %]"></script>
-    <script language="javascript" type="text/javascript">
-        function switchpage(select) {
-            var index;
-            for (index = 0; index < select.options.length; index++) {
-                if (select.options[index].selected) {
-                    if (select.options[index].value !== "") {
-                        window.location.href = select.options[index].value;
-                        break;
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- AI utilities - loaded globally so the chat widget works on all pages -->
-    <script src="/static/js/ai-common.js?v=[% cv %]"></script>
-    [% IF c.session.user_id %]
-    <script src="/static/js/user-prefs.js?v=[% cv %]"></script>
-    [% END %]
+    <!-- End of universal includes -->
 </head>

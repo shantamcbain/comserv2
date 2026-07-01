@@ -1,30 +1,170 @@
-[%# js_load.tt - centralized JavaScript loader for all pages
-   - Loads common UI helpers, floating buttons, chat widget, and AI2 editor conditionally
-   - All scripts use defer and versioned cache-busting
--%]
-[%- SET cv = c.stash.css_v || '1' -%]
+[%# ================================================================
+    root/js_load.tt
+    Core loader - all JS centralized here
+    ================================================================ %]
 
-<!-- Core UI helpers -->
-<script src="/static/js/common/ui.js?v=[% cv %]"></script>
+[% META
+    title = "JS Load - Central JavaScript Loading Strategy"
+    description = "Developer documentation and consolidated script loader"
+    roles = "developer,admin,editor"
+    TemplateType = "Documentation"
+    category = "Documentation"
+    page_version = "0.03"
+    last_updated = "2026-06-30"
+%]
 
-<!-- Floating Back-to-Top + AI2 Editor buttons -->
-<script src="/static/js/floating-buttons.js?v=[% cv %]"></script>
+[% PageVersion = 'root/js_load.tt,v 0.03 2026-06-30 Shanta Exp shanta'; %]
 
-<!-- Chat widget (always present on normal pages) -->
-<link rel="stylesheet" href="/static/css/ai-chat.css?v=[% cv %]">
-<script src="/static/js/nav-back.js?v=[% cv %]"></script>
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[%#
+    ================================================
+    CONSOLIDATION PLAN & LOADING STRATEGY
+    ================================================
+
+    GOAL: Eliminate all inline <script> blocks and onclick="" handlers.
+    Move everything to clean external files in /static/js/
+
+    Benefits:
+    - Much better maintainability & debugging
+    - Faster page loads (especially in Docker)
+    - Proper caching & versioning
+    - Reusability across pages
+    - Future bundling with Vite easy
+
+    MIGRATION APPROACH:
+    1. Extract inline JS from .tt files into /static/js/ai2editor/ or common/
+    2. Use this file for all <script> tags (include it once before </body>)
+    3. Remove old JS from Header.tt
+    4. For page-specific JS: conditionally include or use data attributes + one main handler
+    5. Long term: Add Vite build (one command → optimized bundles)
+
+    LOADING RULES:
+    - Always use defer (or type="module")
+    - Version with ?v=[% cv %] for cache busting
+    - Core + common first, then feature-specific
+    - No blocking scripts in <head>
+
+    File Organization Target:
+    /static/js/
+    ├── common/          (ui.js, api.js, events.js, etc.)
+    ├── ai2editor/       (core.js, popup.js, dock.js, etc.)
+    ├── vendor/          (minified 3rd party if not CDN)
+    └── main.js          (global init if needed)
+
+    When adding new JS:
+    - Create file in appropriate folder
+    - Add <script> tag here (in correct order)
+    - Update this comment block with note
+    ================================================
+%]
+
+[%# ================================================
+    ACTUAL JAVASCRIPT INCLUDES (executed in browser)
+    Place this file include just before </body> in footer/layout
+    ================================================ %]
+
+[%- SET cv = c.stash.css_v || c.stash.version || '1' -%]
+
+<!-- ================================================ -->
+<!-- CONFIRMED PRESENT FILES (as of 2026-06-30) -->
+<!-- ================================================ -->
+<!-- common/ui.js          → present -->
+<!-- common/form-filler.js → present -->
+<!-- ai-common.js          → present -->
+<!-- ai2editor/core.js     → present -->
+<!-- ai2editor/popup.js    → present -->
+<!-- ai2editor/commit-ui.js → present -->
+<!-- menu.js               → present -->
+<!-- local-chat.js         → present -->
+<!-- user-prefs.js         → present -->
+<!-- back-to-top.js        → present -->
+<!-- sub-menu.js           → present -->
+<!-- HealthMonitor.js      → present -->
+
+<!-- ================================================ -->
+<!-- TODO / MISSING FILES (commented until created) -->
+<!-- ================================================ -->
+<!-- common/api.js         → TODO -->
+<!-- common/events.js      → TODO -->
+<!-- ai2editor/dock.js     → TODO -->
+<!-- ai2editor/ai-chat.js  → TODO -->
+<!-- nav-back.js           → TODO -->
+<!-- theme-class.js        → TODO -->
+<!-- switchpage.js         → TODO -->
+
+<!-- Core utilities & common functionality (early load) -->
+<script src="/static/js/common/ui.js?v=[% cv %]" defer></script>
+<script src="/static/js/common/form-filler.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-common.js?v=[% cv %]" defer></script>
+<script src="/static/js/floating-buttons.js?v=[% cv %]" defer></script>
+
+<!-- Theme class (moved from Header.tt) -->
+<!-- <script src="/static/js/theme-class.js?v=[% cv %]" defer></script> -->
+
+<!-- Admin-only (conditional) -->
+[% IF is_admin && SiteName == 'CSC' && !is_dev_server %]
+<script src="/static/js/HealthMonitor.js" defer></script>
+[% END %]
+
+<!-- Legacy menu (conditional) -->
+[% UNLESS c.session.use_db_menu || c.stash.use_db_menu %]
+<script src="/static/js/sub-menu.js" defer></script>
+<script src="/static/js/menu.js" defer></script>
+[% END %]
+
+<!-- Global helpers (moved from Header.tt) -->
+<!-- <script src="/static/js/switchpage.js?v=[% cv %]" defer></script> -->
+<script src="/static/js/back-to-top.js?v=[% cv %]" defer></script>
+[% IF c.session.user_id %]
+<script src="/static/js/user-prefs.js?v=[% cv %]" defer></script>
+[% END %]
+
+
+
+<!-- AI2 Editor Suite (only when popup widget is active) -->
+[% IF c.request.uri.match('/ai2/editing_widget_popup') %]
+<script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
+[% END %]
+
+<!-- Other feature modules -->
+<script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
+<!-- <script src="/static/js/nav-back.js?v=[% cv %]" defer></script> -->
+
+<!-- Third-party (CDN preferred for large libs) -->
+<script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.js" defer></script>
+
+[%# Page-specific initialization data (safe global config) %]
 <script>
-window.AI_CHAT_USER_CONFIG = {
-    username: '[% c.session.username || 'Guest' %]',
-    isGuest:  [% (c.session.username && !c.session.username.match('^Guest-')) ? 'false' : 'true' %],
-    isAdmin:  [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
-    isEditor: [% c.stash.is_editor ? 'true' : 'false' %],
-    siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
-};
+    window.ComservConfig = {
+        debug: [% c.session.debug_mode || 0 %],
+        username: '[% c.session.username | html %]',
+        isAdmin: [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
+        isEditor: [% c.stash.is_editor ? 'true' : 'false' %],
+        siteName: '[% c.stash.SiteName || c.session.SiteName | html %]',
+        cv: '[% cv %]',
+        // Add more as needed - keep this small
+    };
 </script>
 <script src="/static/js/ai-common.js?v=[% cv %]"></script>
 <script src="/static/js/local-chat.js?v=[% cv %]"></script>
 
+[%# Global init call - runs after all scripts load %]
+<script defer>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.ComservInit) {
+            window.ComservInit();
+        }
+        console.log('%c[Comserv] JS modules loaded successfully', 'color:#0a0;font-weight:bold;');
+    });
+</script>
 [%# AI2 Editing Widget (conditional) - only when show_code_editor_widget is true -%]
 [% IF c.stash.show_code_editor_widget %]
 <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
