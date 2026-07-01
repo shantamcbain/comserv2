@@ -44,7 +44,10 @@ sub _documentation_writable_config_dir {
     my $dir = $c && $c->can('path_to')
         ? $c->path_to('root', 'session', 'documentation_config')
         : File::Spec->catdir($FindBin::Bin, '..', 'root', 'session', 'documentation_config');
-    make_path($dir) unless -d $dir;
+    # Defensive: only attempt mkdir if writable (Docker read-only mounts)
+    if (!-d $dir) {
+        eval { make_path($dir) if -w File::Spec->catdir($FindBin::Bin, '..', 'root') };
+    }
     return $dir;
 }
 
