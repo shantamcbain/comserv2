@@ -1,0 +1,38 @@
+[%# js_load.tt - centralized JavaScript loader for all pages
+   - Loads common UI helpers, floating buttons, chat widget, and AI2 editor conditionally
+   - All scripts use defer and versioned cache-busting
+-%]
+[%- SET cv = c.stash.css_v || '1' -%]
+
+<!-- Core UI helpers -->
+<script src="/static/js/common/ui.js?v=[% cv %]" defer></script>
+
+<!-- Floating Back-to-Top + AI2 Editor buttons -->
+<script src="/static/js/floating-buttons.js?v=[% cv %]" defer></script>
+
+<!-- Chat widget (always present on normal pages) -->
+<link rel="stylesheet" href="/static/css/ai-chat.css?v=[% cv %]">
+<script src="/static/js/nav-back.js?v=[% cv %]" defer></script>
+<script>
+window.AI_CHAT_USER_CONFIG = {
+    username: '[% c.session.username || 'Guest' %]',
+    isGuest:  [% (c.session.username && !c.session.username.match('^Guest-')) ? 'false' : 'true' %],
+    isAdmin:  [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
+    isEditor: [% c.stash.is_editor ? 'true' : 'false' %],
+    siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
+};
+</script>
+<script src="/static/js/ai-common.js?v=[% cv %]" defer></script>
+<script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
+
+[%# AI2 Editing Widget (conditional) - only when show_code_editor_widget is true -%]
+[% IF c.stash.show_code_editor_widget %]
+<link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
+<script src="/static/js/ai-editing-widget-float.js?v=20260616c" defer></script>
+[% END %]
+
+[%# AI2 Editor popup scripts - only when ai_popup_mode or on the popup URL -%]
+[% IF c.stash.ai_popup_mode || c.req.uri.path.match('/ai2/editing_widget_popup') %]
+<script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
+[% END %]
