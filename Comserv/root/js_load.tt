@@ -165,14 +165,33 @@
         console.log('%c[Comserv] JS modules loaded successfully', 'color:#0a0;font-weight:bold;');
     });
 </script>
-[%# AI2 Editing Widget (conditional) - only when show_code_editor_widget is true -%]
+[%# ============================================================
+   AI EDITOR LOADING – TWO SEPARATE SYSTEMS
+   ============================================================
+
+   1. LEGACY WIDGET (temporary / deprecated path)
+      - Used only by old templates that set show_code_editor_widget
+      - File: ai-editing-widget-float.js (monolithic)
+      - Will be removed once all pages are migrated to the new system
+
+   2. MODERN AI2 EDITOR (preferred / modular)
+      - Uses the new ai2editor/ directory structure
+      - Loaded for ai_popup_mode or /ai2/ routes
+      - All new development must use this path
+============================================================ %]
+
+[%# --- LEGACY WIDGET (only when explicitly requested) --- %]
 [% IF c.stash.show_code_editor_widget %]
 <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
 <script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
 [% END %]
 
-[%# AI2 Editor popup scripts - only when ai_popup_mode or on the popup URL -%]
+[%# --- MODERN AI2 EDITOR (new modular system) --- %]
 [% IF c.stash.ai_popup_mode || c.req.uri.path.match('/ai2/editing_widget_popup') %]
-<script src="/static/js/ai2editor/core.js?v=[% cv %]"></script>
-<script src="/static/js/ai2editor/popup.js?v=[% cv %]"></script>
+<script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/commit-ui.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
 [% END %]
