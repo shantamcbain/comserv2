@@ -1,4 +1,4 @@
-package Comserv::Controller::AI::AIPlanning;
+package Comserv::AI::AIPlanning;
 use Moose;
 use namespace::autoclean;
 use Try::Tiny;

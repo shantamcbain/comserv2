@@ -1,38 +1,90 @@
 /**
- * common/ui.js
- * Shared UI helpers used across the application.
- * Loaded via js_load.tt (defer)
+ * ui.js
+ * Universal UI helpers for the entire Comserv application.
+ * Includes reusable accordion/toggle functionality.
  */
+
 (function() {
     'use strict';
 
-    window.ComservUI = window.ComservUI || {};
-
     /**
-     * Toggle visibility of a section by ID.
+     * Toggle visibility of a collapsible section.
+     * Works with any element that has an id.
+     *
+     * @param {string} sectionId - The id of the content div to toggle
      */
-    window.ComservUI.toggleSection = function(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+    window.toggleSection = function(sectionId) {
+        const content = document.getElementById(sectionId);
+        if (!content) return;
+
+        if (content.style.display === 'none' || content.style.display === '') {
+            content.style.display = 'block';
+        } else {
+            content.style.display = 'none';
+        }
     };
 
     /**
-     * Mount a sidebar panel (placeholder for future reusable panels).
+     * Toggle the AI Editor right dock panel.
+     * Loads AI content into #aew-right-dock if not already present.
      */
-    window.ComservUI.mountSidebarPanel = function(containerId, content) {
+    window.toggleAIEditorRightPanel = function() {
+        const dock = document.getElementById('aew-right-dock');
+        if (!dock) return;
+
+        if (document.body.classList.contains('aew-right-open')) {
+            document.body.classList.remove('aew-right-open');
+            return;
+        }
+
+        document.body.classList.add('aew-right-open');
+        if (window.AEW && typeof window.AEW.open === 'function') {
+            window.AEW.open({ mode: 'right' });
+        }
+    };
+
+    // =====================================================
+    // Reusable panel / sidebar / editor mounting helpers
+    // (used by AI2 Editor widget and other modules)
+    // =====================================================
+
+    /**
+     * Mount a sidebar panel into a container.
+     * @param {string} containerId
+     * @param {string} panelId
+     */
+    window.mountSidebarPanel = function(containerId, panelId) {
+        const container = document.getElementById(containerId);
+        const panel = document.getElementById(panelId);
+        if (!container || !panel) return;
+        container.innerHTML = '';
+        container.appendChild(panel);
+        panel.style.display = 'block';
+    };
+
+    /**
+     * Show/hide a group of panels.
+     * @param {string} containerId
+     * @param {string} activePanelId
+     */
+    window.togglePanelGroup = function(containerId, activePanelId) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        container.innerHTML = content;
+        Array.from(container.children).forEach(el => {
+            el.style.display = (el.id === activePanelId) ? 'block' : 'none';
+        });
     };
 
     /**
-     * Placeholder for editor mounting (AI2 editor adapters will override/extend).
+     * Mount an editor container (used by AI2Editor).
+     * @param {string} containerId
+     * @param {string} editorType
      */
-    window.ComservUI.mountEditor = function(containerId, options) {
-        console.log('[ComservUI] mountEditor called for', containerId, options);
-        // Real implementation lives in ai2editor/ adapters
+    window.mountEditor = function(containerId, editorType = 'ace') {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.dataset.editorType = editorType;
+        // Actual editor creation is handled by AI2EditorCore
     };
 
-    console.log('[ComservUI] common/ui.js loaded');
 })();

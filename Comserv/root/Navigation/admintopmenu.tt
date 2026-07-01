@@ -77,8 +77,10 @@
                 <a href="/ai/manage_api_keys"><i class="icon-key"></i>Manage API Keys</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
+                <a href="/ai2"><i class="icon-ai"></i>AI2 (New Clean System)</a>
                 [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
                 <a href="#" id="nav-aew-open" onclick="if(window.AEW){AEW.openPopup();return false;}window.open('/ai/editing_widget_popup','aew-code-editor','width=920,height=640,resizable=yes');return false;"><i class="icon-edit"></i>AI Code Editor</a>
+                <a href="#" onclick="window.open('/ai2/editing_widget_popup','AIEditor','width=1400,height=900,menubar=no,toolbar=no,resizable=yes');return false;"><i class="icon-ai"></i>AI2 Code Editor (New)</a>
                 <a href="/ai/template_editor"><i class="icon-ttml"></i>Template Editor</a>
                 [% END %]
                 [% IF c.session.roles.grep('admin').size %]

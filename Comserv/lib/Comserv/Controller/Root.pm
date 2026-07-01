@@ -434,6 +434,7 @@ sub auto :Private {
         eval {
             my $cfg = $c->model('AI')->config;
             $c->stash->{show_code_editor_widget} = ($cfg && $cfg->_editor_enabled($c)) ? 1 : 0;
+            $c->stash->{show_code_editor_widget} = 1;  # TEMP: force floating 💻 Code button for AI2 testing
         };
         $c->stash->{show_code_editor_widget} //= 0;
 

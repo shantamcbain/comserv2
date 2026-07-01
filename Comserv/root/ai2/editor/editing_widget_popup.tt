@@ -1,0 +1,173 @@
+[%# root/ai2/editor/editing_widget_popup.tt
+   PyCharm-like AI Code Editor popup – HTML + TT only.
+   All JS moved to external files under static/js/ai2editor/
+%]
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>[% page_title | html %]</title>
+
+    <!-- PyCharm-style dark theme (inline minimal CSS) -->
+    <style>
+        body { font-family: system-ui, sans-serif; margin:0; display:flex; flex-direction:column; height:100vh; background:#1e1f22; color:#ddd; }
+        .header { background:#2b2b2b; color:#fff; padding:6px 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #555; }
+        .header select, .header button { font-size:0.9em; }
+        select { background:#313335; color:#ddd; border:1px solid #555; padding:2px 6px; border-radius:3px; }
+        .main { display:flex; flex:1; overflow:hidden; }
+        .sidebar { width:64px; background:#313335; color:#bbb; padding:12px 0; border-right:1px solid #555; display:flex; flex-direction:column; align-items:center; gap:2px; }
+        .sidebar-icon { width:52px; padding:8px 0 4px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; font-size:11px; color:#aaa; transition:background .1s; position:relative; }
+        .sidebar-icon:hover { background:#3c3f41; }
+        .sidebar-icon.active { background:#0e639c; color:white; }
+        .sidebar-icon .icon { font-size:20px; margin-bottom:2px; }
+        .sidebar-icon .label { font-size:9px; text-align:center; line-height:1.1; }
+        .file-tree { list-style:none; padding:0; margin:0; }
+        .file-tree li { padding:2px 12px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+        .file-tree li:hover { background:#3c3f41; }
+        .file-tree li.active { background:#0e639c; color:white; }
+        .commit-btn { margin:0 12px; width:calc(100%-24px); background:#0e639c; color:white; border:none; padding:6px; border-radius:3px; cursor:pointer; font-size:12px; }
+        .commit-panel { background:#2b2b2b; margin:8px 12px; padding:8px; border-radius:4px; }
+        .commit-panel textarea { width:100%; height:60px; background:#1e1f22; color:#ddd; border:1px solid #555; border-radius:3px; font-size:12px; resize:vertical; }
+        .commit-panel button { margin-top:6px; width:100%; background:#0e639c; color:white; border:none; padding:4px 10px; border-radius:3px; cursor:pointer; font-size:12px; }
+        .commit-panel button#cancel-commit-btn { background:#555; }
+        .terminal { background:#1e1f22; font-family:monospace; font-size:11px; padding:6px 12px; margin:0 12px; border:1px solid #444; border-radius:3px; }
+        .status-bar { background:#007acc; color:white; font-size:11px; padding:2px 8px; display:flex; justify-content:space-between; }
+    </style>
+</head>
+<body>
+    <!-- Top Header -->
+    <div class="header">
+        <label>Branch:
+            <select id="branch-select">
+                [% FOREACH b IN branches %]
+                    <option [% IF b == 'main' %]selected[% END %]>[% b | html %]</option>
+                [% END %]
+            </select>
+        </label>
+        <button onclick="alert('Merge functionality coming soon')">Merge</button>
+
+        <label style="margin-left:auto">Model:
+            <select id="model-select">
+                [% FOREACH m IN recommended_models %]
+                    <option [% IF m == selected_model %]selected[% END %]>[% m | html %]</option>
+                [% END %]
+            </select>
+        </label>
+
+        <label style="margin-left:12px">Editor:
+            <select id="editor-select">
+                <option value="ace">Ace</option>
+                <option value="richtext">Rich Text</option>
+            </select>
+        </label>
+
+        <button id="refresh-btn" style="margin-left:12px;background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
+            ↻ Refresh
+        </button>
+    </div>
+
+    <div class="main">
+        <!-- Left Sidebar Icons -->
+        <div class="sidebar" id="sidebar-icons">
+            <div class="sidebar-icon" data-panel="projects" title="Projects">
+                <div class="icon">📁</div>
+                <div class="label">Project</div>
+            </div>
+            <div class="sidebar-icon" data-panel="git" title="Git">
+                <div class="icon">🔀</div>
+                <div class="label">Commit</div>
+            </div>
+            <div class="sidebar-icon" data-panel="terminal" title="Terminal">
+                <div class="icon">💻</div>
+                <div class="label">Terminal</div>
+            </div>
+            <div class="sidebar-icon" data-panel="settings" title="Settings">
+                <div class="icon">⚙️</div>
+                <div class="label">Settings</div>
+            </div>
+        </div>
+
+        <!-- Sidebar Panels Container -->
+        <div id="sidebar-panels" style="position:absolute; left:56px; top:0; bottom:0; width:220px; background:#2b2b2b; border-right:1px solid #555; display:none; z-index:10; overflow:auto;">
+            <!-- Panels populated by popup.js -->
+            <div id="panel-projects" class="sidebar-panel" style="display:none; padding:12px;">
+                <h4 style="margin:0 0 8px 0; font-size:12px; color:#aaa;">PROJECTS</h4>
+                <ul class="file-tree">
+                    <li data-path="lib/Comserv/Controller/AI2.pm" class="file-item">📄 AI2.pm</li>
+                    <li data-path="root/ai2/editor/editing_widget_popup.tt" class="file-item active">📄 editing_widget_popup.tt</li>
+                </ul>
+            </div>
+
+            <div id="panel-git" class="sidebar-panel" style="display:none; padding:0; width:100%; background:#2b2b2b; font-size:13px;">
+                <!-- Commit panel HTML (kept minimal) -->
+                <div style="padding:12px; border-top:1px solid #444;">
+                    <textarea id="commit-message" placeholder="feat: improve AI2 editor" style="width:100%; height:70px; background:#1e1f22; color:#ddd; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; resize:vertical; margin-bottom:10px;"></textarea>
+                    <div style="display:flex; gap:8px;">
+                        <button id="do-commit-btn" style="flex:1; background:#0e639c; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; font-size:13px;">Commit</button>
+                        <button id="cancel-commit-btn" style="flex:1; background:#555; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; font-size:13px;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-terminal" class="sidebar-panel" style="display:none; padding:12px;">
+                <h4 style="margin:0 0 8px 0; font-size:12px; color:#aaa;">TERMINAL</h4>
+                <div class="terminal" style="height:120px; overflow:auto;">
+                    $ git status<br>
+                    On branch main<br>
+                    Your branch is up to date.
+                </div>
+            </div>
+
+            <div id="panel-settings" class="sidebar-panel" style="display:none; padding:12px; font-size:12px;">
+                <h4 style="margin:0 0 8px 0; font-size:12px; color:#aaa;">EDITOR SETTINGS</h4>
+                <label style="display:block;margin:4px 0;">Theme:
+                    <select id="theme-select"><option value="dark">Dark (PyCharm)</option></select>
+                </label>
+                <label style="display:block;margin:4px 0;">Font Size:
+                    <select id="font-size"><option value="14" selected>14px</option></select>
+                </label>
+            </div>
+        </div>
+
+        <!-- Main Editor Area -->
+        <div class="editor-area" style="flex:1; display:flex; flex-direction:column;">
+            <div class="editor-tabs" style="background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between;">
+                <span>editing_widget_popup.tt &nbsp; | &nbsp; AI2.pm</span>
+                <span id="file-status" style="font-size:11px;color:#888;"></span>
+            </div>
+            <div class="editor-content" style="flex:1; position:relative;">
+                <div id="ace-editor" style="width:100%;height:100%;"></div>
+            </div>
+            <!-- AI Diff Pane -->
+            <div class="diff-pane" style="height:140px; background:#2b2b2b; color:#0f0; padding:8px; border-top:1px solid #555; font-size:0.85em;">
+                <strong>AI Suggestion (+/- diff)</strong><br>
+                <span style="color:#0f0">+ new line added by AI</span><br>
+                <span style="color:#f66">- old line removed</span>
+                <div style="margin-top:8px">
+                    <button>Approve</button>
+                    <button>Reject</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Chat Sidebar -->
+        <div class="chat-sidebar" style="width:320px; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555;">
+            <div class="chat-header" style="padding:6px 10px; background:#2b2b2b; font-weight:bold;">AI Chat (Router-selected)</div>
+            <div class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
+                <div><strong>AI:</strong> How can I help with this file?</div>
+            </div>
+            <div class="chat-input" style="padding:6px; border-top:1px solid #555;">
+                <input type="text" style="width:100%" placeholder="Ask AI...">
+            </div>
+        </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+        <span id="auto-refresh-status">Auto-refresh: ON (4s)</span>
+        <span id="last-modified" style="color:#a0d2ff;"></span>
+    </div>
+
+    <!-- Scripts loaded centrally via js_load.tt when ai_popup_mode is active -->
+</body>
+</html>

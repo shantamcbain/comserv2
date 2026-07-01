@@ -1,33 +1,5 @@
 package Comserv::Util::Logging;
 
-# =============================================================================
-# LOGGING CHECKLIST (humans + AI — keep Comserv/Util/Logging.pm as single source)
-# =============================================================================
-#
-# 1. USE log_with_details for operational messages (especially warn/error/critical):
-#      $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-#          'meaningful_action_name', "What failed and key context: $detail");
-#
-# 2. SUBROUTINE (5th arg) must name the REAL code area — never generic wrappers:
-#      Good: 'dns_records', 'modify_todo', 'docker_deploy_to_production'
-#      Bad:  'end', 'view', 'auto' (Catalyst wrappers; audit todos become useless)
-#
-# 3. MESSAGE must be self-contained: what, where, identifiers (todo_id, user, path).
-#      Unhandled Catalyst exceptions are OK in the message; error_audit_meta unwraps them.
-#
-# 4. DO NOT use bare warn/print/$c->log->error for production failures — they skip:
-#      - system_log table, email alerts, Application Error Audit auto-todos
-#
-# 5. LEVEL guide: debug/info = file only; warn+ = DB; error+ = email + audit todo
-#
-# 6. After fixing a bug seen in Application Error Audit: deploy, then close the todo.
-#      Read Comserv/DEPLOY_STATUS.json + version.json before assuming prod is current.
-#
-# 7. See also: /Documentation/logging_best_practices, /Documentation/DevelopmentStandards, AGENTS.md
-#
-# NOTE: Recursion guard $_in_todo_create prevents infinite loops during auto-todo create.
-# =============================================================================
-
 use strict;
 use warnings;
 use namespace::autoclean;

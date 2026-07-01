@@ -1,0 +1,10 @@
+[%# ai2/right_dock_project.tt — Project files panel %]
+<div style="padding:12px;">
+    <h4 style="margin:0 0 10px 0;color:#ccc;">PROJECT FILES</h4>
+    <ul style="list-style:none;padding:0;margin:0;font-size:13px;">
+        <li style="padding:4px 8px;cursor:pointer;">📄 AI2.pm</li>
+        <li style="padding:4px 8px;cursor:pointer;">📄 editing_widget_popup.tt</li>
+        <li style="padding:4px 8px;color:#888;">📁 models/</li>
+        <li style="padding:4px 8px;color:#888;">📁 views/</li>
+    </ul>
+</div>
