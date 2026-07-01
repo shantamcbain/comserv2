@@ -144,6 +144,20 @@
 
 <!-- Third-party (CDN preferred for large libs) -->
 <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+
+[%# Force HTMX init early on /todo/details for debugging %]
+[% IF c.request.uri.match('/todo/details') %]
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.htmx) {
+      console.log('%c[HTMX] Loaded and ready on /todo/details', 'color:#06c');
+      // Optional: window.htmx.logAll();
+    } else {
+      console.error('[HTMX] Failed to load!');
+    }
+  });
+</script>
+[% END %]
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.js" defer></script>
 
