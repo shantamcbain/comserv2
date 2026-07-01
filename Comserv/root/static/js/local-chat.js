@@ -3585,7 +3585,8 @@
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
         _sendUserHeartbeat();
-        state.userHeartbeatTimer = setInterval(_sendUserHeartbeat, 30000);
+        // SSE replaces the old heartbeat + polling timers
+        _startChatSSE();
         var header = document.getElementById('chat-header');
         if (header) {
             header.style.background = '#1a6bb5';
