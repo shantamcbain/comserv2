@@ -622,6 +622,15 @@ Uses shared DB so works across multiple server instances.
 
 =cut
 
+sub heartbeat :Path('heartbeat') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({
+        status    => 'ok',
+        timestamp => time(),
+    }));
+}
+
 sub check_admin_online :Path('check_admin_online') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
