@@ -224,122 +224,37 @@
 
     [% IF is_admin && !det_is_done %]
       [% IF det_is_active %]
-      <button id="det-active-btn" onclick="detCloseLog([% det_rid %])"
-          style="padding:5px 14px;border:1px solid #fd7e14;border-radius:4px;background:#fd7e14;color:#fff;cursor:pointer;font-size:0.9em;"
-          title="Session active — click to close log with notes (todo stays in-progress for next session)">⏸ Active</button>
+      <button type="button"
+              class="btn btn-warning"
+              hx-post="/todo/close_log"
+              hx-vals='{"record_id": [% det_rid %]}'
+              hx-confirm="Close this work session? (todo stays in-progress)"
+              hx-on::after-request="if (event.detail.successful) location.reload()">
+          ⏸ Active
+      </button>
       [% ELSE %]
-      <button id="det-start-btn" onclick="detStartWork([% det_rid %])"
-          style="padding:5px 14px;border:1px solid #0d6efd;border-radius:4px;background:transparent;color:#0d6efd;cursor:pointer;font-size:0.9em;"
-          title="Start working — creates a log entry, marks todo active on all servers">▶ Start</button>
+      <button type="button"
+              class="btn btn-primary"
+              hx-post="/todo/open_log"
+              hx-vals='{"record_id": [% det_rid %]}'
+              hx-confirm="Start working on this task?"
+              hx-on::after-request="if (event.detail.successful) location.reload()">
+          ▶ Start
+      </button>
       [% END %]
-      <button id="det-done-btn" onclick="detDoneWithLog([% det_rid %],[% det_is_active ? 1 : 0 %])"
-          style="padding:5px 14px;border:1px solid #28a745;border-radius:4px;background:transparent;color:#28a745;cursor:pointer;font-size:0.9em;"
-          title="[% det_is_active ? 'Close log and mark todo done' : 'Mark done — will ask for duration if no active session' %]">✓ Done</button>
+
+      <button type="button"
+              class="btn btn-success"
+              hx-post="/todo/done_with_log"
+              hx-vals='{"record_id": [% det_rid %]}'
+              hx-confirm="Mark this task as DONE?"
+              hx-on::after-request="if (event.detail.successful) location.reload()">
+          ✓ Done
+      </button>
     [% END %]
 </div>
 
-<script>
-function detStartWork(recordId) {
-    var btn = document.getElementById('det-start-btn');
-    if (btn) { btn.disabled = true; btn.textContent = '…'; }
-    fetch('/todo/open_log', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record_id: recordId })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.ok || (d.error && d.error.indexOf('already open') !== -1)) {
-            if (btn) {
-                btn.id = 'det-active-btn';
-                btn.textContent = '⏸ Active';
-                btn.style.background = '#fd7e14';
-                btn.style.color = '#fff';
-                btn.style.borderColor = '#fd7e14';
-                btn.title = 'Session active — click to close log with notes (todo stays in-progress for next session)';
-                btn.onclick = function() { detCloseLog(recordId); };
-                btn.disabled = false;
-            }
-            var doneBtn = document.getElementById('det-done-btn');
-            if (doneBtn) { doneBtn.title = 'Close log and mark todo done'; doneBtn.onclick = function() { detDoneWithLog(recordId, 1); }; }
-        } else {
-            if (btn) { btn.disabled = false; btn.textContent = '▶ Start'; }
-            alert('Could not start: ' + (d.error || 'unknown error'));
-        }
-    }).catch(function(e) {
-        if (btn) { btn.disabled = false; btn.textContent = '▶ Start'; }
-        alert('Error: ' + e);
-    });
-}
 
-function detCloseLog(recordId) {
-    var btn = document.getElementById('det-active-btn');
-    var notes = prompt('Close session — brief notes on what was done (optional):\n(todo stays in-progress; click Start again for next session)');
-    if (notes === null) return;
-    if (btn) { btn.disabled = true; btn.textContent = '…'; }
-    fetch('/todo/close_log', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record_id: recordId, notes: notes || '' })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.ok) {
-            if (btn) {
-                btn.id = 'det-start-btn';
-                btn.textContent = '▶ Start';
-                btn.style.background = 'transparent';
-                btn.style.color = '#0d6efd';
-                btn.style.borderColor = '#0d6efd';
-                btn.title = 'Start working — creates a log entry, marks todo active on all servers';
-                btn.onclick = function() { detStartWork(recordId); };
-                btn.disabled = false;
-            }
-            var doneBtn = document.getElementById('det-done-btn');
-            if (doneBtn) { doneBtn.title = 'Mark done — will ask for duration if no active session'; doneBtn.onclick = function() { detDoneWithLog(recordId, 0); }; }
-        } else {
-            if (btn) { btn.disabled = false; btn.textContent = '⏸ Active'; }
-            alert('Could not close log: ' + (d.error || 'unknown'));
-        }
-    }).catch(function(e) {
-        if (btn) { btn.disabled = false; btn.textContent = '⏸ Active'; }
-        alert('Error: ' + e);
-    });
-}
-
-function detDoneWithLog(recordId, isActive) {
-    var notes = prompt('Mark todo DONE — what was done / resolution notes (optional):');
-    if (notes === null) return;
-    var payload = { record_id: recordId, notes: notes || '' };
-    if (!isActive) {
-        var durStr = prompt('No active log session.\nHow many minutes did this take? (leave blank to skip log)');
-        if (durStr === null) return;
-        var durMins = parseInt(durStr, 10);
-        if (!isNaN(durMins) && durMins > 0) { payload.duration_mins = durMins; }
-    }
-    var doneBtn = document.getElementById('det-done-btn');
-    if (doneBtn) { doneBtn.disabled = true; doneBtn.textContent = '…'; }
-    fetch('/todo/done_with_log', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.ok) {
-            if (doneBtn) { doneBtn.textContent = '✓ Done'; doneBtn.disabled = true; doneBtn.style.background = '#28a745'; doneBtn.style.color = '#fff'; }
-            var startBtn = document.getElementById('det-start-btn') || document.getElementById('det-active-btn');
-            if (startBtn) { startBtn.style.display = 'none'; }
-            var statusCell = document.querySelector('tr th[align="left"] + td');
-            document.querySelectorAll('table tr').forEach(function(tr) {
-                if (tr.querySelector('th') && tr.querySelector('th').textContent.trim() === 'Status') {
-                    tr.querySelector('td').textContent = '3';
-                }
-            });
-        } else {
-            if (doneBtn) { doneBtn.disabled = false; doneBtn.textContent = '✓ Done'; }
-            alert('Could not mark done: ' + (d.error || 'unknown'));
-        }
-    }).catch(function(e) {
-        if (doneBtn) { doneBtn.disabled = false; doneBtn.textContent = '✓ Done'; }
-        alert('Error: ' + e);
-    });
-}
-</script>
 
 [% IF todo_intervals && todo_intervals.size %]
 <div class="reschedule-log" style="margin-top:20px">
