@@ -14,6 +14,13 @@ has 'logging' => (
 sub check :Path('/admin/health/check') :Args(0) {
     my ($self, $c) = @_;
 
+    # Fast no-op when health logging is disabled
+    if (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1') {
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({ status => 'skipped' }));
+        return;
+    }
+
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     unless ($c->stash->{is_admin} && $sitename eq 'CSC') {
         $c->response->status(403);
