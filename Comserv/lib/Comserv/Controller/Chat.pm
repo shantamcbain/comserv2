@@ -5,6 +5,7 @@ use JSON;
 use DateTime;
 use Try::Tiny;
 use POSIX qw(strftime);
+use AnyEvent;
 use Comserv::Util::Logging;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -642,6 +643,42 @@ sub heartbeat :Path('heartbeat') :Args(0) {
         status    => 'ok',
         timestamp => time(),
     }));
+}
+
+# ============================================================
+#  SSE endpoint (long-term replacement for polling)
+# ============================================================
+sub sse :Path('sse') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $user_id  = $c->session->{user_id}  || 199;
+    my $username = $c->session->{username} || 'Guest';
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'sse',
+        "SSE connection opened - user_id=$user_id, username=$username");
+
+    # Respect health-log suppression
+    if (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1') {
+        $c->response->content_type('text/event-stream');
+        $c->response->body("event: skipped\ndata: 1\n\n");
+        return;
+    }
+
+    $c->response->content_type('text/event-stream');
+    $c->response->headers->header('Cache-Control' => 'no-cache');
+    $c->response->headers->header('Connection'   => 'keep-alive');
+
+    # Lightweight keep-alive comment every 25s
+    my $timer = AnyEvent->timer(
+        after    => 25,
+        interval => 25,
+        cb       => sub {
+            $c->response->write(": keepalive\n\n");
+        }
+    );
+
+    # TODO: push real events (new message, status, etc.)
+    # For now this just keeps the connection open.
 }
 
 sub check_admin_online :Path('check_admin_online') :Args(0) {

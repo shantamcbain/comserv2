@@ -23,9 +23,13 @@ use Catalyst qw/
     Authentication
 /;
 
+
+
 extends 'Catalyst';
 
 our $VERSION = '0.01';
+
+
 
 # REMOVED: Custom log setup that was causing segfaults
 # The problematic code tried to access $self->dispatchers->[0] which doesn't exist
@@ -157,6 +161,16 @@ sub psgi_app {
 
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
+
+        # Suppress Catalyst debug noise for health/heartbeat polling when COMSERV_NO_HEALTH_LOG=1
+        if (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1') {
+            my $path = $env->{PATH_INFO} // '';
+            if ($path =~ m{^/(?:admin/health|chat/(?:user_heartbeat|admin_heartbeat)|HelpDesk/admin/tickets_alert)}) {
+                # Temporarily disable debug output for this request only
+                local $ENV{CATALYST_DEBUG} = 0;
+                $self->config->{debug} = 0;
+            }
+        }
 
         # Periodic memory monitoring (every 500 requests) — production1 only
         $request_count++;
@@ -298,6 +312,12 @@ around 'finalize_error' => sub {
 
 __PACKAGE__->_initialize_database_config();
 __PACKAGE__->setup();
+
+# Replace logger AFTER setup() so health polling is silent when env var is set
+if (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1') {
+    require Comserv::Util::QuietHealthLog;
+    __PACKAGE__->log( Comserv::Util::QuietHealthLog->new );
+}
 
 # All schema initialization wrapped in non-fatal eval blocks
 # App must start even if some tables are missing

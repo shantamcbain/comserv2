@@ -1033,6 +1033,11 @@ sub api_search_tickets :Chained('base') :PathPart('api/search_tickets') :Args(0)
 sub tickets_alert :Chained('base') :PathPart('admin/tickets_alert') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
+    if (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1') {
+        $c->response->body('{"open_count":0,"skipped":1}');
+        return;
+    }
+    $c->response->content_type('application/json');
     unless ($self->_is_staff($c)) {
         $c->response->body('{"open_count":0}');
         return;
