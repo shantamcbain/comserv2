@@ -224,6 +224,13 @@
 
     [% IF is_admin && !det_is_done %]
       <div class="btn-group" role="group" aria-label="Task actions">
+<script>
+document.addEventListener('click', function(e) {
+  if (e.target.closest('.btn-group')) {
+    console.log('[Diagnostic] Click detected on task button group', e.target);
+  }
+});
+</script>
       [% IF det_is_active %]
       <button type="button"
               class="btn btn-warning btn-sm"
@@ -340,3 +347,10 @@
     <a href="/todo/day" class="return-button">Return to Day View</a>
     <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('[Diagnostic] Page loaded - HTMX status:', !!window.htmx);
+    if (window.htmx) htmx.process(document.body);
+  });
+</script>
