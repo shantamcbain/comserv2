@@ -123,6 +123,12 @@
 
             const data = await response.json();
 
+            if (data.status === 'skipped') {
+                // Health logging disabled via COMSERV_NO_HEALTH_LOG=1 – stop polling
+                clearInterval(window.__healthInterval);
+                return;
+            }
+
             if (data.status === 'warning' || data.status === 'critical') {
                 showBanner(data);
 
@@ -156,7 +162,7 @@
 
         // Run immediately, then every 30 s
         await checkHealth();
-        setInterval(checkHealth, CHECK_INTERVAL);
+        window.__healthInterval = setInterval(checkHealth, CHECK_INTERVAL);
     }
 
     if (document.readyState === 'loading') {

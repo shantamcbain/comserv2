@@ -564,6 +564,12 @@ Updates conversation metadata so admin knows the user is still connected.
 sub user_heartbeat :Path('user_heartbeat') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
+
+    if (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1') {
+        $c->response->body(encode_json({ success => 1, skipped => 1 }));
+        return;
+    }
+
     my $conversation_id = $c->req->params->{conversation_id};
     unless ($conversation_id) {
         $c->response->body(encode_json({ success => 0 }));
@@ -591,6 +597,13 @@ Admin presence ping — updates a DB record so heartbeat works across multiple s
 sub admin_heartbeat :Path('admin_heartbeat') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
+
+    # Respect the same env var that disables health logging
+    if (($ENV{COMSERV_NO_HEALTH_LOG} // '') eq '1') {
+        $c->response->body(encode_json({ success => 1, skipped => 1 }));
+        return;
+    }
+
     unless ($c->check_user_roles('admin')) {
         $c->response->body(encode_json({ success => 0 }));
         return;

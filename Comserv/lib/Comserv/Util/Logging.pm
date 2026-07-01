@@ -564,7 +564,8 @@ sub log_with_details {
         || (($subroutine // '') =~ /\bview\b/i && $message =~ /\d{10,}/)
         || $message =~ /DBI Connection failed|Can't connect to (?:MySQL|server)/i
     );
-    if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio && !$_skip_db_noise) {
+    if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio && !$_skip_db_noise
+        && (($ENV{COMSERV_NO_HEALTH_LOG} // '') ne '1')) {
         my $now = time();
         if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
             _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");

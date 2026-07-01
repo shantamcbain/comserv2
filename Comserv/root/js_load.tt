@@ -134,6 +134,11 @@
 
 <!-- Other feature modules -->
 <script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
+
+<!-- Planning / Daily page JS -->
+[% IF c.request.uri.match('/planning/daily') %]
+<script src="/static/js/planning/daily-plan.js?v=[% cv %]" defer></script>
+[% END %]
 <!-- <script src="/static/js/nav-back.js?v=[% cv %]" defer></script> -->
 
 <!-- Third-party (CDN preferred for large libs) -->
@@ -153,8 +158,6 @@
         // Add more as needed - keep this small
     };
 </script>
-<script src="/static/js/ai-common.js?v=[% cv %]"></script>
-<script src="/static/js/local-chat.js?v=[% cv %]"></script>
 
 [%# Global init call - runs after all scripts load %]
 <script defer>
