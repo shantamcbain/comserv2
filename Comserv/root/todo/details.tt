@@ -223,34 +223,43 @@
     </form>
 
     [% IF is_admin && !det_is_done %]
+      <div class="btn-group" role="group" aria-label="Task actions">
       [% IF det_is_active %]
       <button type="button"
-              class="btn btn-warning"
+              class="btn btn-warning btn-sm"
               hx-post="/todo/close_log"
-              hx-vals='{"record_id": [% det_rid %]}'
-              hx-confirm="Close this work session? (todo stays in-progress)"
-              hx-on::after-request="if (event.detail.successful) location.reload()">
+              hx-vals='{"record_id": "[% det_rid %]"}'
+              hx-confirm="Close current work session?"
+              hx-indicator="#work-indicator"
+              hx-on::after-request="console.log('[HTMX] close_log response:', event.detail); if (event.detail.successful) location.reload()"
+              hx-on::before-request="console.log('[HTMX] Starting close_log...')">
           ⏸ Active
       </button>
       [% ELSE %]
       <button type="button"
-              class="btn btn-primary"
+              class="btn btn-primary btn-sm"
               hx-post="/todo/open_log"
-              hx-vals='{"record_id": [% det_rid %]}'
+              hx-vals='{"record_id": "[% det_rid %]"}'
               hx-confirm="Start working on this task?"
-              hx-on::after-request="if (event.detail.successful) location.reload()">
+              hx-indicator="#work-indicator"
+              hx-on::after-request="console.log('[HTMX] open_log response:', event.detail); if (event.detail.successful) location.reload()"
+              hx-on::before-request="console.log('[HTMX] Starting open_log...')">
           ▶ Start
       </button>
       [% END %]
 
       <button type="button"
-              class="btn btn-success"
+              class="btn btn-success btn-sm"
               hx-post="/todo/done_with_log"
-              hx-vals='{"record_id": [% det_rid %]}'
-              hx-confirm="Mark this task as DONE?"
-              hx-on::after-request="if (event.detail.successful) location.reload()">
+              hx-vals='{"record_id": "[% det_rid %]"}'
+              hx-confirm="Mark this task as Done?"
+              hx-indicator="#work-indicator"
+              hx-on::after-request="console.log('[HTMX] done_with_log response:', event.detail); if (event.detail.successful) location.reload()"
+              hx-on::before-request="console.log('[HTMX] Starting done_with_log...')">
           ✓ Done
       </button>
+      <span id="work-indicator" class="htmx-indicator" style="margin-left:8px;">⏳</span>
+      </div>
     [% END %]
 </div>
 
