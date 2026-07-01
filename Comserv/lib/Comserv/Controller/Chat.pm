@@ -7,6 +7,7 @@ use Try::Tiny;
 use POSIX qw(strftime);
 use AnyEvent;
 use Comserv::Util::Logging;
+use Comserv::Util::ChatBroadcaster;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -131,6 +132,18 @@ sub send_message :Path('send_message') :Args(0) {
             "Message stored - message_id=" . $ai_message->id . ", conversation_id=$conversation_id, user_id=$user_id");
         
         $ai_message->discard_changes;
+
+        # Push real-time event via SSE broadcaster
+        Comserv::Util::ChatBroadcaster->broadcast({
+            type => 'new_message',
+            data => {
+                id              => $ai_message->id,
+                conversation_id => $conversation_id,
+                role            => 'user',
+                content         => $message,
+                timestamp       => $ai_message->created_at->iso8601,
+            }
+        });
 
         # Return success response
         $c->response->content_type('application/json');
@@ -426,6 +439,18 @@ sub respond :Path('respond') :Args(0) {
             "Admin response stored - message_id=" . $response_msg->id . ", conversation_id=$conversation_id, admin_id=$admin_user_id");
         
         $response_msg->discard_changes;
+
+        # Push real-time event via SSE broadcaster
+        Comserv::Util::ChatBroadcaster->broadcast({
+            type => 'new_message',
+            data => {
+                id              => $response_msg->id,
+                conversation_id => $conversation_id,
+                role            => 'assistant',
+                content         => $message,
+                timestamp       => $response_msg->created_at->iso8601,
+            }
+        });
         
         # Return success response
         $c->response->content_type('application/json');
@@ -478,6 +503,12 @@ sub pending_count :Path('pending_count') :Args(0) {
         }
     };
     $c->response->body(encode_json({ count => $count }));
+
+    # Push the latest count to all SSE clients
+    Comserv::Util::ChatBroadcaster->broadcast({
+        type => 'pending_count',
+        data => { count => $count }
+    });
 }
 
 =head2 support_conversations
@@ -677,8 +708,15 @@ sub sse :Path('sse') :Args(0) {
         }
     );
 
-    # TODO: push real events (new message, status, etc.)
-    # For now this just keeps the connection open.
+    # Register this response handle for real-time pushes
+    Comserv::Util::ChatBroadcaster->register($c->response);
+
+    # When the client disconnects we must unregister
+    $c->response->on_finalize(sub {
+        Comserv::Util::ChatBroadcaster->unregister($c->response);
+    });
+
+    # The connection stays open; events are pushed via the broadcaster
 }
 
 sub check_admin_online :Path('check_admin_online') :Args(0) {
@@ -731,6 +769,13 @@ sub resolve :Path('resolve') :Args(0) {
         $conv->update({ status => 'archived' });
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve',
             "Conversation $conversation_id resolved by admin " . ($c->session->{username} || 'unknown'));
+
+        # Notify connected clients
+        Comserv::Util::ChatBroadcaster->broadcast({
+            type => 'status_update',
+            data => { conversation_id => $conversation_id, status => 'archived' }
+        });
+
         $c->response->body(encode_json({ success => 1 }));
     };
     if ($@) {
