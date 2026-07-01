@@ -5835,3 +5835,10 @@
         }).catch(function() { openChat(); });
     };
 })();
+document.addEventListener("DOMContentLoaded", function() {
+    if (typeof _startChatSSE === "function") {
+        console.log("[Chat] Starting SSE connection (startChatSSE)");
+        _startChatSSE();
+    }
+});
+
