@@ -133,6 +133,7 @@
 [% END %]
 
 <!-- Other feature modules -->
+<!-- Chat system migrated from polling to Server-Sent Events (SSE) – polling code removed (2026-07-01) -->
 <script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
 
 <!-- Planning / Daily page JS -->

@@ -45,7 +45,7 @@
         supportMode: false,         // true when user is in live support chat mode
         supportConvId: null,        // conversation_id for current support chat
         supportLastMsgId: 0,        // last message id seen in support chat
-        supportPollTimer: null,     // setInterval handle for support chat polling
+        // supportPollTimer removed – SSE migration complete
         siteName: '',                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
         isUnloading: false
     };
@@ -3571,20 +3571,11 @@
         return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
     }
 
-    function _sendUserHeartbeat() {
-        if (!state.supportConvId) return;
-        fetch('/chat/user_heartbeat', {
-            method: 'POST',
-            credentials: 'include',
-            body: new URLSearchParams({ conversation_id: state.supportConvId })
-        }).catch(function() {});
-    }
 
     function _enterSupportMode(convId, lastMsgId, ticketNumber) {
         state.supportMode   = true;
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
-        _sendUserHeartbeat();
         // SSE replaces the old heartbeat + polling timers
         _startChatSSE();
         var header = document.getElementById('chat-header');
@@ -3602,8 +3593,6 @@
     }
 
     function _exitSupportMode() {
-        if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
-        if (state.userHeartbeatTimer) { clearInterval(state.userHeartbeatTimer); state.userHeartbeatTimer = null; }
         state.supportMode   = false;
         state.supportConvId = null;
         state.supportLastMsgId = 0;
@@ -3628,37 +3617,6 @@
         if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
     }
 
-    function _startSupportPolling() {
-        if (state.supportPollTimer) clearInterval(state.supportPollTimer);
-        state.supportPollTimer = setInterval(function() {
-            if (!state.supportMode || !state.supportConvId) { clearInterval(state.supportPollTimer); return; }
-            fetch('/chat/get_messages?conversation_id=' + state.supportConvId + '&last_id=' + state.supportLastMsgId, {
-                credentials: 'include'
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (!d.success || !d.messages) return;
-                d.messages.forEach(function(msg) {
-                    if (msg.id > state.supportLastMsgId) {
-                        state.supportLastMsgId = msg.id;
-                        if (msg.role === 'assistant') {
-                            addMessage(msg.content, 'ai-message');
-                        }
-                    }
-                });
-                if (d.conv_status === 'archived') {
-                    clearInterval(state.supportPollTimer);
-                    state.supportPollTimer = null;
-                    _addSupportSystemMsg('🔒 This support chat has been closed by the administrator. Thank you for contacting us!');
-                    _exitSupportMode();
-                }
-            })
-            .catch(function() {});
-        }, 5000);
-    }
-
-    function _showNoAdminMessage() {
-        var el = document.createElement('div');
         el.className = 'message system-message';
         el.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;padding:10px 14px;border-radius:6px;font-size:.85em;color:#664d03;margin:4px 0;line-height:1.6;';
         el.innerHTML = '⚠️ <strong>No administrator is currently logged in.</strong><br>'
@@ -5677,47 +5635,6 @@
             }, 30000);
         }
 
-        function _checkPendingSupport() {
-            fetch('/chat/pending_count', { credentials: 'include' })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                var n = d && d.count ? parseInt(d.count, 10) : 0;
-                if (n > 0 && n > _adminLastPending) {
-                    if (_adminNotifPerm === 'granted') {
-                        new Notification('💬 Support Chat: ' + n + ' request' + (n > 1 ? 's' : '') + ' awaiting reply', {
-                            body: 'Open Support Chat Admin to respond.',
-                            icon: '/static/images/favicon.ico',
-                            tag: 'admin-support-pending',
-                            requireInteraction: true
-                        });
-                    }
-                    _adminBeep();
-                    _adminTitleFlash(n);
-                    _adminShowToast(n);
-                }
-                _adminLastPending = n;
-                var badge = document.getElementById('nav-support-badge');
-                if (badge) { badge.textContent = n || ''; badge.style.display = n > 0 ? '' : 'none'; }
-            })
-            .catch(function() {});
-        }
-        function _sendAdminHeartbeat() {
-            fetch('/chat/admin_heartbeat', { method: 'POST', credentials: 'include' })
-            .then(function(r) { return r.json(); })
-            .then(function(d) { if (!d.success) console.warn('[Chat] admin_heartbeat rejected (not admin role?)'); })
-            .catch(function() {});
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            _requestAdminNotifPerm();
-            _sendAdminHeartbeat();
-            setTimeout(_checkPendingSupport, 2000);
-            setInterval(_checkPendingSupport, 30000);
-            setInterval(_sendAdminHeartbeat, 20000);
-        });
-    })();
-
-    if (!PAGE_MODE) {
         window.ComservAIChat = {
             open: openChatPreferred,
             openInline: openChat,
