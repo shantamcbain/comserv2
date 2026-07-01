@@ -480,21 +480,7 @@
         </div>
     </div>
 <script>
-(function() {
-    function _updateSupportBadge() {
-        var badge = document.getElementById('nav-support-badge');
-        if (!badge) return;
-        fetch('/chat/pending_count', { credentials: 'include' })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            var n = d && d.count ? parseInt(d.count, 10) : 0;
-            if (n > 0) { badge.textContent = n; badge.style.display = ''; }
-            else { badge.style.display = 'none'; }
-        })
-        .catch(function() {});
-    }
-    _updateSupportBadge();
-    setInterval(_updateSupportBadge, 30000);
-})();
+// Polling removed – SSE migration complete (2026-07-01)
+// The nav-support-badge is now updated via EventSource('/chat/sse') in local-chat.js
 </script>
 </li>
