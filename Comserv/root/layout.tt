@@ -35,13 +35,7 @@
     [% content %]
     [% INCLUDE 'AdminNotes.tt' %]
     
-    <!-- Back to Top Button -->
-    <button id="back-to-top" title="Back to Top" aria-label="Back to Top">
-        <i class="fas fa-arrow-up" aria-hidden="true"></i>
-    </button>
 
-    <!-- AI2 Code Editor floating button (and right-dock container) -->
-    [% TRY %][% INCLUDE 'ai2/editor/code_editor_button.tt' %][% CATCH %][% END %]
 
     [% TRY %]
         [% INCLUDE 'footer.tt' %]
