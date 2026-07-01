@@ -105,7 +105,7 @@ sub scan_for_unconfigured_files {
         "Loaded $configured_count configured paths from documentation config");
     
     my @unconfigured = ();
-    my $doc_root = File::Spec->catdir($FindBin::Bin, "..", "root", "Documentation");
+    my $doc_root = File::Spec->catdir($FindBin::Bin, "root", "Documentation");
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'scan_directory',
         "Scanning documentation root directory: $doc_root");
@@ -410,10 +410,10 @@ sub preview_file :Path('preview_file') :Args(0) {
     }
     
     # Construct full path to file
-    my $full_path = File::Spec->catfile($FindBin::Bin, '..', 'root', $file_path);
+    my $full_path = File::Spec->catfile($FindBin::Bin, 'root', $file_path);
     
     # Security check - ensure file is within Documentation directory
-    my $doc_dir = File::Spec->catfile($FindBin::Bin, '..', 'root', 'Documentation');
+    my $doc_dir = File::Spec->catfile($FindBin::Bin, 'root', 'Documentation');
     unless ($full_path =~ /^\Q$doc_dir\E/) {
         $c->response->status(403);
         $c->response->body('Access denied - file outside Documentation directory');
@@ -533,7 +533,7 @@ sub parse_roles {
 sub update_config_file {
     my ($self, $c, $files_to_add) = @_;
     
-    my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'root', 'Documentation', 'config', 'documentation_config.json');
+    my $config_file = File::Spec->catfile($FindBin::Bin, 'root', 'Documentation', 'config', 'documentation_config.json');
     
     try {
         # Read current configuration

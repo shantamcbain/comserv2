@@ -14,6 +14,13 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+
+# Thin wrapper to reduce repetitive log_with_details calls while keeping full depth
+sub _log_error {
+    my ($self, $c, $action, $msg) = @_;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, $action, $msg);
+}
+
 sub auto :Private {
     my ($self, $c) = @_;
     # Root.pm leaves debug_msg as an arrayref — must not stringify on mail pages.

@@ -59,10 +59,7 @@ __PACKAGE__->add_columns(id => {
         default_value => 1,
     },
     # status column removed - does not exist in DB table
-    unsubscribed_at => {
-        data_type   => 'timestamp',
-        is_nullable => 1,
-    },
+    # unsubscribed_at => { data_type => 'timestamp', is_nullable => 1 },  # column missing in DB - commented to stop fatal error
     blocked_by => {
         data_type   => 'integer',
         is_nullable => 1,

@@ -1,0 +1,21 @@
+{
+  "rules": [
+    {
+      "name": "Reduce repetitive logging",
+      "description": "When editing a controller or model that has many repeated log_with_details calls (especially error logs), introduce a thin private helper method (_log_error, _log_info, etc.) and replace the duplicates. Keep the full logging depth (action, file, line, message). Only do this when duplication is obvious (>8–10 similar calls).",
+      "trigger": "log_with_details.*error",
+      "apply": "on-the-fly"
+    },
+    {
+      "name": "Large file handling",
+      "description": "When a Perl module exceeds ~1500 lines or has many repetitive method patterns (duplicate subs, repeated logging, duplicated eval blocks, etc.), proactively suggest or apply refactoring. Options include: extracting helper methods, splitting into roles/modules, removing dead code, or consolidating duplicate logic. Always preserve behavior and logging depth.",
+      "trigger": "file_size > 1500 || duplicate_methods > 3",
+      "apply": "on-the-fly",
+      "actions": [
+        "suggest_extract_helper",
+        "suggest_split_role",
+        "remove_dead_code"
+      ]
+    }
+  ]
+}
