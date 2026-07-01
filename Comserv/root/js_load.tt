@@ -43,18 +43,18 @@
 
     LOADING RULES:
     - Always use defer (or type="module")
-    - Version with ?v=... for cache busting
+    - Version with query param for cache busting
     - Core + common first, then feature-specific
     - No blocking scripts in <head>
 
-    File Organization Target:
+    File Organization Target (commented for reference):
     /static/js/
     ├── common/          (ui.js, api.js, events.js, etc.)
     ├── ai2editor/       (core.js, popup.js, dock.js, etc.)
     ├── vendor/          (minified 3rd party if not CDN)
     └── main.js          (global init if needed)
 
-    When adding new JS:
+    When adding new JS (commented for reference):
     - Create file in appropriate folder
     - Add <script> tag here (in correct order)
     - Update this comment block with note
