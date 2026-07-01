@@ -5,14 +5,14 @@
 [%- SET cv = c.stash.css_v || '1' -%]
 
 <!-- Core UI helpers -->
-<script src="/static/js/common/ui.js?v=[% cv %]" defer></script>
+<script src="/static/js/common/ui.js?v=[% cv %]"></script>
 
 <!-- Floating Back-to-Top + AI2 Editor buttons -->
-<script src="/static/js/floating-buttons.js?v=[% cv %]" defer></script>
+<script src="/static/js/floating-buttons.js?v=[% cv %]"></script>
 
 <!-- Chat widget (always present on normal pages) -->
 <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% cv %]">
-<script src="/static/js/nav-back.js?v=[% cv %]" defer></script>
+<script src="/static/js/nav-back.js?v=[% cv %]"></script>
 <script>
 window.AI_CHAT_USER_CONFIG = {
     username: '[% c.session.username || 'Guest' %]',
@@ -22,17 +22,17 @@ window.AI_CHAT_USER_CONFIG = {
     siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
 };
 </script>
-<script src="/static/js/ai-common.js?v=[% cv %]" defer></script>
-<script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-common.js?v=[% cv %]"></script>
+<script src="/static/js/local-chat.js?v=[% cv %]"></script>
 
 [%# AI2 Editing Widget (conditional) - only when show_code_editor_widget is true -%]
 [% IF c.stash.show_code_editor_widget %]
 <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
-<script src="/static/js/ai-editing-widget-float.js?v=20260616c" defer></script>
+<script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
 [% END %]
 
 [%# AI2 Editor popup scripts - only when ai_popup_mode or on the popup URL -%]
 [% IF c.stash.ai_popup_mode || c.req.uri.path.match('/ai2/editing_widget_popup') %]
-<script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/core.js?v=[% cv %]"></script>
+<script src="/static/js/ai2editor/popup.js?v=[% cv %]"></script>
 [% END %]
