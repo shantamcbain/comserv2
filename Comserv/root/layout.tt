@@ -24,10 +24,7 @@
 [% ELSIF c.stash.ai_popup_mode %]
     [%# Popup / detached-widget mode: render bare — no nav, no footer, no back-to-top %]
     [% content %]
-    [%- SET cv = c.stash.css_v || '1' -%]
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% cv %]">
-    <script src="/static/js/ai-common.js?v=[% cv %]"></script>
-    <script src="/static/js/local-chat.js?v=[% cv %]"></script>
+    [% INCLUDE 'js_load.tt' %]
 [% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
 [%# INCLUDE 'home.tt' %]
@@ -35,7 +32,7 @@
     [% content %]
     [% INCLUDE 'AdminNotes.tt' %]
     
-    <!-- Back to Top Button -->
+    <!-- Back to Top Button (JS-controlled via floating-buttons.js) -->
     <button id="back-to-top" title="Back to Top" aria-label="Back to Top">
         <i class="fas fa-arrow-up" aria-hidden="true"></i>
     </button>
@@ -46,27 +43,10 @@
         [% IF c.session.debug_mode == 1 %]<!-- footer.tt error: [% error.info %] -->[% END %]
     [% END %]
 
-    <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
-    [%- SET cv = c.stash.css_v || '1' -%]
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% cv %]">
-    <script src="/static/js/nav-back.js?v=[% cv %]"></script>
-    <script>
-    window.AI_CHAT_USER_CONFIG = {
-        username: '[% c.session.username || 'Guest' %]',
-        isGuest:  [% (c.session.username && !c.session.username.match('^Guest-')) ? 'false' : 'true' %],
-        isAdmin:  [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
-        isEditor: [% c.stash.is_editor ? 'true' : 'false' %],
-        siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
-    };
-    </script>
-    <script src="/static/js/ai-common.js?v=[% cv %]"></script>
-    <script src="/static/js/local-chat.js?v=[% cv %]"></script>
-    [% IF c.stash.show_code_editor_widget %]
-    <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
-    <script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
-    [% END %]
+    <!-- Centralized JS loader (replaces all inline script blocks) -->
+    [% INCLUDE 'js_load.tt' %]
 
-    <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->
+    <!-- AI Widget postMessage receiver (kept here for now; can be moved to a separate file later) -->
     <script>
     (function() {
         function applyFieldValue(name, value) {
