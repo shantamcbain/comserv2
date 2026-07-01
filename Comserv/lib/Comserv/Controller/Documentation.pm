@@ -41,12 +41,13 @@ sub _documentation_writable_config_dir {
         make_path($env_dir) unless -d $env_dir;
         return $env_dir if -d $env_dir && -w $env_dir;
     }
-    my $dir = $c && $c->can('path_to')
+        my $dir = $c && $c->can('path_to')
         ? $c->path_to('root', 'session', 'documentation_config')
-        : File::Spec->catdir($FindBin::Bin, '..', 'root', 'session', 'documentation_config');
+        : File::Spec->catdir($FindBin::Bin, 'root', 'session', 'documentation_config');
+
     # Defensive: only attempt mkdir if writable (Docker read-only mounts)
     if (!-d $dir) {
-        eval { make_path($dir) if -w File::Spec->catdir($FindBin::Bin, '..', 'root') };
+        eval { make_path($dir) if -w File::Spec->catdir($FindBin::Bin, 'root') };
     }
     return $dir;
 }
@@ -55,7 +56,7 @@ sub _documentation_config_shipped_path {
     my ($c) = @_;
     return $c && $c->can('path_to')
         ? $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json')
-        : File::Spec->catfile($FindBin::Bin, '..', 'root', 'Documentation', 'config', 'DocumentationConfig.json');
+        : File::Spec->catfile($FindBin::Bin, 'root', 'Documentation', 'config', 'DocumentationConfig.json');
 }
 
 sub _documentation_config_read_path {
