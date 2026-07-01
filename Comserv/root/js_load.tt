@@ -43,7 +43,7 @@
 
     LOADING RULES:
     - Always use defer (or type="module")
-    - Version with ?v=[% cv %] for cache busting
+    - Version with ?v=... for cache busting
     - Core + common first, then feature-specific
     - No blocking scripts in <head>
 
