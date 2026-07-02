@@ -204,14 +204,30 @@
         }
     }
 
-    // Boot when DOM ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initPopupEditor);
-    } else {
+    function initPopupSafe() {
+        const container = document.getElementById('ace-editor');
+        if (!container || container.dataset.initialized === '1') return;
+        container.dataset.initialized = '1';
         initPopupEditor();
     }
 
-    // Expose for debugging / future extension
-    window.AI2EditorPopup = { initPopupEditor };
+    function initAll() {
+        initPopupSafe();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAll);
+    } else {
+        initAll();
+    }
+    document.addEventListener('htmx:afterSwap', initAll);
+
+    window.showAiEditorPopup = function() {
+        const popup = document.querySelector('.ai2editor-popup');
+        if (popup) popup.style.display = 'block';
+        else window.open('/ai2/editing_widget_popup', '_blank');
+    };
+
+    window.AI2EditorPopup = { initPopupEditor, initPopupSafe };
 
 })();
