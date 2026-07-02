@@ -157,6 +157,19 @@
         NS
     };
 
+    function initCore() {
+        if (document.documentElement.dataset.ai2editorCore) return;
+        document.documentElement.dataset.ai2editorCore = '1';
+        console.log(`[${NS}] core initialized (idempotent)`);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCore);
+    } else {
+        initCore();
+    }
+    document.addEventListener('htmx:afterSwap', initCore);
+
     console.log(`[${NS}] core.js loaded`);
 
 })();

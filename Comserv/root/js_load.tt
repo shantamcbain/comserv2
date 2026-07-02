@@ -205,7 +205,7 @@
 [% END %]
 
 [%# --- MODERN AI2 EDITOR (new modular system) --- %]
-[% IF c.stash.ai_popup_mode || c.req.uri.path.match('/ai2/editing_widget_popup') %]
+[% IF c.stash.ai_popup_mode || c.request.uri.match('/ai2/') %]
 <script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/commit-ui.js?v=[% cv %]" defer></script>
