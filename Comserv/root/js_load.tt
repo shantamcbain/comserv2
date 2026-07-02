@@ -219,15 +219,16 @@
    STABLE FLOATING BUTTONS (theme-compliant via Bootstrap classes)
    ============================================================ %]
 
-[%# AI Editor button - lower left %]
-[% IF c.session.user_id %]
-<a href="/ai2/editing_widget_popup"
-   target="_blank"
-   class="btn btn-primary btn-sm"
-   style="position:fixed; bottom:90px; left:24px; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.3);"
-   title="Open AI2 Code Editor (v2)">
+[%# AI Editor button - lower left (HTMX, no inline JS/styles) %]
+[% IF c.session.user_id && !c.request.uri.match('/ai2/') %]
+<button class="btn btn-primary btn-sm ai2-float-btn"
+        hx-get="/ai2/editing_widget_popup"
+        hx-target="#ai2editor-popup-container"
+        hx-swap="innerHTML"
+        title="Open AI2 Code Editor (v2)">
     ✏️ AI Editor
-</a>
+</button>
+<div id="ai2editor-popup-container" class="ai2editor-popup" style="display:none;"></div>
 [% END %]
 
 [%# Chat with AI button - lower right %]

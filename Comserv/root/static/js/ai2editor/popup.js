@@ -61,6 +61,9 @@
             });
         }
 
+        // Focus editor after init
+        if (editorAdapter && editorAdapter.focus) editorAdapter.focus();
+
         // File tree click handlers
         document.querySelectorAll('.file-item').forEach(item => {
             item.addEventListener('click', () => {
