@@ -209,7 +209,11 @@
 <script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/commit-ui.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
+[% END %]
+
+[%# Floating AI2 Editor button — show on logged-in pages (opens the popup) %]
+[% IF c.session.user_id %]
+<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
 [% END %]
