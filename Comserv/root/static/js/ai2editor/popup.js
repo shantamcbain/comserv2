@@ -142,15 +142,20 @@
 
     /**
      * Sidebar panel logic (reuses global toggleSection when available)
+     * Works in both full page and standalone island mode.
      */
     function initSidebarPanels() {
+        const panelsContainer = document.getElementById('sidebar-panels');
+        if (!panelsContainer) return;
+
         let currentPanel = null;
 
         function showSidebarPanel(name) {
-            const panelsContainer = document.getElementById('sidebar-panels');
             const allPanels = panelsContainer.querySelectorAll('.sidebar-panel');
-            const target = document.getElementById('panel-' + name);
+            const targetId = 'panel-' + name;
+            const target = document.getElementById(targetId);
 
+            // Clear active states
             document.querySelectorAll('.sidebar-icon').forEach(el => el.classList.remove('active'));
 
             if (currentPanel === name) {
@@ -161,11 +166,10 @@
 
             allPanels.forEach(p => p.style.display = 'none');
 
-            // Prefer global helper
-            if (typeof window.toggleSection === 'function') {
-                window.toggleSection(target.id);
-            } else {
+            if (target) {
                 target.style.display = 'block';
+            } else {
+                console.warn(`[${NS}] Panel not found: #${targetId}`);
             }
 
             panelsContainer.style.display = 'block';
@@ -173,14 +177,74 @@
 
             const icon = document.querySelector(`.sidebar-icon[data-panel="${name}"]`);
             if (icon) icon.classList.add('active');
+
+            // Special handling for projects panel
+            if (name === 'projects') {
+                loadProjectFiles();
+            }
         }
 
-        document.querySelectorAll('.sidebar-icon').forEach(icon => {
-            icon.addEventListener('click', () => {
+        // Event delegation on sidebar container (works for dynamically added icons too)
+        const sidebar = document.getElementById('sidebar-icons');
+        if (sidebar) {
+            sidebar.addEventListener('click', function(ev) {
+                const icon = ev.target.closest('.sidebar-icon');
+                if (!icon) return;
                 const panelName = icon.getAttribute('data-panel');
-                if (panelName) showSidebarPanel(panelName);
+                if (panelName) {
+                    showSidebarPanel(panelName);
+                }
             });
+        }
+
+        // Also attach direct listeners (idempotent)
+        document.querySelectorAll('.sidebar-icon').forEach(icon => {
+            if (!icon.dataset.wired) {
+                icon.dataset.wired = '1';
+                icon.addEventListener('click', () => {
+                    const panelName = icon.getAttribute('data-panel');
+                    if (panelName) showSidebarPanel(panelName);
+                });
+            }
         });
+    }
+
+    /**
+     * Load project files into the projects panel (island-safe)
+     */
+    async function loadProjectFiles() {
+        const panel = document.getElementById('panel-projects');
+        if (!panel) return;
+
+        try {
+            const res = await fetch('/ai2/project_files');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const files = await res.json();
+
+            let html = '<h4 style="margin:0 0 8px 0; font-size:12px; color:#aaa;">PROJECTS</h4><ul class="file-tree">';
+            (files || []).forEach(f => {
+                html += `<li data-path="${f.path}" class="file-item">📄 ${f.name}</li>`;
+            });
+            html += '</ul>';
+            panel.innerHTML = html;
+
+            // Re-attach file click handlers
+            panel.querySelectorAll('.file-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const path = item.dataset.path;
+                    if (path && window.AI2EditorCore) {
+                        const statusEl = document.getElementById('file-status');
+                        const mtimeEl = document.getElementById('last-modified');
+                        loadAndDisplayFile(path, statusEl, mtimeEl);
+                    }
+                });
+            });
+
+            console.log(`[${NS}] Project files loaded`);
+        } catch (err) {
+            console.error(`[${NS}] loadProjectFiles error:`, err);
+            panel.innerHTML = '<div style="padding:12px;color:#f66;">Failed to load files</div>';
+        }
     }
 
     /**
@@ -212,6 +276,8 @@
         if (!container || container.dataset.initialized === '1') return;
         container.dataset.initialized = '1';
         initPopupEditor();
+        // Ensure sidebar icons are wired even in island mode
+        initSidebarPanels();
     }
 
     function initAll() {
