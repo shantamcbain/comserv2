@@ -213,7 +213,4 @@
 <script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
 [% END %]
 
-[%# Floating AI2 Editor button — show on logged-in pages (opens the popup) %]
-[% IF c.session.user_id %]
-<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
-[% END %]
+[%# Floating AI2 Editor button is now pure HTMX (no JS file) — see templates using hx-get + hx-on or <a target="_blank"> %]
