@@ -205,12 +205,26 @@
 [% END %]
 
 [%# --- MODERN AI2 EDITOR (new modular system) --- %]
-[% IF c.stash.ai_popup_mode || c.request.uri.match('/ai2/') %]
+[% IF c.stash.ai_popup_mode || c.request.uri.match('/ai2/editing_widget_popup') %]
+<!-- Ace CDN first (required by adapters) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.js" defer></script>
+<!-- AI2 modular stack -->
 <script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/commit-ui.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
+<!-- Island bootstrap -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.AI2EditorCore && typeof window.AI2EditorCore.initIslandPopup === 'function') {
+      window.AI2EditorCore.initIslandPopup();
+      console.log('%c[AI2Editor] Island init triggered from js_load.tt', 'color:#0af');
+    }
+  });
+</script>
 [% END %]
 
 [%# Floating AI2 Editor button is now pure HTMX (no JS file) — see templates using hx-get + hx-on or <a target="_blank"> %]

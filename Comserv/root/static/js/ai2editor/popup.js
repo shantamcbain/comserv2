@@ -233,4 +233,8 @@
 
     window.AI2EditorPopup = { initPopupEditor, initPopupSafe };
 
+    // Expose island entry point for core.js bootstrap
+    window.AI2EditorCore = window.AI2EditorCore || {};
+    window.AI2EditorCore.initIslandPopup = initPopupSafe;
+
 })();
