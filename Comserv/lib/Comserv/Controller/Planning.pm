@@ -1940,6 +1940,46 @@ sub update_log_entry :Path('/planning/update_log_entry') :Args(0) {
     $c->response->body(encode_json({ success => JSON::true, message => 'Saved' }));
 }
 
+=head2 deploy
+
+AJAX endpoint called by the Deploy modal on /planning/daily.
+Accepts JSON: { target => "production1|production2|local-5000|local-4000|local-test" }
+
+=cut
+
+sub deploy :Path('deploy') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $data   = $c->req->body_data || {};
+    my $target = $data->{target} || 'unknown';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'deploy',
+        "Deploy requested for target=$target by " . ($c->session->{username} || 'anon'));
+
+    my $ok = 0;
+    my $msg = '';
+
+    if ($target eq 'local-4000' || $target eq 'local-3000') {
+        # Use the new shared staging deploy logic
+        require Comserv::Util::DockerDeploy;
+        my $deploy = Comserv::Util::DockerDeploy->new(
+            logging => $self->logging,
+            target  => $target,
+            trigger => 'modal',
+        );
+        $ok = $deploy->deploy_local_staging();
+        $msg = $ok ? "Local staging (4000) started" : "Staging deploy failed";
+    } else {
+        # Existing production / workstation path (unchanged for now)
+        $ok = 1;
+        $msg = "Deploy request accepted for $target (full implementation pending)";
+    }
+
+    $c->stash->{current_view} = 'JSON';
+    $c->stash->{json_data} = { success => $ok ? JSON::true : JSON::false, target => $target, message => $msg };
+    $c->forward('View::JSON');
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

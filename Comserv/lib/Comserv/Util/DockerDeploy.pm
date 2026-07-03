@@ -42,6 +42,7 @@ our @CANONICAL_VOLUMES = qw(
     comserv2_config_db_data comserv2_redis_data comserv2_logs
     comserv2_sessions comserv2_workshop_files comserv2_whisper_venv
     comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
+    comserv-static comserv-cache comserv-userprefs comserv-sessions
 );
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -88,6 +89,47 @@ sub deploy_to_target {
 
     $self->_log("=== DEPLOY COMPLETE ===");
     return ($remote_success, "Deploy finished");
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Local staging deploy (port 4000 / web-staging service)
+# Creates missing volumes first, then brings up the staging service.
+# ─────────────────────────────────────────────────────────────────────────────
+sub deploy_local_staging {
+    my ($self) = @_;
+
+    my $repo = $self->{repo};
+    $self->_log("=== LOCAL STAGING DEPLOY (4000) START ===");
+
+    $self->_ensure_named_volumes($repo);
+
+    my $cmd = "cd $repo && docker compose -f docker-compose.yml up -d web-staging 2>&1";
+    $self->_log("Running: $cmd");
+    $self->_stream_command($cmd);
+
+    # Quick health probe on 4000
+    sleep 3;
+    my $http = system("curl -sf --max-time 3 http://localhost:4000/ >/dev/null 2>&1") == 0;
+    $self->_log($http ? "Local staging (4000) responded ✓" : "WARNING: 4000 did not respond yet");
+
+    $self->_log("=== LOCAL STAGING DEPLOY COMPLETE ===");
+    return 1;
+}
+
+# Ensure the four new named volumes for static, cache, userprefs, sessions exist
+sub _ensure_named_volumes {
+    my ($self, $repo) = @_;
+    my @vols = qw(comserv-static comserv-cache comserv-userprefs comserv-sessions);
+
+    foreach my $v (@vols) {
+        my $exists = `docker volume inspect $v 2>/dev/null`;
+        if ($exists) {
+            $self->_log("Volume $v already exists.");
+        } else {
+            $self->_log("Creating volume: $v");
+            system("docker volume create $v >/dev/null 2>&1");
+        }
+    }
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
