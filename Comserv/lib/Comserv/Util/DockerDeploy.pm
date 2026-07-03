@@ -106,7 +106,13 @@ sub deploy_local_staging {
     my ($vol_ok, $created) = $self->ensure_all_required_volumes($repo);
     $self->_log("Volumes ensured: " . (@$created ? join(', ', @$created) : "none created (all existed)"));
 
-    my $cmd = "cd $repo && docker compose -f docker-compose.yml up -d web-staging 2>&1";
+    # Build (or rebuild) the image so code changes are picked up
+    my $build_cmd = "cd $repo && docker compose -f docker-compose.yml build web-staging 2>&1";
+    $self->_log("Running: $build_cmd");
+    $self->_stream_command($build_cmd);
+
+    # Start / restart the staging service
+    my $cmd = "cd $repo && docker compose -f docker-compose.yml up -d --force-recreate web-staging 2>&1";
     $self->_log("Running: $cmd");
     $self->_stream_command($cmd);
 
