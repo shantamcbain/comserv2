@@ -110,35 +110,45 @@ services:
     restart: unless-stopped
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-staging}
-      PORT: 3000
+      PORT: 4000
       CATALYST_ENV: ${CATALYST_ENV:-staging}
       CATALYST_DEBUG: ${CATALYST_DEBUG:-0}
-      WEB_PORT: 3000
+      WEB_PORT: 4000
       TZ: UTC
       NFS_DATA_PATH: /data/nfs
       COMSERV_LOG_DIR: /opt/comserv/root/log
     ports:
-      - "4000:3000"
+      - "4000:4000"
     volumes:
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      # Core comserv2_* volumes (standardized across all environments)
       - comserv2_logs:/opt/comserv/root/log
       - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_sessions:/tmp/comserv/session:rw
       - comserv2_whisper_venv:/opt/comserv/whisper_venv
       - comserv2_cpan_cache:/root/.cpan
       - comserv2_cache:/cache
       - comserv2_temp:/tmp/comserv/temp
       - comserv2_themes:/opt/comserv/root/themes
+      # Legacy comserv-* volumes for static, cache, userprefs, sessions
       - comserv-static:/opt/comserv/root/static:rw
       - comserv-cache:/opt/comserv/root/cache:rw
       - comserv-userprefs:/opt/comserv/root/userprefs:rw
       - comserv-sessions:/opt/comserv/root/sessions:rw
-    command: ["starman", "--listen", ":3000", "--workers", "4", "--preload-app", "script/comserv_server.pl"]
+    # Startup command that ensures volumes then starts the app
+    command: >
+      sh -c "
+        if [ -x /opt/comserv/script/setup_volumes.sh ]; then
+          /opt/comserv/script/setup_volumes.sh || true;
+        fi;
+        exec starman --listen :4000 --workers 4 --preload-app script/comserv_server.pl
+      "
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || curl -f http://127.0.0.1:3000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      test: ["CMD-SHELL", "curl -f http://localhost:4000/health || curl -f http://127.0.0.1:4000/health || curl -f http://localhost:4000/ || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 4
+      start_period: 30s
     logging:
       driver: "json-file"
       options:
