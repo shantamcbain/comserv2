@@ -422,7 +422,10 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             trigger  => $trigger,
             target   => $target,
         );
-        my ($success, $msg) = $deployer->deploy_to_target();
+        # Always use the safe wrapper so every target (including local-staging) ensures volumes first
+        my ($success, $msg) = $deployer->deploy_to_target_safe
+            ? (1, "Deploy finished")
+            : (0, "Deploy failed");
 
         close($log);
         unlink($pid_file);
