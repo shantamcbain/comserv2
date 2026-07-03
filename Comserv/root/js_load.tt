@@ -197,19 +197,23 @@
       - Loaded for ai_popup_mode or /ai2/ routes
       - All new development must use this path
 ============================================================ %]
-
-[%# --- LEGACY WIDGET (only when explicitly requested) --- %]
-[% IF c.stash.show_code_editor_widget %]
-<link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
-<script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
+<script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
+[%# AI Editor Button (v2) - Separate Window %]
+[% IF c.session.user_id && !c.request.uri.match('/ai2/') %]
+<button class="btn btn-primary btn-sm ai2-float-btn"
+        onclick="openAI2EditorWindow()"
+        title="Open AI2 Code Editor (v2)">
+    ✏️ AI Editor
+</button>
 [% END %]
 
-[%# --- MODERN AI2 EDITOR (new modular system) --- %]
-[% IF c.stash.ai_popup_mode || c.req.uri.path.match('/ai2/editing_widget_popup') %]
-<script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/commit-ui.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
+[%# Chat with AI button - lower right %]
+[% IF c.session.user_id && !c.request.uri.match('/ai2/editing_widget_popup')%]
+<a href="#"
+   onclick="if(window.openLocalChat) window.openLocalChat(); else alert('Chat loading...'); return false;"
+   class="btn btn-success btn-sm"
+   style="position:fixed; bottom:24px; right:24px; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.3); border-radius:20px;"
+   title="Chat with AI">
+    💬 Chat with AI
+</a>
 [% END %]

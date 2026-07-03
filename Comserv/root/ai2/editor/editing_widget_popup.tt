@@ -169,5 +169,6 @@
     </div>
 
     <!-- Scripts loaded centrally via js_load.tt when ai_popup_mode is active -->
+    [% INCLUDE js_load.tt %]
 </body>
 </html>

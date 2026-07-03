@@ -157,6 +157,50 @@
         NS
     };
 
+    function initCore() {
+        if (document.documentElement.dataset.ai2editorCore) return;
+        document.documentElement.dataset.ai2editorCore = '1';
+        console.log(`[${NS}] core initialized (idempotent)`);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCore);
+    } else {
+        initCore();
+    }
+    document.addEventListener('htmx:afterSwap', initCore);
+
+    // Island bootstrap helper (called from js_load.tt)
+    let islandTries = 0;
+    function initIslandPopup() {
+        const container = document.getElementById('ace-editor');
+        if (!container) {
+            if (islandTries < 1) {
+                islandTries++;
+                setTimeout(initIslandPopup, 300);
+            }
+            return;
+        }
+        if (container.dataset.initialized === '1') return;
+        container.dataset.initialized = '1';
+
+        if (typeof ace === 'undefined') {
+            console.warn(`[${NS}] Ace not ready, retrying...`);
+            setTimeout(initIslandPopup, 400);
+            return;
+        }
+
+        // Delegate to popup.js if present
+        if (window.AI2EditorPopup && typeof window.AI2EditorPopup.initPopupEditor === 'function') {
+            window.AI2EditorPopup.initPopupEditor();
+            console.log(`[${NS}] Island popup initialized via popup.js`);
+        } else {
+            console.log(`[${NS}] popup.js not ready for island init`);
+        }
+    }
+
+    window.AI2EditorCore.initIslandPopup = initIslandPopup;
+
     console.log(`[${NS}] core.js loaded`);
 
 })();
