@@ -197,56 +197,18 @@
       - Loaded for ai_popup_mode or /ai2/ routes
       - All new development must use this path
 ============================================================ %]
-
-[%# --- LEGACY WIDGET (only when explicitly requested) --- %]
-[% IF c.stash.show_code_editor_widget %]
-<link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
-<script src="/static/js/ai-editing-widget-float.js?v=20260616c"></script>
-[% END %]
-
-[%# --- MODERN AI2 EDITOR (new modular system) --- %]
-[% IF c.stash.ai_popup_mode || c.request.uri.match('/ai2/editing_widget_popup') %]
-<!-- Ace CDN first (required by adapters) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.js" defer></script>
-<!-- AI2 modular stack -->
-<script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/commit-ui.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/floating-button.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
-<script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
-<!-- Island bootstrap -->
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    if (window.AI2EditorCore && typeof window.AI2EditorCore.initIslandPopup === 'function') {
-      window.AI2EditorCore.initIslandPopup();
-      console.log('%c[AI2Editor] Island init triggered from js_load.tt', 'color:#0af');
-    }
-  });
-</script>
-[% END %]
-
-[%# Floating AI2 Editor button is now pure HTMX (no JS file) — see templates using hx-get + hx-on or <a target="_blank"> %]
-
-[%# ============================================================
-   STABLE FLOATING BUTTONS (theme-compliant via Bootstrap classes)
-   ============================================================ %]
-
-[%# AI Editor button - lower left (HTMX, no inline JS/styles) %]
+[%# AI Editor Button (v2) - Separate Window %]
 [% IF c.session.user_id && !c.request.uri.match('/ai2/') %]
 <button class="btn btn-primary btn-sm ai2-float-btn"
-        hx-get="/ai2/editing_widget_popup"
-        hx-target="#ai2editor-popup-container"
-        hx-swap="innerHTML"
+        onclick="openAI2EditorWindow()"
         title="Open AI2 Code Editor (v2)">
     ✏️ AI Editor
 </button>
-<div id="ai2editor-popup-container" class="ai2editor-popup" style="display:none;"></div>
 [% END %]
 
 [%# Chat with AI button - lower right %]
-[% IF c.session.user_id %]
+[% IF c.session.user_id && !c.request.uri.match('/ai2/editing_widget_popup')%]
 <a href="#"
    onclick="if(window.openLocalChat) window.openLocalChat(); else alert('Chat loading...'); return false;"
    class="btn btn-success btn-sm"

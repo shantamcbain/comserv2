@@ -13,5 +13,16 @@
 @import url('components/forms.css');
 @import url('components/tables.css');
 /* Project cards CSS is loaded separately in the controller */
-
+.ai2editor-popup {
+    position: fixed;
+    background: white;
+    border: 3px solid #007bff;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    z-index: 9999;
+    overflow: auto;
+    display: none;
+    padding: 20px;
+    min-width: 600px;
+    min-height: 400px;
+}
 /* Note: Theme CSS will be loaded separately based on site selection */
