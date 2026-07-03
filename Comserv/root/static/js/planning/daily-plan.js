@@ -334,4 +334,83 @@
         panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
     };
 
+    // === Deploy button handler (centralized, no inline JS) ===
+    function attachDeployHandler() {
+        var btn = document.getElementById('dl-deploy-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openDeployModal();
+        });
+        document.addEventListener('keydown', function(ev) {
+            if (!window._deployModal) return;
+            var key = ev.key.toUpperCase();
+            var map = {'1':'production1','2':'production2','3':'local-5000','4':'local-4000','B':'local-test'};
+            if (map[key]) {
+                ev.preventDefault();
+                triggerDeploy(map[key]);
+                if (window._deployModal && window._deployModal.parentNode) window._deployModal.parentNode.removeChild(window._deployModal);
+                window._deployModal = null;
+            }
+            if (key === 'ESCAPE' || key === 'ESC') {
+                if (window._deployModal && window._deployModal.parentNode) window._deployModal.parentNode.removeChild(window._deployModal);
+                window._deployModal = null;
+            }
+        });
+    }
+
+    function openDeployModal() {
+        var modal = document.createElement('div');
+        modal.className = 'deploy-modal-overlay';
+        modal.innerHTML =
+            '<div class="deploy-modal">' +
+            '<h3 class="deploy-modal-title">Choose Deployment Target</h3>' +
+            '<div class="deploy-option" data-target="production1"><strong>[1] FULL DEPLOY → production1</strong><br><span class="deploy-desc">Rebuilds, pushes to Docker Hub, restarts production1 container</span></div>' +
+            '<div class="deploy-option" data-target="production2"><strong>[2] FULL DEPLOY → production2</strong><br><span class="deploy-desc">Rebuilds, pushes to Docker Hub, restarts production2 container</span></div>' +
+            '<div class="deploy-option" data-target="local-5000"><strong>[3] Deploy to Local 5000 (production-like)</strong><br><span class="deploy-desc">Deploys the production image to the local port 5000 server</span></div>' +
+            '<div class="deploy-option" data-target="local-4000"><strong>[4] Deploy to Local 4000 (staging)</strong><br><span class="deploy-desc">Deploys to the new local 4000 staging server for testing before local 5000</span></div>' +
+            '<div class="deploy-option" data-target="local-test"><strong>[B] Build &amp; test locally only (no deploy)</strong><br><span class="deploy-desc">Builds and tests the image locally without pushing or deploying</span></div>' +
+            '<div class="deploy-modal-actions"><button type="button" class="btn btn-secondary deploy-cancel">Cancel</button></div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        window._deployModal = modal;
+
+        modal.querySelectorAll('.deploy-option').forEach(function(el){
+            el.addEventListener('click', function(){
+                var t = el.getAttribute('data-target');
+                modal.parentNode.removeChild(modal);
+                window._deployModal = null;
+                triggerDeploy(t);
+            });
+        });
+        modal.querySelector('.deploy-cancel').addEventListener('click', function(){
+            modal.parentNode.removeChild(modal);
+            window._deployModal = null;
+        });
+    }
+
+    function triggerDeploy(target) {
+        console.log('[Deploy] Selected target:', target);
+        fetch('/planning/deploy', {
+            method:'POST', credentials:'include',
+            headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({target: target})
+        }).then(function(r){return r.json();}).then(function(d){
+            if (d.success) { console.log('[Deploy] Success:', d.message||d); alert('Deploy initiated: '+(d.message||target)); }
+            else { console.error('[Deploy] Error:', d.error||d); alert('Deploy failed: '+(d.error||'Unknown error')); }
+        }).catch(function(e){ console.error('[Deploy] Network error:', e); alert('Deploy request failed: '+e); });
+    }
+
+    // Attach immediately (script uses defer so DOM is ready)
+    attachDeployHandler();
+
+    // Safety net: if button is added later (e.g. via partials), re-attach on click anywhere
+    document.addEventListener('click', function(ev){
+        if (ev.target && ev.target.id === 'dl-deploy-btn' && !ev.target._deployHooked) {
+            ev.target._deployHooked = true;
+            ev.preventDefault();
+            openDeployModal();
+        }
+    }, true);
+
 })();
