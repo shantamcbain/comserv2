@@ -8,11 +8,6 @@
     [% CATCH %]
         [% # Silently ignore errors with DefaultDBI.tt %]
     [% END %]
-    [% TRY %]
-        [% INCLUDE 'setup/DefaultVariables.tt' %]
-    [% CATCH %]
-        [% # Silently ignore errors with DefaultVariables.tt %]
-    [% END %]
 
 [% IF c.session.debug_mode == 1 %]
  [% PageVersion %]

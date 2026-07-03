@@ -147,7 +147,7 @@
                         title="Audit system errors, check HelpDesk tickets, create daily log">🌅 Start Day</button>
                 <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
                 [% IF is_admin && (SiteName == 'CSC' || c.session.SiteName == 'CSC') %]
-                <button class="dl-btn" id="dl-deploy-btn" onclick="openDeployPopup(null)"
+                <button class="dl-btn" id="dl-deploy-btn"
                         style="background:#005a8e;color:#fff;"
                         title="git pull + docker restart — opens deploy log popup">🐳 Deploy</button>
                 [% END %]
@@ -1234,7 +1234,6 @@ function closeBranchModal() {
     document.getElementById('branch-start-modal').style.display = 'none';
 }
 
-function openDeployPopup(todoId) {
     // Ensure todoId is a proper value or empty string
     var safeId = (todoId === null || todoId === undefined) ? '' : todoId;
     
