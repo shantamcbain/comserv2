@@ -116,20 +116,53 @@ sub deploy_local_staging {
     return 1;
 }
 
-# Ensure the four new named volumes for static, cache, userprefs, sessions exist
-sub _ensure_named_volumes {
+# Ensure all required named volumes exist (comserv2_* + legacy comserv-*)
+# Returns (success, list_of_created)
+sub ensure_all_required_volumes {
     my ($self, $repo) = @_;
-    my @vols = qw(comserv-static comserv-cache comserv-userprefs comserv-sessions);
 
-    foreach my $v (@vols) {
+    my @required = qw(
+        comserv2_config_db_data comserv2_redis_data comserv2_logs
+        comserv2_sessions comserv2_workshop_files comserv2_whisper_venv
+        comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
+        comserv-static comserv-cache comserv-userprefs comserv-sessions
+    );
+
+    my @created;
+    foreach my $v (@required) {
         my $exists = `docker volume inspect $v 2>/dev/null`;
         if ($exists) {
-            $self->_log("Volume $v already exists.");
+            $self->_log("Volume OK: $v");
         } else {
-            $self->_log("Creating volume: $v");
-            system("docker volume create $v >/dev/null 2>&1");
+            $self->_log("Creating missing volume: $v");
+            my $rc = system("docker volume create $v >/dev/null 2>&1");
+            if ($rc == 0) {
+                push @created, $v;
+            } else {
+                $self->_error("Failed to create volume: $v");
+            }
         }
     }
+
+    # Quick accessibility probe (ls inside a temp container)
+    $self->_log("Verifying volume accessibility...");
+    foreach my $v (@required) {
+        my $probe = `docker run --rm -v $v:/vol busybox ls /vol 2>/dev/null | head -1`;
+        chomp $probe;
+        if ($probe || $? == 0) {
+            $self->_log("  $v accessible");
+        } else {
+            $self->_log("  WARNING: $v may not be mountable");
+        }
+    }
+
+    return (1, \@created);
+}
+
+# Legacy wrapper kept for backward compatibility
+sub _ensure_named_volumes {
+    my ($self, $repo) = @_;
+    $self->ensure_all_required_volumes($repo);
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

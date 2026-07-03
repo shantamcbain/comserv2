@@ -199,6 +199,38 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         my $nfs_compose  = "$repo_path/Comserv/docker-compose.prod.nfs.yml";
         my $container    = 'comserv-web-prod';
 
+        # NEW: Support local staging deploy to port 4000 (web-staging service)
+        my $target = $c->req->body_params->{target} || '';
+        if ($target eq 'local-staging' || $target eq 'staging-4000') {
+            push @lines, "[${\scalar localtime}] LOCAL STAGING DEPLOY (4000) requested";
+            require Comserv::Util::DockerDeploy;
+            my $deploy = Comserv::Util::DockerDeploy->new(
+                log_fh  => undef,
+                logging => $self->logging,
+                repo    => "$repo_path/Comserv",
+                target  => 'local-staging',
+                trigger => $trigger_source,
+            );
+            $deploy->ensure_all_required_volumes("$repo_path/Comserv");
+            my $staging_cmd = "cd '$repo_path/Comserv' && docker compose -f docker-compose.yml up -d web-staging 2>&1";
+            my $staging_out = `$staging_cmd`;
+            push @lines, $staging_out;
+            $success = ($? >> 8) == 0;
+            push @lines, "[${\scalar localtime}] Staging deploy to 4000 complete.";
+            # Early return for staging
+            my $elapsed = time() - $t0;
+            $c->response->body(encode_json({
+                success => $success ? 1 : 0,
+                message => $success ? 'Staging deploy complete' : 'Staging deploy had errors',
+                log_id  => $log_id,
+                output  => join("\n", @lines),
+                title   => $title,
+                server_role => $server_role,
+                trigger_source => $trigger_source,
+            }));
+            return;
+        }
+
         # Determine compose file list
         my @compose_files = ('-f', $base_compose, '-f', $prod_compose);
         if (-f $nfs_compose && $server_role eq 'production1') {
