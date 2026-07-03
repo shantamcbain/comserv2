@@ -101,6 +101,50 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  web-staging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shantamcsbain/comserv-web-prod:latest
+    container_name: comserv2-web-staging
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-staging}
+      PORT: 3000
+      CATALYST_ENV: ${CATALYST_ENV:-staging}
+      CATALYST_DEBUG: ${CATALYST_DEBUG:-0}
+      WEB_PORT: 3000
+      TZ: UTC
+      NFS_DATA_PATH: /data/nfs
+      COMSERV_LOG_DIR: /opt/comserv/root/log
+    ports:
+      - "4000:3000"
+    volumes:
+      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - comserv2_logs:/opt/comserv/root/log
+      - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_whisper_venv:/opt/comserv/whisper_venv
+      - comserv2_cpan_cache:/root/.cpan
+      - comserv2_cache:/cache
+      - comserv2_temp:/tmp/comserv/temp
+      - comserv2_themes:/opt/comserv/root/themes
+      - comserv-static:/opt/comserv/root/static:rw
+      - comserv-cache:/opt/comserv/root/cache:rw
+      - comserv-userprefs:/opt/comserv/root/userprefs:rw
+      - comserv-sessions:/opt/comserv/root/sessions:rw
+    command: ["starman", "--listen", ":3000", "--workers", "4", "--preload-app", "script/comserv_server.pl"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || curl -f http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
 volumes:
   comserv2_config_db_data:
     driver: local
@@ -121,4 +165,12 @@ volumes:
   comserv2_themes:
     driver: local
   comserv2_cache:
+    driver: local
+  comserv-static:
+    driver: local
+  comserv-cache:
+    driver: local
+  comserv-userprefs:
+    driver: local
+  comserv-sessions:
     driver: local
