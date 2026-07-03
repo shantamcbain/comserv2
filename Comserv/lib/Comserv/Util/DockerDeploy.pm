@@ -93,7 +93,8 @@ sub deploy_to_target {
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Local staging deploy (port 4000 / web-staging service)
-# Creates missing volumes first, then brings up the staging service.
+# Ensures ALL required volumes exist first (shared helper), then brings up staging.
+# Always safe to call — idempotent volume creation + accessibility check.
 # ─────────────────────────────────────────────────────────────────────────────
 sub deploy_local_staging {
     my ($self) = @_;
@@ -101,19 +102,36 @@ sub deploy_local_staging {
     my $repo = $self->{repo};
     $self->_log("=== LOCAL STAGING DEPLOY (4000) START ===");
 
-    $self->_ensure_named_volumes($repo);
+    # Always ensure every required volume exists before any deploy
+    my ($vol_ok, $created) = $self->ensure_all_required_volumes($repo);
+    $self->_log("Volumes ensured: " . (@$created ? join(', ', @$created) : "none created (all existed)"));
 
     my $cmd = "cd $repo && docker compose -f docker-compose.yml up -d web-staging 2>&1";
     $self->_log("Running: $cmd");
     $self->_stream_command($cmd);
 
     # Quick health probe on 4000
-    sleep 3;
-    my $http = system("curl -sf --max-time 3 http://localhost:4000/ >/dev/null 2>&1") == 0;
-    $self->_log($http ? "Local staging (4000) responded ✓" : "WARNING: 4000 did not respond yet");
+    sleep 4;
+    my $http = system("curl -sf --max-time 4 http://localhost:4000/ >/dev/null 2>&1") == 0;
+    $self->_log($http ? "Local staging (4000) responded ✓" : "WARNING: 4000 did not respond yet (may still be starting)");
 
     $self->_log("=== LOCAL STAGING DEPLOY COMPLETE ===");
     return 1;
+}
+
+# Public entry point used by controllers / modal actions.
+# Always ensures volumes first for any target.
+sub deploy_to_target_safe {
+    my ($self) = @_;
+    my $target = $self->{target};
+
+    if ($target eq 'local-staging' || $target eq 'staging-4000') {
+        return $self->deploy_local_staging();
+    }
+
+    # For all other targets fall back to the existing full deploy path
+    # (which also calls volume checks internally)
+    return $self->deploy_to_target();
 }
 
 # Ensure all required named volumes exist (comserv2_* + legacy comserv-*)

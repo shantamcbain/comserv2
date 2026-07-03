@@ -211,11 +211,10 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
                 target  => 'local-staging',
                 trigger => $trigger_source,
             );
-            $deploy->ensure_all_required_volumes("$repo_path/Comserv");
-            my $staging_cmd = "cd '$repo_path/Comserv' && docker compose -f docker-compose.yml up -d web-staging 2>&1";
-            my $staging_out = `$staging_cmd`;
-            push @lines, $staging_out;
-            $success = ($? >> 8) == 0;
+            # Use the shared safe entry point (ensures volumes first for any target)
+            my $ok = $deploy->deploy_to_target_safe();
+            push @lines, "[${\scalar localtime}] deploy_to_target_safe returned: " . ($ok ? "success" : "error");
+            $success = $ok;
             push @lines, "[${\scalar localtime}] Staging deploy to 4000 complete.";
             # Early return for staging
             my $elapsed = time() - $t0;
