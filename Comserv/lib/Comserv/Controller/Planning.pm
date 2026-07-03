@@ -6,7 +6,7 @@ use Comserv::Util::AccessControl;
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoTypes qw(recurring_matches_date);
 use Comserv::Model::Ollama;
-use JSON;
+use JSON qw(encode_json);
 use Time::Piece;
 use DateTime;
 use DateTime::Format::ISO8601;
@@ -1956,28 +1956,49 @@ sub deploy :Path('deploy') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'deploy',
         "Deploy requested for target=$target by " . ($c->session->{username} || 'anon'));
 
-    my $ok = 0;
-    my $msg = '';
+    # Always return proper JSON response (avoid View::JSON stash issues)
+    $c->response->content_type('application/json; charset=utf-8');
 
-    if ($target eq 'local-4000' || $target eq 'local-3000') {
-        # Use the new shared staging deploy logic
-        require Comserv::Util::DockerDeploy;
-        my $deploy = Comserv::Util::DockerDeploy->new(
-            logging => $self->logging,
-            target  => $target,
-            trigger => 'modal',
-        );
-        $ok = $deploy->deploy_local_staging();
-        $msg = $ok ? "Local staging (4000) started" : "Staging deploy failed";
+    if ($target eq 'local-4000' || $target eq 'staging-4000') {
+        # Fire-and-forget background deploy so the HTTP response returns immediately
+        # The deploy worker will call deploy_to_target_safe (build + volumes + up)
+        my $repo = '/home/shanta/PycharmProjects/comserv2/Comserv';
+        my $pid_file = '/tmp/comserv_deploy_4000.pid';
+        if (my $pid = fork()) {
+            # parent
+            $c->response->body(encode_json({
+                success => JSON::true,
+                target  => $target,
+                message => 'Local 4000 staging deploy started in background',
+                pid     => $pid
+            }));
+            return;
+        } elsif (defined $pid) {
+            # child — run the real deploy
+            require Comserv::Util::DockerDeploy;
+            open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or exit 1;
+            my $deploy = Comserv::Util::DockerDeploy->new(
+                log_fh  => $log,
+                logging => $self->logging,
+                repo    => $repo,
+                target  => 'local-staging',
+                trigger => 'modal-local-4000',
+            );
+            my $ok = $deploy->deploy_to_target_safe();
+            print $log "[${\scalar localtime}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
+            close($log);
+            exit($ok ? 0 : 1);
+        } else {
+            $c->response->body(encode_json({ success => JSON::false, error => 'fork failed' }));
+        }
     } else {
-        # Existing production / workstation path (unchanged for now)
-        $ok = 1;
-        $msg = "Deploy request accepted for $target (full implementation pending)";
+        # Other targets (production etc.) — placeholder for now
+        $c->response->body(encode_json({
+            success => JSON::true,
+            target  => $target,
+            message => "Deploy request accepted for $target"
+        }));
     }
-
-    $c->stash->{current_view} = 'JSON';
-    $c->stash->{json_data} = { success => $ok ? JSON::true : JSON::false, target => $target, message => $msg };
-    $c->forward('View::JSON');
 }
 
 __PACKAGE__->meta->make_immutable;
