@@ -392,34 +392,6 @@
     function triggerDeploy(target) {
         console.log('[Deploy] Selected target:', target);
 
-        // For local-4000 we open the existing deploy log viewer (DailyPlan.tt)
-        // so the user sees live progress.  Other targets keep the simple alert.
-        if (target === 'local-4000' || target === 'staging-4000') {
-            // Reuse the already-implemented deploy modal + polling UI
-            // by programmatically clicking the existing "Deploy" button
-            // which opens the full-featured log window.
-            var realBtn = document.getElementById('dl-deploy-btn');
-            if (realBtn) {
-                realBtn.click();
-                // After modal opens, auto-select the 4000 option if possible
-                setTimeout(function(){
-                    var opt = document.querySelector('.deploy-option[data-target="local-4000"]');
-                    if (opt) opt.click();
-                }, 300);
-            } else {
-                // Fallback: direct fetch + simple alert
-                fetch('/planning/deploy', {
-                    method:'POST', credentials:'include',
-                    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-                    body: JSON.stringify({target: target})
-                }).then(function(r){return r.json();}).then(function(d){
-                    if (d.success) alert('Local 4000 deploy started in background. Check /tmp/comserv_deploy_4000.log');
-                    else alert('Deploy failed: '+(d.error||'Unknown'));
-                });
-            }
-            return;
-        }
-
         fetch('/planning/deploy', {
             method:'POST', credentials:'include',
             headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},

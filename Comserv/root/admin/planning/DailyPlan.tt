@@ -189,9 +189,9 @@
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
-                <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')"
+                <button class="dl-btn dl-btn-start" id="dl-start-btn" data-action="start-day"
                         title="Audit system errors, check HelpDesk tickets, create daily log">🌅 Start Day</button>
-                <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
+                <button class="dl-btn dl-btn-end" id="dl-end-btn" data-action="end-day">🌙 End Day</button>
                 [% IF is_admin && (SiteName == 'CSC' || c.session.SiteName == 'CSC') %]
                 <button class="dl-btn" id="dl-deploy-btn"
                         style="background:#005a8e;color:#fff;"
@@ -227,15 +227,15 @@
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;min-width:120px;">
-          <button onclick="saveLogEntry([% open_log_entry.record_id %])"
+          <button data-save-log="[% open_log_entry.record_id %]"
                   style="padding:7px 14px;background:#2a7a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em;">
             💾 Save Notes
           </button>
-          <button onclick="dailyLogAction('end')"
+          <button data-action="end-day"
                   style="padding:7px 14px;background:#555;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em;">
             🌙 Close Day
           </button>
-          <button onclick="document.getElementById('log-panel').style.display='none'"
+          <button data-action="dismiss-log-panel"
                   style="padding:7px 14px;background:#eee;color: var(--text-color, #333);border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.9em;">
             ✖ Dismiss
           </button>
@@ -247,29 +247,29 @@
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
-        <button class="tab-button active" onclick="switchTab(event, 'today-work')">
+        <button class="tab-button active" data-tab="today-work">
             DAILY PRIORITIES
         </button>
-        <button class="tab-button" onclick="switchTab(event, 'daily-schedule')">
+        <button class="tab-button" data-tab="daily-schedule">
             🕐 DAILY SCHEDULE
         </button>
-        <button class="tab-button" onclick="switchTab(event, 'weekly-view')">
+        <button class="tab-button" data-tab="weekly-view">
             📅 THIS WEEK
         </button>
-        <button class="tab-button" onclick="switchTab(event, 'month-view')">
+        <button class="tab-button" data-tab="month-view">
             MONTH VIEW
         </button>
-        <button class="tab-button" onclick="switchTab(event, 'planning')">
+        <button class="tab-button" data-tab="planning">
             PLANNING
         </button>
-        <button class="tab-button" onclick="switchTab(event, 'gantt-view')">
+        <button class="tab-button" data-tab="gantt-view">
             📊 GANTT
         </button>
-        <button class="tab-button" onclick="switchTab(event, 'resources-view')">
+        <button class="tab-button" data-tab="resources-view">
             RESOURCES & CONTEXT
         </button>
         [% IF is_csc %]
-        <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
+        <button class="tab-button" data-tab="project-planning">
             DAILY PLAN GUIDE
         </button>
         [% END %]
@@ -378,93 +378,8 @@
             <div id="gantt-chart" style="min-width:700px;"></div>
         </div>
 
-        <script>
-        (function() {
-            var projects = [
-                [% FOREACH p IN planning_projects %]
-                {
-                    id: [% p.id %],
-                    name: "[% p.name %]",
-                    sitename: "[% p.sitename %]",
-                    status: "[% p.status %]",
-                    start_date: [% p.start_date ? ('"' _ p.start_date _ '"') : 'null' %],
-                    end_date:   [% p.end_date   ? ('"' _ p.end_date   _ '"') : 'null' %]
-                }[% UNLESS loop.last %],[% END %]
-                [% END %]
-            ];
-
-            var now = new Date();
-            var windowStart = new Date(now);
-            windowStart.setMonth(windowStart.getMonth() - 3);
-            var windowEnd = new Date(now);
-            windowEnd.setMonth(windowEnd.getMonth() + 9);
-            var totalMs = windowEnd - windowStart;
-
-            var statusColor = {
-                'In-Process': '#17a2b8',
-                'active':     '#17a2b8',
-                'Completed':  '#28a745',
-                'completed':  '#28a745',
-                'On Hold':    '#dc3545',
-                'paused':     '#dc3545'
-            };
-
-            function toDate(s) { return s ? new Date(s) : null; }
-            function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-            function pct(d) { return clamp(((d - windowStart) / totalMs) * 100, 0, 100); }
-
-            // Build month-label header
-            var header = '<div style="display:flex;font-size:0.7em;color:var(--text-muted-color);margin-bottom:4px;padding-left:200px;">';
-            var m = new Date(windowStart);
-            m.setDate(1);
-            while (m <= windowEnd) {
-                var leftPct = pct(m);
-                header += '<div style="position:absolute;left:calc(200px + ' + leftPct + '%);transform:translateX(-50%);white-space:nowrap;">'
-                         + m.toLocaleString('default',{month:'short'}) + ' ' + m.getFullYear() + '</div>';
-                m.setMonth(m.getMonth() + 1);
-            }
-            header += '</div>';
-
-            var todayPct = pct(now);
-
-            var rows = '';
-            var grouped = {};
-            projects.forEach(function(p) { var s = p.sitename||'Other'; (grouped[s]=grouped[s]||[]).push(p); });
-
-            Object.keys(grouped).sort().forEach(function(site) {
-                if (projects.length > 1 && Object.keys(grouped).length > 1) {
-                    rows += '<div style="font-size:0.78em;font-weight:bold;padding:6px 0 2px;color:var(--text-muted-color);">🌐 ' + site + '</div>';
-                }
-                grouped[site].forEach(function(p) {
-                    var sd = toDate(p.start_date);
-                    var ed = toDate(p.end_date);
-                    var barColor = statusColor[p.status] || '#6c757d';
-
-                    var barLeft = sd ? pct(sd) : pct(now) - 1;
-                    var barRight = ed ? pct(ed) : pct(now) + 2;
-                    if (!sd && !ed) { barLeft = todayPct - 0.5; barRight = todayPct + 2; }
-                    if (barRight <= barLeft) barRight = barLeft + 2;
-                    var barWidth = barRight - barLeft;
-
-                    var dateLabel = (p.start_date||'?') + ' → ' + (p.end_date||'ongoing');
-
-                    rows += '<div style="display:flex;align-items:center;margin-bottom:5px;height:24px;">'
-                          + '<div style="width:200px;flex-shrink:0;font-size:0.8em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:8px;">'
-                          + '<a href="/project/details?project_id=' + p.id + '" style="color:var(--text-color);text-decoration:none;" title="' + p.name + '">' + p.name + '</a>'
-                          + '</div>'
-                          + '<div style="flex:1;position:relative;height:18px;background:var(--bg-secondary);border-radius:3px;">'
-                          + '<div style="position:absolute;left:' + todayPct + '%;top:0;bottom:0;width:2px;background:var(--primary-color);opacity:0.5;"></div>'
-                          + '<div style="position:absolute;left:' + barLeft + '%;width:' + barWidth + '%;height:100%;background:' + barColor + ';border-radius:3px;opacity:0.85;" title="' + p.name + ': ' + dateLabel + '"></div>'
-                          + '</div>'
-                          + '</div>';
-                });
-            });
-
-            var container = document.getElementById('gantt-chart');
-            container.style.position = 'relative';
-            container.innerHTML = header + rows;
-        })();
-        </script>
+        [% IF planning_projects && planning_projects.size > 0 %]
+        <script id="gantt-data" type="application/json">[% FOREACH p IN planning_projects %]{"id":[% p.id %],"name":"[% p.name | html %]","sitename":"[% p.sitename | html %]","status":"[% p.status | html %]","start_date":[% p.start_date ? ('"' _ p.start_date _ '"') : 'null' %],"end_date":[% p.end_date ? ('"' _ p.end_date _ '"') : 'null' %]}[% UNLESS loop.last %],[% END %][% END %]</script>
 
         <p style="font-size:0.78em;color:var(--text-muted-color);margin-top:12px;">
             Blue line = today. Projects without dates are placed at current position. 
@@ -479,233 +394,8 @@
         [% END %]
     </div>
 
-</div>
-
-<script>
-    function switchTab(evt, tabName) {
-        var i, tabcontent, tabbuttons;
-        tabcontent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabcontent.length; i++) {
-            tabcontent[i].classList.remove("active");
-        }
-        tabbuttons = document.getElementsByClassName("tab-button");
-        for (i = 0; i < tabbuttons.length; i++) {
-            tabbuttons[i].classList.remove("active");
-        }
-        document.getElementById(tabName).classList.add("active");
-        
-        // Only set active if evt is provided and has currentTarget
-        if (evt && evt.currentTarget && evt.currentTarget.classList.contains('tab-button')) {
-            evt.currentTarget.classList.add("active");
-        } else {
-            // Find the button and set it to active
-            var buttons = document.getElementsByClassName("tab-button");
-            for (i = 0; i < buttons.length; i++) {
-                if (buttons[i].getAttribute('onclick').indexOf("'" + tabName + "'") !== -1) {
-                    buttons[i].classList.add("active");
-                }
-            }
-        }
-        
-        // Update hash without scrolling
-        if (history.pushState) {
-            history.pushState(null, null, '#' + tabName);
-        } else {
-            location.hash = '#' + tabName;
-        }
-    }
-
-    function linkPlanToProject(btn, projectId) {
-        var sel = document.getElementById('link-plan-' + projectId);
-        var planId = sel ? sel.value : '';
-        if (!planId) { alert('Please select a plan first.'); return; }
-        btn.disabled = true;
-        btn.textContent = '…';
-        fetch('/admin/plan/link_project', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'plan_id=' + encodeURIComponent(planId) + '&project_id=' + encodeURIComponent(projectId)
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.success) {
-                btn.closest('div').innerHTML = '<em style="color:#28a745;">✅ Linked — <a href="">Reload page</a> to see changes</em>';
-            } else {
-                btn.disabled = false;
-                btn.textContent = 'Link';
-                alert('Error: ' + (d.error || 'Unknown error'));
-            }
-        })
-        .catch(function(e) {
-            btn.disabled = false;
-            btn.textContent = 'Link';
-            alert('Request failed: ' + e);
-        });
-    }
-
-    function resolveDep(depId, btn) {
-        if (!confirm('Mark this dependency as resolved?')) return;
-        btn.disabled = true;
-        btn.textContent = '…';
-        fetch('/project/resolve_dependency', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-            body: JSON.stringify({id: depId})
-        }).then(function(r){ return r.json(); }).then(function(d){
-            if (d.ok) {
-                var row = btn.closest('tr');
-                if (row) row.style.opacity = '0.4';
-                setTimeout(function(){ if (row) row.remove(); }, 900);
-            } else {
-                btn.disabled = false;
-                btn.textContent = '✓ Resolved';
-                alert('Error: ' + (d.error || 'unknown'));
-            }
-        }).catch(function(e){
-            btn.disabled = false;
-            btn.textContent = '✓ Resolved';
-            alert('Error: ' + e);
-        });
-    }
-
-    function activateHashTarget(hash) {
-        if (!hash) return;
-        var target = document.getElementById(hash);
-        if (!target) return;
-        if (target.classList.contains('tab-content')) {
-            switchTab(null, hash);
-        } else {
-            var parent = target.parentElement;
-            while (parent && !parent.classList.contains('tab-content')) {
-                parent = parent.parentElement;
-            }
-            if (parent) {
-                switchTab(null, parent.id);
-                setTimeout(function() {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 150);
-            }
-        }
-    }
-
-    // Handle hash on load
-    window.addEventListener('load', function() {
-        var hash = window.location.hash.substring(1);
-        activateHashTarget(hash);
-        updateNavLinks();
-    });
-
-    // Handle hash change
-    window.addEventListener('hashchange', function() {
-        var hash = window.location.hash.substring(1);
-        activateHashTarget(hash);
-        updateNavLinks();
-    });
-
-    function updateNavLinks() {
-        var hash = window.location.hash;
-        if (hash) {
-            document.querySelectorAll('.prev-day-link, .next-day-link').forEach(function(link) {
-                var url = new URL(link.href, window.location.origin);
-                url.hash = hash;
-                link.href = url.pathname + url.search + url.hash;
-            });
-        }
-    }
-
-    // ── Project drag-and-drop reordering (admin only) ──────────────────────
-    (function() {
-        var list = document.getElementById('project-sortable-list');
-        if (!list) return;
-        var cards = list.querySelectorAll('.project-card');
-        if (!cards.length) return;
-
-        var bar = document.getElementById('project-reorder-bar');
-        var dragged = null;
-
-        cards.forEach(function(card) {
-            card.addEventListener('dragstart', function(e) {
-                dragged = card;
-                setTimeout(function() { card.style.opacity = '0.4'; }, 0);
-                e.dataTransfer.effectAllowed = 'move';
-                if (bar) bar.style.display = 'flex';
-            });
-            card.addEventListener('dragend', function() {
-                card.style.opacity = '1';
-                dragged = null;
-                list.querySelectorAll('.project-card').forEach(function(c) {
-                    c.style.borderTop = '';
-                });
-            });
-            card.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                if (dragged && dragged !== card) {
-                    list.querySelectorAll('.project-card').forEach(function(c) { c.style.borderTop = ''; });
-                    card.style.borderTop = '2px solid var(--primary-color)';
-                }
-            });
-            card.addEventListener('drop', function(e) {
-                e.preventDefault();
-                if (dragged && dragged !== card) {
-                    card.style.borderTop = '';
-                    var allCards = Array.from(list.querySelectorAll('.project-card'));
-                    var fromIdx = allCards.indexOf(dragged);
-                    var toIdx   = allCards.indexOf(card);
-                    if (fromIdx < toIdx) {
-                        card.after(dragged);
-                    } else {
-                        card.before(dragged);
-                    }
-                }
-            });
-        });
-    })();
-
-    function saveProjectOrder() {
-        var list = document.getElementById('project-sortable-list');
-        if (!list) return;
-        var ids = Array.from(list.querySelectorAll('.project-card')).map(function(c) {
-            return parseInt(c.getAttribute('data-project-id'), 10);
-        }).filter(Boolean);
-
-        var btn = document.getElementById('save-order-btn');
-        var msg = document.getElementById('save-order-msg');
-        if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-        if (msg) msg.style.display = 'none';
-
-        fetch('/project/reorder', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: ids })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (btn) { btn.disabled = false; btn.textContent = 'Save Order'; }
-            if (d.ok) {
-                if (msg) { msg.style.display = 'inline'; }
-                setTimeout(function() { if (msg) msg.style.display = 'none'; }, 3000);
-            } else {
-                alert('Save failed: ' + (d.error || 'Unknown error'));
-            }
-        })
-        .catch(function(e) {
-            if (btn) { btn.disabled = false; btn.textContent = 'Save Order'; }
-            alert('Request failed: ' + e);
-        });
-    }
-
-</script>
-
-<script>
-function dailyLogAction(action) {
-    var startBtn = document.getElementById('dl-start-btn');
-    var endBtn   = document.getElementById('dl-end-btn');
-    var feedback = document.getElementById('dl-feedback');
-    if (startBtn) startBtn.disabled = true;
-    if (endBtn)   endBtn.disabled   = true;
-    feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
-    feedback.style.color = '';
+<!-- Deploy Control Center Modal HTML -->
+<div
 
     fetch('/planning/daily_log', {
         method: 'POST',
