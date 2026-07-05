@@ -71,6 +71,11 @@
     <div class="desc">Deploys to the local workstation (useful for testing).</div>
   </div>
 
+  <div class="choice-option" onclick="startDeploy('staging-4000')" style="border-color: #58a6ff;">
+    <div class="label" style="color: #58a6ff;">[S] DEPLOY TO LOCAL 4000 → staging</div>
+    <div class="desc">Builds and starts the web-staging service on port 4000 (local workstation). All volumes ensured first.</div>
+  </div>
+
   <div class="choice-option" onclick="startDeploy('local-test')">
     <div class="label">[B] Build &amp; test locally only (no deploy)</div>
     <div class="desc">Builds and tests the production image locally but does not push or deploy.</div>
@@ -95,6 +100,7 @@
 var logId         = null;
 var logOutput     = '';
 var todoRecordId  = (new URLSearchParams(window.location.search)).get('todo_record_id') || '';
+var autoTarget    = (new URLSearchParams(window.location.search)).get('target') || '';
 var pollingTimer  = null;
 var lastContent   = '';
 var consecutiveErrors = 0;
@@ -267,6 +273,11 @@ window.addEventListener('beforeunload', function() {
         );
     }
 });
+
+// Auto-start if target was passed in URL (e.g. from Deploy Local 4000 button)
+if (autoTarget) {
+    startDeploy(autoTarget);
+}
 </script>
 </body>
 </html>
