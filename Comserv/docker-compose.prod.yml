@@ -59,8 +59,8 @@ services:
       - "5000:5000"
     volumes:
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      # Mount existing hybrid cache volume (temporary until normalization)
-      - comserv_comserv2_cache:/cache:rw
+      # Standardized comserv2_* cache volume
+      - comserv2_cache:/cache:rw
       # Standardized comserv2_* volumes
       - comserv2_logs:/opt/comserv/root/log
       - comserv2_workshop_files:/data/nfs:rw

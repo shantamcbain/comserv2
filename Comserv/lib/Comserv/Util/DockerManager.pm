@@ -153,6 +153,8 @@ sub restart_containers {
     my $force = $args{force} // 0;
     my $compose_file = $args{compose_file};
     
+    # Resolve container names → compose service names
+    my @compose_services;
     if (!$compose_file && @$services) {
         $compose_file = $self->_find_compose_file_for_service($services->[0]);
         unless ($compose_file) {
@@ -164,8 +166,15 @@ sub restart_containers {
             };
         }
     }
-    
+
     $compose_file ||= $self->docker_compose_file;
+
+    # Map all service names
+    if ($compose_file && @$services) {
+        foreach my $svc (@$services) {
+            push @compose_services, $self->_resolve_service_to_compose_name($svc, $compose_file);
+        }
+    }
     
     unless (-f $compose_file) {
         return {
@@ -187,7 +196,7 @@ sub restart_containers {
 
     if ($force) {
         my @down_cmd = (@base_cmd, 'down', '--remove-orphans');
-        push @down_cmd, @$services if @$services;
+        push @down_cmd, @compose_services if @compose_services;
         my ($dout, $derr);
         my $dok = run \@down_cmd, \undef, \$dout, \$derr;
         $all_out  .= ($dout // '');
@@ -197,7 +206,7 @@ sub restart_containers {
     }
 
     my @up_cmd = (@base_cmd, 'up', '-d');
-    push @up_cmd, @$services if @$services;
+    push @up_cmd, @compose_services if @compose_services;
     my ($uout, $uerr);
     my $uok = run \@up_cmd, \undef, \$uout, \$uerr;
     $all_out  .= ($uout // '');
@@ -506,6 +515,7 @@ sub parse_compose_file {
                     description => $description,
                     ports => \@ports,
                     image => $service->{image} || '',
+                    container_name => $service->{container_name} || '',
                 };
             }
         }
@@ -524,9 +534,35 @@ sub _find_compose_file_for_service {
     foreach my $compose_file ($self->find_all_compose_files()) {
         my $services = $self->parse_compose_file($compose_file);
         return $compose_file if exists $services->{$service};
+
+        # Also match by container_name (docker ps uses container_name, not service name)
+        foreach my $sname (keys %$services) {
+            my $cname = $services->{$sname}{container_name} || '';
+            return $compose_file if $cname && $cname eq $service;
+        }
     }
 
     return;
+}
+
+sub _resolve_service_to_compose_name {
+    my ($self, $service, $compose_file) = @_;
+
+    return $service unless $compose_file;
+    return $service unless -f $compose_file;
+
+    my $services = $self->parse_compose_file($compose_file);
+
+    # Direct match on compose service name
+    return $service if exists $services->{$service};
+
+    # Match by container_name → return compose service name
+    foreach my $sname (keys %$services) {
+        my $cname = $services->{$sname}{container_name} || '';
+        return $sname if $cname && $cname eq $service;
+    }
+
+    return $service;
 }
 
 sub start_container {
@@ -553,6 +589,8 @@ sub start_container {
         }
     }
 
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+
     unless (-f $compose_file) {
         return {
             success => 0,
@@ -566,7 +604,7 @@ sub start_container {
         @{$self->docker_compose_cmd},
         '--project-directory', $self->project_root,
         '-f', $compose_file,
-        'start', $service
+        'start', $compose_service
     );
 
     my ($out, $err);
@@ -605,6 +643,8 @@ sub up_container {
         }
     }
 
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+
     unless (-f $compose_file) {
         return {
             success => 0,
@@ -618,7 +658,7 @@ sub up_container {
         @{$self->docker_compose_cmd},
         '--project-directory', $self->project_root,
         '-f', $compose_file,
-        'up', '-d', $service
+        'up', '-d', $compose_service
     );
 
     my ($out, $err);
@@ -655,6 +695,8 @@ sub stop_container {
         };
     }
 
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+
     unless (-f $compose_file) {
         return {
             success => 0,
@@ -668,7 +710,7 @@ sub stop_container {
         @{$self->docker_compose_cmd},
         '--project-directory', $self->project_root,
         '-f', $compose_file,
-        'stop', $service
+        'stop', $compose_service
     );
 
     my ($out, $err);
@@ -705,6 +747,8 @@ sub down_container {
         };
     }
 
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+
     unless (-f $compose_file) {
         return {
             success => 0,
@@ -718,7 +762,7 @@ sub down_container {
         @{$self->docker_compose_cmd},
         '--project-directory', $self->project_root,
         '-f', $compose_file,
-        'rm', '-f', '-s', $service
+        'rm', '-f', '-s', $compose_service
     );
 
     my ($out, $err);
