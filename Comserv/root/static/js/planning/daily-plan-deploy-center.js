@@ -59,6 +59,13 @@
         settings.style.display = selected.value === 'production' ? 'flex' : 'none';
     };
 
+    // Wire up radio change events for deploy form
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.name === 'deploy_method') {
+            window.toggleDeployForm();
+        }
+    });
+
     function pollDeploymentProgress() {
         if (deployPollingInterval) clearInterval(deployPollingInterval);
         deployPollingInterval = setInterval(function() {
