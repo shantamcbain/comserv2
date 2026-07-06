@@ -22,32 +22,50 @@
         return (new URLSearchParams(window.location.search)).get(name) || '';
     }
 
-    function showFullLog(newOutput) {
-        if (!newOutput || newOutput === lastContent) return;
-        con.innerHTML = '';
-        con.appendChild(document.createTextNode(newOutput));
+    // Append a single line of text to the console. Never clears existing content.
+    function appendLine(text, cls) {
+        if (!con) return;
+        var el = cls
+            ? (function() { var s = document.createElement('span'); s.className = cls; s.textContent = text + '\n'; return s; })()
+            : document.createTextNode((text || '') + '\n');
+        con.appendChild(el);
         con.scrollTop = con.scrollHeight;
-        logOutput = newOutput;
-        lastContent = newOutput;
-        window.scrollTo(0, document.body.scrollHeight);
     }
 
-    function appendLine(text, cls) {
-        if (cls) {
-            var span = document.createElement('span');
-            span.className = cls;
-            span.textContent = text + '\n';
-            con.appendChild(span);
-        } else {
-            con.appendChild(document.createTextNode(text + '\n'));
+    // Append any NEW lines from the full log output (incremental, no full-replace)
+    function appendNewOutput(fullOutput) {
+        if (!fullOutput) return false;
+        if (fullOutput === lastContent) return false;
+        // Determine the new portion: everything after the last known length
+        var knownLen = lastContent.length;
+        if (fullOutput.length > knownLen) {
+            var newChunk = fullOutput.substring(knownLen);
+            if (newChunk) {
+                con.appendChild(document.createTextNode(newChunk));
+                con.scrollTop = con.scrollHeight;
+            }
         }
-        con.scrollTop = con.scrollHeight;
+        lastContent = fullOutput;
+        logOutput = fullOutput;
+        return true;
     }
 
     function setStatus(state, text) {
         var badge = document.getElementById('status-badge');
+        if (!badge) return;
         badge.className = state;
         badge.innerHTML = (state === 'running' ? '<span id="spinner"></span> ' : '') + text;
+        var footer = document.getElementById('footer');
+        if (footer) {
+            var statusEl = document.getElementById('deploy-status-msg');
+            if (!statusEl) {
+                statusEl = document.createElement('span');
+                statusEl.id = 'deploy-status-msg';
+                statusEl.style.cssText = 'font-size:0.85em;color:var(--primary-color,#58a6ff);margin-left:auto;';
+                footer.insertBefore(statusEl, footer.firstChild);
+            }
+            statusEl.textContent = state === 'running' ? '⏳ Deploy running...' : (state === 'success' ? '✅ Complete' : '❌ Failed');
+        }
     }
 
     function safeFetch(url, options) {
@@ -75,17 +93,16 @@
                 .then(function(data) {
                     if (data.success) {
                         consecutiveErrors = 0;
-                        if (data.output && data.output !== lastContent) {
-                            showFullLog(data.output);
-                        }
+                        // Incrementally append new content — never clear/replace
+                        appendNewOutput(data.output || '');
                         if (!data.is_running) {
                             clearInterval(pollingTimer);
                             pollingTimer = null;
-                            appendLine(null, null);
+                            setStatus('success', '✅ Done');
+                            appendLine('', null);
                             appendLine('='.repeat(60), 'ok');
                             appendLine('✅ DEPLOYMENT FINISHED', 'ok');
                             appendLine('='.repeat(60), 'ok');
-                            setStatus('success', '✅ Done');
                             var closeBtn = document.getElementById('btn-close');
                             if (closeBtn) closeBtn.disabled = false;
                             var viewBtn = document.getElementById('btn-view');
@@ -95,7 +112,7 @@
                             if (window.opener && window.opener.postMessage) {
                                 window.opener.postMessage({ type: 'deploy_done', success: 1 }, '*');
                             }
-                            alert('✅ Docker deploy complete — review log and close the window to save.');
+                            appendLine('📋 Click "Close & Save Log" to save this log permanently.', 'info');
                         }
                     }
                 })
@@ -105,7 +122,7 @@
                         consecutiveErrors++;
                     }
                 });
-        }, 500);
+        }, 1500);  // 1.5s interval — lighter on server, still live
     }
 
     function startDeploy(target) {
@@ -140,7 +157,6 @@
         .then(function(data) {
             if (data.success) {
                 appendLine('Background deploy process started for ' + target + '.', 'ok');
-                // Show any initial output returned from the deploy endpoint
                 if (data.message) {
                     appendLine('[deploy] ' + data.message, 'info');
                 }
@@ -185,7 +201,7 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            appendLine(null, null);
+            appendLine('', null);
             appendLine(d.success ? '📋 Log saved and closed.' : '⚠ Log save error: ' + d.message,
                        d.success ? 'ok' : 'err');
             setTimeout(function() { window.close(); }, 1200);
