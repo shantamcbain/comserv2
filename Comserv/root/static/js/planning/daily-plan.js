@@ -340,7 +340,7 @@
         if (!btn) return;
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            openDeployModal();
+            window.open('/admin/docker/deploy_form', 'docker-deploy', 'width=800,height=700,scrollbars=yes,resizable=yes');
         });
         document.addEventListener('keydown', function(ev) {
             if (!window._deployModal) return;
@@ -410,7 +410,7 @@
         if (ev.target && ev.target.id === 'dl-deploy-btn' && !ev.target._deployHooked) {
             ev.target._deployHooked = true;
             ev.preventDefault();
-            openDeployModal();
+            window.open('/admin/docker/deploy_form', 'docker-deploy', 'width=800,height=700,scrollbars=yes,resizable=yes');
         }
     }, true);
 

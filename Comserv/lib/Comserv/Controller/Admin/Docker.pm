@@ -391,9 +391,10 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
-    my $trigger = $c->req->body_params->{trigger_source} || 'manual';
-    my $log_file = '/tmp/comserv_deploy.log';
-    my $pid_file = '/tmp/comserv_deploy.pid';
+    my $trigger   = $c->req->body_params->{trigger_source} || 'manual';
+    my $target    = $c->req->body_params->{target} || 'production1';  # extract BEFORE fork
+    my $log_file  = '/tmp/comserv_deploy.log';
+    my $pid_file  = '/tmp/comserv_deploy.pid';
 
     unlink $log_file;
     unlink $pid_file;
@@ -405,16 +406,15 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     if ($pid == 0) {
-        # CHILD – delegate everything to DockerDeploy utility
-        open(my $log, '>>', $log_file) or exit 1;
+        # CHILD – close parent's DB & Redis connections, open our own log handle
+        close_std_fds();
+        open(my $log, '>>', $log_file) or _exit_with_error($log_file, $pid_file, "Cannot open log file $log_file: $!");
         $| = 1;
         select((select($log), $|=1)[0]);
 
         # Write the very first line immediately so the UI sees activity
-        print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger) ===\n";
+        print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger, target=$target) ===\n";
         $log->flush();
-
-        my $target = $c->req->body_params->{target} || 'production1';
 
         my $deployer = Comserv::Util::DockerDeploy->new(
             log_fh   => $log,
@@ -422,14 +422,41 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             trigger  => $trigger,
             target   => $target,
         );
-        # Always use the safe wrapper so every target (including local-staging) ensures volumes first
-        my ($success, $msg) = $deployer->deploy_to_target_safe
-            ? (1, "Deploy finished")
-            : (0, "Deploy failed");
-
+        eval {
+            my $ok = $deployer->deploy_to_target_safe;
+            print $log "[".scalar(localtime)."] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
+            $log->flush();
+            if ($ok) {
+                $deployer->_log("=== DEPLOY COMPLETE ===");
+            } else {
+                $deployer->_log("=== DEPLOY FAILED (see errors above) ===");
+            }
+        };
+        if ($@) {
+            print $log "[".scalar(localtime)."] CRASH in child: $@\n";
+            $log->flush();
+        }
         close($log);
         unlink($pid_file);
-        exit($success ? 0 : 1);
+        exit(0);
+    }
+
+    # --- helper subs used only by the child ---
+    sub close_std_fds {
+        # Close inherited file handles that are useless in the child
+        if (defined &DBI::db::disconnect) {
+            eval { $_->disconnect for DBI->installed_handles(0,0); };
+        }
+    }
+
+    sub _exit_with_error {
+        my ($lf, $pf, $msg) = @_;
+        if (open my $fh, '>', $lf) {
+            print $fh "[".scalar(localtime)."] $msg\n";
+            close $fh;
+        }
+        unlink $pf;
+        exit(1);
     }
 
     # PARENT
@@ -522,25 +549,52 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
             my $elapsed = sprintf('%02d:%02d:00', int($mins/60), $mins%60);
 
             my $details_text = $notes || 'Docker Hub deployment executed.';
+
+            # Save full log output to a persistent file (DB comments field is too small)
+            my $log_dir  = '/home/shanta/PycharmProjects/comserv2/log/docker_deploy';
+            system("mkdir -p $log_dir") == 0 or warn "mkdir $log_dir failed: $!";
+            my $ts = $now->ymd('') . '_' . $now->hms('');
+            my $output_file = "$log_dir/deploy_$ts.log";
+            if (open my $lfh, '>', $output_file) {
+                print $lfh $output;
+                close $lfh;
+            } else {
+                warn "Cannot write $output_file: $!";
+                $output_file = '';
+            }
+
+            # Store a short summary + file path in the DB comments field
+            my $summary = $details_text;
+            $summary .= "\n\n--- Full log saved to: $output_file" if $output_file;
+            # Truncate to fit in text column (65KB), keep the file pointer
+            my $truncated = length($output) > 60000
+                ? " (full log truncated — see file on server)"
+                : '';
+            $summary .= $truncated if $truncated;
+
             $entry->update({
                 status      => 3,
                 end_time    => $end_time,
                 time        => $elapsed,
                 details     => $details_text,
-                comments    => $output,
+                comments    => $summary,
                 last_mod_by => $c->session->{username} || 'system',
             });
 
-            # Append the entire log output to the comments of the linked Todo task
+            # Append log output to the linked Todo task — truncate to 20KB max
             my $todo_record_id = $entry->todo_record_id;
             if ($todo_record_id) {
                 my $todo = $c->model('DBEncy')->resultset('Todo')->find($todo_record_id);
                 if ($todo) {
                     my $existing_comments = $todo->comments || '';
                     my $timestamp = localtime();
-                    my $appended_comments = $existing_comments . "\n\n=== DEPLOYMENT LOG ($timestamp) ===\n" . $output;
+                    my $appended = $existing_comments . "\n\n=== DEPLOYMENT LOG ($timestamp) ===\n" . $output;
+                    # Keep the Todo comments under 30KB
+                    if (length($appended) > 30000) {
+                        $appended = substr($appended, 0, 28000) . "\n... (truncated — full log at $output_file)";
+                    }
                     $todo->update({
-                        comments      => $appended_comments,
+                        comments      => $appended,
                         last_mod_by   => $c->session->{username} || 'system',
                         last_mod_date => $now->ymd,
                     });
