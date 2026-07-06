@@ -622,11 +622,11 @@ sub list :Path('/admin/docker/list') :Args(0) {
     my $ssh_prefix;  # Declare early
 
     if ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1') {
-        my $output = `docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo ''`;
+        my $output = `docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}|{{.RunningFor}}|{{.State}}|{{.Mounts}}|{{.Networks}}' 2>/dev/null || echo ''`;
         foreach my $line (split /\n/, $output) {
             next unless $line =~ /\|/;
-            my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
-            # Detect dated backup containers
+            my ($id, $name, $image, $status, $ports, $created, $running_for, $state, $mounts, $networks) = split /\|/, $line, 10;
+            $id = substr($id, 0, 12) if $id;
             my $is_backup_container = ($name =~ /backup|bk-?\d{8}/i) ? 1 : 0;
 
             # Get image creation date
@@ -648,8 +648,12 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 name => $name,
                 image => $image,
                 status => $status,
-                state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
+                state => $state || ($status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown')),
                 ports => $ports || '',
+                created => $created || '',
+                running_for => $running_for || '',
+                mounts => $mounts || '',
+                networks => $networks || '',
                 is_backup_container => $is_backup_container,
                 image_created => $img_created,
                 container_created => $container_created,
