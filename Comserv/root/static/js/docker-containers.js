@@ -1,40 +1,55 @@
 /**
  * static/js/docker-containers.js
- * Docker Container Management page (/admin/docker-containers)
+ * Docker Servers page (/admin/docker-containers)
  * Modular JS — loaded via js_load.tt. No inline scripts.
  *
- * Uses data-action attribute delegation, safe fetch, and idempotent Docker calls.
+ * Cards-based container & volume view with per-card action buttons.
+ * Uses data-action delegation, safe fetch, idempotent Docker calls.
  */
 (function() {
     'use strict';
 
     var currentTarget = 'workstation';
     var containersCache = [];
+    var volumesCache = [];
     var outputBox = document.getElementById('output-box');
-    var containersList = document.getElementById('containers-list');
-    var serviceSelect = document.getElementById('service-select');
+    var containersEl = document.getElementById('containers-list');
+    var volumesEl = document.getElementById('volumes-list');
     var targetSelect = document.getElementById('docker-target-select');
     var showAllCheckbox = document.getElementById('show-all-containers');
+
+    // ──────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────
+    function esc(s) {
+        if (!s) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatDate(isoStr) {
+        if (!isoStr) return '';
+        // Docker dates: "2026-07-06T23:18:14.59875699Z" or similar
+        var d = new Date(isoStr);
+        if (isNaN(d.getTime())) return isoStr.substring(0, 10);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+    }
 
     function log(msg, cls) {
         if (!outputBox) return;
         var el = cls
             ? (function() { var s = document.createElement('span'); s.className = cls; s.textContent = msg + '\n'; return s; })()
-            : document.createTextNode(msg + '\n');
+            : document.createTextNode((msg || '') + '\n');
         outputBox.appendChild(el);
         outputBox.scrollTop = outputBox.scrollHeight;
     }
 
-    function setDockerStatus(state, text) {
+    function setStatus(state, text) {
         var dot = document.getElementById('docker-status-dot');
         var txt = document.getElementById('docker-status-text');
         if (dot) dot.style.background = state === 'ok' ? '#3fb950' : state === 'err' ? '#f85149' : '#8b949e';
         if (txt) txt.textContent = text;
     }
 
-    // ──────────────────────────────────────────────────────────
-    // Safe HTTP helpers
-    // ──────────────────────────────────────────────────────────
     function safeFetch(url, opts) {
         var o = Object.assign({ credentials: 'same-origin', redirect: 'manual' }, opts || {});
         return fetch(url, o).then(function(r) {
@@ -44,7 +59,6 @@
         });
     }
 
-    function apiGet(url) { return safeFetch(url).then(function(r){ return r.json(); }); }
     function apiPost(url, body) {
         return safeFetch(url, {
             method: 'POST',
@@ -54,138 +68,247 @@
     }
 
     // ──────────────────────────────────────────────────────────
-    // Load container list from backend
+    // Load containers + volumes from backend
     // ──────────────────────────────────────────────────────────
-    function loadContainers() {
-        log('Loading containers from ' + currentTarget + '...', 'info');
-        setDockerStatus('check', 'Loading...');
+    function loadAll() {
+        log('Loading ' + currentTarget + '...', 'info');
+        setStatus('check', 'Loading...');
 
         apiPost('/admin/docker/list', 'host=' + encodeURIComponent(currentTarget))
             .then(function(data) {
                 if (!data.success) {
-                    log('Error: ' + (data.error || 'Unknown error'), 'err');
-                    setDockerStatus('err', 'Failed');
+                    log('Error: ' + (data.error || 'Unknown error') + ' — Docker may not be available on this host.', 'err');
+                    setStatus('err', 'Failed');
+                    containersCache = [];
+                    volumesCache = [];
+                    renderContainers();
+                    renderVolumes();
                     return;
                 }
                 containersCache = data.containers || [];
-                renderContainers(containersCache);
-                populateServiceSelect(containersCache);
-                setDockerStatus('ok', 'OK (' + containersCache.length + ' containers)');
-                log('Loaded ' + containersCache.length + ' containers.', 'ok');
+                // Collect unique volumes from container mounts and fetch full volume list
+                loadVolumes(containersCache);
+                renderContainers();
+                setStatus('ok', containersCache.length + ' containers');
+                log('Loaded ' + containersCache.length + ' containers from ' + currentTarget + '.', 'ok');
             })
             .catch(function(e) {
-                log('Failed to load containers: ' + e.message, 'err');
-                setDockerStatus('err', 'Error');
+                log('Connection failed: ' + e.message, 'err');
+                setStatus('err', 'Error');
             });
     }
 
-    function renderContainers(containers) {
-        if (!containersList) return;
-        if (!containers || containers.length === 0) {
-            containersList.innerHTML = '<p style="color:#666;text-align:center;padding:10px;">No containers found.</p>';
-            var countEl = document.getElementById('container-count');
-            if (countEl) countEl.textContent = '';
+    function loadVolumes(containers) {
+        // Gather volume names from container mounts, then docker volume ls
+        apiPost('/admin/docker/list', 'host=' + encodeURIComponent(currentTarget) + '&type=volumes')
+            .then(function(data) {
+                volumesCache = data.volumes || [];
+                renderVolumes();
+            })
+            .catch(function() {
+                // Fallback: parse from container mount paths
+                var names = [];
+                containers.forEach(function(c) {
+                    if (c.mounts) {
+                        c.mounts.split(',').forEach(function(m) {
+                            if (m =~ /comserv/) {
+                                var parts = m.split(':');
+                                if (parts[0] && names.indexOf(parts[0]) === -1) names.push(parts[0]);
+                            }
+                        });
+                    }
+                });
+                volumesCache = names.map(function(n) { return { name: n, driver: 'local', status: 'present' }; });
+                renderVolumes();
+            });
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Render containers as cards
+    // ──────────────────────────────────────────────────────────
+    function renderContainers() {
+        if (!containersEl) return;
+        if (!containersCache || containersCache.length === 0) {
+            containersEl.innerHTML = '<p style="color:#666;text-align:center;padding:10px;font-size:0.85em;">No containers found.</p>';
+            var cntEl = document.getElementById('container-count');
+            if (cntEl) cntEl.textContent = '';
             return;
         }
 
         var showAll = showAllCheckbox ? showAllCheckbox.checked : false;
-        var filtered = showAll ? containers : containers.filter(function(c) {
+        var filtered = showAll ? containersCache : containersCache.filter(function(c) {
             return c.state === 'running';
         });
 
-        var countEl = document.getElementById('container-count');
-        if (countEl) countEl.textContent = '(' + filtered.length + '/' + containers.length + ')';
+        var cntEl = document.getElementById('container-count');
+        if (cntEl) cntEl.textContent = '(' + filtered.length + '/' + containersCache.length + ')';
 
-        var html = '<table style="width:100%;border-collapse:collapse;font-size:0.85em;">' +
-            '<thead><tr style="border-bottom:2px solid var(--border-color,#dee2e6);">' +
-            '<th style="text-align:left;padding:4px 6px;">Name</th>' +
-            '<th style="text-align:left;padding:4px 6px;">Image</th>' +
-            '<th style="text-align:left;padding:4px 6px;">Status</th>' +
-            '<th style="text-align:left;padding:4px 6px;">Ports</th>' +
-            '<th style="text-align:left;padding:4px 6px;">Actions</th>' +
-            '</tr></thead><tbody>';
-
+        var isLocal = currentTarget === 'workstation' || currentTarget === 'localhost';
+        var html = '';
         filtered.forEach(function(c) {
-            var stateCls = c.state === 'running' ? 'color:#3fb950;' : (c.state === 'exited' ? 'color:#f85149;' : 'color:#8b949e;');
-            var statusShort = (c.status || '').substring(0, 60);
-            html += '<tr style="border-bottom:1px solid var(--border-color,#e0e0e0);">' +
-                '<td style="padding:6px 6px;"><strong>' + esc(c.name) + '</strong><br><span style="font-size:0.8em;color:#666;">' + esc(c.id) + '</span></td>' +
-                '<td style="padding:6px 6px;font-size:0.9em;">' + esc(c.image) + '</td>' +
-                '<td style="padding:6px 6px;' + stateCls + '">' + esc(statusShort) + '</td>' +
-                '<td style="padding:6px 6px;font-size:0.85em;color:#666;">' + esc(c.ports || '-') + '</td>' +
-                '<td style="padding:6px 6px;white-space:nowrap;">' +
-                '  <button class="btn btn-sm" data-action="container-action" data-cid="' + esc(c.id) + '" data-action-type="logs" style="background:#17a2b8;color:#fff;padding:2px 6px;font-size:0.78em;margin-right:3px;">Logs</button>' +
-                '  <button class="btn btn-sm" data-action="container-action" data-cid="' + esc(c.id) + '" data-action-type="restart" style="background:#0066cc;color:#fff;padding:2px 6px;font-size:0.78em;margin-right:3px;">Restart</button>' +
-                '  <button class="btn btn-sm" data-action="container-action" data-cid="' + esc(c.id) + '" data-action-type="inspect" style="background:#6c757d;color:#fff;padding:2px 6px;font-size:0.78em;">Inspect</button>' +
-                '</td></tr>';
-        });
+            var running = c.state === 'running';
+            var unhealthy = running && (c.status || '').match(/unhealthy/i);
+            var borderColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : '#f85149');
+            var statusColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : '#f85149');
+            var statusIcon = unhealthy ? '!' : (running ? '●' : '○');
+            var created = c.created ? new Date(c.created).toLocaleDateString() : '';
 
-        html += '</tbody></table>';
-        containersList.innerHTML = html;
+            html += '<div style="border:1px solid ' + borderColor + ';border-radius:6px;padding:10px 12px;background:var(--bg-color,#fff);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
+                '<div style="flex:2;min-width:200px;">' +
+                '  <div style="display:flex;align-items:center;gap:6px;">' +
+                '    <span style="color:' + statusColor + ';font-size:1em;">' + statusIcon + '</span>' +
+                '    <strong style="font-size:0.9em;">' + esc(c.name) + '</strong>' +
+                '    <span style="font-size:0.75em;color:#666;">' + esc(c.id) + '</span>' +
+                '  </div>' +
+                '  <div style="font-size:0.82em;color:#666;margin-top:2px;">' +
+                '    Image: ' + esc(c.image) +
+                (c.image_created ? ' <span style="font-size:0.75em;color:#888;">[' + formatDate(c.image_created) + ']</span>' : '') +
+                (c.ports ? ' &middot; Ports: ' + esc(c.ports) : '') +
+                '  </div>' +
+                '  <div style="font-size:0.8em;color:#888;margin-top:1px;">' +
+                '    ' + esc(c.status) +
+                '  </div>' +
+                '</div>' +
+                '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' +
+                '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="logs" style="background:#17a2b8;color:#fff;padding:2px 8px;font-size:0.78em;">Logs</button>' +
+                (running
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="stop" style="background:#dc3545;color:#fff;padding:2px 8px;font-size:0.78em;">Stop</button>' +
+                      '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="restart" style="background:#0066cc;color:#fff;padding:2px 8px;font-size:0.78em;">Restart</button>'
+                    : '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="start" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Start</button>'
+                ) +
+                '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="deploy-log" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Deploy Log</button>' +
+                (isLocal && c.image && c.image.match(/comserv/)
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
+                    : '') +
+                '</div>' +
+            '</div>';
+        });
+        containersEl.innerHTML = html;
     }
 
-    function populateServiceSelect(containers) {
-        if (!serviceSelect) return;
-        serviceSelect.innerHTML = '<option value="">-- Select container --</option>';
-        containers.forEach(function(c) {
-            var opt = document.createElement('option');
-            opt.value = c.id;
-            opt.textContent = c.name + ' (' + c.id + ')';
-            serviceSelect.appendChild(opt);
-        });
-    }
+    // ──────────────────────────────────────────────────────────
+    // Render volumes as cards
+    // ──────────────────────────────────────────────────────────
+    function renderVolumes() {
+        if (!volumesEl) return;
+        if (!volumesCache || volumesCache.length === 0) {
+            volumesEl.innerHTML = '<p style="color:#666;text-align:center;padding:10px;font-size:0.85em;">No volumes found.</p>';
+            var vc = document.getElementById('volume-count');
+            if (vc) vc.textContent = '';
+            return;
+        }
+        var vc = document.getElementById('volume-count');
+        if (vc) vc.textContent = '(' + volumesCache.length + ')';
 
-    function esc(s) {
-        if (!s) return '';
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        var html = '';
+        volumesCache.forEach(function(v) {
+            var name = v.name || v;
+            var driver = v.driver || 'local';
+            html += '<div style="border:1px solid var(--border-color,#dee2e6);border-radius:6px;padding:8px 12px;background:var(--bg-color,#fff);display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+                '<div>' +
+                '  <span style="font-size:0.85em;font-weight:bold;">' + esc(name) + '</span>' +
+                '  <span style="font-size:0.75em;color:#666;margin-left:8px;">' + esc(driver) + '</span>' +
+                '</div>' +
+                '<div style="display:flex;gap:4px;">' +
+                '  <button class="btn btn-sm" data-action="volume-act" data-vname="' + esc(name) + '" data-act="inspect" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Inspect</button>' +
+                '</div>' +
+            '</div>';
+        });
+        volumesEl.innerHTML = html;
     }
 
     // ──────────────────────────────────────────────────────────
     // Container actions
     // ──────────────────────────────────────────────────────────
-    function containerAction(cid, action) {
-        if (action === 'restart') {
-            if (!confirm('Restart container ' + cid + '?')) return;
-            log('Restarting ' + cid + '...', 'info');
-            apiPost('/admin/docker-restart/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
-                .then(function(d) {
-                    log(d.success ? '✅ Restarted: ' + cid : '❌ Failed: ' + d.message, d.success ? 'ok' : 'err');
-                    if (d.success) setTimeout(loadContainers, 2000);
-                })
-                .catch(function(e) { log('Restart error: ' + e.message, 'err'); });
-        } else if (action === 'logs') {
+    function containerAction(cid, act) {
+        if (act === 'logs') {
             log('Fetching logs for ' + cid + '...', 'info');
-            apiPost('/admin/docker-logs/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
+            apiPost('/admin/docker/logs/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget) + '&lines=200')
                 .then(function(d) {
                     if (d.success) {
                         log('=== LOGS: ' + cid + ' ===', 'info');
-                        log(d.output || '(no output)', null);
+                        var output = d.output || d.logs || '(no output)';
+                        // Split into lines and show last 200
+                        var lines = output.split('\n');
+                        if (lines.length > 200) {
+                            log('... (showing last 200 of ' + lines.length + ' lines)', 'dim');
+                            output = lines.slice(-200).join('\n');
+                        }
+                        log(output, null);
                         log('=== END LOGS ===', 'info');
                     } else {
-                        log('Log fetch failed: ' + (d.error || d.message), 'err');
+                        log('Logs failed: ' + (d.error || d.message || 'unknown'), 'err');
                     }
                 })
                 .catch(function(e) { log('Logs error: ' + e.message, 'err'); });
-        } else if (action === 'inspect') {
-            log('Fetching inspect data for ' + cid + '...', 'info');
-            // Use docker inspect via backend
-            apiPost('/admin/docker-restart/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
-                .then(function() {
-                    // The inspect endpoint doesn't exist yet, fallback to shell
-                    showInspectModal(cid, '(run "docker inspect ' + cid + '" on the server)');
+        } else if (act === 'deploy-log') {
+            log('Fetching deploy log for ' + cid + '...', 'info');
+            // cid is the container ID - we need the container name. Look it up in the cache.
+            var container = containersCache.filter(function(c) { return c.id === cid; })[0];
+            var cname = container ? container.name : cid;
+            apiPost('/admin/docker/deploy-logs/' + encodeURIComponent(cname) + '')
+                .then(function(d) {
+                    if (d.success && d.logs && d.logs.length > 0) {
+                        var latest = d.logs[0]; // newest first
+                        log('=== DEPLOY LOG: ' + cname + ' (' + latest.file + ') ===', 'info');
+                        // Fetch the actual file content
+                        return apiPost('/admin/docker/deploy-logs/' + encodeURIComponent(cname) + '?file=' + encodeURIComponent(latest.file) + '')
+                            .then(function(fd) {
+                                if (fd.success) {
+                                    log(fd.output || '(empty)', null);
+                                } else {
+                                    log('Deploy log read failed: ' + (fd.error || 'unknown'), 'err');
+                                }
+                                log('=== END DEPLOY LOG ===', 'info');
+                            });
+                    } else {
+                        log('No deploy logs found for ' + cname + '.', 'info');
+                    }
                 })
-                .catch(function(e) { log('Inspect error: ' + e.message, 'err'); });
+                .catch(function(e) { log('Deploy log error: ' + e.message, 'err'); });
+        } else if (act === 'restart') {
+            if (!confirm('Restart container ' + cid + ' on ' + currentTarget + '?')) return;
+            // For local, avoid restarting the container we're running in
+            if (currentTarget === 'workstation' && cid === window._ourContainerId) {
+                if (!confirm('This is the container the web app is running in. Restart may cause a brief outage. Continue?')) return;
+            }
+            log('Restarting ' + cid + '...', 'info');
+            apiPost('/admin/docker/restart/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
+                .then(function(d) {
+                    log(d.success ? '✅ Restarted ' + cid : '❌ Restart failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
+                    if (d.success) setTimeout(loadAll, 3000);
+                })
+                .catch(function(e) { log('Restart error: ' + e.message, 'err'); });
+        } else if (act === 'stop') {
+            if (!confirm('Stop container ' + cid + ' on ' + currentTarget + '?')) return;
+            if (currentTarget === 'workstation' && cid === window._ourContainerId) {
+                if (!confirm('This is the container we are running in. Stopping it will crash this page. Continue?')) return;
+            }
+            log('Stopping ' + cid + '...', 'info');
+            apiPost('/admin/docker/stop/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
+                .then(function(d) {
+                    log(d.success ? '✅ Stopped ' + cid : '❌ Stop failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
+                    if (d.success) setTimeout(loadAll, 2000);
+                })
+                .catch(function(e) { log('Stop error: ' + e.message, 'err'); });
+        } else if (act === 'start') {
+            log('Starting ' + cid + '...', 'info');
+            apiPost('/admin/docker/start/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
+                .then(function(d) {
+                    log(d.success ? '✅ Started ' + cid : '❌ Start failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
+                    if (d.success) setTimeout(loadAll, 3000);
+                })
+                .catch(function(e) { log('Start error: ' + e.message, 'err'); });
+        } else if (act === 'rebuild') {
+            if (!confirm('Rebuild container ' + cid + ' on ' + currentTarget + '? This runs docker compose build + up --force-recreate.')) return;
+            log('Rebuilding ' + cid + '...', 'info');
+            apiPost('/admin/docker/rebuild/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
+                .then(function(d) {
+                    log(d.success ? '✅ Rebuild started for ' + cid : '❌ Rebuild failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
+                    setTimeout(loadAll, 5000);
+                })
+                .catch(function(e) { log('Rebuild error: ' + e.message, 'err'); });
         }
-    }
-
-    function showInspectModal(cid, data) {
-        var modal = document.getElementById('inspect-modal');
-        var body = document.getElementById('inspect-modal-body');
-        var title = document.getElementById('inspect-modal-title');
-        if (!modal || !body) return;
-        if (title) title.textContent = 'Inspect: ' + cid;
-        body.textContent = data || '(no data)';
-        modal.style.display = 'flex';
     }
 
     // ──────────────────────────────────────────────────────────
@@ -196,57 +319,56 @@
         if (!el) return;
         var action = el.getAttribute('data-action');
 
-        if (action === 'refresh-containers' || action === 'list-containers') {
+        if (action === 'refresh-all') {
             e.preventDefault();
-            loadContainers();
-        } else if (action === 'container-action') {
+            loadAll();
+        } else if (action === 'container-act') {
             e.preventDefault();
-            containerAction(el.getAttribute('data-cid'), el.getAttribute('data-action-type'));
-        } else if (action === 'restart-container') {
+            containerAction(el.getAttribute('data-cid'), el.getAttribute('data-act'));
+        } else if (action === 'volume-act') {
             e.preventDefault();
-            var cid = serviceSelect ? serviceSelect.value : '';
-            if (!cid) { log('Select a container first.', 'err'); return; }
-            containerAction(cid, 'restart');
-        } else if (action === 'view-container-logs') {
-            e.preventDefault();
-            var cid2 = serviceSelect ? serviceSelect.value : '';
-            if (!cid2) { log('Select a container first.', 'err'); return; }
-            containerAction(cid2, 'logs');
-        } else if (action === 'inspect-container') {
-            e.preventDefault();
-            var cid3 = serviceSelect ? serviceSelect.value : '';
-            if (!cid3) { log('Select a container first.', 'err'); return; }
-            containerAction(cid3, 'inspect');
+            var vname = el.getAttribute('data-vname');
+            log('Volume inspect for ' + vname + ' coming soon.', 'info');
         } else if (action === 'clear-output') {
             e.preventDefault();
             if (outputBox) outputBox.textContent = 'Ready.\n';
-        } else if (action === 'close-inspect') {
-            e.preventDefault();
-            var m = document.getElementById('inspect-modal');
-            if (m) m.style.display = 'none';
         }
     });
 
-    // Target selector change
+    // Target change
     document.addEventListener('change', function(e) {
         if (e.target && e.target.id === 'docker-target-select') {
             currentTarget = e.target.value;
             var display = document.getElementById('target-name-display');
             if (display) display.textContent = e.target.options[e.target.selectedIndex].text;
-            loadContainers();
+            loadAll();
         }
     });
 
     // Show all toggle
     document.addEventListener('change', function(e) {
         if (e.target && e.target.id === 'show-all-containers') {
-            renderContainers(containersCache);
+            renderContainers();
         }
     });
 
-    // Auto-load on page open
+    // Try to detect if we are inside a Docker container
+    (function() {
+        try {
+            // Check for /.dockerenv or /proc/1/cgroup
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/admin/docker/self', false);
+            xhr.send();
+            if (xhr.status === 200) {
+                var d = JSON.parse(xhr.responseText);
+                if (d.container_id) window._ourContainerId = d.container_id;
+            }
+        } catch(e) {}
+    })();
+
+    // Auto-load
     document.addEventListener('DOMContentLoaded', function() {
-        loadContainers();
+        loadAll();
     });
 
 })();

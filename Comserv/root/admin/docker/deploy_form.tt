@@ -76,6 +76,11 @@
     <div class="desc">Builds and starts the web-staging service on port 4000 (local workstation). All volumes ensured first.</div>
   </div>
 
+  <div class="choice-option" data-action="start-deploy" data-target="web-dev" style="border-color: #28a745;">
+    <div class="label" style="color: #28a745;">[D] DEPLOY TO LOCAL 3000 → web-dev</div>
+    <div class="desc">Builds and starts the web-dev service on port 3000 for active development work.</div>
+  </div>
+
   <div class="choice-option" data-action="start-deploy" data-target="local-test">
     <div class="label">[B] Build &amp; test locally only (no deploy)</div>
     <div class="desc">Builds and tests the production image locally but does not push or deploy.</div>

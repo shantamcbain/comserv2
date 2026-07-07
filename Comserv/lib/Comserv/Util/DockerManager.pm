@@ -272,21 +272,22 @@ sub check_container_status {
 sub get_container_logs {
     my ($self, $service, $lines) = @_;
 
-    if ($self->in_docker_container) {
+    $lines ||= 200;
+
+    # If the "service" looks like a container ID (hex) or name, try docker logs directly first
+    my $is_container_id = $service =~ /^[a-f0-9]{12,64}$/;
+    if ($is_container_id || !$self->_find_compose_file_for_service($service)) {
+        my $output = `docker logs --tail=${lines} "$service" 2>&1` || '';
+        if ($output || $? == 0) {
+            return { success => 1, output => $output, logs => $output };
+        }
         return {
             output => '',
-            error => 'Cannot get container logs from within a Docker container',
+            error => "Container '$service' not found — docker ps to list running containers",
         };
     }
 
     my $compose_file = $self->_find_compose_file_for_service($service);
-    unless ($compose_file) {
-        return {
-            output => '',
-            error => "Service '$service' not found in any docker-compose file",
-        };
-    }
-
     unless (-f $compose_file) {
         return {
             output => '',
