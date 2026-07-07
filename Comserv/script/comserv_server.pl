@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-
+use Catalyst qw( Static::Simple );
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
 

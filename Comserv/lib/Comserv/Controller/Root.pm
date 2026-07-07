@@ -12,14 +12,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
 use Comserv::Util::UserPreferences;
 
-use constant IS_DEV_WORKTREE => ($Bin =~ m{\.zenflow[\\/]worktrees[\\/]}) ? 1 : 0;
-
-# Configure static file serving
-__PACKAGE__->config(
-    'Plugin::Static::Simple' => {
-        dirs => ['static', 'LegacyStaticPages'],
-        include_path => [qw( root )],
-    });
+use constant IS_DEV_WORKTREE => ($Bin =~ m{\.zenflow[/\\]worktrees[/\\]}) ? 1 : 0;
 
 has 'logging' => (
     is => 'ro',

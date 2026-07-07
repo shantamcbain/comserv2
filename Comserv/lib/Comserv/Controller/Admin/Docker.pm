@@ -595,20 +595,19 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
                 last_mod_by => $c->session->{username} || 'system',
             });
 
-            # Append log output to the linked Todo task — truncate to 20KB max
+            # Link the dated deploy log file to the Todo task (don't dump the whole log)
             my $todo_record_id = $entry->todo_record_id;
-            if ($todo_record_id) {
+            if ($todo_record_id && $output_file) {
                 my $todo = $c->model('DBEncy')->resultset('Todo')->find($todo_record_id);
                 if ($todo) {
                     my $existing_comments = $todo->comments || '';
                     my $timestamp = localtime();
-                    my $appended = $existing_comments . "\n\n=== DEPLOYMENT LOG ($timestamp) ===\n" . $output;
-                    # Keep the Todo comments under 30KB
-                    if (length($appended) > 30000) {
-                        $appended = substr($appended, 0, 28000) . "\n... (truncated — full log at $output_file)";
-                    }
+                    my $log_link = "\n\n=== DEPLOYMENT ($timestamp) ===\nFull log: $output_file";
+                    # Only note the size, never store the body
+                    my $log_size = -s $output_file || 0;
+                    $log_link .= " ($log_size bytes)" if $log_size;
                     $todo->update({
-                        comments      => $appended,
+                        comments      => $existing_comments . $log_link,
                         last_mod_by   => $c->session->{username} || 'system',
                         last_mod_date => $now->ymd,
                     });
@@ -616,7 +615,6 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
             }
         }
     };
-
     $c->response->body(encode_json({ success => $@ ? 0 : 1, message => $@ ? "Error: $@" : 'Log closed' }));
 }
 
