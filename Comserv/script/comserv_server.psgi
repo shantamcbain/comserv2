@@ -40,7 +40,7 @@ my $wrapped = builder {
     # This must come BEFORE the main app so static requests are handled first
     enable 'Plack::Middleware::Static',
         path => qr{^/(static|css|js|images|favicon|root|assets)},
-        root => "$FindBin::Bin/..";
+        root => "$FindBin::Bin/../root";
 
     $app;
 };
