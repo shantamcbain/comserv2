@@ -42,6 +42,13 @@ __PACKAGE__->config(
     enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
+    # Static file serving — serves root/static/* at /static/... URLs
+    # Relative paths resolve against the application home directory (FindBin/..)
+    # Works on host (/home/.../Comserv/root) and in Docker (/opt/comserv/root)
+    'Plugin::Static::Simple' => {
+        include_path => [ 'root' ],
+        dirs         => [ 'static', 'LegacyStaticPages' ],
+    },
     # Force-disable stack traces in production even if CATALYST_DEBUG is accidentally set
     'Plugin::StackTrace' => { enable => $ENV{CATALYST_DEBUG} // 0 ? 1 : 0 },
     # Allow Shanta code editor from any browser (tablet/VPN) when server is the dev workstation
