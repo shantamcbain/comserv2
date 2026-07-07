@@ -1037,6 +1037,131 @@ sub start_backup :Path('/admin/docker/start_backup') :Args(0) {
     $c->forward('View::JSON');
 }
 
+sub restore_backup :Path('/admin/docker/restore_backup') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->stash->{json} = { success => 0, error => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $host = $c->req->param('host') || 'production1';
+    my $backup_name = $c->req->param('backup_name');
+    my $service = $c->req->param('service') || '';
+
+    unless ($backup_name) {
+        $c->stash->{json} = { success => 0, error => 'backup_name required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    # Derive active container name from backup name:
+    #   bk-comserv2-web-prod-20260706_235959  ->  comserv2-web-prod
+    my $active_name = $backup_name;
+    $active_name =~ s/^bk-//;
+    $active_name =~ s/-\d{8}_\d{6}$//;
+
+    # Determine service from active name if not provided
+    $service = $active_name;
+    $service =~ s/^comserv2-//;
+
+    # Determine host SSH details
+    my $is_remote = ($host ne 'workstation' && $host ne 'localhost' && $host ne '127.0.0.1');
+    my $ssh_prefix = '';
+    if ($is_remote) {
+        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
+        my $ssh_user = 'ubuntu';
+        my $admin_ctrl = $c->controller('Admin');
+        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        $ssh_pass ||= $ENV{SSHPASS} || '';
+        unless ($ssh_pass) {
+            $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
+            $c->forward('View::JSON');
+            return;
+        }
+        local $ENV{SSHPASS} = $ssh_pass;
+        $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
+        $ssh_prefix .= " sudo";
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restore_backup',
+        "Restoring backup container $backup_name as $active_name on $host");
+
+    my $now = DateTime->now(time_zone => 'local');
+    my $ts = $now->ymd('') . '_' . $now->hms('');
+    my $new_backup = "bk-$active_name-$ts";
+
+    my @output;
+    my $success = 1;
+
+    # Step 1: Stop the active container
+    my $stop_cmd = $is_remote
+        ? "$ssh_prefix \"docker stop $active_name 2>&1 || true\""
+        : "docker stop $active_name 2>&1 || true";
+    my $stop_out = `$stop_cmd`;
+    push @output, "Stopped $active_name: $stop_out";
+
+    # Step 2: Rename the active container to a new dated backup
+    # (docker rename only works on stopped containers)
+    my $rename_active_cmd = $is_remote
+        ? "$ssh_prefix \"docker rename $active_name $new_backup 2>&1 || true\""
+        : "docker rename $active_name $new_backup 2>&1 || true";
+    my $rename_active_out = `$rename_active_cmd`;
+    push @output, "Preserved previous active as $new_backup: $rename_active_out";
+
+    # Step 3: Rename the backup container to the active name
+    my $rename_backup_cmd = $is_remote
+        ? "$ssh_prefix \"docker rename $backup_name $active_name 2>&1\""
+        : "docker rename $backup_name $active_name 2>&1";
+    my $rename_backup_out = `$rename_backup_cmd`;
+    my $rename_exit = $? >> 8;
+    if ($rename_exit != 0) {
+        push @output, "ERROR renaming $backup_name to $active_name: $rename_backup_out";
+        $success = 0;
+    } else {
+        push @output, "Renamed $backup_name to $active_name";
+    }
+
+    # Step 4: Start the now-restored active container
+    my $start_cmd = $is_remote
+        ? "$ssh_prefix \"docker start $active_name 2>&1\""
+        : "docker start $active_name 2>&1";
+    my $start_out = `$start_cmd`;
+    my $start_exit = $? >> 8;
+    if ($start_exit != 0) {
+        push @output, "ERROR starting $active_name: $start_out";
+        $success = 0;
+    } else {
+        push @output, "Started $active_name";
+    }
+
+    # Log the restore in recovery history (remote only)
+    if ($is_remote) {
+        my $recovery_log = '/tmp/comserv_recovery_history.json';
+        my $existing = `$ssh_prefix \"cat $recovery_log 2>/dev/null || echo '[]'\"` || '[]';
+        $existing =~ s/^\s+|\s+$//g;
+        my $log_entry = {
+            timestamp => scalar(localtime),
+            container => $active_name,
+            reason => "Manual restore from backup: $backup_name",
+            health_status => $success ? 'started' : 'failed',
+            last_logs => $success ? 'Restore complete via UI' : 'Restore failed',
+        };
+        my $append_cmd = "$ssh_prefix \"echo '" . encode_json([$log_entry]) . "' | tee -a $recovery_log >/dev/null 2>&1 || true\"";
+        system($append_cmd);
+    }
+
+    $c->stash->{json} = {
+        success => $success,
+        message => $success
+            ? "Restored $backup_name as $active_name (previous active saved as $new_backup)"
+            : "Restore partially failed — see output",
+        output => join("\n", @output),
+    };
+    $c->forward('View::JSON');
+}
+
 sub delete :Path('/admin/docker/delete') :Args(1) {
     my ($self, $c, $name) = @_;
 

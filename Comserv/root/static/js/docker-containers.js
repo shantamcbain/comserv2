@@ -137,7 +137,7 @@
 
         var showAll = showAllCheckbox ? showAllCheckbox.checked : false;
         var filtered = showAll ? containersCache : containersCache.filter(function(c) {
-            return c.state === 'running';
+            return c.state === 'running' || c.is_backup_container;
         });
 
         var cntEl = document.getElementById('container-count');
@@ -148,16 +148,17 @@
         filtered.forEach(function(c) {
             var running = c.state === 'running';
             var unhealthy = running && (c.status || '').match(/unhealthy/i);
-            var borderColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : '#f85149');
-            var statusColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : '#f85149');
-            var statusIcon = unhealthy ? '!' : (running ? '●' : '○');
+            var borderColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : (c.is_backup_container ? '#6a0dad' : '#f85149'));
+            var statusColor = unhealthy ? '#f0883e' : (running ? '#3fb950' : (c.is_backup_container ? '#6a0dad' : '#f85149'));
+            var statusIcon = unhealthy ? '!' : (running ? '●' : (c.is_backup_container ? '↩' : '○'));
             var created = c.created ? new Date(c.created).toLocaleDateString() : '';
+            var backupBadge = c.is_backup_container ? '<span style="display:inline-block;background:#6a0dad;color:#fff;font-size:0.65em;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:bold;letter-spacing:0.5px;">BACKUP</span>' : '';
 
             html += '<div style="border:1px solid ' + borderColor + ';border-radius:6px;padding:10px 12px;background:var(--bg-color,#fff);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
                 '<div style="flex:2;min-width:200px;">' +
                 '  <div style="display:flex;align-items:center;gap:6px;">' +
                 '    <span style="color:' + statusColor + ';font-size:1em;">' + statusIcon + '</span>' +
-                '    <strong style="font-size:0.9em;">' + esc(c.name) + '</strong>' +
+                '    <strong style="font-size:0.9em;">' + esc(c.name) + '</strong>' + backupBadge +
                 '    <span style="font-size:0.75em;color:#666;">' + esc(c.id) + '</span>' +
                 '  </div>' +
                 '  <div style="font-size:0.82em;color:#666;margin-top:2px;">' +
@@ -179,6 +180,9 @@
                 '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="deploy-log" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Deploy Log</button>' +
                 (isLocal && c.image && c.image.match(/comserv/)
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
+                    : '') +
+                (c.is_backup_container
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="restore-backup" data-host="' + esc(currentTarget) + '" style="background:#6a0dad;color:#fff;padding:2px 8px;font-size:0.78em;font-weight:bold;">↩ Restore as Active</button>'
                     : '') +
                 '</div>' +
             '</div>';
@@ -308,6 +312,23 @@
                     setTimeout(loadAll, 5000);
                 })
                 .catch(function(e) { log('Rebuild error: ' + e.message, 'err'); });
+        } else if (act === 'restore-backup') {
+            if (!confirm('Restore backup container "' + cid + '" as the active container on ' + currentTarget + '?\n\nThe current running container will be stopped and preserved as a backup. Continue?')) return;
+            log('Restoring backup ' + cid + '...', 'info');
+            apiPost('/admin/docker/restore_backup', 'host=' + encodeURIComponent(currentTarget) + '&backup_name=' + encodeURIComponent(cid))
+                .then(function(d) {
+                    if (d.success) {
+                        log('✅ ' + d.message, 'ok');
+                    } else {
+                        log('❌ Restore failed: ' + (d.message || d.error || 'unknown'), 'err');
+                    }
+                    if (d.output) {
+                        log('--- Details ---', 'info');
+                        log(d.output, null);
+                    }
+                    setTimeout(loadAll, 3000);
+                })
+                .catch(function(e) { log('Restore error: ' + e.message, 'err'); });
         }
     }
 
