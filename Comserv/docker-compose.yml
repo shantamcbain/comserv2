@@ -130,7 +130,7 @@ services:
       - comserv2_cache:/cache
       - comserv2_temp:/tmp/comserv/temp
       - comserv2_themes:/opt/comserv/root/themes
-      # Legacy comserv-* volumes for static, cache, userprefs, sessions
+      # Legacy comserv-* volumes (permissions & cross-build persistence)
       - comserv-static:/opt/comserv/root/static:rw
       - comserv-cache:/opt/comserv/root/cache:rw
       - comserv-userprefs:/opt/comserv/root/userprefs:rw

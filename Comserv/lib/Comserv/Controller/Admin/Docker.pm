@@ -2,6 +2,7 @@ package Comserv::Controller::Admin::Docker;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::DockerDeploy;
 use JSON qw(encode_json decode_json);
 use DateTime;
 
@@ -406,22 +407,47 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     if ($pid == 0) {
-        # CHILD – close parent's DB & Redis connections, open our own log handle
+        # CHILD – catch ALL fatal errors and write them to the log file
+        local $SIG{__DIE__} = sub {
+            my $err = shift || 'unknown error';
+            if (open my $lf, '>>', $log_file) {
+                print $lf "[".scalar(localtime)."] CHILD CRASHED: $err\n";
+                close $lf;
+            }
+            unlink $pid_file;
+            exit(1);
+        };
+
         close_std_fds();
-        open(my $log, '>>', $log_file) or _exit_with_error($log_file, $pid_file, "Cannot open log file $log_file: $!");
+        open(my $log, '>>', $log_file) or do {
+            warn "Cannot open $log_file: $!";
+            unlink $pid_file;
+            exit(1);
+        };
         $| = 1;
         select((select($log), $|=1)[0]);
 
-        # Write the very first line immediately so the UI sees activity
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger, target=$target) ===\n";
         $log->flush();
 
-        my $deployer = Comserv::Util::DockerDeploy->new(
-            log_fh   => $log,
-            logging  => $self->logging,
-            trigger  => $trigger,
-            target   => $target,
-        );
+        # Wrap both ->new and deploy in eval so any error is logged
+        my $deployer;
+        eval {
+            $deployer = Comserv::Util::DockerDeploy->new(
+                log_fh   => $log,
+                logging  => $self->logging,
+                trigger  => $trigger,
+                target   => $target,
+            );
+        };
+        if ($@) {
+            print $log "[".scalar(localtime)."] Failed to create DockerDeploy: $@\n";
+            $log->flush();
+            close($log);
+            unlink($pid_file);
+            exit(1);
+        }
+
         eval {
             my $ok = $deployer->deploy_to_target_safe;
             print $log "[".scalar(localtime)."] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
@@ -433,7 +459,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             }
         };
         if ($@) {
-            print $log "[".scalar(localtime)."] CRASH in child: $@\n";
+            print $log "[".scalar(localtime)."] CRASH in deploy: $@\n";
             $log->flush();
         }
         close($log);
@@ -441,22 +467,10 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         exit(0);
     }
 
-    # --- helper subs used only by the child ---
     sub close_std_fds {
-        # Close inherited file handles that are useless in the child
-        if (defined &DBI::db::disconnect) {
-            eval { $_->disconnect for DBI->installed_handles(0,0); };
-        }
-    }
-
-    sub _exit_with_error {
-        my ($lf, $pf, $msg) = @_;
-        if (open my $fh, '>', $lf) {
-            print $fh "[".scalar(localtime)."] $msg\n";
-            close $fh;
-        }
-        unlink $pf;
-        exit(1);
+        # Child process inherits parent's DB handles. They're harmless — the
+        # child exits after the deploy finishes, and the OS reclaims them.
+        # Explicit disconnect is unreliable across DBI versions, so skip it.
     }
 
     # PARENT
@@ -745,13 +759,19 @@ sub list :Path('/admin/docker/list') :Args(0) {
         ? 'docker volume ls --format "{{.Name}}" 2>/dev/null'
         : qq{$ssh_prefix "docker volume ls --format '{{.Name}}' 2>/dev/null"};
 
-    my $vol_out = `\$vol_cmd` || '';
+    my $vol_out = `$vol_cmd` || '';
+    my %canonical = map { $_ => 1 } qw(
+        comserv2_config_db_data comserv2_redis_data comserv2_logs
+        comserv2_sessions comserv2_workshop_files comserv2_whisper_venv
+        comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
+    );
     foreach my $vname (split /\n/, $vol_out) {
-        next unless $vname =~ /comserv/i;
+        chomp $vname;
+        next unless $canonical{$vname};
         my $inspect_cmd = ($host eq 'workstation' || $host eq 'localhost')
-            ? "docker volume inspect \$vname 2>/dev/null"
-            : qq{$ssh_prefix "docker volume inspect \$vname 2>/dev/null"};
-        my $inspect_json = `\$inspect_cmd` || '[]';
+            ? "docker volume inspect $vname 2>/dev/null"
+            : qq{$ssh_prefix "docker volume inspect $vname 2>/dev/null"};
+        my $inspect_json = `$inspect_cmd` || '[]';
         my $vdata;
         eval { $vdata = decode_json($inspect_json); };
         next if $@ || ref($vdata) ne 'ARRAY' || !@$vdata;
@@ -765,9 +785,9 @@ sub list :Path('/admin/docker/list') :Args(0) {
         my $size = 'unknown';
         if ($mountpoint) {
             my $size_cmd = ($host eq 'workstation')
-                ? "du -sh \$mountpoint 2>/dev/null | cut -f1"
-                : qq{$ssh_prefix "du -sh \$mountpoint 2>/dev/null | cut -f1"};
-            $size = `\$size_cmd` || 'unknown';
+                ? "du -sh $mountpoint 2>/dev/null | cut -f1"
+                : qq{$ssh_prefix "du -sh $mountpoint 2>/dev/null | cut -f1"};
+            $size = `$size_cmd` || 'unknown';
             chomp $size;
         }
 
@@ -816,6 +836,23 @@ sub restart :Path('/admin/docker/restart') :Args(1) {
     my $result = $c->model('Docker')->restart_containers(services => [$service]);
     
     $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
+sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->stash->{json} = { success => 0, error => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rebuild', "Rebuilding service: $service");
+    my $repo = '/home/shanta/PycharmProjects/comserv2/Comserv';
+    my $output = `cd $repo && docker compose build $service 2>&1 && docker compose up -d --force-recreate $service 2>&1` || '';
+    my $success = $? == 0;
+    $c->stash->{json} = { success => $success ? 1 : 0, message => $success ? "Rebuild complete for $service" : "Rebuild failed for $service", output => $output };
     $c->forward('View::JSON');
 }
 
@@ -1031,13 +1068,76 @@ sub delete :Path('/admin/docker/delete') :Args(1) {
     $c->forward('View::JSON');
 }
 
+# ── /admin/docker/deploy-logs — get deploy log for a container ──
+sub deploy_logs :Path('/admin/docker/deploy-logs') :Args(1) {
+    my ($self, $c, $container_name) = @_;
+
+    my $log_dir = '/home/shanta/PycharmProjects/comserv2/log/docker_deploy/' . $container_name;
+    my @logs;
+    if (-d $log_dir) {
+        opendir my $dh, $log_dir or do {
+            $c->stash->{json} = { success => 0, error => "Cannot read $log_dir" };
+            $c->forward('View::JSON');
+            return;
+        };
+        while (my $f = readdir $dh) {
+            next unless $f =~ /\.log$/;
+            push @logs, { file => $f, path => "$log_dir/$f", mtime => (stat("$log_dir/$f"))[9] };
+        }
+        closedir $dh;
+        @logs = sort { $b->{mtime} <=> $a->{mtime} } @logs;  # newest first
+    }
+
+    # If a specific file is requested via ?file= param, return its content
+    my $req_file = $c->req->param('file');
+    if ($req_file) {
+        my $path = "$log_dir/$req_file";
+        $path =~ s/\.\.//g;  # prevent path traversal
+        if (-f $path) {
+            if (open my $fh, '<', $path) {
+                local $/;
+                my $content = <$fh>;
+                close $fh;
+                $c->stash->{json} = { success => 1, output => $content, logs => \@logs };
+                $c->forward('View::JSON');
+                return;
+            }
+        }
+        $c->stash->{json} = { success => 0, error => "File not found: $req_file" };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    $c->stash->{json} = { success => 1, logs => \@logs };
+    $c->forward('View::JSON');
+}
+
 sub logs :Path('/admin/docker/logs') :Args(1) {
     my ($self, $c, $service) = @_;
     
     my $lines = $c->req->param('lines') || 100;
-    my $result = $c->model('Docker')->get_container_logs($service, $lines);
+    my $host  = $c->req->param('host')  || 'workstation';
     
-    $c->stash->{json} = $result;
+    if ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1') {
+        my $result = $c->model('Docker')->get_container_logs($service, $lines);
+        $c->stash->{json} = $result;
+    } else {
+        # Remote host via SSH
+        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
+        my $admin_ctrl = $c->controller('Admin');
+        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        $ssh_pass ||= $ENV{SSHPASS} || '';
+        unless ($ssh_pass) {
+            $c->stash->{json} = { success => 0, error => "No SSH password for $host" };
+            $c->forward('View::JSON');
+            return;
+        }
+        local $ENV{SSHPASS} = $ssh_pass;
+        my $cmd = "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"docker logs --tail=$lines $service 2>&1\"";
+        my $output = `$cmd 2>/dev/null` || '';
+        $c->stash->{json} = { success => 1, output => $output, logs => $output };
+    }
+    
     $c->forward('View::JSON');
 }
 
@@ -1119,5 +1219,16 @@ sub docker_containers_legacy :Path('/admin/docker-containers-legacy') :Args(0) {
 }
 
 __PACKAGE__->meta->make_immutable;
+
+1;
+
+# ── /admin/docker/self — returns our container ID if inside Docker ──
+sub docker_self :Path('/admin/docker/self') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $cid = `cat /proc/1/cgroup 2>/dev/null | head -1 | grep -oP 'docker/[a-f0-9]{12}' | cut -d/ -f2` || '';
+    chomp $cid;
+    $c->response->body(encode_json({ container_id => $cid || '', in_docker => (-f '/.dockerenv' ? 1 : 0) }));
+}
 
 1;

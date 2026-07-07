@@ -42,7 +42,9 @@
             var newChunk = fullOutput.substring(knownLen);
             if (newChunk) {
                 con.appendChild(document.createTextNode(newChunk));
+                // Always scroll to bottom on new content
                 con.scrollTop = con.scrollHeight;
+                window.scrollTo(0, document.body.scrollHeight);
             }
         }
         lastContent = fullOutput;
