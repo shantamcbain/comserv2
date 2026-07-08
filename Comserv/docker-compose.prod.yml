@@ -70,9 +70,10 @@ services:
       - comserv2_themes:/opt/comserv/root/themes
       - comserv2_whisper_venv:/opt/comserv/whisper_venv
       - comserv2_cpan_cache:/root/.cpan
-      # Legacy bind mounts (keep or migrate)
-      - /root/static:/opt/comserv/root/static
-      - /root/LegacyStaticPages:/opt/comserv/root/LegacyStaticPages
+      # Legacy bind mounts — use STATIC_SRC/LEGACY_STATIC_SRC env vars to
+      # override source path (for workstation use the repo's root/ dirs)
+      - ${STATIC_SRC:-/root/static}:/opt/comserv/root/static
+      - ${LEGACY_STATIC_SRC:-/root/LegacyStaticPages}:/opt/comserv/root/LegacyStaticPages
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
       interval: 10s
@@ -85,17 +86,8 @@ services:
         max-size: "20m"
         max-file: "5"
 
-volumes:
-  # Core persistent data
-  comserv2_config_db_data:     # MariaDB / MySQL
-  comserv2_redis_data:
-  comserv2_logs:               # Application logs
-  comserv2_sessions:
-  comserv2_workshop_files:     # NFS-backed or local for uploads/workshops
-  comserv2_whisper_venv:       # Shared across envs
-  comserv2_cpan_cache:         # Perl dependencies
-
-  # Optional / dev-only
-  comserv2_temp:
-  comserv2_themes:
-  comserv2_cache:
+# NOTE: Volumes are defined in docker-compose.yml (base compose) only.
+# No volume definitions here to avoid conflicting parameters
+# (driver: local vs external: true) when merging compose files.
+# All volumes are pre-created by ensure_all_required_volumes* methods
+# before docker compose up runs.

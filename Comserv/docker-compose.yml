@@ -101,6 +101,56 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  web-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shantamcsbain/comserv-web-prod:latest
+    container_name: comserv2-web-dev
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      PORT: 3000
+      CATALYST_ENV: development
+      CATALYST_DEBUG: ${CATALYST_DEBUG:-1}
+      WEB_PORT: 3000
+      TZ: UTC
+      COMSERV_LOG_DIR: /opt/comserv/root/log
+    ports:
+      - "3000:3000"
+    volumes:
+      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - ./lib:/opt/comserv/lib:ro
+      - ./script:/opt/comserv/script:ro
+      - ./root:/opt/comserv/root:rw
+      - ./config:/opt/comserv/config:ro
+      - ./t:/opt/comserv/t:ro
+      - comserv2_logs:/opt/comserv/root/log
+      - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_sessions:/tmp/comserv/session:rw
+      - comserv2_cache:/cache
+      - comserv2_temp:/tmp/comserv/temp
+      - comserv2_themes:/opt/comserv/root/themes
+    # Non-built-in cmd: uses the catalyst app directly (not via starman)
+    command: >-
+      sh -c "
+        if [ -x /opt/comserv/script/setup_volumes.sh ]; then
+          /opt/comserv/script/setup_volumes.sh || true;
+        fi;
+        exec script/comserv_server.pl -d -r
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || curl -f http://127.0.0.1:3000/health || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 4
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
   web-staging:
     build:
       context: .
