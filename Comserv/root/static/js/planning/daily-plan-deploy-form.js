@@ -147,6 +147,8 @@
 
             var bodyParams = 'target=' + encodeURIComponent(target)
                          + '&trigger_source=DailyPlan-popup';
+            var noCacheCheckbox = document.getElementById('no-cache-deploy');
+            if (noCacheCheckbox && noCacheCheckbox.checked) bodyParams += '&no_cache=1';
             if (todoRecordId) bodyParams += '&todo_record_id=' + encodeURIComponent(todoRecordId);
 
             return safeFetch('/admin/docker-deploy-to-production', {

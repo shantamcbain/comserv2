@@ -212,6 +212,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
                 repo    => "$repo_path/Comserv",
                 target  => $target,
                 trigger => $trigger_source,
+                no_cache => $c->req->body_params->{no_cache} // 0,
             );
             # Use the shared safe entry point (ensures volumes first for any target)
             my $ok = $deploy->deploy_to_target_safe();
@@ -395,6 +396,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
     my $trigger   = $c->req->body_params->{trigger_source} || 'manual';
     my $target    = $c->req->body_params->{target} || 'production1';  # extract BEFORE fork
+    my $no_cache  = $c->req->body_params->{no_cache} // 0;
     my $log_file  = '/tmp/comserv_deploy.log';
     my $pid_file  = '/tmp/comserv_deploy.pid';
 
@@ -450,6 +452,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
                 logging  => $self->logging,
                 trigger  => $trigger,
                 target   => $target,
+                no_cache => $no_cache,
             );
         };
         if ($@) {
@@ -918,21 +921,90 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         return;
     }
 
-    require Comserv::Util::DockerDeploy;
-    my $deploy = Comserv::Util::DockerDeploy->new(
-        log_fh  => undef,
-        logging => $self->logging,
-        repo    => '/home/shanta/PycharmProjects/comserv2/Comserv',
-        target  => $deploy_target,
-        trigger => 'rebuild',
-    );
-    my $ok = $deploy->deploy_to_target_safe();
-    $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'rebuild',
-        $ok ? "Rebuild complete for $service (target=$deploy_target)" : "Rebuild FAILED for $service (target=$deploy_target)");
+    my $no_cache = $c->req->body_params->{no_cache} // 0;
+    my $log_file = '/tmp/comserv_deploy.log';
+    my $pid_file = '/tmp/comserv_deploy.pid';
+    unlink $log_file;
+    unlink $pid_file;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->stash->{json} = { success => 0, error => 'fork failed' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    if ($pid == 0) {
+        # CHILD — run the deploy asynchronously
+        local $SIG{__DIE__} = sub {
+            my $err = shift || 'unknown error';
+            if (open my $lf, '>>', $log_file) {
+                print $lf "[" . scalar(localtime) . "] CHILD CRASHED: $err\n";
+                close $lf;
+            }
+            unlink $pid_file;
+            exit(1);
+        };
+
+        close_std_fds();
+        open(my $log, '>>', $log_file) or do {
+            warn "Cannot open $log_file: $!";
+            unlink $pid_file;
+            exit(1);
+        };
+        $| = 1;
+        select((select($log), $|=1)[0]);
+
+        print $log "[" . scalar(localtime) . "] === REBUILD STARTED (service=$service, target=$deploy_target, no_cache=" . ($no_cache ? 'yes' : 'no') . ") ===\n";
+        $log->flush();
+
+        require Comserv::Util::DockerDeploy;
+        my $deployer;
+        eval {
+            $deployer = Comserv::Util::DockerDeploy->new(
+                log_fh   => $log,
+                logging  => $self->logging,
+                repo    => '/home/shanta/PycharmProjects/comserv2/Comserv',
+                target  => $deploy_target,
+                trigger => 'rebuild',
+                no_cache => $no_cache,
+            );
+        };
+        if ($@) {
+            print $log "[" . scalar(localtime) . "] Failed to create DockerDeploy: $@\n";
+            $log->flush();
+            close($log);
+            unlink($pid_file);
+            exit(1);
+        }
+
+        eval {
+            my $ok = $deployer->deploy_to_target_safe();
+            print $log "[" . scalar(localtime) . "] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
+            $log->flush();
+            if ($ok) {
+                print $log "[" . scalar(localtime) . "] === REBUILD SUCCESS ===\n";
+            } else {
+                print $log "[" . scalar(localtime) . "] === REBUILD FAILED (see errors above) ===\n";
+            }
+        };
+        if ($@) {
+            print $log "[" . scalar(localtime) . "] CRASH in deploy: $@\n";
+            $log->flush();
+        }
+        close($log);
+        unlink($pid_file);
+        exit(0);
+    }
+
+    # PARENT
+    open(my $pf, '>', $pid_file); print $pf $pid; close($pf);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rebuild',
+        "Rebuild backgrounded for $service (target=$deploy_target, pid=$pid)");
 
     $c->stash->{json} = {
-        success => $ok ? 1 : 0,
-        message => $ok ? "Rebuild complete for $service on $host" : "Rebuild failed for $service on $host",
+        success => 1,
+        message => "Rebuild started for $service on $host",
         target  => $deploy_target,
     };
     $c->forward('View::JSON');
