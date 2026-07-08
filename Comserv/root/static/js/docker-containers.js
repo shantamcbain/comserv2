@@ -17,6 +17,8 @@
     var volumesEl = document.getElementById('volumes-list');
     var targetSelect = document.getElementById('docker-target-select');
     var showAllCheckbox = document.getElementById('show-all-containers');
+    var rebuildPollingTimer = null;
+    var lastKnownOutput = '';
 
     // ──────────────────────────────────────────────────────────
     // Helpers
@@ -65,6 +67,62 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body || ''
         }).then(function(r){ return r.json(); });
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Rebuild polling — reuses /admin/docker-deploy-status
+    // ──────────────────────────────────────────────────────────
+    function startRebuildPolling(target) {
+        if (rebuildPollingTimer) clearInterval(rebuildPollingTimer);
+        lastKnownOutput = '';
+        setStatus('check', 'Rebuilding ' + target + '…');
+        rebuildPollingTimer = setInterval(function() {
+            apiPost('/admin/docker-deploy-status')
+                .then(function(data) {
+                    if (data.success) {
+                        // Append only newly added output lines
+                        var newOutput = data.output || '';
+                        if (newOutput.length > lastKnownOutput.length) {
+                            var delta = newOutput.substring(lastKnownOutput.length);
+                            // Split into lines and log each new line
+                            delta.split('\n').forEach(function(line) {
+                                if (line.trim()) log(line, null);
+                            });
+                            lastKnownOutput = newOutput;
+                        }
+                        if (!data.is_running) {
+                            clearInterval(rebuildPollingTimer);
+                            rebuildPollingTimer = null;
+                            // Determine success/failure from last output line
+                            var finalLine = newOutput.split('\n').filter(Boolean).pop() || '';
+                            if (finalLine.match(/SUCCESS/)) {
+                                setStatus('ok', 'Rebuild done');
+                                log('✅ REBUILD COMPLETE', 'ok');
+                            } else if (finalLine.match(/FAIL|CRASH|ERROR|FAILED/)) {
+                                setStatus('err', 'Rebuild failed');
+                                log('❌ REBUILD FAILED', 'err');
+                            } else {
+                                setStatus('ok', 'Rebuild done');
+                                log('Rebuild finished.', 'ok');
+                            }
+                            // Reload container list to reflect changes
+                            setTimeout(loadAll, 2000);
+                        }
+                    }
+                })
+                .catch(function(e) {
+                    if (e.message !== 'session-expired') {
+                        log('Rebuild status poll error: ' + e.message, 'err');
+                    }
+                });
+        }, 1500);
+    }
+
+    function stopRebuildPolling() {
+        if (rebuildPollingTimer) {
+            clearInterval(rebuildPollingTimer);
+            rebuildPollingTimer = null;
+        }
     }
 
     // ──────────────────────────────────────────────────────────
@@ -319,13 +377,31 @@
                 .catch(function(e) { log('Deploy log error: ' + e.message, 'err'); });
         } else if (act === 'rebuild') {
             if (!confirm('Rebuild container ' + cid + ' on ' + currentTarget + '? This runs the full deploy pipeline: volume check, build, backup, health check, and zero-downtime handover.')) return;
-            log('Rebuilding ' + cid + '...', 'info');
-            apiPost('/admin/docker/rebuild/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
+            // Stop any previous polling that might still be running
+            stopRebuildPolling();
+            log('=== REBUILD STARTED: ' + cid + ' ===', 'info');
+            log('Starting rebuild on ' + currentTarget + '...', 'info');
+            var noCacheCheckbox = document.getElementById('no-cache-rebuild');
+            var noCache = noCacheCheckbox ? noCacheCheckbox.checked : false;
+            var postBody = noCache ? 'no_cache=1' : '';
+            apiPost('/admin/docker/rebuild/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget), postBody)
                 .then(function(d) {
-                    log(d.success ? '✅ Rebuild started for ' + cid : '❌ Rebuild failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
-                    setTimeout(loadAll, 5000);
+                    if (d.success) {
+                        log('Build process started in background. Streaming output below:', 'dim');
+                        // Start polling the deploy status endpoint for live output
+                        startRebuildPolling(cid);
+                    } else {
+                        log('❌ Rebuild failed to start: ' + (d.message || d.stderr || 'unknown'), 'err');
+                        setStatus('err', 'Rebuild failed');
+                        setTimeout(loadAll, 5000);
+                    }
                 })
-                .catch(function(e) { log('Rebuild error: ' + e.message, 'err'); });
+                .catch(function(e) {
+                    stopRebuildPolling();
+                    log('❌ Rebuild request error: ' + e.message, 'err');
+                    setStatus('err', 'Network error');
+                    setTimeout(loadAll, 5000);
+                });
         } else if (act === 'restore-backup') {
             if (!confirm('Restore backup container "' + cid + '" as the active container on ' + currentTarget + '?\n\nThe current running container will be stopped and preserved as a backup. Continue?')) return;
             log('Restoring backup ' + cid + '...', 'info');
@@ -366,7 +442,13 @@
             log('Volume inspect for ' + vname + ' coming soon.', 'info');
         } else if (action === 'clear-output') {
             e.preventDefault();
-            if (outputBox) outputBox.textContent = 'Ready.\n';
+            if (outputBox) {
+                outputBox.textContent = 'Ready.\n';
+                // Reset status to current container count if not rebuilding
+                if (!rebuildPollingTimer) {
+                    setStatus('ok', containersCache.length + ' containers');
+                }
+            }
         }
     });
 
@@ -404,6 +486,11 @@
     // Auto-load
     document.addEventListener('DOMContentLoaded', function() {
         loadAll();
+    });
+
+    // Clean up polling timer on page unload
+    window.addEventListener('beforeunload', function() {
+        stopRebuildPolling();
     });
 
 })();

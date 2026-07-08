@@ -91,6 +91,14 @@
   </div>
 </div>
 
+<!-- No Cache Option -->
+<div style="padding:0 20px 12px;">
+  <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.85em;cursor:pointer;color:#c9d1d9;">
+    <input type="checkbox" id="no-cache-deploy" style="width:14px;height:14px;cursor:pointer;">
+    <span style="color:#ffc107;">No Cache</span> <span style="color:#8b949e;">(clean rebuild — skips Docker layer cache)</span>
+  </label>
+</div>
+
 <!-- Live Log Screen (hidden until choice is made) -->
 <pre id="console" style="display:none;"></pre>
 

@@ -293,6 +293,7 @@
                     '<div class="aew-form-group-row checkbox-row">' +
                       '<label><input type="checkbox" id="aew-deploy-vols"> Recreate Volumes</label>' +
                       '<label><input type="checkbox" id="aew-deploy-noroll"> No Rollback</label>' +
+                      '<label><input type="checkbox" id="aew-deploy-nocache"> No Cache</label>' +
                     '</div>' +
                     '<div class="aew-deploy-actions">' +
                       '<button type="button" class="aew-btn aew-btn-success" id="aew-btn-commit-deploy">Commit & Deploy</button>' +
@@ -416,7 +417,8 @@
             var body = 'target=' + encodeURIComponent(target) +
                        '&commit_msg=' + encodeURIComponent(commitMsg) +
                        '&recreate_volumes=' + recreateVols +
-                       '&no_rollback=' + noRollback;
+                       '&no_rollback=' + noRollback +
+                       '&no_cache=' + (q('#aew-deploy-nocache').checked ? 1 : 0);
 
             ajaxFetch('/ai/deploy_docker', {
                 method: 'POST',

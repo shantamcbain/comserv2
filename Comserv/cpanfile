@@ -24,8 +24,8 @@ requires 'JSON';
 requires 'JSON::XS';
 requires 'Config::JSON';
 
-# Template Toolkit and plugins
-requires 'Template';
+# Template Toolkit — version pinned here (single source of truth)
+requires 'Template' => '3.106';
 requires 'Template::Plugin::DateTime';
 requires 'Template::Plugin::JSON';
 requires 'Template::Plugin::Number::Format';

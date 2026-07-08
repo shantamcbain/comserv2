@@ -17,6 +17,7 @@ sub new {
         repo       => $args{repo}       || '/home/shanta/PycharmProjects/comserv2/Comserv',
         target     => $args{target}     || 'production1',
         trigger    => $args{trigger}    || 'manual',
+        no_cache   => $args{no_cache}   // 0,
     }, $class;
 }
 
@@ -120,8 +121,14 @@ sub deploy {
     # 2. Build (local) then push if remote
     my $git_hash = `cd $repo && git rev-parse --short HEAD 2>/dev/null` || 'unknown';
     chomp $git_hash;
-    $self->_log("Step 2: Building $service container (commit=$git_hash)...");
-    $self->_stream_command("cd $repo && docker compose $compose_files build --progress plain $service 2>&1");
+    $self->_log("Step 2: Building $service container (commit=$git_hash)" . ($self->{no_cache} ? ' [--no-cache]' : '') . "...");
+    my $no_cache_flag = $self->{no_cache} ? ' --no-cache' : '';
+    my $build_rc = $self->_stream_command("cd $repo && docker compose $compose_files build --progress plain$no_cache_flag $service 2>&1");
+    if ($build_rc != 0) {
+        $self->_log("✗ Build failed (exit=$build_rc) — aborting deploy. Running container $container_name is untouched.");
+        $self->_save_deploy_log($container_name, $target);
+        return 0;
+    }
     # Tag with git hash for traceability
     system("docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:$git_hash 2>/dev/null");
     $self->_log("Step 2b: Build finished (commit=$git_hash).");
@@ -444,7 +451,9 @@ sub _stream_command {
             $self->{log_fh}->flush() if $self->{log_fh};
         }
         close $pipe;
+        return ($? >> 8);
     }
+    return -1;
 }
 
 1;

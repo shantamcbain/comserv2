@@ -1978,12 +1978,13 @@ sub deploy :Path('deploy') :Args(0) {
             require Comserv::Util::DockerDeploy;
             open(my $log, '>>', '/tmp/comserv_deploy_4000.log') or exit 1;
             my $deploy = Comserv::Util::DockerDeploy->new(
-                log_fh  => $log,
-                logging => $self->logging,
-                repo    => $repo,
-                target  => 'local-staging',
-                trigger => 'modal-local-4000',
-            );
+                           log_fh   => $log,
+                           logging  => $self->logging,
+                           repo     => $repo,
+                           target   => 'local-staging',
+                           trigger  => 'modal-local-4000',
+                           no_cache => $c->req->body_params->{no_cache} // 0,
+                       );
             my $ok = $deploy->deploy_to_target_safe();
             print $log "[${\scalar localtime}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
             close($log);

@@ -24,11 +24,10 @@
  #    or any other complex admin template, verify the template parses
  #    correctly with TT 3.106+ (the version used in Docker containers).
  #
- # 5. Docker images pin Template::Toolkit@3.102 for stability. The long-term
- #    plan is to clean up templates to be compatible with the latest 3.x
- #    release, then lift the pin. Until then, test new template changes
- #    against BOTH 3.102 (bare metal / host) and 3.106+ (in a local TT
- #    install under /tmp/tt_test/) to catch regressions early.
+ # 5. Template::Toolkit version is pinned in cpanfile (single source of truth).
+ #    The long-term plan is to clean up templates to be compatible with the
+ #    latest 3.x release, then lift the pin. Until then, test new template
+ #    changes against the pinned version in Docker and the host version.
  #
  # Testing checklist for template changes:
  #   - perl -MTemplate -e 'Template->new(...)->process("your.tt", {...}, \$out) or die Template->error()'
