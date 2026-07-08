@@ -182,7 +182,11 @@
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
                     : '') +
                 (c.is_backup_container
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="restore-backup" data-host="' + esc(currentTarget) + '" style="background:#6a0dad;color:#fff;padding:2px 8px;font-size:0.78em;font-weight:bold;">↩ Restore as Active</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="restore-backup" data-host="' + esc(currentTarget) + '" style="background:#6a0dad;color:#fff;padding:2px 8px;font-size:0.78em;font-weight:bold;">↩ Restore as Active</button>' +
+                      '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Delete</button>'
+                    : '') +
+                (!running && !c.is_backup_container
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Delete</button>'
                     : '') +
                 '</div>' +
             '</div>';
@@ -222,9 +226,52 @@
     }
 
     // ──────────────────────────────────────────────────────────
-    // Container actions
+    // Container actions — shared fetch helper
     // ──────────────────────────────────────────────────────────
+    function _containerActionFetch(cid, act, endpoint, confirmMsg) {
+        // Shared logic: confirm (optional), POST to endpoint, log result, reload
+        if (confirmMsg && !confirm(confirmMsg)) return;
+        log((act.charAt(0).toUpperCase() + act.slice(1)) + 'ing ' + cid + '...', 'info');
+        apiPost(endpoint)
+            .then(function(d) {
+                if (d.success) {
+                    log('✅ ' + (d.message || act + ' ' + cid), 'ok');
+                    setTimeout(loadAll, 2000);
+                } else {
+                    log('❌ ' + (d.message || d.stderr || (act + ' failed on ' + cid)), 'err');
+                }
+            })
+            .catch(function(e) { log(act + ' error: ' + e.message, 'err'); });
+    }
+
     function containerAction(cid, act) {
+        var actionMap = {
+            'restart': '/admin/docker/restart/',
+            'stop':    '/admin/docker/stop/',
+            'start':   '/admin/docker/start/',
+            'rm':      '/admin/docker/delete/'
+        };
+
+        if (actionMap[act]) {
+            var endpoint = actionMap[act] + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget);
+            var confirmMsg = null;
+            if (act === 'restart') {
+                confirmMsg = 'Restart container ' + cid + ' on ' + currentTarget + '?';
+                if (currentTarget === 'workstation' && cid === window._ourContainerId) {
+                    confirmMsg = 'This is the container the web app is running in. Restart may cause a brief outage. Continue?';
+                }
+            } else if (act === 'stop') {
+                confirmMsg = 'Stop container ' + cid + ' on ' + currentTarget + '?';
+                if (currentTarget === 'workstation' && cid === window._ourContainerId) {
+                    confirmMsg = 'This is the container we are running in. Stopping it will crash this page. Continue?';
+                }
+            } else if (act === 'rm') {
+                confirmMsg = 'Permanently delete container "' + cid + '" on ' + currentTarget + '?\n\nThis cannot be undone. The container will be removed entirely.';
+            }
+            _containerActionFetch(cid, act, endpoint, confirmMsg);
+            return;
+        }
+
         if (act === 'logs') {
             log('Fetching logs for ' + cid + '...', 'info');
             apiPost('/admin/docker/logs/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget) + '&lines=200')
@@ -270,39 +317,6 @@
                     }
                 })
                 .catch(function(e) { log('Deploy log error: ' + e.message, 'err'); });
-        } else if (act === 'restart') {
-            if (!confirm('Restart container ' + cid + ' on ' + currentTarget + '?')) return;
-            // For local, avoid restarting the container we're running in
-            if (currentTarget === 'workstation' && cid === window._ourContainerId) {
-                if (!confirm('This is the container the web app is running in. Restart may cause a brief outage. Continue?')) return;
-            }
-            log('Restarting ' + cid + '...', 'info');
-            apiPost('/admin/docker/restart/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
-                .then(function(d) {
-                    log(d.success ? '✅ Restarted ' + cid : '❌ Restart failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
-                    if (d.success) setTimeout(loadAll, 3000);
-                })
-                .catch(function(e) { log('Restart error: ' + e.message, 'err'); });
-        } else if (act === 'stop') {
-            if (!confirm('Stop container ' + cid + ' on ' + currentTarget + '?')) return;
-            if (currentTarget === 'workstation' && cid === window._ourContainerId) {
-                if (!confirm('This is the container we are running in. Stopping it will crash this page. Continue?')) return;
-            }
-            log('Stopping ' + cid + '...', 'info');
-            apiPost('/admin/docker/stop/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
-                .then(function(d) {
-                    log(d.success ? '✅ Stopped ' + cid : '❌ Stop failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
-                    if (d.success) setTimeout(loadAll, 2000);
-                })
-                .catch(function(e) { log('Stop error: ' + e.message, 'err'); });
-        } else if (act === 'start') {
-            log('Starting ' + cid + '...', 'info');
-            apiPost('/admin/docker/start/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
-                .then(function(d) {
-                    log(d.success ? '✅ Started ' + cid : '❌ Start failed: ' + (d.message || d.stderr || 'unknown'), d.success ? 'ok' : 'err');
-                    if (d.success) setTimeout(loadAll, 3000);
-                })
-                .catch(function(e) { log('Start error: ' + e.message, 'err'); });
         } else if (act === 'rebuild') {
             if (!confirm('Rebuild container ' + cid + ' on ' + currentTarget + '? This runs docker compose build + up --force-recreate.')) return;
             log('Rebuilding ' + cid + '...', 'info');

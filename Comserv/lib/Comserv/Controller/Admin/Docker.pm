@@ -201,23 +201,24 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         my $container    = 'comserv-web-prod';
 
         # NEW: Support local staging deploy to port 4000 (web-staging service)
+        #       and local workstation deploy to port 5000 (web-prod service)
         my $target = $c->req->body_params->{target} || '';
-        if ($target eq 'local-staging' || $target eq 'staging-4000') {
-            push @lines, "[${\scalar localtime}] LOCAL STAGING DEPLOY (4000) requested";
+        if ($target =~ /^(local-staging|staging-4000|workstation|web-dev|local-test)$/) {
+            push @lines, "[${\\scalar localtime}] $target DEPLOY requested";
             require Comserv::Util::DockerDeploy;
             my $deploy = Comserv::Util::DockerDeploy->new(
                 log_fh  => undef,
                 logging => $self->logging,
                 repo    => "$repo_path/Comserv",
-                target  => 'local-staging',
+                target  => $target,
                 trigger => $trigger_source,
             );
             # Use the shared safe entry point (ensures volumes first for any target)
             my $ok = $deploy->deploy_to_target_safe();
             push @lines, "[${\scalar localtime}] deploy_to_target_safe returned: " . ($ok ? "success" : "error");
             $success = $ok;
-            push @lines, "[${\scalar localtime}] Staging deploy to 4000 complete.";
-            # Early return for staging
+            push @lines, "[${\\scalar localtime}] Deploy to $target complete.";
+            # Early return for local targets
             my $elapsed = time() - $t0;
             $c->response->body(encode_json({
                 success => $success ? 1 : 0,
@@ -399,6 +400,17 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
     unlink $log_file;
     unlink $pid_file;
+
+    # Resolve SSH credentials before forking so the child inherits $ENV{SSHPASS}
+    my $is_remote_target = ($target ne 'staging-4000' && $target ne 'local-staging' && $target ne 'web-dev');
+    if ($is_remote_target) {
+        my $admin_ctrl = $c->controller('Admin');
+        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($target);
+        if ($ssh_pass) {
+            $ENV{SSHPASS} = $ssh_pass;
+        }
+        # Also set user for the SSH prefix in DockerDeploy (used in its own target mapping)
+    }
 
     my $pid = fork();
     if (!defined $pid) {
@@ -819,21 +831,64 @@ sub list :Path('/admin/docker/list') :Args(0) {
     $c->forward('View::JSON');
 }
 
+# ── Shared helper: run a container action locally or via SSH ──
+sub _run_docker_action {
+    my ($self, $c, $action, $container) = @_;
+    # action: start|stop|restart|rm
+    my $host = $c->req->param('host') || 'workstation';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, $action,
+        "Running docker $action on $container ($host)");
+
+    my ($output, $success);
+    if ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1') {
+        if ($action eq 'rm') {
+            my $force = $c->req->param('force') || 0;
+            my $cmd = $force
+                ? "docker rm -f \"$container\" 2>&1"
+                : "docker rm \"$container\" 2>&1";
+            $output = `$cmd`;
+        } else {
+            $output = `docker $action $container 2>&1`;
+        }
+        $success = $? == 0;
+    } else {
+        my $admin_ctrl = $c->controller('Admin');
+        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        $ssh_pass ||= $ENV{SSHPASS} || '';
+        unless ($ssh_pass) {
+            return (0, '', "No SSH password for $host");
+        }
+        local $ENV{SSHPASS} = $ssh_pass;
+
+        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
+        my $remote_cmd = "docker $action $container 2>&1";
+        my $cmd = $action eq 'rm'
+            ? "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"$remote_cmd\""
+            : "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"$remote_cmd\"";
+        $output = `$cmd 2>/dev/null` || '';
+        $success = $? == 0;
+    }
+
+    return ($success, $output);
+}
+
 sub restart :Path('/admin/docker/restart') :Args(1) {
     my ($self, $c, $service) = @_;
-    
+
     unless ($c->req->method eq 'POST') {
         $c->stash->{json} = { success => 0, stderr => 'POST required' };
         $c->forward('View::JSON');
         return;
     }
-    
-    
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart', "Restarting service: $service");
-    my $result = $c->model('Docker')->restart_containers(services => [$service]);
-    
-    $c->stash->{json} = $result;
+
+    my ($success, $output) = $self->_run_docker_action($c, 'restart', $service);
+    my $host = $c->req->param('host') || 'workstation';
+    $c->stash->{json} = {
+        success => $success ? 1 : 0,
+        message => $success ? "Restarted $service on $host" : "Restart failed on $host",
+        output  => $output,
+        stderr  => $output,
+    };
     $c->forward('View::JSON');
 }
 
@@ -856,19 +911,21 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
 
 sub stop :Path('/admin/docker/stop') :Args(1) {
     my ($self, $c, $service) = @_;
-    
+
     unless ($c->req->method eq 'POST') {
         $c->stash->{json} = { success => 0, stderr => 'POST required' };
         $c->forward('View::JSON');
         return;
     }
-    
-    
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'stop', "Stopping service: $service");
-    my $result = $c->model('Docker')->stop_container($service);
-    
-    $c->stash->{json} = $result;
+
+    my ($success, $output) = $self->_run_docker_action($c, 'stop', $service);
+    my $host = $c->req->param('host') || 'workstation';
+    $c->stash->{json} = {
+        success => $success ? 1 : 0,
+        message => $success ? "Stopped $service on $host" : "Stop failed on $host",
+        output  => $output,
+        stderr  => $output,
+    };
     $c->forward('View::JSON');
 }
 
@@ -892,19 +949,21 @@ sub down :Path('/admin/docker/down') :Args(1) {
 
 sub start :Path('/admin/docker/start') :Args(1) {
     my ($self, $c, $service) = @_;
-    
+
     unless ($c->req->method eq 'POST') {
         $c->stash->{json} = { success => 0, stderr => 'POST required' };
         $c->forward('View::JSON');
         return;
     }
-    
-    
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start', "Starting service: $service");
-    my $result = $c->model('Docker')->start_container($service);
-    
-    $c->stash->{json} = $result;
+
+    my ($success, $output) = $self->_run_docker_action($c, 'start', $service);
+    my $host = $c->req->param('host') || 'workstation';
+    $c->stash->{json} = {
+        success => $success ? 1 : 0,
+        message => $success ? "Started $service on $host" : "Start failed on $host",
+        output  => $output,
+        stderr  => $output,
+    };
     $c->forward('View::JSON');
 }
 
@@ -1175,18 +1234,16 @@ sub delete :Path('/admin/docker/delete') :Args(1) {
         return;
     }
 
-    my $force = $c->req->param('force') || 0;
-    my $cmd = $force ? "docker rm -f \"$name\" 2>&1" : "docker rm \"$name\" 2>&1";
-    my $output = `\$cmd`;
-    my $exit = $? >> 8;
+    my ($success, $output) = $self->_run_docker_action($c, 'rm', $name);
+    my $host = $c->req->param('host') || 'workstation';
 
-    $self->logging->log_with_details($c, $exit == 0 ? 'info' : 'error', __FILE__, __LINE__, 'docker_delete',
-        "Deleted container: $name (force=$force)");
+    $self->logging->log_with_details($c, $success ? 'info' : 'error', __FILE__, __LINE__, 'docker_delete',
+        "Deleted container: $name (host=$host)");
 
     $c->stash->{json} = {
-        success => $exit == 0 ? 1 : 0,
-        output => $output,
-        message => $exit == 0 ? "Container $name removed" : "Failed to remove $name"
+        success => $success ? 1 : 0,
+        output  => $output,
+        message => $success ? "Container $name removed from $host" : "Failed to remove $name on $host"
     };
     $c->forward('View::JSON');
 }
