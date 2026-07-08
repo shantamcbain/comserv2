@@ -1,0 +1,38 @@
+[% #
+ # AI_ASSISTANT_GUIDELINES.tt — Template Toolkit policy for AI agents
+ #
+ # IMPORTANT: This file is consumed by the AI coding assistant (Hermes Agent)
+ # reading the project. It is never rendered or served to users. It exists
+ # solely as a non-executable reference document that the AI parses at session
+ # start to understand template conventions.
+ #
+ # Template Toolkit Version Policy
+ # ================================
+ #
+ # 1. ALL new .tt files and edits to existing templates MUST target Template
+ #    Toolkit 3.x compatibility.
+ #
+ # 2. Prefer clean, non-ambiguous nesting of [% IF %], [% FOREACH %],
+ #    [% BLOCK %], etc. Every opened block MUST have exactly one matching
+ #    [% END %] at the same nesting level.
+ #
+ # 3. Avoid deeply nested inline TT directives inside HTML attributes when
+ #    possible. Extract complex expressions to [% SET %] variables or
+ #    dedicated [% BLOCK %] sections instead.
+ #
+ # 4. The most complex admin template is admin/index.tt. Before editing it,
+ #    or any other complex admin template, verify the template parses
+ #    correctly with TT 3.106+ (the version used in Docker containers).
+ #
+ # 5. Docker images pin Template::Toolkit@3.102 for stability. The long-term
+ #    plan is to clean up templates to be compatible with the latest 3.x
+ #    release, then lift the pin. Until then, test new template changes
+ #    against BOTH 3.102 (bare metal / host) and 3.106+ (in a local TT
+ #    install under /tmp/tt_test/) to catch regressions early.
+ #
+ # Testing checklist for template changes:
+ #   - perl -MTemplate -e 'Template->new(...)->process("your.tt", {...}, \$out) or die Template->error()'
+ #   - Test with is_csc => 1 and other relevant view vars populated
+ #   - Verify no "unexpected end of input" or "unexpected token" parse errors
+-%]
+[%# End of guidelines -%]

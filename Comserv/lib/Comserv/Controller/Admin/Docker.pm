@@ -651,7 +651,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
             next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports, $created, $running_for, $state, $mounts, $networks) = split /\|/, $line, 10;
             $id = substr($id, 0, 12) if $id;
-            my $is_backup_container = ($name =~ /backup|bk-?\d{8}/i) ? 1 : 0;
+            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
 
             # Get image creation date
             my $img_created = '';
@@ -707,7 +707,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
             next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
             # Detect dated backup containers
-            my $is_backup_container = ($name =~ /backup|bk-?\d{8}/i) ? 1 : 0;
+            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
 
             # Get image creation date
             my $img_created = '';
@@ -901,11 +901,40 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         return;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rebuild', "Rebuilding service: $service");
-    my $repo = '/home/shanta/PycharmProjects/comserv2/Comserv';
-    my $output = `cd $repo && docker compose build $service 2>&1 && docker compose up -d --force-recreate $service 2>&1` || '';
-    my $success = $? == 0;
-    $c->stash->{json} = { success => $success ? 1 : 0, message => $success ? "Rebuild complete for $service" : "Rebuild failed for $service", output => $output };
+    my $host = $c->req->param('host') || 'workstation';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rebuild', "Rebuild requested for $service on $host");
+
+    # Map container name to DockerDeploy target
+    my $deploy_target;
+    if ($service eq 'comserv2-web-dev') {
+        $deploy_target = 'web-dev';
+    } elsif ($service eq 'comserv2-web-staging') {
+        $deploy_target = 'staging-4000';
+    } elsif ($service eq 'comserv-web-prod') {
+        $deploy_target = $host;
+    } else {
+        $c->stash->{json} = { success => 0, error => "Unknown container: $service" };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    require Comserv::Util::DockerDeploy;
+    my $deploy = Comserv::Util::DockerDeploy->new(
+        log_fh  => undef,
+        logging => $self->logging,
+        repo    => '/home/shanta/PycharmProjects/comserv2/Comserv',
+        target  => $deploy_target,
+        trigger => 'rebuild',
+    );
+    my $ok = $deploy->deploy_to_target_safe();
+    $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'rebuild',
+        $ok ? "Rebuild complete for $service (target=$deploy_target)" : "Rebuild FAILED for $service (target=$deploy_target)");
+
+    $c->stash->{json} = {
+        success => $ok ? 1 : 0,
+        message => $ok ? "Rebuild complete for $service on $host" : "Rebuild failed for $service on $host",
+        target  => $deploy_target,
+    };
     $c->forward('View::JSON');
 }
 

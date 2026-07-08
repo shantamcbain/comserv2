@@ -178,7 +178,7 @@
                     : '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="start" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Start</button>'
                 ) +
                 '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="deploy-log" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Deploy Log</button>' +
-                (isLocal && c.image && c.image.match(/comserv/)
+                (c.name && c.name.match(/comserv/)
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
                     : '') +
                 (c.is_backup_container
@@ -318,7 +318,7 @@
                 })
                 .catch(function(e) { log('Deploy log error: ' + e.message, 'err'); });
         } else if (act === 'rebuild') {
-            if (!confirm('Rebuild container ' + cid + ' on ' + currentTarget + '? This runs docker compose build + up --force-recreate.')) return;
+            if (!confirm('Rebuild container ' + cid + ' on ' + currentTarget + '? This runs the full deploy pipeline: volume check, build, backup, health check, and zero-downtime handover.')) return;
             log('Rebuilding ' + cid + '...', 'info');
             apiPost('/admin/docker/rebuild/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget))
                 .then(function(d) {
