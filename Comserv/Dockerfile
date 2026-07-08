@@ -36,7 +36,10 @@ RUN mkdir -p /opt/comserv/local/lib/perl5
 # Note: Do NOT force-rebuild YAML::XS as it causes binary incompatibility with Perl 5.40.0
 # Application uses YAML::Tiny for all YAML operations
 # Use multiple mirrors for better dependency resolution
+# Pin Template::Toolkit@3.102 for Docker stability (see AI_ASSISTANT_GUIDELINES.tt)
 RUN cpanm --local-lib=/opt/comserv/local --notest \
+    Template::Toolkit@3.102 && \
+    cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
     --installdeps .
