@@ -188,10 +188,32 @@ sub deploy {
         $self->_stream_command("cd $repo && docker compose $compose_files up -d --force-recreate $service 2>&1");
     }
 
-    # 6. Health-check loop (up to 60 seconds)
+    # 5.5 Rename compose-created container to expected name
+    # Docker Compose names containers as <project>_<service>_<index> (e.g.
+    # comserv-deploy_web-prod_1), but our health-check, rollback, and
+    # diagnostics code expects the canonical name ($container_name).
+    {
+        my $compose_ps = $is_remote
+            ? `$ssh_prefix "cd $self->{_remote_compose_dir} && docker compose $compose_files ps --format '{{.Names}}' 2>/dev/null | head -1"`
+            : `cd $repo && docker compose $compose_files ps --format '{{.Names}}' 2>/dev/null | head -1`;
+        chomp $compose_ps;
+        if ($compose_ps && $compose_ps ne $container_name) {
+            my $rename_new = $is_remote
+                ? "$ssh_prefix \"docker rename $compose_ps $container_name 2>&1\""
+                : "docker rename $compose_ps $container_name 2>&1";
+            $self->_stream_command($rename_new);
+            $self->_log("Renamed container from $compose_ps to $container_name for health check");
+        } elsif ($compose_ps) {
+            $self->_log("  Container name already matches $container_name");
+        } else {
+            $self->_log("  WARNING: Could not determine compose container name – continuing with assumed name $container_name");
+        }
+    }
+
+    # 6. Health-check loop (up to 90 seconds)
     $self->_log("Step 6: Waiting for $container_name to become healthy...");
     my $healthy = 0;
-    for my $i (1..30) {
+    for my $i (1..45) {
         my $health;
         if ($is_remote) {
             $health = `$ssh_prefix "docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'"`;
@@ -199,14 +221,32 @@ sub deploy {
             $health = `docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'`;
         }
         chomp $health;
-        $self->_log("  [$i/30] health=$health");
+        $health =~ s/^\s+|\s+$//g;
+        $self->_log("  [$i/45] health=$health");
         if ($health =~ /healthy/i) { $healthy = 1; last; }
+        # Fallback: try direct HTTP to the port (covers missing Docker HEALTHCHECK)
         if ($is_remote) {
-            my $http_ok = system("$ssh_prefix \"curl -sf --max-time 2 http://localhost:$port/ >/dev/null 2>&1\"") == 0;
+            my $http_ok = system("$ssh_prefix \"curl -sf --max-time 3 http://localhost:$port/ >/dev/null 2>&1\"") == 0;
             if ($http_ok) { $healthy = 1; last; }
         } else {
-            my $http_ok = system("curl -sf --max-time 2 http://localhost:$port/ >/dev/null 2>&1") == 0;
+            my $http_ok = system("curl -sf --max-time 3 http://localhost:$port/ >/dev/null 2>&1") == 0;
             if ($http_ok) { $healthy = 1; last; }
+        }
+        # Check if container is actually running (not exited)
+        if ($i % 10 == 0) {
+            my $state;
+            if ($is_remote) {
+                $state = `$ssh_prefix "docker inspect --format='{{.State.Status}}' $container_name 2>/dev/null || echo 'unknown'"`;
+            } else {
+                $state = `docker inspect --format='{{.State.Status}}' $container_name 2>/dev/null || echo 'unknown'`;
+            }
+            chomp $state;
+            $state =~ s/^\s+|\s+$//g;
+            $self->_log("  State check: container status=$state");
+            if ($state ne 'running' && $state ne 'starting' && $state ne 'unknown') {
+                $self->_log("  ✗ Container is not running (status=$state) — aborting health check.");
+                last;
+            }
         }
         sleep 2;
     }
@@ -224,15 +264,58 @@ sub deploy {
         $self->_log("✗ New $container_name failed health check – rolling back.");
         # Check if backup exists before trying to start it
         my $backup_exists = $is_remote
-            ? `$ssh_prefix "docker ps -a -q --filter 'name=^$backup\$' 2>/dev/null"`
-            : `docker ps -a -q --filter 'name=^$backup\$' 2>/dev/null`;
+            ? `$ssh_prefix "docker ps -a -q --filter 'name=^$backup\\$' 2>/dev/null"`
+            : `docker ps -a -q --filter 'name=^$backup\\$' 2>/dev/null`;
         chomp $backup_exists;
         if ($backup_exists) {
+            $self->_log("  Stopping failed new container $container_name...");
+            my $stop_new = $is_remote
+                ? "$ssh_prefix \"docker stop $container_name 2>&1 || true\""
+                : "docker stop $container_name 2>&1 || true";
+            $self->_stream_command($stop_new);
+
             my $rollback_cmd = $is_remote
-                ? "$ssh_prefix \"docker start $backup 2>&1 || true\""
-                : "docker start $backup 2>&1 || true";
-            $self->_stream_command($rollback_cmd);
-            $self->_error("Deploy FAILED on $target – rolled back to $backup. Old container restarted.");
+                ? "$ssh_prefix \"docker start $backup 2>&1\""
+                : "docker start $backup 2>&1";
+            my $rc = $self->_stream_command($rollback_cmd);
+            if ($rc == 0) {
+                $self->_error("Deploy FAILED on $target – rolled back to $backup. Old container restarted.");
+            } else {
+                # Rollback docker start failed — likely a stale Docker network issue.
+                # The backup container was originally created with a different Compose
+                # project network that may have been rotated. Disconnect stale networks
+                # and retry.
+                $self->_log("  docker start failed (exit=$rc) — trying to fix stale network references...");
+                $self->_log("  Attempting: disconnect stale networks and retry start...");
+                # Build the docker inspect format string for listing network IDs
+                # (single-quoted so Perl doesn't interpret Go template vars $n $v)
+                my $fmt = '{{range $n, $v := .NetworkSettings.Networks}}{{.NetworkID}} {{end}}';
+                $fmt =~ s/\$/\\\$/g;  # escape $ for shell (interpolated in double-quoted ssh command)
+                my $list_nets = $is_remote
+                    ? "$ssh_prefix \"docker inspect --format='$fmt' $backup 2>/dev/null\""
+                    : "docker inspect --format='$fmt' $backup 2>/dev/null";
+                my $net_ids = `$list_nets` || '';
+                chomp $net_ids;
+                my @stale_nets = grep { $_ ne '' } split(/\s+/, $net_ids);
+                $self->_log("  Found " . scalar(@stale_nets) . " network(s) attached to $backup.");
+                foreach my $nid (@stale_nets) {
+                    my $found = $is_remote
+                        ? `$ssh_prefix "docker network inspect $nid 2>/dev/null || echo 'NOT_FOUND'"`
+                        : `docker network inspect $nid 2>/dev/null || echo 'NOT_FOUND'`;
+                    chomp $found;
+                    if ($found =~ /NOT_FOUND/) {
+                        $self->_log("  Removing stale network $nid from $backup...");
+                        my $dc = $is_remote
+                            ? system("$ssh_prefix \"docker network disconnect -f $nid $backup 2>/dev/null\"")
+                            : system("docker network disconnect -f $nid $backup 2>/dev/null");
+                    }
+                }
+                my $retry = $is_remote
+                    ? "$ssh_prefix \"docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'\""
+                    : "docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'";
+                $self->_stream_command($retry);
+                $self->_error("Deploy FAILED on $target – attempted rollback with network recovery.");
+            }
         } else {
             $self->_error("Deploy FAILED on $target – no backup container to roll back to. Check container logs.");
         }
@@ -399,9 +482,11 @@ sub _compose_args {
 sub _sync_compose_to_remote {
     my ($self, $repo, $scp_prefix, $ssh_host) = @_;
 
-    my $now = DateTime->now(time_zone => 'local');
-    my $ts  = $now->ymd('') . '_' . $now->hms('');
-    my $remote_dir = "/tmp/comserv-deploy-$ts";
+    # Use a FIXED remote directory so Docker Compose reuses the same
+    # auto-created network (named <dirname>_default) across deploys.
+    # A timestamped directory creates a NEW project network each deploy,
+    # which breaks rollback — the backup container references the old network.
+    my $remote_dir = "/tmp/comserv-deploy";
 
     # List of compose files to transfer (base + prod only — no NFS on remote)
     my @files = ('docker-compose.yml', 'docker-compose.prod.yml');
@@ -419,15 +504,49 @@ sub _sync_compose_to_remote {
         return $self->_compose_args($repo);
     }
 
-    # 2. SCP each compose file
+    # 2. SCP each compose file — strip STATIC_SRC/LEGACY_STATIC_SRC bind mounts
+    #    from docker-compose.prod.yml for remote deploys. The image already has
+    #    static files at /opt/comserv/root/static; bind mounts override (and hide)
+    #    them on remote hosts where STATIC_SRC is unset, falling back to
+    #    /root/static (empty/missing on the remote host).
     foreach my $f (@files) {
         my $local  = "$repo/$f";
         my $remote = "ubuntu\@$ssh_host:$remote_dir/";
+
+        if ($f eq 'docker-compose.prod.yml') {
+            # Read, filter STATIC_SRC/LEGACY_STATIC_SRC bind mount lines, write temp
+            open my $fh_in, '<', $local or do {
+                $self->_error("Cannot read $local: $!");
+                next;
+            };
+            my $content = do { local $/; <$fh_in> };
+            close $fh_in;
+            my $orig_len = length $content;
+            $content =~ s/^[ ]*-\s*\$\{STATIC_SRC[^}]*\}.*\n//gm;
+            $content =~ s/^[ ]*-\s*\$\{LEGACY_STATIC_SRC[^}]*\}.*\n//gm;
+            if (length $content != $orig_len) {
+                my $tmp = "/tmp/comserv_deploy_$f";
+                open my $fh_out, '>', $tmp or do {
+                    $self->_error("Cannot write $tmp: $!");
+                    next;
+                };
+                print $fh_out $content;
+                close $fh_out;
+                $self->_log("  Stripped STATIC_SRC/LEGACY_STATIC_SRC bind mounts from $f for remote deploy");
+                $local = $tmp;
+            }
+        }
+
         $self->_log("  Transferring $f ...");
         my $scp_cmd = "$scp_prefix $local $remote";
         $rc = system($scp_cmd);
         if ($rc != 0) {
             $self->_error("Failed to SCP $f to $ssh_host (exit=$rc)");
+        }
+
+        # Clean up temp file if we created one
+        if ($local ne "$repo/$f") {
+            unlink $local;
         }
     }
 
