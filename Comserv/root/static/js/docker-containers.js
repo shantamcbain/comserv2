@@ -212,6 +212,8 @@
             var created = c.created ? new Date(c.created).toLocaleDateString() : '';
             var backupBadge = c.is_backup_container ? '<span style="display:inline-block;background:#6a0dad;color:#fff;font-size:0.65em;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:bold;letter-spacing:0.5px;">BACKUP</span>' : '';
 
+            // Debug: log container name for debugging button visibility
+            console.log('DEBUG container:', c.name, '|host:', currentTarget, '|isLocal:', isLocal, '|isBackup:', c.is_backup_container);
             html += '<div style="border:1px solid ' + borderColor + ';border-radius:6px;padding:10px 12px;background:var(--bg-color,#fff);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
                 '<div style="flex:2;min-width:200px;">' +
                 '  <div style="display:flex;align-items:center;gap:6px;">' +
@@ -238,6 +240,18 @@
                 '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="deploy-log" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Deploy Log</button>' +
                 (c.name && c.name.match(/comserv/)
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
+                    : '') +
+                // Build & Push: only on workstation for comserv-web-prod
+                (c.name && c.name.match(/^comserv-web-prod/) && isLocal
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="build-push" style="background:#17a2b8;color:#fff;padding:2px 8px;font-size:0.78em;">Build &amp; Push</button>'
+                    : '') +
+                // Push Image (no-build): just push the existing image, workstation only
+                (c.name && c.name.match(/^comserv-web-prod/) && isLocal
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="push-only" style="background:#0056b3;color:#fff;padding:2px 8px;font-size:0.78em;">Push Image</button>'
+                    : '') +
+                // Pull & Deploy: only on production targets for comserv-web-prod
+                (c.name && c.name.match(/^comserv-web-prod/) && !isLocal
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="pull-deploy" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Pull &amp; Deploy</button>'
                     : '') +
                 (c.is_backup_container
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="restore-backup" data-host="' + esc(currentTarget) + '" style="background:#6a0dad;color:#fff;padding:2px 8px;font-size:0.78em;font-weight:bold;">↩ Restore as Active</button>' +
@@ -419,7 +433,149 @@
                     setTimeout(loadAll, 3000);
                 })
                 .catch(function(e) { log('Restore error: ' + e.message, 'err'); });
+        } else if (act === 'build-push') {
+            if (!confirm('Build and push ' + cid + ' to Docker Hub on ' + currentTarget + '?\\n\\nThis will build the image locally and push to Docker Hub.\\nThe running container is NOT restarted.\\n\\nUse "Pull & Deploy" on the production server to deploy this image.')) return;
+            stopRebuildPolling();
+            log('=== BUILD & PUSH: ' + cid + ' ===', 'info');
+            log('Building and pushing to Docker Hub (running container untouched)...', 'info');
+            var noCacheCheckbox = document.getElementById('no-cache-rebuild');
+            var noCache = noCacheCheckbox ? noCacheCheckbox.checked : false;
+            var postBody = 'mode=build-push' + (noCache ? '&no_cache=1' : '');
+            apiPost('/admin/docker/rebuild/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget), postBody)
+                .then(function(d) {
+                    if (d.success) {
+                        log('Build & Push started in background. Streaming output below:', 'dim');
+                        startRebuildPolling(cid);
+                    } else {
+                        log('❌ Build & Push failed to start: ' + (d.message || d.stderr || 'unknown'), 'err');
+                        setStatus('err', 'Build & Push failed');
+                        setTimeout(loadAll, 5000);
+                    }
+                })
+                .catch(function(e) {
+                    stopRebuildPolling();
+                    log('❌ Build & Push request error: ' + e.message, 'err');
+                    setStatus('err', 'Network error');
+                    setTimeout(loadAll, 5000);
+                });
+        } else if (act === 'pull-deploy') {
+            if (!confirm('Pull and deploy ' + cid + ' on ' + currentTarget + '?\\n\\nThis will pull the latest image from Docker Hub, rename the old container to a date-stamped backup, and start the new container with zero-downtime handover.\\n\\nThe image must have been pushed first (use "Build & Push" on the workstation).')) return;
+            stopRebuildPolling();
+            log('=== PULL & DEPLOY: ' + cid + ' ===', 'info');
+            log('Pulling from Docker Hub and deploying on ' + currentTarget + '...', 'info');
+            apiPost('/admin/docker/rebuild/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget), 'mode=pull-deploy')
+                .then(function(d) {
+                    if (d.success) {
+                        log('Pull & Deploy started in background. Streaming output below:', 'dim');
+                        startRebuildPolling(cid);
+                    } else {
+                        log('❌ Pull & Deploy failed to start: ' + (d.message || d.stderr || 'unknown'), 'err');
+                        setStatus('err', 'Pull & Deploy failed');
+                        setTimeout(loadAll, 5000);
+                    }
+                })
+                .catch(function(e) {
+                    stopRebuildPolling();
+                    log('❌ Pull & Deploy request error: ' + e.message, 'err');
+                    setStatus('err', 'Network error');
+                    setTimeout(loadAll, 5000);
+                });
+        } else if (act === 'push-only') {
+            if (!confirm('Push image for ' + cid + ' to Docker Hub?\\n\\nThis will push the current local image without rebuilding. Use this when the container is already working and you just need to push the image for production deployment.')) return;
+            stopRebuildPolling();
+            log('=== PUSH IMAGE: ' + cid + ' ===', 'info');
+            log('Pushing image to Docker Hub (no rebuild)...', 'info');
+            apiPost('/admin/docker/rebuild/' + encodeURIComponent(cid) + '?host=' + encodeURIComponent(currentTarget), 'mode=push-only')
+                .then(function(d) {
+                    if (d.success) {
+                        log('Push started in background. Streaming output below:', 'dim');
+                        startRebuildPolling(cid);
+                    } else {
+                        log('❌ Push failed to start: ' + (d.message || d.stderr || 'unknown'), 'err');
+                        setStatus('err', 'Push failed');
+                        setTimeout(loadAll, 5000);
+                    }
+                })
+                .catch(function(e) {
+                    stopRebuildPolling();
+                    log('❌ Push request error: ' + e.message, 'err');
+                    setStatus('err', 'Network error');
+                    setTimeout(loadAll, 5000);
+                });
         }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Docker disk cleanup — show usage, confirm, then prune
+    // ──────────────────────────────────────────────────────────
+    function dockerPrune() {
+        log('Checking Docker disk usage on ' + currentTarget + '...', 'info');
+        setStatus('check', 'Checking disk...');
+
+        // First, show current usage
+        apiPost('/admin/docker/prune', 'host=' + encodeURIComponent(currentTarget) + '&action=df')
+            .then(function(data) {
+                if (!data.success) {
+                    log('❌ Failed to check disk usage: ' + (data.error || 'unknown'), 'err');
+                    setStatus('err', 'Check failed');
+                    return;
+                }
+
+                // Show current usage
+                log('--- Current Docker Disk Usage ---', 'info');
+                var lines = (data.output || '').split('\n');
+                lines.forEach(function(l) { if (l.trim()) log(l, null); });
+                log('', null);
+
+                // Ask user to confirm pruning
+                if (!confirm('Clean up Docker disk space on ' + currentTarget + '?\n\n' +
+                    'This will:\n' +
+                    '  • Remove ALL build cache (docker builder prune -a)\n' +
+                    '  • Remove unused/dangling images (docker image prune -a)\n\n' +
+                    'Volumes are NOT touched — backup data is safe.\n\n' +
+                    'Proceed?')) {
+                    log('Cleanup cancelled.', 'dim');
+                    setStatus('ok', 'Cancelled');
+                    return;
+                }
+
+                // Run the actual prune
+                log('=== PRUNING DOCKER DISK SPACE ===', 'info');
+                setStatus('check', 'Pruning...');
+
+                apiPost('/admin/docker/prune', 'host=' + encodeURIComponent(currentTarget) + '&action=prune')
+                    .then(function(pruneData) {
+                        if (!pruneData.success) {
+                            log('❌ Prune failed: ' + (pruneData.error || 'unknown'), 'err');
+                            setStatus('err', 'Prune failed');
+                            return;
+                        }
+
+                        // Show all output
+                        var pruneLines = (pruneData.output || '').split('\n');
+                        pruneLines.forEach(function(l) { if (l.trim()) log(l, null); });
+
+                        // Try to extract final reclaim info
+                        var finalLine = pruneLines.filter(function(l) { return l.match(/Total/i); }).pop() || '';
+                        if (finalLine) {
+                            log('✅ Disk cleanup complete!', 'ok');
+                            log('Final: ' + finalLine, 'dim');
+                        } else {
+                            log('✅ Disk cleanup complete.', 'ok');
+                        }
+                        setStatus('ok', 'Cleanup done');
+                        // Reload to reflect changes
+                        setTimeout(loadAll, 3000);
+                    })
+                    .catch(function(e) {
+                        log('❌ Prune error: ' + e.message, 'err');
+                        setStatus('err', 'Prune error');
+                    });
+            })
+            .catch(function(e) {
+                log('❌ Disk check error: ' + e.message, 'err');
+                setStatus('err', 'Check error');
+            });
     }
 
     // ──────────────────────────────────────────────────────────
@@ -449,6 +605,9 @@
                     setStatus('ok', containersCache.length + ' containers');
                 }
             }
+        } else if (action === 'docker-prune') {
+            e.preventDefault();
+            dockerPrune();
         }
     });
 

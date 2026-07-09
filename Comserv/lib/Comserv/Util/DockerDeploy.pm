@@ -18,6 +18,7 @@ sub new {
         target     => $args{target}     || 'production1',
         trigger    => $args{trigger}    || 'manual',
         no_cache   => $args{no_cache}   // 0,
+        mode       => $args{mode}       || 'full',   # full, build-push, pull-deploy
     }, $class;
 }
 
@@ -54,8 +55,9 @@ sub deploy {
     my ($self) = @_;
     my $repo   = $self->{repo};
     my $target = $self->{target};
+    my $mode   = $self->{mode};
 
-    $self->_log("=== DEPLOY STARTED (target=$target, trigger=$self->{trigger}) ===");
+    $self->_log("=== DEPLOY STARTED (target=$target, trigger=$self->{trigger}, mode=$mode) ===");
 
     # 0. Map target to service/container/port/ssh details
     my ($service, $container_name, $port, $compose_files, $ssh_prefix, $is_remote);
@@ -110,35 +112,68 @@ sub deploy {
         $compose_files  = $self->_sync_compose_to_remote($repo, $scp_prefix, $ssh_host);
     }
 
-    # 1. Create all required volumes — local for dev, remote for production
-    $self->_log("Step 1: Ensuring all required volumes exist...");
-    if ($is_remote) {
-        $self->ensure_all_required_volumes_remote($ssh_prefix);
-    } else {
-        $self->ensure_all_required_volumes($repo);
-    }
-
-    # 2. Build (local) then push if remote
-    my $git_hash = `cd $repo && git rev-parse --short HEAD 2>/dev/null` || 'unknown';
-    chomp $git_hash;
-    $self->_log("Step 2: Building $service container (commit=$git_hash)" . ($self->{no_cache} ? ' [--no-cache]' : '') . "...");
-    my $no_cache_flag = $self->{no_cache} ? ' --no-cache' : '';
-    my $build_rc = $self->_stream_command("cd $repo && docker compose $compose_files build --progress plain$no_cache_flag $service 2>&1");
-    if ($build_rc != 0) {
-        $self->_log("✗ Build failed (exit=$build_rc) — aborting deploy. Running container $container_name is untouched.");
+    # ── PUSH ONLY mode ──
+    # Just push the existing image without rebuilding
+    if ($mode eq 'push-only') {
+        $self->_log("Step 2: Pushing $service to Docker Hub (no rebuild)...");
+        my $rc = $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
+        if ($rc != 0) {
+            $self->_log("✗ Push failed (exit=$rc).");
+            $self->_save_deploy_log($container_name, $target);
+            return 0;
+        }
+        $self->_log("=== PUSH ONLY COMPLETE (target=$target) ===");
+        $self->_log("The running $container_name is untouched. Use 'Pull & Deploy' on the production server to deploy this image.");
         $self->_save_deploy_log($container_name, $target);
-        return 0;
+        return 1;
     }
-    # Tag with git hash for traceability
-    system("docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:$git_hash 2>/dev/null");
-    $self->_log("Step 2b: Build finished (commit=$git_hash).");
-    $self->{_git_hash} = $git_hash;
 
-    if ($is_remote) {
-        $self->_log("Step 3: Pushing $service to Docker Hub...");
-        $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
-        $self->_log("Step 3b: Push finished.");
+    # ── BUILD & PUSH phase (steps 1-2) ──
+    # Runs in full and build-push modes. Always skipped in pull-deploy mode.
+    if ($mode ne 'pull-deploy') {
+        # 1. Create all required volumes — local for dev, remote for production
+        $self->_log("Step 1: Ensuring all required volumes exist...");
+        if ($is_remote) {
+            $self->ensure_all_required_volumes_remote($ssh_prefix);
+        } else {
+            $self->ensure_all_required_volumes($repo);
+        }
+
+        # 2. Build (local) then push if remote
+        my $git_hash = `cd $repo && git rev-parse --short HEAD 2>/dev/null` || 'unknown';
+        chomp $git_hash;
+        $self->_log("Step 2: Building $service container (commit=$git_hash)" . ($self->{no_cache} ? ' [--no-cache]' : '') . "...");
+        my $no_cache_flag = $self->{no_cache} ? ' --no-cache' : '';
+        my $build_rc = $self->_stream_command("cd $repo && docker compose $compose_files build --progress plain$no_cache_flag $service 2>&1");
+        if ($build_rc != 0) {
+            $self->_log("✗ Build failed (exit=$build_rc) — aborting. Running container $container_name is untouched.");
+            $self->_save_deploy_log($container_name, $target);
+            return 0;
+        }
+        # Tag with git hash for traceability
+        system("docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:$git_hash 2>/dev/null");
+        $self->_log("Step 2b: Build finished (commit=$git_hash).");
+        $self->{_git_hash} = $git_hash;
+
+        if ($is_remote) {
+            $self->_log("Step 3: Pushing $service to Docker Hub...");
+            $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
+            $self->_log("Step 3b: Push finished.");
+        }
+
+        # In build-push mode, stop here — don't touch the running container
+        if ($mode eq 'build-push') {
+            $self->_log("=== BUILD & PUSH COMPLETE (target=$target, image=$git_hash) ===");
+            $self->_log("The running $container_name is untouched. Use 'Pull & Deploy' on the production server to deploy this image.");
+            $self->_save_deploy_log($container_name, $target);
+            return 1;
+        }
     }
+
+    # ── PULL & DEPLOY phase (steps 3-6) ──
+    # Runs in full and pull-deploy modes.
+    # In pull-deploy mode we do NOT build locally — we rely on the image already
+    # being on Docker Hub (pushed by a prior build-push run).
 
     # 3. Rename old container to date-stamped backup (local or remote)
     $self->_log("Step 4: Renaming old $container_name to backup...");
@@ -168,7 +203,9 @@ sub deploy {
         $self->_log("No existing container named $container_name found — will be created fresh.");
     }
 
-    # 4. Rotate backups — keep max 5
+    # 4. Rotate backups — keep up to 5 per container (global cap).
+    #     Per-container expectations: 4000/staging at least 1, web-dev at least 2, web-prod at least 1.
+    #     Since 5 >= all these, they're automatically satisfied by the global cap.
     $self->_prune_backups($container_name, 5, $is_remote, $ssh_prefix);
 
     # 4.5 Stop any old backup container that may block port $port

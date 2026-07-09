@@ -905,7 +905,9 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
     }
 
     my $host = $c->req->param('host') || 'workstation';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rebuild', "Rebuild requested for $service on $host");
+    my $mode = $c->req->param('mode') || 'full';
+    # mode: full (default), build-push, pull-deploy
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rebuild', "Rebuild requested for $service on $host (mode=$mode)");
 
     # Map container name to DockerDeploy target
     my $deploy_target;
@@ -955,7 +957,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         $| = 1;
         select((select($log), $|=1)[0]);
 
-        print $log "[" . scalar(localtime) . "] === REBUILD STARTED (service=$service, target=$deploy_target, no_cache=" . ($no_cache ? 'yes' : 'no') . ") ===\n";
+        print $log "[" . scalar(localtime) . "] === REBUILD STARTED (service=$service, target=$deploy_target, no_cache=" . ($no_cache ? 'yes' : 'no') . ", mode=$mode) ===\n";
         $log->flush();
 
         require Comserv::Util::DockerDeploy;
@@ -966,8 +968,9 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
                 logging  => $self->logging,
                 repo    => '/home/shanta/PycharmProjects/comserv2/Comserv',
                 target  => $deploy_target,
-                trigger => 'rebuild',
+                trigger => "rebuild:$mode",
                 no_cache => $no_cache,
+                mode    => $mode,
             );
         };
         if ($@) {
@@ -1000,11 +1003,11 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
     # PARENT
     open(my $pf, '>', $pid_file); print $pf $pid; close($pf);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rebuild',
-        "Rebuild backgrounded for $service (target=$deploy_target, pid=$pid)");
+        "Rebuild backgrounded for $service (target=$deploy_target, pid=$pid, mode=$mode)");
 
     $c->stash->{json} = {
         success => 1,
-        message => "Rebuild started for $service on $host",
+        message => "Rebuild started for $service on $host (mode=$mode)",
         target  => $deploy_target,
     };
     $c->forward('View::JSON');
@@ -1504,6 +1507,145 @@ __PACKAGE__->meta->make_immutable;
 1;
 
 # ── /admin/docker/self — returns our container ID if inside Docker ──
+# ── /admin/docker/prune — Docker disk space cleanup ──
+# Runs docker system df, builder prune, and image prune (no volume prune).
+# Skips volumes to protect backup data.
+sub prune :Path('/admin/docker/prune') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    unless ($self->_can_access_docker_widget($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => 0, error => 'CSC admin only' }));
+        return;
+    }
+
+    my $host = $c->req->param('host') || 'workstation';
+    my $action = $c->req->param('action') || 'all';
+    # action: 'df' (show usage only), 'prune' (builder + image prune), 'all' (df then prune)
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_prune',
+        "Docker prunes requested (host=$host, action=$action)");
+
+    my @output;
+
+    my $ssh_prefix;
+    my $is_remote = ($host ne 'workstation' && $host ne 'localhost' && $host ne '127.0.0.1');
+
+    if ($is_remote) {
+        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
+        my $ssh_user = 'ubuntu';
+        my $admin_ctrl = $c->controller('Admin');
+        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        $ssh_pass ||= $ENV{SSHPASS} || '';
+        unless ($ssh_pass) {
+            $c->response->body(encode_json({ success => 0, error => "No SSH password for $host" }));
+            return;
+        }
+        local $ENV{SSHPASS} = $ssh_pass;
+        $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
+    }
+
+    # Helper to run a command locally or via SSH
+    my $run_cmd = sub {
+        my ($cmd) = @_;
+        my $full_cmd = $is_remote ? "$ssh_prefix \"$cmd\"" : $cmd;
+        my $out = `$full_cmd 2>&1`;
+        my $exit = $? >> 8;
+        return ($out, $exit);
+    };
+
+    # Step 1: docker system df (always)
+    push @output, "=== Docker Disk Usage ===";
+    my ($df_out, $df_exit) = $run_cmd->("docker system df 2>&1");
+    push @output, $df_out;
+    push @output, "";
+
+    # Parse the reclaimable values from docker system df
+    my $reclaimable_total = 0;
+    my $build_cache_size = '0B';
+    my $image_reclaimable = '0B';
+    while ($df_out =~ /^(Images|Build Cache)\s+.*?([\d.]+(?:GB|MB|kB|B))\s+([\d.]+(?:GB|MB|kB|B))\s*\(?([\d.]+%)?\)?/gm) {
+        my $type = $1;
+        my $total_size = $2;
+        my $reclaimable = $3;
+        if ($type eq 'Build Cache') {
+            $build_cache_size = $total_size;
+        }
+    }
+
+    if ($action eq 'prune' || $action eq 'all') {
+        # Step 2: builder prune (safe — removes build cache, images stay)
+        push @output, "=== Pruning Build Cache (docker builder prune -a -f) ===";
+        my ($bp_out, $bp_exit) = $run_cmd->("docker builder prune -a -f 2>&1");
+        push @output, $bp_out;
+        push @output, "";
+
+        # Step 3: image prune — but PRESERVE backup images (tagged *backup*)
+        # First, find all backup images and re-tag them with a safe prefix so
+        # docker image prune -a doesn't remove them (they're not used by any
+        # running container, but the user wants to keep them).
+        push @output, "=== Preserving backup images (tagged *backup*) ===";
+        my ($bk_list, $bk_exit) = $run_cmd->(
+            "docker images --filter 'reference=*backup*' --format '{{.Repository}}:{{.Tag}}' 2>/dev/null"
+        );
+        my @backup_images = grep { /./ } split /\n/, ($bk_list || '');
+        foreach my $img (@backup_images) {
+            chomp $img;
+            my $safe_tag = "preserved-$img";
+            $safe_tag =~ s/[^a-zA-Z0-9_.-]/_/g;
+            $run_cmd->("docker tag $img $safe_tag 2>/dev/null");
+        }
+        push @output, "  Preserved " . scalar(@backup_images) . " backup image(s)." if @backup_images;
+        push @output, "  No backup images found." unless @backup_images;
+        push @output, "";
+
+        push @output, "=== Pruning Unused Images (docker image prune -a -f) ===";
+        my ($ip_out, $ip_exit) = $run_cmd->("docker image prune -a -f 2>&1");
+        push @output, $ip_out;
+        push @output, "";
+
+        # Restore backup images from preserved tags, then clean up preserved tags
+        push @output, "=== Restoring backup images ===";
+        my ($preserved_list, $pl_exit) = $run_cmd->(
+            "docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep '^preserved-'"
+        );
+        my @preserved = grep { /./ } split /\n/, ($preserved_list || '');
+        foreach my $ptag (@preserved) {
+            chomp $ptag;
+            # Extract original name: preserved-comserv-web-prod_backup-20260706  ->  comserv-web-prod:backup-20260706
+            my $orig = $ptag;
+            $orig =~ s/^preserved-//;
+            $orig =~ s/_/:/;  # first underscore is the repo:tag separator
+            $run_cmd->("docker tag $ptag $orig 2>/dev/null");
+            $run_cmd->("docker rmi $ptag 2>/dev/null");
+        }
+        push @output, "  Restored " . scalar(@preserved) . " backup image(s)." if @preserved;
+        push @output, "  No backup images to restore." unless @preserved;
+        push @output, "  (Backup images are NOT pruned — they are preserved.)";
+        push @output, "  To manually remove old backups, click 'Delete' on the backup container or image.";
+        push @output, "";
+
+        # Step 4: Show final usage
+        push @output, "=== Final Disk Usage ===";
+        my ($df2_out, $df2_exit) = $run_cmd->("docker system df 2>&1");
+        push @output, $df2_out;
+    }
+
+    $c->response->body(encode_json({
+        success => 1,
+        output  => join("\n", @output),
+        host    => $host,
+    }));
+}
+
 sub docker_self :Path('/admin/docker/self') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json; charset=utf-8');
