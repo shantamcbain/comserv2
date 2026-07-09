@@ -28,34 +28,31 @@
         <a href="#section-mail"><i class="fas fa-envelope"></i> Mail</a>
     </nav>
 
-    [%# ── Persistent action-required banners ──────────────────────── %]
+    [% # ── Persistent action-required banners ──────────────────────── %]
     [% IF pending_hosting > 0 %]
-    <div style="background:#fff3cd;border:2px solid #e67e22;border-radius:8px;padding:1rem 1.4rem;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center;">
+    <div class="banner-hosting">
       <div>
-        <strong style="color:#b45309;font-size:1.05rem;">&#9888; [% pending_hosting %] Hosting Registration[% IF pending_hosting > 1 %]s[% END %] Awaiting Approval</strong>
-        <div style="margin-top:0.25rem;color:#78350f;">
+        <strong class="banner-hosting-title">&#9888; [% pending_hosting %] Hosting Registration[% IF pending_hosting > 1 %]s[% END %] Awaiting Approval</strong>
+        <div class="banner-hosting-text">
           [% FOREACH pa IN pending_hosting_sites %]
-            <span style="display:inline-block;background:#fde68a;border:1px solid #d97706;border-radius:4px;padding:0.1rem 0.5rem;margin:0.15rem 0.2rem 0.15rem 0;font-weight:bold;">
-              [% pa.sitename | html %]
-            </span>
+            <span class="banner-hosting-tag">[% pa.sitename | html %]</span>
           [% END %]
           [% IF pending_hosting == 1 %]has[% ELSE %]have[% END %] submitted a CSC hosting registration request and [% IF pending_hosting == 1 %]is[% ELSE %]are[% END %] waiting for your approval.
         </div>
       </div>
-      <a href="[% c.uri_for('/admin/site_provisioning') %]"
-         style="white-space:nowrap;margin-left:1.5rem;background:#e67e22;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
+      <a href="[% c.uri_for('/admin/site_provisioning') %]" class="banner-hosting-link">
         Review &amp; Provision →
       </a>
     </div>
     [% END %]
 
-    [%# ── Outstanding invoices (non-CSC SiteNames) ────────────────── %]
+    [% # ── Outstanding invoices (non-CSC SiteNames) ────────────────── %]
     [% IF outstanding_invoices.size %]
     [% FOREACH inv IN outstanding_invoices %]
-    <div style="background:#fff0f0;border:2px solid #c0392b;border-radius:8px;padding:1rem 1.4rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+    <div class="banner-invoice">
       <div>
-        <strong style="color:#922b21;font-size:1.05rem;">&#128179; Invoice Due: [% inv.invoice_number | html %]</strong>
-        <div style="margin-top:0.25rem;color:#641e16;">
+        <strong class="banner-invoice-title">&#128179; Invoice Due: [% inv.invoice_number | html %]</strong>
+        <div class="banner-invoice-text">
           From <strong>[% inv.supplier.name | html %]</strong>
           — CAD [% inv.total_amount %]
           ([% inv.total_amount %] pts)
@@ -63,8 +60,7 @@
           [% IF inv.notes %]<br><small>[% inv.notes | html %]</small>[% END %]
         </div>
       </div>
-      <a href="[% c.uri_for('/Inventory/invoice/view/' _ inv.id) %]"
-         style="white-space:nowrap;margin-left:1.5rem;background:#c0392b;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
+      <a href="[% c.uri_for('/Inventory/invoice/view/' _ inv.id) %]" class="banner-invoice-link">
         View &amp; Pay →
       </a>
     </div>
@@ -98,9 +94,8 @@
                     </a>
                 </div>
                 [% IF software_status.git_status.commits_ahead > 0 %]
-                <div style="margin-top:0.75rem;">
-                    <a href="[% c.uri_for('/admin/git_push') %]"
-                       style="display:inline-flex;align-items:center;gap:0.4rem;background:#1565c0;color:#fff;padding:0.55rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:600;">
+                <div class="push-banner-wrapper">
+                    <a href="[% c.uri_for('/admin/git_push') %]" class="push-banner">
                         <i class="fas fa-upload"></i>
                         Push [% software_status.git_status.commits_ahead %] commit[% IF software_status.git_status.commits_ahead != 1 %]s[% END %] to remote
                     </a>
@@ -129,10 +124,10 @@
                     [% END %]
                 </div>
                 [% IF software_status.git_status.commits_ahead > 0 && software_status.git_status.unpushed_commits.size %]
-                <div class="section-info" style="margin-top:0.5rem;font-size:0.9em;">
+                <div class="section-info unpushed-info">
                     <strong>Unpushed:</strong>
                     [% FOREACH cmt IN software_status.git_status.unpushed_commits %]
-                    <code style="display:inline-block;margin:0.15rem 0.35rem 0.15rem 0;">[% cmt | html %]</code>
+                    <code class="code-inline">[% cmt | html %]</code>
                     [% END %]
                     [% IF software_status.git_status.commits_ahead > software_status.git_status.unpushed_commits.size %]
                     <span>…and [% software_status.git_status.commits_ahead - software_status.git_status.unpushed_commits.size %] more</span>
@@ -140,7 +135,7 @@
                 </div>
                 [% END %]
                 [% IF software_status.recommendations.size %]
-                <ul class="section-recommendations" style="margin:0.75rem 0 0;padding-left:1.2rem;font-size:0.92em;">
+                <ul class="section-recommendations">
                     [% FOREACH rec IN software_status.recommendations %]
                     <li>
                         <i class="[% rec.icon %]"></i> [% rec.message | html %]
@@ -152,8 +147,10 @@
             </div>
         </div>
         [% END %]
+        [% END %]
+        [% # close is_csc %]
 
-        [%# Docker Management Card #]
+        [% # Docker Management Card %]
         [% IF is_csc %]
         <div id="section-docker" class="admin-section theme-section">
             <div class="section-header">
@@ -177,6 +174,7 @@
             </div>
         </div>
         [% END %]
+    
 
         [% IF has_accounting %]
         <div id="section-accounting" class="admin-section theme-section">
@@ -538,7 +536,8 @@
                     </a>
                     <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="admin-link">
                         <i class="fas fa-shield-alt"></i>
-                        <span>OPNsense Gateway</span>
+                        <span>OPN
+                            sense Gateway</span>
                     </a>
                     <a href="[% c.uri_for('/cloudflareapi') %]" class="admin-link">
                         <i class="fas fa-cloud"></i>
@@ -591,48 +590,48 @@
         [% END %]
 
         <div id="section-helpdesk" class="admin-section theme-section">
-            <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="section-header section-header-row">
                 <h3><i class="fas fa-life-ring"></i> HelpDesk</h3>
                 [% IF helpdesk_open_count > 0 %]
-                <span style="background:#c0392b;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;font-weight:bold;">
+                <span class="badge-open-count">
                     [% helpdesk_open_count %] open
                 </span>
                 [% END %]
             </div>
             <div class="section-content">
                 [% IF helpdesk_open_tickets.size %]
-                <table style="width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse;font-size:0.88em;margin-bottom:10px;">
+                <table class="table-tickets">
                     <thead>
-                        <tr style="background:#f1f3f5;text-align:left;">
-                            <th style="padding:5px 8px;">Ticket</th>
-                            <th style="padding:5px 8px;">Subject</th>
-                            <th style="padding:5px 8px;">Site</th>
-                            <th style="padding:5px 8px;">Priority</th>
-                            <th style="padding:5px 8px;">Created</th>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Subject</th>
+                            <th>Site</th>
+                            <th>Priority</th>
+                            <th>Created</th>
                         </tr>
                     </thead>
                     <tbody>
                     [% FOREACH t IN helpdesk_open_tickets %]
-                        <tr style="border-bottom:1px solid #e9ecef;">
-                            <td style="padding:5px 8px;">
-                                <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]" style="font-family:monospace;">[% t.ticket_number %]</a>
+                        <tr>
+                            <td class="ticket-subject-mono">
+                                <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]">[% t.ticket_number %]</a>
                             </td>
-                            <td style="padding:5px 8px;">[% t.subject | truncate(50) %]</td>
-                            <td style="padding:5px 8px;">[% t.site_name %]</td>
-                            <td style="padding:5px 8px;">
-                                <span style="color:[% t.priority == 'critical' ? '#c0392b' : t.priority == 'high' ? '#e67e22' : '#555' %];font-weight:bold;">
+                            <td>[% t.subject | truncate(50) %]</td>
+                            <td>[% t.site_name %]</td>
+                            <td>
+                                <span class="ticket-priority-[% t.priority == 'critical' ? 'critical' : t.priority == 'high' ? 'high' : 'medium' %]">
                                     [% t.priority || 'medium' %]
                                 </span>
                             </td>
-                            <td style="padding:5px 8px;color:#888;">[% t.created_at %]</td>
+                            <td class="date-muted">[% t.created_at %]</td>
                         </tr>
                     [% END %]
                     </tbody>
                 </table>
                 [% ELSE %]
-                <p style="color:#27ae60;margin:6px 0;">&#10003; No open tickets.</p>
+                <p class="msg-success">&#10003; No open tickets.</p>
                 [% END %]
-                <div class="admin-links" style="margin-top:8px;">
+                <div class="admin-links helpdesk-links">
                     <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" class="admin-link">
                         <i class="fas fa-inbox"></i>
                         <span>Open Tickets [% IF helpdesk_open_count > 0 %]([% helpdesk_open_count %])[% END %]</span>
@@ -770,9 +769,9 @@
                 </div>
                 <div class="stat-sub-detail">[% stats.nfs_used %] / [% stats.nfs_total %]</div>
                 [% ELSIF stats.nfs_same_device %]
-                <div class="stat-value" style="font-size:.8rem;color:#888">local bind<br>not NFS</div>
+                <div class="stat-value stat-value-small">local bind<br>not NFS</div>
                 [% ELSIF stats.nfs_blended %]
-                <div class="stat-value" style="font-size:.8rem;color:#888">not mounted<br>separately</div>
+                <div class="stat-value stat-value-small">not mounted<br>separately</div>
                 [% ELSE %]
                 <div class="stat-value">—</div>
                 [% END %]
@@ -782,56 +781,54 @@
             [%# ── Uptime ── %]
             <a href="[% c.uri_for('/admin/system_info') %]" class="stat-item stat-item-link"
                title="Click for full system information">
-                <div class="stat-value" style="font-size:1rem">[% stats.uptime || 'Unknown' %]</div>
+                <div class="stat-value stat-value-uptime">[% stats.uptime || 'Unknown' %]</div>
                 <div class="stat-label">System Uptime</div>
             </a>
 
         </div>
     </div>
 
-    [%# ── Remote Server Stats ── %]
+    [% # ── Remote Server Stats ── %]
     [% IF remote_servers.size %]
-    <div class="stat-panel" style="margin-top:12px">
-        <h3 style="margin:0 0 8px;font-size:.95rem;color:var(--text-muted-color,#666)">Infrastructure Servers</h3>
+    <div class="stat-panel">
+        <h3 class="stat-panel-title">Infrastructure Servers</h3>
         <div class="stat-grid">
         [% FOR srv IN remote_servers %]
             <a href="[% c.uri_for('/admin/system_info') %]?host=[% srv.ip | uri %]"
-               class="stat-item stat-item-link" style="min-width:160px"
+               class="stat-item stat-item-link server-stat-item"
                title="View full metrics for [% srv.label %]">
                 [% IF srv.online %]
-                    <div style="font-size:.7rem;font-weight:600;color:var(--primary-color,#1976d2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">
-                        [% srv.label %][% IF srv.stale %] <span style="color:#e65100;font-weight:normal">(stale)</span>[% END %]
+                    <div class="server-label">
+                        [% srv.label %][% IF srv.stale %] <span class="server-label-stale">(stale)</span>[% END %]
                     </div>
-                    [% IF srv.hostname %]<div style="font-size:.65rem;color:#888">reported as [% srv.hostname | html %]</div>[% END %]
-                    [%# Disk %]
+                    [% IF srv.hostname %]<div class="server-hostname">reported as [% srv.hostname | html %]</div>[% END %]
+                    [% # Disk %]
                     [% SET dp = srv.metrics.disk_used_pct_root || srv.metrics.disk_used_pct %]
                     [% IF dp %]
                         [% SET dlvl = dp.level || 'ok' %]
-                        <div style="font-size:.75rem">Disk: <span class="stat-disk-[% dlvl %]"><strong>[% dp.value %]%</strong></span>
-                        [% IF dp.text %]<span style="color:#888;font-size:.7em"> ([% dp.text %])</span>[% END %]</div>
+                        <div class="server-metric">Disk: <span class="stat-disk-[% dlvl %]"><strong>[% dp.value %]%</strong></span>
+                        [% IF dp.text %]<span class="metric-detail"> ([% dp.text %])</span>[% END %]</div>
                     [% END %]
-                    [%# Memory %]
+                    [% # Memory %]
                     [% SET mp = srv.metrics.mem_used_pct %]
                     [% IF mp %]
                         [% SET mlvl = mp.level || 'ok' %]
-                        <div style="font-size:.75rem">Mem: <span class="stat-disk-[% mlvl %]"><strong>[% mp.value %]%</strong></span></div>
+                        <div class="server-metric">Mem: <span class="stat-disk-[% mlvl %]"><strong>[% mp.value %]%</strong></span></div>
                     [% END %]
-                    [%# CPU load %]
+                    [% # CPU load %]
                     [% SET lp = srv.metrics.cpu_load_pct %]
                     [% IF lp %]
                         [% SET llvl = lp.level || 'ok' %]
-                        <div style="font-size:.75rem">CPU: <span class="stat-disk-[% llvl %]"><strong>[% lp.value %]%</strong></span></div>
+                        <div class="server-metric">CPU: <span class="stat-disk-[% llvl %]"><strong>[% lp.value %]%</strong></span></div>
                     [% END %]
                     [% IF srv.last_seen %]
-                    <div style="font-size:.65rem;color:#999;margin-top:3px">[% srv.last_seen %]</div>
+                    <div class="server-last-seen">[% srv.last_seen %]</div>
                     [% END %]
                 [% ELSE %]
-                    <div style="font-size:.7rem;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">[% srv.label %]</div>
-                    <div style="font-size:.8rem;color:#bbb">No data (24h)</div>
-                    <div style="font-size:.65rem;color:#aaa;margin-top:3px">
-                      <button type="button" class="hw-agent-install" data-ip="[% srv.ip %]"
-                              style="font-size:.65rem;padding:2px 6px;cursor:pointer;border:1px solid #ccc;border-radius:3px;background:#f5f5f5"
-                              onclick="event.preventDefault();event.stopPropagation();installHwAgent(this);">
+                    <div class="server-label server-label-offline">[% srv.label %]</div>
+                    <div class="server-offline-msg">No data (24h)</div>
+                    <div class="server-offline-hint">
+                      <button type="button" class="hw-agent-install" data-ip="[% srv.ip %]" data-hw-install>
                         Install hardware agent
                       </button>
                     </div>
@@ -839,7 +836,7 @@
             </a>
         [% END %]
         </div>
-        <div style="font-size:.7rem;color:#aaa;margin-top:6px">
+        <div class="stat-panel-footer">
             Servers report via <a href="[% c.uri_for('/admin/hardware_monitor') %]">Hardware Monitor</a> ingest agent (every 5 min). Stale if &gt;2h old.
             [% IF stats.disk_level == 'critical' || stats.disk_level == 'warn' %]
             &middot; <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]">Disk cleanup</a>
@@ -847,259 +844,5 @@
         </div>
     </div>
     [% END %]
-
-    <style>
-    .stat-item-link { text-decoration:none; color:inherit; display:block; transition:box-shadow .15s, border-color .15s; }
-    .stat-item-link:hover { box-shadow:0 0 0 2px var(--primary-color,#1976d2); border-color:var(--primary-color,#1976d2); }
-    .stat-sub { font-size:.55em; color: var(--text-muted-color, #888); font-weight:normal; }
-    .stat-sub-detail { font-size:.75rem; color: var(--text-muted-color, #888); margin-top:2px; }
-    .stat-bar-wrap { height:8px; background:#e0e0e0; border-radius:4px; margin:4px 0 2px; overflow:hidden; }
-    .stat-bar { height:8px; border-radius:4px; }
-    .stat-bar-ok       { background:#4caf50; }
-    .stat-bar-warn     { background:#ff9800; }
-    .stat-bar-critical { background:#f44336; }
-    .stat-disk-ok       { color:inherit; }
-    .stat-disk-warn     { color:#e65100; }
-    .stat-disk-critical { color:#b71c1c; }
-    </style>
-    <script>
-    function installHwAgent(btn) {
-        var ip = btn.getAttribute('data-ip');
-        btn.disabled = true;
-        btn.textContent = 'Installing…';
-        fetch('/admin/install_hardware_agent?ip=' + encodeURIComponent(ip), { method: 'POST', credentials: 'same-origin' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                btn.textContent = data.success ? 'Done — reloading' : 'Failed — click to retry';
-                btn.disabled = false;
-                if (data.success) setTimeout(function() { location.reload(); }, 2500);
-                else if (data.output) alert(data.output.slice(0, 500));
-            })
-            .catch(function(err) {
-                btn.textContent = 'Error — retry';
-                btn.disabled = false;
-                alert('Install error: ' + err);
-            });
-    }
-    </script>
-    [% END %]
+    [% END %]  [%# close is_csc %]
 </div>
-
-<script>
-// Collapsible admin sections
-(function() {
-    function toggleSection(section) {
-        section.classList.toggle('expanded');
-    }
-
-    // Attach click handlers to all section headers
-    document.querySelectorAll('.admin-section .section-header').forEach(function(header) {
-        header.addEventListener('click', function(e) {
-            var section = header.closest('.admin-section');
-            if (section) toggleSection(section);
-        });
-    });
-
-    // Auto-expand if URL hash matches a section id
-    function expandFromHash() {
-        var hash = window.location.hash;
-        if (hash) {
-            var target = document.querySelector(hash);
-            if (target && target.classList.contains('admin-section')) {
-                target.classList.add('expanded');
-                // scroll into view smoothly
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-    }
-
-    // Run on load
-    window.addEventListener('load', expandFromHash);
-    // Also handle hash changes (back/forward nav)
-    window.addEventListener('hashchange', expandFromHash);
-})();
-</script>
-
-<style>
-/* Collapsible admin cards */
-.admin-section .section-content {
-    display: none;
-}
-.admin-section.expanded .section-content {
-    display: block;
-}
-.admin-section .section-header {
-    cursor: pointer;
-    user-select: none;
-}
-.admin-section .section-header::after {
-    content: ' ▶';
-    float: right;
-    font-size: 0.8em;
-    opacity: 0.6;
-}
-.admin-section.expanded .section-header::after {
-    content: ' ▼';
-}
-
-.admin-dashboard {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
-    font-family: var(--body-font, sans-serif);
-}
-
-.dashboard-header {
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-.admin-quick-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 10px 0 18px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--border-color, #ccc);
-}
-.admin-quick-nav a {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 11px;
-    border-radius: 14px;
-    background: var(--nav-bg, rgba(0,0,0,0.1));
-    color: var(--nav-text, var(--text-color, #333));
-    text-decoration: none;
-    font-size: 0.82em;
-    border: 1px solid var(--border-color, #ccc);
-    white-space: nowrap;
-}
-.admin-quick-nav a:hover {
-    background: var(--button-hover-bg, #e0e0e0);
-}
-
-.dashboard-header h1 {
-    color: var(--header-color, #333);
-    margin-bottom: 10px;
-}
-
-.debug-info {
-    font-size: 12px;
-    color: var(--text-color, #666);
-    opacity: 0.7;
-}
-
-.theme-section {
-    background: rgba(255,255,255,0.15);
-    border: 1px solid var(--border-color, #ccc);
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-    margin-bottom: 25px;
-}
-
-.section-header {
-    background: var(--nav-bg, rgba(255,255,255,0.2));
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--border-color, #ccc);
-}
-
-.section-header h2, .section-header h3 {
-    margin: 0;
-    color: var(--nav-text, var(--header-color, #333));
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.section-info {
-    padding: 8px 0 0;
-    font-size: var(--font-size-small, 13px);
-    color: var(--text-muted-color, #6c757d);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-}
-
-.section-info-warn {
-    color: var(--warning-color, #cc6600);
-    font-weight: bold;
-}
-
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 12px;
-    min-width: auto;
-}
-
-.admin-sections {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 20px;
-}
-
-.section-content { padding: 20px; }
-
-.admin-links { display: grid; gap: 10px; }
-
-.admin-link {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 15px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid var(--border-color, #ccc);
-    border-radius: 4px;
-    text-decoration: none;
-    color: var(--text-color, #333);
-    transition: all 0.2s ease;
-}
-
-.admin-link:hover {
-    background: var(--nav-hover-bg, rgba(255,255,255,0.25));
-    border-color: var(--accent-color, var(--primary-color, #007bff));
-    color: var(--nav-text, var(--text-color, #333));
-    transform: translateX(5px);
-}
-
-.admin-link i {
-    width: 20px;
-    text-align: center;
-    color: var(--text-color, #555);
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 20px;
-    padding: 20px;
-}
-
-.stat-item {
-    text-align: center;
-    padding: 20px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid var(--border-color, #ccc);
-    border-radius: 6px;
-}
-
-.stat-value {
-    font-size: 24px;
-    font-weight: bold;
-    color: var(--accent-color, var(--primary-color, #007bff));
-    margin-bottom: 8px;
-}
-
-.stat-label {
-    font-size: 14px;
-    color: var(--text-color, #555);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-@media (max-width: 768px) {
-    .admin-sections { grid-template-columns: 1fr; }
-    .admin-quick-nav { gap: 4px; }
-}
-</style>
