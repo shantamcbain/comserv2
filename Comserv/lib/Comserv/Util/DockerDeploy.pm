@@ -49,6 +49,59 @@ our @CANONICAL_VOLUMES = qw(
 our @PRODUCTION_VOLUMES = @CANONICAL_VOLUMES;
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Shared helper subroutines — single code path for container operations
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Check if a container exists (by exact name match)
+sub _container_exists {
+    my ($self, $name, $is_remote, $ssh_prefix) = @_;
+    my $cmd = $is_remote
+        ? "$ssh_prefix \"docker ps -a -q --filter 'name=^$name\$' 2>/dev/null\""
+        : "docker ps -a -q --filter 'name=^$name\$' 2>/dev/null";
+    my $out = `$cmd` || '';
+    chomp $out;
+    return $out ? 1 : 0;
+}
+
+# Rename a Docker container (old → new). Returns exit code (0 = success).
+# When $ignore_failure is true, failures are logged but non-fatal.
+sub _rename_container {
+    my ($self, $old_name, $new_name, $is_remote, $ssh_prefix, $ignore_failure) = @_;
+    my $suffix = $ignore_failure ? ' || true' : '';
+    my $cmd = $is_remote
+        ? "$ssh_prefix \"docker rename $old_name $new_name 2>&1$suffix\""
+        : "docker rename $old_name $new_name 2>&1$suffix";
+    my $rc = $self->_stream_command($cmd);
+    if ($rc == 0) {
+        $self->_log("  Renamed $old_name → $new_name");
+    } elsif (!$ignore_failure) {
+        $self->_error("  Failed to rename $old_name → $new_name (exit=$rc)");
+    }
+    return $rc;
+}
+
+# Create a timestamped backup of a running container.
+# Returns the backup name, or undef if the container doesn't exist.
+sub _backup_container {
+    my ($self, $container_name, $is_remote, $ssh_prefix) = @_;
+
+    $self->_log("Backing up $container_name...");
+    my $found = $self->_container_exists($container_name, $is_remote, $ssh_prefix);
+    $self->_log("  Container check: " . ($found ? "found" : "not found"));
+
+    if ($found) {
+        my $now    = DateTime->now(time_zone => 'local');
+        my $ts     = $now->ymd('') . '_' . $now->hms('');
+        my $backup = "bk-$container_name-$ts";
+        $self->_rename_container($container_name, $backup, $is_remote, $ssh_prefix, 0);
+        return $backup;
+    }
+
+    $self->_log("  No existing container named $container_name — skipping backup, will create fresh.");
+    return undef;
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PUBLIC ENTRY POINT — one method for all targets
 # ─────────────────────────────────────────────────────────────────────────────
 sub deploy {
@@ -128,17 +181,19 @@ sub deploy {
         return 1;
     }
 
-    # ── BUILD & PUSH phase (steps 1-2) ──
-    # Runs in full and build-push modes. Always skipped in pull-deploy mode.
-    if ($mode ne 'pull-deploy') {
-        # 1. Create all required volumes — local for dev, remote for production
-        $self->_log("Step 1: Ensuring all required volumes exist...");
-        if ($is_remote) {
-            $self->ensure_all_required_volumes_remote($ssh_prefix);
-        } else {
-            $self->ensure_all_required_volumes($repo);
-        }
+    # ── VOLUME CREATION (always runs for all modes) ──
+    # 1. Create all required volumes — local for dev, remote for production
+    #    Always runs so that pull-deploy mode works on hosts with no volumes yet.
+    $self->_log("Step 1: Ensuring all required volumes exist...");
+    if ($is_remote) {
+        $self->ensure_all_required_volumes_remote($ssh_prefix);
+    } else {
+        $self->ensure_all_required_volumes($repo);
+    }
 
+    # ── BUILD & PUSH phase (steps 2-3) ──
+    # Runs in full and build-push modes. Skipped in pull-deploy mode.
+    if ($mode ne 'pull-deploy') {
         # 2. Build (local) then push if remote
         my $git_hash = `cd $repo && git rev-parse --short HEAD 2>/dev/null` || 'unknown';
         chomp $git_hash;
@@ -175,35 +230,17 @@ sub deploy {
     # In pull-deploy mode we do NOT build locally — we rely on the image already
     # being on Docker Hub (pushed by a prior build-push run).
 
-    # 3. Rename old container to date-stamped backup (local or remote)
-    $self->_log("Step 4: Renaming old $container_name to backup...");
-    my $now     = DateTime->now(time_zone => 'local');
-    my $ts      = $now->ymd('') . '_' . $now->hms('');
-    my $backup  = "bk-$container_name-$ts";
-    my $docker_ps_cmd = $is_remote
-        ? "$ssh_prefix \"docker ps -a --format '{{.Names}}' 2>/dev/null\""
-        : "docker ps -a --format '{{.Names}}' 2>/dev/null";
-    my $ps_out = `$docker_ps_cmd`;
-    my $found = 0;
-    foreach my $n (split /\n/, $ps_out) {
-        chomp $n;
-        if ($n eq $container_name) {
-            $found = 1;
-            last;
-        }
-    }
-    $self->_log("  Container check: ps found=" . ($found ? 'yes' : 'no'));
-    if ($found) {
-        my $rename_cmd = $is_remote
-            ? "$ssh_prefix \"docker rename $container_name $backup 2>&1\""
-            : "docker rename $container_name $backup 2>&1";
-        $self->_stream_command($rename_cmd);
-        $self->_log("Renamed old container to $backup");
-    } else {
-        $self->_log("No existing container named $container_name found — will be created fresh.");
-    }
+    # 3. Backup old container (handles "no container" gracefully)
+    $self->_log("Step 4: Backing up old $container_name...");
+    my $backup  = $self->_backup_container($container_name, $is_remote, $ssh_prefix);
 
-    # 4. Rotate backups — keep up to 5 per container (global cap).
+    # ── eval wrap: exception safety from here through health check ──
+    # The old container was renamed to $backup above (or $backup is undef if no
+    # container existed). If anything dies during the deploy phase, the
+    # EVAL_ERROR handler below rolls back (honoring undef $backup gracefully).
+    my $healthy = 0;
+    my $deploy_ok = eval {
+        # 4. Rotate backups — keep up to 5 per container (global cap).
     #     Per-container expectations: 4000/staging at least 1, web-dev at least 2, web-prod at least 1.
     #     Since 5 >= all these, they're automatically satisfied by the global cap.
     $self->_prune_backups($container_name, 5, $is_remote, $ssh_prefix);
@@ -219,7 +256,12 @@ sub deploy {
     # 5. Start new container on remote (pull then up) or local (up only)
     if ($is_remote) {
         $self->_log("Step 5: Pulling image on $target and starting $service...");
-        $self->_stream_command("$ssh_prefix \"cd $self->{_remote_compose_dir} && docker compose $compose_files pull $service && docker compose $compose_files up -d --force-recreate $service 2>&1\"");
+        my $remote_cmd = sprintf(
+            'cd %s && ( docker compose %s pull %s 2>&1 ) && ( docker compose %s up -d --force-recreate %s 2>&1 )',
+            $self->{_remote_compose_dir}, $compose_files, $service,
+            $compose_files, $service
+        );
+        $self->_stream_command("$ssh_prefix \"$remote_cmd\"");
     } else {
         $self->_log("Step 5: Starting $service on localhost...");
         $self->_stream_command("cd $repo && docker compose $compose_files up -d --force-recreate $service 2>&1");
@@ -231,15 +273,11 @@ sub deploy {
     # diagnostics code expects the canonical name ($container_name).
     {
         my $compose_ps = $is_remote
-            ? `$ssh_prefix "cd $self->{_remote_compose_dir} && docker compose $compose_files ps --format '{{.Names}}' 2>/dev/null | head -1"`
+            ? `$ssh_prefix \"cd $self->{_remote_compose_dir} && docker compose $compose_files ps --format '{{.Names}}' 2>/dev/null | head -1\"`
             : `cd $repo && docker compose $compose_files ps --format '{{.Names}}' 2>/dev/null | head -1`;
         chomp $compose_ps;
         if ($compose_ps && $compose_ps ne $container_name) {
-            my $rename_new = $is_remote
-                ? "$ssh_prefix \"docker rename $compose_ps $container_name 2>&1\""
-                : "docker rename $compose_ps $container_name 2>&1";
-            $self->_stream_command($rename_new);
-            $self->_log("Renamed container from $compose_ps to $container_name for health check");
+            $self->_rename_container($compose_ps, $container_name, $is_remote, $ssh_prefix, 0);
         } elsif ($compose_ps) {
             $self->_log("  Container name already matches $container_name");
         } else {
@@ -249,7 +287,7 @@ sub deploy {
 
     # 6. Health-check loop (up to 90 seconds)
     $self->_log("Step 6: Waiting for $container_name to become healthy...");
-    my $healthy = 0;
+    $healthy = 0;
     for my $i (1..45) {
         my $health;
         if ($is_remote) {
@@ -287,13 +325,37 @@ sub deploy {
         }
         sleep 2;
     }
+    };  # end eval
+    if ($@) {
+        $self->_log("CRITICAL: Runtime error during deploy phase: $@");
+        # Stop the new container (always safe)
+        my $stop_new = $is_remote
+            ? "$ssh_prefix \"docker stop $container_name 2>&1 || true\""
+            : "docker stop $container_name 2>&1 || true";
+        $self->_stream_command($stop_new);
+        # Restore backup only if we had one
+        if ($backup) {
+            $self->_log("Emergency rollback: restoring $backup...");
+            my $start_backup = $is_remote
+                ? "$ssh_prefix \"docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'\""
+                : "docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'";
+            $self->_stream_command($start_backup);
+        } else {
+            $self->_log("No backup container to restore (fresh deploy).");
+        }
+        $self->_log("=== DEPLOY FAILED (target=$target) - emergency rollback ===");
+        $self->_save_deploy_log($container_name, $target);
+        return 0;
+    }
 
     if ($healthy) {
-        $self->_log("✅ New $container_name is healthy – stopping backup $backup.");
-        my $stop_cmd = $is_remote
-            ? "$ssh_prefix \"docker stop $backup 2>&1 || true\""
-            : "docker stop $backup 2>&1 || true";
-        $self->_stream_command($stop_cmd);
+        $self->_log("✅ New $container_name is healthy" . ($backup ? " – stopping backup $backup." : " (fresh deploy, no backup)."));
+        if ($backup) {
+            my $stop_cmd = $is_remote
+                ? "$ssh_prefix \"docker stop $backup 2>&1 || true\""
+                : "docker stop $backup 2>&1 || true";
+            $self->_stream_command($stop_cmd);
+        }
         $self->_log("=== DEPLOY COMPLETE (target=$target) ===");
         $self->_save_deploy_log($container_name, $target);
         return 1;
@@ -301,8 +363,8 @@ sub deploy {
         $self->_log("✗ New $container_name failed health check – rolling back.");
         # Check if backup exists before trying to start it
         my $backup_exists = $is_remote
-            ? `$ssh_prefix "docker ps -a -q --filter 'name=^$backup\\$' 2>/dev/null"`
-            : `docker ps -a -q --filter 'name=^$backup\\$' 2>/dev/null`;
+            ? `$ssh_prefix "docker ps -a -q --filter 'name=^$backup\$' 2>/dev/null"`
+            : `docker ps -a -q --filter 'name=^$backup\$' 2>/dev/null`;
         chomp $backup_exists;
         if ($backup_exists) {
             $self->_log("  Stopping failed new container $container_name...");
@@ -575,7 +637,8 @@ sub _sync_compose_to_remote {
         }
 
         $self->_log("  Transferring $f ...");
-        my $scp_cmd = "$scp_prefix $local $remote";
+        my $dest = "ubuntu\@$ssh_host:$remote_dir/$f";
+        my $scp_cmd = "$scp_prefix $local $dest";
         $rc = system($scp_cmd);
         if ($rc != 0) {
             $self->_error("Failed to SCP $f to $ssh_host (exit=$rc)");
