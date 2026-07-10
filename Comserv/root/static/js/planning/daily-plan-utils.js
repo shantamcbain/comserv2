@@ -23,7 +23,9 @@
         for (i = 0; i < tabbuttons.length; i++) {
             tabbuttons[i].classList.remove('active');
         }
-        document.getElementById(tabName).classList.add('active');
+        var tabEl = document.getElementById(tabName);
+        if (!tabEl) return;
+        tabEl.classList.add('active');
         if (evt && evt.currentTarget && evt.currentTarget.classList.contains('tab-button')) {
             evt.currentTarget.classList.add('active');
         }
@@ -32,6 +34,101 @@
         } else {
             location.hash = '#' + tabName;
         }
+        // Lazy-load tab content if not already fetched
+        if (tabEl.hasAttribute('data-lazy') && !tabEl.classList.contains('lazy-loaded')) {
+            lazyLoadTab(tabEl);
+        }
+    }
+
+    function lazyLoadTab(tabEl, optDate) {
+        var tab = tabEl.getAttribute('data-lazy');
+        var date = optDate || tabEl.getAttribute('data-lazy-date');
+        tabEl.classList.remove('lazy-loaded');
+        if (optDate) {
+            tabEl.setAttribute('data-lazy-date', optDate);
+        }
+        if (!tab || !date) return;
+        // Show loading indicator during re-navigation
+        tabEl.innerHTML = '<div class="tab-loading"><span class="spinner"></span> Loading <span class="tab-loading-name">' + tab + '</span>...</div>';
+        fetch('/planning/daily/' + date + '?tab=' + tab)
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            })
+            .then(function(html) {
+                // Script tags DO NOT execute when set via innerHTML.
+                // Extract them, set the HTML, then re-inject for execution.
+                var scriptContents = [];
+                var externalScripts = [];
+                html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, function(match, attrs, content) {
+                    var srcMatch = attrs.match(/src="([^"]+)"/);
+                    if (srcMatch) {
+                        externalScripts.push(srcMatch[1]);
+                    } else if (content.trim()) {
+                        scriptContents.push(content);
+                    }
+                    return '';
+                });
+
+                tabEl.innerHTML = html;
+                tabEl.classList.add('lazy-loaded');
+
+                // Re-inject inline scripts — executes immediately on DOM append
+                scriptContents.forEach(function(code) {
+                    try {
+                        var s = document.createElement('script');
+                        s.textContent = code;
+                        document.body.appendChild(s);
+                        document.body.removeChild(s);
+                    } catch(e) {
+                        console.warn('lazyLoadTab: script exec failed:', e);
+                    }
+                });
+
+                // Load external scripts referenced in the fetched HTML
+                externalScripts.forEach(function(src) {
+                    var s = document.createElement('script');
+                    s.src = src;
+                    s.async = false;
+                    document.body.appendChild(s);
+                });
+
+                // Initialize the daily-schedule calendar (gcal functions defined above)
+                if (typeof _gcalInitDayView === 'function') {
+                    _gcalInitDayView();
+                }
+                // Replace view-select onchange with lazy tab-switch
+                var selects = tabEl.querySelectorAll('.gcal-view-select');
+                for (var i = 0; i < selects.length; i++) {
+                    (function(sel) {
+                        sel.onchange = function() {
+                            var val = sel.value;
+                            var match = val.match(/#(.+)$/);
+                            if (match && match[1]) {
+                                switchTab(null, match[1]);
+                            }
+                        };
+                    })(selects[i]);
+                }
+                // Patch site filter to re-fetch tab instead of full page reload
+                var siteFilter = tabEl.querySelector('#gcal-site-filter');
+                if (siteFilter) {
+                    siteFilter.onchange = function() {
+                        var filterSite = siteFilter.value;
+                        fetch('/planning/set_filter', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ site: filterSite, user: '' })
+                        }).catch(function() {}).then(function() {
+                            lazyLoadTab(tabEl);
+                        });
+                    };
+                }
+            })
+            .catch(function(err) {
+                tabEl.innerHTML = '<div class="error-banner"><h4>⚠️ Failed to load tab</h4><p>' + err.message + '</p></div>';
+            });
     }
 
     function activateHashTarget(hash) {
@@ -343,7 +440,7 @@
         btn.style.borderColor = '#fd7e14';
         btn.title = 'Session active — click to close';
         btn.disabled = false;
-        btn.onclick = function() { closeLogTodoCard(btn, recordId); };
+        btn.setAttribute('data-record-id', recordId);
         var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
         if (card) {
             card.style.background = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color,#fff))';
@@ -359,7 +456,7 @@
         btn.style.color = '#0d6efd';
         btn.title = 'Start working — creates a log entry, marks todo active';
         btn.disabled = false;
-        btn.onclick = function() { startWorkTodoCard(btn, recordId); };
+        btn.setAttribute('data-record-id', recordId);
         var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
         if (card) {
             card.style.background = '';
@@ -543,6 +640,35 @@
             switchTab(e, tabBtn.getAttribute('data-tab'));
             return;
         }
+        // Date navigation inside lazy-loaded tab: prev/next arrows, Today button, week/month nav
+        var navLink = e.target.tagName === 'A' ? e.target : e.target.closest('a');
+        if (navLink) {
+            var lazyTab = navLink.closest('[data-lazy]');
+            if (lazyTab) {
+                var href = navLink.getAttribute('href') || '';
+                if (href.indexOf('/planning/daily/') === 0) {
+                    e.preventDefault();
+                    var dateMatch = href.match(/\/planning\/daily\/(\d{4}-\d{2}-\d{2})/);
+                    var hashMatch = href.match(/#(.+)$/);
+                    if (dateMatch) {
+                        var hash = hashMatch && hashMatch[1] || '';
+                        var lazyId = lazyTab.getAttribute('data-lazy');
+                        if (hash && hash !== lazyId) {
+                            // Switching to a different tab via navigation link with new date
+                            switchTab(null, hash);
+                            var targetTab = document.querySelector('[data-lazy="' + hash + '"]');
+                            if (targetTab && dateMatch) {
+                                lazyLoadTab(targetTab, dateMatch[1]);
+                            }
+                        } else {
+                            // Same tab, new date
+                            lazyLoadTab(lazyTab, dateMatch[1]);
+                        }
+                    }
+                    return;
+                }
+            }
+        }
         // Daily log actions: <button data-action="start-day"> or "end-day"
         var da = e.target.closest('[data-action]');
         if (da) {
@@ -555,6 +681,39 @@
             if (action === 'start-deploy-center') { if (typeof startDeploymentAction !== 'undefined') startDeploymentAction(); return; }
             if (action === 'close-branch-modal')  { closeBranchModal(); return; }
             if (action === 'cancel-deploy-modal') { cancelDeployModal(da); return; }
+            // Today work tab actions
+            if (action === 'triage-stale')  { if (typeof window.triageStale === 'function') { window.triageStale(); return; } }
+            if (action === 'reschedule')    { if (typeof window.rescheduleTodos === 'function') { window.rescheduleTodos(da); return; } }
+            if (action === 'refresh-audit') { if (typeof window.refreshAudit === 'function') { window.refreshAudit(e); return; } }
+            if (action === 'refresh-page')  { if (typeof window.refreshPage === 'function') { window.refreshPage(e); return; } }
+            if (action === 'sort-priority') { if (typeof window.sortTodos === 'function') { window.sortTodos('priority'); return; } }
+            if (action === 'sort-project')  { if (typeof window.sortTodos === 'function') { window.sortTodos('project'); return; } }
+            if (action === 'sort-due')      { if (typeof window.sortTodos === 'function') { window.sortTodos('due'); return; } }
+            if (action === 'clear-filters') { if (typeof window.clearAllFilters === 'function') { window.clearAllFilters(); return; } }
+        }
+        // Todo card: Start/Active button <button data-start-btn="1" data-record-id="N">
+        var startBtn = e.target.closest('[data-start-btn]');
+        if (startBtn) {
+            e.preventDefault();
+            var recordId = startBtn.getAttribute('data-record-id');
+            if (recordId) {
+                if (startBtn.textContent === '▶ Start' || startBtn.textContent.indexOf('Start') !== -1) {
+                    startWorkTodoCard(startBtn, parseInt(recordId, 10));
+                } else {
+                    closeLogTodoCard(startBtn, parseInt(recordId, 10));
+                }
+            }
+            return;
+        }
+        // Todo card: Done button <button data-done-btn="1" data-record-id="N">
+        var doneBtn = e.target.closest('[data-done-btn]');
+        if (doneBtn) {
+            e.preventDefault();
+            var doneRecordId = doneBtn.getAttribute('data-record-id');
+            if (doneRecordId) {
+                doneWithLogTodoCard(doneBtn, parseInt(doneRecordId, 10));
+            }
+            return;
         }
         // Save log entry: <button data-save-log="ENTRY_ID">
         var sel = e.target.closest('[data-save-log]');
@@ -618,6 +777,18 @@
                 sbm.getAttribute('data-target-url')
             );
             return;
+        }
+    });
+
+    /* ── Change event delegation for filter checkboxes ──────────── */
+
+    document.addEventListener('change', function(e) {
+        var cb = e.target.closest('[data-filter]');
+        if (cb && cb.tagName === 'INPUT' && cb.type === 'checkbox') {
+            var filterAction = cb.getAttribute('data-filter');
+            if (filterAction === 'apply') { applyAllFilters(); return; }
+            if (filterAction === 'parent-change') { onProjectParentChange(cb); return; }
+            if (filterAction === 'apply-update') { applyAllFilters(); updateProjectSummary(); return; }
         }
     });
 

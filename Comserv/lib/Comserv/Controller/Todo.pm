@@ -214,12 +214,8 @@ sub _get_user_accessible_sites {
 sub _get_filtered_calendar_sites {
     my ($self, $c, $all_sites) = @_;
     my $session = $c->session;
-    my $filter_site;
-    if (!exists $session->{cal_filter_site}) {
-        $filter_site = $session->{SiteName} || '';
-    } else {
-        $filter_site = $session->{cal_filter_site} // '';
-    }
+    my $saved_filter = $session->{cal_filter_site} // '';
+    my $filter_site = $saved_filter ? $saved_filter : ($session->{SiteName} || '');
     return $all_sites unless $filter_site && $filter_site ne '';
     return (grep { $_ eq $filter_site } @$all_sites) ? [$filter_site] : $all_sites;
 }
@@ -1997,7 +1993,7 @@ sub day :Path('/todo/day') :Args {
         is_csc                 => $day_is_csc,
         ap_all_sitenames       => \@day_all_sitenames,
         ap_all_usernames       => \@day_all_usernames,
-        cal_filter_site        => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : ($c->session->{SiteName} // '')),
+        cal_filter_site  => do { my $sf = $c->session->{cal_filter_site} // ''; $sf ? $sf : ($c->session->{SiteName} || '') },
         cal_filter_user        => ($c->session->{cal_filter_user} // ''),
         active_todos           => \%active_todos,
         template               => 'todo/day.tt',
@@ -2140,7 +2136,7 @@ sub week :Path('/todo/week') :Args {
         proj_name_map => \%week_proj_map,
         ap_all_sitenames => $calendar_sites_w,
         ap_all_usernames => \@week_all_usernames,
-        cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : ($c->session->{SiteName} // '')),
+        cal_filter_site  => do { my $sf = $c->session->{cal_filter_site} // ''; $sf ? $sf : ($c->session->{SiteName} || '') },
         cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         is_csc           => $week_is_csc,
         template => 'todo/week.tt',
@@ -2240,7 +2236,7 @@ sub month :Path('/todo/month') :Args {
         next_month_date => $next_month_date,
         today => $today,
         ap_all_sitenames => $calendar_sites_m,
-        cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : ($c->session->{SiteName} // '')),
+        cal_filter_site  => do { my $sf = $c->session->{cal_filter_site} // ''; $sf ? $sf : ($c->session->{SiteName} || '') },
         cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         is_csc           => $month_is_csc,
         template => 'todo/month.tt',

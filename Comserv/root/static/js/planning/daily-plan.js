@@ -28,7 +28,7 @@
                         if (!note) {
                             note = document.createElement('div');
                             note.id = 'focus-success-note';
-                            note.style.cssText = 'background:color-mix(in srgb,#28a745 12%,var(--bg-color));border:1px solid #28a745;border-radius:4px;padding:6px 10px;margin-bottom:8px;font-size:0.88em;color:#28a745;';
+                            note.className = 'FocusSuccessNote';
                             var list = document.getElementById('priorities-list');
                             if (list && list.parentNode) list.parentNode.insertBefore(note, list);
                         }
@@ -237,8 +237,8 @@
     function initFilters() {
         applyAllFilters();
         document.addEventListener('click', function(e) {
-            if (!e.target.closest('.ap-dropdown')) {
-                document.querySelectorAll('.ap-dropdown[open]').forEach(function(d){ d.removeAttribute('open'); });
+            if (!e.target.closest('.FilterDropdown')) {
+                document.querySelectorAll('.FilterDropdown[open]').forEach(function(d){ d.removeAttribute('open'); });
             }
         });
     }

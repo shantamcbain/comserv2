@@ -3,63 +3,62 @@
         <div id="today-work-content">
 
             [%# ── Action bar (below tabs) ── %]
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-color);">
-                <a href="/todo/addtodo" style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">+ Add Todo</a>
-                <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
-                <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
+            <div class="ActionBar">
+                <a href="/todo/addtodo" class="ActionBarLink ActionBarLink--primary">+ Add Todo</a>
+                <a href="/todo" class="ActionBarLink">All Todos</a>
+                <a href="/log" class="ActionBarLink">Logs</a>
                 [% IF is_admin %]
                 [% IF open_log_entry %]
-                <a href="#log-panel" onclick="toggleLogPanel();return false;" style="padding:4px 12px;border:1px solid #2a7a2a;border-radius:4px;text-decoration:none;font-size:0.82em;color:#2a7a2a;" title="View today's open log entry">🌅 Today's Log</a>
+                <a href="#log-panel" class="ActionBarLink ActionBarLink--green" data-action="toggle-log-panel" title="View today's open log entry">🌅 Today's Log</a>
                 [% ELSE %]
-                <button onclick="dailyLogAction('start')" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;background:transparent;font-size:0.82em;color:#20c997;cursor:pointer;" title="Start your day — audits application errors, checks HelpDesk, creates daily log">🌅 Start Day</button>
+                <button class="ActionBarBtn ActionBarBtn--teal" data-action="start-day" title="Start your day — audits application errors, checks HelpDesk, creates daily log">🌅 Start Day</button>
                 [% END %]
-                <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
-                <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+                <button class="ActionBarBtn ActionBarBtn--orange" data-action="triage-stale" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
+                <button class="ActionBarBtn ActionBarBtn--purple" data-action="reschedule" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
                 [% END %]
             </div>
 
             [%# ── Cross-project dependency summary (always visible, collapsible) ── %]
-            <details style="margin-bottom:8px;">
-                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#6f42c1 10%,var(--bg-color));border:1px solid #6f42c1;list-style:none;display:flex;align-items:center;gap:8px;">
-                    <span style="font-weight:bold;color:#6f42c1;">🔗 Cross-Project Dependencies</span>
+            <details class="mb-8">
+                <summary class="DepSummary">
+                    <span class="DepSummaryLabel">🔗 Cross-Project Dependencies</span>
                     [% IF active_blockers && active_blockers.size %]
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% active_blockers.size %] active — priority order affected[% IF dep_auto_resolved %] · ✓ [% dep_auto_resolved %] auto-resolved[% END %]</span>
+                    <span class="DepSummaryCount">[% active_blockers.size %] active — priority order affected[% IF dep_auto_resolved %] · ✓ [% dep_auto_resolved %] auto-resolved[% END %]</span>
                     [% ELSE %]
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">none active</span>
+                    <span class="DepSummaryCount">none active</span>
                     [% END %]
                 </summary>
-                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #6f42c1;border-top:none;border-radius:0 0 4px 4px;">
+                <div class="DepDetails">
                     [% IF active_blockers && active_blockers.size %]
                     [% FOREACH ab IN active_blockers %]
-                    <div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.9em;border-bottom:1px solid var(--border-color);">
-                        <a href="/project/details?project_id=[% ab.depends_on_id %]" style="color:#6f42c1;font-weight:bold;text-decoration:none;">[% ab.depends_on_name %]</a>
-                        <span style="color:var(--text-muted-color);font-size:0.85em;">must complete before</span>
-                        <a href="/project/details?project_id=[% ab.project_id %]" style="color:var(--text-color);text-decoration:none;">[% ab.project_name %]</a>
-                        <span style="color:var(--text-muted-color);font-size:0.8em;">can proceed</span>
+                    <div class="DepItem">
+                        <a href="/project/details?project_id=[% ab.depends_on_id %]" class="DepLink">[% ab.depends_on_name %]</a>
+                        <span class="DepSeparator">must complete before</span>
+                        <a href="/project/details?project_id=[% ab.project_id %]" class="link-plain">[% ab.project_name %]</a>
+                        <span class="DepSeparator">can proceed</span>
                     </div>
                     [% END %]
                     [% ELSE %]
-                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No active cross-project dependencies.</p>
+                    <p class="DepEmpty">No active cross-project dependencies.</p>
                     [% END %]
-                    <div style="margin-top:6px;text-align:right;">
-                        <a href="/project/dependency_form" style="font-size:0.85em;color:#6f42c1;">+ Manage Dependencies</a>
+                    <div class="DepManage">
+                        <a href="/project/dependency_form" class="DepLink">+ Manage Dependencies</a>
                     </div>
                 </div>
             </details>
 
             [%# ── Audit Todos (always visible, collapsible) ── %]
-            <details id="audit-panel" style="margin-bottom:8px;" open>
-                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#c45d00 10%,var(--bg-color));border:1px solid #c45d00;list-style:none;display:flex;align-items:center;gap:8px;">
-                    <span style="font-weight:bold;color:#c45d00;">🚨 Application Error Audit</span>
+            <details id="audit-panel" class="mb-8">
+                <summary class="AuditSummary">
+                    <span class="AuditSummaryLabel">🚨 Application Error Audit</span>
                     [% IF audit_todos && audit_todos.size %]
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% audit_todos.size %] item(s)</span>
+                    <span class="AuditSummaryCount">[% audit_todos.size %] item(s)</span>
                     [% ELSE %]
-                    <span id="audit-status-msg" style="font-size:0.85em;color:var(--text-muted-color);">no unresolved errors</span>
+                    <span id="audit-status-msg" class="AuditSummaryCount">no unresolved errors</span>
                     [% END %]
-                    <button id="btn-refresh-audit" onclick="refreshAudit(event)"
-                        style="margin-left:auto;font-size:0.75em;padding:2px 8px;border:1px solid #c45d00;border-radius:3px;background:transparent;color:#c45d00;cursor:pointer;" title="Re-scan system log for new errors">↻ Refresh</button>
+                    <button id="btn-refresh-audit" class="AuditRefreshBtn" data-action="refresh-audit" title="Re-scan system log for new errors">↻ Refresh</button>
                 </summary>
-                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #c45d00;border-top:none;border-radius:0 0 4px 4px;">
+                <div class="AuditDetails">
                     [% IF audit_todos && audit_todos.size %]
                     [% FOREACH at IN audit_todos %]
                     [% INCLUDE 'todo/todo_card.tt'
@@ -73,73 +72,72 @@
                     %]
                     [% END %]
                     [% ELSE %]
-                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No audit todos. Click <strong>🌅 Start Day</strong> to scan the application error log.</p>
+                    <p class="AuditEmpty">No audit todos. Click <strong>🌅 Start Day</strong> to scan the application error log.</p>
                     [% END %]
                 </div>
             </details>
 
             [%# ── Open HelpDesk Tickets (always visible, collapsible) ── %]
-            <details id="helpdesk-panel" style="margin-bottom:12px;" open>
-                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#9b0000 10%,var(--bg-color));border:1px solid #9b0000;list-style:none;display:flex;align-items:center;gap:8px;">
-                    <span style="font-weight:bold;color:#9b0000;">🎫 Open HelpDesk Tickets</span>
+            <details id="helpdesk-panel" class="mb-12">
+                <summary class="HelpdeskSummary">
+                    <span class="HelpdeskSummaryLabel">🎫 Open HelpDesk Tickets</span>
                     [% IF helpdesk_tickets && helpdesk_tickets.size %]
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% helpdesk_tickets.size %] open</span>
+                    <span class="HelpdeskSummaryCount">[% helpdesk_tickets.size %] open</span>
                     [% ELSE %]
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">none open</span>
+                    <span class="HelpdeskSummaryCount">none open</span>
                     [% END %]
-                    <button onclick="refreshPage(event)"
-                        style="margin-left:auto;font-size:0.75em;padding:2px 8px;border:1px solid #9b0000;border-radius:3px;background:transparent;color:#9b0000;cursor:pointer;" title="Re-check open HelpDesk tickets">↻ Refresh</button>
+                    <button class="HelpdeskRefreshBtn" data-action="refresh-page" title="Re-check open HelpDesk tickets">↻ Refresh</button>
                 </summary>
-                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #9b0000;border-top:none;border-radius:0 0 4px 4px;">
+                <div class="HelpdeskDetails">
                     [% IF helpdesk_tickets && helpdesk_tickets.size %]
                     [% FOREACH ht IN helpdesk_tickets %]
-                    <div style="padding:5px 0;border-bottom:1px solid var(--border-color);font-size:0.88em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <span style="font-family:monospace;color:var(--text-muted-color);flex-shrink:0;">[% ht.ticket_number %]</span>
-                        <span style="background:#9b0000;color:#fff;border-radius:3px;padding:1px 5px;font-size:0.78em;flex-shrink:0;">[% ht.priority | upper %]</span>
-                        <span style="flex:1;">[% ht.subject | html %]</span>
-                        <span style="font-size:0.78em;color:var(--text-muted-color);flex-shrink:0;">[% ht.username %] · [% ht.created_at %]</span>
-                        <a href="/HelpDesk/ticket/[% ht.ticket_number %]" style="font-size:0.82em;color:#9b0000;flex-shrink:0;">View →</a>
+                    <div class="HelpdeskItem">
+                        <span class="HelpdeskTicketNum">[% ht.ticket_number %]</span>
+                        <span class="HelpdeskPriority">[% ht.priority | upper %]</span>
+                        <span class="HelpdeskSubject">[% ht.subject | html %]</span>
+                        <span class="HelpdeskMeta">[% ht.username %] · [% ht.created_at %]</span>
+                        <a href="/HelpDesk/ticket/[% ht.ticket_number %]" class="HelpdeskItemLink">View →</a>
                     </div>
                     [% END %]
-                    <div style="margin-top:6px;text-align:right;">
-                        <a href="/HelpDesk" style="font-size:0.82em;color:#9b0000;">View all tickets →</a>
+                    <div class="HelpdeskViewAll">
+                        <a href="/HelpDesk">View all tickets →</a>
                     </div>
                     [% ELSE %]
-                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No open support tickets.</p>
+                    <p class="HelpdeskEmpty">No open support tickets.</p>
                     [% END %]
                 </div>
             </details>
 
             [%# ── TODAY'S FOCUS QUEUE (top 20 actionable todos) ── %]
-            <div style="margin-bottom:24px;">
-                <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                    <h3 style="margin:0;font-size:1.1em;">🎯 Today's Focus Queue</h3>
+            <div class="mb-24">
+                <div class="FocusHeader">
+                    <h3>🎯 Today's Focus Queue</h3>
                     [% SET ap_total = active_priorities_total || active_priorities.size %]
                     [% IF ap_total %]
-                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;">
+                    <span class="FocusStats">
                         <span id="ap-visible-count">[% active_priorities.size %]</span> of <span id="ap-total-count">[% ap_total %]</span> todo[% IF ap_total != 1 %]s[% END %]
                         [% IF focus_queue_limit && ap_total > focus_queue_limit %]
-                        <span style="color:var(--text-muted-color);">(showing top [% focus_queue_limit %])</span>
+                        <span>(showing top [% focus_queue_limit %])</span>
                         [% END %]
                     </span>
                     [% IF active_priorities_backlog %]
-                    <a href="/todo" style="font-size:0.78em;color:var(--primary-color);text-decoration:none;margin-left:4px;">+ [% active_priorities_backlog %] more in backlog →</a>
+                    <a href="/todo" class="BacklogLink">+ [% active_priorities_backlog %] more in backlog →</a>
                     [% END %]
                     [% END %]
 
                 </div>
 
                 [%# ── Filter Bar — compact single row with collapsible dropdowns ── %]
-                <div id="ap-filter-bar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:5px 10px;margin-bottom:12px;">
+                <div id="ap-filter-bar" class="FilterBar">
 
                     [%# Role multi-select — uses actual user profile roles %]
                     [% IF ap_user_roles && ap_user_roles.size > 1 %]
-                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
-                        <summary id="role-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Role: All ▾</summary>
-                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:140px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                    <details class="FilterDropdown">
+                        <summary id="role-summary" class="FilterDropdownSummary">Role: All ▾</summary>
+                        <div class="FilterDropdownMenu">
                             [% FOREACH ur IN ap_user_roles %]
-                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
-                                <input type="checkbox" class="role-cb" value="[% ur %]" checked onchange="applyAllFilters()">
+                            <label class="FilterDropdownItem">
+                                <input type="checkbox" class="role-cb" value="[% ur %]" checked data-filter="apply">
                                 [% ur %]
                             </label>
                             [% END %]
@@ -149,16 +147,16 @@
 
                     [%# Site filter — shown to any user with access to more than one site %]
                     [% IF ap_all_sitenames && ap_all_sitenames.size > 1 %]
-                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
-                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: [% cal_filter_site || 'All' %] ▾</summary>
-                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
-                                <input type="checkbox" class="site-cb" value="" [% UNLESS cal_filter_site %]checked[% END %] onchange="applyAllFilters()">
+                    <details class="FilterDropdown">
+                        <summary id="site-summary" class="FilterDropdownSummary">Site: [% cal_filter_site || 'All' %] ▾</summary>
+                        <div class="FilterDropdownMenu">
+                            <label class="FilterDropdownItem">
+                                <input type="checkbox" class="site-cb" value="" [% UNLESS cal_filter_site %]checked[% END %] data-filter="apply">
                                 All Sites
                             </label>
                             [% FOREACH sname IN ap_all_sitenames %]
-                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
-                                <input type="checkbox" class="site-cb" value="[% sname %]" [% IF !cal_filter_site || cal_filter_site == sname %]checked[% END %] onchange="applyAllFilters()">
+                            <label class="FilterDropdownItem">
+                                <input type="checkbox" class="site-cb" value="[% sname %]" [% IF !cal_filter_site || cal_filter_site == sname %]checked[% END %] data-filter="apply">
                                 [% sname %]
                             </label>
                             [% END %]
@@ -168,26 +166,26 @@
 
                     [%# Focus: project multi-select with parent/child grouping %]
                     [% IF ap_projects && ap_projects.size %]
-                    <details class="ap-dropdown" id="ap-project-dropdown" style="position:relative;display:inline-block;">
-                        <summary id="project-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Focus: All ▾</summary>
-                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:220px;max-height:280px;overflow-y:auto;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                    <details class="FilterDropdown" id="ap-project-dropdown">
+                        <summary id="project-summary" class="FilterDropdownSummary">Focus: All ▾</summary>
+                        <div class="FilterDropdownMenu FilterDropdownMenu--wide FilterDropdownMenu--scrollable">
                             [%# Parent projects first %]
                             [% FOREACH proj IN ap_projects %]
                             [% NEXT IF proj.parent_id %]
-                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;font-weight:bold;">
+                            <label class="FilterDropdownItem FilterDropdownItem--bold">
                                 <input type="checkbox" class="project-cb" value="[% proj.project_id %]" checked
                                     data-is-parent="1"
-                                    onchange="onProjectParentChange(this)">
-                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span style="font-weight:normal;color:var(--text-muted-color);">([% proj.sitename %])</span>[% END %]
+                                    data-filter="parent-change">
+                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span class="SiteTag">([% proj.sitename %])</span>[% END %]
                             </label>
                             [%# Children of this parent %]
                             [% FOREACH child IN ap_projects %]
                             [% NEXT UNLESS child.parent_id == proj.project_id %]
-                            <label style="display:flex;align-items:center;gap:5px;font-size:0.8em;padding:2px 0 2px 16px;cursor:pointer;white-space:nowrap;">
+                            <label class="FilterDropdownItem FilterDropdownItem--child">
                                 <input type="checkbox" class="project-cb" value="[% child.project_id %]" checked
                                     data-parent-id="[% proj.project_id %]"
-                                    onchange="applyAllFilters();updateProjectSummary()">
-                                ↳ [% child.project_name %][% IF is_csc && child.sitename && child.sitename != plan_sitename %] <span style="color:var(--text-muted-color);">([% child.sitename %])</span>[% END %]
+                                    data-filter="apply-update">
+                                ↳ [% child.project_name %][% IF is_csc && child.sitename && child.sitename != plan_sitename %] <span class="SiteTag">([% child.sitename %])</span>[% END %]
                             </label>
                             [% END %]
                             [% END %]
@@ -198,10 +196,10 @@
                             [% SET parent_in_list = 0 %]
                             [% FOREACH pp IN ap_projects %][% IF pp.project_id == proj.parent_id %][% SET parent_in_list = 1 %][% END %][% END %]
                             [% NEXT IF parent_in_list %]
-                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                            <label class="FilterDropdownItem">
                                 <input type="checkbox" class="project-cb" value="[% proj.project_id %]" checked
-                                    onchange="applyAllFilters();updateProjectSummary()">
-                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span style="color:var(--text-muted-color);">([% proj.sitename %])</span>[% END %]
+                                    data-filter="apply-update">
+                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span class="SiteTag">([% proj.sitename %])</span>[% END %]
                             </label>
                             [% END %]
                         </div>
@@ -209,30 +207,30 @@
                     [% END %]
 
                     [%# Sort buttons %]
-                    <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;">Sort:</span>
-                    <button onclick="sortTodos('priority')" id="sort-priority"
-                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">Priority</button>
-                    <button onclick="sortTodos('project')" id="sort-project"
-                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Project</button>
-                    <button onclick="sortTodos('due')" id="sort-due"
-                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Due</button>
-                    <a href="#planning" onclick="clearAllFilters();return false;"
-                        style="font-size:0.75em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear</a>
+                    <span class="SortLabel">Sort:</span>
+                    <button data-action="sort-priority" id="sort-priority"
+                        class="SortBtn SortBtn--active">Priority</button>
+                    <button data-action="sort-project" id="sort-project"
+                        class="SortBtn">Project</button>
+                    <button data-action="sort-due" id="sort-due"
+                        class="SortBtn">Due</button>
+                    <a href="#planning" data-action="clear-filters"
+                        class="ClearFiltersLink">✕ Clear</a>
                 </div>
 
                 [% IF cross_blocker_count %]
-                <div id="cross-blocker-banner" style="background:color-mix(in srgb,#dc3545 10%,var(--bg-color));border:2px solid #dc3545;border-radius:6px;padding:8px 12px;margin-bottom:10px;">
-                    <div style="display:flex;align-items:center;gap:8px;font-weight:600;color:#dc3545;font-size:0.95em;margin-bottom:6px;">
+                <div id="cross-blocker-banner" class="BlockerBanner">
+                    <div class="BlockerBannerHeader">
                         <span>🚨</span>
                         <span>[% cross_blocker_count %] Cross-Project Blocker[% IF cross_blocker_count != 1 %]s[% END %] — Resolve first to unblock other projects</span>
                     </div>
                     [% FOREACH ap IN active_priorities %]
                     [% IF ap.is_cross_blocker %]
-                    <div style="display:flex;align-items:baseline;gap:6px;padding:2px 0;font-size:0.88em;">
-                        <span style="color:#dc3545;font-weight:700;">↳</span>
-                        <a href="/todo/details?record_id=[% ap.record_id %]" style="color:var(--text-color);text-decoration:none;font-weight:600;">[% ap.subject | html %]</a>
-                        <span style="color:var(--text-muted-color);">([% ap.project_name || ap.project_code || 'No project' %])</span>
-                        <span style="color:#dc3545;font-size:0.82em;">blocks: [% ap.blocking_names %]</span>
+                    <div class="BlockerItem">
+                        <span class="BlockerItemArrow">↳</span>
+                        <a href="/todo/details?record_id=[% ap.record_id %]" class="BlockerItemLink">[% ap.subject | html %]</a>
+                        <span class="BlockerItemProject">([% ap.project_name || ap.project_code || 'No project' %])</span>
+                        <span class="BlockerItemBlocks">blocks: [% ap.blocking_names %]</span>
                     </div>
                     [% END %]
                     [% END %]
@@ -267,19 +265,18 @@
                 </div>[%# end #priorities-list %]
 
                 [% ELSE %]
-                <div style="text-align:center;padding:30px;color:var(--text-muted-color);background:var(--bg-secondary);border-radius:6px;">
-                    <p style="margin:0 0 10px;">No active todos found[% IF filter_project || filter_site %] for the selected filter[% ELSE %] for your role and site[% END %].</p>
+                <div class="EmptyState">
+                    <p>No active todos found[% IF filter_project || filter_site %] for the selected filter[% ELSE %] for your role and site[% END %].</p>
                     [% IF filter_project || filter_site %]
-                    <a href="/planning/daily#planning" style="color:var(--primary-color);">✕ Clear filters</a>
+                    <a href="/planning/daily#planning">✕ Clear filters</a>
                     [% ELSE %]
-                    <a href="/todo/addtodo" style="color:var(--primary-color);">+ Create your first todo</a>
+                    <a href="/todo/addtodo">+ Create your first todo</a>
                     [% END %]
                 </div>
                 [% END %]
             </div>
 
             
-
 
 
         </div>
