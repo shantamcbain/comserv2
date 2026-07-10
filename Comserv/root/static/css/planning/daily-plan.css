@@ -1,0 +1,1290 @@
+/* ============================================================
+   planning/daily-plan.css
+   Styles for /planning/daily page
+   Extracted from DailyPlan.tt and _today_work_tab.tt
+   ============================================================ */
+
+/* ── Sticky Header ────────────────────────────────────────── */
+
+.daily-plan-header {
+    position: sticky;
+    top: 0;
+    background-color: var(--background-color);
+    border-bottom: 3px solid var(--primary-color);
+    padding: 10px 15px;
+    margin: -20px -20px 20px -20px;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.daily-plan-header h1 {
+    margin: 0 0 5px 0;
+    font-size: 1.4em;
+    color: var(--text-color);
+}
+
+.header-nav {
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85em;
+}
+
+.header-nav-links {
+    display: flex;
+    gap: 15px;
+}
+
+.header-nav-links a {
+    color: var(--primary-color);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+}
+
+.header-nav-links a:hover {
+    background-color: var(--bg-secondary);
+}
+
+.header-date-nav {
+    text-align: right;
+    color: var(--text-muted-color);
+    font-size: 0.85em;
+}
+
+/* ── Daily Log Buttons ────────────────────────────────────── */
+
+.dl-btn {
+    display: inline-block;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.82em;
+    font-weight: bold;
+    transition: opacity .15s;
+}
+
+.dl-btn:disabled { opacity: .5; cursor: not-allowed; }
+.dl-btn-start { background: #2a7a2a; color: #fff; }
+.dl-btn-end   { background: #7a2a00; color: #fff; }
+.dl-btn-deploy { background: #005a8e; color: #fff; }
+
+#dl-feedback  { font-size: .82em; margin-left: 6px; }
+
+/* ── Stale Log Badge ──────────────────────────────────────── */
+
+.stale-log-badge {
+    font-size: 0.82em;
+    color: #856404;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 3px;
+    padding: 2px 7px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+/* ── Tab Navigation ───────────────────────────────────────── */
+
+.tab-navigation {
+    display: flex;
+    border-bottom: 2px solid var(--border-color);
+    margin: 20px 0 0 0;
+    gap: 5px;
+}
+
+.tab-button {
+    padding: 12px 24px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    color: var(--text-muted-color);
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+    color: var(--text-color);
+    background-color: rgba(255,255,255,0.12);
+}
+
+.tab-button.active {
+    color: var(--text-color) !important;
+    background-color: var(--bg-secondary) !important;
+    border-bottom-color: var(--primary-color) !important;
+    border-bottom-width: 4px !important;
+    font-weight: bold;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ── Tab Loading State ──────────────────────────────────── */
+.tab-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 40px 20px;
+    color: #888;
+    font-size: 1.1em;
+}
+.tab-loading .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--border-color, #ddd);
+    border-top-color: var(--accent-color, #4a90d9);
+    border-radius: 50%;
+    animation: tab-spin 0.8s linear infinite;
+}
+@keyframes tab-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Error/Warning Banners ────────────────────────────────── */
+
+.error-banner {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.error-banner h4 {
+    margin-top: 0;
+    color: #856404;
+}
+
+.error-banner pre {
+    font-size: 0.8em;
+    background: #fff8e1;
+    padding: 8px;
+    border-radius: 3px;
+    overflow: auto;
+}
+
+/* ── Info Box ─────────────────────────────────────────────── */
+
+.info-box {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid var(--info-color);
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.info-box ol {
+    line-height: 1.8;
+}
+
+/* ── Planning Quick Links ─────────────────────────────────── */
+
+.planning-quick-links {
+    background: var(--bg-secondary);
+    border-left: 4px solid var(--primary-color);
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.planning-quick-links .link-title {
+    margin-top: 0;
+    font-size: 1em;
+}
+
+.planning-quick-links p {
+    margin: 4px 0;
+    font-size: 0.88em;
+}
+
+.planning-link-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.planning-link-bar a {
+    font-size: 0.83em;
+    padding: 3px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    text-decoration: none;
+    color: var(--primary-color);
+}
+
+/* ── Gantt View ───────────────────────────────────────────── */
+
+.gantt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.gantt-header h2 {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.gantt-legend {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.8em;
+}
+
+.gantt-legend-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.gantt-container {
+    overflow-x: auto;
+}
+
+.gantt-chart {
+    min-width: 700px;
+}
+
+.gantt-meta {
+    font-size: 0.78em;
+    color: var(--text-muted-color);
+    margin-top: 12px;
+}
+
+.gantt-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted-color);
+}
+
+/* ── Deploy Modal ─────────────────────────────────────────── */
+
+.deploy-modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.deploy-modal {
+    background: var(--bg-color, #fff);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 8px;
+    padding: 20px;
+    min-width: 440px;
+    color: var(--text-color, #333);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    font-family: inherit;
+}
+
+.deploy-modal-title {
+    margin: 0 0 16px 0;
+    color: var(--primary-color, #007bff);
+}
+
+.deploy-option {
+    padding: 10px 14px;
+    margin: 6px 0;
+    background: var(--card-bg, #f8f9fa);
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid var(--border-color, #dee2e6);
+}
+
+.deploy-option:hover {
+    border-color: var(--primary-color, #007bff);
+    background: var(--hover-bg, #e9ecef);
+}
+
+.deploy-desc {
+    font-size: 0.85em;
+    color: var(--text-muted-color, #6c757d);
+}
+
+.deploy-modal-actions {
+    margin-top: 16px;
+    text-align: right;
+}
+
+/* Deploy Control Center (full modal in DailyPlan.tt) */
+
+.deploy-center-overlay {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.6);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.deploy-center-overlay.open {
+    display: flex;
+}
+
+.deploy-center-modal {
+    background: var(--bg-secondary, #f8f9fa);
+    color: var(--text-color, #333);
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 8px;
+    max-width: 650px;
+    width: 100%;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-sizing: border-box;
+}
+
+.deploy-center-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color, #dee2e6);
+    padding-bottom: 10px;
+    margin-bottom: 5px;
+}
+
+.deploy-center-header h3 {
+    margin: 0;
+    font-size: 1.25em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.deploy-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    color: var(--text-muted-color, #6c757d);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.deploy-center-desc {
+    margin: 0;
+    font-size: 0.9em;
+    color: var(--text-muted-color, #6c757d);
+}
+
+.deploy-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.deploy-option-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--bg-color, #fff);
+}
+
+.deploy-option-radio {
+    margin-top: 3px;
+    cursor: pointer;
+}
+
+.deploy-option-name {
+    display: block;
+    font-size: 0.95em;
+}
+
+.deploy-option-name.primary {
+    color: var(--primary-color, #007bff);
+}
+
+.deploy-option-desc {
+    font-size: 0.82em;
+    color: var(--text-muted-color, #6c757d);
+}
+
+.deploy-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: var(--bg-color, #fff);
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.deploy-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.deploy-field-label {
+    display: block;
+    font-size: 0.82em;
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: var(--text-color, #333);
+}
+
+.deploy-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 4px;
+    font-size: 0.88em;
+    background: var(--bg-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+}
+
+.deploy-select {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 4px;
+    font-size: 0.88em;
+    background: var(--bg-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+}
+
+.deploy-hint {
+    font-size: 0.75em;
+    color: var(--text-muted-color, #6c757d);
+}
+
+.deploy-progress {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.deploy-progress.visible {
+    display: flex;
+}
+
+.deploy-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.deploy-progress-header strong {
+    font-size: 0.85em;
+    color: var(--text-color);
+}
+
+.deploy-spinner {
+    font-size: 0.85em;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.deploy-spinner-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.deploy-output {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 12px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 0;
+    border: 1px solid #333;
+    white-space: pre-wrap;
+}
+
+.deploy-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid var(--border-color, #dee2e6);
+    padding-top: 10px;
+    margin-top: 5px;
+}
+
+.deploy-btn-primary {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 4px;
+    background: var(--primary-color, #007bff);
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.88em;
+    font-weight: bold;
+}
+
+.deploy-btn-secondary {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-color, #333);
+    cursor: pointer;
+    font-size: 0.88em;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Branch Start Modal ───────────────────────────────────── */
+
+.branch-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+
+.branch-modal-overlay.open {
+    display: flex;
+}
+
+.branch-modal {
+    background: var(--bg-color,#fff);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.branch-modal-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.branch-modal-body {
+    padding: 12px 16px;
+    flex: 1;
+    overflow: auto;
+}
+
+.branch-modal-cmd {
+    font-family: monospace;
+    font-size: 0.85em;
+    margin-bottom: 8px;
+    color: var(--text-muted-color);
+}
+
+.branch-modal-log {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.82em;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+.branch-modal-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ── Action Bar (today work tab) ──────────────────────────── */
+
+.ActionBar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ActionBarLink {
+    padding: 4px 12px;
+    font-size: 0.82em;
+    text-decoration: none;
+    border-radius: 4px;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.ActionBarLink--primary {
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+}
+
+.ActionBarLink--green {
+    color: #2a7a2a;
+    border-color: #2a7a2a;
+}
+
+.ActionBarBtn {
+    padding: 4px 12px;
+    font-size: 0.82em;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.ActionBarBtn--teal {
+    color: #20c997;
+    border-color: #20c997;
+}
+
+.ActionBarBtn--orange {
+    color: #fd7e14;
+    border-color: #fd7e14;
+}
+
+.ActionBarBtn--purple {
+    color: #6f42c1;
+    border-color: #6f42c1;
+}
+
+/* ── Dependency Summary ───────────────────────────────────── */
+
+.DepSummary {
+    cursor: pointer;
+    padding: 7px 10px;
+    border-radius: 4px;
+    background: color-mix(in srgb, #6f42c1 10%, var(--bg-color));
+    border: 1px solid #6f42c1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.DepSummaryLabel {
+    font-weight: bold;
+    color: #6f42c1;
+}
+
+.DepSummaryCount {
+    font-size: 0.85em;
+    color: var(--text-muted-color);
+}
+
+.DepDetails {
+    margin-top: 4px;
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid #6f42c1;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+.DepItem {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 0.9em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.DepLink {
+    color: #6f42c1;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.DepSeparator {
+    color: var(--text-muted-color);
+    font-size: 0.85em;
+}
+
+.DepManage {
+    margin-top: 6px;
+    text-align: right;
+}
+
+.DepManage a {
+    font-size: 0.85em;
+    color: #6f42c1;
+}
+
+.DepEmpty {
+    margin: 0;
+    font-size: 0.88em;
+    color: var(--text-muted-color);
+}
+
+/* ── Audit Panel ──────────────────────────────────────────── */
+
+.AuditSummary {
+    cursor: pointer;
+    padding: 7px 10px;
+    border-radius: 4px;
+    background: color-mix(in srgb, #c45d00 10%, var(--bg-color));
+    border: 1px solid #c45d00;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.AuditSummaryLabel {
+    font-weight: bold;
+    color: #c45d00;
+}
+
+.AuditSummaryCount {
+    font-size: 0.85em;
+    color: var(--text-muted-color);
+}
+
+.AuditRefreshBtn {
+    margin-left: auto;
+    font-size: 0.75em;
+    padding: 2px 8px;
+    border: 1px solid #c45d00;
+    border-radius: 3px;
+    background: transparent;
+    color: #c45d00;
+    cursor: pointer;
+}
+
+.AuditDetails {
+    margin-top: 4px;
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid #c45d00;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+.AuditEmpty {
+    margin: 0;
+    font-size: 0.88em;
+    color: var(--text-muted-color);
+}
+
+/* ── Helpdesk Panel ───────────────────────────────────────── */
+
+.HelpdeskSummary {
+    cursor: pointer;
+    padding: 7px 10px;
+    border-radius: 4px;
+    background: color-mix(in srgb, #9b0000 10%, var(--bg-color));
+    border: 1px solid #9b0000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.HelpdeskSummaryLabel {
+    font-weight: bold;
+    color: #9b0000;
+}
+
+.HelpdeskSummaryCount {
+    font-size: 0.85em;
+    color: var(--text-muted-color);
+}
+
+.HelpdeskRefreshBtn {
+    margin-left: auto;
+    font-size: 0.75em;
+    padding: 2px 8px;
+    border: 1px solid #9b0000;
+    border-radius: 3px;
+    background: transparent;
+    color: #9b0000;
+    cursor: pointer;
+}
+
+.HelpdeskDetails {
+    margin-top: 4px;
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid #9b0000;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+.HelpdeskItem {
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.88em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.HelpdeskTicketNum {
+    font-family: monospace;
+    color: var(--text-muted-color);
+    flex-shrink: 0;
+}
+
+.HelpdeskPriority {
+    background: #9b0000;
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.78em;
+    flex-shrink: 0;
+}
+
+.HelpdeskSubject {
+    flex: 1;
+}
+
+.HelpdeskMeta {
+    font-size: 0.78em;
+    color: var(--text-muted-color);
+    flex-shrink: 0;
+}
+
+.HelpdeskItemLink {
+    font-size: 0.82em;
+    color: #9b0000;
+    flex-shrink: 0;
+}
+
+.HelpdeskViewAll {
+    margin-top: 6px;
+    text-align: right;
+}
+
+.HelpdeskViewAll a {
+    font-size: 0.82em;
+    color: #9b0000;
+}
+
+.HelpdeskEmpty {
+    margin: 0;
+    font-size: 0.88em;
+    color: var(--text-muted-color);
+}
+
+/* ── Focus Queue ──────────────────────────────────────────── */
+
+.FocusSuccessNote {
+    background: color-mix(in srgb, #28a745 12%, var(--bg-color));
+    border: 1px solid #28a745;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    font-size: 0.88em;
+    color: #28a745;
+}
+
+.FocusHeader {
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.FocusHeader h3 {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.FocusStats {
+    font-size: 0.78em;
+    color: var(--text-muted-color);
+    margin-left: 4px;
+}
+
+.FocusStats a {
+    font-size: .9em;
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.BacklogLink {
+    color: var(--primary-color);
+}
+
+/* ── Filter Bar ───────────────────────────────────────────── */
+
+.FilterBar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 5px 10px;
+    margin-bottom: 12px;
+}
+
+.FilterDropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.FilterDropdownSummary {
+    font-size: 0.78em;
+    padding: 3px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    list-style: none;
+    background: var(--bg-color);
+    color: var(--text-color);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.FilterDropdownMenu {
+    position: absolute;
+    z-index: 500;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 10px;
+    min-width: 130px;
+    top: calc(100% + 2px);
+    left: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.FilterDropdownMenu--wide {
+    min-width: 220px;
+}
+
+.FilterDropdownMenu--scrollable {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.FilterDropdownItem {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.82em;
+    padding: 3px 0;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.FilterDropdownItem--child {
+    padding: 2px 0 2px 16px;
+    font-size: 0.8em;
+}
+
+.FilterDropdownItem--bold {
+    font-weight: bold;
+}
+
+.SiteTag {
+    font-weight: normal;
+    color: var(--text-muted-color);
+}
+
+.SortLabel {
+    font-size: 0.75em;
+    color: var(--text-muted-color);
+    font-weight: bold;
+}
+
+.SortBtn {
+    font-size: 0.75em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.SortBtn--active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+.ClearFiltersLink {
+    font-size: 0.75em;
+    color: var(--danger-color, #dc3545);
+    margin-left: auto;
+    text-decoration: none;
+}
+
+/* ── Cross Blocker Banner ─────────────────────────────────── */
+
+.BlockerBanner {
+    background: color-mix(in srgb, #dc3545 10%, var(--bg-color));
+    border: 2px solid #dc3545;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+}
+
+.BlockerBannerHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #dc3545;
+    font-size: 0.95em;
+    margin-bottom: 6px;
+}
+
+.BlockerItem {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 0.88em;
+}
+
+.BlockerItemArrow {
+    color: #dc3545;
+    font-weight: 700;
+}
+
+.BlockerItemLink {
+    color: var(--text-color);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.BlockerItemProject {
+    color: var(--text-muted-color);
+}
+
+.BlockerItemBlocks {
+    color: #dc3545;
+    font-size: 0.82em;
+}
+
+/* ── Empty State ──────────────────────────────────────────── */
+
+.EmptyState {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-muted-color);
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+.EmptyState p {
+    margin: 0 0 10px;
+}
+
+.EmptyState a {
+    color: var(--primary-color);
+}
+
+/* ── Month View ───────────────────────────────────────────── */
+
+.month-view-title {
+    margin-top: 30px;
+}
+
+.month-view-note {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+/* ── Daily Log Panel ──────────────────────────────────────── */
+
+.log-panel {
+    display: none;
+    background: #f0fff0;
+    border: 1px solid #2a7a2a;
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin: 8px 0;
+    position: relative;
+}
+
+.log-panel.open {
+    display: block;
+}
+
+.log-panel-flex {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.log-panel-main {
+    flex: 1;
+    min-width: 220px;
+}
+
+.log-panel-title {
+    font-weight: bold;
+    color: #1a5a1a;
+    margin-bottom: 6px;
+}
+
+.log-panel-detail {
+    font-size: .9em;
+    margin-bottom: 4px;
+}
+
+.log-panel-field {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: .9em;
+}
+
+.log-panel-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: .9em;
+    resize: vertical;
+}
+
+.log-panel-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 120px;
+}
+
+.log-panel-btn {
+    padding: 7px 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .9em;
+}
+
+.log-panel-btn-primary {
+    background: #2a7a2a;
+    color: #fff;
+}
+
+.log-panel-btn-secondary {
+    background: #555;
+    color: #fff;
+}
+
+.log-panel-btn-ghost {
+    background: #eee;
+    color: var(--text-color, #333);
+    border: 1px solid #ccc;
+}
+
+.log-panel-status {
+    font-size: .8em;
+    margin-top: 6px;
+    color: var(--text-color, #555);
+}
+
+/* ── Tab content wrappers ─────────────────────────────────── */
+
+.dynamic-container {
+    /* Generic container for included dynamic content */
+}
+
+.nav-anchor {
+    /* Anchor for hash-based navigation */
+}
+
+/* ── Utility classes ──────────────────────────────────────── */
+
+.text-muted { color: var(--text-muted-color); }
+.text-primary { color: var(--primary-color); }
+.text-danger { color: #dc3545; }
+.text-success { color: #28a745; }
+
+.flex-row { display: flex; align-items: center; gap: 8px; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-gap-sm { gap: 6px; }
+.flex-gap-md { gap: 10px; }
+
+.mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-24 { margin-bottom: 24px; }
+.mt-12 { margin-top: 12px; }
+
+.p-8 { padding: 8px; }
+.p-10 { padding: 10px; }
+.p-12 { padding: 12px; }
+
+.bg-secondary { background: var(--bg-secondary); }
+.border-color { border: 1px solid var(--border-color); }
+.rounded-4 { border-radius: 4px; }
+.rounded-6 { border-radius: 6px; }
+
+.link-plain {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* ── Gantt data script ────────────────────────────────────── */
+/* Sits inside #gantt-chart as JSON — hidden by default */
+
+#gantt-data {
+    display: none;
+}
