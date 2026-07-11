@@ -18,7 +18,7 @@ set -euo pipefail
 
 # ================== CONFIG ==================
 PROD_HOST="production1"
-PROD_USER="root"
+PROD_USER="shanta"
 IMAGE_NAME="shantamcsbain/comserv-web-prod:latest"
 CONTAINER_NAME="comserv-web-prod"
 OLD_CONTAINER_PREFIX="comservproduction1-old"
@@ -56,17 +56,69 @@ push_image() {
 }
 
 # Step 3: Remote deployment on production1
+# Ensure shanta user exists on production server (Docker operator)
+
+ensure_docker_user() {
+
+    log "Ensuring docker user shanta exists on ${PROD_HOST}..."
+
+    # Bootstrap as ubuntu (must exist and have SSH keys)
+
+    sshpass -e ssh -o StrictHostKeyChecking=no "ubuntu@${PROD_HOST}" bash -s <<'EOF_DOCKERUSER'
+
+        if ! id "shanta" &>/dev/null; then
+
+            echo "Creating shanta user..."
+
+            useradd -m -s /bin/bash shanta
+
+            echo "shanta ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/shanta
+
+            chmod 440 /etc/sudoers.d/shanta
+
+        fi
+
+        if ! groups shanta | grep -q docker; then
+
+            echo "Adding shanta to docker group..."
+
+            usermod -aG docker shanta
+
+        fi
+
+        # Copy authorized_keys from ubuntu for SSH access
+
+        if [ -d /home/ubuntu/.ssh ] && [ ! -f /home/shanta/.ssh/authorized_keys ]; then
+
+            mkdir -p /home/shanta/.ssh
+
+            cp /home/ubuntu/.ssh/authorized_keys /home/shanta/.ssh/authorized_keys 2>/dev/null || true
+
+            chown -R shanta:shanta /home/shanta/.ssh
+
+            chmod 700 /home/shanta/.ssh
+
+            chmod 600 /home/shanta/.ssh/authorized_keys
+
+        fi
+
+EOF_DOCKERUSER
+
+    log "Docker user shanta verified/created successfully"
+
+}
 deploy_to_production() {
+    ensure_docker_user
     log "=== STEP 3: Deploying to production1 ==="
 
-    ssh_cmd="ssh ${PROD_USER}@${PROD_HOST}"
+    ssh_cmd="sshpass -e ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST}"
 
     # Ensure volumes exist
     $ssh_cmd bash -s <<'EOF'
         docker volume create comserv-temp 2>/dev/null || true
         docker volume create comserv-cache 2>/dev/null || true
         docker volume create comserv-themes 2>/dev/null || true
-        mkdir -p /root/static /root/LegacyStaticPages /data/nfs
+        mkdir -p /opt/comserv/root/static /opt/comserv/root/LegacyStaticPages /opt/comserv/nfs
         # Ensure NFS mounts if needed (example)
         # mount -t nfs ... || true
 EOF
@@ -103,16 +155,16 @@ EOF
         -e DB_PORT="${DB_PORT:-3306}" \
         -e DB_NAME="${DB_NAME:-ency}" \
         -e SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-production1}" \
-        -v ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro \
-        -v /root/comserv-logs:/opt/comserv/root/log \
-        -v /root/comserv-workshop:/data/nfs:rw \
-        -v /root/comserv-sessions:/tmp/comserv/session:rw \
-        -v comserv_cache:/cache \
+        -v /opt/comserv/secrets:/opt/comserv/secrets:ro \
+        -v comserv2_logs:/opt/comserv/root/log \
+        -v comserv2_nfs:/opt/comserv/nfs:rw \
+        -v comserv2_sessions:/tmp/comserv/session:rw \
+        -v comserv2_cache:/cache \
         -v comserv_cache:/tmp/comserv/cache \
         -v comserv-temp:/tmp/comserv/temp \
         -v comserv-themes:/opt/comserv/root/themes \
-        -v /root/static:/opt/comserv/root/static \
-        -v /root/LegacyStaticPages:/opt/comserv/root/LegacyStaticPages \
+        -v comserv2_static:/opt/comserv/root/static \
+        -v /opt/comserv/legacy-static:/opt/comserv/root/LegacyStaticPages \
         "$IMAGE_NAME" || fail "New container start failed"
 
     log "New container started: $CONTAINER_NAME"
@@ -122,7 +174,7 @@ EOF
 health_check_and_rollback() {
     log "=== STEP 4: Health check loop (monitoring /health) ==="
     for i in {1..30}; do
-        if ssh "${PROD_USER}@${PROD_HOST}" "curl -f $HEALTH_ENDPOINT" >/dev/null 2>&1; then
+        if sshpass -e ssh -o StrictHostKeyChecking=no "${PROD_USER}@${PROD_HOST}" "curl -f $HEALTH_ENDPOINT" >/dev/null 2>&1; then
             log "Health check PASSED on attempt $i"
             return 0
         fi
@@ -136,8 +188,8 @@ health_check_and_rollback() {
 }
 
 rollback() {
-    progress "Rollback initiated – restoring previous healthy container"
-    ssh "${PROD_USER}@${PROD_HOST}" bash -s <<EOF
+    log "Rollback initiated – restoring previous healthy container"
+    sshpass -e ssh -o StrictHostKeyChecking=no "${PROD_USER}@${PROD_HOST}" bash -s <<EOF
         docker stop $CONTAINER_NAME || true
         docker rm $CONTAINER_NAME || true
         LATEST_OLD=\$(docker ps -aq -f name=$OLD_CONTAINER_PREFIX | head -1)
@@ -152,7 +204,7 @@ EOF
 # Step 5: Cleanup old containers (keep last 5)
 cleanup_old_containers() {
     log "=== STEP 5: Cleaning up old containers (keep last $MAX_OLD_CONTAINERS) ==="
-    ssh "${PROD_USER}@${PROD_HOST}" bash -s <<EOF
+    sshpass -e ssh -o StrictHostKeyChecking=no "${PROD_USER}@${PROD_HOST}" bash -s <<EOF
         docker ps -aq -f name=$OLD_CONTAINER_PREFIX | tail -n +$((MAX_OLD_CONTAINERS+1)) | xargs -r docker rm -f
 EOF
 }
@@ -160,7 +212,7 @@ EOF
 # Step 6: Post-deploy tasks (DB menu mode + cache clear)
 post_deploy_tasks() {
     log "=== STEP 6: Post-deploy tasks (force DB menu + clear caches) ==="
-    ssh "${PROD_USER}@${PROD_HOST}" docker exec "$CONTAINER_NAME" bash -c '
+    sshpass -e ssh -o StrictHostKeyChecking=no "${PROD_USER}@${PROD_HOST}" docker exec "$CONTAINER_NAME" bash -c '
         # Force DB-driven menu
         perl -pi -e "s/USE_DB_MENU.*/USE_DB_MENU=1/" /opt/comserv/comserv.conf || true
         # Clear any static caches

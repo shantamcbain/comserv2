@@ -10,7 +10,7 @@ use JSON::PP qw(encode_json);
 my $target = 'production1'; # default target: production1 or production2
 my $production_host;
 my $service;
-my $ssh_user = 'ubuntu';
+my $ssh_user = 'shanta';
 my $ssh_port = 22;
 my $production_directory = '~/PycharmProjects/comserv2';
 my $rollback_on_failure = 1;
