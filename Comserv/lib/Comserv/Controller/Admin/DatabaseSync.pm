@@ -218,7 +218,7 @@ sub sync_config :Path('/admin/database-sync/config') :Args(0) {
 sub execute_sync {
     my ($self, $c, $options) = @_;
     
-    my $script_path = File::Spec->catfile($FindBin::Bin, '..', 'scripts', 'sync_dev_from_production.pl');
+    my $script_path = File::Spec->catfile($FindBin::Bin, '..', 'script', 'sync_dev_from_production.pl');
     
     my @cmd = ('perl', $script_path);
     
