@@ -1,10 +1,10 @@
 [%# Schema Compare - Database List (server drill-down)
     Shows databases on the selected server with basic stats.
     Clicking a database tunnels to its table comparison view.
-    Follows ApplicationTtTemplate.tt structure and CSS classes.
+    JS via schema-compare.js (event delegation on data-action attributes)
 %]
 
-<div class="app-container">
+<div class="app-container" data-base-url="[% c.uri_for('/admin/schema_compare/server') %]">
     <div class="page-header">
         <h1>Databases on [% server.name | html %]</h1>
         [% IF server.ip %]
@@ -27,8 +27,9 @@
                 [% FOREACH db IN databases %]
                 <div class="database-card" 
                      style="border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; background: var(--card-bg, #fff); cursor: pointer;"
-                     data-db="[% db.name | html %]" 
-                     onclick="loadDatabaseTables('[% server.name | html %]', '[% db.name | html %]')">
+                     data-action="navigate-db"
+                     data-server="[% server.name | html %]"
+                     data-db="[% db.name | html %]">
                     <div class="database-header" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;">
                         <i class="fas fa-database"></i>
                         <h3 style="margin:0; font-size:1.1rem;">[% db.name | html %]</h3>
@@ -39,7 +40,10 @@
                         <div><strong>Status:</strong> <span class="status-[% db.status || 'unknown' %]">[% db.status || 'Unknown' | ucfirst %]</span></div>
                     </div>
                     <div class="database-actions" style="margin-top:0.75rem;">
-                        <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); refreshDatabase('[% server.name | html %]', '[% db.name | html %]')">
+                        <button class="btn btn-sm btn-secondary"
+                                data-action="refresh-db"
+                                data-server="[% server.name | html %]"
+                                data-db="[% db.name | html %]">
                             <i class="fas fa-sync"></i> Refresh
                         </button>
                     </div>
@@ -60,14 +64,3 @@
         </div>
     </div>
 </div>
-
-<script>
-function loadDatabaseTables(serverName, dbName) {
-    window.location.href = '[% c.uri_for("/admin/schema_compare/server") %]/' + encodeURIComponent(serverName) + '/db/' + encodeURIComponent(dbName);
-}
-
-function refreshDatabase(serverName, dbName) {
-    console.log('Refresh database:', serverName, dbName);
-    // Placeholder for future AJAX refresh
-}
-</script>

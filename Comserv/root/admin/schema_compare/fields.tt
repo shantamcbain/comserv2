@@ -2,7 +2,7 @@
     Shows fields from both the live table and its Result file.
     Highlights missing fields on either side.
     Allows: add missing field to table / add to result / drop column.
-    Follows ApplicationTtTemplate.tt structure and CSS classes.
+    JS via schema-compare.js (event delegation on data-action attributes)
 %]
 
 <div class="app-container">
@@ -66,17 +66,26 @@
                             </td>
                             <td class="action-cell">
                                 [% IF field.in_result && !field.in_table %]
-                                    <button class="btn btn-sm btn-primary" onclick="addFieldToTable('[% field.name | html %]', '[% table.name | html %]')">
+                                    <button class="btn btn-sm btn-primary"
+                                            data-action="add-field-to-table"
+                                            data-field="[% field.name | html %]"
+                                            data-table="[% table.name | html %]">
                                         <i class="fas fa-plus"></i> Add to Table
                                     </button>
                                 [% END %]
                                 [% IF field.in_table && !field.in_result %]
-                                    <button class="btn btn-sm btn-secondary" onclick="addFieldToResult('[% field.name | html %]', '[% table.name | html %]')">
+                                    <button class="btn btn-sm btn-secondary"
+                                            data-action="add-field-to-result"
+                                            data-field="[% field.name | html %]"
+                                            data-table="[% table.name | html %]">
                                         <i class="fas fa-file-alt"></i> Add to Result
                                     </button>
                                 [% END %]
                                 [% IF field.in_table %]
-                                    <button class="btn btn-sm btn-delete" onclick="dropColumn('[% field.name | html %]', '[% table.name | html %]'); event.stopPropagation();">
+                                    <button class="btn btn-sm btn-delete"
+                                            data-action="drop-column"
+                                            data-field="[% field.name | html %]"
+                                            data-table="[% table.name | html %]">
                                         <i class="fas fa-trash"></i> Drop
                                     </button>
                                 [% END %]
@@ -100,22 +109,3 @@
         </div>
     </div>
 </div>
-
-<script>
-function addFieldToTable(fieldName, tableName) {
-    console.log('Add field to table:', fieldName, tableName);
-    // TODO: wire to controller endpoint
-}
-
-function addFieldToResult(fieldName, tableName) {
-    console.log('Add field to result:', fieldName, tableName);
-    // TODO: wire to controller endpoint
-}
-
-function dropColumn(fieldName, tableName) {
-    if (confirm('Drop column ' + fieldName + ' from ' + tableName + '?')) {
-        console.log('Drop column:', fieldName, tableName);
-        // TODO: wire to controller endpoint
-    }
-}
-</script>

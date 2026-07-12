@@ -114,3 +114,69 @@ Each `.tt` edit should leave the touched page more consistent site-to-site and t
 3. **.tt vs DB vs both** → decide ad hoc per topic (`/Documentation/newsletter_feature_guide_workflow`)
 
 Legacy per-file changelogs: `/Documentation/all_changelog` (read-only). Full rules: **`/Documentation/DevelopmentStandards#doc-compliance`**
+
+## Module index/summary files — .tt + .SUMMARY.md convention
+
+The repo has two parallel documentation systems for AI context efficiency:
+
+### .tt Index files (web-rendered, human-facing)
+Located at `Documentation/<Module>/index.tt` and `Comserv/root/Documentation/<category>/index.tt`.
+These are Template Toolkit files with YAML META blocks, rendered at `/Documentation/<Module>/index`.
+They contain: overview, access/roles, workflows, data model tables, navigation references.
+
+**Existing .tt indexes:**
+- `Comserv/root/Documentation/controllers/index.tt` — all controllers
+- `Comserv/root/Documentation/models/index.tt` — all models
+- `Documentation/Inventory/index.tt` — inventory system
+- `Documentation/Accounting/index.tt` — accounting system
+
+### .SUMMARY.md files (AI context, compression-friendly)
+Stored at `Documentation/<Module>/SUMMARY.md` — plain markdown, no TT tags.
+Purpose: lightweight AI-readable summary for Hermes compression. Kept small (<2KB each).
+
+**When to create or update:**
+1. **New controller added** → update `Comserv/root/Documentation/controllers/index.tt` + add controller entry in `CLAUDE.md`
+2. **New model/schema result class** → update `Comserv/root/Documentation/models/index.tt` + add to `CLAUDE.md`
+3. **New module with multiple files** → create `Documentation/<Module>/index.tt` (with META block and full sections) + `Documentation/<Module>/SUMMARY.md` (plain markdown, <2KB)
+4. **Database schema change** (new table, new key fields) → update the Data Model table in the relevant `.tt` index and the `.SUMMARY.md` sibling
+5. **Route change, workflow change** → update navigation reference in the relevant `.tt` index
+
+**Summary format template:**
+```markdown
+# Module: <Name>
+## Purpose
+<2-3 sentences>
+## Key Controllers
+- `Comserv/Controller/<Name>.pm`
+## Key Models
+- `Comserv/Model/Schema/Ency/Result/<related>.pm`
+## Routes
+- `/<route>` — description
+## Schema Tables
+<table1>, <table2>, ...
+## Dependencies
+<other modules>
+```
+
+### Automation — git-tied sync (no manual steps)
+
+**The post-commit hook handles this for you.** After every `git commit` that touches Controller/ or Model/ `.pm` files, the hook at `.git/hooks/post-commit` runs `Documentation/script/sync-docs.sh` automatically:
+- Detects new/deleted `.pm` files
+- Updates CLAUDE.md's auto-detected controller section
+- Creates stub `SUMMARY.md` files for new modules
+- Refreshes `Documentation/SUMMARY.md` controller list
+- Auto-stages the doc updates (they ride along to the next commit)
+
+**Manual run** (if you want to refresh without committing):
+```bash
+cd /path/to/comserv2 && bash Documentation/script/sync-docs.sh
+```
+Add `--dry-run` for a preview.
+
+**One-time setup** (already done, but needed if you re-clone):
+```bash
+cd /path/to/comserv2
+ln -sf ../../Documentation/script/post-commit-hook.sh .git/hooks/post-commit
+```
+
+So the process is: write code → `git commit` → docs auto-sync → commit includes doc updates. Zero manual steps, zero forgetting.
