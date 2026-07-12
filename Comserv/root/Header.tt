@@ -135,6 +135,10 @@
     <link rel="stylesheet" type="text/css" href="/static/css/ency-admin.css">
     [% END %]
 
+    [% IF c.stash.template.match('admin/schema_compare') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/schema_compare.css">
+    [% END %]
+
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% cv %]">
 

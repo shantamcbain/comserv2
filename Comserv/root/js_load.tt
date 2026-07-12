@@ -114,6 +114,11 @@
 <script src="/static/js/admin-dashboard.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Schema Compare JS -->
+[% IF c.request.uri.match('/admin/schema_compare') %]
+<script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Legacy menu (conditional) -->
 [% UNLESS c.session.use_db_menu || c.stash.use_db_menu %]
 <script src="/static/js/sub-menu.js" defer></script>

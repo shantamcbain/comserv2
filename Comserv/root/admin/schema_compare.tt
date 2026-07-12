@@ -1,12 +1,12 @@
 [%# Schema Comparison Page - Minimal working version #]
-<link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
+[%# CSS loaded via Header.tt conditional; JS loaded via js_load.tt %]
 
 <div class="schema-compare-container">
     <header class="schema-compare-header">
         <h1><i class="fas fa-database"></i> Database Schema Comparison</h1>
         <div class="schema-compare-context">
             <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
-            <button type="button" class="refresh-btn" onclick="refreshComparison()">
+            <button type="button" class="refresh-btn" data-action="refresh-comparison">
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
         </div>
@@ -15,7 +15,7 @@
     <div class="db-env-selector" style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0;">
         <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
             <strong>Database Environment:</strong>
-            <select id="dbEnvironmentSelect" onchange="switchEnvironment(this.value)" style="padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 200px;">
+            <select id="dbEnvironmentSelect" data-base-url="[% c.uri_for('/admin/schema_compare') %]" style="padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 200px;">
                 [% FOREACH env IN available_environments %]
                 [% IF env.available %]
                 <option value="[% env.environment %]" [% env.environment == active_environment ? 'selected' : '' %]>
@@ -35,13 +35,3 @@
     [% INCLUDE 'admin/schema_compare/servers.tt' %]
 </div>
 </div>
-
-<script>
-function refreshComparison() {
-    location.reload();
-}
-
-function switchEnvironment(env) {
-    window.location.href = '[% c.uri_for("/admin/schema_compare") %]?environment=' + env;
-}
-</script>
