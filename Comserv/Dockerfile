@@ -37,6 +37,14 @@ RUN mkdir -p /opt/comserv/local/lib/perl5
 # Application uses YAML::Tiny for all YAML operations
 # Use multiple mirrors for better dependency resolution
 # Template::Toolkit version is pinned in cpanfile (single source of truth)
+# Pre-install modules that cpanm --installdeps sometimes fails to resolve 
+# in its dependency walk (Crypt::CBC, Session::Store::Cookie)
+# vvv PRE-INSTALL FORK RESILIENCE vvv
+RUN cpanm --local-lib=/opt/comserv/local --notest \
+    --mirror https://cpan.metacpan.org \
+    --mirror https://www.cpan.org \
+    Crypt::CBC Catalyst::Plugin::Session::Store::Cookie
+# ^^^ PRE-INSTALL FORK RESILIENCE ^^^
 RUN cpanm --local-lib=/opt/comserv/local --notest \
     --mirror https://cpan.metacpan.org \
     --mirror https://www.cpan.org \
@@ -81,7 +89,7 @@ ENV COMSERV_LOG_DIR=/opt/comserv
 # Create directories
 RUN mkdir -p /opt/comserv/root/log /opt/comserv/root/session \
     /opt/comserv/backups /opt/comserv/.cpanm \
-    /cache/tt /cache/session /tmp/comserv/cache && \
+    /cache/tt /cache/session /tmp/comserv/cache /tmp/comserv/session && \
     chown -R comserv:comserv /opt/comserv /cache /tmp/comserv && \
     chmod -R 755 /cache /tmp/comserv
 

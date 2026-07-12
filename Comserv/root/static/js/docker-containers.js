@@ -5,6 +5,8 @@
  *
  * Cards-based container & volume view with per-card action buttons.
  * Uses data-action delegation, safe fetch, idempotent Docker calls.
+ *
+ * CV: 20260712a — bumped for deploy-form + registry + polling changes
  */
 (function() {
     'use strict';
@@ -18,14 +20,17 @@
     var targetSelect = document.getElementById('docker-target-select');
     var showAllCheckbox = document.getElementById('show-all-containers');
     var rebuildPollingTimer = null;
-    var lastKnownOutput = '';
+    var lastKnownLineCount = 0;
+    var pollingElapsedTimer = null;
+    var pollingStartTime = null;
+    var deployFormVisible = false;
 
     // ──────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────
     function esc(s) {
         if (!s) return '';
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');
     }
 
     function formatDate(isoStr) {
@@ -70,40 +75,78 @@
     }
 
     // ──────────────────────────────────────────────────────────
-    // Rebuild polling — reuses /admin/docker-deploy-status
+    // Known container/target mapping for deploy form
+    // ──────────────────────────────────────────────────────────
+    var KNOWN_CONTAINERS = [
+        { name: 'comserv-web-prod',       label: 'Production (port 5000)' },
+        { name: 'comserv2-web-staging',   label: 'Staging (port 4000)' },
+        { name: 'comserv2-web-dev',       label: 'Web Dev (port 3000)' },
+    ];
+
+    // ──────────────────────────────────────────────────────────
+    // Rebuild polling — improved with line-based diff, elapsed time, timeout
     // ──────────────────────────────────────────────────────────
     function startRebuildPolling(target) {
         if (rebuildPollingTimer) clearInterval(rebuildPollingTimer);
-        lastKnownOutput = '';
-        setStatus('check', 'Rebuilding ' + target + '…');
+        if (pollingElapsedTimer) clearInterval(pollingElapsedTimer);
+        lastKnownLineCount = 0;
+        pollingStartTime = Date.now();
+        setStatus('check', 'Deploying ' + target + '…');
+
+        // Update elapsed time every second
+        pollingElapsedTimer = setInterval(function() {
+            if (!pollingStartTime) return;
+            var sec = Math.floor((Date.now() - pollingStartTime) / 1000);
+            var min = Math.floor(sec / 60);
+            sec = sec % 60;
+            var elapsed = min > 0 ? min + 'm ' + sec + 's' : sec + 's';
+            setStatus('check', 'Deploying ' + target + ' (' + elapsed + ')');
+        }, 1000);
+
+        var maxDuration = 30 * 60 * 1000; // 30 minutes max
+
         rebuildPollingTimer = setInterval(function() {
+            // Timeout check
+            if (pollingStartTime && (Date.now() - pollingStartTime > maxDuration)) {
+                clearInterval(rebuildPollingTimer);
+                rebuildPollingTimer = null;
+                clearInterval(pollingElapsedTimer);
+                pollingElapsedTimer = null;
+                setStatus('err', 'Deploy timed out (30 min)');
+                log('⏰ DEPLOY TIMED OUT after 30 minutes — check server logs.', 'err');
+                return;
+            }
+
             apiPost('/admin/docker-deploy-status')
                 .then(function(data) {
                     if (data.success) {
-                        // Append only newly added output lines
+                        // Line-based diffing: only log lines we haven't seen yet
                         var newOutput = data.output || '';
-                        if (newOutput.length > lastKnownOutput.length) {
-                            var delta = newOutput.substring(lastKnownOutput.length);
-                            // Split into lines and log each new line
-                            delta.split('\n').forEach(function(line) {
+                        var lines = newOutput.split('\n');
+                        if (lines.length > lastKnownLineCount) {
+                            var delta = lines.slice(lastKnownLineCount);
+                            delta.forEach(function(line) {
                                 if (line.trim()) log(line, null);
                             });
-                            lastKnownOutput = newOutput;
+                            lastKnownLineCount = lines.length;
                         }
+
                         if (!data.is_running) {
                             clearInterval(rebuildPollingTimer);
                             rebuildPollingTimer = null;
+                            clearInterval(pollingElapsedTimer);
+                            pollingElapsedTimer = null;
                             // Determine success/failure from last output line
-                            var finalLine = newOutput.split('\n').filter(Boolean).pop() || '';
+                            var finalLine = lines.filter(Boolean).pop() || '';
                             if (finalLine.match(/SUCCESS/)) {
-                                setStatus('ok', 'Rebuild done');
-                                log('✅ REBUILD COMPLETE', 'ok');
+                                setStatus('ok', 'Deploy done ✓');
+                                log('✅ DEPLOY COMPLETE', 'ok');
                             } else if (finalLine.match(/FAIL|CRASH|ERROR|FAILED/)) {
-                                setStatus('err', 'Rebuild failed');
-                                log('❌ REBUILD FAILED', 'err');
+                                setStatus('err', 'Deploy failed ✗');
+                                log('❌ DEPLOY FAILED', 'err');
                             } else {
-                                setStatus('ok', 'Rebuild done');
-                                log('Rebuild finished.', 'ok');
+                                setStatus('ok', 'Deploy done');
+                                log('Deploy finished.', 'ok');
                             }
                             // Reload container list to reflect changes
                             setTimeout(loadAll, 2000);
@@ -112,7 +155,7 @@
                 })
                 .catch(function(e) {
                     if (e.message !== 'session-expired') {
-                        log('Rebuild status poll error: ' + e.message, 'err');
+                        log('Deploy status poll error: ' + e.message, 'err');
                     }
                 });
         }, 1500);
@@ -123,6 +166,176 @@
             clearInterval(rebuildPollingTimer);
             rebuildPollingTimer = null;
         }
+        if (pollingElapsedTimer) {
+            clearInterval(pollingElapsedTimer);
+            pollingElapsedTimer = null;
+        }
+        pollingStartTime = null;
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Deploy form (standalone new-container deploy + registry auth)
+    // ──────────────────────────────────────────────────────────
+    function showDeployForm() {
+        // If a rebuild is already running, don't show the form
+        if (rebuildPollingTimer) {
+            log('A deploy is already in progress. Wait for it to finish.', 'err');
+            return;
+        }
+
+        deployFormVisible = true;
+        var knownOpts = '';
+        KNOWN_CONTAINERS.forEach(function(kc) {
+            var selected = kc.name === 'comserv-web-prod' ? ' selected' : '';
+            knownOpts += '<option value="' + esc(kc.name) + '"' + selected + '>' + esc(kc.label) + '</option>';
+        });
+
+        var html =
+            '<div id="deploy-form-card" style="border:2px solid #28a745;border-radius:8px;padding:14px;margin-bottom:12px;background:#f0fdf4;">' +
+            '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+            '    <strong style="font-size:0.95em;color:#166534;"><i class="fas fa-rocket"></i> Deploy New Container</strong>' +
+            '    <button class="btn btn-sm" id="btn-close-deploy-form" style="background:#6c757d;color:#fff;padding:2px 10px;font-size:0.78em;">✕ Close</button>' +
+            '  </div>' +
+
+            '  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-bottom:10px;">' +
+
+            // Row 1: Container name + Deploy mode
+            '    <div>' +
+            '      <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Container:</label>' +
+            '      <select id="deploy-container-select" style="width:100%;padding:4px 6px;font-size:0.85em;border:1px solid #ccc;border-radius:4px;">' +
+            knownOpts +
+            '      </select>' +
+            '    </div>' +
+
+            '    <div>' +
+            '      <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Target Host:</label>' +
+            '      <select id="deploy-target-select" style="width:100%;padding:4px 6px;font-size:0.85em;border:1px solid #ccc;border-radius:4px;">' +
+            '        <option value="workstation">Workstation (Local)</option>' +
+            '        <option value="production1">Production 1 (192.168.1.126)</option>' +
+            '        <option value="production2">Production 2 (192.168.1.127)</option>' +
+            '      </select>' +
+            '    </div>' +
+
+            // Row 2: Mode + No Cache
+            '    <div>' +
+            '      <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Mode:</label>' +
+            '      <select id="deploy-mode-select" style="width:100%;padding:4px 6px;font-size:0.85em;border:1px solid #ccc;border-radius:4px;">' +
+            '        <option value="pull-deploy">Pull &amp; Deploy (from registry)</option>' +
+            '        <option value="full">Full Rebuild (build + push + deploy)</option>' +
+            '        <option value="build-push">Build &amp; Push only (no deploy)</option>' +
+            '      </select>' +
+            '    </div>' +
+
+            '    <div style="display:flex;align-items:flex-end;padding-bottom:4px;">' +
+            '      <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82em;cursor:pointer;">' +
+            '        <input type="checkbox" id="deploy-no-cache" style="width:14px;height:14px;cursor:pointer;">' +
+            '        <span style="color:#d97706;">No Cache</span>' +
+            '      </label>' +
+            '    </div>' +
+            '  </div>' +
+
+            // Registry auth fields (collapsible)
+            '  <details style="margin-bottom:10px;font-size:0.85em;">' +
+            '    <summary style="cursor:pointer;color:#0066cc;font-weight:bold;">Custom Registry Auth (optional)</summary>' +
+            '    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-top:6px;padding:8px;background:#e8f4fd;border-radius:4px;">' +
+            '      <div>' +
+            '        <label style="font-size:0.82em;display:block;margin-bottom:1px;">Registry URL:</label>' +
+            '        <input type="text" id="deploy-registry-url" placeholder="ghcr.io / docker.io / …" style="width:100%;padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:0.9em;">' +
+            '      </div>' +
+            '      <div>' +
+            '        <label style="font-size:0.82em;display:block;margin-bottom:1px;">Image Tag (optional):</label>' +
+            '        <input type="text" id="deploy-image-tag" placeholder="latest (default)" style="width:100%;padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:0.9em;">' +
+            '      </div>' +
+            '      <div>' +
+            '        <label style="font-size:0.82em;display:block;margin-bottom:1px;">Username:</label>' +
+            '        <input type="text" id="deploy-registry-user" placeholder="(leave blank if none)" style="width:100%;padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:0.9em;">' +
+            '      </div>' +
+            '      <div>' +
+            '        <label style="font-size:0.82em;display:block;margin-bottom:1px;">Password / Token:</label>' +
+            '        <input type="password" id="deploy-registry-pass" placeholder="(masked)" style="width:100%;padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:0.9em;">' +
+            '      </div>' +
+            '    </div>' +
+            '  </details>' +
+
+            '  <div style="display:flex;gap:8px;">' +
+            '    <button class="btn btn-sm" id="btn-start-deploy" style="background:#28a745;color:#fff;padding:6px 20px;font-size:0.85em;font-weight:bold;">▶ Deploy</button>' +
+            '    <button class="btn btn-sm" id="btn-cancel-deploy" style="background:#dc3545;color:#fff;padding:6px 12px;font-size:0.85em;">Cancel</button>' +
+            '  </div>' +
+            '</div>';
+
+        // Insert deploy form at the top of containers section
+        if (containersEl) {
+            containersEl.insertAdjacentHTML('afterbegin', html);
+        }
+    }
+
+    function hideDeployForm() {
+        var card = document.getElementById('deploy-form-card');
+        if (card) card.parentNode.removeChild(card);
+        deployFormVisible = false;
+    }
+
+    function submitDeployForm() {
+        var cname = document.getElementById('deploy-container-select');
+        var targetEl = document.getElementById('deploy-target-select');
+        var modeEl = document.getElementById('deploy-mode-select');
+        var noCacheEl = document.getElementById('deploy-no-cache');
+        var registryUrlEl = document.getElementById('deploy-registry-url');
+        var registryUserEl = document.getElementById('deploy-registry-user');
+        var registryPassEl = document.getElementById('deploy-registry-pass');
+        var imageTagEl = document.getElementById('deploy-image-tag');
+
+        if (!cname || !targetEl) return;
+
+        var containerName = cname.value;
+        var target = targetEl.value;
+        var mode = modeEl ? modeEl.value : 'pull-deploy';
+        var noCache = noCacheEl ? noCacheEl.checked : false;
+        var registryUrl = registryUrlEl ? registryUrlEl.value.trim() : '';
+        var registryUser = registryUserEl ? registryUserEl.value.trim() : '';
+        var registryPass = registryPassEl ? registryPassEl.value : '';
+        var imageTag = imageTagEl ? imageTagEl.value.trim() : '';
+
+        // Confirm
+        var confirmMsg = 'Deploy ' + containerName + ' to ' + target + '?';
+        if (mode === 'full') confirmMsg = 'Full rebuild + deploy ' + containerName + ' on ' + target + '? This builds, pushes to Docker Hub, and deploys with zero-downtime handover.';
+        if (mode === 'build-push') confirmMsg = 'Build and push ' + containerName + ' to Docker Hub (no deploy)?';
+        if (registryUrl) confirmMsg += '\n\nRegistry: ' + registryUrl;
+        if (!confirm(confirmMsg)) return;
+
+        // Build POST body
+        var parts = [];
+        if (mode !== 'full') parts.push('mode=' + encodeURIComponent(mode));
+        if (noCache) parts.push('no_cache=1');
+        if (registryUrl) parts.push('registry_url=' + encodeURIComponent(registryUrl));
+        if (registryUser) parts.push('registry_user=' + encodeURIComponent(registryUser));
+        if (registryPass) parts.push('registry_pass=' + encodeURIComponent(registryPass));
+        if (imageTag) parts.push('image_tag=' + encodeURIComponent(imageTag));
+
+        var postBody = parts.join('&');
+
+        hideDeployForm();
+        stopRebuildPolling();
+        log('=== DEPLOY: ' + containerName + ' on ' + target + ' ===', 'info');
+        log('Mode: ' + mode + (registryUrl ? ', Registry: ' + registryUrl : '') + (imageTag ? ', Tag: ' + imageTag : ''), 'info');
+
+        apiPost('/admin/docker/rebuild/' + encodeURIComponent(containerName) + '?host=' + encodeURIComponent(target), postBody)
+            .then(function(d) {
+                if (d.success) {
+                    log('Deploy process started in background. Streaming output below:', 'dim');
+                    startRebuildPolling(containerName);
+                } else {
+                    log('❌ Deploy failed to start: ' + (d.message || d.stderr || 'unknown'), 'err');
+                    setStatus('err', 'Deploy failed');
+                    setTimeout(loadAll, 5000);
+                }
+            })
+            .catch(function(e) {
+                stopRebuildPolling();
+                log('❌ Deploy request error: ' + e.message, 'err');
+                setStatus('err', 'Network error');
+                setTimeout(loadAll, 5000);
+            });
     }
 
     // ──────────────────────────────────────────────────────────
@@ -169,7 +382,7 @@
                 containers.forEach(function(c) {
                     if (c.mounts) {
                         c.mounts.split(',').forEach(function(m) {
-                            if (m =~ /comserv/) {
+                            if (m.indexOf('comserv') !== -1) {
                                 var parts = m.split(':');
                                 if (parts[0] && names.indexOf(parts[0]) === -1) names.push(parts[0]);
                             }
@@ -186,8 +399,21 @@
     // ──────────────────────────────────────────────────────────
     function renderContainers() {
         if (!containersEl) return;
+
+        // If deploy form is visible, preserve it by not clearing innerHTML directly
+        var deployCard = document.getElementById('deploy-form-card');
+        var deployHtml = '';
+        if (deployCard) {
+            deployHtml = deployCard.outerHTML;
+        }
+
         if (!containersCache || containersCache.length === 0) {
-            containersEl.innerHTML = '<p style="color:#666;text-align:center;padding:10px;font-size:0.85em;">No containers found.</p>';
+            containersEl.innerHTML = deployHtml +
+                '<div style="text-align:center;padding:16px;border:1px dashed #28a745;border-radius:8px;margin-top:6px;">' +
+                '<p style="color:#666;font-size:0.88em;margin:0 0 10px 0;">No containers found on <strong>' + esc(currentTarget) + '</strong>.</p>' +
+                '<button class="btn btn-sm" data-action="show-deploy-form" style="background:#28a745;color:#fff;padding:6px 16px;font-size:0.88em;font-weight:bold;">' +
+                '<i class="fas fa-rocket"></i> Deploy New Container</button>' +
+                '</div>';
             var cntEl = document.getElementById('container-count');
             if (cntEl) cntEl.textContent = '';
             return;
@@ -211,14 +437,13 @@
             var statusIcon = unhealthy ? '!' : (running ? '●' : (c.is_backup_container ? '↩' : '○'));
             var created = c.created ? new Date(c.created).toLocaleDateString() : '';
             var backupBadge = c.is_backup_container ? '<span style="display:inline-block;background:#6a0dad;color:#fff;font-size:0.65em;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:bold;letter-spacing:0.5px;">BACKUP</span>' : '';
+            var hostBadge = '<span style="font-size:0.7em;background:#e2e8f0;color:#475569;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap;">' + esc(currentTarget) + '</span>';
 
-            // Debug: log container name for debugging button visibility
-            console.log('DEBUG container:', c.name, '|host:', currentTarget, '|isLocal:', isLocal, '|isBackup:', c.is_backup_container);
             html += '<div style="border:1px solid ' + borderColor + ';border-radius:6px;padding:10px 12px;background:var(--bg-color,#fff);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
                 '<div style="flex:2;min-width:200px;">' +
                 '  <div style="display:flex;align-items:center;gap:6px;">' +
                 '    <span style="color:' + statusColor + ';font-size:1em;">' + statusIcon + '</span>' +
-                '    <strong style="font-size:0.9em;">' + esc(c.name) + '</strong>' + backupBadge +
+                '    <strong style="font-size:0.9em;">' + esc(c.name) + '</strong>' + hostBadge + backupBadge +
                 '    <span style="font-size:0.75em;color:#666;">' + esc(c.id) + '</span>' +
                 '  </div>' +
                 '  <div style="font-size:0.82em;color:#666;margin-top:2px;">' +
@@ -228,6 +453,7 @@
                 '  </div>' +
                 '  <div style="font-size:0.8em;color:#888;margin-top:1px;">' +
                 '    ' + esc(c.status) +
+                (c.running_for && c.running_for !== c.status ? ' &middot; Created ' + esc(c.running_for) : '') +
                 '  </div>' +
                 '</div>' +
                 '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' +
@@ -263,6 +489,11 @@
                 '</div>' +
             '</div>';
         });
+
+        // If we had a deploy form card, preserve it
+        if (deployHtml) {
+            html = deployHtml + html;
+        }
         containersEl.innerHTML = html;
     }
 
@@ -434,7 +665,7 @@
                 })
                 .catch(function(e) { log('Restore error: ' + e.message, 'err'); });
         } else if (act === 'build-push') {
-            if (!confirm('Build and push ' + cid + ' to Docker Hub on ' + currentTarget + '?\\n\\nThis will build the image locally and push to Docker Hub.\\nThe running container is NOT restarted.\\n\\nUse "Pull & Deploy" on the production server to deploy this image.')) return;
+            if (!confirm('Build and push ' + cid + ' to Docker Hub on ' + currentTarget + '?\n\nThis will build the image locally and push to Docker Hub.\nThe running container is NOT restarted.\n\nUse "Pull & Deploy" on the production server to deploy this image.')) return;
             stopRebuildPolling();
             log('=== BUILD & PUSH: ' + cid + ' ===', 'info');
             log('Building and pushing to Docker Hub (running container untouched)...', 'info');
@@ -459,7 +690,7 @@
                     setTimeout(loadAll, 5000);
                 });
         } else if (act === 'pull-deploy') {
-            if (!confirm('Pull and deploy ' + cid + ' on ' + currentTarget + '?\\n\\nThis will pull the latest image from Docker Hub, rename the old container to a date-stamped backup, and start the new container with zero-downtime handover.\\n\\nThe image must have been pushed first (use "Build & Push" on the workstation).')) return;
+            if (!confirm('Pull and deploy ' + cid + ' on ' + currentTarget + '?\n\nThis will pull the latest image from Docker Hub, rename the old container to a date-stamped backup, and start the new container with zero-downtime handover.\n\nThe image must have been pushed first (use "Build & Push" on the workstation).')) return;
             stopRebuildPolling();
             log('=== PULL & DEPLOY: ' + cid + ' ===', 'info');
             log('Pulling from Docker Hub and deploying on ' + currentTarget + '...', 'info');
@@ -481,7 +712,7 @@
                     setTimeout(loadAll, 5000);
                 });
         } else if (act === 'push-only') {
-            if (!confirm('Push image for ' + cid + ' to Docker Hub?\\n\\nThis will push the current local image without rebuilding. Use this when the container is already working and you just need to push the image for production deployment.')) return;
+            if (!confirm('Push image for ' + cid + ' to Docker Hub?\n\nThis will push the current local image without rebuilding. Use this when the container is already working and you just need to push the image for production deployment.')) return;
             stopRebuildPolling();
             log('=== PUSH IMAGE: ' + cid + ' ===', 'info');
             log('Pushing image to Docker Hub (no rebuild)...', 'info');
@@ -583,12 +814,28 @@
     // ──────────────────────────────────────────────────────────
     document.addEventListener('click', function(e) {
         var el = e.target.closest('[data-action]');
-        if (!el) return;
+        if (!el) {
+            // Also check for non-data-action buttons by id
+            if (e.target.id === 'btn-start-deploy') {
+                e.preventDefault();
+                submitDeployForm();
+                return;
+            }
+            if (e.target.id === 'btn-cancel-deploy' || e.target.id === 'btn-close-deploy-form') {
+                e.preventDefault();
+                hideDeployForm();
+                return;
+            }
+            return;
+        }
         var action = el.getAttribute('data-action');
 
         if (action === 'refresh-all') {
             e.preventDefault();
             loadAll();
+        } else if (action === 'show-deploy-form') {
+            e.preventDefault();
+            showDeployForm();
         } else if (action === 'container-act') {
             e.preventDefault();
             containerAction(el.getAttribute('data-cid'), el.getAttribute('data-act'));
