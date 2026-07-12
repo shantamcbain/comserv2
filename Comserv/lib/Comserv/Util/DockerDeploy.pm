@@ -19,6 +19,11 @@ sub new {
         trigger    => $args{trigger}    || 'manual',
         no_cache   => $args{no_cache}   // 0,
         mode       => $args{mode}       || 'full',   # full, build-push, pull-deploy
+        # Custom registry auth for pull-deploy
+        registry_url  => $args{registry_url}  || '',
+        registry_user => $args{registry_user} || '',
+        registry_pass => $args{registry_pass} || '',
+        image_tag     => $args{image_tag}     || '',
     }, $class;
 }
 
@@ -102,13 +107,38 @@ sub _backup_container {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC ENTRY POINT — one method for all targets
+# Docker registry login — supports both local and remote targets
 # ─────────────────────────────────────────────────────────────────────────────
+sub _docker_login {
+    my ($self, $is_remote, $ssh_prefix) = @_;
+
+    my $url  = $self->{registry_url}  || '';
+    my $user = $self->{registry_user} || '';
+    my $pass = $self->{registry_pass} || '';
+
+    return 1 unless $url && $user;   # no custom registry — proceed
+    $self->_log("Logging into registry: $url (user=$user)...");
+    my $cmd;
+    if ($is_remote) {
+        $cmd = qq{$ssh_prefix "echo '$pass' | docker login $url --username '$user' --password-stdin 2>&1"};
+    } else {
+        $cmd = qq{echo '$pass' | docker login $url --username '$user' --password-stdin 2>&1};
+    }
+    my $rc = $self->_stream_command($cmd);
+    if ($rc != 0) {
+        $self->_error("Docker login to $url failed (exit=$rc)");
+        return 0;
+    }
+    $self->_log("  Docker login to $url succeeded.");
+    return 1;
+}
+
 sub deploy {
     my ($self) = @_;
     my $repo   = $self->{repo};
     my $target = $self->{target};
     my $mode   = $self->{mode};
+    my $image_tag = $self->{image_tag} || 'latest';
 
     $self->_log("=== DEPLOY STARTED (target=$target, trigger=$self->{trigger}, mode=$mode) ===");
 
@@ -154,9 +184,22 @@ sub deploy {
                         : $target eq 'production2' ? '192.168.1.127'
                         : 'localhost';
         my $ssh_pass    = $ENV{SSHPASS} || '';
+        # Resolve SSH user from credentials file, falling back to ubuntu
+        my $ssh_user    = 'ubuntu';
+        my $cred_file   = $ENV{HOME} . '/.comserv/secrets/ssh_credentials.json';
+        if (-f $cred_file) {
+            open(my $cfh, '<', $cred_file) or warn "Can't open $cred_file: $!";
+            my $json_str = do { local $/; <$cfh> };
+            close $cfh;
+            my $creds = decode_json($json_str);
+            if ($creds->{$target} && $creds->{$target}->{ssh_user}) {
+                $ssh_user = $creds->{$target}->{ssh_user};
+            }
+        }
+        $self->{ssh_user} = $ssh_user;
         $ssh_prefix     = $ssh_pass
-            ? "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host"
-            : "ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host";
+                    ? "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host"
+                    : "ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
         # SCP prefix for transferring compose files
         my $scp_prefix  = $ssh_pass
             ? "sshpass -e scp -o StrictHostKeyChecking=no"
@@ -211,6 +254,11 @@ sub deploy {
         $self->{_git_hash} = $git_hash;
 
         if ($is_remote) {
+            $self->_docker_login($is_remote, $ssh_prefix) or do {
+                $self->_error("Aborting: registry login failed before push.");
+                $self->_save_deploy_log($container_name, $target);
+                return 0;
+            };
             $self->_log("Step 3: Pushing $service to Docker Hub...");
             $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
             $self->_log("Step 3b: Push finished.");
@@ -255,6 +303,10 @@ sub deploy {
 
     # 5. Start new container on remote (pull then up) or local (up only)
     if ($is_remote) {
+        $self->_docker_login($is_remote, $ssh_prefix) or do {
+            $self->_error("Aborting: registry login failed before pull on $target.");
+            die "docker login failed";
+        };
         $self->_log("Step 5: Pulling image on $target and starting $service...");
         my $remote_cmd = sprintf(
             'cd %s && ( docker compose %s pull %s 2>&1 ) && ( docker compose %s up -d --force-recreate %s 2>&1 )',
@@ -263,6 +315,10 @@ sub deploy {
         );
         $self->_stream_command("$ssh_prefix \"$remote_cmd\"");
     } else {
+        $self->_docker_login($is_remote, $ssh_prefix) or do {
+            $self->_error("Aborting: registry login failed before local pull.");
+            die "docker login failed";
+        };
         $self->_log("Step 5: Starting $service on localhost...");
         $self->_stream_command("cd $repo && docker compose $compose_files up -d --force-recreate $service 2>&1");
     }
@@ -593,8 +649,8 @@ sub _sync_compose_to_remote {
     # 1. Create remote temp dir
     $self->_log("Syncing compose files to $ssh_host:$remote_dir ...");
     my $mkdir_cmd = $ENV{SSHPASS}
-        ? "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"mkdir -p $remote_dir\""
-        : "ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"mkdir -p $remote_dir\"";
+        ? "sshpass -e ssh -o StrictHostKeyChecking=no $self->{ssh_user}\@$ssh_host \"mkdir -p $remote_dir\""
+        : "ssh -o StrictHostKeyChecking=no $self->{ssh_user}\@$ssh_host \"mkdir -p $remote_dir\"";
     my $rc = system($mkdir_cmd);
     if ($rc != 0) {
         $self->_error("Failed to create remote dir $remote_dir on $ssh_host (exit=$rc)");
@@ -610,7 +666,7 @@ sub _sync_compose_to_remote {
     #    /root/static (empty/missing on the remote host).
     foreach my $f (@files) {
         my $local  = "$repo/$f";
-        my $remote = "ubuntu\@$ssh_host:$remote_dir/";
+        my $remote = "$self->{ssh_user}\@$ssh_host:$remote_dir/";
 
         if ($f eq 'docker-compose.prod.yml') {
             # Read, filter STATIC_SRC/LEGACY_STATIC_SRC bind mount lines, write temp
@@ -637,7 +693,7 @@ sub _sync_compose_to_remote {
         }
 
         $self->_log("  Transferring $f ...");
-        my $dest = "ubuntu\@$ssh_host:$remote_dir/$f";
+        my $dest = "$self->{ssh_user}\@$ssh_host:$remote_dir/$f";
         my $scp_cmd = "$scp_prefix $local $dest";
         $rc = system($scp_cmd);
         if ($rc != 0) {

@@ -66,7 +66,7 @@
     Place this file include just before </body> in footer/layout
     ================================================ %]
 
-[%- SET cv = c.stash.css_v || c.stash.version || '20260710' -%]
+[%- SET cv = c.stash.css_v || c.stash.version || '20260712' -%]
 
 <!-- ================================================ -->
 <!-- CONFIRMED PRESENT FILES (as of 2026-06-30) -->

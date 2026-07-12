@@ -15,8 +15,12 @@ if [ "$ENVIRONMENT" = "production" ] || [ "$ENVIRONMENT" = "staging" ]; then
     echo "→ Starting with Starman (production-grade server)"
 
     # Ensure cache directories are writable
-    mkdir -p /cache/tt /cache/session /tmp/comserv/cache /opt/comserv/root/themes /tmp/comserv/temp
-    chown -R comserv:comserv /cache /tmp/comserv /opt/comserv/root/themes /tmp/comserv/temp 2>/dev/null || true
+    mkdir -p /cache/tt /cache/session /tmp/comserv/cache /opt/comserv/root/themes /tmp/comserv/temp /tmp/comserv/session
+    # chown each directory separately so volume-mounted dirs under /tmp/comserv (e.g. session, temp) get fixed too
+    chown -R comserv:comserv /cache /opt/comserv/root/themes 2>&1 || true
+    for dir in /tmp/comserv /tmp/comserv/session /tmp/comserv/temp /tmp/comserv/cache; do
+        if [ -d "$dir" ]; then chown comserv:comserv "$dir" 2>&1 || true; fi
+    done
     chmod -R 755 /cache /tmp/comserv /opt/comserv/root/themes /tmp/comserv/temp 2>/dev/null || true
 
     # Use the canonical production PSGI (has Static middleware for menu CSS/JS)
@@ -35,5 +39,10 @@ if [ "$ENVIRONMENT" = "production" ] || [ "$ENVIRONMENT" = "staging" ]; then
 
 else
     echo "→ Starting development server (comserv_server.pl)"
+    # Ensure session dir is writable (volume-mounted dirs may be root-owned)
+    mkdir -p /tmp/comserv/cache /tmp/comserv/temp
+    for dir in /tmp/comserv /tmp/comserv/session /tmp/comserv/temp /tmp/comserv/cache; do
+        if [ -d "$dir" ]; then chown comserv:comserv "$dir" 2>&1 || true; fi
+    done
     exec perl -Ilib script/comserv_server.pl --port "$PORT" "$@"
 fi

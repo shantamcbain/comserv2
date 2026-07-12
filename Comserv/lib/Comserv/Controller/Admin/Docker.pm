@@ -647,6 +647,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
     my @containers = ();
 
     my $ssh_prefix;  # Declare early
+    my $ssh_pass_remote;  # Save SSH pass for use outside the else block
 
     if ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1') {
         my $output = `docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}|{{.RunningFor}}|{{.State}}|{{.Mounts}}|{{.Networks}}' 2>/dev/null || echo ''`;
@@ -687,12 +688,11 @@ sub list :Path('/admin/docker/list') :Args(0) {
             };
         }
     } else {
-        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
-        my $ssh_user = 'ubuntu';
-
         my $admin_ctrl = $c->controller('Admin');
-        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        my ($ssh_host, $ssh_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
         $ssh_pass ||= $ENV{SSHPASS} || '';
+
+        $ssh_pass_remote = $ssh_pass;  # Save for later use outside else block
 
         unless ($ssh_pass) {
             $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
@@ -703,18 +703,20 @@ sub list :Path('/admin/docker/list') :Args(0) {
         local $ENV{SSHPASS} = $ssh_pass;
         $ssh_prefix = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
 
-        my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo ''\"";
+        my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}|{{.RunningFor}}|{{.State}}|{{.Mounts}}|{{.Networks}}' 2>/dev/null || echo ''\"";
         my $output = `$cmd 2>/dev/null` || '';
 
         foreach my $line (split /\n/, $output) {
             next unless $line =~ /\|/;
-            my ($id, $name, $image, $status, $ports) = split /\|/, $line, 5;
+            my ($id, $name, $image, $status, $ports, $created, $running_for, $state, $mounts, $networks) = split /\|/, $line, 10;
+            $id = substr($id, 0, 12) if $id;
             # Detect dated backup containers
             my $is_backup_container = ($name =~ /^bk-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
 
-            # Get image creation date
+            # Get image creation date via remote SSH
             my $img_created = '';
-            my $img_inspect = `docker inspect --format='{{.Created}}' "$image" 2>/dev/null | head -1`;
+            my $img_cmd = "$ssh_prefix \"docker inspect --format='{{.Created}}' \"$image\" 2>/dev/null | head -1\"";
+            my $img_inspect = `$img_cmd 2>/dev/null` || '';
             if ($img_inspect) {
                 chomp $img_inspect;
                 $img_created = $img_inspect;
@@ -731,14 +733,21 @@ sub list :Path('/admin/docker/list') :Args(0) {
                 name => $name,
                 image => $image,
                 status => $status,
-                state => $status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown'),
+                state => $state || ($status =~ /Up/i ? 'running' : ($status =~ /Exited/i ? 'exited' : 'unknown')),
                 ports => $ports || '',
+                created => $created || '',
+                running_for => $running_for || '',
+                mounts => $mounts || '',
+                networks => $networks || '',
                 is_backup_container => $is_backup_container,
                 image_created => $img_created,
                 container_created => $container_created,
             };
         }
     }
+
+    # Re-set SSHPASS for backup images and volumes queries (outside the else block)
+    local $ENV{SSHPASS} = $ssh_pass_remote if $ssh_pass_remote;
 
     # Backup Images
     my @backups = ();
@@ -863,11 +872,10 @@ sub _run_docker_action {
         }
         local $ENV{SSHPASS} = $ssh_pass;
 
-        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
         my $remote_cmd = "docker $action $container 2>&1";
         my $cmd = $action eq 'rm'
-            ? "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"$remote_cmd\""
-            : "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"$remote_cmd\"";
+            ? "sshpass -e ssh -o StrictHostKeyChecking=no $resolved_user\@$resolved_host \"$remote_cmd\""
+            : "sshpass -e ssh -o StrictHostKeyChecking=no $resolved_user\@$resolved_host \"$remote_cmd\"";
         $output = `$cmd 2>/dev/null` || '';
         $success = $? == 0;
     }
@@ -924,10 +932,24 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
     }
 
     my $no_cache = $c->req->body_params->{no_cache} // 0;
+    my $registry_url  = $c->req->param('registry_url')  || '';
+    my $registry_user = $c->req->param('registry_user') || '';
+    my $registry_pass = $c->req->param('registry_pass') || '';
+    my $image_tag     = $c->req->param('image_tag')     || '';
     my $log_file = '/tmp/comserv_deploy.log';
     my $pid_file = '/tmp/comserv_deploy.pid';
     unlink $log_file;
     unlink $pid_file;
+
+    # Resolve SSH credentials before forking so the child inherits $ENV{SSHPASS}
+    my $is_remote_target = ($deploy_target ne 'staging-4000' && $deploy_target ne 'local-staging' && $deploy_target ne 'web-dev' && $deploy_target ne 'workstation');
+    if ($is_remote_target) {
+        my $admin_ctrl = $c->controller('Admin');
+        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($deploy_target);
+        if ($ssh_pass) {
+            $ENV{SSHPASS} = $ssh_pass;
+        }
+    }
 
     my $pid = fork();
     if (!defined $pid) {
@@ -971,6 +993,10 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
                 trigger => "rebuild:$mode",
                 no_cache => $no_cache,
                 mode    => $mode,
+                registry_url  => $registry_url,
+                registry_user => $registry_user,
+                registry_pass => $registry_pass,
+                image_tag     => $image_tag,
             );
         };
         if ($@) {
@@ -1096,11 +1122,8 @@ sub recovery_history :Path('/admin/docker/recovery_history') :Args(0) {
     my $service = $c->req->param('service') || 'web-prod';
     
     # For now we read the JSON log file via SSH on the target host
-    my $ssh_host = $host eq 'production1' ? '192.168.1.126' : ($host eq 'production2' ? '192.168.1.127' : 'localhost');
-    my $ssh_user = 'ubuntu';
-    
     my $admin_ctrl = $c->controller('Admin');
-    my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+    my ($ssh_host, $ssh_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
     $ssh_pass ||= $ENV{SSHPASS} || '';
     
     unless ($ssh_pass) {
@@ -1142,11 +1165,8 @@ sub start_backup :Path('/admin/docker/start_backup') :Args(0) {
         return;
     }
     
-    my $ssh_host = $host eq 'production1' ? '192.168.1.126' : ($host eq 'production2' ? '192.168.1.127' : 'localhost');
-    my $ssh_user = 'ubuntu';
-    
     my $admin_ctrl = $c->controller('Admin');
-    my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+    my ($ssh_host, $ssh_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
     $ssh_pass ||= $ENV{SSHPASS} || '';
     
     unless ($ssh_pass) {
@@ -1231,10 +1251,8 @@ sub restore_backup :Path('/admin/docker/restore_backup') :Args(0) {
     my $is_remote = ($host ne 'workstation' && $host ne 'localhost' && $host ne '127.0.0.1');
     my $ssh_prefix = '';
     if ($is_remote) {
-        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
-        my $ssh_user = 'ubuntu';
         my $admin_ctrl = $c->controller('Admin');
-        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        my ($ssh_host, $ssh_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
         $ssh_pass ||= $ENV{SSHPASS} || '';
         unless ($ssh_pass) {
             $c->stash->{json} = { success => 0, error => "No SSH password for $host", host => $host };
@@ -1407,9 +1425,8 @@ sub logs :Path('/admin/docker/logs') :Args(1) {
         $c->stash->{json} = $result;
     } else {
         # Remote host via SSH
-        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
         my $admin_ctrl = $c->controller('Admin');
-        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        my ($ssh_host, $ssh_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
         $ssh_pass ||= $ENV{SSHPASS} || '';
         unless ($ssh_pass) {
             $c->stash->{json} = { success => 0, error => "No SSH password for $host" };
@@ -1417,7 +1434,7 @@ sub logs :Path('/admin/docker/logs') :Args(1) {
             return;
         }
         local $ENV{SSHPASS} = $ssh_pass;
-        my $cmd = "sshpass -e ssh -o StrictHostKeyChecking=no ubuntu\@$ssh_host \"docker logs --tail=$lines $service 2>&1\"";
+        my $cmd = "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host \"docker logs --tail=$lines $service 2>&1\"";
         my $output = `$cmd 2>/dev/null` || '';
         $c->stash->{json} = { success => 1, output => $output, logs => $output };
     }
@@ -1540,10 +1557,8 @@ sub prune :Path('/admin/docker/prune') :Args(0) {
     my $is_remote = ($host ne 'workstation' && $host ne 'localhost' && $host ne '127.0.0.1');
 
     if ($is_remote) {
-        my $ssh_host = $host eq 'production1' ? '192.168.1.126' : '192.168.1.127';
-        my $ssh_user = 'ubuntu';
         my $admin_ctrl = $c->controller('Admin');
-        my ($resolved_host, $resolved_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
+        my ($ssh_host, $ssh_user, $ssh_port, $ssh_pass) = $admin_ctrl->_resolve_ssh_target($host);
         $ssh_pass ||= $ENV{SSHPASS} || '';
         unless ($ssh_pass) {
             $c->response->body(encode_json({ success => 0, error => "No SSH password for $host" }));

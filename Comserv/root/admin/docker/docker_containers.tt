@@ -24,6 +24,9 @@
             <button class="btn btn-secondary btn-sm" data-action="docker-prune" style="padding:4px 10px;font-size:0.85em;background:#28a745;color:#fff;border-color:#28a745;">
                 <i class="fas fa-broom"></i> Clean Up Disk
             </button>
+            <button class="btn btn-primary btn-sm" data-action="show-deploy-form" style="padding:4px 10px;font-size:0.85em;background:#0366d6;color:#fff;border-color:#0366d6;">
+                <i class="fas fa-ship"></i> Pull & Deploy
+            </button>
             <a href="/admin/docker-containers-working" class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:0.85em;">
                 <i class="fas fa-history"></i> Working View
             </a>
