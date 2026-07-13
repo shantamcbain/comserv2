@@ -23,23 +23,22 @@
     <div class="content-container">
         <div class="content-primary">
             [% IF databases.size %]
-            <div class="database-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+            <div class="database-grid">
                 [% FOREACH db IN databases %]
-                <div class="database-card" 
-                     style="border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; background: var(--card-bg, #fff); cursor: pointer;"
+                <div class="database-card"
                      data-action="navigate-db"
                      data-server="[% server.name | html %]"
                      data-db="[% db.name | html %]">
-                    <div class="database-header" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;">
+                    <div class="database-header">
                         <i class="fas fa-database"></i>
-                        <h3 style="margin:0; font-size:1.1rem;">[% db.name | html %]</h3>
+                        <h3>[% db.name | html %]</h3>
                     </div>
-                    <div class="database-meta" style="font-size:0.9rem; line-height:1.4;">
+                    <div class="database-meta">
                         <div><strong>Tables:</strong> [% db.table_count || 0 %]</div>
                         <div><strong>Size:</strong> [% db.size || '—' | html %]</div>
                         <div><strong>Status:</strong> <span class="status-[% db.status || 'unknown' %]">[% db.status || 'Unknown' | ucfirst %]</span></div>
                     </div>
-                    <div class="database-actions" style="margin-top:0.75rem;">
+                    <div class="database-actions">
                         <button class="btn btn-sm btn-secondary"
                                 data-action="refresh-db"
                                 data-server="[% server.name | html %]"

@@ -1,53 +1,40 @@
 # Comserv Agent Guidelines
 
-Entry point for AI assistants (Cursor, Continue, Zencoder, etc.) working on this repository.
+## Primary guidance
 
-## Canonical standards (read these — not IDE-specific folders)
+**`.hermes.md`** (project root) is the consolidated AI guidance file — auto-loaded every session. Read it first.
 
-**Primary index:** `/Documentation/DevelopmentStandards` (in-app) — themes, templates, logging, doc links, file hierarchy.
+## Unique content not in .hermes.md
 
-| Topic | Canonical source |
-|-------|------------------|
-| **Standards hub** | `/Documentation/DevelopmentStandards` |
-| **Theme authoring** | `Comserv/root/static/config/theme_definitions.json`, `/Documentation/CssThemes`, `/Documentation/ThemeConfig` |
-| **Template compliance** | `/Documentation/ApplicationTtTemplate`, `/Documentation/DocumentationTtTemplate` |
-| **Logging** | `Comserv/lib/Comserv/Util/Logging.pm` (checklist), `/Documentation/logging_best_practices` |
-| **Documentation / feature guides** | `/Documentation/DevelopmentStandards#doc-compliance`, `/Documentation/newsletter_feature_guide_workflow` |
-| **YAML consolidation** | `Comserv/root/coding-standards-comserv.yaml` |
-| **Repo layout & tasks** | `.zencoder/rules/repo.md` (project overview; defers to in-app docs for TT/theme/logging detail) |
+### Documentation compliance
 
-**`.zencoder/rules/*.md`** are thin **Zencoder adapters** (`globs`, `alwaysApply`) that point to the sources above. They are not canonical — workstations without Zencoder/PyCharm should use `AGENTS.md` + in-app documentation only.
+1. **Code changes** → append `/Documentation/CHANGELOG`
+2. **Member how-to** → edit stable `Documentation/guides/*.tt` in place
+3. **.tt vs DB vs both** → decide ad hoc per topic
 
-## Zencoder adapter index (optional — if your IDE loads `.zencoder/rules/`)
+### Module index/summary files
 
-- Repo overview: [./.zencoder/rules/repo.md](./.zencoder/rules/repo.md)
-- AI behavior: [./.zencoder/rules/ai-behavior.md](./.zencoder/rules/ai-behavior.md)
-- Documentation: [./.zencoder/rules/documentation-standards.md](./.zencoder/rules/documentation-standards.md)
-- Naming: [./.zencoder/rules/naming-standards.md](./.zencoder/rules/naming-standards.md)
-- SQL: [./.zencoder/rules/sql-standards.md](./.zencoder/rules/sql-standards.md)
-- Templates/themes: [./.zencoder/rules/template-standards.md](./.zencoder/rules/template-standards.md) → `/Documentation/DevelopmentStandards`
-- Logging: [./.zencoder/rules/logging-standards.md](./.zencoder/rules/logging-standards.md) → `Logging.pm`
-- Workflow: [./.zencoder/rules/workflow-standards.md](./.zencoder/rules/workflow-standards.md)
-- Access: [./.zencoder/rules/application-access-standards.md](./.zencoder/rules/application-access-standards.md)
-- Config paths: [./.zencoder/rules/config-location.md](./.zencoder/rules/config-location.md)
+- `.tt` indexes at `Documentation/<Module>/index.tt` — rendered web pages with YAML META blocks
+- `.SUMMARY.md` files at `Documentation/<Module>/SUMMARY.md` — plain markdown (<2KB), AI context
+- Post-commit hook auto-runs `Documentation/script/sync-docs.sh` on every `git commit` touching `.pm` files
+- Manual: `bash Documentation/script/sync-docs.sh` (add `--dry-run` for preview)
 
-## Perl module hygiene — check for duplicates
+### Theme details
 
-When fixing `BEGIN failed`, `package is not defined`, or adding/moving `.pm` files, **always scan for duplicates and path mismatches before closing the task**.
+| Goal | Task | Where |
+|------|------|-------|
+| **A — Authoring** | Create/change site appearance | `theme_definitions.json` → `ThemeConfig` generates CSS |
+| **B — Compliance** | Make `.tt` work on every theme | Edit `.tt`; use `var(--*)` from `base.css` |
 
-Catalyst maps `lib/Comserv/Controller/Foo.pm` → `Comserv::Controller::Foo`. A file in that path that declares a different package (e.g. a DBIx::Class model) loads successfully but breaks autoload with *"require was successful but the package is not defined"*.
+Template compliance: pick right base template (`ApplicationTtTemplate` or `DocumentationTtTemplate`), replace hardcoded colors → `var(--*)`, verify across sites.
 
-**Checklist:**
+### Deploy awareness (morning audit)
 
-1. **Path vs package** — first `package` line must match the file path (`lib/Foo/Bar.pm` → `package Foo::Bar;`).
-2. **Duplicate packages** — same `package` name must not appear in two files.
-3. **Duplicate purpose** — do not add a second file for the same role; extend the existing module (see `.zencoder/rules/ai-behavior.md` consolidation rule).
-4. **Stale copies** — after moves/renames, delete or update the old path; grep for leftover `require`/`use` of the old location.
+Morning Audit uses the latest **Docker Hub Deploy** log entry as its window (see `Planning.pm` `_run_audit_scan`). `DEPLOY_STATUS.json` is updated by Admin → Docker Hub deploy and production `script/deploy.sh`.
 
-**Quick scan** (from `Comserv/`):
+### Perl module hygiene scan (full)
 
 ```bash
-# Path/package mismatches under Controller (most common Catalyst break)
 for f in lib/Comserv/Controller/*.pm lib/Comserv/Controller/*/*.pm; do
   [ -f "$f" ] || continue
   pkg=$(grep -m1 '^package ' "$f" | sed 's/^package //;s/;//')
@@ -56,127 +43,14 @@ for f in lib/Comserv/Controller/*.pm lib/Comserv/Controller/*/*.pm; do
 done
 ```
 
-After the InventoryItem fix (2026-06-15), a full `lib/Comserv` scan reported **no remaining mismatches or duplicate packages**. Re-run after any module move or large merge.
+### Quick context
 
-## Quick summary
+- **Language**: Perl (Catalyst Framework) · **DB**: MySQL (DBIx::Class ORM) · **Templates**: TT (.tt)
+- **Primary Access**: workstation.local:3001 · **Workflow**: Analyze → Plan → Diff → Apply
 
-- **Language**: Perl (Catalyst Framework)
-- **Database**: MySQL (DBIx::Class ORM)
-- **Templates**: Template Toolkit (.tt)
-- **Primary Access**: workstation.local:3001
-- **Workflow**: Analyze → Plan → Diff → Apply (approval required at each step)
+### Full docs (in-app)
 
-## Deploy awareness (read at session start for prod/debug work)
-
-Before closing Application Error Audit todos or assuming a fix is live on production:
-
-1. Read **`Comserv/DEPLOY_STATUS.json`** — last deploy commit, time, target, status
-2. Read **`Comserv/version.json`** — commit baked into the current build/image
-3. Run **`git rev-parse --short HEAD`** — compare to `last_deploy.commit`
-
-| Situation | Meaning |
-|-----------|---------|
-| `HEAD` == `last_deploy.commit` | Production likely has your latest deploy |
-| `HEAD` ahead of `last_deploy.commit` | Fixes exist locally only — deploy before closing audit todos |
-| Error timestamp after `last_deploy.at_utc` | May be a new bug; investigate |
-| Error timestamp before deploy | Likely fixed — close after deploy confirms |
-
-`DEPLOY_STATUS.json` is updated automatically by:
-- Admin → Docker Hub deploy (`Comserv::Util::DeployStatus`)
-- Production `script/deploy.sh` on successful container health (also copied to NFS logs dir when configured)
-
-Morning Audit scan uses the latest **Docker Hub Deploy** log entry as its window (see `Planning.pm` `_run_audit_scan`).
-
-## Themes — two goals (do not conflate)
-
-| Goal | Task | Where |
-|------|------|-------|
-| **A — Theme authoring** | Create/change site appearance or mapping | `Comserv/root/static/config/theme_definitions.json` → `ThemeConfig` regenerates `static/css/themes/*.css` |
-| **B — Template compliance** | Make `.tt` pages work on every theme | Edit the `.tt` file; use `var(--*)` from `base.css` |
-
-Full detail: **`/Documentation/DevelopmentStandards`** and **`/Documentation/CssThemes`**.
-
-- **Authoring:** Add/edit `themes.{id}.variables`, map site in `site_themes`, save via `/admin/theme` or `ThemeConfig`. Do **not** treat hand-edited CSS as source of truth. Legacy DB `Model::Theme` is deprecated.
-- **Compliance (opportunistic):** When creating or editing `.tt` files, improve theme compliance **in that file** — do not sweep the whole repo.
-
-Template compliance steps:
-1. **Pick the right base template** — Application UI → `/Documentation/ApplicationTtTemplate`; Documentation → `/Documentation/DocumentationTtTemplate`
-2. **Follow** the checklist in those templates and `/Documentation/DevelopmentStandards`
-3. **Replace while editing:** hardcoded colours → `var(--*)`, custom buttons → `btn btn-*`, opaque page wrappers → transparent/semi-transparent where needed
-4. **Verify mentally** across site themes (CSC, USBM, apis/BMaster) — variables adapt; literals do not
-
-Each `.tt` edit should leave the touched page more consistent site-to-site and theme-to-theme.
-
-## Documentation compliance (lightweight)
-
-1. **Code changes** → append **`/Documentation/CHANGELOG`** (single file; no new `YYYY-MM-DD-*.tt`)
-2. **Member how-to** → edit stable **`Documentation/guides/*.tt`** in place, or `page_type=feature_guide`
-3. **.tt vs DB vs both** → decide ad hoc per topic (`/Documentation/newsletter_feature_guide_workflow`)
-
-Legacy per-file changelogs: `/Documentation/all_changelog` (read-only). Full rules: **`/Documentation/DevelopmentStandards#doc-compliance`**
-
-## Module index/summary files — .tt + .SUMMARY.md convention
-
-The repo has two parallel documentation systems for AI context efficiency:
-
-### .tt Index files (web-rendered, human-facing)
-Located at `Documentation/<Module>/index.tt` and `Comserv/root/Documentation/<category>/index.tt`.
-These are Template Toolkit files with YAML META blocks, rendered at `/Documentation/<Module>/index`.
-They contain: overview, access/roles, workflows, data model tables, navigation references.
-
-**Existing .tt indexes:**
-- `Comserv/root/Documentation/controllers/index.tt` — all controllers
-- `Comserv/root/Documentation/models/index.tt` — all models
-- `Documentation/Inventory/index.tt` — inventory system
-- `Documentation/Accounting/index.tt` — accounting system
-
-### .SUMMARY.md files (AI context, compression-friendly)
-Stored at `Documentation/<Module>/SUMMARY.md` — plain markdown, no TT tags.
-Purpose: lightweight AI-readable summary for Hermes compression. Kept small (<2KB each).
-
-**When to create or update:**
-1. **New controller added** → update `Comserv/root/Documentation/controllers/index.tt` + add controller entry in `CLAUDE.md`
-2. **New model/schema result class** → update `Comserv/root/Documentation/models/index.tt` + add to `CLAUDE.md`
-3. **New module with multiple files** → create `Documentation/<Module>/index.tt` (with META block and full sections) + `Documentation/<Module>/SUMMARY.md` (plain markdown, <2KB)
-4. **Database schema change** (new table, new key fields) → update the Data Model table in the relevant `.tt` index and the `.SUMMARY.md` sibling
-5. **Route change, workflow change** → update navigation reference in the relevant `.tt` index
-
-**Summary format template:**
-```markdown
-# Module: <Name>
-## Purpose
-<2-3 sentences>
-## Key Controllers
-- `Comserv/Controller/<Name>.pm`
-## Key Models
-- `Comserv/Model/Schema/Ency/Result/<related>.pm`
-## Routes
-- `/<route>` — description
-## Schema Tables
-<table1>, <table2>, ...
-## Dependencies
-<other modules>
-```
-
-### Automation — git-tied sync (no manual steps)
-
-**The post-commit hook handles this for you.** After every `git commit` that touches Controller/ or Model/ `.pm` files, the hook at `.git/hooks/post-commit` runs `Documentation/script/sync-docs.sh` automatically:
-- Detects new/deleted `.pm` files
-- Updates CLAUDE.md's auto-detected controller section
-- Creates stub `SUMMARY.md` files for new modules
-- Refreshes `Documentation/SUMMARY.md` controller list
-- Auto-stages the doc updates (they ride along to the next commit)
-
-**Manual run** (if you want to refresh without committing):
-```bash
-cd /path/to/comserv2 && bash Documentation/script/sync-docs.sh
-```
-Add `--dry-run` for a preview.
-
-**One-time setup** (already done, but needed if you re-clone):
-```bash
-cd /path/to/comserv2
-ln -sf ../../Documentation/script/post-commit-hook.sh .git/hooks/post-commit
-```
-
-So the process is: write code → `git commit` → docs auto-sync → commit includes doc updates. Zero manual steps, zero forgetting.
+- Standards hub: `/Documentation/DevelopmentStandards`
+- Theme authoring: `/Documentation/CssThemes`, `/Documentation/ThemeConfig`
+- Template compliance: `/Documentation/ApplicationTtTemplate`, `/Documentation/DocumentationTtTemplate`
+- Logging: `Comserv/lib/Comserv/Util/Logging.pm` header checklist

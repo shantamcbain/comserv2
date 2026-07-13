@@ -1,13 +1,50 @@
 /**
  * Admin styles for Comserv
- * Version: 0.01
- * Date: 2025/08/31
+ * Version: 0.02
+ * Date: 2026/07/12
  * Author: shanta
+ *
+ * Updated: Converted hardcoded colors to CSS variables with fallbacks.
+ * Uses semantic variables from base.css + admin-specific overrides.
  */
+
+/* ── Admin-specific CSS variables ─────────────────────────── */
+:root {
+  /* Admin accent palette (overridable per-theme) */
+  --admin-primary:      #007bff;
+  --admin-primary-dark: #0056b3;
+  --admin-primary-drkr: #004085;
+
+  --admin-purple:       #6f42c1;
+  --admin-purple-dark:  #5a2a9b;
+  --admin-purple-drkr:  #4e237a;
+
+  --admin-orange:       #e67e22;
+  --admin-orange-dark:  #d97706;
+  --admin-orange-drkr:  #b45309;
+
+  --admin-blue:         #1565c0;
+  --admin-blue-dark:    #0d47a1;
+
+  --admin-red:          #c0392b;
+  --admin-red-dark:     #a93226;
+  --admin-red-drkr:     #641e16;
+
+  /* Stat bar colors */
+  --admin-statbar-ok:       #4caf50;
+  --admin-statbar-warn:     #ff9800;
+  --admin-statbar-critical: #f44336;
+
+  /* Background tints */
+  --admin-bg-light:     #f5f5f5;
+  --admin-bg-lighter:   #f1f3f5;
+  --admin-bg-blue-tint: #f8f9ff;
+  --admin-bg-purple-tint:#f8f5ff;
+}
 
 /* Network Diagnostics Styles */
 .command-output {
-    background-color: #f8f9fa;
+    background-color: var(--light-color, #f8f9fa);
     padding: 15px;
     border-radius: 4px;
     white-space: pre-wrap;
@@ -21,7 +58,7 @@
 .quick-nav {
     margin-bottom: 15px;
     padding: 10px 0;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-color, #eee);
 }
 
 .btn-sm {
@@ -58,9 +95,9 @@
 .debug-footer {
     margin-top: 30px;
     padding: 10px;
-    background-color: #f8f9fa;
+    background-color: var(--light-color, #f8f9fa);
     border-radius: 4px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
 }
 
 .debug-footer details {
@@ -85,15 +122,15 @@
 /* Schema Comparison Server/Database Structure Styles */
 .server-section {
     margin-bottom: 15px;
-    border: 2px solid #007bff;
+    border: 2px solid var(--admin-primary, #007bff);
     border-radius: 8px;
-    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+    background: linear-gradient(135deg, var(--admin-bg-blue-tint, #f8f9ff) 0%, var(--background-color, #ffffff) 100%);
 }
 
 .server-toggle {
     width: 100%;
     padding: 15px;
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    background: linear-gradient(135deg, var(--admin-primary, #007bff) 0%, var(--admin-primary-dark, #0056b3) 100%);
     color: white;
     border: none;
     border-radius: 6px 6px 0 0;
@@ -107,14 +144,14 @@
 }
 
 .server-toggle:hover {
-    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+    background: linear-gradient(135deg, var(--admin-primary-dark, #0056b3) 0%, var(--admin-primary-drkr, #004085) 100%);
     box-shadow: 0 2px 8px rgba(0,123,255,0.3);
 }
 
 .server-content {
     display: none;
     padding: 10px;
-    background: #f8f9ff;
+    background: var(--admin-bg-blue-tint, #f8f9ff);
 }
 
 .server-content.expanded {
@@ -123,20 +160,20 @@
 
 .database-section {
     margin: 8px 0;
-    border: 1px solid #6f42c1;
+    border: 1px solid var(--admin-purple, #6f42c1);
     border-radius: 6px;
-    background: linear-gradient(135deg, #f8f5ff 0%, #ffffff 100%);
+    background: linear-gradient(135deg, var(--admin-bg-purple-tint, #f8f5ff) 0%, var(--background-color, #ffffff) 100%);
 }
 
 .database-section.disconnected {
-    border-color: #dc3545;
-    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+    border-color: var(--danger-color, #dc3545);
+    background: linear-gradient(135deg, var(--danger-color, #fff5f5) 0%, var(--background-color, #ffffff) 100%);
 }
 
 .database-toggle {
     width: 100%;
     padding: 12px 15px;
-    background: linear-gradient(135deg, #6f42c1 0%, #5a2a9b 100%);
+    background: linear-gradient(135deg, var(--admin-purple, #6f42c1) 0%, var(--admin-purple-dark, #5a2a9b) 100%);
     color: white;
     border: none;
     border-radius: 5px 5px 0 0;
@@ -150,13 +187,13 @@
 }
 
 .database-toggle:hover {
-    background: linear-gradient(135deg, #5a2a9b 0%, #4e237a 100%);
+    background: linear-gradient(135deg, var(--admin-purple-dark, #5a2a9b) 0%, var(--admin-purple-drkr, #4e237a) 100%);
     box-shadow: 0 2px 6px rgba(111,66,193,0.3);
 }
 
 .database-header {
     padding: 12px 15px;
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    background: linear-gradient(135deg, var(--danger-color, #dc3545) 0%, #c82333 100%);
     color: white;
     border-radius: 5px 5px 0 0;
     font-size: 14px;
@@ -166,7 +203,7 @@
 .database-content {
     display: none;
     padding: 10px;
-    background: #f8f5ff;
+    background: var(--admin-bg-purple-tint, #f8f5ff);
 }
 
 .database-content.expanded {
@@ -182,12 +219,12 @@
 }
 
 .status-badge.connected {
-    background: #28a745;
+    background: var(--success-color, #28a745);
     color: white;
 }
 
 .status-badge.disconnected {
-    background: #dc3545;
+    background: var(--danger-color, #dc3545);
     color: white;
 }
 
@@ -213,7 +250,7 @@
 }
 
 .error-info {
-    color: #ffecb3;
+    color: var(--schema-warning-color, #ffecb3);
     font-size: 11px;
     font-weight: normal;
 }
@@ -233,13 +270,13 @@
 }
 
 #system-health-banner.warning-alert {
-    background-color: #ffc107;
-    color: #212529;
-    border-bottom: 3px solid #e0a800;
+    background-color: var(--caution-color, #ffc107);
+    color: var(--text-color, #212529);
+    border-bottom: 3px solid var(--caution-color, #e0a800);
 }
 
 #system-health-banner.critical-alert {
-    background-color: #dc3545;
+    background-color: var(--danger-color, #dc3545);
     color: white;
     border-bottom: 3px solid #bd2130;
 }
@@ -300,14 +337,14 @@
 .stat-item-link:hover { box-shadow:0 0 0 2px var(--primary-color,#1976d2); border-color:var(--primary-color,#1976d2); }
 .stat-sub { font-size:.55em; color: var(--text-muted-color, #888); font-weight:normal; }
 .stat-sub-detail { font-size:.75rem; color: var(--text-muted-color, #888); margin-top:2px; }
-.stat-bar-wrap { height:8px; background:#e0e0e0; border-radius:4px; margin:4px 0 2px; overflow:hidden; }
+.stat-bar-wrap { height:8px; background: var(--button-hover-bg, #e0e0e0); border-radius:4px; margin:4px 0 2px; overflow:hidden; }
 .stat-bar { height:8px; border-radius:4px; }
-.stat-bar-ok       { background:#4caf50; }
-.stat-bar-warn     { background:#ff9800; }
-.stat-bar-critical { background:#f44336; }
+.stat-bar-ok       { background: var(--admin-statbar-ok, #4caf50); }
+.stat-bar-warn     { background: var(--admin-statbar-warn, #ff9800); }
+.stat-bar-critical { background: var(--admin-statbar-critical, #f44336); }
 .stat-disk-ok       { color:inherit; }
-.stat-disk-warn     { color:#e65100; }
-.stat-disk-critical { color:#b71c1c; }
+.stat-disk-warn     { color: var(--warning-color, #e65100); }
+.stat-disk-critical { color: var(--danger-color, #b71c1c); }
 
 /* Collapsible admin cards */
 .admin-section .section-content {
@@ -494,27 +531,27 @@
 /* ── Admin Dashboard Banner Classes (replacing inline styles) ──────────── */
 
 .banner-hosting {
-    background:#fff3cd;
-    border:2px solid #e67e22;
+    background: var(--caution-color, #fff3cd);
+    border: 2px solid var(--admin-orange, #e67e22);
     border-radius:8px;
     padding:1rem 1.4rem;
-    margin-bottom:1.2rem;
+    margin-bottom:1rem;
     display:flex;
     justify-content:space-between;
     align-items:center;
 }
 .banner-hosting-title {
-    color:#b45309;
+    color: var(--admin-orange-drkr, #b45309);
     font-size:1.05rem;
 }
 .banner-hosting-text {
     margin-top:0.25rem;
-    color:#78350f;
+    color: #78350f;
 }
 .banner-hosting-tag {
     display:inline-block;
-    background:#fde68a;
-    border:1px solid #d97706;
+    background: #fde68a;
+    border:1px solid var(--admin-orange-dark, #d97706);
     border-radius:4px;
     padding:0.1rem 0.5rem;
     margin:0.15rem 0.2rem 0.15rem 0;
@@ -523,7 +560,7 @@
 .banner-hosting-link {
     white-space:nowrap;
     margin-left:1.5rem;
-    background:#e67e22;
+    background: var(--admin-orange, #e67e22);
     color:#fff;
     padding:0.5rem 1.1rem;
     border-radius:6px;
@@ -531,12 +568,12 @@
     font-weight:bold;
 }
 .banner-hosting-link:hover {
-    background:#d97706;
+    background: var(--admin-orange-dark, #d97706);
 }
 
 .banner-invoice {
-    background:#fff0f0;
-    border:2px solid #c0392b;
+    background: #fff0f0;
+    border:2px solid var(--admin-red, #c0392b);
     border-radius:8px;
     padding:1rem 1.4rem;
     margin-bottom:1rem;
@@ -545,17 +582,17 @@
     align-items:center;
 }
 .banner-invoice-title {
-    color:#922b21;
+    color: var(--admin-red-drkr, #922b21);
     font-size:1.05rem;
 }
 .banner-invoice-text {
     margin-top:0.25rem;
-    color:#641e16;
+    color: var(--admin-red-drkr, #641e16);
 }
 .banner-invoice-link {
     white-space:nowrap;
     margin-left:1.5rem;
-    background:#c0392b;
+    background: var(--admin-red, #c0392b);
     color:#fff;
     padding:0.5rem 1.1rem;
     border-radius:6px;
@@ -563,7 +600,7 @@
     font-weight:bold;
 }
 .banner-invoice-link:hover {
-    background:#a93226;
+    background: var(--admin-red-dark, #a93226);
 }
 
 /* Push commits banner */
@@ -571,7 +608,7 @@
     display:inline-flex;
     align-items:center;
     gap:0.4rem;
-    background:#1565c0;
+    background: var(--admin-blue, #1565c0);
     color:#fff;
     padding:0.55rem 1.1rem;
     border-radius:6px;
@@ -579,7 +616,7 @@
     font-weight:600;
 }
 .push-banner:hover {
-    background:#0d47a1;
+    background: var(--admin-blue-dark, #0d47a1);
 }
 
 /* Section recommendations list */
@@ -605,29 +642,29 @@
     padding:5px 8px;
 }
 .table-tickets thead tr {
-    background:#f1f3f5;
+    background: var(--admin-bg-lighter, #f1f3f5);
     text-align:left;
 }
 .table-tickets tbody tr {
     border-bottom:1px solid #e9ecef;
 }
-.ticket-priority-critical { color:#c0392b; font-weight:bold; }
-.ticket-priority-high { color:#e67e22; font-weight:bold; }
-.ticket-priority-medium { color:#555; font-weight:bold; }
+.ticket-priority-critical { color: var(--admin-red, #c0392b); font-weight:bold; }
+.ticket-priority-high { color: var(--admin-orange, #e67e22); font-weight:bold; }
+.ticket-priority-medium { color: var(--text-color, #555); font-weight:bold; }
 .ticket-subject-mono a {
     font-family:monospace;
 }
 .date-muted {
-    color:#888;
+    color: var(--text-muted-color, #888);
 }
 .msg-success {
-    color:#27ae60;
+    color: var(--success-color, #27ae60);
     margin:6px 0;
 }
 
 /* HelpDesk open count badge */
 .badge-open-count {
-    background:#c0392b;
+    background: var(--admin-red, #c0392b);
     color:#fff;
     border-radius:12px;
     padding:2px 12px;
@@ -649,7 +686,7 @@
 .stat-panel-title {
     margin:0 0 8px;
     font-size:.95rem;
-    color:var(--text-muted-color,#666);
+    color: var(--text-muted-color, #666);
 }
 
 /* Remote server stat item */
@@ -659,42 +696,42 @@
 .server-label {
     font-size:.7rem;
     font-weight:600;
-    color:var(--primary-color,#1976d2);
+    color: var(--primary-color, #1976d2);
     text-transform:uppercase;
     letter-spacing:.04em;
     margin-bottom:4px;
 }
 .server-label-offline {
-    color:#999;
+    color: var(--text-muted-color, #999);
 }
 .server-label-stale {
-    color:#e65100;
+    color: var(--warning-color, #e65100);
     font-weight:normal;
 }
 .server-hostname {
     font-size:.65rem;
-    color:#888;
+    color: var(--text-muted-color, #888);
 }
 .server-metric {
     font-size:.75rem;
 }
 .server-last-seen {
     font-size:.65rem;
-    color:#999;
+    color: var(--text-muted-color, #999);
     margin-top:3px;
 }
 .server-offline-msg {
     font-size:.8rem;
-    color:#bbb;
+    color: var(--text-muted-color, #bbb);
 }
 .server-offline-hint {
     font-size:.65rem;
-    color:#aaa;
+    color: var(--text-muted-color, #aaa);
     margin-top:3px;
 }
 .stat-panel-footer {
     font-size:.7rem;
-    color:#aaa;
+    color: var(--text-muted-color, #aaa);
     margin-top:6px;
 }
 
@@ -703,18 +740,18 @@
     font-size:.65rem;
     padding:2px 6px;
     cursor:pointer;
-    border:1px solid #ccc;
+    border:1px solid var(--border-color, #ccc);
     border-radius:3px;
-    background:#f5f5f5;
+    background: var(--admin-bg-light, #f5f5f5);
 }
 .hw-agent-install:hover {
-    background:#e8e8e8;
+    background: var(--button-hover-bg, #e8e8e8);
 }
 
 /* Stat value small (for NFS info) */
 .stat-value-small {
     font-size:.8rem;
-    color:#888;
+    color: var(--text-muted-color, #888);
 }
 
 /* Stat value uptime */
@@ -724,7 +761,7 @@
 
 /* Server metrics detail text */
 .metric-detail {
-    color:#888;
+    color: var(--text-muted-color, #888);
     font-size:.7em;
 }
 
