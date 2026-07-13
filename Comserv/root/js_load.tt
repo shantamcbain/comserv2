@@ -110,7 +110,7 @@
 [% END %]
 
 <!-- Admin Dashboard JS -->
-[% IF c.request.uri.match('^/admin') %]
+[% IF c.request.uri.match('/admin') %]
 <script src="/static/js/admin-dashboard.js?v=[% cv %]" defer></script>
 [% END %]
 
@@ -159,9 +159,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js" defer></script>
-<script src="/static/js/docker-containers.js?v=[% cv %]" defer></script>
-[% ELSIF c.request.uri.match('/admin/docker-containers-working') %]
-<script src="/static/js/planning/daily-plan-deploy-form.js?v=[% cv %]" defer></script>
+<script src="/static/js/docker-containers-working.js?v=[% cv %]" defer></script>
 [% ELSIF c.request.uri.match('/admin/docker-containers') %]
 <script src="/static/js/docker-containers.js?v=[% cv %]" defer></script>
 [% END %]

@@ -24,35 +24,36 @@
     </div>
 
     <!-- Result File Discovery Header (shows both ENCY total and current schema) -->
-    <div class="result-header" style="background: #e8f4f8; border: 1px solid #17a2b8; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem;">
-        <h4 style="margin: 0 0 0.5rem 0; color: #17a2b8;">
+    <div class="result-discovery-header">
+        <h4>
             <i class="fas fa-folder-open"></i> Result Files Discovery
         </h4>
-        <p style="margin: 0; font-size: 1rem;">
-            <strong>ENCY total:</strong> <span style="font-weight: bold; color: #17a2b8;">[% ency_result_count || 0 %]</span>
+        <p class="result-summary">
+            <strong>ENCY total:</strong> <span class="result-count">[% ency_result_count || 0 %]</span>
             &nbsp;|&nbsp;
-            <strong>Current schema ([% result_schema %]):</strong> <span style="font-weight: bold; color: #17a2b8;">[% result_count || 0 %]</span>
+            <strong>Current schema ([% result_schema %]):</strong> <span class="result-count">[% result_count || 0 %]</span>
         </p>
         [% IF result_count %]
-        <details style="margin-top: 0.5rem;">
-            <summary style="cursor: pointer; color: #17a2b8;">Show first 20 result files for [% result_schema %]</summary>
-            <div style="max-height: 150px; overflow-y: auto; margin-top: 0.5rem; font-family: monospace; font-size: 0.8rem; background: #fff; padding: 0.5rem; border-radius: 4px;">
+        <details class="result-file-toggle">
+            <summary class="result-file-summary">Show first 20 result files for [% result_schema %]</summary>
+            <div class="result-file-scroll">
                 [% FOREACH rf IN result_files.splice(0,20) %]
                     <div>[% rf.name | html %]</div>
                 [% END %]
-            </details>
+            </div>
+        </details>
         [% END %]
 
         [% IF result_extract_failures.size %]
-        <details style="margin-top: 0.75rem; border-top: 1px solid #17a2b8; padding-top: 0.5rem;">
-            <summary style="cursor: pointer; color: #dc3545; font-weight: bold;">
+        <details class="result-extract-failures">
+            <summary class="result-failure-summary">
                 ⚠ Extraction failures: [% result_extract_failures.size %] result files could not be parsed
             </summary>
-            <div style="max-height: 200px; overflow-y: auto; margin-top: 0.5rem; font-family: monospace; font-size: 0.75rem; background: #fff3cd; padding: 0.5rem; border-radius: 4px; border: 1px solid #ffc107;">
+            <div class="result-failure-scroll">
                 [% FOREACH fail IN result_extract_failures %]
-                    <div style="margin-bottom: 0.25rem;">
-                        <strong style="color: #dc3545;">[% fail.name | html %]</strong><br>
-                        <span style="color: #666;">[% fail.path | html %]</span>
+                    <div class="result-failure-item">
+                        <strong class="result-failure-name">[% fail.name | html %]</strong><br>
+                        <span class="result-failure-path">[% fail.path | html %]</span>
                     </div>
                 [% END %]
             </div>
@@ -60,24 +61,24 @@
         [% END %]
 
         <!-- Diagnostic: why Result files without tables is empty -->
-        <details style="margin-top: 0.5rem; font-size: 0.9rem;" open>
-            <summary style="cursor: pointer; color: #666;">Debug: Result file vs DB table matching (open by default)</summary>
-            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 0.8rem;">
+        <details class="debug-section" open>
+            <summary>Debug: Result file vs DB table matching (open by default)</summary>
+            <div class="debug-content">
                 Total result files scanned: <strong>[% result_count %]</strong><br>
                 DB tables from information_schema: <strong>[% db_table_count %]</strong><br>
                 Result files whose table name matches a DB table: <strong>[% matched_count %]</strong><br>
                 Result files whose table name does NOT exist in DB: <strong>[% result_only.size %]</strong><br>
-                <span style="color: #dc3545;">If result_only is 0 but result_count > matched_count, the DB table list is incomplete or keys don't match.</span>
+                <span class="warning-text">If result_only is 0 but result_count > matched_count, the DB table list is incomplete or keys don't match.</span>
 
                 [% IF result_only.size == 0 && result_count > matched_count %]
-                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                <div class="debug-warning-block">
                     <strong>WARNING:</strong> 219 result files but only 213 matched. The 6 unmatched result table names are NOT appearing in result_only.<br>
                     This means the DB table query is returning fewer tables than MariaDB reports, or the key comparison is failing.
                 </div>
                 [% END %]
 
                 [% IF orphaned_result_files.size %]
-                <div style="margin-top: 0.75rem; padding: 0.5rem; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px;">
+                <div class="debug-orphan-block">
                     <strong>Orphaned Result files (table name not in DB):</strong><br>
                     [% FOREACH o IN orphaned_result_files %]
                         [% o.result_name | html %] → extracted table name: <code>[% o.extracted_table_name | html %]</code><br>
@@ -92,10 +93,10 @@
         <div class="content-primary">
             
             <!-- Section 1: Tables with Result files -->
-            <div class="comparison-section" style="margin-bottom: 2rem;">
-                <h3 data-action="toggle-section" style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; cursor: pointer;">
-                    <i class="fas fa-check-circle" style="color: #28a745;"></i> Tables (all have result files) ([% both.size %])
-                    <span style="float: right; font-size: 0.9rem;">[click to toggle]</span>
+            <div class="comparison-section">
+                <h3 class="section-toggle-h3" data-action="toggle-section">
+                    <i class="fas fa-check-circle icon-green"></i> Tables (all have result files) ([% both.size %])
+                    <span class="toggle-hint">[click to toggle]</span>
                 </h3>
                 <div class="section-content">
                     [% IF both.size %]
@@ -135,10 +136,10 @@
             </div>
 
             <!-- Section 2: Tables without Result files -->
-            <div class="comparison-section" style="margin-bottom: 2rem;">
-                <h3 data-action="toggle-section" style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; cursor: pointer;">
-                    <i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Tables without Result files ([% table_only.size %])
-                    <span style="float: right; font-size: 0.9rem;">[click to toggle]</span>
+            <div class="comparison-section">
+                <h3 class="section-toggle-h3" data-action="toggle-section">
+                    <i class="fas fa-exclamation-triangle icon-warning"></i> Tables without Result files ([% table_only.size %])
+                    <span class="toggle-hint">[click to toggle]</span>
                 </h3>
                 <div class="section-content">
                     [% IF table_only.size %]
@@ -180,10 +181,10 @@
             </div>
 
             <!-- Section 3: Result files without tables -->
-            <div class="comparison-section" style="margin-bottom: 2rem;">
-                <h3 data-action="toggle-section" style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; cursor: pointer;">
-                    <i class="fas fa-file-code" style="color: #17a2b8;"></i> Result files without tables ([% result_only.size %])
-                    <span style="float: right; font-size: 0.9rem;">[click to toggle]</span>
+            <div class="comparison-section">
+                <h3 class="section-toggle-h3" data-action="toggle-section">
+                    <i class="fas fa-file-code icon-info"></i> Result files without tables ([% result_only.size %])
+                    <span class="toggle-hint">[click to toggle]</span>
                 </h3>
                 <div class="section-content">
                     [% IF result_only.size %]

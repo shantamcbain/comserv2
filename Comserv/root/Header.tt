@@ -144,7 +144,7 @@
 
     [% IF is_admin %]
     <!-- Admin-only styles -->
-    <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/admin.css?v=[% cv %]">
     [% END %]
     <!-- End of universal includes -->
 </head>

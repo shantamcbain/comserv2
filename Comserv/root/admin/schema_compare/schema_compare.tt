@@ -12,10 +12,10 @@
         </div>
     </header>
     
-    <div class="db-env-selector" style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0;">
-        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+    <div class="env-selector">
+        <div class="env-selector-row">
             <strong>Database Environment:</strong>
-            <select id="dbEnvironmentSelect" data-base-url="[% c.uri_for('/admin/schema_compare') %]" style="padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 200px;">
+            <select id="dbEnvironmentSelect" data-base-url="[% c.uri_for('/admin/schema_compare') %]" class="env-select">
                 [% FOREACH env IN available_environments %]
                 [% IF env.available %]
                 <option value="[% env.environment %]" [% env.environment == active_environment ? 'selected' : '' %]>

@@ -10,6 +10,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::DatabaseEnv;
 use Data::Dumper;
+use POSIX qw(WNOHANG);
 use File::Slurp qw(read_file write_file);
 use File::Basename qw(dirname);
 use File::Path qw(make_path);
@@ -2061,7 +2062,7 @@ sub _strip_fk_constraints {
 # Reuses the existing .tt files in admin/schema_compare/
 # ============================================================
 
-sub schema_compare :Path('/admin/schema_compare') :Args(0) {
+sub schema_compare :Private {
     my ($self, $c) = @_;
 
     require Comserv::Model::RemoteDB;
@@ -2069,13 +2070,22 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    my @target_ips = ('192.168.1.198', '192.168.1.199', '192.168.1.20', '192.168.1.21');
-
+    # Derive target IPs from config — unique hosts from real connections
+    # Skip SQLite offline fallbacks and placeholder credentials (YOUR_*)
     my @primary_conns;
     foreach my $name (keys %$all_conns) {
-        next if $name =~ /^(backup_|local_|zerotier_|sqlite_|dev_)/i;
+        my $cfg = $all_conns->{$name}{config};
+        next if ($cfg->{db_type} // 'mysql') eq 'sqlite';
+        my $host = $cfg->{host} // '';
+        next if $host =~ /^YOUR_/i;
         push @primary_conns, $name;
     }
+
+    my %seen_ip;
+    my @target_ips = grep { $seen_ip{$_}++ == 0 }
+        map  { $all_conns->{$_}{config}{host} // '' }
+        @primary_conns;
+    @target_ips = sort @target_ips;
 
     my @servers;
     foreach my $ip (@target_ips) {
@@ -2089,13 +2099,8 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
         }
         my $type_display = join(', ', map { ucfirst($_) . ": $type_count{$_}" } sort keys %type_count);
 
-        # Safe cached status only (no live connect on normal page load)
-        our %SERVER_STATUS_CACHE;
-        my $status = $SERVER_STATUS_CACHE{$ip} || {
-            running     => 0,
-            table_count => 0,
-            status      => 'unknown',
-        };
+        # Live-check this server (with timeout) and cache result
+        my $status = $self->_check_server_live($c, $remote_db, $ip, \@conns_for_ip);
 
         push @servers, {
             name         => $ip,
@@ -2108,11 +2113,112 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
         };
     }
 
+    # Environment context for the template dropdown
+    my $active_env = 'production';
+    my @available_envs;
+    eval {
+        require Comserv::Util::DatabaseEnv;
+        my $db_env = Comserv::Util::DatabaseEnv->new();
+        $active_env = $db_env->get_active_environment($c);
+        @available_envs = @{ $db_env->get_available_environments($c, 'ency') };
+    };
+
     $c->stash(
-        template      => 'admin/schema_compare.tt',
-        servers       => \@servers,
-        server_count  => scalar(@servers),
+        template              => 'admin/schema_compare/schema_compare.tt',
+        servers               => \@servers,
+        server_count          => scalar(@servers),
+        active_environment    => $active_env,
+        available_environments => \@available_envs,
     );
+}
+
+# ---------------------------------------------------------------
+# Quick fork-based live check for one server IP.
+# Times out after ~4 seconds if the server is unreachable.
+# Returns { running => 0|1, table_count => N, status => 'active'|'offline' }
+# ---------------------------------------------------------------
+sub _check_server_live {
+    my ($self, $c, $remote_db, $ip, $conns_for_ip) = @_;
+
+    return { running => 0, table_count => 0, status => 'offline' }
+        unless $conns_for_ip && @$conns_for_ip;
+
+    my $conn_name = $conns_for_ip->[0];
+
+    my $pid = fork();
+    unless (defined $pid) {
+        # fork failed — return safe default
+        return { running => 0, table_count => 0, status => 'unknown' };
+    }
+
+    if ($pid == 0) {
+        # Child: attempt real connection, sum table counts from ALL databases on this IP
+        my $running = 0;
+        my $table_count = 0;
+        eval {
+            my $dbh = $remote_db->get_connection(undef, $conn_name);
+            if ($dbh) {
+                $running = 1;
+                # Count tables per database on this server
+                my $sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?");
+                foreach my $cn (@$conns_for_ip) {
+                    my $db_name = $remote_db->config->{$cn}{database} // $cn;
+                    $sth->execute($db_name);
+                    my ($cnt) = $sth->fetchrow_array;
+                    $table_count += $cnt || 0;
+                }
+                $sth->finish;
+                $dbh->disconnect;
+            }
+        };
+        # Write result on a pipe or just exit with encoded status
+        # We use /tmp pidfile as simple IPC
+        require JSON;
+        my $json = JSON->new;
+        my $result = $json->encode({ running => $running, table_count => $table_count, status => $running ? 'active' : 'offline' });
+        open my $fh, '>', "/tmp/srvcheck_$$.json" or exit 1;
+        print $fh $result;
+        close $fh;
+        exit 0;
+    }
+
+    # Parent: wait with timeout (4 seconds)
+    my $timeout = 4;
+    my $wait_pid;
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm($timeout);
+        $wait_pid = waitpid($pid, 0);
+        alarm(0);
+    };
+    if ($@ || $wait_pid != $pid) {
+        # Timeout or interrupted — kill child
+        kill 'TERM', $pid;
+        # Give it a moment then SIGKILL
+        eval { local $SIG{ALRM} = sub { die }; alarm(1); waitpid($pid, WNOHANG); alarm(0) };
+        kill 'KILL', $pid if kill(0, $pid);
+    }
+
+    # Read result file
+    my $result_file = "/tmp/srvcheck_$$.json";
+    if (-f $result_file) {
+        local $/;
+        open my $fh, '<', $result_file or return { running => 0, table_count => 0, status => 'offline' };
+        my $text = <$fh>;
+        close $fh;
+        unlink $result_file;
+        my $parsed;
+        eval {
+            require JSON;
+            my $json = JSON->new;
+            $parsed = $json->decode($text);
+        };
+        if ($parsed) {
+            return { running => $parsed->{running}, table_count => $parsed->{table_count}, status => $parsed->{status} };
+        }
+    }
+
+    return { running => 0, table_count => 0, status => 'offline' };
 }
 
 sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
@@ -2123,8 +2229,15 @@ sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    # Get ALL connections for this IP
-    my @conns_for_ip = grep { ($all_conns->{$_}{config}{host} // '') eq $server_ip } keys %$all_conns;
+    # Get ALL connections for this IP (skip SQLite and placeholder hosts)
+    my @conns_for_ip = grep {
+        my $name = $_;
+        my $cfg = $all_conns->{$name}{config};
+        my $host = $cfg->{host} // '';
+        ($host) eq $server_ip &&
+        ($cfg->{db_type} // 'mysql') ne 'sqlite' &&
+        $host !~ /^YOUR_/i
+    } keys %$all_conns;
 
     my @databases;
     foreach my $conn_name (@conns_for_ip) {
@@ -2372,7 +2485,14 @@ sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1)
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    my @conns_for_ip = grep { ($all_conns->{$_}{config}{host} // '') eq $server_ip } keys %$all_conns;
+    my @conns_for_ip = grep {
+        my $name = $_;
+        my $cfg = $all_conns->{$name}{config};
+        my $host = $cfg->{host} // '';
+        ($host) eq $server_ip &&
+        ($cfg->{db_type} // 'mysql') ne 'sqlite' &&
+        $host !~ /^YOUR_/i
+    } keys %$all_conns;
 
     my $running = 0;
     my $table_count = 0;

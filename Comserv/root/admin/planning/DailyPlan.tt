@@ -127,6 +127,9 @@
     <!-- TAB 1: TODAY'S WORK (extracted) -->
     [% INCLUDE 'admin/planning/_today_work_tab.tt' %]
 
+    <!-- TAB: PLANNING (extracted) -->
+    [% INCLUDE 'admin/planning/_planning_tab.tt' %]
+
     <div id="daily-schedule" class="tab-content" data-lazy="daily-schedule" data-lazy-date="[% selected_date %]">
         <div class="tab-loading">
             <span class="spinner"></span> Loading daily schedule…

@@ -5,34 +5,33 @@
 %]
 <div class="schema-servers" data-base-url="[% c.uri_for('/admin/schema_compare/server') %]" data-refresh-url="[% c.uri_for('/admin/schema_compare/refresh_server') %]">
     <!-- Fixed summary card -->
-    <div class="card mb-3 border" style="border-color: var(--border-color, #dee2e6); background: var(--bg-secondary, #f8f9fa);">
+    <div class="card mb-3 border servers-summary-card">
         <div class="card-body py-2">
             <strong>Configured Database Servers:</strong> [% server_count %] 
-            (192.168.1.198, 192.168.1.199, 192.168.1.20, 192.168.1.21)
+            ([% servers.map('name').join(', ') %])
         </div>
     </div>
 
     <!-- Horizontal server cards -->
-    <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+    <div class="server-grid">
         [% FOREACH server IN servers %]
-        <div class="card border" 
-             style="border-color: var(--border-color, #dee2e6); background: var(--bg-secondary, #fff); cursor: pointer; width: auto; min-width: 220px;"
+        <div class="card border server-card"
              data-action="navigate-server"
              data-server="[% server.name | html %]">
             <div class="card-body">
-                <h5 class="card-title" style="color: var(--text-color, #212529);">
+                <h5 class="card-title server-card-title">
                     <i class="fas fa-server me-2"></i>[% server.name | html %]
                 </h5>
-                <p class="card-text mb-1" style="color: var(--text-color, #212529);">
+                <p class="card-text mb-1 server-card-text">
                     <strong>Databases:</strong> [% server.db_count %]
                 </p>
-                <p class="card-text mb-1" style="color: var(--text-color, #212529);">
+                <p class="card-text mb-1 server-card-text">
                     <strong>Types:</strong> [% server.type_display || '—' %]
                 </p>
-                <p class="card-text mb-1" style="color: var(--text-color, #212529);">
+                <p class="card-text mb-1 server-card-text">
                     <strong>Status:</strong> <span class="server-status">[% server.status | ucfirst %]</span>
                 </p>
-                <p class="card-text mb-2" style="color: var(--text-color, #212529);">
+                <p class="card-text mb-2 server-card-text">
                     <strong>Tables:</strong> <span class="table-count">[% server.table_count %]</span>
                 </p>
                 <button class="btn btn-sm btn-outline-primary refresh-btn" data-action="refresh-server" data-ip="[% server.ip %]">
