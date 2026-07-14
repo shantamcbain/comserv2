@@ -3617,6 +3617,7 @@
         if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
     }
 
+    function _showNoAdminMessage() {
         el.className = 'message system-message';
         el.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;padding:10px 14px;border-radius:6px;font-size:.85em;color:#664d03;margin:4px 0;line-height:1.6;';
         el.innerHTML = '⚠️ <strong>No administrator is currently logged in.</strong><br>'
@@ -5641,7 +5642,7 @@
             openPopup: detachToPopup,
         };
         window.openChat = openChat;
-    }
+    })();
 
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();

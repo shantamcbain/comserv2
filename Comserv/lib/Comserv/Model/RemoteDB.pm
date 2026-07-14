@@ -654,17 +654,29 @@ sub get_connection {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        # Use MariaDB driver (compatible with MySQL)
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
+
+        if ($db_type eq 'postgresql') {
+            $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
+        } else {
+            # Use MariaDB driver (compatible with MySQL)
+            $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
+        }
     }
     
     try {
-        my $dbh = DBI->connect($dsn, $username, $password, {
+        my %connect_attrs = (
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,
-        });
-        
+        );
+        # Add connect timeout to prevent DBI from hanging on unreachable hosts
+        if ($db_type eq 'postgresql') {
+            $connect_attrs{pg_connect_timeout} = 3;
+        } elsif ($db_type ne 'sqlite') {
+            $connect_attrs{mariadb_connect_timeout} = 3;
+        }
+        my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
+
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_connection',
             "Successfully connected to database connection '$conn_name'");
         

@@ -1342,3 +1342,94 @@
     border-radius: 4px;
     font-size: 0.8rem;
 }
+
+/* ------------------------------
+   Field attribute comparison — two-row per field layout
+   Table row first, Result row second, attributes as columns
+   ------------------------------ */
+
+.field-compare-table .cell-source {
+    width: 58px;
+}
+
+.source-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.source-badge.source-table {
+    background: #cfe2ff;
+    color: #084298;
+}
+
+.source-badge.source-result {
+    background: #e2d9f3;
+    color: #5a32a3;
+}
+
+.field-compare-table .cell-name {
+    width: 140px;
+}
+
+.field-compare-table .cell-attr {
+    width: 10%;
+    font-size: 0.85rem;
+}
+
+.field-compare-table .cell-attr code {
+    font-size: 0.85rem;
+    background: transparent;
+    padding: 0;
+}
+
+.field-compare-table .cell-attr.diff {
+    background: #fff3cd;
+}
+
+.field-compare-table .cell-attr.diff code {
+    color: #856404;
+}
+
+.field-compare-table .cell-status {
+    width: 130px;
+}
+
+.field-compare-table .cell-actions {
+    width: 180px;
+}
+
+/* Highlight table rows that differ from result */
+.field-compare-table tbody tr.table-row {
+    background: #f8fbff;
+}
+
+.field-compare-table tbody tr.table-row.has-diff {
+    border-left: 3px solid #ffc107;
+}
+
+.field-compare-table tbody tr.result-row {
+    background: #faf7ff;
+    border-bottom: 2px solid #ddd;
+}
+
+.field-compare-table tbody tr.result-row.has-diff {
+    border-left: 3px solid #6f42c1;
+}
+
+.field-compare-table tbody tr.all-match {
+    border-left: 3px solid #28a745;
+}
+
+/* Summary line above the table */
+.field-count-info {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #666;
+}

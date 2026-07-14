@@ -12,10 +12,11 @@ use Comserv::Util::DatabaseEnv;
 use Data::Dumper;
 use POSIX qw(WNOHANG);
 use File::Slurp qw(read_file write_file);
-use File::Basename qw(dirname);
+use File::Basename qw(dirname basename);
 use File::Path qw(make_path);
 use File::Spec;
 use File::Find;
+use Comserv::Util::Schema::ResultParser;
 
 sub begin :Private {
     my ($self, $c) = @_;
@@ -219,7 +220,7 @@ sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_res
         my $pks = $table_schema->{primary_keys} || [];
         my $pk_list = join(', ', map { "'$_'" } @$pks);
         
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
         my $table_key = lc($table_name);
         my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
         
@@ -276,11 +277,11 @@ sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_tabl
     my $database = $json_data->{database};
     
     try {
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
         my $table_key = lc($table_name);
         my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
         
-        my $result_schema = $self->get_result_file_schema($c, $result_file_path);
+        my $result_schema = Comserv::Util::Schema::ResultParser->new->get_result_file_schema($result_file_path);
         my $pks = $result_schema->{primary_keys} || [];
         
         die "No primary keys found in Result file" unless @$pks;
@@ -340,11 +341,11 @@ sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constr
     my $constraint_name = $json_data->{constraint_name};
     
     try {
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
         my $table_key = lc($table_name);
         my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
         
-        my $result_schema = $self->get_result_file_schema($c, $result_file_path);
+        my $result_schema = Comserv::Util::Schema::ResultParser->new->get_result_file_schema($result_file_path);
         my ($constraint) = grep { ($_->{name} || 'unnamed') eq $constraint_name } @{$result_schema->{unique_constraints} || []};
         
         die "Constraint '$constraint_name' not found in Result file" unless $constraint;
@@ -429,7 +430,7 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
             ? "__PACKAGE__->add_unique_constraint($cols_list);"
             : "__PACKAGE__->add_unique_constraint('$constraint_name' => $cols_list);";
         
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
         my $table_key = lc($table_name);
         my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
         
@@ -493,7 +494,7 @@ sub sync_table_name_to_result :Path('/schema-comparison/sync_table_name_to_resul
     my $database = $json_data->{database};
     
     try {
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
         my $table_key = lc($table_name);
         my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
         
@@ -926,7 +927,7 @@ sub remove_field_from_result :Path('/schema-comparison/remove_field_from_result'
     }
 
     try {
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
         my $result_file_path = $result_table_mapping->{lc($table_name)}->{result_path};
 
         die "Result file not found for table '$table_name'" unless $result_file_path && -f $result_file_path;
@@ -1093,52 +1094,47 @@ sub get_table_field_info {
 
 sub get_result_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
-    
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
-    my $schema = $c->model($model_name)->schema;
-    
-    # Find the source that matches the table name
-    my $source_name;
-    foreach my $s ($schema->sources) {
-        my $source = $schema->source($s);
-        # Some sources have 'from' as the table name, others match the class name
-        if (lc($source->from) eq lc($table_name) || lc($s) eq lc($table_name)) {
-            $source_name = $s;
-            last;
-        }
+
+    # Use the ResultParser (file-based) instead of DBIx::Class schema,
+    # so we see the latest .pm file contents even if the server hasn't
+    # reloaded the class after recent edits.
+    my $parser = Comserv::Util::Schema::ResultParser->new;
+    my $result_table_mapping = $parser->build_result_table_mapping($database, $c);
+    my $table_key = lc($table_name);
+    my $result_file_path;
+    if (exists $result_table_mapping->{$table_key}) {
+        $result_file_path = $result_table_mapping->{$table_key}->{result_path};
     }
-    
-    unless ($source_name) {
-        die "Could not find DBIx::Class source for table '$table_name' in database '$database'";
+
+    unless ($result_file_path && -f $result_file_path) {
+        die "Result file not found for table '$table_name' in database '$database'";
     }
-    
-    my $source = $schema->source($source_name);
-    my $info = $source->column_info($field_name);
-    
-    unless ($info && %$info) {
-        die "Field '$field_name' not found in Result source '$source_name'";
+
+    my $schema_info = $parser->get_result_file_schema($result_file_path);
+    my $col_info = $schema_info->{columns}->{$field_name};
+
+    unless ($col_info) {
+        die "Field '$field_name' not found in Result file '$result_file_path'";
     }
-    
-    # Dereference scalar references for JSON serialization
-    my $default_value = $info->{default_value};
-    if (defined $default_value && ref($default_value) eq 'SCALAR') {
-        $default_value = $$default_value;
-    }
-    
+
+    # Normalize ResultParser output to match the expected return format
     return {
-        data_type => $info->{data_type},
-        size => $info->{size},
-        is_nullable => $info->{is_nullable} ? 1 : 0,
-        is_auto_increment => $info->{is_auto_increment} ? 1 : 0,
-        default_value => $default_value,
-        enum_list => ($info->{extra} && $info->{extra}->{list}) ? $info->{extra}->{list} : undef
+        data_type => $col_info->{data_type} || $col_info->{type} || '',
+        size      => $col_info->{size} // '',
+        is_nullable => ($col_info->{is_nullable} // '') eq 'YES' ? 1
+                     : ($col_info->{is_nullable} // '') eq 'NO'  ? 0
+                     : ($col_info->{is_nullable} ? 1 : 0),
+        is_auto_increment => $col_info->{is_auto_increment} ? 1 : 0,
+        default_value => $col_info->{default_value},
+        enum_list => ($col_info->{extra} && ref($col_info->{extra}) eq 'HASH' && $col_info->{extra}->{list})
+                     ? $col_info->{extra}->{list} : undef,
     };
 }
 
 sub update_result_field_from_table {
     my ($self, $c, $table_name, $field_name, $database, $table_field_info) = @_;
     
-    my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+    my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
     my $result_file_path;
     
     my $table_key = lc($table_name);
@@ -1371,19 +1367,6 @@ sub generate_result_file_content {
     return $content;
 }
 
-sub build_result_table_mapping {
-    my ($self, $c, $database) = @_;
-    # Delegated to single Parser impl (consolidation after refactor, uses fixed robust discovery)
-    return Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c || $self);
-}
-
-sub get_all_result_files {
-    my ($self, $database, $c) = @_;
-    # Delegated to single canonical impl (fixes path bug and ensures all display paths use same Result discovery)
-    my $ctx = (ref($c) && $c->can('path_to')) ? $c : undef;
-    return Comserv::Util::Schema::ResultParser->new->get_all_result_files($database, $ctx);
-}
-
 sub scan_result_directory_recursive {
     my ($self, $dir_path, $prefix) = @_;
     
@@ -1412,12 +1395,6 @@ sub scan_result_directory_recursive {
     }
     
     return @files;
-}
-
-sub extract_table_name_from_result_file {
-    my ($self, $file_path) = @_;
-    # Delegated (consolidation)
-    return Comserv::Util::Schema::ResultParser->new->extract_table_name_from_result_file($file_path);
 }
 
 sub get_ency_table_schema {
@@ -1599,7 +1576,7 @@ sub get_field_comparison :Path('/schema-comparison/get_field_comparison') :Args(
     
     try {
         # Build comprehensive mapping for this database
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
         
         my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
         
@@ -1649,7 +1626,7 @@ sub get_table_result_comparison_v2 {
     
     if ($result_info && -f $result_info->{result_path}) {
         eval {
-            $result_schema = $self->get_result_file_schema($c, $result_info->{result_path});
+            $result_schema = Comserv::Util::Schema::ResultParser->new->get_result_file_schema($result_info->{result_path});
         };
         if ($@) {
             warn "Failed to parse Result file $result_info->{result_path}: $@";
@@ -1983,18 +1960,6 @@ sub normalize_data_type {
     return $mapping{$data_type} || $data_type;
 }
 
-sub get_result_file_schema {
-    my ($self, $c, $file_path) = @_;
-    # Delegate to canonical Parser for consistent column extraction (important for missing fields display)
-    return Comserv::Util::Schema::ResultParser->new->get_result_file_schema($file_path);
-}
-
-sub parse_result_file_columns {
-    my ($self, $text) = @_;
-    # Delegate to Parser (single robust impl)
-    return Comserv::Util::Schema::ResultParser->new->parse_result_file_columns($text);
-}
-
 sub clean_scalar_refs {
     my ($self, $data) = @_;
     
@@ -2070,8 +2035,7 @@ sub schema_compare :Private {
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    # Derive target IPs from config — unique hosts from real connections
-    # Skip SQLite offline fallbacks and placeholder credentials (YOUR_*)
+    # Collect real connections — skip SQLite offline fallbacks and placeholder credentials (YOUR_*)
     my @primary_conns;
     foreach my $name (keys %$all_conns) {
         my $cfg = $all_conns->{$name}{config};
@@ -2081,35 +2045,47 @@ sub schema_compare :Private {
         push @primary_conns, $name;
     }
 
-    my %seen_ip;
-    my @target_ips = grep { $seen_ip{$_}++ == 0 }
-        map  { $all_conns->{$_}{config}{host} // '' }
-        @primary_conns;
-    @target_ips = sort @target_ips;
+    # Group connections so each distinct DB server process gets its own card.
+    # Two connections are the SAME server if they share server_group AND port
+    # (even across different IPs — e.g. .222:3306 + .198:3306 on prod01).
+    # They are DIFFERENT servers if they are on different ports (e.g.
+    # MySQL:3307 vs PostgreSQL:5433 on prod02) — those each get their own card.
+    my %grouped;
+    foreach my $name (@primary_conns) {
+        my $cfg = $all_conns->{$name}{config};
+        my $port = $cfg->{port} // ($cfg->{db_type} && lc($cfg->{db_type}) eq 'postgresql' ? 5432 : 3306);
+        # Include port in the group key even when server_group is set so that
+        # different service ports stay separate.
+        my $group = $cfg->{server_group}
+            ? $cfg->{server_group} . ':' . $port
+            : sprintf('%s:%s:%s', $cfg->{host} // 'unknown', $port, lc($cfg->{db_type} // 'mysql'));
+        $grouped{$group} //= { conns => [], ips => {}, types => {}, dbs => {} };
+        push @{ $grouped{$group}{conns} }, $name;
+        $grouped{$group}{ips}{ $cfg->{host} } = 1;
+        my $t = $cfg->{db_type} // 'mysql';
+        $grouped{$group}{types}{$t}++;
+        $grouped{$group}{dbs}{ $cfg->{database} } = 1;
+    }
 
     my @servers;
-    foreach my $ip (@target_ips) {
-        my @conns_for_ip = grep { ($all_conns->{$_}{config}{host} // '') eq $ip } @primary_conns;
-        my $db_count = scalar(@conns_for_ip);
+    foreach my $group (sort keys %grouped) {
+        my $g = $grouped{$group};
+        my @group_ips = sort keys %{ $g->{ips} };
+        my $display_name = join(', ', @group_ips);
+        my $type_display = join(', ', map { ucfirst($_) } sort keys %{ $g->{types} });
+        my $db_count = scalar keys %{ $g->{dbs} };
 
-        my %type_count;
-        foreach my $c (@conns_for_ip) {
-            my $t = $all_conns->{$c}{config}{db_type} // 'mysql';
-            $type_count{$t}++;
-        }
-        my $type_display = join(', ', map { ucfirst($_) . ": $type_count{$_}" } sort keys %type_count);
-
-        # Live-check this server (with timeout) and cache result
-        my $status = $self->_check_server_live($c, $remote_db, $ip, \@conns_for_ip);
+        # Live-check using the first connection in the group
+        my $status = $self->_check_server_live($c, $remote_db, $group, $g->{conns});
 
         push @servers, {
-            name         => $ip,
-            ip           => $ip,
+            name         => $display_name,
+            ips          => \@group_ips,
             db_count     => $db_count,
             type_display => $type_display,
             running      => $status->{running},
-            table_count  => $status->{table_count},
             status       => $status->{status},
+            server_group => $group,
         };
     }
 
@@ -2133,140 +2109,119 @@ sub schema_compare :Private {
 }
 
 # ---------------------------------------------------------------
-# Quick fork-based live check for one server IP.
+# Quick fork-based live check for a server group.
 # Times out after ~4 seconds if the server is unreachable.
-# Returns { running => 0|1, table_count => N, status => 'active'|'offline' }
+# Returns { running => 0|1, status => 'active'|'offline' }
 # ---------------------------------------------------------------
 sub _check_server_live {
-    my ($self, $c, $remote_db, $ip, $conns_for_ip) = @_;
+    my ($self, $c, $remote_db, $group_name, $conns_for_group) = @_;
 
-    return { running => 0, table_count => 0, status => 'offline' }
-        unless $conns_for_ip && @$conns_for_ip;
+    return { running => 0, status => 'offline' }
+        unless $conns_for_group && @$conns_for_group;
 
-    my $conn_name = $conns_for_ip->[0];
+    my $conn_name = $conns_for_group->[0];
+    my $all = $remote_db->get_all_connections();
+    my $cfg = $all->{$conn_name}{config}
+        or return { running => 0, status => 'offline' };
+    my $host = $cfg->{host}  || 'localhost';
+    my $port = $cfg->{port}  || 3306;
 
-    my $pid = fork();
-    unless (defined $pid) {
-        # fork failed — return safe default
-        return { running => 0, table_count => 0, status => 'unknown' };
+    # TCP socket check — faster than DBI fork, credential-free, just confirms
+    # the database server process is running and listening on its port.
+    require IO::Socket::INET;
+    my $sock = IO::Socket::INET->new(
+        PeerHost => $host,
+        PeerPort => $port,
+        Proto    => 'tcp',
+        Timeout  => 3,
+    );
+    if ($sock) {
+        close($sock);
+        return { running => 1, status => 'active' };
     }
 
-    if ($pid == 0) {
-        # Child: attempt real connection, sum table counts from ALL databases on this IP
-        my $running = 0;
-        my $table_count = 0;
-        eval {
-            my $dbh = $remote_db->get_connection(undef, $conn_name);
-            if ($dbh) {
-                $running = 1;
-                # Count tables per database on this server
-                my $sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?");
-                foreach my $cn (@$conns_for_ip) {
-                    my $db_name = $remote_db->config->{$cn}{database} // $cn;
-                    $sth->execute($db_name);
-                    my ($cnt) = $sth->fetchrow_array;
-                    $table_count += $cnt || 0;
-                }
-                $sth->finish;
-                $dbh->disconnect;
-            }
-        };
-        # Write result on a pipe or just exit with encoded status
-        # We use /tmp pidfile as simple IPC
-        require JSON;
-        my $json = JSON->new;
-        my $result = $json->encode({ running => $running, table_count => $table_count, status => $running ? 'active' : 'offline' });
-        open my $fh, '>', "/tmp/srvcheck_$$.json" or exit 1;
-        print $fh $result;
-        close $fh;
-        exit 0;
-    }
+    return { running => 0, status => 'offline' };
+}
 
-    # Parent: wait with timeout (4 seconds)
-    my $timeout = 4;
-    my $wait_pid;
-    eval {
-        local $SIG{ALRM} = sub { die "timeout\n" };
-        alarm($timeout);
-        $wait_pid = waitpid($pid, 0);
-        alarm(0);
-    };
-    if ($@ || $wait_pid != $pid) {
-        # Timeout or interrupted — kill child
-        kill 'TERM', $pid;
-        # Give it a moment then SIGKILL
-        eval { local $SIG{ALRM} = sub { die }; alarm(1); waitpid($pid, WNOHANG); alarm(0) };
-        kill 'KILL', $pid if kill(0, $pid);
-    }
+# ==================================================================
+# Helper: match connections by group key
+# Group key format is "server_group:port" (e.g. "prod01:3306")
+# or "host:port:dbtype" (e.g. "192.168.1.20:3307:mysql").
+# ==================================================================
+sub _match_group_connections {
+    my ($self, $all_conns, $group_key) = @_;
 
-    # Read result file
-    my $result_file = "/tmp/srvcheck_$$.json";
-    if (-f $result_file) {
-        local $/;
-        open my $fh, '<', $result_file or return { running => 0, table_count => 0, status => 'offline' };
-        my $text = <$fh>;
-        close $fh;
-        unlink $result_file;
-        my $parsed;
-        eval {
-            require JSON;
-            my $json = JSON->new;
-            $parsed = $json->decode($text);
-        };
-        if ($parsed) {
-            return { running => $parsed->{running}, table_count => $parsed->{table_count}, status => $parsed->{status} };
+    my ($name_part, $port_str, $type_part) = split(/:/, $group_key, 3);
+    defined $name_part or return ();
+
+    my @matches;
+    foreach my $name (keys %$all_conns) {
+        my $cfg = $all_conns->{$name}{config};
+        next if ($cfg->{db_type} // 'mysql') eq 'sqlite';
+        next if ($cfg->{host} // '') =~ /^YOUR_/i;
+
+        my $p = $cfg->{port} // ($cfg->{db_type} && lc($cfg->{db_type}) eq 'postgresql' ? 5432 : 3306);
+        next unless $p eq $port_str;
+
+        if (defined $cfg->{server_group}) {
+            # Has explicit server_group — must match name AND port
+            next unless $cfg->{server_group} eq $name_part;
+        } else {
+            # No server_group — must match host AND port AND db_type
+            next unless $cfg->{host} eq $name_part;
+            next unless (lc($cfg->{db_type} // 'mysql')) eq ($type_part // 'mysql');
         }
+        push @matches, $name;
     }
-
-    return { running => 0, table_count => 0, status => 'offline' };
+    return @matches;
 }
 
 sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
-    my ($self, $c, $server_ip) = @_;
+    my ($self, $c, $group_key) = @_;
 
     require Comserv::Model::RemoteDB;
     my $remote_db = Comserv::Model::RemoteDB->new();
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    # Get ALL connections for this IP (skip SQLite and placeholder hosts)
-    my @conns_for_ip = grep {
-        my $name = $_;
-        my $cfg = $all_conns->{$name}{config};
-        my $host = $cfg->{host} // '';
-        ($host) eq $server_ip &&
-        ($cfg->{db_type} // 'mysql') ne 'sqlite' &&
-        $host !~ /^YOUR_/i
-    } keys %$all_conns;
+    my @conns_for_group = $self->_match_group_connections($all_conns, $group_key);
 
     my @databases;
-    foreach my $conn_name (@conns_for_ip) {
+    my %seen_db;
+    foreach my $conn_name (@conns_for_group) {
         my $cfg = $all_conns->{$conn_name}{config};
         my $db_name = $cfg->{database} // $conn_name;
         my $db_type = $cfg->{db_type} // 'mysql';
 
-        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
-        next unless $dbh;
+        # Deduplicate — same database name across multiple IPs (e.g. ency on
+        # both .222 and .198) is one database, not two.
+        next if $seen_db{$db_name}++;
 
-        # Get basic stats
+        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+
         my $table_count = 0;
         my $size_kb     = 0;
-        eval {
-            my $sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?");
-            $sth->execute($db_name);
-            ($table_count) = $sth->fetchrow_array;
-            $sth->finish;
+        my $status      = 'unreachable';
+        if ($dbh) {
+            $status = 'active';
+            eval {
+                my $sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?");
+                $sth->execute($db_name);
+                ($table_count) = $sth->fetchrow_array;
+                $sth->finish;
 
-            # Rough size in KB (data_length + index_length)
-            $sth = $dbh->prepare("
-                SELECT ROUND(SUM(data_length + index_length) / 1024, 1) 
-                FROM information_schema.tables 
-                WHERE table_schema = ?
-            ");
-            $sth->execute($db_name);
-            ($size_kb) = $sth->fetchrow_array;
-            $sth->finish;
-        };
+                # Rough size in KB (data_length + index_length)
+                $sth = $dbh->prepare("
+                    SELECT ROUND(SUM(data_length + index_length) / 1024, 1) 
+                    FROM information_schema.tables 
+                    WHERE table_schema = ?
+                ");
+                $sth->execute($db_name);
+                ($size_kb) = $sth->fetchrow_array;
+                $sth->finish;
+            };
+            $dbh->disconnect;
+        }
 
         my $size_display = $size_kb ? "$size_kb KB" : '—';
 
@@ -2276,33 +2231,31 @@ sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
             table_count => $table_count,
             size        => $size_display,
             size_kb     => $size_kb || 0,
-            status      => 'active',
+            status      => $status,
         };
-
-        $dbh->disconnect;
     }
 
     $c->stash(
         template  => 'admin/schema_compare/databases.tt',
-        server    => { name => $server_ip, ip => $server_ip, container_count => 0 },
+        server    => { name => $group_key, ip => $group_key, container_count => 0 },
         databases => \@databases,
     );
 }
 
 sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
-    my ($self, $c, $server_ip, undef, $db_name) = @_;
+    my ($self, $c, $group_key, undef, $db_name) = @_;
 
     require Comserv::Model::RemoteDB;
     my $remote_db = Comserv::Model::RemoteDB->new();
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    # Find a connection that matches this server + database
+    # Find a connection that matches this group key + database
+    my @group_conns = $self->_match_group_connections($all_conns, $group_key);
     my ($conn_name) = grep {
         my $cfg = $all_conns->{$_}{config};
-        ($cfg->{host} // '') eq $server_ip &&
         (($cfg->{database} // $_) eq $db_name)
-    } keys %$all_conns;
+    } @group_conns;
 
     # Get live tables from the database
     my %db_tables;  # name => { row_count, size_kb, size }
@@ -2358,13 +2311,16 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     # === Determine which Result schema to use based on database name ===
     my $result_schema = lc($db_name) =~ /forager/ ? 'forager' : 'ency';
 
+    # Determine project root for relative path calculation
+    my $app_root = $c->path_to('.')->stringify;
+    $app_root =~ s{/+$}{};
+
     # Discover Result files for the relevant schema
     my $result_mapping = {};
     my $result_count   = 0;
     my @result_files   = ();
     my @result_extract_failures = ();
     eval {
-        require Comserv::Util::Schema::ResultParser;
         my $parser = Comserv::Util::Schema::ResultParser->new();
         @result_files = $parser->get_all_result_files($result_schema, $c);
         $result_count = scalar(@result_files);
@@ -2378,6 +2334,13 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                     result_path => $rf->{path},
                 };
             } else {
+                # Fallback: use the filename (without .pm) so the file still
+                # appears in "Result files without tables" and can be added.
+                ($table_name = $rf->{name}) =~ s/\.pm$//;
+                $result_mapping->{lc($table_name)} = {
+                    result_name => $rf->{name},
+                    result_path => $rf->{path},
+                };
                 push @result_extract_failures, {
                     name => $rf->{name},
                     path => $rf->{path},
@@ -2390,7 +2353,6 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
     my $ency_result_count = 0;
     my @ency_result_files = ();
     eval {
-        require Comserv::Util::Schema::ResultParser;
         my $parser = Comserv::Util::Schema::ResultParser->new();
         @ency_result_files = $parser->get_all_result_files('ency', $c);
         $ency_result_count = scalar(@ency_result_files);
@@ -2410,6 +2372,8 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 %$tinfo,
                 has_result  => 1,
                 result_name => $result_mapping->{lc($tname)}{result_name},
+                result_path => $result_mapping->{lc($tname)}{result_path},
+                result_rel_path => $result_mapping->{lc($tname)}{result_path} =~ s{^\Q$app_root\E/?}{}r,
             };
         } else {
             push @table_only, {
@@ -2426,6 +2390,8 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
         if (!exists $db_tables{lc($tname)}) {
             push @orphaned_result_files, {
                 result_name => $result_mapping->{$tname}{result_name},
+                result_path => $result_mapping->{$tname}{result_path},
+                result_rel_path => $result_mapping->{$tname}{result_path} =~ s{^\Q$app_root\E/?}{}r,
                 extracted_table_name => $tname,
             };
             push @result_only, {
@@ -2437,6 +2403,8 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
                 in_table    => 0,
                 has_result  => 1,
                 result_name => $result_mapping->{$tname}{result_name},
+                result_path => $result_mapping->{$tname}{result_path},
+                result_rel_path => $result_mapping->{$tname}{result_path} =~ s{^\Q$app_root\E/?}{}r,
             };
         }
     }
@@ -2448,7 +2416,7 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
 
     $c->stash(
         template => 'admin/schema_compare/tables.tt',
-        server   => { name => $server_ip, ip => $server_ip },
+        server   => { name => $group_key, ip => $group_key },
         db       => { name => $db_name },
         both       => \@both,
         table_only => \@table_only,
@@ -2466,37 +2434,180 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
 }
 
 sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
-    my ($self, $c, $server_ip, undef, $db_name, undef, $table_name) = @_;
-    $c->stash(
-        template => 'admin/schema_compare/fields.tt',
-        server   => { name => $server_ip },
-        db       => { name => $db_name },
-        table    => { name => $table_name },
-        fields   => [],
-    );
-}
-
-# AJAX endpoint: refresh status for one server IP (live connect test)
-sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1) {
-    my ($self, $c, $server_ip) = @_;
+    my ($self, $c, $group_key, undef, $db_name, undef, $table_name) = @_;
 
     require Comserv::Model::RemoteDB;
     my $remote_db = Comserv::Model::RemoteDB->new();
     $remote_db->config({});
     my $all_conns = $remote_db->get_all_connections();
 
-    my @conns_for_ip = grep {
-        my $name = $_;
-        my $cfg = $all_conns->{$name}{config};
-        my $host = $cfg->{host} // '';
-        ($host) eq $server_ip &&
-        ($cfg->{db_type} // 'mysql') ne 'sqlite' &&
-        $host !~ /^YOUR_/i
-    } keys %$all_conns;
+    my @group_conns = $self->_match_group_connections($all_conns, $group_key);
+    my ($conn_name) = grep {
+        my $cfg = $all_conns->{$_}{config};
+        ($cfg->{database} // $_) eq $db_name
+    } @group_conns;
+
+    # --- Get DB column definitions ---
+    my %db_columns;  # lc(name) => { name, data_type, size, is_nullable, default_value, extra, comment }
+    if ($conn_name) {
+        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+        if ($dbh) {
+            eval {
+                my $qt = $dbh->quote_identifier($table_name);
+                my $sth = $dbh->prepare("SHOW FULL COLUMNS FROM $qt");
+                $sth->execute();
+                while (my $row = $sth->fetchrow_hashref) {
+                    # Parse data_type and size from e.g. "varchar(255)" or "int(11)"
+                    my ($data_type, $size) = $row->{Type} =~ /^(\w+)(\([^)]+\))?/;
+                    $size //= '';
+                    $db_columns{ lc($row->{Field}) } = {
+                        name          => $row->{Field},
+                        data_type     => $data_type // $row->{Type},
+                        size          => $size,
+                        is_nullable   => ($row->{Null} // 'YES') eq 'NO' ? 'NO' : 'YES',
+                        default_value => $row->{Default},
+                        extra         => $row->{Extra} // '',
+                        comment       => $row->{Comment} // '',
+                    };
+                }
+                $sth->finish;
+            };
+            $dbh->disconnect;
+        }
+    }
+
+    # --- Get Result file column definitions ---
+    my %result_columns;  # lc(name) => { name, data_type, size, is_nullable, default_value }
+    {
+        my $result_schema = lc($db_name) eq 'shanta_forager' ? 'forager' : 'ency';
+        my $parser = Comserv::Util::Schema::ResultParser->new();
+        my @result_files = $parser->get_all_result_files($result_schema, $c);
+
+        my $result_file_path;
+        foreach my $rf (@result_files) {
+            my $rf_table = $parser->extract_table_name_from_result_file($rf->{path});
+            $rf_table ||= $rf->{name};
+            $rf_table =~ s/\.pm$//;
+            if (lc($rf_table) eq lc($table_name)) {
+                $result_file_path = $rf->{path};
+                last;
+            }
+        }
+
+        if ($result_file_path) {
+            my $schema_info = $parser->get_result_file_schema($result_file_path);
+            foreach my $col_name (keys %{ $schema_info->{columns} }) {
+                my $c = $schema_info->{columns}{$col_name};
+                my $dt = $c->{data_type} // $c->{type} // 'varchar';
+                my $sz = (defined $c->{size}       && $c->{size} ne '')
+                      || (defined $c->{data_length} && $c->{data_length} ne '')
+                    ? '(' . ($c->{size} // $c->{data_length} // '255') . ')' : '';
+                $result_columns{ lc($col_name) } = {
+                    name          => $col_name,
+                    data_type     => $dt,
+                    size          => $sz,
+                    is_nullable   => (defined $c->{is_nullable} && $c->{is_nullable} eq '0') ? 'NO' : 'YES',
+                    default_value => $c->{default_value},
+                };
+            }
+        }
+    }
+
+    # --- Build rows: two per field (Table + Result) ---
+    my %all_seen;
+    $all_seen{$_} = 1 for (keys %db_columns, keys %result_columns);
+
+    my @field_rows;
+    foreach my $fname (sort keys %all_seen) {
+        my $d     = $db_columns{$fname};
+        my $r     = $result_columns{$fname};
+        my $in_table  = $d ? 1 : 0;
+        my $in_result = $r ? 1 : 0;
+
+        # --- Table row (always shown if field exists in DB) ---
+        if ($d) {
+            my $match = $r
+                && lc($d->{data_type} // '')    eq lc($r->{data_type} // '')
+                && lc($d->{size} // '')          eq lc($r->{size} // '')
+                && lc($d->{is_nullable} // '')   eq lc($r->{is_nullable} // '')
+                && ($d->{default_value}//'NULL') eq ($r->{default_value}//'NULL');
+            my $row_class = 'table-row';
+            $row_class .= ' all-match' if $match;
+            $row_class .= ' has-diff'   if !$match;
+            push @field_rows, {
+                row_class    => $row_class,
+                source       => 'Table',
+                name         => $d->{name},
+                data_type    => $d->{data_type},
+                size         => $d->{size},
+                nullable     => $d->{is_nullable},
+                default_val  => (defined $d->{default_value} ? $d->{default_value} : 'NULL'),
+                extra        => $d->{extra} // '',
+                comment      => $d->{comment} // '',
+                status       => $match ? 'Match' : 'Table',
+                has_result   => $r ? 1 : 0,
+                has_diff     => $match ? 0 : 1,
+                show_update  => $r && !$match ? 1 : 0,
+                show_drop    => 1,
+                show_add_result => $r ? 0 : 1,
+            };
+        }
+
+        # --- Result row (only shown if field exists in Result file) ---
+        if ($r) {
+            my $match = $d
+                && lc($d->{data_type} // '')    eq lc($r->{data_type} // '')
+                && lc($d->{size} // '')          eq lc($r->{size} // '')
+                && lc($d->{is_nullable} // '')   eq lc($r->{is_nullable} // '')
+                && ($d->{default_value}//'NULL') eq ($r->{default_value}//'NULL');
+            my $row_class = 'result-row';
+            $row_class .= ' all-match' if $match;
+            $row_class .= ' has-diff'   if !$match;
+            push @field_rows, {
+                row_class    => $row_class,
+                source       => 'Result',
+                name         => $r->{name},
+                data_type    => $r->{data_type},
+                size         => $r->{size},
+                nullable     => $r->{is_nullable},
+                default_val  => (defined $r->{default_value} ? $r->{default_value} : 'NULL'),
+                extra        => '',
+                comment      => '',
+                status       => $match ? 'Match' : 'Result',
+                has_result   => $d ? 1 : 0,
+                has_diff     => $match ? 0 : 1,
+                show_update  => (!$match) ? 1 : 0,
+                show_drop    => 0,
+                show_add_result => 0,
+                show_update_result => ($d && !$match) ? 1 : 0,
+            };
+        }
+    }
+
+    $c->stash(
+        template => 'admin/schema_compare/fields.tt',
+        server   => { name => $group_key },
+        db       => { name => $db_name },
+        table    => { name => $table_name },
+        fields   => \@field_rows,
+        table_name => $table_name,
+    );
+}
+
+# AJAX endpoint: refresh status for one server (live connect test)
+sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1) {
+    my ($self, $c, $group_key) = @_;
+
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->new();
+    $remote_db->config({});
+    my $all_conns = $remote_db->get_all_connections();
+
+    my @conns_for_group = $self->_match_group_connections($all_conns, $group_key);
 
     my $running = 0;
     my $table_count = 0;
-    foreach my $c (@conns_for_ip) {
+    foreach my $c (@conns_for_group) {
         my $dbh = eval { $remote_db->get_connection(undef, $c) };
         if ($dbh) {
             eval {
@@ -2518,7 +2629,7 @@ sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1)
     }
 
     our %SERVER_STATUS_CACHE;
-    $SERVER_STATUS_CACHE{$server_ip} = {
+    $SERVER_STATUS_CACHE{$group_key} = {
         running     => $running,
         table_count => $table_count,
         status      => $running ? 'active' : 'offline',
@@ -2526,7 +2637,7 @@ sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1)
 
     $c->stash(json => {
         success     => 1,
-        ip          => $server_ip,
+        ip          => $group_key,
         running     => $running,
         table_count => $table_count,
         status      => $running ? 'active' : 'offline',

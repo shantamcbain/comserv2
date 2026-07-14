@@ -29,6 +29,8 @@ use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
 use Comserv::Util::SystemInfo;
 use Comserv::Util::AdminAuth;
+use Time::HiRes;
+use Comserv::Util::EditorFile;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -11010,27 +11012,22 @@ sub read_file :Local :Args(0) {
         return;
     }
 
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$rel";
+    my $ef     = Comserv::Util::EditorFile->new($c);
+    my $result = $ef->read_file($c, $rel);
 
-    unless (-f $full) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
+    if ($result->{error}) {
+        $c->response->body(encode_json({ success => JSON::false, error => $result->{error} }));
         return;
     }
 
-    my $offset = int($c->request->params->{offset} || 0);
-    my $limit  = int($c->request->params->{limit}  || 300);
+    my $offset  = int($c->request->params->{offset} || 0);
+    my $limit   = int($c->request->params->{limit}  || 300);
     $limit = 500 if $limit > 800;
 
-    open(my $fh, '<:utf8', $full) or do {
-        $c->response->body(encode_json({ success => JSON::false, error => "Cannot read: $!" }));
-        return;
-    };
-    my @lines = <$fh>;
-    close $fh;
-
-    my $total = scalar @lines;
-    my $end   = $offset + $limit - 1;
+    my $content = $result->{content};
+    my @lines   = split /(?<=\n)/, $content;
+    my $total   = scalar @lines;
+    my $end     = $offset + $limit - 1;
     $end = $total - 1 if $end >= $total;
     my @chunk = $offset <= $end ? @lines[$offset..$end] : ();
 
@@ -11076,68 +11073,606 @@ sub apply_fix :Local :Args(0) {
         return;
     }
 
-    my $root = $self->_project_root_path($c);
-    my $full = "$root/$rel";
-
-    unless (-f $full) {
-        $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
-        return;
-    }
-
-    require File::Copy;
-    my $bak = $full . '.bak';
-    File::Copy::copy($full, $bak) or do {
-        $c->response->body(encode_json({ success => JSON::false, error => "Backup failed: $!" }));
-        return;
-    };
-
+    # Determine content: direct body param, or do find/replace on the existing file
     my $content = $c->request->body_parameters->{content}
                // $c->request->params->{content}
                // '';
 
-    # Optional partial replacement mode: find + replace strings
     if (!$content) {
         my $find    = $c->request->body_parameters->{find}    // $c->request->params->{find}    // '';
         my $replace = $c->request->body_parameters->{replace} // $c->request->params->{replace} // '';
         if ($find) {
-            open(my $rfh, '<:utf8', $full) or do {
-                $c->response->body(encode_json({ success => JSON::false, error => "Read failed: $!" }));
+            my $ef   = Comserv::Util::EditorFile->new($c);
+            my $read = $ef->read_file($c, $rel);
+            if ($read->{error}) {
+                $c->response->body(encode_json({ success => JSON::false, error => $read->{error} }));
                 return;
-            };
-            local $/;
-            $content = <$rfh>;
-            close $rfh;
+            }
+            $content = $read->{content};
             my $count = ($content =~ s/\Q$find\E/$replace/g);
             unless ($count) {
-                $c->response->body(encode_json({ success => JSON::false, error => "Search string not found in file" }));
-                unlink $bak;
+                $c->response->body(encode_json({ success => JSON::false, error => 'Search string not found in file' }));
                 return;
             }
         }
     }
 
     unless ($content) {
-        $c->response->body(encode_json({ success => JSON::false, error => "No content or find/replace params supplied" }));
-        unlink $bak;
+        $c->response->body(encode_json({ success => JSON::false, error => 'No content or find/replace params supplied' }));
         return;
     }
 
-    open(my $wfh, '>:utf8', $full) or do {
-        $c->response->body(encode_json({ success => JSON::false, error => "Write failed: $!" }));
-        return;
-    };
-    print $wfh $content;
-    close $wfh;
+    my $ef     = Comserv::Util::EditorFile->new($c);
+    my $result = $ef->write_file($c, $rel, $content);
 
+    if ($result->{success}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'apply_fix', "Applied fix to $rel (backup: $rel.bak)");
+        $c->response->body(encode_json({
+            success => JSON::true,
+            path    => $rel,
+            backup  => "$rel.bak",
+            message => "File updated. Original backed up as $rel.bak",
+        }));
+    } else {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => $result->{error},
+            ($result->{detail} ? (detail => $result->{detail}) : ()),
+            ($result->{hint}   ? (hint   => $result->{hint})   : ()),
+        }));
+    }
+}
+
+# ── File Index ─────────────────────────────────────────────────────────────────
+# Browser-side file index for the AI editing widget.
+# Cached as JSON on disk to avoid scanning the FS on every request.
+# ──────────────────────────────────────────────────────────────────────────────
+
+sub _file_index_path {
+    my ($self, $c) = @_;
+    my $root = $self->_project_root_path($c);
+    return "$root/.file_index_cache.json";
+}
+
+sub _scan_project_files {
+    my ($self, $c) = @_;
+    my $root = $self->_project_root_path($c);
+    my $start = Time::HiRes::time();
+    my @files;
+    for my $top (@_EDITOR_ROOTS) {
+        my $dir = "$root/$top";
+        next unless -d $dir;
+        $self->_walk_dir($dir, $top, \@files);
+    }
+    my $elapsed = sprintf('%.3f', Time::HiRes::time() - $start);
+    # Sort for stable ordering
+    @files = sort @files;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-        'apply_fix', "Applied fix to $rel (backup: $bak)");
+        '_scan_project_files', "Scanned " . scalar(@files) . " files in ${elapsed}s");
+    return \@files;
+}
+
+sub _walk_dir {
+    my ($self, $full_dir, $rel_prefix, $files) = @_;
+    return unless -d $full_dir;
+    opendir(my $dh, $full_dir) or return;
+    my @names = sort grep { $_ !~ /^\./ } readdir($dh);
+    closedir $dh;
+    for my $name (@names) {
+        my $child_full = "$full_dir/$name";
+        my $child_rel  = "$rel_prefix/$name";
+        if (-d $child_full) {
+            $self->_walk_dir($child_full, $child_rel, $files);
+        } elsif (-f $child_full && -s $child_full >= 0) {
+            push @$files, $child_rel;
+        }
+    }
+}
+
+sub _read_file_index {
+    my ($self, $c) = @_;
+    my $path = $self->_file_index_path($c);
+    return undef unless -f $path;
+    local $/;
+    open(my $fh, '<:utf8', $path) or return undef;
+    my $json = <$fh>;
+    close $fh;
+    my $data = eval { decode_json($json) };
+    return $data;
+}
+
+sub _write_file_index {
+    my ($self, $c, $files) = @_;
+    my $path = $self->_file_index_path($c);
+    my $json = encode_json({
+        files       => $files,
+        count       => scalar(@$files),
+        updated_at  => scalar(localtime),
+        updated_ts  => time,
+    });
+    open(my $fh, '>:utf8', $path) or return 0;
+    print $fh $json;
+    close $fh;
+    return 1;
+}
+
+# ── get_file_index ─────────────────────────────────────────────────────────────
+# GET /ai/get_file_index — return cached file list.  Builds on first call.
+# Returns { success, files: [rel/path, ...] }
+# ──────────────────────────────────────────────────────────────────────────────
+sub get_file_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+    my $start = Time::HiRes::time();
+    my $data = $self->_read_file_index($c);
+    my $files;
+    if ($data && ref($data->{files}) eq 'ARRAY' && @{$data->{files}}) {
+        $files = $data->{files};
+    } else {
+        # Cold start — scan and cache
+        $files = $self->_scan_project_files($c);
+        $self->_write_file_index($c, $files);
+    }
+    my $elapsed = sprintf('%.3f', Time::HiRes::time() - $start);
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'get_file_index', "Returned " . scalar(@$files) . " files in ${elapsed}s");
+    $c->response->body(encode_json({
+        success => JSON::true,
+        files   => $files,
+        count   => scalar(@$files),
+        elapsed => $elapsed,
+    }));
+}
+
+# ── rebuild_file_index ─────────────────────────────────────────────────────────
+# GET /ai/rebuild_file_index — full rescan of all editor roots.
+# Returns { success, files: [...], count }
+# ──────────────────────────────────────────────────────────────────────────────
+sub rebuild_file_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+    my $start = Time::HiRes::time();
+    my $files = $self->_scan_project_files($c);
+    $self->_write_file_index($c, $files);
+    my $elapsed = sprintf('%.3f', Time::HiRes::time() - $start);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'rebuild_file_index', "Rebuilt index with " . scalar(@$files) . " files in ${elapsed}s");
+    $c->response->body(encode_json({
+        success => JSON::true,
+        files   => $files,
+        count   => scalar(@$files),
+        elapsed => $elapsed,
+    }));
+}
+
+# ── search_files ───────────────────────────────────────────────────────────────
+# GET /ai/search_files?q=...&limit=50
+# Searches the cached file index by filename.  Returns exact matches first,
+# then substring matches, then fuzzy (Levenshtein) matches.
+# Returns { success, files: [rel/path, ...], fuzzy: bool, elapsed }
+# ──────────────────────────────────────────────────────────────────────────────
+sub search_files :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+    my $query = $c->request->param('q') || '';
+    $query = lc($query);
+    $query =~ s/^\s+|\s+$//g;
+    unless ($query) {
+        $c->response->body(encode_json({ success => JSON::true, files => [], fuzzy => JSON::false, count => 0 }));
+        return;
+    }
+    my $limit = int($c->request->param('limit') || 50);
+    $limit = 200 if $limit > 200;
+
+    my $start = Time::HiRes::time();
+
+    # Ensure index is loaded
+    my $data = $self->_read_file_index($c);
+    my $all_files = ($data && ref($data->{files}) eq 'ARRAY' && @{$data->{files}})
+        ? $data->{files}
+        : $self->_scan_project_files($c);
+
+    my @exact;
+    my @prefix;
+    my @substring;
+    my @fuzzy;
+    my $query_name = $query;
+    # Also check if query looks like a path fragment
+    if ($query =~ m{/}) {
+        # Path-aware search — match against whole path
+        for my $path (@$all_files) {
+            my $low = lc($path);
+            if ($low eq $query) {
+                push @exact, $path;
+            } elsif (CORE::index($low, $query) == 0) {
+                push @prefix, $path;
+            } elsif (CORE::index($low, $query) != -1) {
+                push @substring, $path;
+            }
+        }
+    } else {
+        # Filename-only search — extract name from path
+        for my $path (@$all_files) {
+            my $low = lc($path);
+            my $name = (split m{/}, $low)[-1];
+            if ($name eq $query || $low eq $query) {
+                push @exact, $path;
+            } elsif (CORE::index($name, $query) == 0 || CORE::index($low, $query) == 0) {
+                push @prefix, $path;
+            } elsif (CORE::index($name, $query) != -1 || CORE::index($low, $query) != -1) {
+                push @substring, $path;
+            }
+        }
+    }
+
+    # Fuzzy fallback via Levenshtein if few results
+    my $total = scalar(@exact) + scalar(@prefix) + scalar(@substring);
+    if ($total < 10 && length($query) >= 3) {
+        for my $path (@$all_files) {
+            next if grep { $_ eq $path } @exact, @prefix, @substring;
+            my $low = lc($path);
+            my $name = (split m{/}, $low)[-1];
+            my $dist = $self->_levenshtein_distance($name, $query);
+            my $max_len = length($name) > length($query) ? length($name) : length($query);
+            my $sim = $max_len > 0 ? 1 - ($dist / $max_len) : 0;
+            if ($sim >= 0.72) {
+                push @fuzzy, $path;
+            }
+        }
+    }
+
+    my @results = (@exact, @prefix, @substring, @fuzzy);
+    if ($limit > 0 && @results > $limit) {
+        @results = @results[0 .. $limit - 1];
+    }
+    my $is_fuzzy = @fuzzy > 0 && scalar(@exact) + scalar(@prefix) == 0;
+    my $elapsed = sprintf('%.3f', Time::HiRes::time() - $start);
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'search_files', "q=$query matched " . scalar(@results) . " files in ${elapsed}s (fuzzy=$is_fuzzy)");
 
     $c->response->body(encode_json({
         success => JSON::true,
-        path    => $rel,
-        backup  => "$rel.bak",
-        message => "File updated. Original backed up as $rel.bak",
+        files   => \@results,
+        fuzzy   => $is_fuzzy ? JSON::true : JSON::false,
+        count   => scalar(@results),
+        total   => scalar(@$all_files),
+        elapsed => $elapsed,
     }));
+}
+
+sub _levenshtein_distance {
+    my ($self, $a, $b) = @_;
+    $a ||= '';
+    $b ||= '';
+    return length($b) if !length($a);
+    return length($a) if !length($b);
+    my @a = split //, lc($a);
+    my @b = split //, lc($b);
+    my @d = map { [0 .. @b] } 0 .. @a;
+    $d[0][$_] = $_ for 0 .. @b;
+    for my $i (1 .. @a) {
+        $d[$i][0] = $i;
+        my $a_char = $a[$i-1];
+        for my $j (1 .. @b) {
+            my $cost = $a_char eq $b[$j-1] ? 0 : 1;
+            $d[$i][$j] = $d[$i-1][$j-1] + $cost;
+            $d[$i][$j] = $d[$i][$j] < $d[$i-1][$j] + 1 ? $d[$i][$j] : $d[$i-1][$j] + 1;
+            $d[$i][$j] = $d[$i][$j] < $d[$i][$j-1] + 1 ? $d[$i][$j] : $d[$i][$j-1] + 1;
+        }
+    }
+    return $d[@a][@b];
+}
+
+# ── add_to_index ───────────────────────────────────────────────────────────────
+# POST /ai/add_to_index  { path: "rel/path/to/file.pm" }
+# Adds a single file to the cached index, or refreshes its entry.
+# Returns { success, count }
+# ──────────────────────────────────────────────────────────────────────────────
+sub add_to_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+    my $rel = $c->request->param('path') || '';
+    $rel = $self->_sanitize_editor_rel_path($rel);
+    unless ($rel && $self->_editor_path_allowed($rel)) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Invalid path: $rel" }));
+        return;
+    }
+    my $data = $self->_read_file_index($c);
+    my $files = ($data && ref($data->{files}) eq 'ARRAY') ? $data->{files} : [];
+    # Add if not already present
+    unless (grep { $_ eq $rel } @$files) {
+        push @$files, $rel;
+        @$files = sort @$files;
+        $self->_write_file_index($c, $files);
+    }
+    $c->response->body(encode_json({
+        success => JSON::true,
+        path    => $rel,
+        count   => scalar(@$files),
+    }));
+}
+
+# ── remove_from_index ──────────────────────────────────────────────────────────
+# POST /ai/remove_from_index  { path: "rel/path/to/file.pm" }
+# Removes a single file from the cached index.
+# Returns { success, count }
+# ──────────────────────────────────────────────────────────────────────────────
+sub remove_from_index :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+    my $rel = $c->request->param('path') || '';
+    $rel = $self->_sanitize_editor_rel_path($rel);
+    unless ($rel) {
+        $c->response->body(encode_json({ success => JSON::false, error => "No path provided" }));
+        return;
+    }
+    my $data = $self->_read_file_index($c);
+    my $files = ($data && ref($data->{files}) eq 'ARRAY') ? $data->{files} : [];
+    my @filtered = grep { $_ ne $rel } @$files;
+    if (@filtered < @$files) {
+        $self->_write_file_index($c, \@filtered);
+    }
+    $c->response->body(encode_json({
+        success => JSON::true,
+        path    => $rel,
+        count   => scalar(@filtered),
+    }));
+}
+
+# ── resolve_route ──────────────────────────────────────────────────────────────
+# GET /ai/resolve_route?path=/planning/daily
+# Maps a URL route to a controller + template file path.
+# Uses a built-in route map derived from Catalyst conventions.
+# Returns { success, route, template, controller, guessed_templates }
+# ──────────────────────────────────────────────────────────────────────────────
+
+sub resolve_route :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $route = $c->request->param('path') || '';
+    $route =~ s{^/+}{};
+    $route =~ s{/+$}{};
+    $route = "/$route";
+
+    unless ($route && length($route) > 1) {
+        $c->response->body(encode_json({ success => JSON::false, route => $route, error => 'No route path provided' }));
+        return;
+    }
+
+    my $start = Time::HiRes::time();
+    my $map   = $self->_build_route_map($c);
+    my $entry = $map->{lc($route)};
+
+    my $elapsed = sprintf('%.3f', Time::HiRes::time() - $start);
+
+    if ($entry) {
+        $c->response->body(encode_json({
+            success    => JSON::true,
+            route      => $route,
+            template   => $entry->{template},
+            controller => $entry->{controller},
+            note       => $entry->{note} || '',
+            related    => $entry->{related} || [],
+            elapsed    => $elapsed,
+        }));
+    } else {
+        # No exact match — try to guess from similar routes
+        my @guesses;
+        my $lc_route = lc($route);
+        for my $known (keys %$map) {
+            if (CORE::index($known, $lc_route) != -1 || CORE::index($lc_route, $known) != -1) {
+                push @guesses, $map->{$known}{template};
+            }
+        }
+        # Also scan controller files for action names matching the last segment
+        my $last_seg = (split m{/}, $route)[-1];
+        if ($last_seg && @guesses < 5) {
+            for my $known (keys %$map) {
+                my $k_last = (split m{/}, $known)[-1];
+                if ($k_last && lc($k_last) eq lc($last_seg) && !grep { $_ eq $map->{$known}{template} } @guesses) {
+                    push @guesses, $map->{$known}{template};
+                }
+            }
+        }
+        $c->response->body(encode_json({
+            success          => JSON::false,
+            route            => $route,
+            guessed_templates => \@guesses,
+            elapsed          => $elapsed,
+        }));
+    }
+}
+
+sub _build_route_map {
+    my ($self, $c) = @_;
+    my $map_path = $self->_route_map_path($c);
+    if (-f $map_path) {
+        local $/;
+        open(my $fh, '<:utf8', $map_path) or return {};
+        my $json = <$fh>;
+        close $fh;
+        my $data = eval { decode_json($json) };
+        return $data if $data && ref $data eq 'HASH';
+    }
+    # Build from scratch
+    my $map = $self->_scan_controllers_for_routes($c);
+    $self->_write_route_map($c, $map);
+    return $map;
+}
+
+sub _route_map_path {
+    my ($self, $c) = @_;
+    my $root = $self->_project_root_path($c);
+    return "$root/.route_map_cache.json";
+}
+
+sub _write_route_map {
+    my ($self, $c, $map) = @_;
+    my $path = $self->_route_map_path($c);
+    open(my $fh, '>:utf8', $path) or return;
+    print $fh encode_json($map);
+    close $fh;
+}
+
+sub _scan_controllers_for_routes {
+    my ($self, $c) = @_;
+    my $root = $self->_project_root_path($c);
+    my $ctrl_dir = "$root/lib/Comserv/Controller";
+    my %map;
+
+    return \%map unless -d $ctrl_dir;
+
+    my @pm_files;
+    $self->_find_pm_files($ctrl_dir, '', \@pm_files);
+
+    for my $rel (@pm_files) {
+        my $full = "$ctrl_dir/$rel";
+        next unless -f $full;
+        open(my $fh, '<:utf8', $full) or next;
+        local $/;
+        my $content = <$fh>;
+        close $fh;
+
+        # Build controller package name from path
+        (my $pkg = $rel) =~ s{\.pm$}{};
+        $pkg = "Comserv::Controller::$pkg";
+        $pkg =~ s{/}{::}g;
+
+        # Extract action methods: sub name :Local / :Path / :Args
+        my @actions;
+        while ($content =~ /^sub\s+(\w+)\s*:([^;{]+)/gm) {
+            my ($action, $attrs) = ($1, $2);
+            push @actions, { name => $action, attrs => $attrs };
+        }
+
+        # Determine base route from the controller file name
+        my $base_route = $rel;
+        $base_route =~ s{\.pm$}{};
+        $base_route =~ s{/Admin/}{/admin/};
+        # Convert PascalCase to lower case with dashes or just keep lowercased
+        # Catalyst convention: /Inventory → /inventory (lowered)
+        my @parts = split m{/}, $base_route;
+        $base_route = join '/', map { lc($_) } @parts;
+        $base_route = "/$base_route" unless $base_route =~ m{^/};
+
+        # Map known route patterns
+        for my $act (@actions) {
+            my $aname = $act->{name};
+            my $attrs = $act->{attrs};
+
+            # Skip private methods
+            next if $aname =~ /^_/;
+
+            # Determine route for this action
+            my $route;
+            my $is_index = $attrs =~ /\b:Path\s*(?::Args\(0\))?\s*$/ || $attrs =~ /\b:Args\(0\)\s*$/;
+
+            if ($aname eq 'index' && $is_index) {
+                $route = $base_route;
+            } elsif ($attrs =~ /\b:Path\s*\([^)]*"([^"]+)"[^)]*\)/) {
+                $route = "/$1";
+            } elsif ($attrs =~ /:Local/) {
+                $route = "$base_route/$aname";
+            } elsif ($attrs =~ /:Path/) {
+                $route = $base_route;
+            } else {
+                $route = "$base_route/$aname";
+            }
+
+            $route =~ s{/+}{/}g;
+            $route =~ s{/$}{};
+
+            # Map to template file path
+            my $template = $self->_action_to_template($base_route, $aname, $rel, $pkg, $attrs);
+            my $lc_route = lc($route);
+
+            $map{$lc_route} = {
+                route      => $route,
+                controller => $pkg,
+                action     => $aname,
+                template   => $template,
+                note       => '',
+                related    => [],
+            } unless exists $map{$lc_route};
+        }
+    }
+
+    # Override known special cases
+    $map{'/planning/daily'} = {
+        route      => '/planning/daily',
+        controller => 'Comserv::Controller::Planning',
+        action     => 'daily',
+        template   => 'root/admin/planning/DailyPlan.tt',
+        note       => 'root/DailyPlan.tt does not exist — this is the live path.',
+        related    => [],
+    };
+
+    return \%map;
+}
+
+sub _find_pm_files {
+    my ($self, $full_dir, $rel_prefix, $files) = @_;
+    return unless -d $full_dir;
+    opendir(my $dh, $full_dir) or return;
+    my @names = sort grep { $_ !~ /^\./ } readdir($dh);
+    closedir $dh;
+    for my $name (@names) {
+        my $full = "$full_dir/$name";
+        my $rel  = $rel_prefix ? "$rel_prefix/$name" : $name;
+        if (-d $full) {
+            $self->_find_pm_files($full, $rel, $files);
+        } elsif ($name =~ /\.pm$/) {
+            push @$files, $rel;
+        }
+    }
+}
+
+sub _action_to_template {
+    my ($self, $base_route, $action, $ctrl_rel, $pkg, $attrs) = @_;
+
+    # Special known overrides
+    my %overrides = (
+        '/'                               => 'root/index.tt',
+        '/login'                          => 'root/login.tt',
+        '/admin'                          => 'root/admin/index.tt',
+        '/admin/docker'                   => 'root/admin/docker/index.tt',
+    );
+    return $overrides{$base_route} if exists $overrides{$base_route};
+
+    # Convert controller path to template directory
+    my $tmpl_dir = $ctrl_rel;
+    $tmpl_dir =~ s{\.pm$}{};
+    $tmpl_dir = "root/$tmpl_dir";
+
+    # Default: template is at root/<controller>/<action>.tt (lowercase)
+    my $action_lc = $action;
+    $action_lc =~ s/_/-/g;
+
+    my $tmpl = "$tmpl_dir/$action_lc.tt";
+    return $tmpl;
 }
 
 =head2 transcribe

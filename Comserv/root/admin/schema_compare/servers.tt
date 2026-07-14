@@ -1,5 +1,5 @@
 [%# Schema Compare - Server List (top level)
-    Shows active servers with container counts.
+    Shows server groups with their database counts and status.
     Clicking a server tunnels to its DB list.
     JS via schema-compare.js (event delegation on data-action attributes)
 %]
@@ -17,7 +17,7 @@
         [% FOREACH server IN servers %]
         <div class="card border server-card"
              data-action="navigate-server"
-             data-server="[% server.name | html %]">
+             data-server="[% server.server_group | html %]">
             <div class="card-body">
                 <h5 class="card-title server-card-title">
                     <i class="fas fa-server me-2"></i>[% server.name | html %]
@@ -31,11 +31,8 @@
                 <p class="card-text mb-1 server-card-text">
                     <strong>Status:</strong> <span class="server-status">[% server.status | ucfirst %]</span>
                 </p>
-                <p class="card-text mb-2 server-card-text">
-                    <strong>Tables:</strong> <span class="table-count">[% server.table_count %]</span>
-                </p>
-                <button class="btn btn-sm btn-outline-primary refresh-btn" data-action="refresh-server" data-ip="[% server.ip %]">
-                    <i class="fas fa-sync"></i> Refresh
+                <button class="btn btn-sm btn-outline-primary refresh-btn" data-action="refresh-server" data-server="[% server.server_group | html %]">
+                    <i class="fa fa-sync"></i> Refresh
                 </button>
             </div>
         </div>

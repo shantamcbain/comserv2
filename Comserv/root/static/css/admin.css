@@ -228,6 +228,27 @@
     color: white;
 }
 
+.status-badge.different {
+    background: var(--warning-color, #ffc107);
+    color: #333;
+}
+
+.status-badge.synchronized,
+.status-badge.match {
+    background: var(--success-color, #28a745);
+    color: white;
+}
+
+.status-badge.table-only {
+    background: var(--info-color, #17a2b8);
+    color: white;
+}
+
+.status-badge.result-only {
+    background: #6f42c1;
+    color: white;
+}
+
 .connection-type {
     padding: 2px 6px;
     background: rgba(255,255,255,0.2);

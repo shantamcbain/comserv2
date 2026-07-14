@@ -58,7 +58,7 @@
   }
 
   // Refresh single server
-  function refreshServer(ip, btn) {
+  function refreshServer(serverGroup, btn) {
     if (!btn) return;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
@@ -67,16 +67,14 @@
     var base = container ? container.dataset.refreshUrl : '';
     if (!base) base = '/admin/schema_compare/refresh_server';
 
-    fetch(base + '/' + encodeURIComponent(ip))
+    fetch(base + '/' + encodeURIComponent(serverGroup))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.success) {
           var card = btn.closest('.card');
           if (card) {
             var status = card.querySelector('.server-status');
-            var count = card.querySelector('.table-count');
             if (status) status.textContent = data.status;
-            if (count) count.textContent = data.table_count;
           }
         } else {
           alert('Refresh failed: ' + (data.error || 'unknown'));
@@ -112,7 +110,7 @@
   function toggleSection(headerEl) {
     var content = headerEl.nextElementSibling;
     if (!content) return;
-    content.style.display = content.style.display === 'none' ? '' : 'none';
+    content.classList.toggle('expanded');
   }
 
   function autoCollapseEmptySections() {
@@ -121,9 +119,12 @@
       if (!h3) return;
       var m = h3.textContent.match(/\((\d+)\)/);
       var count = m ? parseInt(m[1], 10) : 0;
+      var content = section.querySelector('.section-content');
+      if (!content) return;
       if (count === 0) {
-        var content = section.querySelector('.section-content');
-        if (content) content.style.display = 'none';
+        content.classList.remove('expanded');
+      } else {
+        content.classList.add('expanded');
       }
     });
   }
@@ -172,16 +173,67 @@
     // TODO: wire to controller endpoint
   }
 
-  function addFieldToResult(fieldName, tableName) {
-    console.log('Add field to result:', fieldName, tableName);
-    // TODO: wire to controller endpoint
+  function addFieldToResult(fieldName, tableName, database) {
+    if (!confirm('Add field "' + fieldName + '" to Result file for table "' + tableName + '"?')) return;
+    fetch('/schema-comparison/sync_table_to_result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table_name: tableName, field_name: fieldName, database: database, database_environment: 'production', allow_production: 1, confirmed: true })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success) {
+          alert('Field "' + fieldName + '" added to Result file.');
+          location.reload();
+        } else {
+          alert('Failed to add field: ' + (data.error || 'unknown error'));
+        }
+      })
+      .catch(function (err) { alert('Server error: ' + err.message); });
+  }
+
+  function updateTableFromResult(fieldName, tableName, database) {
+    if (!confirm('Alter table "' + tableName + '" — update column "' + fieldName + '" to match the Result file definition?')) return;
+    fetch('/schema-comparison/sync_result_to_table', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table_name: tableName, field_name: fieldName, database: database, database_environment: 'production', allow_production: 1, confirmed: true })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success) {
+          alert('Column "' + fieldName + '" updated to match Result file.');
+          location.reload();
+        } else {
+          alert('Failed to update column: ' + (data.error || 'unknown error'));
+        }
+      })
+      .catch(function (err) { alert('Server error: ' + err.message); });
+  }
+
+  function updateResultFromTable(fieldName, tableName, database, server) {
+    if (!confirm('Update Result file for table "' + tableName + '" — set column "' + fieldName + '" to match the DB table definition?')) return;
+    fetch('/schema-comparison/sync_table_to_result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table_name: tableName, field_name: fieldName, database: database, database_environment: 'production', allow_production: 1, confirmed: true })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success) {
+          alert('Result file column "' + fieldName + '" updated to match DB table.');
+          location.reload();
+        } else {
+          alert('Failed to update Result file: ' + (data.error || 'unknown error'));
+        }
+      })
+      .catch(function (err) { alert('Server error: ' + err.message); });
   }
 
   function dropColumn(fieldName, tableName) {
-    if (confirm('Drop column ' + fieldName + ' from ' + tableName + '?')) {
-      console.log('Drop column:', fieldName, tableName);
-      // TODO: wire to controller endpoint
-    }
+    if (!confirm('Drop column "' + fieldName + '" from table "' + tableName + '"?')) return;
+    console.log('Drop column:', fieldName, tableName);
+    // TODO: wire to controller endpoint
   }
 
   /* ================================================================
@@ -222,8 +274,8 @@
       if (srvRefresh) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        var ip = getParam(srvRefresh, 'ip');
-        if (ip) refreshServer(ip, srvRefresh);
+        var srvGroup = getParam(srvRefresh, 'server');
+        if (srvGroup) refreshServer(srvGroup, srvRefresh);
         return;
       }
 
@@ -306,7 +358,8 @@
         e.preventDefault();
         var rfName = getParam(addFieldRes, 'field');
         var rfTbl = getParam(addFieldRes, 'table');
-        if (rfName && rfTbl) addFieldToResult(rfName, rfTbl);
+        var rfDb = getParam(addFieldRes, 'db');
+        if (rfName && rfTbl) addFieldToResult(rfName, rfTbl, rfDb);
         return;
       }
 
@@ -317,6 +370,29 @@
         var colName = getParam(dropCol, 'field');
         var colTbl = getParam(dropCol, 'table');
         if (colName && colTbl) dropColumn(colName, colTbl);
+        return;
+      }
+
+      // Update table from Result file (fields page — "Update Table" button)
+      var updateTbl = target.closest('[data-action="update-table-from-result"]');
+      if (updateTbl) {
+        e.preventDefault();
+        var uField = getParam(updateTbl, 'field');
+        var uTable = getParam(updateTbl, 'table');
+        var uDb = getParam(updateTbl, 'db');
+        if (uField && uTable) updateTableFromResult(uField, uTable, uDb);
+        return;
+      }
+
+      // Update Result file from table (fields page — "Update Result" button)
+      var updateRes = target.closest('[data-action="update-result-from-table"]');
+      if (updateRes) {
+        e.preventDefault();
+        var rField = getParam(updateRes, 'field');
+        var rTable = getParam(updateRes, 'table');
+        var rDb = getParam(updateRes, 'db');
+        var rServer = getParam(updateRes, 'server');
+        if (rField && rTable) updateResultFromTable(rField, rTable, rDb, rServer);
         return;
       }
     }, true); // capture phase
@@ -332,5 +408,12 @@
     }
 
   }); // end DOMContentLoaded
+
+  /* Expose to inline onclick handlers in template */
+  window.updateTableFromResult = updateTableFromResult;
+  window.updateResultFromTable = updateResultFromTable;
+  window.dropColumn = dropColumn;
+  window.addFieldToTable = addFieldToTable;
+  window.addFieldToResult = addFieldToResult;
 
 })();

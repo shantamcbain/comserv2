@@ -6,16 +6,21 @@ use warnings;
 __PACKAGE__->load_components(qw/TimeStamp/);
 __PACKAGE__->table('mailing_list_subscriptions');
 
-__PACKAGE__->add_columns(id => {
-        data_type => 'integer',
+__PACKAGE__->add_columns(
+    id => {
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
         is_auto_increment => 1,
     },
     mailing_list_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 0,
     },
     user_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
     },
     email => {
@@ -45,23 +50,27 @@ __PACKAGE__->add_columns(id => {
         # Values: 'manual', 'workshop', 'auto'
     },
     source_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
-        # workshop_id if source is 'workshop'
     },
     subscribed_at => {
         data_type => 'timestamp',
-        default_value => \'CURRENT_TIMESTAMP',
-        set_on_create => 1,
+        is_nullable => 0,
+        default_value => 'current_timestamp()',
     },
     is_active => {
-        data_type     => 'tinyint',
-        default_value => 1,
+        data_type => 'tinyint',
+        size => 4,
+        is_nullable => 0,
+        default_value => '1',
     },
     # status column removed - does not exist in DB table
     # unsubscribed_at => { data_type => 'timestamp', is_nullable => 1 },  # column missing in DB - commented to stop fatal error
+
     blocked_by => {
-        data_type   => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
     },
     blocked_at => {
