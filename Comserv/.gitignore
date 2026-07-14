@@ -24,3 +24,7 @@ root/Documentation/session_history/
 
 # Dev workstation TLS certs (never commit private keys)
 config/dev_tls/
+
+# Auto-generated editor caches (runtime, re-creatable)
+/.file_index_cache.json
+/.route_map_cache.json

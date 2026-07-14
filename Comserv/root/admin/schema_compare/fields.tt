@@ -1,16 +1,14 @@
 [%# Schema Compare - Field Comparison (table drill-down)
-    Shows fields from both the live table and its Result file.
-    Highlights missing fields on either side.
-    Allows: add missing field to table / add to result / drop column.
+    Each field gets TWO rows: one from the live DB table, one from the Result file.
+    Each attribute (data_type, size, nullable, default) is its own column.
+    Shows exactly which attributes differ so admin can update the table to match result file.
     JS via schema-compare.js (event delegation on data-action attributes)
 %]
-
 <div class="app-container">
     <div class="page-header">
         <h1>Fields for [% table.name | html %]</h1>
         <p class="page-subtitle">Database: [% db.name | html %] • Server: [% server.name | html %]</p>
     </div>
-
     <div class="breadcrumb-container">
         <nav class="breadcrumb">
             <a href="[% c.uri_for('/admin/schema_compare') %]">Schema Compare</a>
@@ -22,70 +20,101 @@
             <span>[% table.name | html %]</span>
         </nav>
     </div>
-
     <div class="content-container">
         <div class="content-primary">
             [% IF fields.size %]
             <div class="table-container">
-                <table class="data-table">
+                <p class="field-count-info">
+                    [% SET match_count = 0; diff_count = 0; table_only = 0; result_only = 0; %]
+                    [% FOREACH f IN fields; NEXT UNLESS f.source == 'Table'; %]
+                      [% IF f.status == 'Match'; match_count = match_count + 1; %]
+                      [% ELSIF f.status == 'Table' && f.has_result; diff_count = diff_count + 1; %]
+                      [% ELSIF f.status == 'Table' && !f.has_result; table_only = table_only + 1; %]
+                      [% END; END %]
+                    [% count_result_only = 0; %]
+                    [% FOREACH f IN fields; NEXT UNLESS f.source == 'Result'; NEXT IF f.status == 'Match'; count_result_only = count_result_only + 1; END %]
+                    <strong>[% fields.size %] rows</strong> —
+                    [% match_count %] match ·
+                    [% diff_count %] differ ·
+                    [% table_only %] table-only ·
+                    [% count_result_only %] result-only
+                </p>
+                <table class="data-table field-compare-table">
                     <thead>
                         <tr>
-                            <th>Field Name</th>
-                            <th>Table Definition</th>
-                            <th>Result File Definition</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th class="col-source">Source</th>
+                            <th class="col-name">Field</th>
+                            <th class="col-attr">Data Type</th>
+                            <th class="col-attr">Size</th>
+                            <th class="col-attr">Nullable</th>
+                            <th class="col-attr">Default</th>
+                            <th class="col-attr">Extra</th>
+                            <th class="col-attr">Comment</th>
+                            <th class="col-status">Status</th>
+                            <th class="col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         [% FOREACH field IN fields %]
-                        <tr data-field="[% field.name | html %]">
-                            <td><strong>[% field.name | html %]</strong></td>
-                            <td>
-                                [% IF field.in_table %]
-                                    <code>[% field.table_def | html %]</code>
-                                [% ELSE %]
-                                    <span class="text-muted">— (missing in table)</span>
-                                [% END %]
+                        <tr class="[% field.row_class | html %]"
+                            data-field="[% field.name | html %]"
+                            data-source="[% field.source | html %]">
+                            <td class="cell-source">
+                                <span class="source-badge source-[% field.source | html | lower %]">[% field.source | html %]</span>
                             </td>
-                            <td>
-                                [% IF field.in_result %]
-                                    <code>[% field.result_def | html %]</code>
-                                [% ELSE %]
-                                    <span class="text-muted">— (missing in result)</span>
-                                [% END %]
-                            </td>
-                            <td>
-                                [% IF field.in_table && field.in_result %]
+                            <td class="cell-name"><strong>[% field.name | html %]</strong></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.data_type | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.size | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.nullable | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.default_val | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]"><code>[% field.extra | html %]</code></td>
+                            <td class="cell-attr[% ' diff' IF field.has_diff && field.source == 'Table' %]">[% field.comment | html %]</td>
+                            <td class="cell-status">
+                                [% IF field.status == 'Match' %]
                                     <span class="status-badge synchronized">Match</span>
-                                [% ELSIF field.in_table %]
+                                [% ELSIF field.source == 'Table' && field.has_diff %]
+                                    <span class="status-badge different">Update needed</span>
+                                [% ELSIF field.source == 'Table' && !field.has_result %]
                                     <span class="status-badge table-only">Table only</span>
-                                [% ELSE %]
+                                [% ELSIF field.source == 'Result' && field.has_diff %]
+                                    <span class="status-badge different">Differs (Result)</span>
+                                [% ELSIF field.source == 'Result' && !field.has_result %]
                                     <span class="status-badge result-only">Result only</span>
                                 [% END %]
                             </td>
-                            <td class="action-cell">
-                                [% IF field.in_result && !field.in_table %]
+                            <td class="cell-actions">
+                                [% IF field.show_update %]
                                     <button class="btn btn-sm btn-primary"
-                                            data-action="add-field-to-table"
                                             data-field="[% field.name | html %]"
-                                            data-table="[% table.name | html %]">
-                                        <i class="fas fa-plus"></i> Add to Table
+                                            data-table="[% table_name | html %]"
+                                            data-db="[% db.name | html %]"
+                                            onclick="var f=this.dataset.field;var t=this.dataset.table;var d=this.dataset.db;if(confirm('Alter table &quot;'+t+'&quot; — update column &quot;'+f+'&quot; to match the Result file definition?')){fetch('/schema-comparison/sync_result_to_table',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({table_name:t,field_name:f,database:d,database_environment:'production',allow_production:1,confirmed:true})}).then(function(r){return r.json()}).then(function(data){if(data.success){alert('Column &quot;'+f+'&quot; updated to match Result file.');location.reload()}else{alert('Failed: '+data.error)}}).catch(function(err){alert('Server error: '+err.message)})}return false">
+                                        <i class="fas fa-arrow-down"></i> Update Table
                                     </button>
                                 [% END %]
-                                [% IF field.in_table && !field.in_result %]
+                                [% IF field.show_update_result %]
                                     <button class="btn btn-sm btn-secondary"
-                                            data-action="add-field-to-result"
                                             data-field="[% field.name | html %]"
-                                            data-table="[% table.name | html %]">
+                                            data-table="[% table_name | html %]"
+                                            data-db="[% db.name | html %]"
+                                            onclick="var f=this.dataset.field;var t=this.dataset.table;var d=this.dataset.db;if(confirm('Update Result file for table &quot;'+t+'&quot; — set column &quot;'+f+'&quot; to match the DB table definition?')){fetch('/schema-comparison/sync_table_to_result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({table_name:t,field_name:f,database:d,database_environment:'production',allow_production:1,confirmed:true})}).then(function(r){return r.json()}).then(function(data){if(data.success){alert('Result file column &quot;'+f+'&quot; updated to match DB table.');location.reload()}else{alert('Failed: '+data.error)}}).catch(function(err){alert('Server error: '+err.message)})}return false">
+                                        <i class="fas fa-arrow-up"></i> Update Result
+                                    </button>
+                                [% END %]
+                                [% IF field.show_add_result %]
+                                    <button class="btn btn-sm btn-secondary"
+                                            data-field="[% field.name | html %]"
+                                            data-table="[% table_name | html %]"
+                                            data-db="[% db.name | html %]"
+                                            onclick="var f=this.dataset.field;var t=this.dataset.table;var d=this.dataset.db;if(confirm('Add field &quot;'+f+'&quot; to Result file for table &quot;'+t+'&quot;?')){fetch('/schema-comparison/sync_table_to_result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({table_name:t,field_name:f,database:d,database_environment:'production',allow_production:1,confirmed:true})}).then(function(r){return r.json()}).then(function(data){if(data.success){alert('Field &quot;'+f+'&quot; added to Result file.');location.reload()}else{alert('Failed: '+data.error)}}).catch(function(err){alert('Server error: '+err.message)})}return false">
                                         <i class="fas fa-file-alt"></i> Add to Result
                                     </button>
                                 [% END %]
-                                [% IF field.in_table %]
+                                [% IF field.show_drop %]
                                     <button class="btn btn-sm btn-delete"
                                             data-action="drop-column"
                                             data-field="[% field.name | html %]"
-                                            data-table="[% table.name | html %]">
+                                            data-table="[% table_name | html %]">
                                         <i class="fas fa-trash"></i> Drop
                                     </button>
                                 [% END %]
@@ -102,7 +131,6 @@
             [% END %]
         </div>
     </div>
-
     <div class="page-footer">
         <div class="footer-actions">
             <a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]/db/[% db.name | uri %]" class="btn btn-secondary">← Back to Tables</a>

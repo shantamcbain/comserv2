@@ -68,12 +68,18 @@
                 DB tables from information_schema: <strong>[% db_table_count %]</strong><br>
                 Result files whose table name matches a DB table: <strong>[% matched_count %]</strong><br>
                 Result files whose table name does NOT exist in DB: <strong>[% result_only.size %]</strong><br>
+                Result files that FAILED to parse: <strong>[% result_extract_failures.size %]</strong><br>
                 <span class="warning-text">If result_only is 0 but result_count > matched_count, the DB table list is incomplete or keys don't match.</span>
 
-                [% IF result_only.size == 0 && result_count > matched_count %]
+                [% IF result_only.size == 0 && result_count > matched_count && result_extract_failures.size == 0 %]
                 <div class="debug-warning-block">
-                    <strong>WARNING:</strong> 219 result files but only 213 matched. The 6 unmatched result table names are NOT appearing in result_only.<br>
+                    <strong>WARNING:</strong> [% result_count %] result files but only [% matched_count %] matched. The [% result_count - matched_count %] unmatched result table names are NOT appearing in result_only.<br>
                     This means the DB table query is returning fewer tables than MariaDB reports, or the key comparison is failing.
+                </div>
+                [% ELSIF result_count > matched_count && result_extract_failures.size > 0 %]
+                <div class="debug-info-block">
+                    <strong>NOTE:</strong> [% result_count %] result files, [% matched_count %] matched, [% result_extract_failures.size %] failed to parse.<br>
+                    All unmatched files are accounted for in the extraction failures above.
                 </div>
                 [% END %]
 
@@ -117,7 +123,11 @@
                                     <td><a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]/db/[% db.name | uri %]/table/[% table.name | uri %]">[% table.name | html %]</a></td>
                                     <td>[% table.row_count || 0 %]</td>
                                     <td>[% table.size %]</td>
-                                    <td>[% table.result_name | html %]</td>
+                                    <td>[% table.result_name | html %]
+                                        [% IF table.result_rel_path %]
+                                            <a href="#" onclick="openAI2EditorWindow('[% table.result_rel_path | html %]');return false" class="btn btn-sm btn-secondary" title="Edit result file in AI editor"><i class="fas fa-edit"></i> Edit</a>
+                                        [% END %]
+                                    </td>
                                     <td class="action-cell">
                                         <button class="btn btn-sm btn-delete"
                                                 data-action="drop-table"
@@ -199,7 +209,11 @@
                             <tbody>
                                 [% FOREACH res IN result_only %]
                                 <tr>
-                                    <td>[% res.result_name | html %]</td>
+                                    <td>[% res.result_name | html %]
+                                        [% IF res.result_rel_path %]
+                                            <a href="#" onclick="openAI2EditorWindow('[% res.result_rel_path | html %]');return false" class="btn btn-sm btn-secondary" title="Edit result file in AI editor"><i class="fas fa-edit"></i> Edit</a>
+                                        [% END %]
+                                    </td>
                                     <td class="action-cell">
                                         <button class="btn btn-sm btn-primary"
                                                 data-action="create-table-from-result"

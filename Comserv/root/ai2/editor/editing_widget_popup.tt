@@ -132,8 +132,11 @@
         <!-- Main Editor Area -->
         <div class="editor-area" style="flex:1; display:flex; flex-direction:column;">
             <div class="editor-tabs" style="background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between;">
-                <span>editing_widget_popup.tt &nbsp; | &nbsp; AI2.pm</span>
-                <span id="file-status" style="font-size:11px;color:#888;"></span>
+                <span id="file-tab-label" style="font-size:12px;">[% IF file_to_load %][% file_to_load | html %][% ELSE %]No file loaded[% END %]</span>
+                <span style="display:flex;align-items:center;gap:8px;">
+                    <span id="file-status" style="font-size:11px;color:#888;"></span>
+                    <button id="save-btn" style="background:#0e639c;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;font-size:12px;display:none;">Save</button>
+                </span>
             </div>
             <div class="editor-content" style="flex:1; position:relative;">
                 <div id="ace-editor" style="width:100%;height:100%;"></div>
@@ -168,7 +171,104 @@
         <span id="last-modified" style="color:#a0d2ff;"></span>
     </div>
 
-    <!-- Scripts loaded centrally via js_load.tt when ai_popup_mode is active -->
-    [% INCLUDE js_load.tt %]
+    <!-- Scripts loaded centrally via js_load.tt -->
+        [% INCLUDE js_load.tt %]
+
+    [% IF file_to_load %]
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var filePath = '[% file_to_load | html %]';
+                var fileName = filePath.split('/').pop();
+                var editor = null;
+                var hasChanges = false;
+                var saveBtn = document.getElementById('save-btn');
+                var statusEl = document.getElementById('file-status');
+                var tabLabel = document.getElementById('file-tab-label');
+
+                function setStatus(msg, isError) {
+                    if (statusEl) {
+                        statusEl.textContent = msg;
+                        statusEl.style.color = isError ? '#f66' : '#888';
+                    }
+                }
+
+                function updateDirtyState() {
+                    if (!editor) return;
+                    hasChanges = true;
+                    if (saveBtn) saveBtn.style.display = 'inline-block';
+                    if (tabLabel) tabLabel.innerHTML = '<span style="color:#ff6;">●</span> ' + fileName;
+                    setStatus('Unsaved changes');
+                }
+
+                function tryLoad() {
+                    if (window.AI2EditorCore && typeof AI2EditorCore.loadFileContent === 'function') {
+                        AI2EditorCore.loadFileContent(filePath).then(function(data) {
+                            if (data && data.content !== undefined) {
+                                if (window.ace && ace.edit) {
+                                    editor = ace.edit('ace-editor');
+                                    editor.setValue(data.content, -1);
+                                    editor.clearSelection();
+                                    editor.session.on('change', function() {
+                                        if (!hasChanges) updateDirtyState();
+                                    });
+                                } else {
+                                    var el = document.getElementById('ace-editor');
+                                    if (el) el.textContent = data.content;
+                                }
+                                if (tabLabel) tabLabel.textContent = fileName;
+                                setStatus('Loaded');
+                            }
+                        }).catch(function(err) {
+                            console.error('[AI2] Failed to load file:', err);
+                            setStatus('Error loading: ' + filePath, true);
+                        });
+                    } else {
+                        setTimeout(tryLoad, 300);
+                    }
+                }
+
+                // Save button handler
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', function() {
+                        if (!editor) return;
+                        var content = editor.getValue();
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = 'Saving...';
+                        setStatus('Saving...');
+
+                        fetch('/ai2/save_file', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: filePath, content: content })
+                        })
+                        .then(function(res) { return res.json(); })
+                        .then(function(data) {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = 'Save';
+                            if (data.success) {
+                                hasChanges = false;
+                                saveBtn.style.display = 'none';
+                                if (tabLabel) tabLabel.textContent = fileName;
+                                setStatus('Saved');
+                            } else {
+                                var msg = 'Save failed: ' + (data.error || 'unknown error');
+                                if (data.detail) {
+                                    msg += ' — ' + data.detail.replace(/\n/g, ' | ');
+                                }
+                                setStatus(msg, true);
+                            }
+                        })
+                        .catch(function(err) {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = 'Save';
+                            setStatus('Save error: ' + err.message, true);
+                        });
+                    });
+                }
+
+                tryLoad();
+            });
+        </script>
+    [% END %]
 </body>
 </html>

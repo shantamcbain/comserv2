@@ -602,6 +602,8 @@ function setSidebar(open) {
 
 if (toggleSidebarBtn) {
     toggleSidebarBtn.addEventListener('click', function() { setSidebar(!sidebarOpen); });
+    // Load sidebar history on initial page load (sidebar starts open by default)
+    loadSidebarHistory();
 }
 
 // ── Sidebar flip (left/right) ─────────────────────────────────────────────────
@@ -673,6 +675,7 @@ if (_newChatSidebar) _newChatSidebar.addEventListener('click', function() {
 let _sidebarLoaded = false;
 function loadSidebarHistory() {
     const list = document.getElementById('sidebar-history-list');
+    if (!list) return;
     fetch('/ai/get_conversation_list', { credentials: 'include' })
         .then(r => r.json())
         .then(function(data) {

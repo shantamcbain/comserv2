@@ -5,6 +5,7 @@ use namespace::autoclean;
 
 use Try::Tiny;
 use JSON;
+use Comserv::Util::EditorFile;
 use DateTime;
 
 use Comserv::Util::Logging;
@@ -71,6 +72,9 @@ sub editing_widget_popup :Local :Args(0) {
     my $current_branch = 'main';
     @$branches = sort { $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b } @$branches;
 
+    # Accept optional file path to load on open
+    my $file_to_load = $c->req->param('file') || '';
+
     $c->stash(
         template            => 'ai2/editor/editing_widget_popup.tt',
         selected_model      => $selected_model,
@@ -79,6 +83,7 @@ sub editing_widget_popup :Local :Args(0) {
         no_wrapper          => 1,
         ai_popup_mode       => 1,   # triggers conditional loading of ai2editor/*.js in js_load.tt
         show_ai2_editor     => 1,
+        file_to_load        => $file_to_load,
     );
     # Catalyst will render the fragment into the dialog
 }
@@ -99,30 +104,18 @@ sub load_file :Local :Args(0) {
     my ($self, $c) = @_;
 
     my $rel_path = $c->req->param('path') || '';
-    my $root     = $c->path_to('');
-    my $full     = $root->file($rel_path)->absolute;
+    my $ef       = Comserv::Util::EditorFile->new($c);
+    my $result   = $ef->read_file($c, $rel_path);
 
-    # Security: must be inside project root
-    unless ($full =~ /^\Q$root\E/) {
-        $c->res->status(403);
-        $c->res->body('Forbidden');
+    if ($result->{error}) {
+        my $status = $result->{error} eq 'Forbidden' ? 403 : 404;
+        $c->res->status($status);
+        $c->res->body($result->{error});
         return;
     }
-    unless (-e $full) {
-        $c->res->status(404);
-        $c->res->body('Not found');
-        return;
-    }
-
-    my $content = $full->slurp;
-    my $mtime   = (stat($full))[9];
 
     $c->res->content_type('application/json');
-    $c->res->body(encode_json({
-        path    => "$full",
-        content => $content,
-        mtime   => $mtime,
-    }));
+    $c->res->body(encode_json($result));
 }
 
 # GET /ai2/file_checksum?path=...
@@ -151,6 +144,45 @@ sub file_checksum :Local :Args(0) {
         path  => "$full",
         mtime => $mtime,
     }));
+}
+
+# -------------------------------------------------------------------
+# Secure file saving for the AI2 editor
+# -------------------------------------------------------------------
+
+# POST /ai2/save_file
+sub save_file :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+
+    my $body;
+    try {
+        my $body_fh = $c->req->body;
+        my $json_text = $body_fh ? do { local $/; <$body_fh> } : '';
+        $body = decode_json($json_text || '{}');
+    } catch {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid JSON' }));
+        return;
+    };
+
+    my $rel_path = $body->{path} || '';
+    my $content  = $body->{content};
+
+    my $ef     = Comserv::Util::EditorFile->new($c);
+    my $result = $ef->write_file($c, $rel_path, $content);
+
+    if ($result->{success}) {
+        $c->res->body(encode_json($result));
+    } else {
+        my $status = $result->{error} eq 'Forbidden' ? 403
+                   : $result->{error} eq 'Syntax error' ? 422
+                   : $result->{error} eq 'No content provided' ? 400
+                   : 500;
+        $c->res->status($status);
+        $c->res->body(encode_json($result));
+    }
 }
 
 __PACKAGE__->meta->make_immutable;
