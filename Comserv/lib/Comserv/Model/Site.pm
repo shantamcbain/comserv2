@@ -167,15 +167,16 @@ sub get_site_domain {
 
     return unless defined $domain;
 
-    # Dev workstation: LAN + ZeroTier IPs map to workstation.local (same sitedomain row).
+    # Dev workstation: LAN + ZeroTier IPs map to workstation.local — not in SiteDomain table,
+    # so short-circuit immediately (same as localhost).
     if ($domain =~ /^(?:192\.168\.1\.199|172\.30\.131\.126)$/) {
-        my $alias = $self->schema->resultset('SiteDomain')->find({ domain => 'workstation.local' });
-        return $alias if $alias;
+        return;
     }
 
     # Short-circuit for loopback/internal addresses — these are never in the SiteDomain
     # table and hitting the DB for every Docker health check causes 15s timeout errors.
-    if ($domain =~ /^(localhost|127\.\d+\.\d+\.\d+|::1)(?::\d+)?$/) {
+    # Also covers workstation.local (local dev hostname never in the DB).
+    if ($domain =~ /^(localhost|127\.\d+\.\d+\.\d+|::1|workstation\.local)(?::\d+)?$/) {
         return;
     }
 

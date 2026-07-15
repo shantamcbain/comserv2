@@ -312,12 +312,12 @@ sub test_connection {
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
 
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=2";
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=10";
     }
     
     # Fork a child to test the DBI connection so we can SIGKILL it after a timeout.
     # alarm() cannot interrupt C-level DBI blocking calls; fork+kill can.
-    my $timeout = 3;
+    my $timeout = 12;
     my $pid = fork();
     unless (defined $pid) {
         $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
@@ -332,7 +332,7 @@ sub test_connection {
                 RaiseError => 1,
                 PrintError => 0,
                 AutoCommit => 1,
-                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 2) : ()),
+                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 10) : ()),
             );
             my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
             $dbh->disconnect() if $dbh;
@@ -370,11 +370,11 @@ sub test_connection {
 }
 
 sub select_connection {
-    my ($self, $database_name) = @_;
-    
+    my ($self, $database_name, $sitename) = @_;
+
     $self->_load_config();
     my $config = $self->config;
-    
+
     my @matching_connections = grep {
         my $conn = $config->{$_};
         $conn && ref $conn eq 'HASH' &&
@@ -385,13 +385,51 @@ sub select_connection {
     @matching_connections = sort {
         ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
     } @matching_connections;
-    
+
+    # Apply site-based filtering when a sitename is provided
+    if ($sitename) {
+        require Comserv::Config::Sites;
+        my $site_cfg = Comserv::Config::Sites::get_site_db_connection($sitename);
+        if ($site_cfg) {
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
+                "Site '$sitename' config: db_name=$site_cfg->{db_name}, " .
+                "preferred_hosts=[" . join(',', @{$site_cfg->{preferred_hosts} || []}) . "], " .
+                "server_group=" . ($site_cfg->{server_group} || 'none'));
+
+            # Filter by server_group if set
+            if ($site_cfg->{server_group}) {
+                my $sg = $site_cfg->{server_group};
+                @matching_connections = grep {
+                    my $conn_sg = $config->{$_}{server_group} // '';
+                    $conn_sg eq $sg
+                } @matching_connections;
+            }
+
+            # Filter by preferred_hosts if set
+            if ($site_cfg->{preferred_hosts} && @{$site_cfg->{preferred_hosts}}) {
+                my %preferred = map { $_ => 1 } @{$site_cfg->{preferred_hosts}};
+                @matching_connections = grep {
+                    my $host = $config->{$_}{host} // '';
+                    $preferred{$host}
+                } @matching_connections;
+            }
+
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
+                "After site filtering for '$sitename': " . scalar(@matching_connections) . " candidates remain: " .
+                join(', ', @matching_connections));
+        } else {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
+                "Site '$sitename' not found in site configuration — testing all candidates unfiltered");
+        }
+    }
+
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
-        "RemoteDB Connection Selection for '$database_name' - candidates: " .
+        "RemoteDB Connection Selection for '$database_name'" .
+        ($sitename ? " (site: $sitename)" : '') . " - candidates: " .
         join(', ', map { "$_ (p" . ($config->{$_}{priority}//999) . ")" } @matching_connections));
 
-    my @failed_attempts;
-    
+    # Filter out invalid/placeholder configs before testing
+    my @candidates;
     foreach my $conn_name (@matching_connections) {
         my $conn = $config->{$conn_name};
         my $host = $conn->{host} || 'N/A';
@@ -399,7 +437,7 @@ sub select_connection {
 
         my $skip = 0;
         my $skip_reason = '';
-        
+
         if (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|sqlite|mariadb)$/i) {
             $skip = 1;
             $skip_reason = "Invalid db_type";
@@ -412,7 +450,7 @@ sub select_connection {
             $skip = 1;
             $skip_reason = "Database name is placeholder or missing";
         }
-        
+
         if ($skip) {
             my $priority = $conn->{priority} // 999;
             $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
@@ -420,49 +458,161 @@ sub select_connection {
             next;
         }
 
-        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
-            "Attempting Priority " . ($conn->{priority} // 999) . " ($conn_name): $host:$port");
-        
-        if ($self->test_connection($conn_name)) {
-            my $connection_info = {
-                connection_name => $conn_name,
-                config => $conn,
-                database_name => $database_name,
-            };
-            
-            $self->selected_connection->{$database_name} = $connection_info;
-            
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-                "SUCCESS: Selected connection '$conn_name' (Priority " . ($conn->{priority} // 999) . ") for database '$database_name'");
-            
-            return $connection_info;
-        } else {
-            push @failed_attempts, {
-                connection_name => $conn_name,
-                priority => $conn->{priority} // 999,
-                reason => "Connection test failed"
-            };
-        }
+        push @candidates, $conn_name;
     }
 
-    my $error_msg = "Failed to find working connection for database '$database_name'. Attempted:\n";
-    foreach my $attempt (@failed_attempts) {
-        $error_msg .= "  Priority " . $attempt->{priority} . " ($attempt->{connection_name}): $attempt->{reason}\n";
+    if (!@candidates) {
+        my $error_msg = "No valid connection candidates for database '$database_name'" .
+            ($sitename ? " (site: $sitename)" : '') . " — all candidates were skipped or filtered out";
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'select_connection', $error_msg);
+        die $error_msg;
     }
-    $error_msg .= "No valid connections available for '$database_name'";
-    
+
+    # Race all candidates in parallel via fork
+    my $winner = $self->_parallel_test_connections(\@candidates, $database_name);
+
+    if ($winner) {
+        my $conn = $config->{$winner};
+        my $connection_info = {
+            connection_name => $winner,
+            config => $conn,
+            database_name => $database_name,
+        };
+
+        $self->selected_connection->{$database_name} = $connection_info;
+
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+            "SUCCESS: Selected connection '$winner' (Priority " . ($conn->{priority} // 999) .
+            ") for database '$database_name'" .
+            ($sitename ? " (site: $sitename)" : ''));
+
+        return $connection_info;
+    }
+
+    my $error_msg = "Failed to find working connection for database '$database_name'" .
+        ($sitename ? " (site: $sitename)" : '') . ". Tested: " . join(', ', @candidates);
     $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'select_connection', $error_msg);
     die $error_msg;
 }
 
 sub get_connection_info {
-    my ($self, $database_name) = @_;
-    
+    my ($self, $database_name, $sitename) = @_;
+
     if (exists $self->selected_connection->{$database_name}) {
         return $self->selected_connection->{$database_name};
     }
-    
-    return $self->select_connection($database_name);
+
+    return $self->select_connection($database_name, $sitename);
+}
+
+sub _parallel_test_connections {
+    my ($self, $candidates, $database_name) = @_;
+
+    my $config = $self->config;
+    my $timeout = 12;
+
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
+        "Parallel testing " . scalar(@$candidates) . " candidates for '$database_name': " .
+        join(', ', @$candidates));
+
+    my %children = ();
+
+    # Fork a child for each candidate — all at once
+    foreach my $conn_name (@$candidates) {
+        my $conn = $config->{$conn_name};
+        my $db_type = $conn->{db_type} // 'mysql';
+
+        my $dsn;
+        my $username = $conn->{username} // '';
+        my $password = $conn->{password} // '';
+
+        if ($db_type eq 'sqlite') {
+            $dsn = "dbi:SQLite:dbname=" . $conn->{database_path};
+        } else {
+            my $host = $conn->{host} // 'localhost';
+            my $port = $conn->{port} // 3306;
+            my $database = $conn->{database} // '';
+            $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=10";
+        }
+
+        my $pid = fork();
+        unless (defined $pid) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_parallel_test_connections',
+                "fork() failed for '$conn_name': $! — skipping this candidate");
+            next;
+        }
+
+        if ($pid == 0) {
+            # Child process: attempt DBI connect, exit 0 on success, exit 1 on failure.
+            eval {
+                my %connect_attrs = (
+                    RaiseError => 1,
+                    PrintError => 0,
+                    AutoCommit => 1,
+                    ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 10) : ()),
+                );
+                my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
+                $dbh->disconnect() if $dbh;
+            };
+            exit($@ ? 1 : 0);
+        }
+
+        $children{$pid} = $conn_name;
+
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
+            "Forked child PID $pid for '$conn_name' ($db_type)");
+    }
+
+    return undef unless keys %children;
+
+    # Parent: collect results, return first success
+    my $winner = undef;
+    my $start = time();
+
+    while (keys %children) {
+        my $kid = waitpid(-1, POSIX::WNOHANG());
+        if ($kid > 0) {
+            my $conn_name = delete $children{$kid};
+            my $exit_ok = ($? == 0);
+
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
+                "Child PID $kid for '$conn_name' exited with " . ($exit_ok ? 'SUCCESS' : 'FAILURE'));
+
+            if ($exit_ok && !$winner) {
+                $winner = $conn_name;
+                last;
+            }
+        }
+
+        if (time() - $start >= $timeout) {
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
+                "Parallel test timed out after ${timeout}s — " . scalar(keys %children) . " children still running");
+            last;
+        }
+
+        select(undef, undef, undef, 0.1);
+    }
+
+    # Kill any remaining children (SIGKILL) after winner found or timeout
+    if (keys %children) {
+        foreach my $pid (keys %children) {
+            my $name = $children{$pid};
+            kill 'KILL', $pid;
+            waitpid($pid, POSIX::WNOHANG());
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
+                "Killed remaining child PID $pid for '$name'");
+        }
+    }
+
+    if ($winner) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
+            "Winner: '$winner' for database '$database_name'");
+    } else {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
+            "No successful connection found for '$database_name' among " . scalar(@$candidates) . " candidates");
+    }
+
+    return $winner;
 }
 
 sub get_user_preferred_connection {

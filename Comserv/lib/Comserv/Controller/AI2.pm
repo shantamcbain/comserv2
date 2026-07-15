@@ -6,6 +6,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use DateTime;
+use File::Copy qw(copy);
 
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
@@ -61,6 +62,9 @@ sub editing_widget_popup :Local :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'ai2_editing_widget_popup', "AI2 code editor popup opened");
 
+    # Accept optional file= query param to pre-load a file
+    my $file_to_load = $c->req->param('file') || '';
+
     my $router = eval { $c->model('AI2::Router') } || undef;
 
     my $selected_model = $router ? $router->select_best_model($c) : 'grok-beta';
@@ -79,6 +83,7 @@ sub editing_widget_popup :Local :Args(0) {
         no_wrapper          => 1,
         ai_popup_mode       => 1,   # triggers conditional loading of ai2editor/*.js in js_load.tt
         show_ai2_editor     => 1,
+        file_to_load        => $file_to_load,
     );
     # Catalyst will render the fragment into the dialog
 }
@@ -151,6 +156,69 @@ sub file_checksum :Local :Args(0) {
         path  => "$full",
         mtime => $mtime,
     }));
+}
+
+# POST /ai2/save_file — saves file content with syntax check and backup
+sub save_file :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+
+    # Read JSON body
+    my $body = {};
+    try {
+        my $body_fh = $c->req->body;
+        my $json_text = $body_fh ? do { local $/; <$body_fh> } : '';
+        $body = decode_json($json_text || '{}');
+    } catch {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid JSON' }));
+        return;
+    };
+
+    my $rel_path = $body->{path} || '';
+    my $content  = $body->{content};
+    my $root     = $c->path_to('');
+    my $full     = $root->file($rel_path)->absolute;
+
+    # Security: must be inside project root
+    unless ($full =~ /^\Q$root\E/) {
+        $c->res->status(403);
+        $c->res->body(encode_json({ success => 0, error => 'Forbidden' }));
+        return;
+    }
+
+    # Backup existing file (rotate: one .bak kept)
+    if (-f $full) {
+        my $bak = "$full.bak";
+        unlink $bak if -f $bak;
+        eval { copy($full, $bak); 1; };
+    }
+
+    # Validate Perl syntax before writing .pm/.pl files
+    if ($rel_path =~ /\.(pm|pl)$/i) {
+        require File::Temp;
+        my ($tmp_fh, $tmp_path) = File::Temp::tempfile(SUFFIX => '.pl', UNLINK => 1);
+        print $tmp_fh $content;
+        close $tmp_fh;
+
+        my $validate = `perl -c -I "$root/lib" "$tmp_path" 2>&1`;
+        if ($? != 0) {
+            $c->res->status(422);
+            $c->res->body(encode_json({
+                success => 0, error => 'Syntax error', detail => $validate,
+                hint => 'Fix the syntax errors and try saving again. Backup saved as .bak'
+            }));
+            return;
+        }
+    }
+
+    open my $fh, '>:utf8', $full or die "open: $!";
+    print $fh $content;
+    close $fh;
+
+    my $mtime = (stat($full))[9];
+    $c->res->body(encode_json({ success => 1, path => "$full", mtime => $mtime }));
 }
 
 __PACKAGE__->meta->make_immutable;

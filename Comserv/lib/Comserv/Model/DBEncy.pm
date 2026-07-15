@@ -38,7 +38,7 @@ sub COMPONENT {
     # Use RemoteDB to select the best connection for 'ency' database
     my $connection_info;
     eval {
-        $connection_info = $remote_db->get_connection_info('ency');
+        $connection_info = $remote_db->get_connection_info('ency', 'CSC');
     };
 
     # Fallback to SQLite if primary connections fail

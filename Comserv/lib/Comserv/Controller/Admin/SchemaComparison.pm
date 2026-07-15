@@ -58,6 +58,20 @@ sub database_env {
     return Comserv::Util::DatabaseEnv->new();
 }
 
+# Map database name to schema type ('ency' or 'forager')
+# Accepts actual database names like 'ency_production', 'forager_production', 'ency', 'forager', etc.
+sub _resolve_schema_name {
+    my ($self, $database) = @_;
+    return 'forager' if lc($database // '') =~ /forager/;
+    return 'ency';
+}
+
+# Map schema name to Catalyst model name
+sub _schema_to_model_name {
+    my ($self, $schema_name) = @_;
+    return $schema_name eq 'forager' ? 'DBForager' : 'DBEncy';
+}
+
 sub _write_result_file_safe {
     my ($self, $result_file_path, $content) = @_;
     my $tmpfile = $result_file_path . '.syntaxcheck.tmp';
@@ -209,9 +223,10 @@ sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_res
     
     try {
         my $table_schema;
-        if ($database eq 'ency') {
+        my $schema_name = $self->_resolve_schema_name($database);
+        if ($schema_name eq 'ency') {
             $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
+        } elsif ($schema_name eq 'forager') {
             $table_schema = $self->get_forager_table_schema($c, $table_name);
         }
         
@@ -287,9 +302,10 @@ sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_tabl
         my $pk_list = join(', ', @$pks);
         
         my $dbh;
-        if ($database eq 'ency') {
+        my $schema_name = $self->_resolve_schema_name($database);
+        if ($schema_name eq 'ency') {
             $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
+        } elsif ($schema_name eq 'forager') {
             $dbh = $c->model('DBForager')->schema->storage->dbh;
         }
         
@@ -351,9 +367,10 @@ sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constr
         my $cols_list = join(', ', @{$constraint->{columns}});
         
         my $dbh;
-        if ($database eq 'ency') {
+        my $schema_name = $self->_resolve_schema_name($database);
+        if ($schema_name eq 'ency') {
             $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
+        } elsif ($schema_name eq 'forager') {
             $dbh = $c->model('DBForager')->schema->storage->dbh;
         }
         
@@ -404,9 +421,10 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
     
     try {
         my $table_schema;
-        if ($database eq 'ency') {
+        my $schema_name = $self->_resolve_schema_name($database);
+        if ($schema_name eq 'ency') {
             $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
+        } elsif ($schema_name eq 'forager') {
             $table_schema = $self->get_forager_table_schema($c, $table_name);
         }
         
@@ -671,9 +689,10 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     
     try {
         my $table_schema;
-        if ($database eq 'ency') {
+        my $schema_name = $self->_resolve_schema_name($database);
+        if ($schema_name eq 'ency') {
             $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
+        } elsif ($schema_name eq 'forager') {
             $table_schema = $self->get_forager_table_schema($c, $table_name);
         } else {
             die "Invalid database: $database";
@@ -788,7 +807,8 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         # Load the Result class dynamically
         # result_name may contain '/' from scan_result_directory_recursive (subdir prefix);
         # convert to '::' so the eval'd require is valid Perl
-        my $namespace  = $database eq 'ency' ? 'Ency' : 'Forager';
+        my $schema_name = $self->_resolve_schema_name($database);
+        my $namespace  = $schema_name eq 'forager' ? 'Forager' : 'Ency';
         (my $result_path = $result_name) =~ s{/}{::}g;
         my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_path}";
 
@@ -799,9 +819,10 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
 
         # Get the schema / DBH
         my $schema;
-        if ($database eq 'ency') {
+        my $schema_name = $self->_resolve_schema_name($database);
+        if ($schema_name eq 'ency') {
             $schema = $c->model('DBEncy')->schema;
-        } elsif ($database eq 'forager') {
+        } elsif ($schema_name eq 'forager') {
             $schema = $c->model('DBForager')->schema;
         } else {
             die "Invalid database: $database";
@@ -1028,7 +1049,7 @@ sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') 
     }
 
     try {
-        my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
+        my $model_name = $self->_schema_to_model_name($self->_resolve_schema_name($database));
         my $dbh = $c->model($model_name)->schema->storage->dbh;
 
         my $sql = "ALTER TABLE `$table_name` DROP COLUMN `$field_name`";
@@ -1053,7 +1074,8 @@ sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') 
 sub get_table_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
     
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
+    my $schema_name = $self->_resolve_schema_name($database);
+    my $model_name = $self->_schema_to_model_name($schema_name);
     my $dbh = $c->model($model_name)->schema->storage->dbh;
     
     my $sth = $dbh->prepare("DESCRIBE $table_name $field_name");
@@ -1093,7 +1115,8 @@ sub get_table_field_info {
 sub get_result_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
     
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
+    my $schema_name = $self->_resolve_schema_name($database);
+    my $model_name = $self->_schema_to_model_name($schema_name);
     my $schema = $c->model($model_name)->schema;
     
     # Find the source that matches the table name
@@ -1243,9 +1266,10 @@ sub update_table_field_from_result {
     $extra = "AUTO_INCREMENT" if $result_field_info->{is_auto_increment};
     
     my $dbh;
-    if ($database eq 'ency') {
+    my $schema_name = $self->_resolve_schema_name($database);
+    if ($schema_name eq 'ency') {
         $dbh = $c->model('DBEncy')->schema->storage->dbh;
-    } elsif ($database eq 'forager') {
+    } elsif ($schema_name eq 'forager') {
         $dbh = $c->model('DBForager')->schema->storage->dbh;
     } else {
         die "Invalid database: $database";
@@ -2081,6 +2105,42 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     foreach my $ip (@target_ips) {
         my @conns_for_ip = grep { ($all_conns->{$_}{config}{host} // '') eq $ip } @primary_conns;
         my $db_count = scalar(@conns_for_ip);
+        my $initial_status = 'unknown';
+        my $initial_table_count = 0;
+        my $initial_running = 0;
+
+        # Do a quick live check on each connection for this IP
+        foreach my $c_name (@conns_for_ip) {
+            my $dbh = eval { $remote_db->get_connection(undef, $c_name) };
+            if ($dbh) {
+                $initial_running = 1;
+                $initial_status = 'active';
+                eval {
+                    my $db_name = $all_conns->{$c_name}{config}{database} // $c_name;
+                    my $sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ?");
+                    $sth->execute($db_name);
+                    my ($cnt) = $sth->fetchrow_array;
+                    $initial_table_count += $cnt || 0;
+                    $sth->finish;
+                };
+                $dbh->disconnect;
+            }
+        }
+        # If no connections succeeded, try a quick TCP socket check
+        if (!$initial_running) {
+            eval {
+                require IO::Socket::INET;
+                my $sock = IO::Socket::INET->new(
+                    PeerHost => $ip,
+                    PeerPort => 3306,
+                    Timeout  => 2,
+                );
+                if ($sock) {
+                    $initial_status = 'offline (no DB access)';
+                    close($sock);
+                }
+            };
+        }
 
         my %type_count;
         foreach my $c (@conns_for_ip) {
@@ -2088,23 +2148,16 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
             $type_count{$t}++;
         }
         my $type_display = join(', ', map { ucfirst($_) . ": $type_count{$_}" } sort keys %type_count);
-
-        # Safe cached status only (no live connect on normal page load)
-        our %SERVER_STATUS_CACHE;
-        my $status = $SERVER_STATUS_CACHE{$ip} || {
-            running     => 0,
-            table_count => 0,
-            status      => 'unknown',
-        };
+        my $status = $initial_running ? 'active' : 'unknown';
 
         push @servers, {
             name         => $ip,
             ip           => $ip,
             db_count     => $db_count,
             type_display => $type_display,
-            running      => $status->{running},
-            table_count  => $status->{table_count},
-            status       => $status->{status},
+            running      => $initial_running,
+            table_count  => $initial_table_count,
+            status       => $status,
         };
     }
 
@@ -2354,12 +2407,179 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
 
 sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
     my ($self, $c, $server_ip, undef, $db_name, undef, $table_name) = @_;
+
+    my @fields = ();
+
+    # Connect to the remote database to get the table schema
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->new();
+    $remote_db->config({});
+    my $all_conns = $remote_db->get_all_connections();
+
+    my ($conn_name) = grep {
+        my $cfg = $all_conns->{$_}{config};
+        ($cfg->{host} // '') eq $server_ip &&
+        (($cfg->{database} // $_) eq $db_name)
+    } keys %$all_conns;
+
+    my $table_schema = { columns => {}, primary_keys => [], unique_constraints => [], foreign_keys => [] };
+    my $db_connected = 0;
+
+    if ($conn_name) {
+        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+        if ($dbh) {
+            $db_connected = 1;
+            eval {
+                my $sth = $dbh->prepare("DESCRIBE `$table_name`");
+                $sth->execute();
+                while (my $row = $sth->fetchrow_hashref()) {
+                    my $col = $row->{Field};
+                    $table_schema->{columns}->{$col} = {
+                        data_type         => $row->{Type},
+                        is_nullable       => ($row->{Null} eq 'YES' ? 1 : 0),
+                        default_value     => $row->{Default},
+                        is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                        extra             => $row->{Extra},
+                        size              => undef,
+                        comment           => '',
+                    };
+                    if ($row->{Key} eq 'PRI') {
+                        push @{$table_schema->{primary_keys}}, $col;
+                    }
+                }
+                $sth->finish;
+            };
+            $dbh->disconnect;
+        }
+    }
+
+    # Determine which Result schema to use
+    my $result_schema_name = lc($db_name) =~ /forager/ ? 'forager' : 'ency';
+
+    # Find Result file for this table
+    my $result_file_path;
+    my $result_name;
+    my $result_schema = { columns => {}, primary_keys => [], unique_constraints => [], relationships => {}, table_name => undef };
+
+    eval {
+        require Comserv::Util::Schema::ResultParser;
+        my $parser = Comserv::Util::Schema::ResultParser->new();
+        my $result_mapping = $parser->build_result_table_mapping($result_schema_name, $c);
+        my $table_key = lc($table_name);
+        if (exists $result_mapping->{$table_key}) {
+            $result_file_path = $result_mapping->{$table_key}->{result_path};
+            $result_name      = $result_mapping->{$table_key}->{result_name};
+            if ($result_file_path && -f $result_file_path) {
+                $result_schema = $parser->get_result_file_schema($result_file_path);
+            }
+        }
+    };
+
+    # Build the field comparison array for the template
+    my %all_field_names;
+    foreach my $fn (keys %{$table_schema->{columns}})    { $all_field_names{$fn} = 1; }
+    foreach my $fn (keys %{$result_schema->{columns}})   { $all_field_names{$fn} = 1; }
+
+    foreach my $fname (sort keys %all_field_names) {
+        my $tcol = $table_schema->{columns}->{$fname};
+        my $rcol = $result_schema->{columns}->{$fname};
+
+        my $in_table  = $tcol ? 1 : 0;
+        my $in_result = $rcol ? 1 : 0;
+
+        # Compare actual definitions to determine status
+        my $table_def_type  = $tcol ? ($tcol->{data_type} // '') : '';
+        my $result_def_type = $rcol ? ($rcol->{data_type} // $rcol->{type} // '') : '';
+
+        # Normalize for comparison: strip size/params, lowercase
+        my $normalize_type = sub {
+            my $t = shift;
+            $t =~ s/\(.*?\)//g;          # strip (11), (255), etc.
+            $t =~ s/\s+/ /g;
+            $t =~ s/^\s+|\s+$//g;
+            $t = lc($t);
+            # Map MySQL aliases to logical types
+            $t =~ s/\bint\b/integer/;
+            $t =~ s/\bdecimal\b/numeric/;
+            $t =~ s/\bdouble\b/float/;
+            return $t;
+        };
+
+        my $table_normalized  = &$normalize_type($table_def_type);
+        my $result_normalized = &$normalize_type($result_def_type);
+
+        my $defs_match = 0;
+        if ($in_table && $in_result) {
+            $defs_match = ($table_normalized eq $result_normalized) ? 1 : 0;
+        }
+
+        my $status;
+        my $row_class = '';
+        if ($in_table && $in_result && $defs_match) {
+            $status    = 'Match';
+            $row_class = '';
+        } elsif ($in_table && $in_result) {
+            $status    = 'Update needed';
+            $row_class = 'row-diff';
+        } elsif ($in_table && !$in_result) {
+            $status    = 'Table only';
+            $row_class = 'row-table-only';
+        } else {
+            $status    = 'Result only';
+            $row_class = 'row-result-only';
+        }
+
+        # Build the table-side definition string (e.g. "int(11) NOT NULL AUTO_INCREMENT")
+        my $table_def  = '';
+        my $result_def = '';
+
+        if ($tcol) {
+            $table_def = $tcol->{data_type} // '';
+            $table_def .= ' NOT NULL' unless $tcol->{is_nullable};
+            $table_def .= ' NULL' if $tcol->{is_nullable};
+            $table_def .= ' DEFAULT ' . (defined $tcol->{default_value} ? $tcol->{default_value} : 'NULL')
+                if defined $tcol->{default_value};
+            $table_def .= ' ' . ($tcol->{extra} // '') if $tcol->{extra};
+            $table_def =~ s/\s+/ /g;
+            $table_def =~ s/^\s+|\s+$//g;
+        }
+
+        if ($rcol) {
+            # Build a compact definition from the Result file column info
+            my $rdt = $rcol->{data_type} // $rcol->{type} // '';
+            my $rsize = $rcol->{size};
+            $result_def = $rdt;
+            $result_def .= "($rsize)" if defined $rsize && $rsize ne '';
+            $result_def .= ' NOT NULL' unless $rcol->{is_nullable};
+            $result_def .= ' NULL' if $rcol->{is_nullable};
+            if (defined $rcol->{default_value}) {
+                $result_def .= ' DEFAULT ' . $rcol->{default_value};
+            }
+            $result_def .= ' AUTO_INCREMENT' if $rcol->{is_auto_increment};
+            $result_def =~ s/\s+/ /g;
+            $result_def =~ s/^\s+|\s+$//g;
+        }
+
+        push @fields, {
+            name        => $fname,
+            in_table    => $in_table,
+            in_result   => $in_result,
+            table_def   => $table_def,
+            result_def  => $result_def,
+            status      => $status,
+            row_class   => $row_class,
+        };
+    }
+
     $c->stash(
         template => 'admin/schema_compare/fields.tt',
         server   => { name => $server_ip },
         db       => { name => $db_name },
         table    => { name => $table_name },
-        fields   => [],
+        fields   => \@fields,
+        db_connected => $db_connected,
+        has_result_file => ($result_file_path ? 1 : 0),
+        result_name => $result_name,
     );
 }
 

@@ -110,7 +110,7 @@
 [% END %]
 
 <!-- Admin Dashboard JS -->
-[% IF c.request.uri.match('^/admin') %]
+[% IF c.request.uri.match('/admin') %]
 <script src="/static/js/admin-dashboard.js?v=[% cv %]" defer></script>
 [% END %]
 

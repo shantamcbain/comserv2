@@ -240,12 +240,9 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         }
         my $compose_args = join(' ', @compose_files);
 
-        push @lines, "[${\scalar localtime}] === git pull ===";
-        my $git_out  = `cd '$repo_path' && git pull 2>&1`;
-        my $git_exit = $? >> 8;
-        push @lines, $git_out;
-        push @lines, "git pull exited with code $git_exit" if $git_exit;
-        $success = 0 if $git_exit;
+        # NOTE: git pull is NOT done here for local deploys — the user is testing local
+        # code changes before merging. The git pull is handled in the production deploy
+        # path via docker-deploy.sh (deploy_to_server).
 
         # === Step: Create dated backup via Model (Catalyst norm) ===
         push @lines, "[${\scalar localtime}] === Creating dated backup of $container ===";

@@ -1,5 +1,6 @@
 .git
 .gitignore
+db_config.json
 .github
 .env
 .env.local

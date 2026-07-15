@@ -28,7 +28,7 @@ sub _get_schema {
     require Comserv::Model::Schema::Ency;
 
     my $remote_db = Comserv::Model::RemoteDB->new();
-    my $connection_info = $remote_db->get_connection_info('ency');
+    my $connection_info = $remote_db->get_connection_info('ency', 'CSC');
 
     die "Weather: Cannot get ency database connection from RemoteDB\n"
         unless $connection_info;

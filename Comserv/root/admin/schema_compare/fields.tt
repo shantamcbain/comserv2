@@ -39,7 +39,7 @@
                     </thead>
                     <tbody>
                         [% FOREACH field IN fields %]
-                        <tr data-field="[% field.name | html %]">
+                        <tr data-field="[% field.name | html %]"[% IF field.row_class %] class="[% field.row_class | html %]"[% END %]>
                             <td><strong>[% field.name | html %]</strong></td>
                             <td>
                                 [% IF field.in_table %]
@@ -56,9 +56,11 @@
                                 [% END %]
                             </td>
                             <td>
-                                [% IF field.in_table && field.in_result %]
+                                [% IF field.status == 'Match' %]
                                     <span class="status-badge synchronized">Match</span>
-                                [% ELSIF field.in_table %]
+                                [% ELSIF field.status == 'Update needed' %]
+                                    <span class="status-badge needs-update">Update needed</span>
+                                [% ELSIF field.status == 'Table only' %]
                                     <span class="status-badge table-only">Table only</span>
                                 [% ELSE %]
                                     <span class="status-badge result-only">Result only</span>
@@ -87,9 +89,21 @@
                 </table>
             </div>
             [% ELSE %]
+            [% IF !db_connected %]
+            <div class="empty-state" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 2rem; text-align: center;">
+                <p><strong>Could not connect to database server</strong></p>
+                <p style="color: #666; margin-top: 0.5rem;">Unable to connect to [% server.name | html %] / [% db.name | html %]. The server may be offline or unreachable.</p>
+                <p style="margin-top: 0.5rem;"><a href="[% c.uri_for('/admin/schema_compare/server') %]/[% server.name | uri %]/db/[% db.name | uri %]">← Back to Tables</a></p>
+            </div>
+            [% ELSIF db_connected && !has_result_file %]
+            <div class="empty-state">
+                <p>Connected to database, but no Result file found for table <strong>[% table.name | html %]</strong>.</p>
+            </div>
+            [% ELSE %]
             <div class="empty-state">
                 <p>No field comparison data available.</p>
             </div>
+            [% END %]
             [% END %]
         </div>
     </div>
@@ -103,19 +117,87 @@
 
 <script>
 function addFieldToTable(fieldName, tableName) {
-    console.log('Add field to table:', fieldName, tableName);
-    // TODO: wire to controller endpoint
+    var dbName = '[% db.name | html %]';
+    if (!confirm('Add field "' + fieldName + '" to table "' + tableName + '" from result file?')) return;
+    fetch('/schema-comparison/sync_result_to_table', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: dbName,
+            database_environment: 'development',
+            allow_production: 1,
+            confirmed: true
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('Done: ' + (data.message || 'Field added to table'));
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(function(err) {
+        alert('Request failed: ' + err.message);
+    });
 }
 
 function addFieldToResult(fieldName, tableName) {
-    console.log('Add field to result:', fieldName, tableName);
-    // TODO: wire to controller endpoint
+    var dbName = '[% db.name | html %]';
+    if (!confirm('Add field "' + fieldName + '" to result file from table "' + tableName + '"?')) return;
+    fetch('/schema-comparison/sync_table_to_result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: dbName,
+            database_environment: 'development',
+            allow_production: 1,
+            confirmed: true
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('Done: ' + (data.message || 'Field added to result'));
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(function(err) {
+        alert('Request failed: ' + err.message);
+    });
 }
 
 function dropColumn(fieldName, tableName) {
-    if (confirm('Drop column ' + fieldName + ' from ' + tableName + '?')) {
-        console.log('Drop column:', fieldName, tableName);
-        // TODO: wire to controller endpoint
-    }
+    var dbName = '[% db.name | html %]';
+    if (!confirm('Drop column "' + fieldName + '" from table "' + tableName + '"?')) return;
+    fetch('/schema-comparison/remove_field_from_table', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: dbName,
+            confirmed: true
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('Done: ' + (data.message || 'Column dropped'));
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(function(err) {
+        alert('Request failed: ' + err.message);
+    });
 }
 </script>

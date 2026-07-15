@@ -116,6 +116,7 @@
                                     <td>[% table.size %]</td>
                                     <td>[% table.result_name | html %]</td>
                                     <td class="action-cell">
+                                        <button class="btn btn-sm btn-secondary" onclick="editResultFile('[% table.result_name | html %]'); event.stopPropagation();"><i class="fas fa-edit"></i> Edit</button>
                                         <button class="btn btn-sm btn-delete" onclick="dropTable('[% table.name | html %]', '[% db.name | html %]'); event.stopPropagation();"><i class="fas fa-trash"></i> Drop</button>
                                     </td>
                                 </tr>
@@ -190,6 +191,7 @@
                                     <td>[% res.result_name | html %]</td>
                                     <td class="action-cell">
                                         <button class="btn btn-sm btn-primary" onclick="createTableFromResult('[% res.result_name | html %]', '[% db.name | html %]')"><i class="fas fa-plus"></i> Create Table</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="editResultFile('[% res.result_name | html %]'); event.stopPropagation();"><i class="fas fa-edit"></i> Edit</button>
                                     </td>
                                 </tr>
                                 [% END %]
@@ -239,14 +241,47 @@ function createTableFromResult(resultName, dbName) {
 }
 
 function createResultFromTable(tableName, dbName) {
-    console.log('Create result from table:', tableName, dbName);
-    // TODO: wire to controller endpoint
+    if (!confirm('Create result file from table "' + tableName + '"?')) return;
+    fetch('[% c.uri_for("/schema-comparison/create_result_from_table") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: dbName
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Success: ' + (data.message || 'Result file created'));
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        alert('Request failed: ' + err);
+    });
 }
 
 function dropTable(tableName, dbName) {
-    if (confirm('Drop table ' + tableName + '?')) {
-        console.log('Drop table:', tableName, dbName);
-        // TODO: wire to controller endpoint
+    if (!confirm('Drop table "' + tableName + '" from database "' + dbName + '"?')) return;
+    alert('Drop table is not yet implemented via the API. Use a SQL client like HeidiSQL or phpMyAdmin to drop the table, then refresh this page.');
+}
+
+function syncTable(tableName, dbName) {
+    if (!confirm('Sync all fields for table "' + tableName + '"?')) return;
+    alert('Sync all fields is not yet implemented. Use the per-field sync buttons on the field comparison page instead.');
+}
+
+function editResultFile(resultName) {
+    // resultName may contain '/' from subdirectory scanning; convert to relative path
+    // The result files live under lib/Comserv/Model/Schema/<schema>/Result/
+    var path = 'lib/Comserv/Model/Schema/Ency/Result/' + resultName + '.pm';
+    if (typeof openAI2EditorWindow === 'function') {
+        openAI2EditorWindow(path);
+    } else {
+        window.open('/ai2/editing_widget_popup?file=' + encodeURIComponent(path), 'AI2Editor', 'width=1250,height=820,resizable=yes');
     }
 }
 
