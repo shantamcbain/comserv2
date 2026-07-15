@@ -819,7 +819,7 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
 
         # Get the schema / DBH
         my $schema;
-        my $schema_name = $self->_resolve_schema_name($database);
+        $schema_name = $self->_resolve_schema_name($database);
         if ($schema_name eq 'ency') {
             $schema = $c->model('DBEncy')->schema;
         } elsif ($schema_name eq 'forager') {

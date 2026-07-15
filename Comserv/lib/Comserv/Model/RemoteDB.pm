@@ -37,6 +37,13 @@ has 'selected_connection' => (
     default => sub { {} },
 );
 
+has 'runtime_network' => (
+    is      => 'rw',
+    isa     => 'Str',
+    lazy    => 1,
+    default => sub { shift->_detect_runtime_network() },
+);
+
 use FindBin;
 use File::Spec;
 
@@ -52,6 +59,15 @@ sub _load_config {
             warn "[RemoteDB] Successfully loaded configuration from K8s Secrets\n";
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
                 "Configuration loaded from K8s Secrets mount point");
+
+            # Log loaded connections with their network and host for diagnostics
+            foreach my $cn (sort keys %$config) {
+                my $c = $config->{$cn};
+                $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                    "  Loaded connection: $cn -> host=$c->{host}, network=" . ($c->{network} // '<none>') .
+                    ", server_group=" . ($c->{server_group} // '<none>'));
+            }
+
             $self->config($config);
             return;
         }
@@ -218,6 +234,14 @@ sub _load_from_env_variables {
     if (keys %env_config) {
         $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_env_variables',
             "Loaded " . scalar(keys %env_config) . " database connections from environment variables");
+
+        # Tag env-var-created entries with the detected runtime network so the
+        # network filter in select_connection() can match them correctly.
+        my $detected_network = $self->runtime_network;
+        foreach my $cn (keys %env_config) {
+            $env_config{$cn}->{network} = $detected_network;
+        }
+
         return \%env_config;
     }
     
@@ -423,6 +447,33 @@ sub select_connection {
         }
     }
 
+    # Filter by runtime network — skip connections that belong to a different
+    # network environment (e.g. skip docker entries when on LAN, skip LAN entries
+    # when inside Docker). Entries without a network field are always tested.
+    my $runtime_network = $self->runtime_network;
+    my @network_filtered = grep {
+        my $conn = $config->{$_};
+        !defined $conn->{network} || $conn->{network} eq $runtime_network
+    } @matching_connections;
+
+    if (@network_filtered) {
+        @matching_connections = @network_filtered;
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
+            "Network filter ($runtime_network): " . scalar(@network_filtered) . " candidates remain: " .
+            join(', ', @network_filtered));
+    } else {
+        # Fallback: only test entries without a network field (backward compat).
+        # Entries with a non-matching network (e.g. network=lan inside Docker) are
+        # excluded because they are guaranteed to fail and waste 12s each timing out.
+        @matching_connections = grep {
+            !defined $config->{$_}{network}
+        } @matching_connections;
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
+            "Network filter ($runtime_network): no network-matched candidates found " .
+            "(missing secrets for this environment?). Falling back to " .
+            scalar(@matching_connections) . " legacy (no-network) entries.");
+    }
+
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
         "RemoteDB Connection Selection for '$database_name'" .
         ($sitename ? " (site: $sitename)" : '') . " - candidates: " .
@@ -613,6 +664,38 @@ sub _parallel_test_connections {
     }
 
     return $winner;
+}
+
+sub _detect_runtime_network {
+    my ($self) = @_;
+
+    # Explicit override via env var (e.g. RUNNING_IN_DOCKER=docker)
+    if (my $override = $ENV{RUNNING_IN_DOCKER}) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_runtime_network',
+            "Runtime network override from env: $override");
+        return $override;
+    }
+
+    # Check if we're inside a container by examining /proc/1/cgroup.
+    # This is reliable because on the host /proc/1/cgroup shows init.scope
+    # or similar, never matching docker/kubepods/containerd.
+    if (-e '/proc/1/cgroup') {
+        local $/;
+        if (open my $fh, '<', '/proc/1/cgroup') {
+            my $cgroup = <$fh>;
+            close $fh;
+            if ($cgroup =~ /docker|kubepods|containerd/) {
+                $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_runtime_network',
+                    "Detected Docker runtime via /proc/1/cgroup");
+                return 'docker';
+            }
+        }
+    }
+
+    # Default: we're on the LAN
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_runtime_network',
+        "Defaulting to LAN runtime network");
+    return 'lan';
 }
 
 sub get_user_preferred_connection {

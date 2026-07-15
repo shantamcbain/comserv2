@@ -53,6 +53,7 @@ services:
       COMSERV_DB_PRODUCTION_FORAGER_USERNAME: "${COMSERV_DB_PRODUCTION_FORAGER_USERNAME}"
       COMSERV_DB_PRODUCTION_FORAGER_PASSWORD: "${COMSERV_DB_PRODUCTION_FORAGER_PASSWORD}"
       COMSERV_DB_PRODUCTION_FORAGER_DATABASE: "${COMSERV_DB_PRODUCTION_FORAGER_DATABASE:-shanta_forager}"
+      RUNNING_IN_DOCKER: "docker"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -75,6 +76,8 @@ services:
       - ./var:/opt/comserv/var:delegated
       # Config (read-only)
       - ./db_config.json:/opt/comserv/db_config.json:ro
+      # Secrets for database connection (read-only)
+      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       # Override entrypoint to fix permission errors without rebuild
       - ./docker-entrypoint-dev.sh:/opt/comserv/docker-entrypoint.sh:ro
     healthcheck:
