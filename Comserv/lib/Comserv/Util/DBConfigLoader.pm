@@ -41,6 +41,7 @@ use File::Spec;
 our @EXPORT_OK = qw(load_config is_cli_context is_dev_server force_db_load detect_runtime_network);
 
 use Comserv::Util::Logging;
+use JSON;
 
 # -----------------------------------------------------------------------
 # Public API
@@ -318,14 +319,17 @@ sub _load_from_config_file {
         $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_load_from_config_file',
             "Using db_config.json fallback at $path — migrate to K8s Secrets for production");
 
+        my $parsed;
         eval {
             local $/;
             open my $fh, '<', $path or die;
             my $json_text = <$fh>;
             close $fh;
-            my $config = JSON::decode_json($json_text);
-            return $config if $config && ref $config eq 'HASH';
+            $parsed = JSON::decode_json($json_text);
         };
+        if ($parsed && ref $parsed eq 'HASH' && keys %$parsed) {
+            return $parsed;
+        }
         last;  # only try first found config file
     }
 
@@ -400,13 +404,72 @@ sub _build_workstation_dev_config {
         }
     }
 
-    # 2. Build from env vars or defaults
+    # 2. Try to find credentials from ~/.comserv/secrets/dbi/ (the standard
+    #    K8s-style secrets directory).  Look for a config that targets the
+    #    dev host (192.168.1.198).  We try, in priority:
+    #    a. Any file whose connection key is "production_server" or that
+    #       contains host 192.168.1.198 (the intended dev target).
+    #    b. Any file on the same host.
+    #    c. Any file with host+user+password (last-resort, any host).
+    my $dbi_dir = "$home/.comserv/secrets/dbi";
+    my ($found_user, $found_pass, $found_host) = ('', '', '');
+    if (-d $dbi_dir) {
+        my $target_host = $ENV{COMSERV_DEV_HOST} // '192.168.1.198';
+        my ($fallback_user, $fallback_pass, $fallback_host) = ('', '', '');
+        my $dh;
+        if (opendir($dh, $dbi_dir)) {
+            while (my $file = readdir($dh)) {
+                next if $file =~ /^\./;
+                my $secret_file = "$dbi_dir/$file";
+                next unless -f $secret_file;
+                eval {
+                    local $/;
+                    open my $fh, '<', $secret_file or die;
+                    my $json_text = <$fh>;
+                    close $fh;
+                    my $loaded = JSON::decode_json($json_text);
+                    if (ref $loaded eq 'HASH') {
+                        foreach my $key (keys %$loaded) {
+                            my $entry = $loaded->{$key};
+                            next unless ref $entry eq 'HASH';
+                            my $h = $entry->{host} // '';
+                            my $u = $entry->{username} // '';
+                            my $p = $entry->{password} // '';
+                            next unless $h && $u && $p;
+                            # Priority match: same host as target
+                            if ($h eq $target_host) {
+                                ($found_host, $found_user, $found_pass) = ($h, $u, $p);
+                                $logging->log_with_details(undef, 'info', __FILE__, __LINE__,
+                                    '_build_workstation_dev_config',
+                                    "Found credentials for $target_host (user=$u) from $secret_file");
+                            }
+                            # Fallback: remember first entry with any host
+                            elsif (!$fallback_host) {
+                                ($fallback_host, $fallback_user, $fallback_pass) = ($h, $u, $p);
+                            }
+                        }
+                    }
+                };
+            }
+            closedir($dh);
+        }
+        # If we didn't find an exact host match, use the fallback
+        if (!$found_host && $fallback_host) {
+            ($found_host, $found_user, $found_pass) = ($fallback_host, $fallback_user, $fallback_pass);
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__,
+                '_build_workstation_dev_config',
+                "No exact host match for $target_host, using fallback credentials for $fallback_host");
+        }
+    }
+
+    # 3. Build from env vars or defaults.
+    #    env vars override secrets-found values (if any).
     #    The dev host defaults to 192.168.1.198 (production server / workstation
     #    MariaDB). Override via COMSERV_DEV_HOST.
-    my $host     = $ENV{COMSERV_DEV_HOST}     // '192.168.1.198';
+    my $host     = $ENV{COMSERV_DEV_HOST}     // ($found_host || '192.168.1.198');
     my $port     = $ENV{COMSERV_DEV_PORT}     // 3306;
-    my $username = $ENV{COMSERV_DEV_USERNAME} // '';
-    my $password = $ENV{COMSERV_DEV_PASSWORD} // '';
+    my $username = $ENV{COMSERV_DEV_USERNAME} // ($found_user || '');
+    my $password = $ENV{COMSERV_DEV_PASSWORD} // ($found_pass || '');
 
     my %dev_config = (
         'ency_dev' => {

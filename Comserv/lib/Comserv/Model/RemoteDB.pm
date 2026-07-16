@@ -224,54 +224,101 @@ sub test_connection {
     
     # Fork a child to test the DBI connection so we can SIGKILL it after a timeout.
     # alarm() cannot interrupt C-level DBI blocking calls; fork+kill can.
-    my $timeout = 12;
+    my $timeout = is_dev_server() ? 20 : 12;
+    
+    # Create a pipe so the child can send back its DBI error string
+    pipe(my $child_err_r, my $child_err_w);
+    $child_err_w->autoflush(1);
+
     my $pid = fork();
     unless (defined $pid) {
         $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
-            "fork() failed for '$conn_name': $! — skipping connection test");
-        return 0;
-    }
-
-    if ($pid == 0) {
-        # Child process: attempt DBI connect, exit 0 on success, exit 1 on failure.
-        eval {
+            "fork() failed for '$conn_name': $! — trying direct connect");
+        
+        # Fallback: try direct connect in-process with alarm
+        my $direct_ok = eval {
+            local $SIG{ALRM} = sub { die "connect timed out\n" };
+            alarm($timeout);
             my %connect_attrs = (
                 RaiseError => 1,
                 PrintError => 0,
                 AutoCommit => 1,
-                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 10) : ()),
+                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => $timeout) : ()),
+            );
+            my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
+            alarm(0);
+            $dbh->disconnect() if $dbh;
+            1;
+        };
+        alarm(0);
+        if ($direct_ok) {
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
+                "Connection test (direct fallback) succeeded for '$conn_name'");
+            return 1;
+        } else {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
+                "Connection test (direct fallback) failed for '$conn_name': $@");
+            return 0;
+        }
+    }
+
+    if ($pid == 0) {
+        # Child process: redirect STDERR to the pipe, attempt DBI connect
+        close $child_err_r;
+        open STDERR, '>&', $child_err_w or exit(1);
+        eval {
+            my %connect_attrs = (
+                RaiseError => 1,
+                PrintError => 1,   # Enable so DBI errors go to STDERR
+                AutoCommit => 1,
+                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => $timeout) : ()),
             );
             my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
             $dbh->disconnect() if $dbh;
         };
-        exit($@ ? 1 : 0);
+        if ($@) {
+            print STDERR "DBI connect failed for '$conn_name': $@\n";
+            POSIX::_exit(1);
+        }
+        POSIX::_exit(0);
     }
 
     # Parent: wait up to $timeout seconds, then kill the child.
+    # Read child's STDERR to capture DBI error details.
+    close $child_err_w;
     my $start = time();
     my $result = 0;
+    my $child_error = '';
     while (1) {
         my $kid = waitpid($pid, POSIX::WNOHANG());
         if ($kid == $pid) {
             $result = ($? == 0) ? 1 : 0;
+            # Drain the error pipe
+            while (<$child_err_r>) { $child_error .= $_ }
+            chomp($child_error) if $child_error;
             last;
         }
         if (time() - $start >= $timeout) {
             kill 'KILL', $pid;
             waitpid($pid, POSIX::WNOHANG());
+            # Drain the error pipe
+            while (<$child_err_r>) { $child_error .= $_ }
+            chomp($child_error) if $child_error;
             $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
-                "Connection test timed out after ${timeout}s for '$conn_name'");
+                "Connection test timed out after ${timeout}s for '$conn_name'" .
+                ($child_error ? " — $child_error" : ''));
             last;
         }
         select(undef, undef, undef, 0.1);
     }
+    close $child_err_r;
 
     if ($result) {
         $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
             "Connection test successful for '$conn_name'");
     } else {
         $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
-            "Connection test failed for '$conn_name'");
+            "Connection test failed for '$conn_name'" . ($child_error ? " — $child_error" : ''));
     }
     return $result;
 }
@@ -481,10 +528,10 @@ sub _parallel_test_connections {
     my ($self, $candidates, $database_name) = @_;
 
     my $config = $self->config;
-    my $timeout = 12;
+    my $timeout = is_dev_server() ? 20 : 12;
 
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
-        "Parallel testing " . scalar(@$candidates) . " candidates for '$database_name': " .
+        "Parallel testing " . scalar(@$candidates) . " candidates for '$database_name' (timeout=${timeout}s): " .
         join(', ', @$candidates));
 
     my %children = ();
@@ -504,32 +551,75 @@ sub _parallel_test_connections {
             my $host = $conn->{host} // 'localhost';
             my $port = $conn->{port} // 3306;
             my $database = $conn->{database} // '';
-            $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=10";
+            $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=$timeout";
         }
+
+        # Create a pipe so the child can send back its DBI error string
+        pipe(my $child_err_r, my $child_err_w);
+        $child_err_w->autoflush(1);
 
         my $pid = fork();
         unless (defined $pid) {
             $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_parallel_test_connections',
-                "fork() failed for '$conn_name': $! — skipping this candidate");
-            next;
-        }
+                "fork() failed for '$conn_name': $! — falling back to direct (non-forked) test");
 
-        if ($pid == 0) {
-            # Child process: attempt DBI connect, exit 0 on success, exit 1 on failure.
-            eval {
+            # Fallback: try a direct DBI connect in-process with an eval + alarm guard
+            my $direct_ok = eval {
+                local $SIG{ALRM} = sub { die "connect timed out\n" };
+                alarm($timeout);
                 my %connect_attrs = (
                     RaiseError => 1,
                     PrintError => 0,
                     AutoCommit => 1,
-                    ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 10) : ()),
+                    ($db_type ne 'sqlite' ? (mariadb_connect_timeout => $timeout) : ()),
+                );
+                my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
+                alarm(0);
+                $dbh->disconnect() if $dbh;
+                1;
+            };
+            alarm(0);
+            if ($direct_ok) {
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_parallel_test_connections',
+                    "Direct (fallback) connect succeeded for '$conn_name' — returning as winner");
+                # Clean up any already-forked children
+                foreach my $pid (keys %children) {
+                    kill 'KILL', $pid;
+                    waitpid($pid, POSIX::WNOHANG());
+                }
+                return $conn_name;
+            } else {
+                $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_parallel_test_connections',
+                    "Direct (fallback) connect failed for '$conn_name': $@");
+                next;
+            }
+        }
+
+        if ($pid == 0) {
+            # Child process: redirect STDERR to the pipe, attempt DBI connect
+            close $child_err_r;
+            open STDERR, '>&', $child_err_w or do {
+                # Cannot log — just exit with failure code
+                exit(1);
+            };
+            eval {
+                my %connect_attrs = (
+                    RaiseError => 1,
+                    PrintError => 1,   # Enable PrintError so DBI errors go to STDERR
+                    AutoCommit => 1,
+                    ($db_type ne 'sqlite' ? (mariadb_connect_timeout => $timeout) : ()),
                 );
                 my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
                 $dbh->disconnect() if $dbh;
             };
-            exit($@ ? 1 : 0);
+            if ($@) {
+                print STDERR "DBI connect failed for '$conn_name': $@\n";
+                POSIX::_exit(1);
+            }
+            POSIX::_exit(0);
         }
 
-        $children{$pid} = $conn_name;
+        $children{$pid} = { name => $conn_name, err_r => $child_err_r, err_w => $child_err_w };
 
         $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
             "Forked child PID $pid for '$conn_name' ($db_type)");
@@ -544,11 +634,25 @@ sub _parallel_test_connections {
     while (keys %children) {
         my $kid = waitpid(-1, POSIX::WNOHANG());
         if ($kid > 0) {
-            my $conn_name = delete $children{$kid};
+            my $entry = delete $children{$kid};
+            my $conn_name = $entry->{name};
             my $exit_ok = ($? == 0);
+            my $exit_status = $?;
+
+            # Read child's STDERR (DBI error details)
+            close $entry->{err_w};
+            my $child_error = '';
+            while (readline($entry->{err_r})) {
+                $child_error .= $_;
+            }
+            close $entry->{err_r};
+            chomp($child_error) if $child_error;
 
             $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
-                "Child PID $kid for '$conn_name' exited with " . ($exit_ok ? 'SUCCESS' : 'FAILURE'));
+                "Child PID $kid for '$conn_name' exited with " . ($exit_ok ? 'SUCCESS' : 'FAILURE') .
+                ($child_error ? " — $child_error" : '') .
+                ($exit_ok ? '' : " (exit code=" . ($exit_status >> 8) . ")"));
+            # Note: $? = exit_code << 8; signal = $? & 127; core_dump = $? & 128
 
             if ($exit_ok && !$winner) {
                 $winner = $conn_name;
@@ -568,11 +672,17 @@ sub _parallel_test_connections {
     # Kill any remaining children (SIGKILL) after winner found or timeout
     if (keys %children) {
         foreach my $pid (keys %children) {
-            my $name = $children{$pid};
+            my $entry = $children{$pid};
+            my $name = $entry->{name};
             kill 'KILL', $pid;
             waitpid($pid, POSIX::WNOHANG());
+            # Drain child's error pipe before closing
+            close $entry->{err_w};
+            my $tail = '';
+            while (readline($entry->{err_r})) { $tail .= $_ }
+            close $entry->{err_r};
             $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_parallel_test_connections',
-                "Killed remaining child PID $pid for '$name'");
+                "Killed remaining child PID $pid for '$name'" . ($tail ? " (had error: $tail)" : ''));
         }
     }
 
