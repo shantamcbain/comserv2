@@ -186,14 +186,17 @@ sub COMPONENT {
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
             "DBEncy SQLite: Running lightweight schema migration...");
 
-        # ROBUST MIGRATION: check table existence before ALTER TABLE.
+        # CLI/DB loading stabilized [2026-07-16] - Grok review
+        # ROBUST MIGRATION: check column existence via PRAGMA table_info before ALTER TABLE.
         # For brand-new SQLite DBs, deploy the schema from Result files first.
         # For existing DBs, add columns that exist in MariaDB but not in dev SQLite.
-        # SQLite's ALTER TABLE ADD COLUMN is safe (fails with error if column exists).
-        # CLI/DB loading stabilized [2026-07-16] - Grok review
-        eval {
-            my $dbh = $instance->schema->storage->dbh;
-
+        # Using PRAGMA table_info is more reliable than catching "duplicate column" errors.
+        my $dbh;
+        eval { $dbh = $instance->schema->storage->dbh; };
+        if ($@) {
+            $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+                "DBEncy SQLite: Cannot get DB handle — skipping migration: $@");
+        } else {
             # Check if the 'sites' table exists
             my ($table_exists) = $dbh->selectrow_array(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sites'"
@@ -202,34 +205,41 @@ sub COMPONENT {
             if (!$table_exists) {
                 $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
                     "DBEncy SQLite: 'sites' table not found — deploying schema from Result files...");
-                $instance->schema->deploy({
-                    add_drop_table => 0,   # never drop existing tables
-                });
-                $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
-                    "DBEncy SQLite: Schema deployment complete.");
-            }
-
-            # Run ALTER TABLE migrations for missing columns
-            my @sqlite_migrations = (
-                "ALTER TABLE sites ADD COLUMN points_enabled INTEGER DEFAULT 0",
-                "ALTER TABLE sites ADD COLUMN cash_allowed INTEGER DEFAULT 0",
-                "ALTER TABLE sites ADD COLUMN site_display_name TEXT DEFAULT ''",
-                "ALTER TABLE sites ADD COLUMN image_root_url TEXT DEFAULT ''",
-            );
-            foreach my $migration_sql (@sqlite_migrations) {
-                my $rv = $dbh->do($migration_sql);
-                if (defined $rv) {
-                    $logger->log_with_details(undef, 'debug', __FILE__, __LINE__, 'COMPONENT',
-                        "DBEncy SQLite migration applied: $migration_sql");
+                eval { $instance->schema->deploy({ add_drop_table => 0 }); };
+                if ($@) {
+                    $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+                        "DBEncy SQLite: Schema deploy failed (non-fatal): $@");
+                } else {
+                    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+                        "DBEncy SQLite: Schema deployment complete.");
                 }
             }
-        };
-        if ($@) {
-            # "duplicate column" is expected for existing DBs — ignore it.
-            # Anything else (e.g. "no such table") is logged as a warning.
-            unless ($@ =~ /duplicate column/i) {
-                $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
-                    "DBEncy SQLite migration non-fatal issue: $@");
+
+            # Read existing columns from the sites table
+            my @existing_columns = map { $_->[1] } @{$dbh->selectall_arrayref(
+                "PRAGMA table_info(sites)"
+            )};
+
+            # Define migrations: [column_name, alter_sql]
+            my @sqlite_migrations = (
+                ['points_enabled',    "ALTER TABLE sites ADD COLUMN points_enabled INTEGER DEFAULT 0"],
+                ['cash_allowed',      "ALTER TABLE sites ADD COLUMN cash_allowed INTEGER DEFAULT 0"],
+                ['site_display_name', "ALTER TABLE sites ADD COLUMN site_display_name TEXT DEFAULT ''"],
+                ['image_root_url',    "ALTER TABLE sites ADD COLUMN image_root_url TEXT DEFAULT ''"],
+            );
+
+            my %col_lookup = map { $_ => 1 } @existing_columns;
+            foreach my $migration (@sqlite_migrations) {
+                my ($col_name, $alter_sql) = @$migration;
+                next if $col_lookup{$col_name};  # already exists, skip
+                eval { $dbh->do($alter_sql); };
+                if ($@) {
+                    $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+                        "DBEncy SQLite: Non-fatal ALTER TABLE for '$col_name': $@");
+                } else {
+                    $logger->log_with_details(undef, 'debug', __FILE__, __LINE__, 'COMPONENT',
+                        "DBEncy SQLite migration applied: $alter_sql");
+                }
             }
         }
     }
