@@ -1,3 +1,4 @@
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 package Comserv::Controller::SiteHome;
 use Moose;
 use namespace::autoclean;
@@ -21,7 +22,16 @@ sub index :Path :Args(0) {
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'SiteHome';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "SiteHome serving site: $site_name");
 
-    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->first;
+    # Defensive: wrap Site query in eval for schema mismatch tolerance (e.g. missing columns in SQLite).
+    my $site;
+    eval {
+        $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->first;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
+            "Site lookup failed (possible schema mismatch / SQLite fallback): $@");
+        undef $site;
+    }
 
     # Check if a dynamic home page exists in the new Page table
     my $page = eval {

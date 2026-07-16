@@ -1,3 +1,4 @@
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 package Comserv::Model::RemoteDB;
 
 use strict;
@@ -12,6 +13,11 @@ use JSON;
 use IO::Socket::INET;
 use POSIX qw(WNOHANG);
 use Comserv::Util::Logging;
+use Comserv::Util::DBConfigLoader qw(
+    load_config
+    is_cli_context    force_db_load
+    detect_runtime_network
+);
 
 has 'logging' => (
     is      => 'ro',
@@ -47,230 +53,64 @@ has 'runtime_network' => (
 use FindBin;
 use File::Spec;
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub _load_config {
     my ($self) = @_;
-    
+
     return if keys %{$self->config};
-    
-    my $config;
-    try {
-        $config = $self->_load_from_k8s_secrets();
-        if ($config && keys %$config) {
-            warn "[RemoteDB] Successfully loaded configuration from K8s Secrets\n";
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
-                "Configuration loaded from K8s Secrets mount point");
 
-            # Log loaded connections with their network and host for diagnostics
-            foreach my $cn (sort keys %$config) {
-                my $c = $config->{$cn};
-                $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'RemoteDB::_load_config',
-                    "  Loaded connection: $cn -> host=$c->{host}, network=" . ($c->{network} // '<none>') .
-                    ", server_group=" . ($c->{server_group} // '<none>'));
-            }
-
-            $self->config($config);
-            return;
-        }
-        
-        $config = $self->_load_from_env_variables();
-        if ($config && keys %$config) {
-            warn "[RemoteDB] Successfully loaded configuration from environment variables\n";
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
-                "Configuration loaded from environment variables (COMSERV_DB_*)");
-            $self->config($config);
-            return;
-        }
-        
-        my $config_file = $self->_find_db_config_file();
-        if ($config_file) {
-            warn "[RemoteDB] Loading config from db_config.json (DEPRECATED - migrate to K8s Secrets)\n";
-            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
-                "Using db_config.json fallback - MIGRATE TO K8S SECRETS for production security");
-
-            local $/;
-            open my $fh, "<", $config_file or die "Could not open $config_file: $!";
-            my $json_text = <$fh>;
-            close $fh;
-            $config = decode_json($json_text);
-
-            $self->config($config);
-
-            if (!$self->{k8s_secrets_found}) {
-                $self->{configuration_status} = 'FALLBACK';
-                $self->{configuration_error} = 'Using db_config.json fallback - K8s Secrets not found. Please migrate to K8s Secrets for production security.';
-                $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
-                    "Configuration status set to FALLBACK - K8s Secrets not found, using db_config.json");
-            }
-
-            return;
-        }
-        
-        warn "[RemoteDB] CONFIGURATION NOT FOUND - Admin setup required\n";
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
-            "No configuration found in K8s Secrets, environment variables, or db_config.json");
-        
-        $self->{configuration_status} = 'MISSING';
-        $self->{configuration_error} = "Could not locate configuration in any source (K8s Secrets, env vars, or db_config.json)";
-        $self->config({});
+    # CLI fast-path: skip filesystem I/O unless FORCE_DB_LOAD is set
+    if (is_cli_context() && !force_db_load()) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'RemoteDB::_load_config',
+            "[CLI mode] Skipping DB config load — no FORCE_DB_LOAD env var set");
         return;
-        
-    } catch {
-        warn "[RemoteDB] Configuration load exception: $_\n";
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'RemoteDB::_load_config',
-            "Failed to load database configuration: $_");
-        
-        $self->{configuration_status} = 'ERROR';
-        $self->{configuration_error} = "Exception during configuration load: $_";
-        $self->config({});
+    }
+
+    my $config = load_config();
+    if ($config && keys %$config) {
+        $self->config($config);
+        $self->{configuration_status} = 'ok';
+
+        # Log loaded connections for diagnostics
+        foreach my $cn (sort keys %$config) {
+            my $c = $config->{$cn};
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "  Loaded connection: $cn -> host=$c->{host}, network=" . ($c->{network} // '<none>') .
+                ", server_group=" . ($c->{server_group} // '<none>'));
+        }
         return;
-    };
+    }
+
+    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
+        "No configuration found in K8s Secrets, environment variables, or db_config.json");
+    $self->{configuration_status} = 'MISSING';
+    $self->{configuration_error} = "Could not locate configuration in any source";
+    $self->config({});
+    return;
 }
 
+# CLI detection helper — lightweight, no filesystem I/O
+sub is_cli {
+    my ($self) = @_;
+    return is_cli_context();
+}
+
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub _load_from_k8s_secrets {
     my ($self) = @_;
-    
-    my %k8s_config = ();
-    my $k8s_secrets_found = 0;
-    
-    my $home = $ENV{HOME} || '/tmp';
-    my @secret_paths = (
-        '/home/comserv/.comserv/secrets',  # Docker mount point (comserv user home)
-        "$home/.comserv/secrets",
-        "$FindBin::Bin/../secrets",
-        '/var/run/secrets/comserv/',
-        '/opt/secrets/',
-        '/var/run/secrets/default/',
-    );
-    
-    foreach my $base_path (@secret_paths) {
-        next unless -d $base_path;
-        
-        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_k8s_secrets',
-            "Checking K8s Secret mount point: $base_path");
-        
-        my $dbi_path = "$base_path/dbi";
-        
-        if (-d $dbi_path) {
-            opendir(my $dh, $dbi_path) or next;
-            my @secret_files = readdir($dh);
-            closedir($dh);
-            
-            foreach my $file (@secret_files) {
-                next if $file =~ /^\./;
-                
-                my $secret_file = "$dbi_path/$file";
-                next unless -f $secret_file;
-                
-                eval {
-                    local $/;
-                    open my $fh, "<", $secret_file or die "Cannot read $secret_file: $!";
-                    my $json_text = <$fh>;
-                    close $fh;
-                    
-                    my $loaded = decode_json($json_text);
-                    if (ref $loaded eq 'HASH') {
-                        %k8s_config = (%k8s_config, %$loaded);
-                        $k8s_secrets_found = 1;
-                        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_k8s_secrets',
-                            "Loaded K8s Secret from: $secret_file (found " . scalar(keys %$loaded) . " connections)");
-                    }
-                };
-                if ($@) {
-                    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_load_from_k8s_secrets',
-                        "Could not parse secret file $secret_file as JSON: $@");
-                }
-            }
-        }
-        
-        if (keys %k8s_config) {
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_k8s_secrets',
-                "Successfully loaded " . scalar(keys %k8s_config) . " database connections from K8s Secrets");
-            $self->{k8s_secrets_found} = 1;
-            return \%k8s_config;
-        }
-    }
-    
-    $self->{k8s_secrets_found} = $k8s_secrets_found;
-    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_k8s_secrets',
-        "No K8s Secrets found in standard mount points");
-    return undef;
+    return Comserv::Util::DBConfigLoader::_load_from_k8s_secrets($self->logging);
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub _load_from_env_variables {
     my ($self) = @_;
-    
-    my %env_config = ();
-    
-    foreach my $env_var (sort keys %ENV) {
-        next unless $env_var =~ /^COMSERV_DB_(.+?)_([A-Z_]+)$/;
-        
-        my $conn_name_upper = $1;
-        my $field_upper = $2;
-        my $conn_name = lc($conn_name_upper);
-        my $field = lc($field_upper);
-        my $value = $ENV{$env_var};
-        
-        $env_config{$conn_name} ||= {};
-        
-        if ($field eq 'host') {
-            $env_config{$conn_name}->{host} = $value;
-        } elsif ($field eq 'port') {
-            $env_config{$conn_name}->{port} = $value;
-        } elsif ($field eq 'username') {
-            $env_config{$conn_name}->{username} = $value;
-        } elsif ($field eq 'password') {
-            $env_config{$conn_name}->{password} = $value;
-        } elsif ($field eq 'database') {
-            $env_config{$conn_name}->{database} = $value;
-        } elsif ($field eq 'db_type') {
-            $env_config{$conn_name}->{db_type} = $value;
-        } elsif ($field eq 'priority') {
-            $env_config{$conn_name}->{priority} = $value;
-        } elsif ($field eq 'environment') {
-            $env_config{$conn_name}->{environment} = $value;
-        }
-    }
-    
-    if (keys %env_config) {
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_env_variables',
-            "Loaded " . scalar(keys %env_config) . " database connections from environment variables");
-
-        # Tag env-var-created entries with the detected runtime network so the
-        # network filter in select_connection() can match them correctly.
-        my $detected_network = $self->runtime_network;
-        foreach my $cn (keys %env_config) {
-            $env_config{$cn}->{network} = $detected_network;
-        }
-
-        return \%env_config;
-    }
-    
-    return undef;
+    return Comserv::Util::DBConfigLoader::_load_from_env_variables($self->logging);
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub _find_db_config_file {
     my ($self) = @_;
-    
-    my @search_paths = (
-        "$FindBin::Bin/db_config.json",
-        "$FindBin::Bin/../db_config.json",
-        "$FindBin::Bin/../../db_config.json",
-        "/opt/comserv/db_config.json",
-        "/opt/comserv/Comserv/db_config.json",
-        "$ENV{HOME}/db_config.json",
-    );
-    
-    foreach my $path (@search_paths) {
-        if (-f $path && -r $path) {
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_find_db_config_file',
-                "Found db_config.json at: $path");
-            return $path;
-        }
-    }
-    
-    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_find_db_config_file',
-        "db_config.json not found in any search location");
-    return undef;
+    return Comserv::Util::DBConfigLoader::_find_db_config_file($self->logging);
 }
 
 sub _apply_env_overrides {
@@ -666,36 +506,10 @@ sub _parallel_test_connections {
     return $winner;
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub _detect_runtime_network {
     my ($self) = @_;
-
-    # Explicit override via env var (e.g. RUNNING_IN_DOCKER=docker)
-    if (my $override = $ENV{RUNNING_IN_DOCKER}) {
-        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_runtime_network',
-            "Runtime network override from env: $override");
-        return $override;
-    }
-
-    # Check if we're inside a container by examining /proc/1/cgroup.
-    # This is reliable because on the host /proc/1/cgroup shows init.scope
-    # or similar, never matching docker/kubepods/containerd.
-    if (-e '/proc/1/cgroup') {
-        local $/;
-        if (open my $fh, '<', '/proc/1/cgroup') {
-            my $cgroup = <$fh>;
-            close $fh;
-            if ($cgroup =~ /docker|kubepods|containerd/) {
-                $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_runtime_network',
-                    "Detected Docker runtime via /proc/1/cgroup");
-                return 'docker';
-            }
-        }
-    }
-
-    # Default: we're on the LAN
-    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_runtime_network',
-        "Defaulting to LAN runtime network");
-    return 'lan';
+    return detect_runtime_network();
 }
 
 sub get_user_preferred_connection {

@@ -1,4 +1,5 @@
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 package Comserv::Model::DBEncy;
 
 use strict;
@@ -121,6 +122,9 @@ sub COMPONENT {
             dsn => "dbi:SQLite:dbname=" . $conn->{database_path},
             user => "",
             password => "",
+            RaiseError => 1,
+            PrintError => 0,
+            AutoCommit => 1,
             sqlite_unicode => 1,
             on_connect_do => ["PRAGMA foreign_keys = ON"],
         };
@@ -180,7 +184,54 @@ sub COMPONENT {
 
     if ($db_type eq 'sqlite') {
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
-            "DBEncy SQLite: Skipping auto-deploy (tables should pre-exist).");
+            "DBEncy SQLite: Running lightweight schema migration...");
+
+        # ROBUST MIGRATION: check table existence before ALTER TABLE.
+        # For brand-new SQLite DBs, deploy the schema from Result files first.
+        # For existing DBs, add columns that exist in MariaDB but not in dev SQLite.
+        # SQLite's ALTER TABLE ADD COLUMN is safe (fails with error if column exists).
+        # CLI/DB loading stabilized [2026-07-16] - Grok review
+        eval {
+            my $dbh = $instance->schema->storage->dbh;
+
+            # Check if the 'sites' table exists
+            my ($table_exists) = $dbh->selectrow_array(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sites'"
+            );
+
+            if (!$table_exists) {
+                $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+                    "DBEncy SQLite: 'sites' table not found — deploying schema from Result files...");
+                $instance->schema->deploy({
+                    add_drop_table => 0,   # never drop existing tables
+                });
+                $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+                    "DBEncy SQLite: Schema deployment complete.");
+            }
+
+            # Run ALTER TABLE migrations for missing columns
+            my @sqlite_migrations = (
+                "ALTER TABLE sites ADD COLUMN points_enabled INTEGER DEFAULT 0",
+                "ALTER TABLE sites ADD COLUMN cash_allowed INTEGER DEFAULT 0",
+                "ALTER TABLE sites ADD COLUMN site_display_name TEXT DEFAULT ''",
+                "ALTER TABLE sites ADD COLUMN image_root_url TEXT DEFAULT ''",
+            );
+            foreach my $migration_sql (@sqlite_migrations) {
+                my $rv = $dbh->do($migration_sql);
+                if (defined $rv) {
+                    $logger->log_with_details(undef, 'debug', __FILE__, __LINE__, 'COMPONENT',
+                        "DBEncy SQLite migration applied: $migration_sql");
+                }
+            }
+        };
+        if ($@) {
+            # "duplicate column" is expected for existing DBs — ignore it.
+            # Anything else (e.g. "no such table") is logged as a warning.
+            unless ($@ =~ /duplicate column/i) {
+                $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+                    "DBEncy SQLite migration non-fatal issue: $@");
+            }
+        }
     }
 
     return $instance;

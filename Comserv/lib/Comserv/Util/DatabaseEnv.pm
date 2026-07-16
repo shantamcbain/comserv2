@@ -1,3 +1,4 @@
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 package Comserv::Util::DatabaseEnv;
 
 use strict;
@@ -6,6 +7,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Model::RemoteDB;
+use Comserv::Util::DBConfigLoader qw(is_cli_context);
 
 has 'logging' => (
     is      => 'ro',
@@ -13,13 +15,26 @@ has 'logging' => (
 );
 
 has 'remote_db' => (
-    is      => 'ro',
-    default => sub { Comserv::Model::RemoteDB->new }
+    is       => 'ro',
+    lazy     => 1,
+    builder  => '_build_remote_db',
 );
+
+sub _build_remote_db {
+    return Comserv::Model::RemoteDB->new;
+}
 
 sub get_active_environment {
     my ($self, $c) = @_;
-    
+
+    # CLI fast-path: skip session lookup, use env var or default
+    if (is_cli_context()) {
+        my $env = $ENV{ACTIVE_DB_ENVIRONMENT} || 'production';
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_active_environment',
+            "[CLI mode] Active database environment: $env");
+        return $env;
+    }
+
     if ($c && $c->session && exists $c->session->{active_db_environment}) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_active_environment',
             "Using session-based environment override: " . $c->session->{active_db_environment});
@@ -74,6 +89,13 @@ sub list_environments {
 
 sub get_environment_connection {
     my ($self, $c, $env_name, $db_name) = @_;
+
+    # CLI fast-path: avoid RemoteDB instantiation unless forced
+    if (is_cli_context() && !DBConfigLoader::force_db_load()) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_environment_connection',
+            "[CLI mode] Skipping RemoteDB connection lookup — not forced; use ENV vars directly");
+        return;
+    }
     
     unless ($self->validate_environment($env_name)) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_environment_connection',
@@ -148,6 +170,13 @@ sub get_environment_metadata {
 
 sub get_available_environments {
     my ($self, $c, $db_name) = @_;
+
+    # CLI fast-path: avoid RemoteDB instantiation unless forced
+    if (is_cli_context() && !DBConfigLoader::force_db_load()) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_available_environments',
+            "[CLI mode] Skipping environment listing — not forced");
+        return [];
+    }
     
     $db_name ||= 'ency';
     
