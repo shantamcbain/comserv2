@@ -1,0 +1,591 @@
+/* Docker Containers CSS - v2.0 - Theme Compliant */
+/* Uses CSS variables from theme_definitions.json for theme compatibility */
+/* File: /home/shanta/PycharmProjects/comserv2/Comserv/root/static/css/components/docker-containers.css */
+
+/* ── Page Layout ── */
+.docker-page {
+    margin: 20px auto;
+    max-width: 1200px;
+}
+
+.docker-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color, #ccc);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.docker-page-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--text-color, #000);
+}
+
+.docker-page-header h1 i {
+    margin-right: 8px;
+    color: var(--primary-color, #ccffff);
+}
+
+.docker-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* ── Status Badge ── */
+.docker-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.82em;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: var(--table-header-bg, #f2f2f2);
+    color: var(--text-color, #000);
+}
+
+.docker-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.docker-status-dot.ok {
+    background: var(--success-color, #3fb950);
+}
+
+.docker-status-dot.err {
+    background: var(--danger-color, #f85149);
+}
+
+.docker-status-dot.check {
+    background: var(--warning-color, #ffc107);
+}
+
+/* ── Target Selector Card ── */
+.docker-target-card {
+    border-left: 4px solid var(--link-color, #0066cc);
+    margin-bottom: 15px;
+}
+
+.docker-target-body {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.docker-target-label-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.docker-target-label {
+    font-weight: bold;
+    font-size: 0.88em;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.docker-target-label i {
+    color: var(--link-color, #0066cc);
+}
+
+.docker-target-select {
+    width: auto;
+    display: inline-block;
+    font-size: 0.82em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #ccc);
+    color: var(--text-color, #000);
+    background: var(--background-color, #fff);
+}
+
+.docker-target-info {
+    font-size: 0.82em;
+    color: var(--muted-text, #666);
+    font-style: italic;
+}
+
+/* ── Section Headers ── */
+.docker-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--table-header-bg, #f8f9fa);
+}
+
+.docker-section-title {
+    font-size: 0.9em;
+    color: var(--text-color, #000);
+}
+
+.docker-section-count {
+    font-weight: normal;
+    color: var(--muted-color, #666);
+    font-size: 0.85em;
+}
+
+.docker-section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82em;
+    margin: 0;
+    cursor: pointer;
+}
+
+.docker-section-label input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+}
+
+/* ── Container Cards ── */
+.docker-container-list {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.docker-container-card {
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--background-color, #fff);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    transition: border-color 0.2s ease;
+}
+
+.docker-container-card.running {
+    border-left: 3px solid var(--success-color, #3fb950);
+}
+
+.docker-container-card.unhealthy {
+    border-left: 3px solid var(--warning-color, #f0883e);
+}
+
+.docker-container-card.stopped {
+    border-left: 3px solid var(--danger-color, #dc3545);
+}
+
+.docker-container-card.backup {
+    border-left: 3px solid var(--accent-color, #6a0dad);
+}
+
+.docker-container-info {
+    flex: 2;
+    min-width: 200px;
+}
+
+.docker-container-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.docker-container-status-icon {
+    font-size: 1em;
+}
+
+.docker-container-status-icon.running {
+    color: var(--success-color, #3fb950);
+}
+
+.docker-container-status-icon.unhealthy {
+    color: var(--warning-color, #f0883e);
+}
+
+.docker-container-status-icon.stopped {
+    color: var(--danger-color, #dc3545);
+}
+
+.docker-container-status-icon.backup {
+    color: var(--accent-color, #6a0dad);
+}
+
+.docker-container-name {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--text-color, #000);
+}
+
+.docker-container-id {
+    font-size: 0.75em;
+    color: var(--muted-color, #666);
+}
+
+.docker-container-meta {
+    font-size: 0.82em;
+    color: var(--muted-color, #666);
+    margin-top: 2px;
+}
+
+.docker-container-meta .dim {
+    font-size: 0.75em;
+    color: var(--muted-color, #888);
+}
+
+.docker-container-status-line {
+    font-size: 0.8em;
+    color: var(--muted-color, #888);
+    margin-top: 1px;
+}
+
+/* ── Action Buttons Group ── */
+.docker-actions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.docker-actions .btn-sm {
+    padding: 2px 8px;
+    font-size: 0.78em;
+}
+
+/* ── Special Action Buttons ── */
+.btn-docker-info {
+    background: var(--link-color, #17a2b8) !important;
+    color: #fff !important;
+}
+
+.btn-docker-danger {
+    background: var(--danger-color, #dc3545) !important;
+    color: #fff !important;
+}
+
+.btn-docker-primary {
+    background: var(--link-color, #0066cc) !important;
+    color: #fff !important;
+}
+
+.btn-docker-success {
+    background: var(--success-color, #28a745) !important;
+    color: #fff !important;
+}
+
+.btn-docker-warning {
+    background: var(--warning-color, #ffc107) !important;
+    color: var(--text-color, #333) !important;
+}
+
+.btn-docker-purple {
+    background: var(--accent-color, #6a0dad) !important;
+    color: #fff !important;
+}
+
+.btn-docker-darkred {
+    background: #8b0000 !important;
+    color: #fff !important;
+}
+
+.btn-docker-teal {
+    background: var(--link-color, #17a2b8) !important;
+    color: #fff !important;
+}
+
+.btn-docker-darkblue {
+    background: #0056b3 !important;
+    color: #fff !important;
+}
+
+/* ── Badges ── */
+.docker-backup-badge {
+    display: inline-block;
+    background: var(--accent-color, #6a0dad);
+    color: #fff;
+    font-size: 0.65em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.docker-host-badge {
+    font-size: 0.7em;
+    background: var(--table-header-bg, #e2e8f0);
+    color: var(--text-color, #475569);
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+/* ── Volume Cards ── */
+.docker-volume-list {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.docker-volume-card {
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 6px;
+    padding: 8px 12px;
+    background: var(--background-color, #fff);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.docker-volume-name {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--text-color, #000);
+}
+
+.docker-volume-driver {
+    font-size: 0.75em;
+    color: var(--muted-color, #666);
+    margin-left: 8px;
+}
+
+/* ── Output Console ── */
+.docker-output-box {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 10px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+    max-height: 250px;
+    overflow-y: auto;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.docker-output-box .ok   { color: var(--success-color, #3fb950); }
+.docker-output-box .err  { color: var(--danger-color, #f85149); }
+.docker-output-box .info { color: var(--link-color, #79c0ff); }
+.docker-output-box .dim  { color: var(--muted-color, #8b949e); }
+
+/* ── Empty State ── */
+.docker-empty-state {
+    text-align: center;
+    padding: 16px;
+    border: 1px dashed var(--success-color, #28a745);
+    border-radius: 8px;
+    margin-top: 6px;
+}
+
+.docker-empty-state p {
+    color: var(--muted-color, #666);
+    font-size: 0.88em;
+    margin: 0 0 10px 0;
+}
+
+.docker-empty-text {
+    color: var(--muted-color, #666);
+    text-align: center;
+    padding: 10px;
+    font-size: 0.85em;
+}
+
+/* ── Deploy Form ── */
+.docker-deploy-form {
+    border: 2px solid var(--success-color, #28a745);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: var(--background-color, #f0fdf4);
+}
+
+.docker-deploy-form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.docker-deploy-form-title {
+    font-size: 0.95em;
+    color: var(--success-color, #166534);
+    font-weight: bold;
+}
+
+.docker-deploy-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    margin-bottom: 10px;
+}
+
+.docker-deploy-field {
+    font-size: 0.82em;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 2px;
+    color: var(--text-color, #000);
+}
+
+.docker-deploy-input {
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 0.85em;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    color: var(--text-color, #000);
+    background: var(--background-color, #fff);
+}
+
+.docker-deploy-checkbox-group {
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 4px;
+}
+
+.docker-deploy-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.82em;
+    cursor: pointer;
+}
+
+.docker-deploy-checkbox-label input {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.docker-deploy-checkbox-label .no-cache-text {
+    color: var(--warning-color, #d97706);
+}
+
+/* ── Registry Auth Section ── */
+.docker-registry-details {
+    margin-bottom: 10px;
+    font-size: 0.85em;
+}
+
+.docker-registry-summary {
+    cursor: pointer;
+    color: var(--link-color, #0066cc);
+    font-weight: bold;
+}
+
+.docker-registry-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 10px;
+    margin-top: 6px;
+    padding: 8px;
+    background: var(--table-header-bg, #e8f4fd);
+    border-radius: 4px;
+}
+
+.docker-registry-field {
+    font-size: 0.82em;
+    display: block;
+    margin-bottom: 1px;
+    color: var(--text-color, #000);
+}
+
+.docker-registry-input {
+    width: 100%;
+    padding: 3px 6px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 3px;
+    font-size: 0.9em;
+    color: var(--text-color, #000);
+    background: var(--background-color, #fff);
+}
+
+/* ── Deploy Action Buttons ── */
+.docker-deploy-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-docker-deploy {
+    background: var(--success-color, #28a745) !important;
+    color: #fff !important;
+    padding: 6px 20px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.btn-docker-cancel {
+    background: var(--danger-color, #dc3545) !important;
+    color: #fff !important;
+    padding: 6px 12px;
+    font-size: 0.85em;
+}
+
+/* ── No Cache Warning ── */
+.docker-no-cache-text {
+    color: var(--warning-color, #ffc107);
+}
+
+.docker-clean-rebuild-text {
+    color: var(--muted-color, #888);
+    font-size: 0.9em;
+}
+
+/* ── Clear Button ── */
+.btn-docker-clear {
+    background: var(--secondary-color, #6c757d) !important;
+    color: #fff !important;
+    padding: 2px 8px;
+    font-size: 0.8em;
+}
+
+/* ── Volume Inspect Button ── */
+.btn-docker-inspect {
+    background: var(--secondary-color, #6c757d) !important;
+    color: #fff !important;
+    padding: 2px 8px;
+    font-size: 0.78em;
+}
+
+/* ── Refresh Button ── */
+.btn-docker-refresh {
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
+/* ── Prune Button ── */
+.btn-docker-prune {
+    background: var(--success-color, #28a745) !important;
+    color: #fff !important;
+    border-color: var(--success-color, #28a745) !important;
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
+/* ── Deploy Header Button ── */
+.btn-docker-deploy-header {
+    background: var(--link-color, #0366d6) !important;
+    color: #fff !important;
+    border-color: var(--link-color, #0366d6) !important;
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
+/* ── Working View Link ── */
+.btn-docker-working {
+    padding: 4px 10px;
+    font-size: 0.85em;
+}

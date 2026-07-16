@@ -8,3 +8,9 @@ workspace.xml
 # AI session history and working files (not tracked)
 root/Documentation/session_history/
 *.md
+
+# Python virtual environments (Whisper voice command, etc.)
+whisper_venv/
+
+# Dev TLS certificates (private keys — never commit)
+config/dev_tls/

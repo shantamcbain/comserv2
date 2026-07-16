@@ -1,0 +1,78 @@
+[% META title = 'Docker Management' %]
+
+<div class="admin-dashboard">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-docker"></i> Docker Management</h1>
+        <p class="text-muted">Manage Docker containers, images, and deployment</p>
+    </div>
+
+    <div class="admin-sections">
+        <!-- Old Working System -->
+        <div class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-history"></i> Production System (Stable)</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/admin/docker-containers-old') %]" class="admin-link">
+                        <i class="fas fa-cubes"></i>
+                        <span>Docker Containers (Production)</span>
+                    </a>
+                    <p class="section-description">
+                        View and manage running Docker containers in the production environment.
+                        This is the stable, working system currently in use.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- New System Under Development -->
+        <div class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-flask"></i> Development System (New)</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Docker Containers (Development)</span>
+                    </a>
+                    <p class="section-description">
+                        New Docker management interface under active development.
+                        Supports multiple targets (Production 1, Production 2, Workstation).
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legacy Local-Only System -->
+        <div class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-archive"></i> Legacy System (Local Docker)</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                        <i class="fas fa-desktop"></i>
+                        <span>Docker Containers (Legacy)</span>
+                    </a>
+                    <p class="section-description">
+                        Legacy Docker management interface that only manages local Docker containers.
+                        This is the previous development version, now superseded by the multi-target Development system.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.section-description {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(0,0,0,0.03);
+    border-left: 3px solid var(--primary-color, #007bff);
+    font-size: 0.9em;
+    color: var(--text-muted-color, #666);
+}
+</style>

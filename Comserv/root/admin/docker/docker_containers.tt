@@ -1,0 +1,103 @@
+[% META
+   title = 'Docker Container Management'
+   version = '1.4'
+   author = 'System'
+   date = '2026-07-15'
+   last_modified = '2026-07-15'
+   category = 'admin'
+   tags = 'docker, containers, volumes, infrastructure'
+%]
+
+[% PageVersion = 'root/admin/docker/docker_containers.tt,v 1.4 2026/07/15 system Exp system ' %]
+
+<link rel="stylesheet" href="/static/css/components/docker-containers.css">
+
+<div class="app-container docker-page">
+    <div class="docker-page-header">
+        <h1><i class="icon-docker"></i> Docker Servers</h1>
+        <div class="docker-header-actions">
+            <span class="docker-status-badge" id="docker-status-badge">
+                <span class="docker-status-dot check" id="docker-status-dot"></span>
+                <span id="docker-status-text">Loading...</span>
+            </span>
+            <button class="btn btn-secondary btn-sm" data-action="refresh-all">
+                <i class="icon-refresh"></i> Refresh
+            </button>
+            <button class="btn btn-sm btn-docker-prune" data-action="docker-prune">
+                <i class="fas fa-broom"></i> Clean Up Disk
+            </button>
+            <button class="btn btn-sm btn-docker-deploy-header" data-action="show-deploy-form">
+                <i class="fas fa-ship"></i> Pull &amp; Deploy
+            </button>
+            <a href="/admin/docker-containers-working" class="btn btn-secondary btn-sm btn-docker-working">
+                <i class="fas fa-history"></i> Working View
+            </a>
+        </div>
+    </div>
+
+    <!-- Target selector -->
+    <div class="card mb-3 docker-target-card">
+        <div class="card-body docker-target-body">
+            <div class="docker-target-label-group">
+                <label for="docker-target-select" class="docker-target-label">
+                    <i class="fas fa-server"></i> Target Host:
+                </label>
+                <select id="docker-target-select" class="docker-target-select">
+                    <option value="workstation" selected>Workstation (Local)</option>
+                    <option value="production1">Production 1 (192.168.1.126)</option>
+                    <option value="production2">Production 2 (192.168.1.127)</option>
+                </select>
+            </div>
+            <div class="docker-target-info">
+                <span id="target-name-display">Workstation</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Containers Section -->
+    <div class="card mb-3">
+        <div class="card-header docker-section-header">
+            <strong class="docker-section-title">
+                <i class="icon-list"></i> Containers
+                <span class="docker-section-count" id="container-count"></span>
+            </strong>
+            <label class="docker-section-label">
+                <input type="checkbox" id="show-all-containers">
+                Show stopped
+            </label>
+            <label class="docker-section-label" style="margin-left: auto;">
+                <input type="checkbox" id="no-cache-rebuild">
+                <span class="docker-no-cache-text">No Cache</span> <span class="docker-clean-rebuild-text">(clean rebuild)</span>
+            </label>
+        </div>
+        <div class="docker-container-list" id="containers-list">
+            <p class="docker-empty-text">Select a target and click <strong>Refresh</strong>.</p>
+        </div>
+    </div>
+
+    <!-- Volumes Section -->
+    <div class="card mb-3">
+        <div class="card-header docker-section-header">
+            <strong class="docker-section-title">
+                <i class="fas fa-database"></i> Volumes
+                <span class="docker-section-count" id="volume-count"></span>
+            </strong>
+        </div>
+        <div class="docker-volume-list" id="volumes-list">
+            <p class="docker-empty-text">Load containers to see volumes.</p>
+        </div>
+    </div>
+
+    <!-- Output Console -->
+    <div class="card">
+        <div class="card-header docker-section-header">
+            <strong class="docker-section-title"><i class="icon-log"></i> Output</strong>
+            <button class="btn btn-sm btn-docker-clear" data-action="clear-output">Clear</button>
+        </div>
+        <div class="card-body" style="padding: 8px 14px;">
+            <pre class="docker-output-box" id="output-box">Ready.</pre>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/docker-containers.js"></script>
