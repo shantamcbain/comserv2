@@ -1,11 +1,12 @@
-
 # CLI/DB loading stabilized [2026-07-16] - Grok review
 package Comserv::Model::DBEncy;
 
 use strict;
 use base 'Catalyst::Model::DBIC::Schema';
 use Comserv::Util::Logging;
-
+use Comserv::Util::DBConfigLoader qw(is_cli_context);
+use File::Spec;
+use FindBin;
 # Store connection details for debugging
 my $startup_connection_info;
 
@@ -42,32 +43,48 @@ sub COMPONENT {
         $connection_info = $remote_db->get_connection_info('ency', 'CSC');
     };
 
-    # Fallback to SQLite if primary connections fail
+    # CLI/workstation fallback: log the transition when fallback SQLite is used
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
-        
+
+        # Detect workstation/dev mode for clearer diagnostics
+        my $workstation_context = is_cli_context()
+            ? "CLI script mode"
+            : ($ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG}
+                ? "workstation dev server"
+                : "unknown context");
+
         # Write error to STDERR for debugging  (bypasses logging system if broken)
-        warn "\n=== DBEncy CRITICAL ERROR ===\n";
+        warn "=== DBEncy CRITICAL ERROR ===\n";
         warn "Failed to get connection from RemoteDB\n";
+        warn "Context: $workstation_context\n";
         warn "Error: $error\n";
         warn "===========================\n\n";
-        
+
         $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBEncy CRITICAL: Failed to get connection from RemoteDB: $error");
+            "DBEncy CRITICAL: Failed to get connection from RemoteDB: $error (context: $workstation_context)");
         $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBEncy CRITICAL: Falling back to SQLite offline mode - APPLICATION WILL HAVE LIMITED FUNCTIONALITY");
-        
+            "DBEncy CRITICAL: Falling back to SQLite offline mode — APPLICATION WILL HAVE LIMITED FUNCTIONALITY");
+
+        # Resolve data directory relative to app root (FindBin::Bin may be script/ or Comserv/)
+        my $app_root = $ENV{COMSERV_ROOT} || $FindBin::Bin;
+        $app_root =~ s{/script$}{} if $app_root =~ m{/script$};
+        my $fallback_path = File::Spec->catfile($app_root, 'data', 'ency_offline.db');
+
         # Create a fallback SQLite connection
         $connection_info = {
             connection_name => 'sqlite_ency_fallback',
             config => {
                 db_type => 'sqlite',
-                database_path => 'data/ency_offline.db',
+                database_path => $fallback_path,
                 description => 'SQLite Fallback - ENCY Database (offline mode)',
                 priority => 999
             },
             database_name => 'ency'
         };
+
+        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy SQLite fallback path: $fallback_path");
     }
 
     # Extract connection details from RemoteDB

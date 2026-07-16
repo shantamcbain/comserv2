@@ -7,7 +7,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Model::RemoteDB;
-use Comserv::Util::DBConfigLoader qw(is_cli_context);
+use Comserv::Util::DBConfigLoader qw(is_cli_context force_db_load);
 
 has 'logging' => (
     is      => 'ro',
@@ -24,6 +24,7 @@ sub _build_remote_db {
     return Comserv::Model::RemoteDB->new;
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub get_active_environment {
     my ($self, $c) = @_;
 
@@ -87,13 +88,14 @@ sub list_environments {
     return ['production', 'staging', 'dev'];
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub get_environment_connection {
     my ($self, $c, $env_name, $db_name) = @_;
 
     # CLI fast-path: avoid RemoteDB instantiation unless forced
-    if (is_cli_context() && !DBConfigLoader::force_db_load()) {
+    if (is_cli_context() && !force_db_load()) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_environment_connection',
-            "[CLI mode] Skipping RemoteDB connection lookup — not forced; use ENV vars directly");
+            "[CLI mode] Skipping environment-specific connection lookup — RemoteDB fallback configs are available via get_connection_info()");
         return;
     }
     
@@ -168,13 +170,14 @@ sub get_environment_metadata {
     return $metadata{$env_name};
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub get_available_environments {
     my ($self, $c, $db_name) = @_;
 
     # CLI fast-path: avoid RemoteDB instantiation unless forced
-    if (is_cli_context() && !DBConfigLoader::force_db_load()) {
+    if (is_cli_context() && !force_db_load()) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_available_environments',
-            "[CLI mode] Skipping environment listing — not forced");
+            "[CLI mode] Skipping environment listing — environment-specific configs not available, but RemoteDB fallback connections are ready");
         return [];
     }
     

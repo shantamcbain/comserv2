@@ -53,15 +53,25 @@ Catalyst web server / Docker entrypoint.
 
 Detection:
     * C<$ENV{CATALYST_SCRIPT}> is set (explicit marker)
-    * C<$0> matches C<script/> path segment
+    * C<$0> matches C<script/> path segment and is NOT C<comserv_server>
     * C<$0> matches C<.pl> extension and is NOT Catalyst's server script
+    * C<$0> is C<-> (stdin) or C<-e> (one-liner)
 
 =cut
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub is_cli_context {
+    # Explicit marker: set CATALYST_SCRIPT=1 to force CLI detection
     return 1 if $ENV{CATALYST_SCRIPT};
-    return 1 if $0 =~ m{ script/ }x;
-    return 1 if $0 =~ m{ \.pl \z }xms && $0 !~ m{ comserv_server }x;
+    # Scripts under a 'script/' subdirectory (Catalyst convention for CLI tools).
+    # EXCLUDE the Catalyst dev server (comserv_server.pl) — it should always get
+    # full DB config, not SQLite fallbacks, even when started via script/.
+    return 1 if ($0 =~ m{ /script/ }x || $0 =~ m{ \A script/ }x)
+             && $0 !~ m{ comserv_server }xms;
+    # Standalone .pl scripts (not Catalyst server)
+    return 1 if $0 =~ m{ \.pl \z }xms && $0 !~ m{ comserv_server }xms;
+    # -e one-liners and stdin scripts
+    return 1 if $0 eq '-e' || $0 eq '-';
     return 0;
 }
 

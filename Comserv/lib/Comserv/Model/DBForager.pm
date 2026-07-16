@@ -3,6 +3,8 @@ package Comserv::Model::DBForager;
 use strict;
 use base 'Catalyst::Model::DBIC::Schema';
 use Comserv::Util::Logging;
+use File::Spec;
+use FindBin;
 
 # Store connection details for debugging
 my $startup_connection_info;
@@ -44,29 +46,37 @@ sub COMPONENT {
     # Fallback to SQLite if primary connections fail
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
-        
+
         # Write error to STDERR for debugging  (bypasses logging system if broken)
         warn "\n=== DBForager CRITICAL ERROR ===\n";
         warn "Failed to get connection from RemoteDB\n";
         warn "Error: $error\n";
         warn "===============================\n\n";
-        
+
         $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
             "DBForager CRITICAL: Failed to get connection from RemoteDB: $error");
         $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
             "DBForager CRITICAL: Falling back to SQLite offline mode - APPLICATION WILL HAVE LIMITED FUNCTIONALITY");
-        
+
+        # Resolve data directory relative to app root (FindBin::Bin may be script/ or Comserv/)
+        my $app_root = $ENV{COMSERV_ROOT} || $FindBin::Bin;
+        $app_root =~ s{/script$}{} if $app_root =~ m{/script$};
+        my $fallback_path = File::Spec->catfile($app_root, 'data', 'forager_offline.db');
+
         # Create a fallback SQLite connection
         $connection_info = {
             connection_name => 'sqlite_forager_fallback',
             config => {
                 db_type => 'sqlite',
-                database_path => 'data/forager_offline.db',
+                database_path => $fallback_path,
                 description => 'SQLite Fallback - Forager Database (offline mode)',
                 priority => 999
             },
             database_name => 'shanta_forager'
         };
+
+        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager SQLite fallback path: $fallback_path");
     }
 
     # Extract connection details from RemoteDB

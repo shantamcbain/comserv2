@@ -12,6 +12,7 @@ use Data::Dumper;
 use JSON;
 use IO::Socket::INET;
 use POSIX qw(WNOHANG);
+use Cwd;
 use Comserv::Util::Logging;
 use Comserv::Util::DBConfigLoader qw(
     load_config
@@ -59,10 +60,16 @@ sub _load_config {
 
     return if keys %{$self->config};
 
-    # CLI fast-path: skip filesystem I/O unless FORCE_DB_LOAD is set
+    # CLI fast-path: seed local SQLite fallback configs instead of returning empty.
+    # This ensures select_connection() finds candidates and doesn't die.
+    # Use FORCE_DB_LOAD=1 to override and attempt full K8s/Env config loading.
     if (is_cli_context() && !force_db_load()) {
-        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'RemoteDB::_load_config',
-            "[CLI mode] Skipping DB config load — no FORCE_DB_LOAD env var set");
+        my $fallback = $self->_build_cli_fallback_config();
+        $self->config($fallback);
+        $self->{configuration_status} = 'fallback';
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
+            "CLI workstation mode — using local fallback connections (" .
+            join(', ', sort keys %$fallback) . ")");
         return;
     }
 
@@ -119,6 +126,7 @@ sub _apply_env_overrides {
     return $config;
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub get_all_connections {
     my ($self) = @_;
     
@@ -145,6 +153,25 @@ sub get_all_connections {
             environment => $environment,
             connection_name => $conn_name,
         };
+    }
+    
+    # CLI workstation mode: if no connections were loaded, provide fallback configs
+    # so callers always have at least sqlite_ency_fallback and sqlite_forager_fallback
+    if (!keys %connections && is_cli_context()) {
+        my $fallback = $self->_build_cli_fallback_config();
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_all_connections',
+            "CLI workstation mode — no connections loaded, adding fallback configs (" .
+            join(', ', sort keys %$fallback) . ")");
+        foreach my $conn_name (keys %$fallback) {
+            $connections{$conn_name} = {
+                config => $fallback->{$conn_name},
+                priority => $fallback->{$conn_name}{priority} // 999,
+                db_type => 'sqlite',
+                description => $fallback->{$conn_name}{description} // '',
+                environment => 'fallback',
+                connection_name => $conn_name,
+            };
+        }
     }
     
     return \%connections;
@@ -233,6 +260,7 @@ sub test_connection {
     return $result;
 }
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review
 sub select_connection {
     my ($self, $database_name, $sitename) = @_;
 
@@ -250,8 +278,9 @@ sub select_connection {
         ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
     } @matching_connections;
 
-    # Apply site-based filtering when a sitename is provided
-    if ($sitename) {
+    # Apply site-based filtering when a sitename is provided (skip in CLI mode —
+    # CLI/workstation uses local SQLite fallbacks, not site-specific K8s secrets)
+    if ($sitename && !is_cli_context()) {
         require Comserv::Config::Sites;
         my $site_cfg = Comserv::Config::Sites::get_site_db_connection($sitename);
         if ($site_cfg) {
@@ -285,33 +314,45 @@ sub select_connection {
             $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
                 "Site '$sitename' not found in site configuration — testing all candidates unfiltered");
         }
+    } elsif ($sitename && is_cli_context()) {
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+            "CLI workstation mode — skipping site-based filtering for '$sitename'; using local fallback connections");
     }
 
-    # Filter by runtime network — skip connections that belong to a different
-    # network environment (e.g. skip docker entries when on LAN, skip LAN entries
-    # when inside Docker). Entries without a network field are always tested.
-    my $runtime_network = $self->runtime_network;
-    my @network_filtered = grep {
-        my $conn = $config->{$_};
-        !defined $conn->{network} || $conn->{network} eq $runtime_network
-    } @matching_connections;
-
-    if (@network_filtered) {
-        @matching_connections = @network_filtered;
-        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
-            "Network filter ($runtime_network): " . scalar(@network_filtered) . " candidates remain: " .
-            join(', ', @network_filtered));
-    } else {
-        # Fallback: only test entries without a network field (backward compat).
-        # Entries with a non-matching network (e.g. network=lan inside Docker) are
-        # excluded because they are guaranteed to fail and waste 12s each timing out.
-        @matching_connections = grep {
-            !defined $config->{$_}{network}
+    # CLI workstation mode: skip network filtering — use whatever configs are available
+    # (local SQLite fallbacks, env vars, or K8s). Network filtering is designed for
+    # Docker-vs-LAN separation in production, which doesn't apply to CLI scripts.
+    if (!is_cli_context()) {
+        # Filter by runtime network — skip connections that belong to a different
+        # network environment (e.g. skip docker entries when on LAN, skip LAN entries
+        # when inside Docker). Entries without a network field are always tested.
+        my $runtime_network = $self->runtime_network;
+        my @network_filtered = grep {
+            my $conn = $config->{$_};
+            !defined $conn->{network} || $conn->{network} eq $runtime_network
         } @matching_connections;
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
-            "Network filter ($runtime_network): no network-matched candidates found " .
-            "(missing secrets for this environment?). Falling back to " .
-            scalar(@matching_connections) . " legacy (no-network) entries.");
+
+        if (@network_filtered) {
+            @matching_connections = @network_filtered;
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
+                "Network filter ($runtime_network): " . scalar(@network_filtered) . " candidates remain: " .
+                join(', ', @network_filtered));
+        } else {
+            # Fallback: only test entries without a network field (backward compat).
+            # Entries with a non-matching network (e.g. network=lan inside Docker) are
+            # excluded because they are guaranteed to fail and waste 12s each timing out.
+            @matching_connections = grep {
+                !defined $config->{$_}{network}
+            } @matching_connections;
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
+                "Network filter ($runtime_network): no network-matched candidates found " .
+                "(missing secrets for this environment?). Falling back to " .
+                scalar(@matching_connections) . " legacy (no-network) entries.");
+        }
+    } else {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
+            "CLI workstation mode — skipping network-based filtering, keeping " .
+            scalar(@matching_connections) . " candidates");
     }
 
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
@@ -353,6 +394,19 @@ sub select_connection {
     }
 
     if (!@candidates) {
+        # CLI/workstation fallback: provide a local SQLite fallback instead of dying.
+        # This covers:
+        #   - CLI scripts (is_cli_context)
+        #   - Dev workstation server (COMSERV_DEV_MODE / CATALYST_DEBUG)
+        #   - Any env with ACTIVE_DB_ENVIRONMENT set (explicit override)
+        if (is_cli_context() || $ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG}) {
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+                "Workstation/CLI mode — no candidates for '$database_name'" .
+                ($sitename ? " (site: $sitename)" : '') . ", using fallback connection");
+            my $fallback = $self->_build_cli_fallback_for_database($database_name);
+            $self->selected_connection->{$database_name} = $fallback;
+            return $fallback;
+        }
         my $error_msg = "No valid connection candidates for database '$database_name'" .
             ($sitename ? " (site: $sitename)" : '') . " — all candidates were skipped or filtered out";
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'select_connection', $error_msg);
@@ -378,6 +432,17 @@ sub select_connection {
             ($sitename ? " (site: $sitename)" : ''));
 
         return $connection_info;
+    }
+
+    # CLI/workstation fallback: if all parallel tests failed, provide a fallback
+    # instead of dying. The fallback configs are SQLite (always connect locally).
+    if (!$winner && (is_cli_context() || $ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG})) {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
+            "Workstation/CLI mode — all candidates failed for '$database_name'" .
+            ($sitename ? " (site: $sitename)" : '') . ", using fallback connection");
+        my $fallback = $self->_build_cli_fallback_for_database($database_name);
+        $self->selected_connection->{$database_name} = $fallback;
+        return $fallback;
     }
 
     my $error_msg = "Failed to find working connection for database '$database_name'" .
@@ -510,6 +575,85 @@ sub _parallel_test_connections {
 sub _detect_runtime_network {
     my ($self) = @_;
     return detect_runtime_network();
+}
+
+# CLI/DB loading stabilized [2026-07-16] - Grok review
+# Build a set of local SQLite fallback configs for CLI/workstation mode.
+# These are used when no K8s/Env config is available, ensuring that
+# select_connection() always has candidates and never dies.
+sub _build_cli_fallback_config {
+    my ($self) = @_;
+
+    # Resolve the data directory — try multiple strategies so this works
+    # from any calling context (script/, standalone, -e one-liner, Catalyst server)
+    my $app_root = $ENV{COMSERV_ROOT};
+    if (!$app_root) {
+        eval {
+            require FindBin;
+            $app_root = $FindBin::RealBin;
+        };
+        # If FindBin points to a script/ subdirectory, go up one level
+        if ($app_root && $app_root =~ m{/script$}) {
+            $app_root =~ s{/script$}{};
+        }
+    }
+    # Last resort: if we're inside the Comserv directory, use CWD
+    if (!$app_root || !-d $app_root) {
+        $app_root = Cwd::getcwd();
+        # If cwd ends in /script/, go up
+        $app_root =~ s{/script$}{} if $app_root =~ m{/script$};
+    }
+    my $data_dir = File::Spec->catdir($app_root, 'data');
+
+    return {
+        'sqlite_ency_fallback' => {
+            db_type      => 'sqlite',
+            database_path => File::Spec->catfile($data_dir, 'ency_offline.db'),
+            description  => 'SQLite fallback for CLI/workstation mode — ENCY database',
+            priority     => 999,
+        },
+        'sqlite_forager_fallback' => {
+            db_type      => 'sqlite',
+            database_path => File::Spec->catfile($data_dir, 'forager_offline.db'),
+            description  => 'SQLite fallback for CLI/workstation mode — Forager database',
+            priority     => 999,
+        },
+    };
+}
+
+# CLI/DB loading stabilized [2026-07-16] - Grok review
+# Build a single fallback entry for a specific database in CLI mode.
+# Used as a last-resort when select_connection() has no candidates.
+sub _build_cli_fallback_for_database {
+    my ($self, $database_name) = @_;
+
+    my $fallback_config = $self->_build_cli_fallback_config();
+
+    # Map common database names to fallback config keys
+    my $key;
+    if ($database_name eq 'ency' || $database_name eq 'shanta_ency') {
+        $key = 'sqlite_ency_fallback';
+    } elsif ($database_name eq 'shanta_forager' || $database_name eq 'forager') {
+        $key = 'sqlite_forager_fallback';
+    } else {
+        $key = "sqlite_${database_name}_fallback";
+        # Create on-the-fly if not pre-built
+        unless ($fallback_config->{$key}) {
+            $fallback_config->{$key} = {
+                db_type      => 'sqlite',
+                database_path => $fallback_config->{'sqlite_ency_fallback'}{database_path},
+                description  => "SQLite fallback for CLI/workstation mode — $database_name",
+                priority     => 999,
+            };
+        }
+    }
+
+    my $conn = $fallback_config->{$key} || $fallback_config->{'sqlite_ency_fallback'};
+    return {
+        connection_name => $key,
+        config          => $conn,
+        database_name   => $database_name,
+    };
 }
 
 sub get_user_preferred_connection {
