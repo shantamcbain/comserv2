@@ -221,7 +221,14 @@ sub test_connection {
 
         $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=10";
     }
-    
+
+    # CLI/DB loading stabilized [2026-07-16] - Grok review - simplified
+    # Dev server: skip fork-based test (unreliable on workstation due to NFS
+    # D-state hangs).  Use direct non-forked connect with alarm-based timeout.
+    if (is_dev_server()) {
+        return $self->_direct_test_connection($conn_config, $conn_name, 30);
+    }
+
     # Fork a child to test the DBI connection so we can SIGKILL it after a timeout.
     # alarm() cannot interrupt C-level DBI blocking calls; fork+kill can.
     my $timeout = is_dev_server() ? 20 : 12;
@@ -234,30 +241,16 @@ sub test_connection {
     unless (defined $pid) {
         $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
             "fork() failed for '$conn_name': $! — trying direct connect");
-        
-        # Fallback: try direct connect in-process with alarm
-        my $direct_ok = eval {
-            local $SIG{ALRM} = sub { die "connect timed out\n" };
-            alarm($timeout);
-            my %connect_attrs = (
-                RaiseError => 1,
-                PrintError => 0,
-                AutoCommit => 1,
-                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => $timeout) : ()),
-            );
-            my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
-            alarm(0);
-            $dbh->disconnect() if $dbh;
-            1;
-        };
-        alarm(0);
+
+        # Fallback: use the non-forked direct test helper
+        my $direct_ok = $self->_direct_test_connection($conn_config, $conn_name, $timeout);
         if ($direct_ok) {
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
                 "Connection test (direct fallback) succeeded for '$conn_name'");
             return 1;
         } else {
             $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
-                "Connection test (direct fallback) failed for '$conn_name': $@");
+                "Connection test (direct fallback) failed for '$conn_name'");
             return 0;
         }
     }
@@ -321,6 +314,70 @@ sub test_connection {
             "Connection test failed for '$conn_name'" . ($child_error ? " — $child_error" : ''));
     }
     return $result;
+}
+
+# Non-forked DBI connection test with eval + alarm.
+# Used as a fallback when fork() is unavailable or when the fork-based
+# parallel test fails on a dev workstation (where NFS D-state hangs can
+# cause fork/child issues).  Uses alarm() to enforce a timeout since
+# DBI connect blocks at the C level.
+#
+# Parameters:
+#   $conn_config  - HashRef of connection config (host, port, db_type, etc.)
+#   $conn_name    - Connection name (for logging)
+#   $timeout      - Optional timeout in seconds (default: is_dev_server() ? 20 : 12)
+#
+# Returns: 1 on success, 0 on failure.  Logs the exact DBI error on failure.
+sub _direct_test_connection {
+    my ($self, $conn_config, $conn_name, $timeout) = @_;
+
+    $conn_name //= 'unknown';
+    $timeout //= is_dev_server() ? 20 : 12;
+
+    my $db_type = $conn_config->{db_type} // 'mysql';
+    my $dsn;
+    my $username = $conn_config->{username} // '';
+    my $password = $conn_config->{password} // '';
+
+    if ($db_type eq 'sqlite') {
+        $dsn = "dbi:SQLite:dbname=" . $conn_config->{database_path};
+    } else {
+        my $host = $conn_config->{host} // 'localhost';
+        my $port = $conn_config->{port} // 3306;
+        my $database = $conn_config->{database} // '';
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=$timeout";
+    }
+
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_direct_test_connection',
+        "Attempting direct (non-forked) connect for '$conn_name' with ${timeout}s timeout");
+
+    my $ok = eval {
+        local $SIG{ALRM} = sub { die "connect timed out\n" };
+        alarm($timeout);
+        my $dbh = DBI->connect($dsn, $username, $password, {
+            RaiseError => 1,
+            PrintError => 0,
+            AutoCommit => 1,
+            ($db_type ne 'sqlite' ? (mariadb_connect_timeout => $timeout) : ()),
+        });
+        alarm(0);
+        $dbh->disconnect() if $dbh;
+        1;
+    };
+    alarm(0);
+
+    if ($ok) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_direct_test_connection',
+            "Direct connect succeeded for '$conn_name'");
+        return 1;
+    }
+
+    # Clean up $@: remove trailing newline/trailing noise for cleaner logs
+    my $error = $@ // 'unknown error';
+    chomp($error);
+    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_direct_test_connection',
+        "Direct connect failed for '$conn_name' after ${timeout}s: $error");
+    return 0;
 }
 
 # CLI/DB loading stabilized [2026-07-16] - Grok review
@@ -476,8 +533,31 @@ sub select_connection {
         die $error_msg;
     }
 
-    # Race all candidates in parallel via fork
-    my $winner = $self->_parallel_test_connections(\@candidates, $database_name);
+    # CLI/DB loading stabilized [2026-07-16] - Grok review - simplified
+    # Dev server: skip fork-based parallel test (unreliable on workstation due to
+    # NFS D-state hangs).  Try candidates sequentially via direct non-forked DBI
+    # connect with alarm-based timeout (30s).
+    # Production/Docker: use fork-based parallel test (reliable in container/LAN).
+    my $winner;
+    my $testing_approach = '';
+    if (is_dev_server() && @candidates) {
+        $testing_approach = 'sequential direct connect';
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+            "Dev server — trying candidates sequentially via direct connect for '$database_name': " .
+            join(', ', @candidates));
+        foreach my $conn_name (@candidates) {
+            my $conn = $config->{$conn_name};
+            if ($self->_direct_test_connection($conn, $conn_name, 30)) {
+                $winner = $conn_name;
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+                    "Dev server — candidate '$conn_name' connected successfully");
+                last;
+            }
+        }
+    } else {
+        $testing_approach = 'fork-based parallel';
+        $winner = $self->_parallel_test_connections(\@candidates, $database_name);
+    }
 
     if ($winner) {
         my $conn = $config->{$winner};
@@ -490,14 +570,14 @@ sub select_connection {
         $self->selected_connection->{$database_name} = $connection_info;
 
         $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-            "SUCCESS: Selected connection '$winner' (Priority " . ($conn->{priority} // 999) .
-            ") for database '$database_name'" .
+            "SUCCESS: Selected connection '$winner' ($testing_approach, Priority " .
+            ($conn->{priority} // 999) . ") for database '$database_name'" .
             ($sitename ? " (site: $sitename)" : ''));
 
         return $connection_info;
     }
 
-    # CLI/workstation fallback: if all parallel tests failed, provide a fallback
+    # CLI/workstation fallback: if all tests failed, provide a fallback
     # instead of dying. The fallback configs are SQLite (always connect locally).
     if (!$winner && (is_cli_context() || is_dev_server())) {
         $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
@@ -563,22 +643,8 @@ sub _parallel_test_connections {
             $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_parallel_test_connections',
                 "fork() failed for '$conn_name': $! — falling back to direct (non-forked) test");
 
-            # Fallback: try a direct DBI connect in-process with an eval + alarm guard
-            my $direct_ok = eval {
-                local $SIG{ALRM} = sub { die "connect timed out\n" };
-                alarm($timeout);
-                my %connect_attrs = (
-                    RaiseError => 1,
-                    PrintError => 0,
-                    AutoCommit => 1,
-                    ($db_type ne 'sqlite' ? (mariadb_connect_timeout => $timeout) : ()),
-                );
-                my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
-                alarm(0);
-                $dbh->disconnect() if $dbh;
-                1;
-            };
-            alarm(0);
+            # Fallback: use the non-forked direct test helper
+            my $direct_ok = $self->_direct_test_connection($conn, $conn_name, $timeout);
             if ($direct_ok) {
                 $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_parallel_test_connections',
                     "Direct (fallback) connect succeeded for '$conn_name' — returning as winner");
@@ -590,7 +656,7 @@ sub _parallel_test_connections {
                 return $conn_name;
             } else {
                 $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_parallel_test_connections',
-                    "Direct (fallback) connect failed for '$conn_name': $@");
+                    "Direct (fallback) connect failed for '$conn_name'");
                 next;
             }
         }

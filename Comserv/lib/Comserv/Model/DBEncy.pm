@@ -1,4 +1,4 @@
-# CLI/DB loading stabilized [2026-07-16] - Grok review
+# CLI/DB loading stabilized [2026-07-16] - Grok review - simplified
 package Comserv::Model::DBEncy;
 
 use strict;

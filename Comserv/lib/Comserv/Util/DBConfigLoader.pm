@@ -93,6 +93,7 @@ Pure CLI scripts (C<is_cli_context()> returning true) are explicitly excluded
 
 =cut
 
+# CLI/DB loading stabilized [2026-07-16] - Grok review - simplified
 sub is_dev_server {
     # Pure CLI scripts are NOT dev servers — they use SQLite fast path
     return 0 if is_cli_context();
@@ -373,6 +374,7 @@ sub _find_db_config_file {
 #   2. COMSERV_DEV_USERNAME / COMSERV_DEV_PASSWORD / COMSERV_DEV_HOST env vars
 #
 # Returns undef if no dev server context is detected.
+# CLI/DB loading stabilized [2026-07-16] - Grok review - simplified
 sub _build_workstation_dev_config {
     my ($logging) = @_;
 
