@@ -57,14 +57,13 @@ sub _detect_project_root {
     my @candidates = (
         File::Spec->catdir($FindBin::Bin, '..'),
         File::Spec->catdir($FindBin::Bin, '..', '..'),
-        File::Spec->catdir($FindBin::Bin, '..', '..', '..'),  # Add one more level up
+        File::Spec->catdir($FindBin::Bin, '..', '..', '..'),
         '/opt/comserv',
         getcwd(),
-        File::Spec->catdir(getcwd(), 'Comserv'),  # Check Comserv subdirectory
+        File::Spec->catdir(getcwd(), 'Comserv'),
     );
 
     foreach my $candidate (@candidates) {
-        # Look for Comserv-specific compose files first
         if (-f File::Spec->catfile($candidate, 'Comserv', 'docker-compose.dev.yml') ||
             -f File::Spec->catfile($candidate, 'Comserv', 'docker-compose.prod.yml') ||
             -f File::Spec->catfile($candidate, 'Comserv', 'docker-compose.staging.yml')) {
@@ -91,10 +90,10 @@ sub _detect_project_root {
 
 sub _build_docker_compose_file {
     my ($self) = @_;
-    
+
     my $env = $self->environment;
     my $filename = 'docker-compose.yml';
-    
+
     if ($env eq 'production') {
         $filename = 'docker-compose.prod.yml';
     } elsif ($env eq 'staging') {
@@ -102,14 +101,14 @@ sub _build_docker_compose_file {
     } elsif ($env eq 'development') {
         $filename = 'docker-compose.dev.yml';
     }
-    
+
     my $full_path = File::Spec->catfile($self->project_root, $filename);
-    
+
     if (!-f $full_path && $filename ne 'docker-compose.yml') {
         my $fallback = File::Spec->catfile($self->project_root, 'docker-compose.yml');
         return -f $fallback ? $fallback : $full_path;
     }
-    
+
     return $full_path;
 }
 
@@ -118,316 +117,307 @@ sub _detect_docker_container {
 }
 
 sub _detect_docker_compose_command {
-    # Try docker compose (v2) first, then docker-compose (v1)
     my ($out, $err);
-
-    # Test docker compose (v2)
     my $success = run ['docker', 'compose', 'version'], \undef, \$out, \$err;
     if ($success) {
         return ['docker', 'compose'];
     }
-
-    # Test docker-compose (v1)
     $success = run ['docker-compose', '--version'], \undef, \$out, \$err;
     if ($success) {
         return ['docker-compose'];
     }
-
-    # Default to docker compose v2
     return ['docker', 'compose'];
 }
 
-sub restart_containers {
-    my ($self, %args) = @_;
-    
-    if ($self->in_docker_container) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => 'Cannot restart containers from within a Docker container',
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-    
-    my $services = $args{services} || [];
-    my $force = $args{force} // 0;
-    my $compose_file = $args{compose_file};
-    
-    if (!$compose_file && @$services) {
-        $compose_file = $self->_find_compose_file_for_service($services->[0]);
-        unless ($compose_file) {
-            return {
-                success => 0,
-                stdout => '',
-                stderr => "Service '$services->[0]' not found in any docker-compose file",
-                timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-            };
-        }
-    }
-    
-    $compose_file ||= $self->docker_compose_file;
-    
-    unless (-f $compose_file) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => "docker-compose file not found: $compose_file",
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-    
-    my @cmd = (
-        @{$self->docker_compose_cmd},
-        '--project-directory', $self->project_root,
-        '-f', $compose_file
-    );
-    
-    if ($force) {
-        push @cmd, ('down', '--remove-orphans');
-        if (@$services) {
-            push @cmd, @$services;
-        }
-    }
-    
-    push @cmd, 'up', '-d';
-    push @cmd, @$services if @$services;
-    
-    my ($out, $err);
-    my $success = run \@cmd, \undef, \$out, \$err;
-    
-    return {
-        success => $success,
-        stdout => $out // '',
-        stderr => $err // '',
-        timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        command => join(' ', @cmd),
-    };
-}
-
-sub check_container_status {
-    my ($self, $service) = @_;
-    
-    if ($self->in_docker_container) {
-        return {
-            success => 0,
-            output => '',
-            error => 'Cannot check container status from within a Docker container',
-        };
-    }
-    
-    my $compose_file = $self->_find_compose_file_for_service($service);
-    unless ($compose_file) {
-        return {
-            success => 0,
-            output => '',
-            error => "Service '$service' not found in any docker-compose file",
-        };
-    }
-    
-    unless (-f $compose_file) {
-        return {
-            success => 0,
-            output => '',
-            error => "docker-compose file not found: $compose_file",
-        };
-    }
-    
-    my @cmd = (
-        @{$self->docker_compose_cmd},
-        '--project-directory', $self->project_root,
-        '-f', $compose_file,
-        'ps', $service
-    );
-    
-    my ($out, $err);
-    my $success = run \@cmd, \undef, \$out, \$err;
-    
-    return {
-        success => $success,
-        output => $out // '',
-        error => $err // '',
-        command => join(' ', @cmd),
-    };
-}
-
-sub get_container_logs {
-    my ($self, $service, $lines) = @_;
-
-    if ($self->in_docker_container) {
-        return {
-            output => '',
-            error => 'Cannot get container logs from within a Docker container',
-        };
-    }
-
-    my $compose_file = $self->_find_compose_file_for_service($service);
-    unless ($compose_file) {
-        return {
-            output => '',
-            error => "Service '$service' not found in any docker-compose file",
-        };
-    }
-
-    unless (-f $compose_file) {
-        return {
-            output => '',
-            error => "docker-compose file not found: $compose_file",
-        };
-    }
-
-    $lines ||= 50;
-
-    my @cmd = (
-        @{$self->docker_compose_cmd},
-        '--project-directory', $self->project_root,
-        '-f', $compose_file,
-        'logs', '--tail=' . $lines, $service
-    );
-
-    my ($out, $err);
-    run \@cmd, \undef, \$out, \$err;
-
-    return {
-        output => $out // '',
-        error => $err // '',
-        command => join(' ', @cmd),
-    };
-}
+# ────────────────────────────────────────────────────────────────
+# Controller-facing methods — called from Admin/Docker.pm
+# ────────────────────────────────────────────────────────────────
 
 sub list_containers {
-    my ($self) = @_;
+    my ($self, $c, %args) = @_;
 
-    if ($self->in_docker_container) {
-        return {
-            success => 0,
-            containers => [],
-            error => 'Cannot list containers from within a Docker container',
-        };
+    my $host = $args{host} || 'workstation';
+    my $compose_file = $self->_get_compose_file_for_host($host);
+
+    unless (-f $compose_file) {
+        return { success => 0, containers => [], error => "Compose file not found: $compose_file" };
     }
 
     my @all_containers;
-    my %seen_services;
+    my @cmd = (
+        @{$self->docker_compose_cmd},
+        '--project-directory', $self->project_root,
+        '-f', $compose_file,
+        'ps', '-a', '--format', 'json'
+    );
 
-    # Find all docker-compose files in the project root
-    my @compose_files = $self->find_all_compose_files();
+    my ($ps_out, $ps_err);
+    my $ps_success = run \@cmd, \undef, \$ps_out, \$ps_err;
 
-    if (!@compose_files) {
-        return {
-            success => 0,
-            containers => [],
-            error => "No docker-compose files found in: " . $self->project_root,
+    if ($ps_success && $ps_out) {
+        my @json_lines = split /\n/, $ps_out;
+        foreach my $line (@json_lines) {
+            next unless $line =~ /^\s*\{/;
+            my $container = JSON->new->decode($line);
+            push @all_containers, {
+                name => $container->{Name},
+                service => $container->{Service} || $container->{Name},
+                state => $container->{State} || 'unknown',
+                status => $container->{Status} || 'unknown',
+                image => $container->{Image} || '',
+                ports => $container->{Ports} || '',
+                created => $container->{CreatedAt} || '',
+            };
+        }
+    }
+
+    # Also get raw docker ps for additional details (image, mounts, etc.)
+    my $docker_ps = `docker ps -a --format json 2>/dev/null` || '';
+    my @docker_lines = split /\n/, $docker_ps;
+    my %docker_containers;
+    foreach my $line (@docker_lines) {
+        next unless $line =~ /^\s*\{/;
+        my $dc = JSON->new->decode($line);
+        $docker_containers{$dc->{ID}} = $dc;
+    }
+
+    # Enrich with docker inspect data
+    foreach my $c (@all_containers) {
+        my $inspect = `docker inspect $c->{name} 2>/dev/null` || '';
+        my $idata = JSON->new->decode($inspect) if $inspect;
+        if ($idata && ref $idata eq 'ARRAY' && $idata->[0]) {
+            my $d = $idata->[0];
+            $c->{image_created} = $d->{Created} || '';
+            $c->{running_for} = $d->{State}->{StartedAt} || '';
+            # Extract mounts
+            my @mounts;
+            if ($d->{Mounts}) {
+                foreach my $m (@{$d->{Mounts}}) {
+                    push @mounts, $m->{Name} || $m->{Source} || '';
+                }
+            }
+            $c->{mounts} = join(',', @mounts);
+            # Check if backup container
+            $c->{is_backup_container} = ($c->{name} =~ /^bk-/ ? 1 : 0);
+        }
+    }
+
+    return { success => 1, containers => \@all_containers, error => '' };
+}
+
+sub list_volumes {
+    my ($self, $c, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $vol_output = `docker volume ls --format json 2>/dev/null` || '';
+    my @volumes;
+    my @lines = split /\n/, $vol_output;
+    foreach my $line (@lines) {
+        next unless $line =~ /^\s*\{/;
+        my $v = JSON->new->decode($line);
+        push @volumes, {
+            name => $v->{Name},
+            driver => $v->{Driver} || 'local',
+            status => 'present',
         };
     }
 
-    # Process each compose file
-    foreach my $compose_file (@compose_files) {
-        # Parse compose file for service descriptions
-        my $compose_services = $self->parse_compose_file($compose_file);
+    return { success => 1, volumes => \@volumes };
+}
 
-        # Get container status from docker-compose ps
-        my @ps_cmd = (
+sub restart {
+    my ($self, $c, %args) = @_;
+
+    my $service = $args{service} || '';
+    my $host = $args{host} || 'workstation';
+    my $compose_file = $self->_get_compose_file_for_host($host);
+    return { success => 0, stderr => "No service specified" } unless $service;
+    return { success => 0, stderr => "Compose file not found" } unless -f $compose_file;
+
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+    my @cmd = (
+        @{$self->docker_compose_cmd},
+        '--project-directory', $self->project_root,
+        '-f', $compose_file,
+        'restart', $compose_service
+    );
+    my ($out, $err);
+    my $success = run \@cmd, \undef, \$out, \$err;
+    return { success => $success, stdout => $out // '', stderr => $err // '' };
+}
+
+sub stop {
+    my ($self, $c, $service, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $compose_file = $self->_get_compose_file_for_host($host);
+    return { success => 0, stderr => "No service specified" } unless $service;
+    return { success => 0, stderr => "Compose file not found" } unless -f $compose_file;
+
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+    my @cmd = (
+        @{$self->docker_compose_cmd},
+        '--project-directory', $self->project_root,
+        '-f', $compose_file,
+        'stop', $compose_service
+    );
+    my ($out, $err);
+    my $success = run \@cmd, \undef, \$out, \$err;
+    return { success => $success, stdout => $out // '', stderr => $err // '' };
+}
+
+sub start {
+    my ($self, $c, $service, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $compose_file = $self->_get_compose_file_for_host($host);
+    return { success => 0, stderr => "No service specified" } unless $service;
+    return { success => 0, stderr => "Compose file not found" } unless -f $compose_file;
+
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+    my @cmd = (
+        @{$self->docker_compose_cmd},
+        '--project-directory', $self->project_root,
+        '-f', $compose_file,
+        'start', $compose_service
+    );
+    my ($out, $err);
+    my $success = run \@cmd, \undef, \$out, \$err;
+    return { success => $success, stdout => $out // '', stderr => $err // '' };
+}
+
+sub up {
+    my ($self, $c, $service, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $compose_file = $self->_get_compose_file_for_host($host);
+    return { success => 0, stderr => "No service specified" } unless $service;
+    return { success => 0, stderr => "Compose file not found" } unless -f $compose_file;
+
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+    my @cmd = (
+        @{$self->docker_compose_cmd},
+        '--project-directory', $self->project_root,
+        '-f', $compose_file,
+        'up', '-d', $compose_service
+    );
+    my ($out, $err);
+    my $success = run \@cmd, \undef, \$out, \$err;
+    return { success => $success, stdout => $out // '', stderr => $err // '' };
+}
+
+sub down {
+    my ($self, $c, $service, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $compose_file = $self->_get_compose_file_for_host($host);
+    return { success => 0, stderr => "No service specified" } unless $service;
+    return { success => 0, stderr => "Compose file not found" } unless -f $compose_file;
+
+    my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+    my @cmd = (
+        @{$self->docker_compose_cmd},
+        '--project-directory', $self->project_root,
+        '-f', $compose_file,
+        'rm', '-f', '-s', $compose_service
+    );
+    my ($out, $err);
+    my $success = run \@cmd, \undef, \$out, \$err;
+    return { success => $success, stdout => $out // '', stderr => $err // '' };
+}
+
+sub logs {
+    my ($self, $c, $service, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $lines = $args{lines} || 100;
+    my $compose_file = $self->_get_compose_file_for_host($host);
+
+    return { success => 0, output => '', error => "No service specified" } unless $service;
+
+    if (-f $compose_file) {
+        my $compose_service = $self->_resolve_service_to_compose_name($service, $compose_file);
+        my @cmd = (
             @{$self->docker_compose_cmd},
             '--project-directory', $self->project_root,
             '-f', $compose_file,
-            'ps', '-a', '--format', 'json'
+            'logs', '--tail=' . $lines, $compose_service
         );
-
-        my ($ps_out, $ps_err);
-        my $ps_success = run \@ps_cmd, \undef, \$ps_out, \$ps_err;
-
-        my @containers_from_file;
-
-        # Parse the docker-compose ps JSON output
-        if ($ps_success && $ps_out) {
-            try {
-                # Handle both single JSON object and JSON lines format
-                my @json_lines = split /\n/, $ps_out;
-                foreach my $line (@json_lines) {
-                    next unless $line =~ /^\s*\{/;
-                    my $container = JSON->new->decode($line);
-
-                    my $service_name = $container->{Service} || $container->{Name};
-
-                    next if $seen_services{$service_name}; # Skip duplicates
-                    $seen_services{$service_name} = 1;
-
-                    push @containers_from_file, {
-                        name => $container->{Name},
-                        service => $service_name,
-                        state => $container->{State} || 'unknown',
-                        status => $container->{Status} || 'unknown',
-                        description => $compose_services->{$service_name}->{description} || '',
-                        ports => $compose_services->{$service_name}->{ports} || [],
-                        image => $compose_services->{$service_name}->{image} || '',
-                        compose_file => $compose_file,
-                    };
-                }
-            } catch {
-                # Fall back to parsing text output if JSON fails
-                @ps_cmd = (
-                    @{$self->docker_compose_cmd},
-                    '--project-directory', $self->project_root,
-                    '-f', $compose_file,
-                    'ps', '-a'
-                );
-
-                run \@ps_cmd, \undef, \$ps_out, \$ps_err;
-
-                # Parse text output (skip header lines)
-                my @lines = split /\n/, $ps_out;
-                foreach my $line (@lines) {
-                    next if $line =~ /^NAME|^-+/;
-                    next unless $line =~ /\S/;
-
-                    if ($line =~ /^(\S+)\s+(.+?)\s+(Up|Exit|Restarting|Paused|Created)/i) {
-                        my ($name, $command, $state) = ($1, $2, $3);
-                        my $service = $name;
-
-                        next if $seen_services{$service}; # Skip duplicates
-                        $seen_services{$service} = 1;
-
-                        push @containers_from_file, {
-                            name => $name,
-                            service => $service,
-                            state => lc($state),
-                            status => $line,
-                            description => $compose_services->{$service}->{description} || '',
-                            ports => $compose_services->{$service}->{ports} || [],
-                            image => $compose_services->{$service}->{image} || '',
-                            compose_file => $compose_file,
-                        };
-                    }
-                }
-            };
-        }
-
-        # If no running containers found, list services from compose file
-        if (!@containers_from_file && %$compose_services) {
-            foreach my $service (sort keys %$compose_services) {
-                next if $seen_services{$service}; # Skip duplicates
-                $seen_services{$service} = 1;
-
-                push @containers_from_file, {
-                    name => $service,
-                    service => $service,
-                    state => 'not_created',
-                    status => 'Not running',
-                    description => $compose_services->{$service}->{description} || '',
-                    ports => $compose_services->{$service}->{ports} || [],
-                    image => $compose_services->{$service}->{image} || '',
-                    compose_file => $compose_file,
-                };
-            }
-        }
-
-        push @all_containers, @containers_from_file;
+        my ($out, $err);
+        run \@cmd, \undef, \$out, \$err;
+        return { success => 1, output => $out // '', logs => $out // '' };
     }
 
-    return {
-        success => 1,
-        containers => \@all_containers,
-        error => '',
-    };
+    # Fallback to docker logs
+    my $output = `docker logs --tail=${lines} "$service" 2>&1` || '';
+    return { success => 1, output => $output, logs => $output };
+}
+
+sub delete_container {
+    my ($self, $c, $service, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $rm_cmd = "docker rm -f \"$service\" 2>&1";
+    my $output = `$rm_cmd` || '';
+    my $exit = $? >> 8;
+    return { success => $exit == 0, stdout => $output, stderr => $exit == 0 ? '' : "Failed to delete $service" };
+}
+
+sub prune {
+    my ($self, $c, %args) = @_;
+
+    my $host = $args{host} || 'workstation';
+    my $action = $args{action} || 'df';
+
+    if ($action eq 'df') {
+        my $output = `docker system df 2>&1` || '';
+        return { success => 1, output => $output };
+    }
+
+    if ($action eq 'prune') {
+        my $output = '';
+        $output .= `docker builder prune -a -f 2>&1` || '';
+        $output .= `docker image prune -a -f 2>&1` || '';
+        return { success => 1, output => $output };
+    }
+
+    return { success => 0, error => "Unknown action: $action" };
+}
+
+# ────────────────────────────────────────────────────────────────
+# Internal helpers
+# ────────────────────────────────────────────────────────────────
+
+sub _get_compose_file_for_host {
+    my ($self, $host) = @_;
+
+    if ($host eq 'production1' || $host eq 'production2') {
+        my $prod_file = File::Spec->catfile($self->project_root, 'docker-compose.prod.yml');
+        return $prod_file if -f $prod_file;
+    }
+    if ($host eq 'staging') {
+        my $staging_file = File::Spec->catfile($self->project_root, 'docker-compose.staging.yml');
+        return $staging_file if -f $staging_file;
+    }
+
+    return $self->docker_compose_file;
+}
+
+sub _resolve_service_to_compose_name {
+    my ($self, $service, $compose_file) = @_;
+
+    return $service unless $compose_file;
+    return $service unless -f $compose_file;
+
+    my $services = $self->parse_compose_file($compose_file);
+    return $service if exists $services->{$service};
+
+    foreach my $sname (keys %$services) {
+        my $cname = $services->{$sname}{container_name} || '';
+        return $sname if $cname && $cname eq $service;
+    }
+
+    return $service;
 }
 
 sub find_all_compose_files {
@@ -436,7 +426,6 @@ sub find_all_compose_files {
     my @files;
     my $root = $self->project_root;
 
-    # List of common compose file patterns
     my @patterns = (
         'docker-compose.yml',
         'docker-compose.dev.yml',
@@ -455,11 +444,8 @@ sub find_all_compose_files {
 sub parse_compose_file {
     my ($self, $compose_file) = @_;
 
-    # Use provided file or default to docker_compose_file attribute
     $compose_file ||= $self->docker_compose_file;
-
     my $services = {};
-
     return $services unless -f $compose_file;
 
     try {
@@ -469,8 +455,6 @@ sub parse_compose_file {
         if ($config && $config->{services}) {
             foreach my $service_name (keys %{$config->{services}}) {
                 my $service = $config->{services}->{$service_name};
-
-                # Extract description from labels or comments
                 my $description = '';
                 if ($service->{labels}) {
                     if (ref $service->{labels} eq 'HASH') {
@@ -485,17 +469,15 @@ sub parse_compose_file {
                         }
                     }
                 }
-
-                # Extract ports
                 my @ports;
                 if ($service->{ports}) {
                     @ports = ref $service->{ports} eq 'ARRAY' ? @{$service->{ports}} : ($service->{ports});
                 }
-
                 $services->{$service_name} = {
                     description => $description,
                     ports => \@ports,
                     image => $service->{image} || '',
+                    container_name => $service->{container_name} || '',
                 };
             }
         }
@@ -514,213 +496,14 @@ sub _find_compose_file_for_service {
     foreach my $compose_file ($self->find_all_compose_files()) {
         my $services = $self->parse_compose_file($compose_file);
         return $compose_file if exists $services->{$service};
+
+        foreach my $sname (keys %$services) {
+            my $cname = $services->{$sname}{container_name} || '';
+            return $compose_file if $cname && $cname eq $service;
+        }
     }
 
     return;
-}
-
-sub start_container {
-    my ($self, $service, $compose_file) = @_;
-
-    if ($self->in_docker_container) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => 'Cannot start containers from within a Docker container',
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    unless ($compose_file) {
-        $compose_file = $self->_find_compose_file_for_service($service);
-        unless ($compose_file) {
-            return {
-                success => 0,
-                stdout => '',
-                stderr => "Service '$service' not found in any docker-compose file",
-                timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-            };
-        }
-    }
-
-    unless (-f $compose_file) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => "docker-compose file not found: $compose_file",
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    my @cmd = (
-        @{$self->docker_compose_cmd},
-        '--project-directory', $self->project_root,
-        '-f', $compose_file,
-        'start', $service
-    );
-
-    my ($out, $err);
-    my $success = run \@cmd, \undef, \$out, \$err;
-
-    return {
-        success => $success,
-        stdout => $out // '',
-        stderr => $err // '',
-        timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        command => join(' ', @cmd),
-    };
-}
-
-sub up_container {
-    my ($self, $service, $compose_file) = @_;
-
-    if ($self->in_docker_container) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => 'Cannot create containers from within a Docker container',
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    unless ($compose_file) {
-        $compose_file = $self->_find_compose_file_for_service($service);
-        unless ($compose_file) {
-            return {
-                success => 0,
-                stdout => '',
-                stderr => "Service '$service' not found in any docker-compose file",
-                timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-            };
-        }
-    }
-
-    unless (-f $compose_file) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => "docker-compose file not found: $compose_file",
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    my @cmd = (
-        @{$self->docker_compose_cmd},
-        '--project-directory', $self->project_root,
-        '-f', $compose_file,
-        'up', '-d', $service
-    );
-
-    my ($out, $err);
-    my $success = run \@cmd, \undef, \$out, \$err;
-
-    return {
-        success => $success,
-        stdout => $out // '',
-        stderr => $err // '',
-        timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        command => join(' ', @cmd),
-    };
-}
-
-sub stop_container {
-    my ($self, $service) = @_;
-
-    if ($self->in_docker_container) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => 'Cannot stop containers from within a Docker container',
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    my $compose_file = $self->_find_compose_file_for_service($service);
-    unless ($compose_file) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => "Service '$service' not found in any docker-compose file",
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    unless (-f $compose_file) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => "docker-compose file not found: $compose_file",
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    my @cmd = (
-        @{$self->docker_compose_cmd},
-        '--project-directory', $self->project_root,
-        '-f', $compose_file,
-        'stop', $service
-    );
-
-    my ($out, $err);
-    my $success = run \@cmd, \undef, \$out, \$err;
-
-    return {
-        success => $success,
-        stdout => $out // '',
-        stderr => $err // '',
-        timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        command => join(' ', @cmd),
-    };
-}
-
-sub down_container {
-    my ($self, $service) = @_;
-
-    if ($self->in_docker_container) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => 'Cannot down containers from within a Docker container',
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    my $compose_file = $self->_find_compose_file_for_service($service);
-    unless ($compose_file) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => "Service '$service' not found in any docker-compose file",
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    unless (-f $compose_file) {
-        return {
-            success => 0,
-            stdout => '',
-            stderr => "docker-compose file not found: $compose_file",
-            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        };
-    }
-
-    my @cmd = (
-        @{$self->docker_compose_cmd},
-        '--project-directory', $self->project_root,
-        '-f', $compose_file,
-        'rm', '-f', '-s', $service
-    );
-
-    my ($out, $err);
-    my $success = run \@cmd, \undef, \$out, \$err;
-
-    return {
-        success => $success,
-        stdout => $out // '',
-        stderr => $err // '',
-        timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        command => join(' ', @cmd),
-    };
 }
 
 1;

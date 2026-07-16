@@ -25,6 +25,30 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
+# When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
+# Defaults to disabled when CATALYST_ENV=production (safe default for disk).
+# Admin can toggle at runtime via set_file_logging(). A restart is only needed
+# to affect the log file initialisation itself.
+my $FILE_LOGGING_DISABLED = do {
+    my $env_val = $ENV{DISABLE_FILE_LOGGING} // '';
+    if    ($env_val eq '1') { 1 }
+    elsif ($env_val eq '0') { 0 }
+    elsif (($ENV{CATALYST_ENV} // '') eq 'production') { 1 }
+    else  { 0 }
+};
+
+# Allow runtime toggle — called by admin UI actions.
+sub set_file_logging {
+    my ($class, $enabled) = @_;
+    $FILE_LOGGING_DISABLED = $enabled ? 0 : 1;
+    _print_log("File logging " . ($FILE_LOGGING_DISABLED ? "DISABLED" : "ENABLED") . " at runtime by admin");
+    return !$FILE_LOGGING_DISABLED;
+}
+
+sub file_logging_enabled {
+    return !$FILE_LOGGING_DISABLED;
+}
+
 # Known bot/spider user-agent patterns for request classification
 my @BOT_PATTERNS = (
     qr/googlebot/i,
@@ -92,10 +116,18 @@ our $EMAIL_NOTIFY_THRESHOLD = 'ERROR';
 # This prevents millions of low-value rows from filling the table.
 our $DB_LOG_MIN_LEVEL = $ENV{DB_LOG_MIN_LEVEL} || 'WARN';
 
+# Minimum level to emit to STDERR (captured by Docker as container logs).
+# Set COMSERV_LOG_MIN_LEVEL=WARN in production to suppress DEBUG/INFO noise.
+# Default: DEBUG (emit everything) to preserve existing dev behaviour.
+our $STDERR_LOG_MIN_LEVEL = $ENV{COMSERV_LOG_MIN_LEVEL} || 'DEBUG';
+
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {
-    my ($msg) = @_;
-    print STDERR "$msg\n";
+    my ($msg, $level) = @_;
+    $level //= 'DEBUG';
+    my $min_prio  = $LEVEL_PRIORITY{ uc($STDERR_LOG_MIN_LEVEL) } // 1;
+    my $msg_prio  = $LEVEL_PRIORITY{ uc($level)                } // 1;
+    print STDERR "$msg\n" if $msg_prio >= $min_prio;
     if (defined $LOG_FH && fileno($LOG_FH)) {
         flock($LOG_FH, LOCK_EX);
         print $LOG_FH "$msg\n";
@@ -106,14 +138,15 @@ sub _print_log {
 # Log rotation method
 sub rotate_log {
     my ($class) = @_;
+    return if $FILE_LOGGING_DISABLED;
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
-    _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
-    return if $file_size < $MAX_LOG_SIZE;
+    _print_log("Current log file size: $file_size bytes, rotation threshold: $ROTATION_THRESHOLD bytes");
+    return if $file_size < $ROTATION_THRESHOLD;
 
     # Log that we're rotating the file
-    _print_log("Log file size ($file_size bytes) exceeds maximum size ($MAX_LOG_SIZE bytes). Rotating log file.");
+    _print_log("Log file size ($file_size bytes) exceeds rotation threshold ($ROTATION_THRESHOLD bytes). Rotating log file.");
 
     # Generate timestamped filename
     my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
@@ -153,6 +186,37 @@ sub rotate_log {
     _cleanup_old_logs($archive_dir, $filename);
 
     _print_log("Log rotated: $archived_log");
+
+    # Async copy of the archived log to NFS — runs in a child process so the
+    # server never blocks waiting for NFS I/O.
+    _copy_archive_to_nfs_async($archived_log) if defined $archived_log && -e $archived_log;
+}
+
+sub _copy_archive_to_nfs_async {
+    my ($archived_log) = @_;
+    return unless defined $archived_log && length $archived_log;
+
+    my $nfs_archive_dir;
+    eval {
+        my $nfs_util = Comserv::Util::NfsPath->new();
+        my $nfs_root = $nfs_util->get_nfs_root();
+        $nfs_archive_dir = File::Spec->catdir($nfs_root, 'logs', 'archive');
+    };
+    return if $@ || !defined $nfs_archive_dir;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        _print_log("NFS archive copy: fork failed (non-fatal): $!");
+        return;
+    }
+    if ($pid == 0) {
+        eval {
+            make_path($nfs_archive_dir) unless -d $nfs_archive_dir;
+            my (undef, undef, $fname) = File::Spec->splitpath($archived_log);
+            File::Copy::copy($archived_log, File::Spec->catfile($nfs_archive_dir, $fname));
+        };
+        exit 0;
+    }
 }
 
 # Helper function to clean up old log files
@@ -264,74 +328,62 @@ sub get_system_identifier {
 sub init {
     my ($class) = @_;
 
-    # Determine the base directory for logs
-    # Priority 1: Configured path in Database (logging_nfs_dir)
-    # Priority 2: Standardized NFS shared directory (via Comserv::Util::NfsPath)
-    # Priority 3: NFS shared directory from ENV (COMSERV_NFS_LOG_DIR)
-    # Priority 4: Specific log directory from ENV (COMSERV_LOG_DIR)
-    # Priority 5: Default relative to binary
+    # Also honour the legacy env var COMSERV_DISABLE_FILE_LOG
+    $FILE_LOGGING_DISABLED = 1 if $ENV{COMSERV_DISABLE_FILE_LOG};
+
+    if ($FILE_LOGGING_DISABLED) {
+        print STDERR "=== FILE LOGGING DISABLED — STDERR + DB only ===\n";
+        __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+            "Logging system initialized (STDERR + DB only; file logging disabled)");
+        return;
+    }
+
+    # Always write to the local log directory — never NFS during startup.
+    # NFS is only used for async copy of rotated archives (see _copy_archive_to_nfs_async).
+    # Writing directly to NFS causes D-state hangs when the NFS server has a transient
+    # issue, because the NFS mount uses the 'hard' option (blocking forever on I/O).
     my $log_file;
     my $log_dir;
 
-    # Note: DB access in init() might be restricted depending on startup sequence.
-    # We use ENV as primary for bootstrap, and refresh_settings() for DB overrides later.
-    
-    my $nfs_path_util = Comserv::Util::NfsPath->new();
-    my $standard_nfs = $nfs_path_util->get_nfs_root();
-    my $standard_log_dir = File::Spec->catdir($standard_nfs, 'logs');
-    
-    my $nfs_log_dir = $ENV{'COMSERV_NFS_LOG_DIR'};
-    
-    if (-d $standard_log_dir && -w $standard_log_dir) {
-        $log_dir  = $standard_log_dir;
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using standardized NFS log directory: $log_dir");
-    } elsif ($nfs_log_dir && -d $nfs_log_dir && -w $nfs_log_dir) {
-        $log_dir  = $nfs_log_dir;
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using centralized log directory: $log_dir");
+    if ($ENV{'COMSERV_LOG_DIR'}) {
+        $log_dir = $ENV{'COMSERV_LOG_DIR'};
     } else {
-        my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-        $log_dir  = File::Spec->catdir($base_dir, "logs");
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using local log directory: $log_dir");
+        my $base_dir = File::Spec->catdir($FindBin::Bin, '..');
+        $log_dir = File::Spec->catdir($base_dir, "logs");
     }
 
-    _print_log("Log file: $log_file");
+    $log_file = File::Spec->catfile($log_dir, "application.log");
+
+    print STDERR "Using local log directory: $log_dir\n";
+    print STDERR "Log file: $log_file\n";
 
     # Create the log directory if it doesn't exist
     unless (-d $log_dir) {
         eval { make_path($log_dir) };
         if ($@) {
-            _print_log("[ERROR] Failed to create log directory $log_dir: $@");
+            print STDERR "[ERROR] Failed to create log directory $log_dir: $@\n";
             die "Failed to create log directory $log_dir: $@\n";
         }
-        _print_log("Log directory created: $log_dir");
-    } else {
-        _print_log("Log directory exists: $log_dir");
     }
 
     # Open the log file for appending
     unless (sysopen($LOG_FH, $log_file, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
         my $error_message = "Can't open log file $log_file: $!";
-        _print_log("[ERROR] $error_message");
+        print STDERR "[ERROR] $error_message\n";
         die $error_message;
     }
 
     # Ensure the file handle is auto-flushed
     select((select($LOG_FH), $| = 1)[0]);
-    _print_log("Log file opened: $log_file");
 
-    # Write a test entry to ensure the log file is created
     print $LOG_FH "Test log entry\n";
-    _print_log("Wrote test log entry to file");
-    
+
     # Set global log file path for rotation
     $LOG_FILE = $log_file;
-    _print_log("Global log file path set to: $LOG_FILE");
 
-    # Log initialization message
-    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    # Now safe to use full logging
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+        "Logging system initialized with log file: $LOG_FILE");
 }
 
 # Constructor for creating a new instance
