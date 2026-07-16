@@ -38,7 +38,7 @@ use Exporter qw(import);
 use Carp qw(croak);
 use File::Spec;
 
-our @EXPORT_OK = qw(load_config is_cli_context force_db_load detect_runtime_network);
+our @EXPORT_OK = qw(load_config is_cli_context is_dev_server force_db_load detect_runtime_network);
 
 use Comserv::Util::Logging;
 
@@ -69,9 +69,38 @@ sub is_cli_context {
     return 1 if ($0 =~ m{ /script/ }x || $0 =~ m{ \A script/ }x)
              && $0 !~ m{ comserv_server }xms;
     # Standalone .pl scripts (not Catalyst server)
-    return 1 if $0 =~ m{ \.pl \z }xms && $0 !~ m{ comserv_server }xms;
+    return 1 if $0 =~ m{ \\.pl \\z }xms && $0 !~ m{ comserv_server }xms;
     # -e one-liners and stdin scripts
     return 1 if $0 eq '-e' || $0 eq '-';
+    return 0;
+}
+
+# CLI/DB loading stabilized [2026-07-16] - Grok review
+=head2 is_dev_server
+
+Returns true when the calling process is a Catalyst development server or
+workstation environment, as opposed to a pure CLI script or production
+deployment.
+
+Detection:
+    * C<$ENV{CATALYST_DEBUG}> is set (Catalyst debug mode)
+    * C<$ENV{COMSERV_DEV_MODE}> is set (explicit workstation marker)
+    * C<$0> matches C<comserv_server> (Catalyst dev server script)
+
+Pure CLI scripts (C<is_cli_context()> returning true) are explicitly excluded
+— they use the fast SQLite path regardless.
+
+=cut
+
+sub is_dev_server {
+    # Pure CLI scripts are NOT dev servers — they use SQLite fast path
+    return 0 if is_cli_context();
+    # Catalyst debug mode (set by -d flag or CATALYST_DEBUG=1)
+    return 1 if $ENV{CATALYST_DEBUG};
+    # Explicit workstation marker
+    return 1 if $ENV{COMSERV_DEV_MODE};
+    # The Catalyst dev server script
+    return 1 if $0 =~ /comserv_server/;
     return 0;
 }
 
@@ -117,8 +146,19 @@ sub load_config {
     $config = _load_from_config_file($logging);
     return $config if $config && keys %$config;
 
+    # 4. Workstation dev server fallback: when on a dev workstation / Catalyst
+    #    dev server with no secrets or config files, inject the known dev host
+    #    (default: 192.168.1.198) as a candidate so select_connection() tries
+    #    the real MariaDB before falling back to SQLite.
+    #    Credentials come from COMSERV_DEV_USERNAME / COMSERV_DEV_PASSWORD env
+    #    vars, or from ~/.comserv/secrets/workstation_dev.json if it exists.
+    if (is_dev_server()) {
+        $config = _build_workstation_dev_config($logging);
+        return $config if $config && keys %$config;
+    }
+
     $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'load_config',
-        "No DBI configuration found in any source (K8s secrets, env vars, db_config.json)");
+        "No DBI configuration found in any source (K8s secrets, env vars, db_config.json, workstation dev)");
 
     return {};
 }
@@ -318,6 +358,87 @@ sub _find_db_config_file {
     $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_find_db_config_file',
         "db_config.json not found in any search location");
     return undef;
+}
+
+# CLI/DB loading stabilized [2026-07-16] - Grok review
+# Build a workstation dev fallback config that injects the known dev host
+# (default: 192.168.1.198) as a candidate. This is used when the dev server
+# (comserv_server.pl) cannot find K8s secrets, env vars, or db_config.json.
+# Credentials are sourced from:
+#   1. ~/.comserv/secrets/workstation_dev.json  (per-workstation credential file)
+#   2. COMSERV_DEV_USERNAME / COMSERV_DEV_PASSWORD / COMSERV_DEV_HOST env vars
+#
+# Returns undef if no dev server context is detected.
+sub _build_workstation_dev_config {
+    my ($logging) = @_;
+
+    # Only build for dev server context — pure CLI scripts use SQLite fast path
+    return undef unless is_dev_server();
+
+    my $home = $ENV{HOME} || '/tmp';
+
+    # 1. Check for per-workstation credential file
+    my $workstation_file = "$home/.comserv/secrets/workstation_dev.json";
+    if (-f $workstation_file && -r $workstation_file) {
+        eval {
+            local $/;
+            open my $fh, '<', $workstation_file or die;
+            my $json_text = <$fh>;
+            close $fh;
+            my $config = JSON::decode_json($json_text);
+            if ($config && ref $config eq 'HASH' && keys %$config) {
+                $logging->log_with_details(undef, 'info', __FILE__, __LINE__,
+                    '_build_workstation_dev_config',
+                    "Loaded workstation dev config from $workstation_file");
+                return $config;
+            }
+        };
+        if ($@) {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
+                '_build_workstation_dev_config',
+                "Failed to parse $workstation_file: $@");
+        }
+    }
+
+    # 2. Build from env vars or defaults
+    #    The dev host defaults to 192.168.1.198 (production server / workstation
+    #    MariaDB). Override via COMSERV_DEV_HOST.
+    my $host     = $ENV{COMSERV_DEV_HOST}     // '192.168.1.198';
+    my $port     = $ENV{COMSERV_DEV_PORT}     // 3306;
+    my $username = $ENV{COMSERV_DEV_USERNAME} // '';
+    my $password = $ENV{COMSERV_DEV_PASSWORD} // '';
+
+    my %dev_config = (
+        'ency_dev' => {
+            host        => $host,
+            port        => $port,
+            db_type     => 'mariadb',
+            database    => 'ency',
+            username    => $username,
+            password    => $password,
+            network     => 'lan',
+            priority    => 100,
+            description => "Workstation dev fallback — $host:$port (ency)",
+        },
+        'forager_dev' => {
+            host        => $host,
+            port        => $port,
+            db_type     => 'mariadb',
+            database    => 'shanta_forager',
+            username    => $username,
+            password    => $password,
+            network     => 'lan',
+            priority    => 100,
+            description => "Workstation dev fallback — $host:$port (forager)",
+        },
+    );
+
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__,
+        '_build_workstation_dev_config',
+        "Built workstation dev fallback config targeting $host:$port" .
+        ($username ? " (user: $username)" : " (no credentials — set COMSERV_DEV_USERNAME/PASSWORD)"));
+
+    return \%dev_config;
 }
 
 1;

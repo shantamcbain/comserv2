@@ -16,7 +16,7 @@ use Cwd;
 use Comserv::Util::Logging;
 use Comserv::Util::DBConfigLoader qw(
     load_config
-    is_cli_context    force_db_load
+    is_cli_context    is_dev_server    force_db_load
     detect_runtime_network
 );
 
@@ -86,6 +86,22 @@ sub _load_config {
                 ", server_group=" . ($c->{server_group} // '<none>'));
         }
         return;
+    }
+
+    # Dev server fallback: if load_config() returned empty and we're on a
+    # Catalyst dev server / workstation, inject the known dev host
+    # (192.168.1.198) via the workstation dev config builder. This ensures
+    # the dev server tries the real MariaDB before falling back to SQLite.
+    if (is_dev_server()) {
+        $config = Comserv::Util::DBConfigLoader::_build_workstation_dev_config($self->logging);
+        if ($config && keys %$config) {
+            $self->config($config);
+            $self->{configuration_status} = 'dev_workstation';
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "Workstation dev server mode — using dev host fallback connections: " .
+                join(', ', sort keys %$config));
+            return;
+        }
     }
 
     $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
@@ -397,9 +413,9 @@ sub select_connection {
         # CLI/workstation fallback: provide a local SQLite fallback instead of dying.
         # This covers:
         #   - CLI scripts (is_cli_context)
-        #   - Dev workstation server (COMSERV_DEV_MODE / CATALYST_DEBUG)
+        #   - Dev workstation server (is_dev_server — CATALYST_DEBUG, COMSERV_DEV_MODE, comserv_server)
         #   - Any env with ACTIVE_DB_ENVIRONMENT set (explicit override)
-        if (is_cli_context() || $ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG}) {
+        if (is_cli_context() || is_dev_server()) {
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
                 "Workstation/CLI mode — no candidates for '$database_name'" .
                 ($sitename ? " (site: $sitename)" : '') . ", using fallback connection");
@@ -436,7 +452,7 @@ sub select_connection {
 
     # CLI/workstation fallback: if all parallel tests failed, provide a fallback
     # instead of dying. The fallback configs are SQLite (always connect locally).
-    if (!$winner && (is_cli_context() || $ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG})) {
+    if (!$winner && (is_cli_context() || is_dev_server())) {
         $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'select_connection',
             "Workstation/CLI mode — all candidates failed for '$database_name'" .
             ($sitename ? " (site: $sitename)" : '') . ", using fallback connection");

@@ -4,7 +4,7 @@ package Comserv::Model::DBEncy;
 use strict;
 use base 'Catalyst::Model::DBIC::Schema';
 use Comserv::Util::Logging;
-use Comserv::Util::DBConfigLoader qw(is_cli_context);
+use Comserv::Util::DBConfigLoader qw(is_cli_context is_dev_server);
 use File::Spec;
 use FindBin;
 # Store connection details for debugging
@@ -50,7 +50,7 @@ sub COMPONENT {
         # Detect workstation/dev mode for clearer diagnostics
         my $workstation_context = is_cli_context()
             ? "CLI script mode"
-            : ($ENV{COMSERV_DEV_MODE} || $ENV{CATALYST_DEBUG}
+            : (is_dev_server()
                 ? "workstation dev server"
                 : "unknown context");
 
