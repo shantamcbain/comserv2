@@ -170,10 +170,11 @@ sub COMPONENT {
             "DBEncy: Using database driver: $driver (available: $driver_available)");
         
         my %driver_attrs = $driver eq 'MariaDB'
-            ? (mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
+            ? (mariadb_connect_timeout => 8, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
             : (); # mysql fallback: timeouts go in DSN to avoid attribute-rejection by older DBIx::Class
         my $dsn = "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port};
-        $dsn .= ";mysql_connect_timeout=10;mysql_read_timeout=30;mysql_write_timeout=30" if $driver eq 'mysql';
+        $dsn .= ";connect_timeout=8;mariadb_connect_timeout=8;mysql_connect_timeout=8;mysql_read_timeout=30;mysql_write_timeout=30" if $driver eq 'mysql';
+        $dsn .= ";connect_timeout=8;mariadb_connect_timeout=8;mysql_connect_timeout=8" if $driver eq 'MariaDB';
 
         $connect_info = {
             dsn => $dsn,

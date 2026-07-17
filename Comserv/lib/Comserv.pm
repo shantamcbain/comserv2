@@ -915,14 +915,28 @@ sub _ensure_nav_submenu_table {
 
 sub _initialize_session_schema {
     my $class = shift;
-    
+
+    # SKIP_DB_TEST=1: bypass session schema checks for fast startup
+    if ($ENV{SKIP_DB_TEST}) {
+        eval {
+            use Comserv::Util::Logging;
+            my $log = Comserv::Util::Logging->instance;
+            $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_session_schema',
+                'SKIP_DB_TEST=1 — skipping session schema check');
+        };
+        return 1;
+    }
+
     eval {
+        local $SIG{ALRM} = sub { die "session schema check timed out\n" };
+        alarm(8);
         use Comserv::Util::Logging;
         my $log = Comserv::Util::Logging->instance;
         
         my $schema = $class->model('DBEncy');
         if ($schema && $schema->storage && $schema->storage->dbh) {
             my $dbh = $schema->storage->dbh;
+            alarm(0);
             my $sth = $dbh->prepare("SHOW TABLES LIKE 'sessions'");
             $sth->execute();
             my $exists = $sth->fetchrow_arrayref();
@@ -946,6 +960,7 @@ sub _initialize_session_schema {
             }
         }
     };
+    alarm(0);
     if ($@) {
         warn "Warning: Could not auto-initialize sessions table: $@\n";
     }

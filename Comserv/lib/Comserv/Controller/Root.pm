@@ -1970,6 +1970,29 @@ sub site_setup {
         undef $site;
     }
 
+    # Retry once after 2s delay if the first attempt failed — the DB may not
+    # have been ready yet on first call (e.g. connect was still initializing).
+    if (!defined $site) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "First site lookup returned nothing — retrying after 2s delay");
+        sleep(2);
+        eval {
+            local $SIG{ALRM} = sub { die "get_site_details_by_name retry timeout\n"; };
+            alarm(5);
+            $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
+            alarm(0);
+        };
+        alarm(0);
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
+                "Retry of get_site_details_by_name also failed: $@");
+            undef $site;
+        } elsif ($site) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                "Retry succeeded — site found on second attempt");
+        }
+    }
+
     if (!defined $site) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
             "No site found by name='" . (defined $SiteName ? $SiteName : 'UNDEF') . "'. Attempting domain-based resolution for '$domain'.");

@@ -195,7 +195,14 @@ sub get_all_connections {
 
 sub test_connection {
     my ($self, $conn_name) = @_;
-    
+
+    # SKIP_DB_TEST=1: hard bypass for all connection tests — assume success.
+    if ($ENV{SKIP_DB_TEST}) {
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
+            "Skipping DB test due to SKIP_DB_TEST=1 — assuming success for '$conn_name'");
+        return 1;
+    }
+
     $self->_load_config();
     my $config = $self->config;
     
@@ -219,7 +226,7 @@ sub test_connection {
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
 
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;connect_timeout=8;mariadb_connect_timeout=8;mysql_connect_timeout=8";
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;connect_timeout=5;mariadb_connect_timeout=8;mysql_connect_timeout=8";
     }
 
     # CLI/DB loading stabilized [2026-07-16] - Grok review - simplified
@@ -357,7 +364,7 @@ sub _direct_test_connection {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;connect_timeout=8;mariadb_connect_timeout=8;mysql_connect_timeout=8";
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;connect_timeout=5;mariadb_connect_timeout=8;mysql_connect_timeout=8";
     }
 
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_direct_test_connection',
