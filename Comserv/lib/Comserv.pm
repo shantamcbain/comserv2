@@ -462,6 +462,17 @@ sub _initialize_ai_chat_schema {
     # NEW MENU DISABLED by default – forces legacy Menu / CustomMenu navigation
     $class->config->{use_new_menu} = 0;
     
+    # SKIP_DB_TEST=1: bypass all schema initialization for fast dev startup
+    if ($ENV{SKIP_DB_TEST}) {
+        eval {
+            use Comserv::Util::Logging;
+            my $log = Comserv::Util::Logging->instance;
+            $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_ai_chat_schema',
+                'SKIP_DB_TEST=1 — skipping AI Chat schema checks');
+        };
+        return 1;
+    }
+    
     eval {
         use Comserv::Util::Logging;
         my $log = Comserv::Util::Logging->instance;
@@ -481,6 +492,9 @@ sub _initialize_ai_chat_schema {
         
         foreach my $table (@ai_chat_tables) {
             eval {
+                # Use alarm to prevent C-level DBI connect from hanging indefinitely
+                local $SIG{ALRM} = sub { die "table check timed out\n" };
+                alarm(8);
                 my $schema = $class->model('DBEncy');
                 if ($schema && $schema->storage && $schema->storage->dbh) {
                     my $dbh = $schema->storage->dbh;
@@ -493,7 +507,9 @@ sub _initialize_ai_chat_schema {
                             "Table '$table' not found in ENCY database. Will be created on first admin request.");
                     }
                 }
+                alarm(0);
             };
+            alarm(0);
             if ($@) {
                 $log->log_with_details(undef, 'warn', __FILE__, __LINE__, '_initialize_ai_chat_schema',
                     "Could not check table '$table': $@");

@@ -219,14 +219,14 @@ sub test_connection {
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
 
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=10";
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;connect_timeout=8;mariadb_connect_timeout=8;mysql_connect_timeout=8";
     }
 
     # CLI/DB loading stabilized [2026-07-16] - Grok review - simplified
     # Dev server: skip fork-based test (unreliable on workstation due to NFS
     # D-state hangs).  Use direct non-forked connect with alarm-based timeout.
     if (is_dev_server()) {
-        return $self->_direct_test_connection($conn_config, $conn_name, 10);
+        return $self->_direct_test_connection($conn_config, $conn_name, 12);
     }
 
     # Fork a child to test the DBI connection so we can SIGKILL it after a timeout.
@@ -357,7 +357,7 @@ sub _direct_test_connection {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;connect_timeout=5;mariadb_connect_timeout=10";
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;connect_timeout=8;mariadb_connect_timeout=8;mysql_connect_timeout=8";
     }
 
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_direct_test_connection',
@@ -370,7 +370,7 @@ sub _direct_test_connection {
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,
-            ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 10) : ()),
+            ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 8) : ()),
         });
         alarm(0);
         $dbh->disconnect() if $dbh;
