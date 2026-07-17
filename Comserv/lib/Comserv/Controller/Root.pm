@@ -1953,27 +1953,46 @@ sub site_setup {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
-    # Primary attempt: lookup by SiteName (as provided)
-    my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
+    # Primary attempt: lookup by SiteName (as provided) — with timeout
+    # so slow DB doesn't block startup. Falls back to domain resolution
+    # or defaults if the DB is unreachable.
+    my $site;
+    eval {
+        local $SIG{ALRM} = sub { die "get_site_details_by_name timeout\n"; };
+        alarm(5);  # 5 second timeout for site lookup
+        $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
+        alarm(0);
+    };
+    alarm(0);
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
+            "get_site_details_by_name timed out or failed: $@. Falling back to domain resolution.");
+        undef $site;
+    }
+
     if (!defined $site) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
             "No site found by name='" . (defined $SiteName ? $SiteName : 'UNDEF') . "'. Attempting domain-based resolution for '$domain'.");
-        # Fallback: resolve via domain to site_id then fetch details
-        my $site_domain = eval { $c->model('Site')->get_site_domain($c, $domain) };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "get_site_domain error: $@");
-        }
-        if ($site_domain) {
-            my $site_id = eval { $site_domain->site_id };
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Resolved site_id via domain: '" . (defined $site_id ? $site_id : 'UNDEF') . "'");
-            if (defined $site_id) {
-                $site = eval { $c->model('Site')->get_site_details($c, $site_id) };
-                if ($@) {
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "get_site_details error: $@");
+        # Fallback: resolve via domain to site_id then fetch details — with alarm timeout
+        eval {
+            local $SIG{ALRM} = sub { die "domain resolution timeout\n"; };
+            alarm(5);
+            my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
+            if ($site_domain) {
+                my $site_id = $site_domain->site_id;
+                if (defined $site_id) {
+                    $site = $c->model('Site')->get_site_details($c, $site_id);
                 }
             }
+            alarm(0);
+        };
+        alarm(0);
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
+                "Domain-based resolution failed or timed out: $@");
         } else {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup', "Domain-based resolution failed for domain '$domain'");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                "Domain-based resolution completed" . ($site ? '' : ' (no match)'));
         }
     }
 
