@@ -144,6 +144,8 @@
 <script src="/static/js/ai-chat/voice.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/support.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/page-context.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-chat/wizards.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-chat/audio-backup.js?v=[% cv %]" defer></script>
 <script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/index.js?v=[% cv %]" defer></script>
 
