@@ -45,7 +45,7 @@
         supportMode: false,         // true when user is in live support chat mode
         supportConvId: null,        // conversation_id for current support chat
         supportLastMsgId: 0,        // last message id seen in support chat
-        // supportPollTimer removed – SSE migration complete
+        supportPollTimer: null,     // setInterval handle for support chat polling
         siteName: '',                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
         isUnloading: false
     };
@@ -709,7 +709,12 @@
             '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
               '<option value="auto">⚡ Auto</option>' +
             '</select>' +
-            '<label for="ai-provider">Model:</label>' +
+            '<label for="conversation-selector" style="font-size:0.82em;color:#555;margin-left:6px;">Chat:</label>' +
+            '<select id="conversation-selector" title="Select past conversation to resume" style="font-size:0.82em;max-width:110px;">' +
+              '<option value="">Current Chat</option>' +
+            '</select>' +
+            '<button id="widget-new-chat-btn" class="chat-header-icon-btn" title="New conversation" style="margin-left:2px;font-size:1.1em;border:1px solid #ccc;border-radius:4px;padding:1px 5px;background:#fff;color:#000;">✏️</button>' +
+            '<label for="ai-provider" style="margin-left:6px;">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
@@ -787,8 +792,9 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-4.3',               label: 'Grok 4.3 (xAI)' },
-                                    { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast (xAI)' }
+                                    { val: 'grok|grok-2',                 label: 'Grok 2 (xAI)' },
+                                    { val: 'grok|grok-2-mini',            label: 'Grok 2 Mini (xAI)' },
+                                    { val: 'grok|grok-beta',              label: 'Grok Beta (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -836,7 +842,7 @@
                                     const sorted = chatModels.slice().sort(function(a, b) {
                                         return modelSizeScore(a.id) - modelSizeScore(b.id);
                                     });
-                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                                     const pool   = usable.length > 0 ? usable : sorted; // fallback if all tiny
                                     state.modelTiers.small  = 'ollama|' + pool[0].id;
                                     state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
@@ -1034,6 +1040,21 @@
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
+        const widgetNewChatBtn = document.getElementById('widget-new-chat-btn');
+        if (widgetNewChatBtn) {
+            widgetNewChatBtn.addEventListener('click', function() { resetConversation(); });
+        }
+        const convSelector = document.getElementById('conversation-selector');
+        if (convSelector) {
+            convSelector.addEventListener('change', function(e) {
+                const val = e.target.value;
+                if (val) {
+                    loadConversation(val);
+                } else {
+                    resetConversation();
+                }
+            });
+        }
         var dockBtn = document.getElementById('dock-chat-inline');
         if (dockBtn) {
             dockBtn.addEventListener('click', function() {
@@ -1104,367 +1125,16 @@
             }
         });
 
-        (function _initMicRecorder() {
-            var micBtn = document.getElementById('mic-record-btn');
-            if (!micBtn) return;
-            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                micBtn.addEventListener('click', function() {
-                    var _statusEl = document.getElementById('audio-transcribe-status');
-                    var msg = window.isSecureContext === false
-                        ? '⚠️ Microphone requires HTTPS. Use the 📂 button to upload a saved audio file instead.'
-                        : '⚠️ Microphone recording is not available in this browser. Use the 📂 button to upload a saved audio file instead.';
-                    if (_statusEl) { _statusEl.textContent = msg; _statusEl.style.display = ''; }
-                });
-                return;
-            }
-
-            var _mediaRec   = null;
-            var _chunks     = [];
-            var _stream     = null;
-            var _recTimer   = null;
-            var _recStart   = null;
-            var _wakeLock   = null;
-
-            function _requestWakeLock() {
-                if (navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
-                    navigator.wakeLock.request('screen').then(function(lock) {
-                        _wakeLock = lock;
-                    }).catch(function(err) {
-                        console.warn('Screen Wake Lock request failed:', err);
-                    });
-                }
-            }
-
-            function _releaseWakeLock() {
-                if (_wakeLock) {
-                    _wakeLock.release().then(function() {
-                        _wakeLock = null;
-                    }).catch(function(err) {
-                        console.warn('Screen Wake Lock release failed:', err);
-                    });
-                }
-            }
-
-            document.addEventListener('visibilitychange', function() {
-                if (_mediaRec && _mediaRec.state === 'recording' && document.visibilityState === 'visible') {
-                    _requestWakeLock();
-                }
+        // ── Voice / SpeechRec (extracted → static/js/ai-chat/voice.js, V2 module) ──
+        if (window.ComservChat && window.ComservChat.voice && window.ComservChat.voice.wire) {
+            window.ComservChat.voice.wire({
+                state: state,
+                sendMessage: sendMessage,
+                saveAudioBackup: _saveAudioBackup,
+                transcribeAudioFile: _transcribeAudioFile,
+                renderLocalAudioBackups: _renderLocalAudioBackups
             });
-
-            function _fmtElapsed(ms) {
-                var s = Math.floor(ms / 1000);
-                var m = Math.floor(s / 60);
-                s = s % 60;
-                return m + ':' + (s < 10 ? '0' : '') + s;
-            }
-
-            micBtn.addEventListener('click', function() {
-                if (_mediaRec && _mediaRec.state === 'recording') {
-                    _mediaRec.stop();
-                    _releaseWakeLock();
-                    clearInterval(_recTimer);
-                    _recTimer = null;
-                    return;
-                }
-                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-                    _stream  = stream;
-                    _chunks  = [];
-                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
-                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
-                                 : 'audio/webm';
-                    _mediaRec = new MediaRecorder(stream, { mimeType: mimeType });
-
-                    _mediaRec.ondataavailable = function(ev) {
-                        if (ev.data && ev.data.size > 0) _chunks.push(ev.data);
-                    };
-
-                    _mediaRec.onstop = function() {
-                        clearInterval(_recTimer);
-                        _recTimer = null;
-                        _releaseWakeLock();
-                        stream.getTracks().forEach(function(t) { t.stop(); });
-                        var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
-                        var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
-                        var elapsed = _recStart ? _fmtElapsed(Date.now() - _recStart) : '';
-                        var file = new File([blob], 'recording.' + ext, { type: blob.type });
-
-                        var backupId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-                        _saveAudioBackup(backupId, file, elapsed).then(function() {
-                            _transcribeAudioFile(file, backupId);
-                            _renderLocalAudioBackups();
-                        }).catch(function(err) {
-                            console.error('Failed to save audio backup:', err);
-                            _transcribeAudioFile(file);
-                        });
-
-                        micBtn.textContent = '🎤';
-                        micBtn.title = 'Record voice inspection — click to start, click again to stop. No time limit.';
-                        micBtn.style.background = '';
-                        var _statusEl = document.getElementById('audio-transcribe-status');
-                        if (_statusEl) { _statusEl.textContent = '⏳ Recording stopped (' + elapsed + ') — uploading…'; }
-                    };
-
-                    _mediaRec.start(1000);
-                    _requestWakeLock();
-                    _recStart = Date.now();
-                    micBtn.textContent = '⏹';
-                    micBtn.title = 'Stop recording';
-                    micBtn.style.background = '#ffd0d0';
-
-                    var _statusEl = document.getElementById('audio-transcribe-status');
-                    if (_statusEl) { _statusEl.textContent = '🔴 Recording 0:00 — click ⏹ to stop (no time limit)'; _statusEl.style.display = ''; }
-
-                    _recTimer = setInterval(function() {
-                        var el = document.getElementById('audio-transcribe-status');
-                        if (el && _recStart) {
-                            el.textContent = '🔴 Recording ' + _fmtElapsed(Date.now() - _recStart) + ' — click ⏹ to stop (no time limit)';
-                        }
-                    }, 1000);
-                }).catch(function(err) {
-                    var _statusEl = document.getElementById('audio-transcribe-status');
-                    if (_statusEl) { _statusEl.textContent = '⚠️ Microphone access denied: ' + err.message; _statusEl.style.display = ''; }
-                });
-            });
-        })();
-
-        // ── Voice Conversation Mode ────────────────────────────────────────────
-        // Full hands-free loop: user speaks → auto-sent to AI → AI response read aloud
-        // → listening restarts.
-        //
-        // STT strategy (in priority order):
-        //   1. Web Speech API  — Chrome/Edge/Safari (streaming, instant)
-        //   2. VAD + Whisper   — Firefox and any browser without SpeechRecognition
-        //                        Uses AudioContext to detect speech, records via
-        //                        MediaRecorder, uploads to /ai/transcribe (our server).
-        //                        No audio leaves to third-party servers. 1-3s delay.
-        // TTS: speechSynthesis — all browsers.
-        (function() {
-            var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            var _hasTTS    = !!(window.speechSynthesis);
-            var _hasVAD    = !!(window.AudioContext || window.webkitAudioContext) && !!(window.MediaRecorder) && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-            var _voiceBtn  = document.getElementById('voice-mode-btn');
-            if (!_voiceBtn) return;
-
-            if (_hasTTS || _SpeechRec || _hasVAD) { _voiceBtn.style.display = ''; }
-
-            var _voiceActive = false;
-            var _recog       = null;
-            var _ttsSpeaking = false;
-            var _voiceStatus = document.getElementById('audio-transcribe-status');
-
-            var _vadStream   = null;
-            var _vadCtx      = null;
-            var _vadRec      = null;
-            var _vadChunks   = [];
-            var _vadSpeaking = false;
-            var _vadSilTimer = null;
-            var _vadRafId    = null;
-
-            var VAD_SPEAK_THRESH  = 18;
-            var VAD_SILENCE_MS    = 1400;
-            var VAD_MIN_SPEECH_MS = 300;
-            var _vadSpeakStart    = 0;
-
-            function _setVoiceStatus(msg) {
-                if (_voiceStatus) { _voiceStatus.textContent = msg; _voiceStatus.style.display = msg ? '' : 'none'; }
-            }
-
-            function _speak(text) {
-                if (!_hasTTS || !_voiceActive) return;
-                window.speechSynthesis.cancel();
-                var clean = text
-                    .replace(/\[ACTION:[^\]]*\]/gi, '')
-                    .replace(/#{1,6}\s*/g, '')
-                    .replace(/\*\*([^*]+)\*\*/g, '$1')
-                    .replace(/\*([^*]+)\*/g, '$1')
-                    .replace(/`[^`]+`/g, function(m){ return m.replace(/`/g,''); })
-                    .replace(/https?:\/\/\S+/g, '')
-                    .trim();
-                if (!clean) { _startListening(); return; }
-                _ttsSpeaking = true;
-                _setVoiceStatus('🔈 Speaking…');
-                var utter = new window.SpeechSynthesisUtterance(clean);
-                utter.lang  = 'en-US';
-                utter.rate  = 1.05;
-                utter.pitch = 1.0;
-                utter.onend  = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
-                utter.onerror = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
-                window.speechSynthesis.speak(utter);
-            }
-
-            state._speakResponse = _speak;
-
-            function _stopVAD() {
-                if (_vadRafId) { cancelAnimationFrame(_vadRafId); _vadRafId = null; }
-                if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
-                if (_vadRec && _vadRec.state !== 'inactive') { try { _vadRec.stop(); } catch(e){} }
-                if (_vadStream) { _vadStream.getTracks().forEach(function(t){ t.stop(); }); _vadStream = null; }
-                if (_vadCtx) { try { _vadCtx.close(); } catch(e){} _vadCtx = null; }
-                _vadRec = null; _vadChunks = []; _vadSpeaking = false;
-            }
-
-            function _uploadVADBlob(blob) {
-                if (!blob || blob.size < 1000) { _startListening(); return; }
-                _setVoiceStatus('⏳ Transcribing speech…');
-                var ext = (blob.type.indexOf('ogg') !== -1) ? 'ogg' : 'webm';
-                var file = new File([blob], 'voice.' + ext, { type: blob.type });
-                var fd = new FormData();
-                fd.append('audio', file, file.name);
-                fd.append('diarize', '0');
-                fetch('/ai/transcribe', { method: 'POST', credentials: 'include', body: fd })
-                .then(function(r){ return r.json(); })
-                .then(function(data) {
-                    if (!_voiceActive) return;
-                    var txt = (data.transcript || '').trim();
-                    if (!txt) { _setVoiceStatus('👂 Nothing heard — listening…'); _startListening(); return; }
-                    var inputEl = document.getElementById('message-input');
-                    if (inputEl) inputEl.value = txt;
-                    _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
-                    sendMessage();
-                })
-                .catch(function() {
-                    if (_voiceActive) { _setVoiceStatus('⚠️ Transcription failed — retrying…'); setTimeout(_startListening, 1500); }
-                });
-            }
-
-            function _startVAD() {
-                if (!_voiceActive) return;
-                _setVoiceStatus('👂 Listening… (speak now)');
-                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-                    if (!_voiceActive) { stream.getTracks().forEach(function(t){ t.stop(); }); return; }
-                    _vadStream  = stream;
-                    _vadChunks  = [];
-                    _vadSpeaking = false;
-                    var ACtx = window.AudioContext || window.webkitAudioContext;
-                    _vadCtx = new ACtx();
-                    var source   = _vadCtx.createMediaStreamSource(stream);
-                    var analyser = _vadCtx.createAnalyser();
-                    analyser.fftSize = 512;
-                    source.connect(analyser);
-                    var buf = new Uint8Array(analyser.fftSize);
-                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
-                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
-                                 : 'audio/webm';
-                    _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
-                    _vadRec.ondataavailable = function(ev) { if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
-                    _vadRec.onstop = function() {
-                        var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' });
-                        _vadChunks = [];
-                        _uploadVADBlob(blob);
-                    };
-                    function _tick() {
-                        if (!_voiceActive) { _stopVAD(); return; }
-                        analyser.getByteTimeDomainData(buf);
-                        var rms = 0;
-                        for (var i = 0; i < buf.length; i++) { var d = (buf[i] - 128); rms += d * d; }
-                        rms = Math.sqrt(rms / buf.length);
-                        if (rms > VAD_SPEAK_THRESH) {
-                            if (!_vadSpeaking) {
-                                _vadSpeaking = true;
-                                _vadSpeakStart = Date.now();
-                                _vadChunks = [];
-                                _vadRec.start(100);
-                                _setVoiceStatus('🔴 Recording…');
-                            }
-                            if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
-                        } else if (_vadSpeaking) {
-                            if (!_vadSilTimer) {
-                                _vadSilTimer = setTimeout(function() {
-                                    _vadSilTimer = null;
-                                    if (!_vadSpeaking) return;
-                                    _vadSpeaking = false;
-                                    var dur = Date.now() - _vadSpeakStart;
-                                    if (dur < VAD_MIN_SPEECH_MS) {
-                                        _vadRec.stop();
-                                        _vadChunks = [];
-                                        _setVoiceStatus('👂 Listening… (speak now)');
-                                        _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
-                                        _vadRec.ondataavailable = function(ev){ if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
-                                        _vadRec.onstop = function(){ var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' }); _vadChunks = []; _uploadVADBlob(blob); };
-                                    } else {
-                                        _vadRec.stop();
-                                    }
-                                }, VAD_SILENCE_MS);
-                            }
-                        }
-                        _vadRafId = requestAnimationFrame(_tick);
-                    }
-                    _vadRafId = requestAnimationFrame(_tick);
-                }).catch(function(err) {
-                    _setVoiceStatus('⚠️ Microphone access denied: ' + err.message);
-                });
-            }
-
-            function _startSpeechRec() {
-                if (!_voiceActive) return;
-                if (_recog) { try { _recog.abort(); } catch(e){} }
-                _recog = new _SpeechRec();
-                _recog.lang = 'en-US';
-                _recog.continuous = false;
-                _recog.interimResults = true;
-                _recog.maxAlternatives = 1;
-                var _inputEl = document.getElementById('message-input');
-                _setVoiceStatus('👂 Listening… (speak now)');
-                _recog.onresult = function(ev) {
-                    var interim = '', fin = '';
-                    for (var i = ev.resultIndex; i < ev.results.length; i++) {
-                        var t = ev.results[i][0].transcript;
-                        if (ev.results[i].isFinal) { fin += t; } else { interim += t; }
-                    }
-                    if (_inputEl) _inputEl.value = fin || interim;
-                };
-                _recog.onend = function() {
-                    var txt = _inputEl ? (_inputEl.value || '').trim() : '';
-                    if (txt && _voiceActive) {
-                        _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
-                        sendMessage();
-                    } else if (_voiceActive) {
-                        _setVoiceStatus('👂 Listening… (nothing heard, trying again)');
-                        setTimeout(_startSpeechRec, 800);
-                    }
-                };
-                _recog.onerror = function(ev) {
-                    if (ev.error === 'no-speech' && _voiceActive) { setTimeout(_startSpeechRec, 600); }
-                    else if (ev.error !== 'aborted' && _voiceActive) {
-                        _setVoiceStatus('⚠️ Voice recognition error: ' + ev.error);
-                        setTimeout(_startSpeechRec, 2000);
-                    }
-                };
-                try { _recog.start(); } catch(e) {}
-            }
-
-            function _startListening() {
-                if (!_voiceActive) return;
-                if (_SpeechRec) { _startSpeechRec(); } else { _startVAD(); }
-            }
-
-            function _stopVoiceMode() {
-                _voiceActive = false;
-                window.speechSynthesis.cancel();
-                if (_recog) { try { _recog.abort(); } catch(e){} _recog = null; }
-                _stopVAD();
-                _voiceBtn.textContent = '🔊';
-                _voiceBtn.style.background = '';
-                _voiceBtn.title = 'Voice conversation mode — speak to AI, AI speaks back';
-                _setVoiceStatus('');
-            }
-
-            _voiceBtn.addEventListener('click', function() {
-                if (_voiceActive) { _stopVoiceMode(); return; }
-                if (!_SpeechRec && !_hasVAD) {
-                    if (!_hasTTS) { alert('Your browser does not support voice features. Please use Chrome, Edge, Safari, or Firefox.'); return; }
-                }
-                _voiceActive = true;
-                _voiceBtn.textContent = '🔇';
-                _voiceBtn.style.background = '#d0ffd0';
-                _voiceBtn.title = 'Voice mode ON — click to stop';
-                _startListening();
-            });
-
-            document.getElementById('close-chat').addEventListener('click', function() {
-                if (_voiceActive) _stopVoiceMode();
-            }, true);
-        })();
+        }
 
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             const selectedVal = e.target.value;
@@ -1590,19 +1260,21 @@
         .then(data => {
             if (data.success && data.conversations) {
                 const selector = document.getElementById('conversation-selector');
-                // Clear existing options except first one
-                selector.innerHTML = '<option value="">Current Chat</option>';
-                
-                // Add conversations to dropdown
-                data.conversations.forEach(conv => {
-                    const option = document.createElement('option');
-                    option.value = conv.id;
-                    option.textContent = `${conv.title} (${conv.message_count} msgs)`;
-                    if (state.currentConversationId && conv.id === state.currentConversationId) {
-                        option.selected = true;
-                    }
-                    selector.appendChild(option);
-                });
+                if (selector) {
+                    // Clear existing options except first one
+                    selector.innerHTML = '<option value="">Current Chat</option>';
+                    
+                    // Add conversations to dropdown
+                    data.conversations.forEach(conv => {
+                        const option = document.createElement('option');
+                        option.value = conv.id;
+                        option.textContent = `${conv.title} (${conv.message_count} msgs)`;
+                        if (state.currentConversationId && conv.id === state.currentConversationId) {
+                            option.selected = true;
+                        }
+                        selector.appendChild(option);
+                    });
+                }
                 
                 console.debug('Loaded', data.conversations.length, 'conversations');
             }
@@ -1713,7 +1385,7 @@
                                 const sorted = chatModels.slice().sort(function(a, b) {
                                     return modelSizeScore(a.id) - modelSizeScore(b.id);
                                 });
-                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                                 const pool   = usable.length > 0 ? usable : sorted;
                                 state.modelTiers.small  = 'ollama|' + pool[0].id;
                                 state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
@@ -1746,14 +1418,14 @@
                             const sorted = chatModels.slice().sort(function(a, b) {
                                 return modelSizeScore(a.id) - modelSizeScore(b.id);
                             });
-                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                             const pool   = usable.length > 0 ? usable : sorted;
                             state.modelTiers.small  = 'ollama|' + pool[0].id;
                             state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
                             state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                         }
-                        // Only show usable (≥3B) models in dropdown; hide toy models
-                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                        // Only show usable (≥2B) models in dropdown; hide toy models
+                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 2; });
                         const listModels = displayModels.length > 0 ? displayModels : chatModels;
                         listModels.forEach(function(m) {
                             const opt = document.createElement('option');
@@ -1779,8 +1451,9 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-4.3',               label: 'Grok 4.3' },
-                            { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast' }
+                            { val: 'grok|grok-2',                 label: 'Grok 2' },
+                            { val: 'grok|grok-2-mini',            label: 'Grok 2 Mini' },
+                            { val: 'grok|grok-beta',              label: 'Grok Beta' }
                         ];
                     grokModels.forEach(function(m) {
                         const opt = document.createElement('option');
@@ -3571,13 +3244,21 @@
         return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
     }
 
+    function _sendUserHeartbeat() {
+        if (!state.supportConvId) return;
+        fetch('/chat/user_heartbeat', {
+            method: 'POST',
+            credentials: 'include',
+            body: new URLSearchParams({ conversation_id: state.supportConvId })
+        }).catch(function() {});
+    }
 
     function _enterSupportMode(convId, lastMsgId, ticketNumber) {
         state.supportMode   = true;
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
-        // SSE replaces the old heartbeat + polling timers
-        _startChatSSE();
+        _sendUserHeartbeat();
+        state.userHeartbeatTimer = setInterval(_sendUserHeartbeat, 30000);
         var header = document.getElementById('chat-header');
         if (header) {
             header.style.background = '#1a6bb5';
@@ -3593,6 +3274,8 @@
     }
 
     function _exitSupportMode() {
+        if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
+        if (state.userHeartbeatTimer) { clearInterval(state.userHeartbeatTimer); state.userHeartbeatTimer = null; }
         state.supportMode   = false;
         state.supportConvId = null;
         state.supportLastMsgId = 0;
@@ -3617,6 +3300,37 @@
         if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
     }
 
+    function _startSupportPolling() {
+        if (state.supportPollTimer) clearInterval(state.supportPollTimer);
+        state.supportPollTimer = setInterval(function() {
+            if (!state.supportMode || !state.supportConvId) { clearInterval(state.supportPollTimer); return; }
+            fetch('/chat/get_messages?conversation_id=' + state.supportConvId + '&last_id=' + state.supportLastMsgId, {
+                credentials: 'include'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.success || !d.messages) return;
+                d.messages.forEach(function(msg) {
+                    if (msg.id > state.supportLastMsgId) {
+                        state.supportLastMsgId = msg.id;
+                        if (msg.role === 'assistant') {
+                            addMessage(msg.content, 'ai-message');
+                        }
+                    }
+                });
+                if (d.conv_status === 'archived') {
+                    clearInterval(state.supportPollTimer);
+                    state.supportPollTimer = null;
+                    _addSupportSystemMsg('🔒 This support chat has been closed by the administrator. Thank you for contacting us!');
+                    _exitSupportMode();
+                }
+            })
+            .catch(function() {});
+        }, 5000);
+    }
+
+    function _showNoAdminMessage() {
+        var el = document.createElement('div');
         el.className = 'message system-message';
         el.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;padding:10px 14px;border-radius:6px;font-size:.85em;color:#664d03;margin:4px 0;line-height:1.6;';
         el.innerHTML = '⚠️ <strong>No administrator is currently logged in.</strong><br>'
@@ -5200,17 +4914,20 @@
 
             /* In a detached popup window: fill the entire window so resize works naturally */
             body.ai-widget-popup .chat-panel {
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
+                position: fixed !important;
+                top: 38px !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
                 width: 100% !important;
-                height: 100% !important;
+                height: calc(100vh - 38px) !important;
                 max-width: 100% !important;
                 max-height: 100% !important;
                 min-width: 0 !important;
                 min-height: 0 !important;
-                border-radius: 0;
-                box-shadow: none;
-                margin: 0;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                margin: 0 !important;
             }
             body.ai-widget-popup .chat-input {
                 flex-shrink: 0;
@@ -5635,6 +5352,47 @@
             }, 30000);
         }
 
+        function _checkPendingSupport() {
+            fetch('/chat/pending_count', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var n = d && d.count ? parseInt(d.count, 10) : 0;
+                if (n > 0 && n > _adminLastPending) {
+                    if (_adminNotifPerm === 'granted') {
+                        new Notification('💬 Support Chat: ' + n + ' request' + (n > 1 ? 's' : '') + ' awaiting reply', {
+                            body: 'Open Support Chat Admin to respond.',
+                            icon: '/static/images/favicon.ico',
+                            tag: 'admin-support-pending',
+                            requireInteraction: true
+                        });
+                    }
+                    _adminBeep();
+                    _adminTitleFlash(n);
+                    _adminShowToast(n);
+                }
+                _adminLastPending = n;
+                var badge = document.getElementById('nav-support-badge');
+                if (badge) { badge.textContent = n || ''; badge.style.display = n > 0 ? '' : 'none'; }
+            })
+            .catch(function() {});
+        }
+        function _sendAdminHeartbeat() {
+            fetch('/chat/admin_heartbeat', { method: 'POST', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { if (!d.success) console.warn('[Chat] admin_heartbeat rejected (not admin role?)'); })
+            .catch(function() {});
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            _requestAdminNotifPerm();
+            _sendAdminHeartbeat();
+            setTimeout(_checkPendingSupport, 2000);
+            setInterval(_checkPendingSupport, 30000);
+            setInterval(_sendAdminHeartbeat, 20000);
+        });
+    })();
+
+    if (!PAGE_MODE) {
         window.ComservAIChat = {
             open: openChatPreferred,
             openInline: openChat,
@@ -5835,10 +5593,3 @@
         }).catch(function() { openChat(); });
     };
 })();
-document.addEventListener("DOMContentLoaded", function() {
-    if (typeof _startChatSSE === "function") {
-        console.log("[Chat] Starting SSE connection (startChatSSE)");
-        _startChatSSE();
-    }
-});
-
