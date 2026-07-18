@@ -264,6 +264,10 @@ sub get_site_domain {
         $site_domain = $self->_site_domain_from_subdomain_prefix($c, $domain);
         return $site_domain if $site_domain;
 
+        # Dev workstation fallback: workstation.local → CSC site
+        $site_domain = $self->_site_domain_for_dev_workstation($c, $domain);
+        return $site_domain if $site_domain;
+
         # If we get here, the domain wasn't found — cache the miss
         $_domain_miss_cache{$domain} = time();
         $self->logging->log_with_details(
@@ -306,6 +310,27 @@ sub _site_domain_from_subdomain_prefix {
         site_id => $site->id,
         domain  => $domain,
     });
+}
+
+sub _site_domain_for_dev_workstation {
+    my ($self, $c, $domain) = @_;
+    return unless defined $domain && $domain ne '';
+
+    # Match dev workstation patterns
+    if ($domain =~ /^(?:workstation\.local|localhost|127\.0\.0\.1|192\.168\.1\.199|172\.30\.131\.126)(?::\d+)?$/) {
+        my $site = $self->get_site_details_by_name($c, 'CSC');
+        if ($site) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, '_site_domain_for_dev_workstation',
+                "Dev workstation fallback: $domain → CSC site"
+            );
+            return $self->schema->resultset('SiteDomain')->new_result({
+                site_id => $site->id,
+                domain  => $domain,
+            });
+        }
+    }
+    return;
 }
 
 sub add_site {
