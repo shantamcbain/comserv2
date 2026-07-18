@@ -1165,8 +1165,12 @@
             if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
             if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
-            // Hide provider selector and history button for guests / non-admins
-            if (data.is_guest || !data.can_access_history) {
+            // Guests get the minimal experience: hide the provider selector + history
+            // (they cannot hold a conversation). Authenticated non-admin users CAN
+            // chat (the widget is available to all roles), so they keep the selector
+            // and see the Ollama model list — only admin-only server-switching is
+            // suppressed below. Admins get the full experience.
+            if (data.is_guest) {
                 const selectorBar = document.querySelector('.provider-selector');
                 if (selectorBar) selectorBar.style.display = 'none';
                 const histBtn = document.getElementById('toggle-history-btn');
@@ -1176,8 +1180,8 @@
                 // Clear any stale conversation ID left from a previous login session
                 state.currentConversationId = null;
                 sessionStorage.removeItem('currentConversationId');
-                // For guests: still populate modelTiers from available Ollama models
-                // so query auto-tier selection works correctly.
+                // Still populate modelTiers from available Ollama models so query
+                // auto-tier selection works correctly.
                 if (data.providers) {
                     data.providers.forEach(function(p) {
                         if (p.service === 'ollama' && p.models && p.models.length > 0) {
