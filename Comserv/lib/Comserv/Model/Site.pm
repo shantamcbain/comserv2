@@ -1,4 +1,3 @@
-
 package Comserv::Model::Site;
 
 use Moose;
@@ -14,6 +13,9 @@ extends 'Catalyst::Model';
 our %SUBDOMAIN_SITE_PREFIX = (
     brew => 'Brew',
 );
+
+# Environment variable for default site when domain not found
+our $DEFAULT_SITE_NAME = $ENV{COMSERV_DEFAULT_SITENAME} || '';
 
 # Negative cache: domains confirmed not in SiteDomain table.
 # Expires entries after 5 minutes to allow DB updates to take effect.
@@ -318,11 +320,12 @@ sub _site_domain_for_dev_workstation {
 
     # Match dev workstation patterns
     if ($domain =~ /^(?:workstation\.local|localhost|127\.0\.0\.1|192\.168\.1\.199|172\.30\.131\.126)(?::\d+)?$/) {
-        my $site = $self->get_site_details_by_name($c, 'CSC');
+        my $default_site_name = $self->_get_default_site_name($c) || "CSC";
+        my $site = $self->get_site_details_by_name($c, $default_site_name);
         if ($site) {
             $self->logging->log_with_details(
                 $c, 'info', __FILE__, __LINE__, '_site_domain_for_dev_workstation',
-                "Dev workstation fallback: $domain → CSC site"
+                "Dev workstation fallback: $domain → $default_site_name site"
             );
             return $self->schema->resultset('SiteDomain')->new_result({
                 site_id => $site->id,
@@ -331,6 +334,66 @@ sub _site_domain_for_dev_workstation {
         }
     }
     return;
+}
+
+sub _get_default_site_name {
+    my ($self, $c) = @_;
+    
+    # 1. Check environment variable
+    if ($DEFAULT_SITE_NAME) {
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, '_get_default_site_name',
+            "Using default site from environment: $DEFAULT_SITE_NAME"
+        );
+        return $DEFAULT_SITE_NAME;
+    }
+    
+    # 2. Try to find a site with name='CSC' (common default)
+    try {
+        my $csc_site = $self->schema->resultset('Site')->find({ name => 'CSC' });
+        if ($csc_site) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, '_get_default_site_name',
+                "Found CSC site in database"
+            );
+            return 'CSC';
+        }
+    } catch {
+        # Ignore errors, fall through
+    }
+    
+    # 3. Try to find the first site alphabetically
+    try {
+        my $first_site = $self->schema->resultset('Site')->search(
+            {}, 
+            { order_by => 'name', rows => 1 }
+        )->first;
+        if ($first_site) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, '_get_default_site_name',
+                "Using first site alphabetically: " . $first_site->name
+            );
+            return $first_site->name;
+        }
+    } catch {
+        # Ignore errors
+    }
+    
+    # 4. No site found
+    $self->logging->log_with_details(
+        $c, 'warn', __FILE__, __LINE__, '_get_default_site_name',
+        "No default site found - returning empty string"
+    );
+    return '';
+}
+
+sub get_default_site {
+    my ($self, $c) = @_;
+    
+    my $default_site_name = $self->_get_default_site_name($c);
+    return unless $default_site_name;
+    
+    return $self->get_site_details_by_name($c, $default_site_name);
 }
 
 sub add_site {
