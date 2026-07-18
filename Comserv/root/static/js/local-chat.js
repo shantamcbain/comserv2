@@ -579,12 +579,14 @@
                     if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
                 }
                 if (data.success && data.providers && data.providers.length > 0) {
-                    const sel = document.getElementById('ai-provider');
-                    if (!sel) return;
+                    // NOTE: This fetch only seeds state/tiers/toggles. It must NOT
+                    // write <option>s into #ai-provider — loadUserProviders() is the
+                    // single source of truth for the model list (called from
+                    // openChat/initPageMode). Writing here first caused a flash-then-
+                    // disappear race for admin (this block populated a partial list,
+                    // then loadUserProviders() cleared and rebuilt it).
                     data.providers.forEach(function(p) {
                         if (p.service === 'grok') {
-                            const grp = document.createElement('optgroup');
-                            grp.label = 'External AI (xAI)';
                             const grokModels = (p.models && p.models.length > 0)
                                 ? p.models
                                     .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
@@ -597,12 +599,6 @@
                                     { val: 'grok|grok-4-fast-reasoning',     label: 'Grok 4 Fast Reasoning (xAI)' },
                                     { val: 'grok|grok-3',                    label: 'Grok 3 (xAI)' }
                                 ];
-                            grokModels.forEach(function(m) {
-                                const opt = document.createElement('option');
-                                opt.value = m.val; opt.textContent = m.label;
-                                grp.appendChild(opt);
-                            });
-                            sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
                                 state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-fast-non-reasoning';
@@ -616,34 +612,17 @@
                             }
                         } else if (p.service === 'ollama') {
                             state.ollamaHost = p.active_host;
-                            // Update the default "Ollama (Local)" option label
-                            const defaultOpt = sel.querySelector('option[value="ollama"]');
-                            if (defaultOpt) defaultOpt.textContent = p.name || 'Ollama (Local AI)';
-
-                            // Admin server switcher: add optgroup if multiple servers available
-                            if (p.servers && p.servers.length > 1 && data.is_admin) {
-                                const svrGrp = document.createElement('optgroup');
-                                svrGrp.label = 'Ollama Server';
-                                p.servers.forEach(function(srv) {
-                                    const opt = document.createElement('option');
-                                    opt.value = 'ollama_server|' + srv.host;
-                                    opt.textContent = srv.label + (srv.active ? ' ✓' : '');
-                                    if (srv.active) opt.selected = false; // keep default selected
-                                    svrGrp.appendChild(opt);
-                                });
-                                sel.appendChild(svrGrp);
-                            }
-
-                            // Build model tiers from chat-capable installed models.
-                            // Exclude sub-2B toy models (tinyllama, 1.1b, etc.) from
-                            // auto-selection — they produce unreliable answers.
+                            // Build model tiers from chat-capable installed models so
+                            // query auto-tiering works even before loadUserProviders runs.
+                            // (Excludes sub-2B toy models — they produce unreliable answers.)
                             if (p.models && p.models.length > 0) {
-                                const chatModels = p.models.filter(function(m) { return window.ComservChat.pageContext.isChatModel(m.id); });
+                                const pc = (window.ComservChat && window.ComservChat.pageContext) || null;
+                                const chatModels = pc ? p.models.filter(function(m) { return pc.isChatModel(m.id); }) : p.models.slice();
                                 if (chatModels.length > 0) {
                                     const sorted = chatModels.slice().sort(function(a, b) {
-                                        return window.ComservChat.pageContext.modelSizeScore(a.id) - window.ComservChat.pageContext.modelSizeScore(b.id);
+                                        return pc ? (pc.modelSizeScore(a.id) - pc.modelSizeScore(b.id)) : 0;
                                     });
-                                    const usable = sorted.filter(function(m) { return window.ComservChat.pageContext.modelSizeScore(m.id) >= 2; });
+                                    const usable = pc ? sorted.filter(function(m) { return pc.modelSizeScore(m.id) >= 2; }) : sorted;
                                     const pool   = usable.length > 0 ? usable : sorted; // fallback if all tiny
                                     state.modelTiers.small  = 'ollama|' + pool[0].id;
                                     state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
@@ -931,9 +910,9 @@
             window.ComservChat.voice.wire({
                 state: state,
                 sendMessage: sendMessage,
-                saveAudioBackup: _saveAudioBackup,
+                saveAudioBackup: window.ComservChat.audioBackup ? window.ComservChat.audioBackup.saveAudioBackup : null,
                 transcribeAudioFile: _transcribeAudioFile,
-                renderLocalAudioBackups: _renderLocalAudioBackups
+                renderLocalAudioBackups: window.ComservChat.audioBackup ? window.ComservChat.audioBackup.renderLocalAudioBackups : null
             });
         }
 
@@ -1206,7 +1185,18 @@
 
             const providerSelect = document.getElementById('ai-provider');
             if (!providerSelect) return;
+
+            // This is the single source of truth for #ai-provider. It is called
+            // from openChat() and initPageMode(); the partial populate done inside
+            // createChatWidget() at widget-build time is intentionally NOT touching
+            // the options (it only sets state/tiers/toggles) to avoid a flash-then-
+            // disappear race. Guard every pageContext.* access so a missing module
+            // can never leave the selector empty.
             providerSelect.innerHTML = '';
+
+            // pageContext may be absent (e.g. popup mode where ai-chat/*.js are not
+            // loaded). Fall back to listing raw model ids so the list still populates.
+            const pc = (window.ComservChat && window.ComservChat.pageContext) || null;
 
             data.providers.forEach(function(p) {
                 if (p.service === 'ollama') {
@@ -1218,19 +1208,19 @@
                     if (p.models && p.models.length > 0) {
                         // Build model tiers from chat-capable models only, sorted by size.
                         // Exclude sub-2B toy models from auto-selection.
-                        const chatModels = p.models.filter(function(m) { return window.ComservChat.pageContext.isChatModel(m.id); });
+                        const chatModels = pc ? p.models.filter(function(m) { return pc.isChatModel(m.id); }) : p.models.slice();
                         if (chatModels.length > 0) {
                             const sorted = chatModels.slice().sort(function(a, b) {
-                                return window.ComservChat.pageContext.modelSizeScore(a.id) - window.ComservChat.pageContext.modelSizeScore(b.id);
+                                return pc ? (pc.modelSizeScore(a.id) - pc.modelSizeScore(b.id)) : 0;
                             });
-                            const usable = sorted.filter(function(m) { return window.ComservChat.pageContext.modelSizeScore(m.id) >= 2; });
+                            const usable = pc ? sorted.filter(function(m) { return pc.modelSizeScore(m.id) >= 2; }) : sorted;
                             const pool   = usable.length > 0 ? usable : sorted;
                             state.modelTiers.small  = 'ollama|' + pool[0].id;
                             state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
                             state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                         }
                         // Only show usable (≥2B) models in dropdown; hide toy models
-                        const displayModels = chatModels.filter(function(m) { return window.ComservChat.pageContext.modelSizeScore(m.id) >= 2; });
+                        const displayModels = pc ? chatModels.filter(function(m) { return pc.modelSizeScore(m.id) >= 2; }) : chatModels;
                         const listModels = displayModels.length > 0 ? displayModels : chatModels;
                         listModels.forEach(function(m) {
                             const opt = document.createElement('option');
@@ -1245,6 +1235,21 @@
                         grp.appendChild(opt);
                     }
                     providerSelect.appendChild(grp);
+                    // Admin server switcher (only when multiple Ollama servers exist).
+                    // This optgroup was previously added only by createChatWidget();
+                    // it now lives here so the rebuild is complete (no missing options).
+                    if (p.servers && p.servers.length > 1 && data.is_admin) {
+                        const svrGrp = document.createElement('optgroup');
+                        svrGrp.label = 'Ollama Server';
+                        p.servers.forEach(function(srv) {
+                            const opt = document.createElement('option');
+                            opt.value = 'ollama_server|' + srv.host;
+                            opt.textContent = srv.label + (srv.active ? ' ✓' : '');
+                            if (srv.active) opt.selected = false; // keep default selected
+                            svrGrp.appendChild(opt);
+                        });
+                        providerSelect.appendChild(svrGrp);
+                    }
                 } else if (p.service === 'grok') {
                     const grp = document.createElement('optgroup');
                     grp.label = 'xAI (Grok)';
@@ -3066,217 +3071,10 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // ── Local Audio Backup Store (IndexedDB) ───────────────────────────────────
-    const dbName = 'AudioInspectionBackupDB';
-    const storeName = 'recordings';
-
-    function _openAudioDB() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(dbName, 1);
-            request.onerror = (e) => reject(e.target.error);
-            request.onsuccess = (e) => resolve(e.target.result);
-            request.onupgradeneeded = (e) => {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName, { keyPath: 'id' });
-                }
-            };
-        });
-    }
-
-    async function _saveAudioBackup(id, file, elapsed) {
-        try {
-            const db = await _openAudioDB();
-            const tx = db.transaction(storeName, 'readwrite');
-            const store = tx.objectStore(storeName);
-            const record = {
-                id: id,
-                fileName: file.name,
-                type: file.type,
-                blob: file,
-                elapsed: elapsed,
-                timestamp: Date.now(),
-                status: 'pending'
-            };
-            store.put(record);
-            return new Promise((resolve, reject) => {
-                tx.oncomplete = () => resolve(record);
-                tx.onerror = (e) => reject(e.target.error);
-            });
-        } catch (err) {
-            console.error('Failed to save local audio backup:', err);
+        // -- Local Audio Backup Store (extracted -> static/js/ai-chat/audio-backup.js, V2 module) --
+        if (window.ComservChat && window.ComservChat.audioBackup && window.ComservChat.audioBackup.init) {
+            window.ComservChat.audioBackup.init({ transcribeAudioFile: _transcribeAudioFile });
         }
-    }
-
-    async function _getAudioBackup(id) {
-        try {
-            const db = await _openAudioDB();
-            const tx = db.transaction(storeName, 'readonly');
-            const store = tx.objectStore(storeName);
-            const req = store.get(id);
-            return new Promise((resolve, reject) => {
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = (e) => reject(e.target.error);
-            });
-        } catch (err) {
-            console.error('Failed to get local audio backup:', err);
-        }
-    }
-
-    async function _updateAudioBackupStatus(id, status) {
-        try {
-            const db = await _openAudioDB();
-            const tx = db.transaction(storeName, 'readwrite');
-            const store = tx.objectStore(storeName);
-            const req = store.get(id);
-            req.onsuccess = () => {
-                const record = req.result;
-                if (record) {
-                    record.status = status;
-                    store.put(record);
-                }
-            };
-            return new Promise((resolve) => {
-                tx.oncomplete = () => resolve();
-            });
-        } catch (err) {
-            console.error('Failed to update local audio backup status:', err);
-        }
-    }
-
-    async function _deleteAudioBackup(id) {
-        try {
-            const db = await _openAudioDB();
-            const tx = db.transaction(storeName, 'readwrite');
-            const store = tx.objectStore(storeName);
-            store.delete(id);
-            return new Promise((resolve) => {
-                tx.oncomplete = () => resolve();
-            });
-        } catch (err) {
-            console.error('Failed to delete local audio backup:', err);
-        }
-    }
-
-    async function _listAudioBackups() {
-        try {
-            const db = await _openAudioDB();
-            const tx = db.transaction(storeName, 'readonly');
-            const store = tx.objectStore(storeName);
-            const req = store.getAll();
-            return new Promise((resolve, reject) => {
-                req.onsuccess = () => resolve(req.result || []);
-                req.onerror = (e) => reject(e.target.error);
-            });
-        } catch (err) {
-            console.error('Failed to list local audio backups:', err);
-            return [];
-        }
-    }
-
-    async function _cleanupOldAudioBackups() {
-        try {
-            const backups = await _listAudioBackups();
-            const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days
-            for (const b of backups) {
-                if (b.timestamp < cutoff || b.status === 'uploaded') {
-                    await _deleteAudioBackup(b.id);
-                }
-            }
-        } catch (e) {
-            console.error('Failed to cleanup old audio backups:', e);
-        }
-    }
-
-    async function _renderLocalAudioBackups() {
-        const container = document.getElementById('local-audio-backups-container');
-        if (!container) return;
-
-        const backups = await _listAudioBackups();
-        const pending = backups.filter(b => b.status !== 'uploaded');
-
-        if (pending.length === 0) {
-            container.style.display = 'none';
-            container.innerHTML = '';
-            return;
-        }
-
-        container.style.display = 'block';
-        container.innerHTML = '<div style="font-weight:bold;margin-bottom:5px;border-bottom:1px solid var(--border-color,#ddd);padding-bottom:3px;display:flex;justify-content:space-between;align-items:center;">' +
-            '<span>⚠️ Unsent Voice Recordings (' + pending.length + ')</span>' +
-            '<button id="close-backups-btn" style="background:none;border:none;cursor:pointer;font-size:1.1em;padding:0;color:var(--text-muted-color,#888);">×</button>' +
-            '</div>';
-
-        // Add close button listener
-        container.querySelector('#close-backups-btn').addEventListener('click', () => {
-            container.style.display = 'none';
-        });
-
-        const listDiv = document.createElement('div');
-        listDiv.style.cssText = 'max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;';
-
-        pending.forEach(b => {
-            const item = document.createElement('div');
-            item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px;background:var(--table-header-bg,#f9f9f9);border-radius:3px;border:1px solid var(--border-color,#eee);';
-
-            const dateStr = new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' (' + b.elapsed + ')';
-            
-            const info = document.createElement('span');
-            info.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;font-size:0.9em;';
-            info.textContent = dateStr;
-            item.appendChild(info);
-
-            const btnGroup = document.createElement('div');
-            btnGroup.style.cssText = 'display:flex;gap:3px;';
-
-            // Retry button
-            const retryBtn = document.createElement('button');
-            retryBtn.textContent = 'Retry';
-            retryBtn.title = 'Retry upload and transcription';
-            retryBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:var(--accent-color, #0077cc);color:var(--background-color, #fff);border:none;border-radius:3px;';
-            retryBtn.addEventListener('click', async () => {
-                retryBtn.disabled = true;
-                retryBtn.textContent = '...';
-                _transcribeAudioFile(b.blob, b.id);
-            });
-            btnGroup.appendChild(retryBtn);
-
-            // Download/Save button
-            const dlBtn = document.createElement('button');
-            dlBtn.textContent = 'Save';
-            dlBtn.title = 'Download raw audio file to your device';
-            dlBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:var(--success-color, #28a745);color:var(--background-color, #fff);border:none;border-radius:3px;';
-            dlBtn.addEventListener('click', () => {
-                const url = URL.createObjectURL(b.blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = b.fileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
-            btnGroup.appendChild(dlBtn);
-
-            // Delete button
-            const delBtn = document.createElement('button');
-            delBtn.textContent = 'Delete';
-            delBtn.title = 'Remove local backup';
-            delBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:var(--danger-color, #dc3545);color:var(--background-color, #fff);border:none;border-radius:3px;';
-            delBtn.addEventListener('click', async () => {
-                if (confirm('Delete this local recording?')) {
-                    await _deleteAudioBackup(b.id);
-                    _renderLocalAudioBackups();
-                }
-            });
-            btnGroup.appendChild(delBtn);
-
-            item.appendChild(btnGroup);
-            listDiv.appendChild(item);
-        });
-
-        container.appendChild(listDiv);
-    }
 
     // ── _transcribeAudioFile ───────────────────────────────────────────────────
     // Upload an audio File object to /ai/transcribe, show progress, and on success
@@ -3302,7 +3100,8 @@
             if (!data.success) {
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
                 if (backupId) {
-                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                    var _ab0 = window.ComservChat.audioBackup;
+                    if (_ab0) _ab0.updateAudioBackupStatus(backupId, 'failed').then(function(){ _ab0.renderLocalAudioBackups(); });
                 }
                 return;
             }
@@ -3310,7 +3109,8 @@
             if (!transcript) {
                 if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
                 if (backupId) {
-                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                    var _ab0 = window.ComservChat.audioBackup;
+                    if (_ab0) _ab0.updateAudioBackupStatus(backupId, 'failed').then(function(){ _ab0.renderLocalAudioBackups(); });
                 }
                 return;
             }
@@ -3354,7 +3154,8 @@
             addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
 
             if (backupId) {
-                _deleteAudioBackup(backupId).then(_renderLocalAudioBackups);
+                var _ab1 = window.ComservChat.audioBackup;
+                if (_ab1) _ab1.deleteAudioBackup(backupId).then(function() { _ab1.renderLocalAudioBackups(); });
             }
         }
 
@@ -3364,7 +3165,8 @@
                 if (sendBtn) sendBtn.disabled = false;
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription timed out after 10 minutes. Try a shorter recording.'; }
                 if (backupId) {
-                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                    var _ab0 = window.ComservChat.audioBackup;
+                    if (_ab0) _ab0.updateAudioBackupStatus(backupId, 'failed').then(function(){ _ab0.renderLocalAudioBackups(); });
                 }
                 return;
             }
@@ -3406,7 +3208,8 @@
                 if (sendBtn) sendBtn.disabled = false;
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
                 if (backupId) {
-                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                    var _ab0 = window.ComservChat.audioBackup;
+                    if (_ab0) _ab0.updateAudioBackupStatus(backupId, 'failed').then(function(){ _ab0.renderLocalAudioBackups(); });
                 }
                 return;
             }
@@ -3421,354 +3224,16 @@
             if (sendBtn) sendBtn.disabled = false;
             if (statusEl) { statusEl.textContent = '⚠️ Upload failed: ' + err.message; }
             if (backupId) {
-                _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                var _ab0 = window.ComservChat.audioBackup;
+                if (_ab0) _ab0.updateAudioBackupStatus(backupId, 'failed').then(function(){ _ab0.renderLocalAudioBackups(); });
             }
         });
     }
 
-    function _makeWizardForm(fields, onConfirm) {
-        var form = document.createElement('form');
-        form.onsubmit = function(e) { e.preventDefault(); onConfirm(form); };
-        fields.forEach(function(f) {
-            var row = document.createElement('div');
-            row.style.cssText = 'margin:4px 0;display:flex;gap:6px;align-items:center;';
-            var label = document.createElement('label');
-            label.textContent = f.label;
-            label.style.cssText = 'width:160px;font-size:12px;color:var(--text-color,#555);flex-shrink:0;';
-            var input = document.createElement('input');
-            input.name = f.name;
-            input.value = f.value !== undefined ? f.value : '';
-            input.type = f.type || 'text';
-            input.style.cssText = 'flex:1;padding:4px 6px;border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:13px;background:var(--background-color,#fff);color:var(--text-color,#222);';
-            if (f.required) input.required = true;
-            row.appendChild(label);
-            row.appendChild(input);
-            form.appendChild(row);
-        });
-        return form;
-    }
-
-    function _postWizardAction(actionName, params, msgEl) {
-        msgEl.textContent = '⏳ Saving…';
-        fetch('/ai/action', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: actionName, params: params })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(result) {
-            if (result.success) {
-                msgEl.innerHTML = '✅ ' + (result.message || 'Saved') +
-                    (result.url ? ' <a href="' + result.url + '" target="_blank" style="color:var(--accent-color, #0077cc);font-weight:bold;">View →</a>' : '');
-            } else {
-                msgEl.textContent = '⚠️ ' + (result.error || 'Save failed');
-            }
-        })
-        .catch(function(e) { msgEl.textContent = '⚠️ Request failed: ' + e.message; });
-    }
-
-    function _openSimpleWizard(title, fields, actionName, extraParams) {
-        var chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
-        var id = 'ai-' + actionName + '-wizard';
-        var existing = document.getElementById(id);
-        if (existing) existing.remove();
-
-        var wrapper = document.createElement('div');
-        wrapper.id = id;
-        wrapper.className = 'msg-wrapper msg-wrapper-ai';
-        wrapper.style.cssText = 'margin:8px 0;';
-
-        var card = document.createElement('div');
-        card.className = 'message system-message';
-        card.style.cssText = 'background:var(--table-header-bg,#f9f9f9);border:1px solid var(--border-color,#ddd);border-radius:8px;padding:12px;max-width:520px;color:var(--text-color,#222);';
-
-        var heading = document.createElement('div');
-        heading.textContent = title;
-        heading.style.cssText = 'font-weight:bold;font-size:14px;margin-bottom:8px;';
-        card.appendChild(heading);
-
-        var msgEl = document.createElement('div');
-        msgEl.style.cssText = 'font-size:12px;color:var(--text-muted-color, #666);margin-top:6px;';
-
-        var form = _makeWizardForm(fields, function(f) {
-            var params = Object.assign({}, extraParams || {}, { wizard_confirmed: 1 });
-            fields.forEach(function(fd) {
-                var inp = f.elements[fd.name];
-                if (inp) params[fd.name] = inp.value;
-            });
-            _postWizardAction(actionName, params, msgEl);
-        });
-        card.appendChild(form);
-
-        var btnRow = document.createElement('div');
-        btnRow.style.cssText = 'margin-top:8px;display:flex;gap:8px;';
-        var saveBtn = document.createElement('button');
-        saveBtn.textContent = 'Save';
-        saveBtn.type = 'submit';
-        saveBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;';
-        saveBtn.onclick = function() { form.requestSubmit ? form.requestSubmit() : form.submit(); };
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.type = 'button';
-        cancelBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;';
-        cancelBtn.onclick = function() { wrapper.remove(); };
-        btnRow.appendChild(saveBtn);
-        btnRow.appendChild(cancelBtn);
-        card.appendChild(btnRow);
-        card.appendChild(msgEl);
-        wrapper.appendChild(card);
-        chatMessages.appendChild(wrapper);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    function openYardWizard(prefill) {
-        _openSimpleWizard('🏡 Create Yard', [
-            { name: 'yard_name',       label: 'Yard Name *',      value: prefill.yard_name  || '', required: true },
-            { name: 'yard_code',       label: 'Yard Code *',      value: prefill.yard_code  || '', required: true },
-            { name: 'yard_size',       label: 'Capacity (hives)', value: prefill.yard_size  || 10, type: 'number' },
-            { name: 'total_yard_size', label: 'Total Size (hives)',value: prefill.total_yard_size || 10, type: 'number' },
-            { name: 'notes',           label: 'Notes',            value: prefill.notes      || '' },
-        ], 'create_yard', {});
-    }
-
-    function openHiveWizard(prefill) {
-        _openSimpleWizard('🐝 Register Hive', [
-            { name: 'hive_number', label: 'Hive Number *', value: prefill.hive_number || '', required: true },
-            { name: 'yard_id',     label: 'Yard ID *',     value: prefill.yard_id    || '', required: true, type: 'number' },
-            { name: 'queen_code',  label: 'Queen Code',    value: prefill.queen_code || '' },
-            { name: 'notes',       label: 'Notes',         value: prefill.notes      || '' },
-        ], 'create_hive', {});
-    }
-
-    function openQueenWizard(prefill) {
-        _openSimpleWizard('👑 Record Queen', [
-            { name: 'tag_number',    label: 'Tag / Number',   value: prefill.tag_number    || '' },
-            { name: 'color_marking', label: 'Colour Marking', value: prefill.color_marking || '' },
-            { name: 'birth_date',    label: 'Birth Date',     value: prefill.birth_date    || '', type: 'date' },
-            { name: 'breed',         label: 'Breed',          value: prefill.breed         || 'unknown' },
-            { name: 'mating_status', label: 'Mating Status',  value: prefill.mating_status || 'mated' },
-            { name: 'health_status', label: 'Health Status',  value: prefill.health_status || 'healthy' },
-            { name: 'notes',         label: 'Notes',          value: prefill.notes         || '' },
-        ], 'create_queen', { hive_id: prefill.hive_id || undefined });
-    }
-
-    // ── openInspectionWizard ───────────────────────────────────────────────────
-    // Renders an inline inspection review form pre-filled with AI-extracted data.
-    // User can edit all fields before confirming; on confirm sends create_inspection.
-    function openInspectionWizard(prefill) {
-        var chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
-
-        var existing = document.getElementById('ai-inspection-wizard');
-        if (existing) existing.remove();
-
-        var wrapper = document.createElement('div');
-        wrapper.className = 'msg-wrapper msg-wrapper-ai';
-        wrapper.id = 'ai-inspection-wizard';
-
-        var lbl = document.createElement('div');
-        lbl.className = 'msg-label';
-        lbl.textContent = 'Hive Inspection Review';
-
-        var box = document.createElement('div');
-        box.className = 'message system-message';
-        box.style.cssText = 'padding:12px;max-width:520px;font-size:0.88em;';
-
-        var p = prefill || {};
-        var qs_yes = p.queen_seen        ? 'checked' : '';
-        var qm_yes = p.queen_marked      ? 'checked' : '';
-        var eg_yes = p.eggs_seen         ? 'checked' : '';
-        var lv_yes = p.larvae_seen       ? 'checked' : '';
-        var cb_yes = p.capped_brood_seen ? 'checked' : '';
-        var fd_yes = p.feeding_done      ? 'checked' : '';
-        var today  = new Date().toISOString().slice(0, 10);
-
-        var popOpts = ['', 'very_strong', 'strong', 'moderate', 'weak', 'very_weak'].map(function(v) {
-            var sel = (p.population_estimate || '') === v ? ' selected' : '';
-            var lbl2 = v ? v.replace(/_/g, ' ') : '— select —';
-            return '<option value="' + v + '"' + sel + '>' + lbl2 + '</option>';
-        }).join('');
-        var tempOpts = ['calm', 'moderate', 'aggressive', 'very_aggressive'].map(function(v) {
-            var sel = (p.temperament || 'calm') === v ? ' selected' : '';
-            return '<option value="' + v + '"' + sel + '>' + v.replace(/_/g, ' ') + '</option>';
-        }).join('');
-        var statusOpts = ['excellent', 'good', 'fair', 'poor', 'critical'].map(function(v) {
-            var sel = (p.overall_status || 'good') === v ? ' selected' : '';
-            return '<option value="' + v + '"' + sel + '>' + v + '</option>';
-        }).join('');
-
-        var inpStyle = 'width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
-        var selStyle = 'width:100%;padding:3px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
-        var lblStyle = 'font-weight:600;display:block;font-size:0.85em;color:var(--text-color,#333);';
-
-        box.innerHTML =
-            '<strong style="font-size:1.05em;color:var(--text-color,#222)">🐝 Review Hive Inspection</strong>' +
-            '<p style="margin:4px 0 8px;color:var(--text-color,#555);font-size:0.9em">Review AI-extracted data below, edit any fields, then click Save.</p>' +
-            '<form id="ai-insp-form" style="display:flex;flex-direction:column;gap:5px;">' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">' +
-                    '<div><label style="' + lblStyle + '">Hive ID *</label><input name="hive_id" type="number" required value="' + (p.hive_id || '') + '" style="' + inpStyle + '"></div>' +
-                    '<div><label style="' + lblStyle + '">Date *</label><input name="inspection_date" type="date" required value="' + (p.inspection_date || today) + '" style="' + inpStyle + '"></div>' +
-                    '<div><label style="' + lblStyle + '">Population</label><select name="population_estimate" style="' + selStyle + '">' + popOpts + '</select></div>' +
-                    '<div><label style="' + lblStyle + '">Temperament</label><select name="temperament" style="' + selStyle + '">' + tempOpts + '</select></div>' +
-                    '<div><label style="' + lblStyle + '">Overall Status</label><select name="overall_status" style="' + selStyle + '">' + statusOpts + '</select></div>' +
-                    '<div><label style="' + lblStyle + '">Weather</label><input name="weather_conditions" type="text" value="' + (p.weather_conditions || '') + '" placeholder="sunny, cloudy…" style="' + inpStyle + '"></div>' +
-                    '<div><label style="' + lblStyle + '">Temperature (°C)</label><input name="temperature" type="number" step="0.5" value="' + (p.temperature != null ? p.temperature : '') + '" style="' + inpStyle + '"></div>' +
-                    '<div><label style="' + lblStyle + '">Inspector</label><input name="inspector" type="text" value="' + (p.inspector || '') + '" style="' + inpStyle + '"></div>' +
-                '</div>' +
-                '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0;color:var(--text-color,#333);">' +
-                    '<label><input type="checkbox" name="queen_seen" ' + qs_yes + '> Queen seen</label>' +
-                    '<label><input type="checkbox" name="queen_marked" ' + qm_yes + '> Queen marked</label>' +
-                    '<label><input type="checkbox" name="eggs_seen" ' + eg_yes + '> Eggs</label>' +
-                    '<label><input type="checkbox" name="larvae_seen" ' + lv_yes + '> Larvae</label>' +
-                    '<label><input type="checkbox" name="capped_brood_seen" ' + cb_yes + '> Capped brood</label>' +
-                    '<label><input type="checkbox" name="feeding_done" ' + fd_yes + '> Feeding done</label>' +
-                '</div>' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">' +
-                    '<div><label style="' + lblStyle + '">Swarm cells</label><input name="swarm_cells" type="number" min="0" value="' + (p.swarm_cells || 0) + '" style="' + inpStyle + '"></div>' +
-                    '<div><label style="' + lblStyle + '">Queen cells</label><input name="queen_cells" type="number" min="0" value="' + (p.queen_cells || 0) + '" style="' + inpStyle + '"></div>' +
-                    '<div><label style="' + lblStyle + '">Supersedure</label><input name="supersedure_cells" type="number" min="0" value="' + (p.supersedure_cells || 0) + '" style="' + inpStyle + '"></div>' +
-                '</div>' +
-                '<div><label style="' + lblStyle + '">General notes</label><textarea name="general_notes" rows="3" style="' + inpStyle + 'resize:vertical;">' + (p.general_notes || '') + '</textarea></div>' +
-                '<div><label style="' + lblStyle + '">Action required</label><textarea name="action_required" rows="2" style="' + inpStyle + 'resize:vertical;">' + (p.action_required || '') + '</textarea></div>' +
-                '<div><label style="' + lblStyle + '">Feed type</label><input name="feed_type" type="text" value="' + (p.feed_type || '') + '" placeholder="syrup, fondant…" style="' + inpStyle + '"></div>' +
-                '<div><label style="' + lblStyle + '">Feed amount</label><input name="feed_amount" type="text" value="' + (p.feed_amount || '') + '" placeholder="1L, 500g…" style="' + inpStyle + '"></div>' +
-                '<div id="ai-insp-status" style="display:none;font-style:italic;font-size:0.85em;color:var(--text-color,#555);"></div>' +
-                '<div style="display:flex;gap:8px;margin-top:4px;">' +
-                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#0077cc);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em">Save Inspection</button>' +
-                    '<button type="button" id="ai-insp-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
-                '</div>' +
-            '</form>';
-
-        wrapper.appendChild(lbl);
-        wrapper.appendChild(box);
-        chatMessages.appendChild(wrapper);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        document.getElementById('ai-insp-cancel').addEventListener('click', function() {
-            wrapper.remove();
-        });
-
-        document.getElementById('ai-insp-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            var fd = new FormData(e.target);
-            var confirmed = { box_details: p.box_details || [] };
-            fd.forEach(function(val, key) { confirmed[key] = val; });
-            confirmed.queen_seen        = e.target.queen_seen.checked        ? 1 : 0;
-            confirmed.queen_marked      = e.target.queen_marked.checked      ? 1 : 0;
-            confirmed.eggs_seen         = e.target.eggs_seen.checked         ? 1 : 0;
-            confirmed.larvae_seen       = e.target.larvae_seen.checked       ? 1 : 0;
-            confirmed.capped_brood_seen = e.target.capped_brood_seen.checked ? 1 : 0;
-            confirmed.feeding_done      = e.target.feeding_done.checked      ? 1 : 0;
-            confirmed.swarm_cells       = parseInt(confirmed.swarm_cells, 10) || 0;
-            confirmed.queen_cells       = parseInt(confirmed.queen_cells, 10) || 0;
-            confirmed.supersedure_cells = parseInt(confirmed.supersedure_cells, 10) || 0;
-
-            var statusDiv = document.getElementById('ai-insp-status');
-            if (statusDiv) { statusDiv.textContent = 'Saving…'; statusDiv.style.display = ''; }
-            e.target.querySelector('[type=submit]').disabled = true;
-
-            executeAIAction({ action: 'create_inspection', params: confirmed });
-
-            setTimeout(function() { wrapper.remove(); }, 1500);
-        });
-    }
-
-    // Project creation wizard — renders an inline form in the chat window.
-    // Submitted data is sent to /ai/action as a create_project ACTION.
-    function openProjectWizard(prefillTitle) {
-        const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
-
-        const existing = document.getElementById('ai-project-wizard');
-        if (existing) existing.remove();
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'msg-wrapper msg-wrapper-ai';
-        wrapper.id = 'ai-project-wizard';
-
-        const lbl = document.createElement('div');
-        lbl.className = 'msg-label';
-        lbl.textContent = 'Planning Agent';
-
-        const box = document.createElement('div');
-        box.className = 'message system-message';
-        box.style.cssText = 'padding:12px;max-width:480px;';
-
-        const DEPS = [
-            ['inventory',   'Inventory tracking'],
-            ['billing',     'Billing / payments'],
-            ['email',       'Email notifications'],
-            ['calendar',    'Calendar / bookings'],
-            ['helpdesk',    'HelpDesk / support'],
-            ['api',         'External API'],
-            ['schema',      'New DB tables needed'],
-            ['ai',          'AI / Chat integration'],
-        ];
-
-        box.innerHTML =
-            '<strong style="font-size:1.05em">📋 New Project Wizard</strong>' +
-            '<form id="ai-wizard-form" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
-                '<label style="font-size:.85em;font-weight:600">Project name</label>' +
-                '<input id="wiz-name" type="text" required style="padding:4px 6px;border:1px solid var(--border-color, #ccc);border-radius:4px;" value="' + (prefillTitle || '').replace(/"/g, '&quot;') + '">' +
-                '<label style="font-size:.85em;font-weight:600">Description</label>' +
-                '<textarea id="wiz-desc" rows="2" style="padding:4px 6px;border:1px solid var(--border-color, #ccc);border-radius:4px;resize:vertical;"></textarea>' +
-                '<label style="font-size:.85em;font-weight:600">Due date</label>' +
-                '<input id="wiz-due" type="date" style="padding:4px 6px;border:1px solid var(--border-color, #ccc);border-radius:4px;">' +
-                '<label style="font-size:.85em;font-weight:600">Dependencies needed (check all that apply)</label>' +
-                '<div id="wiz-deps" style="display:flex;flex-wrap:wrap;gap:4px 12px;">' +
-                    DEPS.map(function(d) {
-                        return '<label style="font-size:.82em"><input type="checkbox" name="dep" value="' + d[0] + '" style="margin-right:3px">' + d[1] + '</label>';
-                    }).join('') +
-                '</div>' +
-                '<div style="display:flex;gap:8px;margin-top:4px;">' +
-                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
-                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
-                '</div>' +
-            '</form>';
-
-        wrapper.appendChild(lbl);
-        wrapper.appendChild(box);
-        chatMessages.appendChild(wrapper);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        document.getElementById('wiz-cancel').addEventListener('click', function() {
-            wrapper.remove();
-        });
-
-        document.getElementById('ai-wizard-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            var name = document.getElementById('wiz-name').value.trim();
-            var desc = document.getElementById('wiz-desc').value.trim();
-            var due  = document.getElementById('wiz-due').value;
-            var deps = Array.from(document.querySelectorAll('#wiz-deps input:checked')).map(function(cb) { return cb.value; });
-
-            if (!name) { alert('Project name is required.'); return; }
-
-            var depNote = deps.length ? '\n\nDependencies: ' + deps.join(', ') : '';
-            wrapper.remove();
-
-            executeAIAction({
-                action: 'create_project',
-                params: {
-                    name:        name,
-                    description: desc + depNote,
-                    due_date:    due || undefined,
-                }
-            });
-
-            if (deps.length) {
-                var depMsg = 'Project "' + name + '" was created. Dependencies noted: ' + deps.join(', ') + '. Please create the relevant sub-project todos and blocking dependencies.';
-                var chatInput = document.getElementById('chat-input') || document.getElementById('chat-message');
-                if (chatInput) {
-                    chatInput.value = depMsg;
-                    var sendBtn = document.getElementById('send-button') || document.querySelector('[data-action="send"]');
-                    if (sendBtn) sendBtn.click();
-                }
-            }
-        });
-    }
+        // -- Action wizards (extracted -> static/js/ai-chat/wizards.js, V2 module) --
+        if (window.ComservChat && window.ComservChat.wizards && window.ComservChat.wizards.init) {
+            window.ComservChat.wizards.init({ executeAIAction: executeAIAction });
+        }
 
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
@@ -3856,27 +3321,30 @@
             if (!result) {
                 throw new Error('Action server returned an empty response');
             }
+            // Action wizards live in the ai-chat/wizards.js V2 module. In popup
+            // mode (widget.tt) that module is not loaded, so guard each call to
+            // avoid a TypeError when the module is absent.
             if (result.success && result.action === 'open_project_wizard') {
-                openProjectWizard(result.wizard_title || '');
+                if (window.ComservChat && window.ComservChat.wizards) window.ComservChat.wizards.openProjectWizard(result.wizard_title || '');
                 return;
             }
             if (result.action === 'open_inspection_wizard' || (actionObj.action === 'create_inspection' && result.wizard_prefill)) {
                 var prefill = result.wizard_prefill || actionObj.params || {};
                 if (state.lastAudioFileId)      { prefill.audio_file_id      = state.lastAudioFileId; }
                 if (state.lastTranscriptFileId) { prefill.transcript_file_id = state.lastTranscriptFileId; }
-                openInspectionWizard(prefill);
+                if (window.ComservChat && window.ComservChat.wizards) window.ComservChat.wizards.openInspectionWizard(prefill);
                 return;
             }
             if (result.action === 'open_yard_wizard') {
-                openYardWizard(result.wizard_prefill || {});
+                if (window.ComservChat && window.ComservChat.wizards) window.ComservChat.wizards.openYardWizard(result.wizard_prefill || {});
                 return;
             }
             if (result.action === 'open_hive_wizard') {
-                openHiveWizard(result.wizard_prefill || {});
+                if (window.ComservChat && window.ComservChat.wizards) window.ComservChat.wizards.openHiveWizard(result.wizard_prefill || {});
                 return;
             }
             if (result.action === 'open_queen_wizard') {
-                openQueenWizard(result.wizard_prefill || {});
+                if (window.ComservChat && window.ComservChat.wizards) window.ComservChat.wizards.openQueenWizard(result.wizard_prefill || {});
                 return;
             }
             const wrapper = document.createElement('div');
@@ -4199,421 +3667,6 @@
             document.head.appendChild(link);
         }
     }
-    function _addChatStylesLEGACY_UNUSED() {
-        const style = document.createElement('style');
-        style.textContent = `
-            .local-chat-widget {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                z-index: 9999;
-                font-family: inherit;
-            }
-            
-            .chat-button {
-                background-color: var(--accent-color, #FF9900);
-                color: var(--background-color, #fff);
-                border: none;
-                border-radius: 50px;
-                padding: 10px 20px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                font-family: inherit;
-                position: relative;
-                z-index: 10000;
-            }
-            
-            .chat-icon {
-                margin-right: 8px;
-                font-size: 1.2em;
-            }
-
-            /* Popup-active state: pulsing ring shows the popup window is live */
-            .chat-button.popup-active {
-                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
-                animation: ai-popup-pulse 2s infinite;
-            }
-            @keyframes ai-popup-pulse {
-                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
-                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
-                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
-            }
-            
-            .chat-panel {
-                position: fixed;
-                bottom: 90px;
-                right: 20px;
-                width: 380px;
-                min-width: 280px;
-                max-width: 90vw;
-                height: 500px;
-                min-height: 300px;
-                max-height: 90vh;
-                background-color: var(--background-color, #ffffff);
-                border-radius: 10px;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-                display: flex;
-                flex-direction: column;
-                font-family: inherit;
-                z-index: 10001;
-                overflow: hidden;
-            }
-
-            /* In a detached popup window: fill the entire window so resize works naturally */
-            body.ai-widget-popup .chat-panel {
-                position: fixed !important;
-                top: 38px !important;
-                left: 0 !important;
-                right: 0 !important;
-                bottom: 0 !important;
-                width: 100% !important;
-                height: calc(100vh - 38px) !important;
-                max-width: 100% !important;
-                max-height: 100% !important;
-                min-width: 0 !important;
-                min-height: 0 !important;
-                border-radius: 0 !important;
-                box-shadow: none !important;
-                margin: 0 !important;
-            }
-            body.ai-widget-popup .chat-input {
-                flex-shrink: 0;
-            }
-            body.ai-widget-popup #message-input {
-                height: auto;
-                min-height: 40px;
-                max-height: 160px;
-                resize: vertical;
-            }
-
-            /* Popup-active state: pulsing ring shows the popup window is live */
-            .chat-button.popup-active {
-                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
-                animation: ai-popup-pulse 2s infinite;
-            }
-            @keyframes ai-popup-pulse {
-                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
-                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
-                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
-            }
-
-            .chat-header {
-                background-color: var(--accent-color, #FF9900);
-                color: var(--background-color, #fff);
-                padding: 8px 12px;
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 6px;
-                flex-shrink: 0;
-            }
-
-            .chat-header-drag {
-                cursor: grab; font-size: 18px; opacity: 0.5; padding: 0 4px;
-                user-select: none; letter-spacing: -2px; flex-shrink: 0;
-            }
-            .chat-header-drag:active { cursor: grabbing; }
-
-            .chat-header h3 {
-                margin: 0; font-size: 14px; white-space: nowrap;
-                overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
-            }
-
-            .chat-header-title-group {
-                display: flex; align-items: baseline; gap: 5px;
-                flex: 1; min-width: 0; overflow: hidden;
-            }
-
-            .chat-page-label {
-                font-size: 11px; opacity: 0.88; white-space: nowrap;
-                overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
-                display: flex; align-items: center; gap: 3px; flex-wrap: nowrap;
-            }
-            .chat-ctx-page {
-                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                flex-shrink: 1; min-width: 0;
-            }
-            .chat-ctx-badge {
-                display: inline-block; border-radius: 3px; padding: 0 4px;
-                font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
-                white-space: nowrap; flex-shrink: 0; line-height: 1.5;
-            }
-            .chat-ctx-site  { background: rgba(255,255,255,0.28); }
-            .chat-ctx-agent { background: rgba(0,0,0,0.22); }
-
-            .chat-header-buttons {
-                display: flex; gap: 4px; align-items: center; flex-shrink: 0;
-            }
-
-            .chat-header-icon-btn {
-                background: none; border: none; color: var(--background-color, #fff);
-                font-size: 15px; cursor: pointer; padding: 2px 5px;
-                border-radius: 4px; opacity: 0.85; transition: opacity 0.15s, background 0.15s;
-            }
-            .chat-header-icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.2); }
-
-            /* History drawer */
-            .widget-history-drawer {
-                display: flex; flex-direction: column;
-                background-color: var(--table-header-bg, #fafafa);
-                border-bottom: 1px solid var(--border-color, #ddd);
-                max-height: 220px; overflow: hidden; flex-shrink: 0;
-            }
-            .widget-history-header {
-                display: flex; justify-content: space-between; align-items: center;
-                padding: 6px 10px; font-size: 12px; font-weight: 600;
-                border-bottom: 1px solid var(--border-color); flex-shrink: 0;
-            }
-            .widget-history-list {
-                overflow-y: auto; padding: 4px;
-                display: flex; flex-direction: column; gap: 2px;
-            }
-            .wh-item {
-                width: 100%; text-align: left; background: transparent; border: none;
-                border-radius: 5px; padding: 6px 8px; cursor: pointer; font-size: 12px;
-                color: var(--text-color); transition: background 0.15s;
-            }
-            .wh-item:hover { background: var(--table-header-bg); }
-            .wh-item.active { background: var(--table-header-bg); border-left: 3px solid var(--link-color); }
-            .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .wh-meta { font-size: 10px; opacity: 0.5; margin-top: 1px; }
-            .wh-loading, .wh-empty { text-align: center; padding: 12px; font-size: 12px; opacity: 0.5; }
-
-            .conversation-selector {
-                background: var(--background-color);
-                border: 1px solid var(--border-color);
-                color: var(--text-color);
-                font-size: 12px;
-                padding: 4px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                max-width: 200px;
-            }
-            
-            #new-chat {
-                background: none; border: none; color: var(--background-color, #fff);
-                font-size: 15px; cursor: pointer; padding: 2px 5px;
-                border-radius: 4px; opacity: 0.85;
-            }
-            
-            #close-chat {
-                background: none; border: none; color: var(--background-color, #fff);
-                font-size: 18px; cursor: pointer; opacity: 0.85;
-            }
-            
-            .chat-messages {
-                flex-grow: 1;
-                padding: 10px 12px;
-                overflow-y: auto;
-                background-color: var(--background-color, #ffffff);
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-            }
-
-            .msg-wrapper { display: flex; flex-direction: column; max-width: 85%; gap: 2px; }
-            .msg-wrapper-user { align-self: flex-end; align-items: flex-end; }
-            .msg-wrapper-ai  { align-self: flex-start; align-items: flex-start; }
-            .msg-label {
-                font-size: 10px; font-weight: 600; opacity: 0.6;
-                padding: 0 4px; letter-spacing: 0.02em;
-            }
-            
-            .message {
-                padding: 8px 12px;
-                border-radius: 18px;
-                word-wrap: break-word;
-                margin: 0;
-            }
-            
-            .system-message {
-                background-color: var(--table-header-bg, #f5f5f5);
-                color: var(--text-color, #333);
-                align-self: flex-start;
-                margin-right: auto;
-                border-bottom-left-radius: 5px;
-            }
-            
-            .user-message {
-                background-color: var(--accent-color, #FF9900);
-                color: var(--background-color, #fff);
-                align-self: flex-end;
-                margin-left: auto;
-                border-bottom-right-radius: 5px;
-            }
-            
-            .ai-message {
-                background-color: var(--table-header-bg, #f0f4f8);
-                color: var(--text-color, #222);
-                align-self: flex-start;
-                margin-right: auto;
-                border-bottom-left-radius: 5px;
-                border-left: 3px solid var(--accent-color, #FF9900);
-            }
-            
-            .ai-message.loading {
-                background-color: var(--table-header-bg, #f0f4f8);
-                color: var(--text-muted-color, #888);
-                font-style: italic;
-            }
-            
-            .error-message {
-                background-color: var(--danger-bg, #fff3f3);
-                border: 1px solid var(--danger-color, #cc0000);
-                color: var(--danger-color, #cc0000);
-                align-self: center;
-                margin: 5px auto;
-                font-size: 0.9em;
-            }
-            
-            .chat-status {
-                padding: 5px 10px;
-                font-size: 0.8em;
-                text-align: center;
-                background-color: var(--table-header-bg, #fafafa);
-                border-top: 1px solid var(--border-color, #ddd);
-                color: var(--text-color, #555);
-            }
-            
-            .chat-status.connected {
-                color: var(--success-color);
-            }
-            
-            .chat-status.error {
-                color: var(--warning-color);
-            }
-            
-            .chat-status.processing {
-                color: var(--accent-color);
-            }
-            
-            .loading-dots {
-                display: inline-block;
-                animation: loadingDots 1.5s infinite;
-            }
-            
-            @keyframes loadingDots {
-                0%, 20% { opacity: 0.2; }
-                50% { opacity: 1; }
-                100% { opacity: 0.2; }
-            }
-            
-            .provider-selector {
-                padding: 8px 15px;
-                background-color: var(--table-header-bg, #f5f5f5);
-                border-bottom: 1px solid var(--border-color, #ddd);
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                font-size: 13px;
-            }
-            
-            .provider-selector label {
-                font-weight: 600;
-                color: var(--text-color, #444);
-            }
-            
-            .provider-selector select {
-                flex-grow: 1;
-                padding: 5px 10px;
-                border: 1px solid var(--border-color, #ccc);
-                border-radius: 4px;
-                background-color: var(--background-color, #fff);
-                color: var(--text-color, #333);
-                cursor: pointer;
-            }
-            
-            .manage-keys-link {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 28px;
-                height: 28px;
-                background: var(--accent-color, #FF9900);
-                color: var(--background-color, #fff);
-                border-radius: 4px;
-                text-decoration: none;
-                font-size: 14px;
-                transition: opacity 0.2s;
-            }
-            
-            .manage-keys-link:hover {
-                opacity: 0.85;
-                text-decoration: none;
-            }
-            
-            .chat-input {
-                padding: 10px;
-                border-top: 1px solid var(--border-color);
-                display: flex;
-            }
-            
-            #message-input {
-                flex-grow: 1;
-                border: 1px solid var(--border-color, #ccc);
-                border-radius: 4px;
-                padding: 8px;
-                resize: none;
-                height: 40px;
-                margin-right: 8px;
-                background-color: var(--background-color, #fff);
-                color: var(--text-color, #222);
-            }
-            
-            #send-message {
-                background-color: var(--accent-color, #FF9900);
-                color: var(--background-color, #fff);
-                border: none;
-                border-radius: 4px;
-                padding: 8px 15px;
-                cursor: pointer;
-                font-family: inherit;
-            }
-            
-            #send-message:hover {
-                opacity: 0.85;
-            }
-            
-            #send-message:disabled {
-                background-color: var(--border-color, #ccc);
-                color: var(--text-muted-color, #888);
-                cursor: not-allowed;
-            }
-
-            .chat-resize-handle {
-                position: absolute;
-                bottom: 0;
-                right: 0;
-                width: 16px;
-                height: 16px;
-                cursor: se-resize;
-                background: linear-gradient(135deg, transparent 50%, var(--text-muted-color, #aaa) 50%);
-                border-bottom-right-radius: 10px;
-                opacity: 0.6;
-                z-index: 10;
-            }
-            .chat-resize-handle:hover { opacity: 1; }
-
-            .chat-retry-btn {
-                display: block;
-                margin-top: 6px;
-                padding: 4px 12px;
-                border: 1px solid var(--border-color, #ccc);
-                border-radius: 4px;
-                background: var(--table-header-bg, #f5f5f5);
-                color: var(--text-color, #333);
-                cursor: pointer;
-                font-size: 0.85em;
-                font-family: inherit;
-            }
-            .chat-retry-btn:hover { opacity: 0.8; }
-        `;
-        document.head.appendChild(style);
-    }
     
     // Listen for dock-back message from detached popup so the widget re-opens
     // on the parent page when the user clicks ⤡ in the popup.
@@ -4770,9 +3823,13 @@
         }
 
         // Cleanup old local voice recording backups (> 7 days) and render any pending/failed ones
-        _cleanupOldAudioBackups().then(_renderLocalAudioBackups).catch(function(e) {
-            console.error('Failed to init local audio backups:', e);
-        });
+        if (window.ComservChat && window.ComservChat.audioBackup) {
+            window.ComservChat.audioBackup.cleanupOldAudioBackups()
+                .then(function() { window.ComservChat.audioBackup.renderLocalAudioBackups(); })
+                .catch(function(e) {
+                    console.error('Failed to init local audio backups:', e);
+                });
+        }
 
         // Check if there is a pending query that needs to be resumed due to navigation
         try {
