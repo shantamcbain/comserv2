@@ -1328,14 +1328,24 @@ sub fetch_and_set {
                 }
             }
         } else {
-            if (defined $c->session->{SiteName}) {
+            # Domain not found in SiteDomain, try default site
+            my $default_site = $c->model('Site')->get_default_site($c);
+            if ($default_site) {
+                $value = $default_site->name;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
+                    "Domain not in DB; using default site: " . $value);
+            } elsif (defined $c->session->{SiteName}) {
                 $c->stash->{SiteName} = $c->session->{SiteName};
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Domain not in DB; using session SiteName: " . $c->session->{SiteName});
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
+                    "Domain not in DB and no default site; using session SiteName: " . $c->session->{SiteName});
             } else {
                 $c->session->{SiteName} = 'none';
                 $c->stash->{SiteName} = 'none';
                 $c->session->{ControllerName} = 'Root';
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName to 'none'");
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
+                    "No site domain found and no default site; defaulting SiteName to 'none'");
             }
         }
     }
