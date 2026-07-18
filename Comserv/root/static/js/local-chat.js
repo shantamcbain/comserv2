@@ -2072,6 +2072,13 @@
         if (state.pageContext.model_settings) {
             requestPayload.model_settings = state.pageContext.model_settings;
         }
+
+        // Attach recent conversation history to the payload (was an inline IIFE
+        // in the original; now a page-context module function). Must run after
+        // requestPayload is fully assembled.
+        if (window.ComservChat && window.ComservChat.pageContext && window.ComservChat.pageContext.buildHistory) {
+            window.ComservChat.pageContext.buildHistory(requestPayload);
+        }
         
         // Include capabilities if available
         if (state.pageContext.capabilities) {
