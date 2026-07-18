@@ -305,7 +305,7 @@
         if (!banner) return;
         if (agentKey === 'template_editor') {
             banner.innerHTML = '✏️ <strong>Template Editor</strong> — Use the dedicated form to load, edit, and apply template changes: ' +
-                '<a href="/ai/template_editor" target="_blank" style="color:#1a73e8;font-weight:bold;">Open Template Editor →</a>';
+                '<a href="/ai/template_editor" target="_blank" style="color:var(--accent-color, #1a73e8);font-weight:bold;">Open Template Editor →</a>';
             banner.style.display = 'block';
         } else {
             banner.style.display = 'none';
@@ -506,15 +506,15 @@
         const providerSelector = document.createElement('div');
         providerSelector.className = 'provider-selector';
         providerSelector.innerHTML =
-            '<label for="ai-agent-select" style="font-size:0.82em;color:#555;">Agent:</label>' +
+            '<label for="ai-agent-select" style="font-size:0.82em;color:var(--text-color, #555);">Agent:</label>' +
             '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
               '<option value="auto">⚡ Auto</option>' +
             '</select>' +
-            '<label for="conversation-selector" style="font-size:0.82em;color:#555;margin-left:6px;">Chat:</label>' +
+            '<label for="conversation-selector" style="font-size:0.82em;color:var(--text-color, #555);margin-left:6px;">Chat:</label>' +
             '<select id="conversation-selector" title="Select past conversation to resume" style="font-size:0.82em;max-width:110px;">' +
               '<option value="">Current Chat</option>' +
             '</select>' +
-            '<button id="widget-new-chat-btn" class="chat-header-icon-btn" title="New conversation" style="margin-left:2px;font-size:1.1em;border:1px solid #ccc;border-radius:4px;padding:1px 5px;background:#fff;color:#000;">✏️</button>' +
+            '<button id="widget-new-chat-btn" class="chat-header-icon-btn" title="New conversation" style="margin-left:2px;font-size:1.1em;border:1px solid var(--border-color, #ccc);border-radius:4px;padding:1px 5px;background:var(--background-color, #fff);color:var(--text-color, #000);">✏️</button>' +
             '<label for="ai-provider" style="margin-left:6px;">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
@@ -527,8 +527,8 @@
         // Agent-specific banner (shown when a special agent needs a dedicated page)
         const agentBanner = document.createElement('div');
         agentBanner.id = 'chat-agent-banner';
-        agentBanner.style.cssText = 'display:none;padding:6px 10px;background:#fffbe6;border-top:1px solid #f0c000;' +
-            'border-bottom:1px solid #f0c000;font-size:0.82em;color:#555;';
+        agentBanner.style.cssText = 'display:none;padding:6px 10px;background:var(--warning-bg, #fffbe6);border-top:1px solid var(--warning-color, #f0c000);' +
+            'border-bottom:1px solid var(--warning-color, #f0c000);font-size:0.82em;color:var(--text-color, #555);';
 
         // Status indicator
         const statusIndicator = document.createElement('div');
@@ -812,9 +812,9 @@
                 const prev = document.getElementById('chat-img-preview');
                 if (prev) {
                     prev.style.display = 'block';
-                    prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:80px;max-width:120px;border-radius:4px;border:1px solid #ccc;vertical-align:middle;">' +
-                        ' <button type="button" title="Remove image" onclick="_clearPendingImage()" style="font-size:1em;border:none;background:none;cursor:pointer;color:#c00;">✕</button>' +
-                        ' <small style="color:#666;">' + (file.name || 'image') + '</small>';
+                    prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:80px;max-width:120px;border-radius:4px;border:1px solid var(--border-color, #ccc);vertical-align:middle;">' +
+                        ' <button type="button" title="Remove image" onclick="_clearPendingImage()" style="font-size:1em;border:none;background:none;cursor:pointer;color:var(--danger-color, #c00);">✕</button>' +
+                        ' <small style="color:var(--text-muted-color, #666);">' + (file.name || 'image') + '</small>';
                 }
             };
             reader.readAsDataURL(file);
@@ -1440,7 +1440,7 @@
         ffBtn.id = 'lc-ff-btn';
         ffBtn.textContent = '🪄 Fill Form';
         ffBtn.title = 'Describe what to fill in the message box, then click here to fill the form with AI';
-        ffBtn.style.cssText = 'padding:4px 8px;background:#f0c000;color:#333;border:none;border-radius:4px;' +
+        ffBtn.style.cssText = 'padding:4px 8px;background:var(--warning-color, #f0c000);color:var(--text-color, #333);border:none;border-radius:4px;' +
             'cursor:pointer;font-size:.8em;font-weight:bold;white-space:nowrap;flex-shrink:0;';
 
         // Insert after Send button
@@ -2588,7 +2588,7 @@
             if (ollamaTimeout) {
                 var switchGrokBtn = document.createElement('button');
                 switchGrokBtn.className = 'chat-retry-btn';
-                switchGrokBtn.style.cssText = 'margin-left:8px;background:#1a1a2e;color:#fff;';
+                switchGrokBtn.style.cssText = 'margin-left:8px;background:var(--text-color, #1a1a2e);color:var(--background-color, #fff);';
                 switchGrokBtn.textContent = '⚡ Switch to Grok';
                 switchGrokBtn.onclick = function() { _doRetry('grok'); };
                 wrapper.appendChild(switchGrokBtn);
@@ -2724,15 +2724,15 @@
     function _showEscalationButtons(afterEl) {
         var strip = document.createElement('div');
         strip.className = 'support-escalation-strip';
-        strip.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;padding:6px 10px 4px;border-top:1px solid #e0e0e0;margin-top:4px;';
+        strip.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;padding:6px 10px 4px;border-top:1px solid var(--border-color, #e0e0e0);margin-top:4px;';
         strip.innerHTML =
-            '<span style="font-size:.82em;color:#666;align-self:center;">Need more help?</span>'
+            '<span style="font-size:.82em;color:var(--text-muted-color, #666);align-self:center;">Need more help?</span>'
           + '<button class="chat-action-btn" onclick="(function(){'
           + '  var _s=window.__aiChatSupportFns;if(_s)_s.ticket();'
-          + '})();" style="font-size:.8em;padding:4px 10px;background:#eee;border:1px solid #ccc;border-radius:4px;cursor:pointer;">📋 Create Ticket</button>'
+          + '})();" style="font-size:.8em;padding:4px 10px;background:var(--border-color, #eee);border:1px solid var(--border-color, #ccc);border-radius:4px;cursor:pointer;">📋 Create Ticket</button>'
           + '<button class="chat-action-btn" onclick="(function(){'
           + '  var _s=window.__aiChatSupportFns;if(_s)_s.startChat();'
-          + '})();" style="font-size:.8em;padding:4px 10px;background:#1a6bb5;color:#fff;border:none;border-radius:4px;cursor:pointer;">💬 Chat with Support</button>';
+          + '})();" style="font-size:.8em;padding:4px 10px;background:var(--accent-color, #1a6bb5);color:var(--background-color, #fff);border:none;border-radius:4px;cursor:pointer;">💬 Chat with Support</button>';
         var container = document.getElementById('chat-messages');
         if (container) { container.appendChild(strip); container.scrollTop = container.scrollHeight; }
     }
@@ -3222,7 +3222,7 @@
             const retryBtn = document.createElement('button');
             retryBtn.textContent = 'Retry';
             retryBtn.title = 'Retry upload and transcription';
-            retryBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:#0077cc;color:#fff;border:none;border-radius:3px;';
+            retryBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:var(--accent-color, #0077cc);color:var(--background-color, #fff);border:none;border-radius:3px;';
             retryBtn.addEventListener('click', async () => {
                 retryBtn.disabled = true;
                 retryBtn.textContent = '...';
@@ -3234,7 +3234,7 @@
             const dlBtn = document.createElement('button');
             dlBtn.textContent = 'Save';
             dlBtn.title = 'Download raw audio file to your device';
-            dlBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:#28a745;color:#fff;border:none;border-radius:3px;';
+            dlBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:var(--success-color, #28a745);color:var(--background-color, #fff);border:none;border-radius:3px;';
             dlBtn.addEventListener('click', () => {
                 const url = URL.createObjectURL(b.blob);
                 const a = document.createElement('a');
@@ -3251,7 +3251,7 @@
             const delBtn = document.createElement('button');
             delBtn.textContent = 'Delete';
             delBtn.title = 'Remove local backup';
-            delBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:#dc3545;color:#fff;border:none;border-radius:3px;';
+            delBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:var(--danger-color, #dc3545);color:var(--background-color, #fff);border:none;border-radius:3px;';
             delBtn.addEventListener('click', async () => {
                 if (confirm('Delete this local recording?')) {
                     await _deleteAudioBackup(b.id);
@@ -3449,7 +3449,7 @@
         .then(function(result) {
             if (result.success) {
                 msgEl.innerHTML = '✅ ' + (result.message || 'Saved') +
-                    (result.url ? ' <a href="' + result.url + '" target="_blank" style="color:#0077cc;font-weight:bold;">View →</a>' : '');
+                    (result.url ? ' <a href="' + result.url + '" target="_blank" style="color:var(--accent-color, #0077cc);font-weight:bold;">View →</a>' : '');
             } else {
                 msgEl.textContent = '⚠️ ' + (result.error || 'Save failed');
             }
@@ -3479,7 +3479,7 @@
         card.appendChild(heading);
 
         var msgEl = document.createElement('div');
-        msgEl.style.cssText = 'font-size:12px;color:#666;margin-top:6px;';
+        msgEl.style.cssText = 'font-size:12px;color:var(--text-muted-color, #666);margin-top:6px;';
 
         var form = _makeWizardForm(fields, function(f) {
             var params = Object.assign({}, extraParams || {}, { wizard_confirmed: 1 });
@@ -3700,11 +3700,11 @@
             '<strong style="font-size:1.05em">📋 New Project Wizard</strong>' +
             '<form id="ai-wizard-form" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
                 '<label style="font-size:.85em;font-weight:600">Project name</label>' +
-                '<input id="wiz-name" type="text" required style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;" value="' + (prefillTitle || '').replace(/"/g, '&quot;') + '">' +
+                '<input id="wiz-name" type="text" required style="padding:4px 6px;border:1px solid var(--border-color, #ccc);border-radius:4px;" value="' + (prefillTitle || '').replace(/"/g, '&quot;') + '">' +
                 '<label style="font-size:.85em;font-weight:600">Description</label>' +
-                '<textarea id="wiz-desc" rows="2" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;resize:vertical;"></textarea>' +
+                '<textarea id="wiz-desc" rows="2" style="padding:4px 6px;border:1px solid var(--border-color, #ccc);border-radius:4px;resize:vertical;"></textarea>' +
                 '<label style="font-size:.85em;font-weight:600">Due date</label>' +
-                '<input id="wiz-due" type="date" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;">' +
+                '<input id="wiz-due" type="date" style="padding:4px 6px;border:1px solid var(--border-color, #ccc);border-radius:4px;">' +
                 '<label style="font-size:.85em;font-weight:600">Dependencies needed (check all that apply)</label>' +
                 '<div id="wiz-deps" style="display:flex;flex-wrap:wrap;gap:4px 12px;">' +
                     DEPS.map(function(d) {
@@ -3877,7 +3877,7 @@
             el.className = 'message system-message';
             if (result.success && result.inspection_id) {
                 el.innerHTML = '✅ ' + (result.message || 'Inspection saved') +
-                    ' <a href="' + (result.url || '/BMaster') + '" target="_blank" style="color:#0077cc;font-weight:bold;">View inspection →</a>';
+                    ' <a href="' + (result.url || '/BMaster') + '" target="_blank" style="color:var(--accent-color, #0077cc);font-weight:bold;">View inspection →</a>';
             } else {
                 el.textContent = result.success
                     ? '✅ ' + (result.message || 'Action completed')
@@ -4201,7 +4201,7 @@
             
             .chat-button {
                 background-color: var(--accent-color, #FF9900);
-                color: #fff;
+                color: var(--background-color, #fff);
                 border: none;
                 border-radius: 50px;
                 padding: 10px 20px;
@@ -4240,7 +4240,7 @@
                 height: 500px;
                 min-height: 300px;
                 max-height: 90vh;
-                background-color: #ffffff;
+                background-color: var(--background-color, #ffffff);
                 border-radius: 10px;
                 box-shadow: 0 4px 20px rgba(0,0,0,0.25);
                 display: flex;
@@ -4290,7 +4290,7 @@
 
             .chat-header {
                 background-color: var(--accent-color, #FF9900);
-                color: #fff;
+                color: var(--background-color, #fff);
                 padding: 8px 12px;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
@@ -4339,7 +4339,7 @@
             }
 
             .chat-header-icon-btn {
-                background: none; border: none; color: #fff;
+                background: none; border: none; color: var(--background-color, #fff);
                 font-size: 15px; cursor: pointer; padding: 2px 5px;
                 border-radius: 4px; opacity: 0.85; transition: opacity 0.15s, background 0.15s;
             }
@@ -4348,8 +4348,8 @@
             /* History drawer */
             .widget-history-drawer {
                 display: flex; flex-direction: column;
-                background-color: #fafafa;
-                border-bottom: 1px solid #ddd;
+                background-color: var(--table-header-bg, #fafafa);
+                border-bottom: 1px solid var(--border-color, #ddd);
                 max-height: 220px; overflow: hidden; flex-shrink: 0;
             }
             .widget-history-header {
@@ -4384,13 +4384,13 @@
             }
             
             #new-chat {
-                background: none; border: none; color: #fff;
+                background: none; border: none; color: var(--background-color, #fff);
                 font-size: 15px; cursor: pointer; padding: 2px 5px;
                 border-radius: 4px; opacity: 0.85;
             }
             
             #close-chat {
-                background: none; border: none; color: #fff;
+                background: none; border: none; color: var(--background-color, #fff);
                 font-size: 18px; cursor: pointer; opacity: 0.85;
             }
             
@@ -4398,7 +4398,7 @@
                 flex-grow: 1;
                 padding: 10px 12px;
                 overflow-y: auto;
-                background-color: #ffffff;
+                background-color: var(--background-color, #ffffff);
                 display: flex;
                 flex-direction: column;
                 gap: 6px;
@@ -4420,8 +4420,8 @@
             }
             
             .system-message {
-                background-color: #f5f5f5;
-                color: #333;
+                background-color: var(--table-header-bg, #f5f5f5);
+                color: var(--text-color, #333);
                 align-self: flex-start;
                 margin-right: auto;
                 border-bottom-left-radius: 5px;
@@ -4429,15 +4429,15 @@
             
             .user-message {
                 background-color: var(--accent-color, #FF9900);
-                color: #fff;
+                color: var(--background-color, #fff);
                 align-self: flex-end;
                 margin-left: auto;
                 border-bottom-right-radius: 5px;
             }
             
             .ai-message {
-                background-color: #f0f4f8;
-                color: #222;
+                background-color: var(--table-header-bg, #f0f4f8);
+                color: var(--text-color, #222);
                 align-self: flex-start;
                 margin-right: auto;
                 border-bottom-left-radius: 5px;
@@ -4445,15 +4445,15 @@
             }
             
             .ai-message.loading {
-                background-color: #f0f4f8;
-                color: #888;
+                background-color: var(--table-header-bg, #f0f4f8);
+                color: var(--text-muted-color, #888);
                 font-style: italic;
             }
             
             .error-message {
-                background-color: #fff3f3;
-                border: 1px solid #cc0000;
-                color: #cc0000;
+                background-color: var(--danger-bg, #fff3f3);
+                border: 1px solid var(--danger-color, #cc0000);
+                color: var(--danger-color, #cc0000);
                 align-self: center;
                 margin: 5px auto;
                 font-size: 0.9em;
@@ -4463,9 +4463,9 @@
                 padding: 5px 10px;
                 font-size: 0.8em;
                 text-align: center;
-                background-color: #fafafa;
-                border-top: 1px solid #ddd;
-                color: #555;
+                background-color: var(--table-header-bg, #fafafa);
+                border-top: 1px solid var(--border-color, #ddd);
+                color: var(--text-color, #555);
             }
             
             .chat-status.connected {
@@ -4493,8 +4493,8 @@
             
             .provider-selector {
                 padding: 8px 15px;
-                background-color: #f5f5f5;
-                border-bottom: 1px solid #ddd;
+                background-color: var(--table-header-bg, #f5f5f5);
+                border-bottom: 1px solid var(--border-color, #ddd);
                 display: flex;
                 align-items: center;
                 gap: 10px;
@@ -4503,16 +4503,16 @@
             
             .provider-selector label {
                 font-weight: 600;
-                color: #444;
+                color: var(--text-color, #444);
             }
             
             .provider-selector select {
                 flex-grow: 1;
                 padding: 5px 10px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--border-color, #ccc);
                 border-radius: 4px;
-                background-color: #fff;
-                color: #333;
+                background-color: var(--background-color, #fff);
+                color: var(--text-color, #333);
                 cursor: pointer;
             }
             
@@ -4523,7 +4523,7 @@
                 width: 28px;
                 height: 28px;
                 background: var(--accent-color, #FF9900);
-                color: #fff;
+                color: var(--background-color, #fff);
                 border-radius: 4px;
                 text-decoration: none;
                 font-size: 14px;
@@ -4543,19 +4543,19 @@
             
             #message-input {
                 flex-grow: 1;
-                border: 1px solid #ccc;
+                border: 1px solid var(--border-color, #ccc);
                 border-radius: 4px;
                 padding: 8px;
                 resize: none;
                 height: 40px;
                 margin-right: 8px;
-                background-color: #fff;
-                color: #222;
+                background-color: var(--background-color, #fff);
+                color: var(--text-color, #222);
             }
             
             #send-message {
                 background-color: var(--accent-color, #FF9900);
-                color: #fff;
+                color: var(--background-color, #fff);
                 border: none;
                 border-radius: 4px;
                 padding: 8px 15px;
@@ -4568,8 +4568,8 @@
             }
             
             #send-message:disabled {
-                background-color: #ccc;
-                color: #888;
+                background-color: var(--border-color, #ccc);
+                color: var(--text-muted-color, #888);
                 cursor: not-allowed;
             }
 
@@ -4580,7 +4580,7 @@
                 width: 16px;
                 height: 16px;
                 cursor: se-resize;
-                background: linear-gradient(135deg, transparent 50%, #aaa 50%);
+                background: linear-gradient(135deg, transparent 50%, var(--text-muted-color, #aaa) 50%);
                 border-bottom-right-radius: 10px;
                 opacity: 0.6;
                 z-index: 10;
@@ -4591,10 +4591,10 @@
                 display: block;
                 margin-top: 6px;
                 padding: 4px 12px;
-                border: 1px solid #ccc;
+                border: 1px solid var(--border-color, #ccc);
                 border-radius: 4px;
-                background: #f5f5f5;
-                color: #333;
+                background: var(--table-header-bg, #f5f5f5);
+                color: var(--text-color, #333);
                 cursor: pointer;
                 font-size: 0.85em;
                 font-family: inherit;
