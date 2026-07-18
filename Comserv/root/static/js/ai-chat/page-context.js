@@ -107,6 +107,23 @@
     ];
     var NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|take me to the|go to the)\s+(.+)/i;
 
+    // Concept synonym groups used by resolveNavIntent for natural-language
+    // navigation (e.g. "medicinal plants" -> /ENCY/herbs). Static data, defined
+    // here so the module is self-contained.
+    var NAV_CONCEPT_GROUPS = [
+        { url: '/ENCY/glossary',         concepts: ['terminology', 'dictionary', 'vocab', 'vocabulary', 'definitions', 'define', 'look up term', 'beekeeping terms', 'herbal terms'] },
+        { url: '/ENCY/herbs',            concepts: ['medicinal plants', 'herb database', 'plant database', 'botanical list', 'herbal list', 'flora', 'herb search'] },
+        { url: '/ENCY/diseases',         concepts: ['conditions', 'ailments', 'health conditions', 'bee diseases', 'hive diseases', 'disorders', 'bee conditions'] },
+        { url: '/ENCY/BeePastureView',   concepts: ['nectar plants', 'pollen plants', 'bee garden', 'foraging plants', 'bee friendly plants', 'melliferous', 'pasture plants', 'pollinator garden'] },
+        { url: '/ENCY/symptoms',         concepts: ['signs', 'hive symptoms', 'bee symptoms', 'warning signs', 'colony symptoms'] },
+        { url: '/ENCY/Constituent',      concepts: ['active compounds', 'chemical constituents', 'phytochemicals', 'active ingredients'] },
+        { url: '/ENCY/formula',          concepts: ['remedy', 'remedies', 'preparation', 'preparations', 'compound formula', 'herbal recipe'] },
+        { url: '/Inventory/invoice/new', concepts: ['new invoice', 'add invoice', 'create invoice', 'log bill', 'record bill', 'enter bill', 'new bill'] },
+        { url: '/HelpDesk',              concepts: ['get help', 'support system', 'contact support', 'tech support', 'it support'] },
+        { url: '/BMaster',               concepts: ['beekeeping home', 'bee management', 'beemaster', 'bee master home'] },
+        { url: '/Apiary/HiveManagement', concepts: ['manage hives', 'my hives', 'hive list', 'hive overview'] },
+    ];
+
     function _collectPageErrors() {
         var errors = [];
         var seen = {};
@@ -499,7 +516,8 @@
         return null;
     }
 
-        (function buildHistory() {
+        function buildHistory(requestPayload) {
+            if (!requestPayload) return;
             const allWrappers = Array.from(
                 document.querySelectorAll('#chat-messages .msg-wrapper')
             );
@@ -522,7 +540,7 @@
                 requestPayload.history = historyMsgs.slice(-4);
                 console.debug('Sending history:', requestPayload.history.length, 'prior messages');
             }
-        })();
+        }
 
     window.ComservChat.pageContext = {
         init: init,
