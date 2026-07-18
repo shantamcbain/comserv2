@@ -9,7 +9,13 @@
     // state is injected by local-chat.js core (set once at startup). STATIC_NAV /
     // NAV_RE are defined in this file and used directly by the functions below.
     var state = null;
-    function init(ctx) { state = ctx.state; }
+    var PAGE_MODE = false;
+    var _selectAgentForPage = null;
+    function init(ctx) {
+        state = ctx.state;
+        if (ctx && typeof ctx.PAGE_MODE !== 'undefined') PAGE_MODE = !!ctx.PAGE_MODE;
+        if (ctx && typeof ctx.selectAgentForPage === 'function') _selectAgentForPage = ctx.selectAgentForPage;
+    }
 
     var STATIC_NAV = [
         { label: 'ai conversations',           url: '/ai/conversations' },
@@ -290,7 +296,7 @@
         }
         
         // Try to load and select agent from config
-        const selectedAgent = selectAgentForPage();
+        const selectedAgent = _selectAgentForPage ? _selectAgentForPage() : null;
         state.currentAgent = selectedAgent;
         
         let context = {

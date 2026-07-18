@@ -52,7 +52,7 @@
 
         // V2: inject chat-core state into the extracted page-context module
         if (window.ComservChat && window.ComservChat.pageContext && window.ComservChat.pageContext.init) {
-            window.ComservChat.pageContext.init({ state: state });
+            window.ComservChat.pageContext.init({ state: state, PAGE_MODE: PAGE_MODE, selectAgentForPage: selectAgentForPage });
         }
 
     
