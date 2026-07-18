@@ -142,6 +142,7 @@
 <!-- AI Chat V2 modular suite: voice.js must load before local-chat.js (it is
      wired from createChatWidget()); index.js loads last as the namespace shim. -->
 <script src="/static/js/ai-chat/voice.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-chat/support.js?v=[% cv %]" defer></script>
 <script src="/static/js/local-chat.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai-chat/index.js?v=[% cv %]" defer></script>
 
