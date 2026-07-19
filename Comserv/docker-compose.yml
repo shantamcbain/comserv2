@@ -80,7 +80,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - ${COMSERV_SECRETS_DIR:-~/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       - comserv2_logs:/opt/comserv/root/log
       - comserv2_workshop_files:/data/nfs:rw
       - comserv2_sessions:/tmp/comserv/session:rw
@@ -106,7 +106,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: shantamcsbain/comserv-web-prod:latest
-    container_name: comserv2-web-dev
+    container_name: comserv-web-dev
     restart: unless-stopped
     environment:
       ENVIRONMENT: development
@@ -119,7 +119,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - ${COMSERV_SECRETS_DIR:-~/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       - ./lib:/opt/comserv/lib:ro
       - ./script:/opt/comserv/script:ro
       - ./root:/opt/comserv/root:rw
@@ -156,7 +156,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: shantamcsbain/comserv-web-prod:latest
-    container_name: comserv2-web-staging
+    container_name: comserv-web-staging
     restart: unless-stopped
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-staging}
@@ -170,7 +170,7 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - ${COMSERV_SECRETS_DIR:-~/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       # Core comserv2_* volumes (standardized across all environments)
       - comserv2_logs:/opt/comserv/root/log
       - comserv2_workshop_files:/data/nfs:rw
