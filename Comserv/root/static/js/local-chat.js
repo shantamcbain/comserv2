@@ -1677,7 +1677,7 @@
                 var effectivePrompt = prompt;
 
                 if (state.pageContext && state.pageContext.agent_id === 'coding') {
-                    var pageErrors = window.ComservChat.pageContext._collectPageErrors();
+                    var pageErrors = window.ComservChat.pageContext.collectPageErrors();
                     if (pageErrors && !prompt.toLowerCase().includes('[page error')) {
                         effectivePrompt = pageErrors + '\n\n' + prompt;
                     }
@@ -1685,7 +1685,7 @@
 
                 if (state.pageContext && state.pageContext.agent_id === 'template_editor'
                         && !prompt.includes('[FILE:')) {
-                    var tplPath = window.ComservChat.pageContext._getTemplatePathForPage(window.location.pathname);
+                    var tplPath = window.ComservChat.pageContext.getTemplatePathForPage(window.location.pathname);
                     if (tplPath) {
                         fetch('/ai/read_file?path=' + encodeURIComponent(tplPath) + '&limit=500',
                               { credentials: 'include' })
@@ -2836,7 +2836,7 @@
 
         // Template editor agent: open the dedicated form page with the file + request pre-loaded
         if (state.pageContext && state.pageContext.agent_id === 'template_editor' && message) {
-            var tplPath = window.ComservChat.pageContext._getTemplatePathForPage(window.location.pathname);
+            var tplPath = window.ComservChat.pageContext.getTemplatePathForPage(window.location.pathname);
             var params = new URLSearchParams();
             if (tplPath) params.set('file', tplPath);
             params.set('request', message);
