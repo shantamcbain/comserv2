@@ -10,13 +10,13 @@ requires qw(endpoint ua last_error timeout);
 sub query {
     my ($self, %args) = @_;
     my $prompt = $args{prompt} // '';
-    my $model  = $args{model}  // 'llama3.1';
+    my $model  = $args{model} // $self->model;
     my $format = $args{format} // 'text';
     my $url = $self->endpoint . '/api/generate';
     my $payload = {
         model  => $model,
         prompt => $prompt,
-        stream => 0,
+        stream => JSON::false,
     };
     my $req = HTTP::Request->new(POST => $url);
     $req->header('Content-Type' => 'application/json');
@@ -35,12 +35,12 @@ sub query {
 sub chat {
     my ($self, %args) = @_;
     my $messages = $args{messages} // [];
-    my $model    = $args{model}    // 'llama3.1';
+    my $model    = $args{model}    // $self->model;
     my $url = $self->endpoint . '/api/chat';
     my $payload = {
         model    => $model,
         messages => $messages,
-        stream   => 0,
+        stream   => JSON::false,
     };
     my $req = HTTP::Request->new(POST => $url);
     $req->header('Content-Type' => 'application/json');
@@ -51,7 +51,9 @@ sub chat {
         my $data = decode_json($res->decoded_content);
         return $data->{message}->{content} // '';
     } else {
-        $self->last_error($res->status_line);
+        my $body = eval { decode_json($res->decoded_content); } // {};
+        my $detail = (ref($body) eq 'HASH' && $body->{error}) ? $body->{error} : $res->status_line;
+        $self->last_error($detail);
         return undef;
     }
 }

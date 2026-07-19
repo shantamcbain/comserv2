@@ -22,10 +22,33 @@ sub list_models {
     }
 }
 
+sub get_running_models {
+    my ($self) = @_;
+
+    my $endpoint = $self->endpoint;
+    $endpoint =~ s{/api/(generate|chat)$}{/api/ps};
+
+    my $req = HTTP::Request->new(GET => $endpoint);
+
+    my $orig_timeout = $self->ua->timeout;
+    $self->ua->timeout(10);
+    my $response;
+    eval { $response = $self->ua->request($req); };
+    $self->ua->timeout($orig_timeout);
+
+    return [] if $@ || !$response || !$response->is_success;
+
+    my $data;
+    eval { $data = decode_json($response->content); };
+    return [] if $@;
+
+    return $data->{models} || [];
+}
+
 sub pull_model {
     my ($self, $model_name) = @_;
     my $url = $self->endpoint . '/api/pull';
-    my $payload = { name => $model_name, stream => 0 };
+    my $payload = { name => $model_name, stream => JSON::false };
     my $req = HTTP::Request->new(POST => $url);
     $req->header('Content-Type' => 'application/json');
     $req->content(encode_json($payload));

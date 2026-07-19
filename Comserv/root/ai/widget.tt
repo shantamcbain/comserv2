@@ -6,7 +6,7 @@
     <title>AI Chat</title>
     <link rel="stylesheet" href="/static/css/themes/[% theme_name || 'default' %].css">
     <link rel="stylesheet" href="/static/css/theme-overrides.css">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=20260612j">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% c.stash.css_v || '1' %]">
     <style>
         html, body {
             margin: 0;
@@ -249,8 +249,19 @@
             }
         })();
     </script>
-    <script src="/static/js/ai-common.js?v=20260612a"></script>
-    <script src="/static/js/local-chat.js?v=20260612j"></script>
+    <script src="/static/js/ai-common.js?v=[% c.stash.css_v || '1' %]"></script>
+    <!-- AI Chat V2 modular suite (popup mode): load the same modules as js_load.tt
+         so page-context / wizards / voice / audio-backup are available. Without these,
+         sendMessage() -> detectPageContext() throws (pageContext undefined) and the
+         send button does nothing. Dynamic cache-buster (css_v = time()) prevents the
+         stale ?v=20260612j copy from being served. -->
+    <script src="/static/js/ai-chat/voice.js?v=[% c.stash.css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/support.js?v=[% c.stash.css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/page-context.js?v=[% c.stash.css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/wizards.js?v=[% c.stash.css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/audio-backup.js?v=[% c.stash.css_v || '1' %]" defer></script>
+    <script src="/static/js/local-chat.js?v=[% c.stash.css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/index.js?v=[% c.stash.css_v || '1' %]" defer></script>
     <!-- Keep header visible forever in popup mode (overrides any 7-10s timeout in JS) -->
     <script>
     (function() {
