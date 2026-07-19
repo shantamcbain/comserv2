@@ -85,8 +85,14 @@ sub _rename_container {
     return $rc;
 }
 
-# Create a timestamped backup of a running container.
-# Returns the backup name, or undef if the container doesn't exist.
+# Create a timestamped backup of a running container by COMMITTING IT TO AN IMAGE.
+# Returns the backup image ref (bk-<name>:<ts>), or undef if no container exists.
+#
+# WHY an image, not `docker rename`: a renamed container keeps its Compose labels
+# (com.docker.compose.service/project/container-number). The next
+# `docker compose up --force-recreate` matches by LABELS, finds the renamed
+# backup, and RECREATES (destroys) it — so every rename-based backup was lost.
+# A committed image has no Compose labels, so compose cannot touch it.
 sub _backup_container {
     my ($self, $container_name, $is_remote, $ssh_prefix) = @_;
 
@@ -94,16 +100,54 @@ sub _backup_container {
     my $found = $self->_container_exists($container_name, $is_remote, $ssh_prefix);
     $self->_log("  Container check: " . ($found ? "found" : "not found"));
 
-    if ($found) {
-        my $now    = DateTime->now(time_zone => 'local');
-        my $ts     = $now->ymd('') . '_' . $now->hms('');
-        my $backup = "bk-$container_name-$ts";
-        $self->_rename_container($container_name, $backup, $is_remote, $ssh_prefix, 0);
-        return $backup;
+    unless ($found) {
+        $self->_log("  No existing container named $container_name — skipping backup, will create fresh.");
+        return undef;
     }
 
-    $self->_log("  No existing container named $container_name — skipping backup, will create fresh.");
-    return undef;
+    # Capture the image the running container uses so rollback can retag→compose up.
+    my $img_ref_cmd = $is_remote
+        ? "$ssh_prefix \"docker inspect --format='{{.Config.Image}}' $container_name 2>/dev/null\""
+        : "docker inspect --format='{{.Config.Image}}' $container_name 2>/dev/null";
+    my $img_ref = `$img_ref_cmd` || '';
+    chomp $img_ref;
+    $self->{_backup_image_ref} = $img_ref;
+
+    my $now    = DateTime->now(time_zone => 'local');
+    my $ts     = $now->ymd('') . '_' . $now->hms('');
+    my $backup = "bk-$container_name:$ts";
+
+    my $commit_cmd = $is_remote
+        ? "$ssh_prefix \"docker commit $container_name $backup 2>&1\""
+        : "docker commit $container_name $backup 2>&1";
+    my $rc = $self->_stream_command($commit_cmd);
+    if ($rc != 0) {
+        $self->_error("  Failed to commit backup image $backup (exit=$rc)");
+        return undef;
+    }
+    $self->_log("  Backed up $container_name → image $backup (source image_ref=$img_ref)");
+    return $backup;
+}
+
+# Restore a committed backup image: retag it to the image Compose expects, then
+# recreate the service from it via compose (no pull). Returns 1 on success.
+sub _restore_backup_image {
+    my ($self, $backup_image, $service, $compose_files, $repo, $is_remote, $ssh_prefix) = @_;
+    my $img_ref = $self->{_backup_image_ref} || '';
+    unless ($backup_image && $img_ref) {
+        $self->_error("  Cannot restore: missing backup image or source image_ref.");
+        return 0;
+    }
+    $self->_log("Restoring backup image $backup_image → $img_ref ...");
+    my $tag_cmd = $is_remote
+        ? "$ssh_prefix \"docker tag $backup_image $img_ref 2>&1\""
+        : "docker tag $backup_image $img_ref 2>&1";
+    $self->_stream_command($tag_cmd);
+    my $up = $is_remote
+        ? "$ssh_prefix \"cd $self->{_remote_compose_dir} && docker compose $compose_files up -d --force-recreate $service 2>&1\""
+        : "cd $repo && docker compose $compose_files up -d --force-recreate $service 2>&1";
+    my $rc = $self->_stream_command($up);
+    return $rc == 0 ? 1 : 0;
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -146,13 +190,13 @@ sub deploy {
     my ($service, $container_name, $port, $compose_files, $ssh_prefix, $is_remote);
     if ($target eq 'staging-4000' || $target eq 'local-staging') {
         $service        = 'web-staging';
-        $container_name = 'comserv2-web-staging';
+        $container_name = 'comserv-web-staging';
         $port           = 4000;
         $compose_files  = '-f docker-compose.yml';
         $is_remote      = 0;
     } elsif ($target eq 'web-dev') {
         $service        = 'web-dev';
-        $container_name = 'comserv2-web-dev';
+        $container_name = 'comserv-web-dev';
         $port           = 3000;
         $compose_files  = '-f docker-compose.yml';
         $is_remote      = 0;
@@ -283,23 +327,17 @@ sub deploy {
     my $backup  = $self->_backup_container($container_name, $is_remote, $ssh_prefix);
 
     # ── eval wrap: exception safety from here through health check ──
-    # The old container was renamed to $backup above (or $backup is undef if no
-    # container existed). If anything dies during the deploy phase, the
-    # EVAL_ERROR handler below rolls back (honoring undef $backup gracefully).
+    # $backup is a committed IMAGE ref (bk-<name>:<ts>) or undef if no container
+    # existed. The old container still runs under its real name until compose
+    # --force-recreate replaces it in place. On failure, rollback retags the
+    # backup image and compose-recreates from it (honoring undef gracefully).
     my $healthy = 0;
     my $deploy_ok = eval {
-        # 4. Rotate backups — keep up to 5 per container (global cap).
-    #     Per-container expectations: 4000/staging at least 1, web-dev at least 2, web-prod at least 1.
-    #     Since 5 >= all these, they're automatically satisfied by the global cap.
+        # 4. Rotate backup images — keep up to 5 per container (global cap).
     $self->_prune_backups($container_name, 5, $is_remote, $ssh_prefix);
 
-    # 4.5 Stop any old backup container that may block port $port
-    if ($is_remote) {
-        # Stop all backup containers that might be holding the port
-        $self->_stream_command("$ssh_prefix \"docker ps -q --filter 'name=bk-$container_name' --filter 'publish=$port' 2>/dev/null | xargs -r docker stop 2>&1 || true\"");
-    } else {
-        system("docker ps -q --filter 'name=bk-$container_name' --filter 'publish=$port' 2>/dev/null | xargs -r docker stop 2>&1 || true");
-    }
+    # 4.5 (Backups are images now — no bk- containers to stop. compose
+    #      --force-recreate below replaces the old container in place.)
 
     # 5. Start new container on remote (pull then up) or local (up only)
     if ($is_remote) {
@@ -384,20 +422,13 @@ sub deploy {
     };  # end eval
     if ($@) {
         $self->_log("CRITICAL: Runtime error during deploy phase: $@");
-        # Stop the new container (always safe)
-        my $stop_new = $is_remote
-            ? "$ssh_prefix \"docker stop $container_name 2>&1 || true\""
-            : "docker stop $container_name 2>&1 || true";
-        $self->_stream_command($stop_new);
-        # Restore backup only if we had one
+        # Restore from backup image if we had one (retag → compose recreate).
         if ($backup) {
-            $self->_log("Emergency rollback: restoring $backup...");
-            my $start_backup = $is_remote
-                ? "$ssh_prefix \"docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'\""
-                : "docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'";
-            $self->_stream_command($start_backup);
+            $self->_log("Emergency rollback: restoring backup image $backup...");
+            my $ok = $self->_restore_backup_image($backup, $service, $compose_files, $repo, $is_remote, $ssh_prefix);
+            $self->_log($ok ? "  Rollback succeeded." : "  ROLLBACK_FAILED");
         } else {
-            $self->_log("No backup container to restore (fresh deploy).");
+            $self->_log("No backup image to restore (fresh deploy).");
         }
         $self->_log("=== DEPLOY FAILED (target=$target) - emergency rollback ===");
         $self->_save_deploy_log($container_name, $target);
@@ -405,74 +436,21 @@ sub deploy {
     }
 
     if ($healthy) {
-        $self->_log("✅ New $container_name is healthy" . ($backup ? " – stopping backup $backup." : " (fresh deploy, no backup)."));
-        if ($backup) {
-            my $stop_cmd = $is_remote
-                ? "$ssh_prefix \"docker stop $backup 2>&1 || true\""
-                : "docker stop $backup 2>&1 || true";
-            $self->_stream_command($stop_cmd);
-        }
+        $self->_log("✅ New $container_name is healthy" . ($backup ? " – backup image $backup retained." : " (fresh deploy, no backup)."));
         $self->_log("=== DEPLOY COMPLETE (target=$target) ===");
         $self->_save_deploy_log($container_name, $target);
         return 1;
     } else {
         $self->_log("✗ New $container_name failed health check – rolling back.");
-        # Check if backup exists before trying to start it
-        my $backup_exists = $is_remote
-            ? `$ssh_prefix "docker ps -a -q --filter 'name=^$backup\$' 2>/dev/null"`
-            : `docker ps -a -q --filter 'name=^$backup\$' 2>/dev/null`;
-        chomp $backup_exists;
-        if ($backup_exists) {
-            $self->_log("  Stopping failed new container $container_name...");
-            my $stop_new = $is_remote
-                ? "$ssh_prefix \"docker stop $container_name 2>&1 || true\""
-                : "docker stop $container_name 2>&1 || true";
-            $self->_stream_command($stop_new);
-
-            my $rollback_cmd = $is_remote
-                ? "$ssh_prefix \"docker start $backup 2>&1\""
-                : "docker start $backup 2>&1";
-            my $rc = $self->_stream_command($rollback_cmd);
-            if ($rc == 0) {
-                $self->_error("Deploy FAILED on $target – rolled back to $backup. Old container restarted.");
+        if ($backup) {
+            my $ok = $self->_restore_backup_image($backup, $service, $compose_files, $repo, $is_remote, $ssh_prefix);
+            if ($ok) {
+                $self->_error("Deploy FAILED on $target – rolled back to backup image $backup.");
             } else {
-                # Rollback docker start failed — likely a stale Docker network issue.
-                # The backup container was originally created with a different Compose
-                # project network that may have been rotated. Disconnect stale networks
-                # and retry.
-                $self->_log("  docker start failed (exit=$rc) — trying to fix stale network references...");
-                $self->_log("  Attempting: disconnect stale networks and retry start...");
-                # Build the docker inspect format string for listing network IDs
-                # (single-quoted so Perl doesn't interpret Go template vars $n $v)
-                my $fmt = '{{range $n, $v := .NetworkSettings.Networks}}{{.NetworkID}} {{end}}';
-                $fmt =~ s/\$/\\\$/g;  # escape $ for shell (interpolated in double-quoted ssh command)
-                my $list_nets = $is_remote
-                    ? "$ssh_prefix \"docker inspect --format='$fmt' $backup 2>/dev/null\""
-                    : "docker inspect --format='$fmt' $backup 2>/dev/null";
-                my $net_ids = `$list_nets` || '';
-                chomp $net_ids;
-                my @stale_nets = grep { $_ ne '' } split(/\s+/, $net_ids);
-                $self->_log("  Found " . scalar(@stale_nets) . " network(s) attached to $backup.");
-                foreach my $nid (@stale_nets) {
-                    my $found = $is_remote
-                        ? `$ssh_prefix "docker network inspect $nid 2>/dev/null || echo 'NOT_FOUND'"`
-                        : `docker network inspect $nid 2>/dev/null || echo 'NOT_FOUND'`;
-                    chomp $found;
-                    if ($found =~ /NOT_FOUND/) {
-                        $self->_log("  Removing stale network $nid from $backup...");
-                        my $dc = $is_remote
-                            ? system("$ssh_prefix \"docker network disconnect -f $nid $backup 2>/dev/null\"")
-                            : system("docker network disconnect -f $nid $backup 2>/dev/null");
-                    }
-                }
-                my $retry = $is_remote
-                    ? "$ssh_prefix \"docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'\""
-                    : "docker start $backup 2>&1 || echo 'ROLLBACK_FAILED'";
-                $self->_stream_command($retry);
-                $self->_error("Deploy FAILED on $target – attempted rollback with network recovery.");
+                $self->_error("Deploy FAILED on $target – ROLLBACK from $backup also failed. Check container logs.");
             }
         } else {
-            $self->_error("Deploy FAILED on $target – no backup container to roll back to. Check container logs.");
+            $self->_error("Deploy FAILED on $target – no backup image to roll back to. Check container logs.");
         }
         $self->_log("=== DEPLOY FAILED (target=$target) ===");
         $self->_save_deploy_log($container_name, $target);
@@ -562,30 +540,32 @@ sub ensure_all_required_volumes_remote {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Backup pruning — keeps at most N backup containers for a given base name
+# Backup pruning — keeps at most N backup IMAGES for a given base name.
+# Backups are now committed images tagged bk-<base_name>:<timestamp>.
 # ─────────────────────────────────────────────────────────────────────────────
 sub _prune_backups {
     my ($self, $base_name, $max_keep, $is_remote, $ssh_prefix) = @_;
     $max_keep ||= 5;
 
+    # List backup image tags (bk-<base>:<ts>) sorted oldest→newest by tag.
+    my $repo_tag = "bk-$base_name";
     my $list_cmd = $is_remote
-        ? "$ssh_prefix \"docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^bk-$base_name-' | sort\""
-        : "docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^bk-$base_name-' | sort";
+        ? "$ssh_prefix \"docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep '^$repo_tag:' | sort\""
+        : "docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep '^$repo_tag:' | sort";
     my $output = `$list_cmd` || '';
-    my @backups = split /\n/, $output;
+    my @backups = grep { /\S/ } split /\n/, $output;
     return if @backups <= $max_keep;
 
-    # Remove oldest (sorted so first entries are oldest)
     my @to_remove = splice @backups, 0, (@backups - $max_keep);
     foreach my $old (@to_remove) {
         chomp $old;
-        $self->_log("Pruning old backup: $old");
+        $self->_log("Pruning old backup image: $old");
         my $rm_cmd = $is_remote
-            ? "$ssh_prefix \"docker rm -f $old 2>&1 || true\""
-            : "docker rm -f $old 2>&1 || true";
+            ? "$ssh_prefix \"docker rmi $old 2>&1 || true\""
+            : "docker rmi $old 2>&1 || true";
         $self->_stream_command($rm_cmd);
     }
-    $self->_log("Pruned " . scalar(@to_remove) . " old backup(s), keeping $max_keep.");
+    $self->_log("Pruned " . scalar(@to_remove) . " old backup image(s), keeping $max_keep.");
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -599,8 +579,8 @@ sub _save_deploy_log {
     my $now = DateTime->now(time_zone => 'local');
     my $ts  = $now->ymd('') . '_' . $now->hms('');
     my $path = "$log_dir/$container_name/deploy_$ts.log";
-    # Get backup name from the last backup created (freshest)
-    my $backup_name = `docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^bk-$container_name-' | tail -1` || '';
+    # Get freshest backup image (bk-<name>:<ts>) for the log metadata header
+    my $backup_name = `docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep '^bk-$container_name:' | sort | tail -1` || '';
     chomp $backup_name;
     # Read the temp log file and copy to per-container file with metadata header
     if (open my $src, '<', '/tmp/comserv_deploy.log') {
@@ -638,13 +618,25 @@ sub _sync_compose_to_remote {
     my ($self, $repo, $scp_prefix, $ssh_host) = @_;
 
     # Use a FIXED remote directory so Docker Compose reuses the same
-    # auto-created network (named <dirname>_default) across deploys.
-    # A timestamped directory creates a NEW project network each deploy,
-    # which breaks rollback — the backup container references the old network.
+    # auto-created network (named <dirname>_default) across deploys. A
+    # timestamped directory creates a NEW project network each deploy.
+    # (Backups are committed IMAGES now, so they carry no compose network
+    #  labels and rollback retags→compose-recreates; the fixed dir mainly
+    #  keeps the live service network stable across deploys.)
     my $remote_dir = "/tmp/comserv-deploy";
 
-    # List of compose files to transfer (base + prod only — no NFS on remote)
-    my @files = ('docker-compose.yml', 'docker-compose.prod.yml');
+    # List of compose files to transfer. Only include files that actually exist
+    # at the repo root — a phantom overlay (e.g. docker-compose.prod.yml, which
+    # lives under Comserv/ not root) makes `docker compose -f ... -f missing.yml`
+    # run against an absent overlay. The root docker-compose.yml fully defines
+    # the web-prod service, so it is sufficient on its own.
+    my @candidate_files = ('docker-compose.yml', 'docker-compose.prod.yml');
+    my @files = grep { -f "$repo/$_" } @candidate_files;
+    unless (@files) {
+        $self->_error("No compose files found at $repo — cannot sync to remote");
+        return $self->_compose_args($repo);
+    }
+    $self->_log("Compose files to sync: " . join(', ', @files));
 
     # 1. Create remote temp dir
     $self->_log("Syncing compose files to $ssh_host:$remote_dir ...");
@@ -703,6 +695,61 @@ sub _sync_compose_to_remote {
         # Clean up temp file if we created one
         if ($local ne "$repo/$f") {
             unlink $local;
+        }
+    }
+
+    # 2b. Sync credential secrets tree to the remote compose project dir.
+    #     ROOT CAUSE FIX: the compose file mounts the secrets dir into the
+    #     container (RemoteDB reads ~/.comserv/secrets/dbi/*.json — the K8s-Secret
+    #     pattern). Previously only compose files were synced, so on the remote
+    #     host the mounted path was empty → RemoteDB found zero connections →
+    #     select_connection('ency') died → the app attached to NO database.
+    #     We copy the whole secrets tree into $remote_dir/secrets and point the
+    #     compose mount at it via COMSERV_SECRETS_DIR in the generated .env below.
+    my $local_secrets = ($ENV{HOME} || '/home/shanta') . '/.comserv/secrets';
+    my $remote_secrets = "$remote_dir/secrets";
+    if (-d $local_secrets) {
+        $self->_log("  Syncing credential secrets ($local_secrets) to remote ...");
+        my $scp_secrets = "$scp_prefix -r $local_secrets/. $self->{ssh_user}\@$ssh_host:$remote_secrets/";
+        # Ensure the remote secrets dir exists first
+        my $mk = $ENV{SSHPASS}
+            ? "sshpass -e ssh -o StrictHostKeyChecking=no $self->{ssh_user}\@$ssh_host \"mkdir -p $remote_secrets\""
+            : "ssh -o StrictHostKeyChecking=no $self->{ssh_user}\@$ssh_host \"mkdir -p $remote_secrets\"";
+        system($mk);
+        my $src = system($scp_secrets);
+        if ($src != 0) {
+            $self->_error("Failed to sync secrets to $ssh_host (exit=$src) — app will not find DB credentials");
+        } else {
+            $self->_log("  Secrets synced to $ssh_host:$remote_secrets");
+        }
+    } else {
+        $self->_error("Local secrets dir $local_secrets not found — cannot propagate DB credentials to remote");
+    }
+
+    # 2c. Generate the compose .env on the remote (docker compose auto-loads
+    #     ./.env from the project dir). This is the single place that guarantees
+    #     the correct env is present for a remote deploy, generating it fresh
+    #     each time from the known workstation source rather than relying on a
+    #     stale .env.production being hand-copied to the server.
+    #       COMSERV_SECRETS_DIR   → points the compose secrets mount at 2b's copy
+    #       ACTIVE_DB_ENVIRONMENT → selects the 'production' connection set
+    #                               (ency → production_server.json, 192.168.1.198,
+    #                                priority 1; NOT the 192.168.1.20 migration box)
+    my $active_env = $ENV{ACTIVE_DB_ENVIRONMENT} || 'production';
+    my $env_body = "# Generated by DockerDeploy for remote deploy — do not edit\n"
+                 . "COMSERV_SECRETS_DIR=$remote_secrets\n"
+                 . "ACTIVE_DB_ENVIRONMENT=$active_env\n";
+    my $local_env_tmp = "/tmp/comserv_deploy_remote.env";
+    if (open my $efh, '>', $local_env_tmp) {
+        print $efh $env_body;
+        close $efh;
+        my $env_scp = "$scp_prefix $local_env_tmp $self->{ssh_user}\@$ssh_host:$remote_dir/.env";
+        my $erc = system($env_scp);
+        unlink $local_env_tmp;
+        if ($erc != 0) {
+            $self->_error("Failed to write remote .env (exit=$erc)");
+        } else {
+            $self->_log("  Generated remote .env (COMSERV_SECRETS_DIR=$remote_secrets, ACTIVE_DB_ENVIRONMENT=$active_env)");
         }
     }
 
