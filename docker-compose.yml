@@ -64,7 +64,9 @@ services:
     volumes:
       - ./Comserv:/opt/comserv:rw
       - cpan-cache:/opt/comserv/local:rw
-      - /home/shanta/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      # K8s parity: Secret volumeMount at /home/comserv/.comserv/secrets in-cluster.
+      # Host path injected via COMSERV_SECRETS_DIR for remote deploys.
+      - ${COMSERV_SECRETS_DIR:-/home/shanta/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       - ${NFS_HOST_PATH:-/home/shanta/nfs}:/data/nfs:rw
       - whisper-venv:/opt/comserv/whisper_venv:rw
     networks:
@@ -142,7 +144,11 @@ services:
     volumes:
       - ./Comserv:/opt/comserv:ro
       - cpan-cache:/opt/comserv/local:rw
-      - /home/shanta/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      # K8s parity: in-cluster this becomes a Secret volumeMount at the same
+      # container path (/home/comserv/.comserv/secrets, mode 0400). The host
+      # path is injected via COMSERV_SECRETS_DIR so remote deploys can point at
+      # the copy synced into the compose project dir (see DockerDeploy.pm).
+      - ${COMSERV_SECRETS_DIR:-/home/shanta/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       - ${NFS_HOST_PATH:-/home/shanta/nfs}:/data/nfs:rw
       - whisper-venv:/opt/comserv/whisper_venv:rw
     networks:
