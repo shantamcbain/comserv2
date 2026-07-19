@@ -42,6 +42,14 @@ has 'timeout' => (
     is => 'rw',
     isa => 'Int',
     default => 120,
+    # Propagate timeout changes to the (lazy-built) UA. The UA is built once from
+    # $self->timeout at construction; if AI.pm raises timeout later (e.g. 480s for
+    # warm/cold models) the already-built UA would keep the old 120s and silently
+    # time out. Clearing ua forces a rebuild with the new value on next request.
+    trigger => sub {
+        my ($self) = @_;
+        $self->clear_ua if $self->can('clear_ua');
+    },
     documentation => 'HTTP request timeout in seconds'
 );
 
@@ -50,6 +58,7 @@ has 'ua' => (
     isa => 'LWP::UserAgent',
     lazy => 1,
     builder => '_build_ua',
+    clearer => 'clear_ua',
     documentation => 'LWP UserAgent for HTTP requests'
 );
 
