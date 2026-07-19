@@ -58,7 +58,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - ${COMSERV_SECRETS_DIR:-~/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       # Standardized comserv2_* cache volume
       - comserv2_cache:/cache:rw
       # Standardized comserv2_* volumes
