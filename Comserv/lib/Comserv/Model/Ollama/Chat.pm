@@ -49,7 +49,18 @@ sub chat {
     if ($res->is_success) {
         $self->last_error('');
         my $data = decode_json($res->decoded_content);
-        return $data->{message}->{content} // '';
+        # Return a hashref matching what Controller::AI::chat expects:
+        # $response->{response} / $response->{message}{content}, plus
+        # model / eval_count / created_at / total_duration.
+        my $content = $data->{message}->{content} // '';
+        return {
+            response      => $content,
+            message       => { content => $content },
+            model         => $data->{model} // $model,
+            eval_count    => $data->{eval_count},
+            created_at    => $data->{created_at} // '',
+            total_duration=> $data->{total_duration} // 0,
+        };
     } else {
         my $body = eval { decode_json($res->decoded_content); } // {};
         my $detail = (ref($body) eq 'HASH' && $body->{error}) ? $body->{error} : $res->status_line;

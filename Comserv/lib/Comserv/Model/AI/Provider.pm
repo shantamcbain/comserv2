@@ -107,14 +107,14 @@ sub get_client {
                 my $messages = $chat_args{messages} || [];
                 my $model    = $chat_args{model} || 'llama3.1:latest';
 
-                # Use the role's chat (expects array of {role,content})
-                my $text = eval { $ollama->chat( messages => $messages, model => $model ) };
+                # Ollama::Chat::chat returns a hashref { response, model, ... }
+                my $r = eval { $ollama->chat( messages => $messages, model => $model ) };
 
-                if (defined $text && length($text)) {
+                if ($r && ref($r) eq 'HASH' && defined $r->{response} && length($r->{response})) {
                     return {
                         success  => 1,
-                        response => $text,
-                        model    => $model,
+                        response => $r->{response},
+                        model    => $r->{model} || $model,
                         usage    => {},
                     };
                 } else {
