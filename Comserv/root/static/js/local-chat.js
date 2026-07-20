@@ -12,7 +12,7 @@
     // Configuration
     const config = {
         apiEndpoints: {
-            generateResponse: '/ai/generate',
+            generateResponse: '/ai2/chat',
             agentsConfig: '/static/config/agents.json'
         },
         maxRetries: 3,      // Max retries for failed API calls

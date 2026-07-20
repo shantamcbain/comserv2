@@ -228,6 +228,87 @@ sub save_file :Local :Args(0) {
     }
 }
 
+# -------------------------------------------------------------------
+# Main chat endpoint (v2). Mirrors the v1 /ai/chat request/response
+# contract so local-chat.js needs no other changes — just point
+# config.apiEndpoints.generateResponse at /ai2/chat. Routing of
+# provider+model is delegated to Model::AI2::Router (openrouter/grok/
+# ollama all handled), so any model in the dropdown works.
+# -------------------------------------------------------------------
+sub chat :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} || 'Guest';
+    my $user_id  = $c->session->{user_id};
+
+    # Parse JSON body (mirrors v1 parsing)
+    my $json_data = {};
+    my $content_type = $c->request->content_type || '';
+    if ($content_type =~ /application\/json/i) {
+        try {
+            my $raw = $c->req->can('content') ? $c->req->content : $c->request->body;
+            $raw = do { local $/; <$raw> } if ref($raw);
+            $json_data = decode_json($raw) if $raw && length($raw);
+        } catch {
+            $c->res->body(encode_json({ success => 0, error => 'Invalid JSON' }));
+            return;
+        };
+    }
+    $json_data //= {};
+
+    my $prompt  = $json_data->{prompt} // '';
+    my $model   = $json_data->{model}  // $json_data->{provider} // '';
+    my $history = $json_data->{history} // [];
+    my $agent_id= $json_data->{agent_id} // '';
+    my $system  = $json_data->{system} // '';
+    my $page_path   = $json_data->{page_path} // '';
+    my $page_title  = $json_data->{page_title} // '';
+    my $page_content= $json_data->{page_content} // '';
+    my $use_search  = $json_data->{use_search} ? 1 : 0;
+
+    # The dropdown sends "provider|model" (e.g. openrouter|anthropic/...,
+    # grok|grok-4..., ollama|llama3...). Extract the real model name.
+    if ($model && $model =~ /^\s*([^|]+)\|(.+?)\s*$/) {
+        $model = $2;
+    }
+
+    unless ($prompt && length($prompt) > 0) {
+        $c->res->body(encode_json({ success => 0, error => 'Prompt is required' }));
+        return;
+    }
+
+    my $result = try {
+        $c->model('AI2::Chat')->process($c,
+            prompt       => $prompt,
+            model        => $model,
+            history      => $history,
+            agent_id     => $agent_id,
+            system       => $system,
+            page_path    => $page_path,
+            page_title   => $page_title,
+            page_content => $page_content,
+            use_search   => $use_search,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "Chat process threw: $_");
+        { success => 0, error => "Chat failed: $_" };
+    };
+
+    $result //= { success => 0, error => 'No response' };
+
+    $c->res->body(encode_json({
+        success          => $result->{success} ? 1 : 0,
+        response         => $result->{response} // '',
+        model            => $result->{model} // $model,
+        provider         => $result->{provider} // '',
+        needs_web_search => 0,
+        error            => $result->{error},
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
