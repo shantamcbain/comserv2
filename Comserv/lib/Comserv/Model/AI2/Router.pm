@@ -214,9 +214,30 @@ sub get_available_models {
         while (my $k = $rs->next) {
             my $svc = $k->service || next;
             next if $seen{$svc}++;
+            # Providers with a dedicated AI2::Provider class return their real
+            # model catalog; everything else degrades to a single service entry.
+            my %dedicated = ( grok => 'AI2::Provider::Grok', openrouter => 'AI2::Provider::OpenRouter' );
+            if (my $cls = $dedicated{lc $svc}) {
+                my $prov = eval { $c->model($cls) } || undef;
+                if ($prov) {
+                    my $listed = try { $prov->list_models($c) } catch { undef };
+                    if ($listed && $listed->{success} && $listed->{models}) {
+                        for my $m (@{$listed->{models}}) {
+                            push @all, {
+                                name     => $m->{id},
+                                provider => $svc,
+                                label    => ($m->{label} || $m->{id}) . " ($svc)",
+                                local    => 0,
+                            };
+                        }
+                        next;
+                    }
+                }
+            }
+
             push @all, {
                 name     => $svc,
-                provider => $svc,   # grok / openai / openrouter
+                provider => $svc,
                 label    => ucfirst($svc) . ' (external)',
                 local    => 0,
             };
