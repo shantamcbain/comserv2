@@ -55,6 +55,49 @@ sub models :Local :Args(0) {
 
 # Add more thin actions as needed (chat, sync, etc.)
 
+# JSON provider catalog for the chat widget. Returns the v1-compatible
+# `providers` shape that local-chat.js consumes, sourced from the v2 Router
+# (Ollama + Grok + OpenRouter + any keyed OpenAI-compatible service). This is
+# what makes admin users see ALL available models in the chat dropdown.
+sub providers :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+    my $is_admin = grep { $_ =~ /^(admin|developer|editor)$/i } @$roles;
+
+    my $catalog = try { $c->model('AI2')->get_available_models($c) } || [];
+
+    # Group v2 catalog (each: name, provider, label, local) into providers[].
+    my %by_service;
+    for my $m (@$catalog) {
+        my $svc = $m->{provider} || 'unknown';
+        $by_service{$svc} ||= { service => $svc, models => [], name => ucfirst($svc) };
+        push @{ $by_service{$svc}{models} }, { id => $m->{name}, label => $m->{label} };
+    }
+
+    my @providers = values %by_service;
+
+    # Ollama gets a friendly name + active host hint for the admin switcher.
+    for my $p (@providers) {
+        if ($p->{service} eq 'ollama') {
+            $p->{name}       = 'Ollama (Local AI)';
+            $p->{active_host}= ($c->config->{Ollama}{host} || '192.168.1.199');
+        }
+    }
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success           => 1,
+        providers         => \@providers,
+        is_admin          => $is_admin ? 1 : 0,
+        can_access_history=> $is_admin ? 1 : 0,
+        is_guest          => 0,
+        username          => $c->session->{username} || 'Guest',
+    }));
+}
+
+
 # PyCharm-like AI Code Editor popup (new clean system)
 sub editing_widget_popup :Local :Args(0) {
     my ($self, $c) = @_;
