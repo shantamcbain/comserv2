@@ -763,7 +763,7 @@
         chatPanel.appendChild(resizeHandle);
 
         // ── Populate provider dropdown ────────────────────────────────────────
-        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+        fetch('/ai2/providers', { method: 'GET', credentials: 'include' })
             .then(r => r.json())
             .then(function(data) {
                 if (data.success) {
@@ -842,6 +842,28 @@
                                     state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
                                     state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                                 }
+                            }
+                        } else {
+                            // Generic external provider (OpenRouter, OpenAI, Groq, ...)
+                            const grp = document.createElement('optgroup');
+                            grp.label = (p.name || p.service || 'External');
+                            const extModels = (p.models && p.models.length > 0)
+                                ? p.models
+                                    .filter(function(m) { return m.id && !m.id.match(/imagine|video|embed|rerank/i); })
+                                    .map(function(m) {
+                                        const label = (m.label || m.id).replace(/-/g, ' ');
+                                        return { val: p.service + '|' + m.id, label: label + ' (' + p.service + ')' };
+                                    })
+                                : [{ val: p.service + '|' + p.service, label: (p.name || p.service) + ' (external)' }];
+                            extModels.forEach(function(m) {
+                                const opt = document.createElement('option');
+                                opt.value = m.val; opt.textContent = m.label;
+                                grp.appendChild(opt);
+                            });
+                            sel.appendChild(grp);
+                            // Expose a tier for this external provider if none set
+                            if (!state.modelTiers[p.service]) {
+                                state.modelTiers[p.service] = extModels[0] ? extModels[0].val : (p.service + '|' + p.service);
                             }
                         }
                     });
@@ -1679,7 +1701,7 @@
     // Load user's available AI providers and populate model dropdown.
     // Returns a Promise that resolves when role and tiers are known.
     function loadUserProviders() {
-        return fetch('/ai/get_user_providers', {
+        return fetch('/ai2/providers', {
             method: 'GET',
             credentials: 'include'
         })
