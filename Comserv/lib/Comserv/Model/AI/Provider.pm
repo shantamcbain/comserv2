@@ -105,7 +105,7 @@ sub get_client {
             chat => sub {
                 my %chat_args = @_;
                 my $messages = $chat_args{messages} || [];
-                my $model    = $chat_args{model} || 'llama3.1:latest';
+                my $model    = $chat_args{model} || $ollama->model || 'llama3.1:latest';
 
                 # Ollama::Chat::chat returns a hashref { response, model, ... }
                 my $r = eval { $ollama->chat( messages => $messages, model => $model ) };

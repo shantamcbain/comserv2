@@ -75,6 +75,18 @@
           if (card) {
             var status = card.querySelector('.server-status');
             if (status) status.textContent = data.status;
+            var dbEl = card.querySelector('.server-db-error, .server-db-ok');
+            if (dbEl) {
+              if (data.db_error) {
+                dbEl.className = 'server-db-error text-danger';
+                dbEl.textContent = 'error';
+                dbEl.title = data.db_error;
+              } else {
+                dbEl.className = 'server-db-ok text-success';
+                dbEl.textContent = 'ok';
+                dbEl.removeAttribute('title');
+              }
+            }
           }
         } else {
           alert('Refresh failed: ' + (data.error || 'unknown'));

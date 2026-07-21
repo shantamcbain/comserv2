@@ -6,9 +6,10 @@ use base 'DBIx::Class::Core';
 __PACKAGE__->table('access_log');
 __PACKAGE__->add_columns(
     id => {
-        data_type         => 'bigint',
+        data_type => 'bigint',
+        size => 20,
+        is_nullable => 0,
         is_auto_increment => 1,
-        is_nullable       => 0,
     },
     timestamp => {
         data_type     => 'datetime',

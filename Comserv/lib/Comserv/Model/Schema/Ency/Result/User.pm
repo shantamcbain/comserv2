@@ -76,7 +76,7 @@ __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint('username_unique' => ['username']);
 
 # Relationships
-__PACKAGE__->has_many(site_users => 'Comserv::Model::Schema::Ency::Result::System::SiteUser', 'user_id');
+__PACKAGE__->has_many(site_users => 'Comserv::Model::Schema::Ency::Result::UserSite', 'user_id');
 
 __PACKAGE__->belongs_to(
     'creator' => 'Comserv::Model::Schema::Ency::Result::User',

@@ -23,15 +23,20 @@
         </nav>
     </div>
 
-    <!-- Result File Discovery Header (shows both ENCY total and current schema) -->
+    <!-- Result File Discovery Header (Result files vs live DB tables) -->
     <div class="result-discovery-header">
         <h4>
             <i class="fas fa-folder-open"></i> Result Files Discovery
         </h4>
         <p class="result-summary">
-            <strong>ENCY total:</strong> <span class="result-count">[% ency_result_count || 0 %]</span>
+            <strong>Result files discovered:</strong> <span class="result-count">[% result_count || 0 %]</span>
             &nbsp;|&nbsp;
-            <strong>Current schema ([% result_schema %]):</strong> <span class="result-count">[% result_count || 0 %]</span>
+            <strong>Live DB tables:</strong> <span class="result-count">[% db_table_count || 0 %]</span>
+            &nbsp;|&nbsp;
+            <strong>Matched:</strong> <span class="result-count">[% matched_count || 0 %]</span>
+            &nbsp;|&nbsp;
+            <strong>Result files without a DB table:</strong>
+            <span class="result-count[% IF result_only.size %] result-count-warn[% END %]">[% result_only.size || 0 %]</span>
         </p>
         [% IF result_count %]
         <details class="result-file-toggle">
@@ -69,12 +74,12 @@
                 Result files whose table name matches a DB table: <strong>[% matched_count %]</strong><br>
                 Result files whose table name does NOT exist in DB: <strong>[% result_only.size %]</strong><br>
                 Result files that FAILED to parse: <strong>[% result_extract_failures.size %]</strong><br>
-                <span class="warning-text">If result_only is 0 but result_count > matched_count, the DB table list is incomplete or keys don't match.</span>
+                <span class="warning-text">Result files without a DB table are listed at the bottom. They mean the live DB this scan is connected to does not contain that table (table not yet deployed, deployed to a different DB, or the scan is pointed at a stale/secondary connection).</span>
 
                 [% IF result_only.size == 0 && result_count > matched_count && result_extract_failures.size == 0 %]
                 <div class="debug-warning-block">
-                    <strong>WARNING:</strong> [% result_count %] result files but only [% matched_count %] matched. The [% result_count - matched_count %] unmatched result table names are NOT appearing in result_only.<br>
-                    This means the DB table query is returning fewer tables than MariaDB reports, or the key comparison is failing.
+                    <strong>WARNING:</strong> [% result_count %] result files but only [% matched_count %] matched, yet none appear in "Result files without tables".<br>
+                    The DB table list may be incomplete or the table-name key comparison is failing.
                 </div>
                 [% ELSIF result_count > matched_count && result_extract_failures.size > 0 %]
                 <div class="debug-info-block">

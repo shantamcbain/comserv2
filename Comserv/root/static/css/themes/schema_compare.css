@@ -1058,6 +1058,9 @@
     font-weight: bold;
     color: #17a2b8;
 }
+.result-discovery-header .result-count.result-count-warn {
+    color: #d9534f;
+}
 .result-discovery-header .result-extract-failures {
     margin-top: 0.75rem;
     border-top: 1px solid #17a2b8;

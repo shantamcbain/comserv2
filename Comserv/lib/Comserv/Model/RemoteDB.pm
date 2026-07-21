@@ -655,11 +655,18 @@ sub get_connection {
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
 
+        # The MariaDB driver rejects an explicit port when host is
+        # 'localhost' ("port cannot be specified when host is localhost or
+        # embedded") and falls back to the unix socket, which then fails
+        # because we also passed a port. Route 'localhost' through the TCP
+        # loopback address so the port is honoured and the check is honest.
+        my $connect_host = ($host eq 'localhost') ? '127.0.0.1' : $host;
+
         if ($db_type eq 'postgresql') {
-            $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
+            $dsn = "dbi:Pg:dbname=$database;host=$connect_host;port=$port";
         } else {
             # Use MariaDB driver (compatible with MySQL)
-            $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
+            $dsn = "dbi:MariaDB:database=$database;host=$connect_host;port=$port";
         }
     }
     
@@ -677,15 +684,22 @@ sub get_connection {
         }
         my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
 
+        $self->{_last_connection_error} = undef;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_connection',
             "Successfully connected to database connection '$conn_name'");
         
         return $dbh;
     } catch {
+        $self->{_last_connection_error} = "$_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_connection',
             "Failed to connect to database connection '$conn_name': $_");
         return;
     };
+}
+
+sub last_connection_error {
+    my ($self) = @_;
+    return $self->{_last_connection_error};
 }
 
 sub execute_query {

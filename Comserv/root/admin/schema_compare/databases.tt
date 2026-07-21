@@ -7,9 +7,7 @@
 <div class="app-container" data-base-url="[% c.uri_for('/admin/schema_compare/server') %]">
     <div class="page-header">
         <h1>Databases on [% server.name | html %]</h1>
-        [% IF server.ip %]
-            <p class="page-subtitle">Server: [% server.ip | html %] • Containers: [% server.container_count %]</p>
-        [% END %]
+        <p class="page-subtitle">Server group: [% server.name | html %]</p>
     </div>
 
     <div class="breadcrumb-container">

@@ -29,6 +29,16 @@ sub _resolve_api_key {
     # Explicit key passed (already decrypted) takes precedence.
     return $api_key if $api_key && length $api_key;
 
+    # Mirror v1 Model::Grok key resolution: K8s secret, then env var.
+    my $k8s_secret = '/run/secrets/grok_api_key';
+    if (-e $k8s_secret && open my $fh, '<', $k8s_secret) {
+        my $k = do { local $/; <$fh> };
+        close $fh;
+        chomp($k);
+        return $k if $k && length $k;
+    }
+    return $ENV{GROK_API_KEY} if $ENV{GROK_API_KEY} && length $ENV{GROK_API_KEY};
+
     my $user_id = $c->session->{user_id} or return undef;
     my $roles   = $c->session->{roles} || [];
     $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
@@ -73,6 +83,53 @@ sub list_models {
               @{ $data->{data} || [] };
 
     return { success => 1, models => \@out, count => scalar @out };
+}
+
+# Chat completion against x.AI (Grok). Migrated from v1 Model::Grok::chat.
+# Returns { success, response, model, usage } to match the v2 shape.
+sub chat {
+    my ($self, $c, %args) = @_;
+
+    my $api_key = $self->_resolve_api_key($c, $args{api_key});
+    return { success => 0, error => 'No active grok API key found' } unless $api_key;
+
+    my $messages = $args{messages} || [];
+    return { success => 0, error => 'No messages provided' }
+        unless ref($messages) eq 'ARRAY' && @$messages;
+
+    my $model = $args{model} || 'grok-3';
+    my $payload = {
+        model       => $model,
+        messages    => $messages,
+        temperature => 0.7,
+        max_tokens  => $args{max_tokens} // 2048,
+    };
+    if ($args{use_search}) {
+        $payload->{search_parameters} = { mode => 'auto' };
+    }
+
+    my $ua = LWP::UserAgent->new(timeout => 180);
+    $ua->agent('Comserv-AI/1.0');
+    my $req = HTTP::Request->new(POST => 'https://api.x.ai/v1/chat/completions');
+    $req->header('Content-Type'  => 'application/json');
+    $req->header('Authorization' => "Bearer $api_key");
+    $req->content(encode_json($payload));
+
+    my $res = try { $ua->request($req) } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'grok_chat', "x.AI request failed: $_");
+        return undef;
+    };
+    return { success => 0, error => 'Grok provider error' } unless $res && $res->is_success;
+
+    my $data = try { decode_json($res->decoded_content) } catch { undef };
+    return { success => 0, error => 'Bad JSON from Grok' } unless $data;
+
+    my $text = '';
+    if ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {
+        $text = $data->{choices}[0]{message}{content} // '';
+    }
+    return { success => 1, response => $text, model => $data->{model} || $model, usage => $data->{usage} || {} };
 }
 
 # Admin-only sync: returns the live catalog (UI stores it in metadata if desired).

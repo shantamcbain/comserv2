@@ -203,49 +203,55 @@ sub get_available_models {
             'get_available_models', "Ollama discovery failed: $_");
     };
 
-    # --- External (x.ai / OpenRouter) from configured keys ---
-    try {
-        my $schema = $c->model('DBEncy')->schema;
-        my $rs = $schema->resultset('UserApiKeys')->search(
-            { is_active => '1' },
-            { order_by => 'service' },
-        );
-        my %seen;
-        while (my $k = $rs->next) {
-            my $svc = $k->service || next;
-            next if $seen{$svc}++;
-            # Providers with a dedicated AI2::Provider class return their real
-            # model catalog; everything else degrades to a single service entry.
-            my %dedicated = ( grok => 'AI2::Provider::Grok', openrouter => 'AI2::Provider::OpenRouter' );
-            if (my $cls = $dedicated{lc $svc}) {
-                my $prov = eval { $c->model($cls) } || undef;
-                if ($prov) {
-                    my $listed = try { $prov->list_models($c) } catch { undef };
-                    if ($listed && $listed->{success} && $listed->{models}) {
-                        for my $m (@{$listed->{models}}) {
-                            push @all, {
-                                name     => $m->{id},
-                                provider => $svc,
-                                label    => ($m->{label} || $m->{id}) . " ($svc)",
-                                local    => 0,
-                            };
-                        }
-                        next;
-                    }
-                }
-            }
-
-            push @all, {
-                name     => $svc,
-                provider => $svc,
-                label    => ucfirst($svc) . ' (external)',
-                local    => 0,
-            };
+    # --- External (x.AI / OpenRouter) ---
+    # Driven by key *resolution*, not by the presence of a UserApiKeys row.
+    # A provider is shown (with its live model catalog) when a key can be
+    # resolved (k8s secret / env var / DBEncy); otherwise it appears as a
+    # non-selectable "configure key" note so the user knows why it's empty.
+    # We never emit a bare service-name id (e.g. "grok") as a selectable
+    # model — that would be sent to chat and fail with "model not found".
+    my %external = (
+        grok       => 'AI2::Provider::Grok',
+        openrouter => 'AI2::Provider::OpenRouter',
+    );
+    for my $svc (sort keys %external) {
+        my $cls  = $external{$svc};
+        my $prov = try { $c->model($cls) } catch { undef };
+        unless ($prov && $prov->can('list_models') && $prov->can('_resolve_api_key')) {
+            push @all, { name => $svc . '_unconfigured', provider => $svc,
+                         label => ucfirst($svc) . ' (unavailable)', local => 0,
+                         needs_key => 1, disabled => 1 };
+            next;
         }
-    } catch {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            'get_available_models', "External key read failed: $_");
-    };
+
+        # Can we resolve a key? _resolve_api_key needs $c for session/DB; if it
+        # returns nothing, the provider is configured-but-no-key.
+        my $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
+
+        if ($has_key) {
+            my $listed = try { $prov->list_models($c) } catch { undef };
+            if ($listed && $listed->{success} && $listed->{models} && @{$listed->{models}}) {
+                for my $m (@{$listed->{models}}) {
+                    push @all, {
+                        name     => $m->{id},
+                        provider => $svc,
+                        label    => ($m->{label} || $m->{id}) . " ($svc)",
+                        local    => 0,
+                    };
+                }
+                next;
+            }
+            # Key present but listing failed — surface the error rather than a stub.
+            push @all, { name => $svc . '_error', provider => $svc,
+                         label => ucfirst($svc) . ' (key set, list failed: '
+                                 . ($listed->{error} // 'unknown') . ')',
+                         local => 0, needs_key => 1, disabled => 1 };
+        } else {
+            push @all, { name => $svc . '_needs_key', provider => $svc,
+                         label => ucfirst($svc) . ' (configure API key to list models)',
+                         local => 0, needs_key => 1, disabled => 1 };
+        }
+    }
 
     return \@all;
 }

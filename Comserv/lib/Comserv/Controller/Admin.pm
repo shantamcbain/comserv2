@@ -16,6 +16,7 @@ use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
+use Time::HiRes qw(time);
 use MIME::Base64;
 use File::Slurp qw(read_file write_file);
 use File::Basename qw(dirname);
@@ -922,20 +923,27 @@ sub system_shell_terminal :Path('/admin/system-shell-terminal') :Args(0) {
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
+    my $t0 = Time::HiRes::time();
+    my $step = sub { my $label = shift; $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index_timing', sprintf("%s: +%.2fs", $label, Time::HiRes::time() - $t0)); };
     # Report this server's metrics (throttled) so infrastructure cards populate
     eval { Comserv::Util::HardwareAgent->report_if_due($c, 300) };
+    $step->('hardware_report');
 
     # Get system stats
     my $stats = $self->get_system_stats($c);
+    $step->('system_stats');
 
     # Get remote server stats (db + prod catalyst servers)
     my $remote_servers = $self->get_remote_server_stats($c);
+    $step->('remote_server_stats');
     
     # Get recent user activity
     my $recent_activity = $self->get_recent_activity($c);
+    $step->('recent_activity');
     
     # Get system notifications
     my $notifications = $self->get_system_notifications($c);
+    $step->('notifications');
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {

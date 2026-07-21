@@ -142,17 +142,30 @@ sub process {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'process',
         "AI2 using provider=$provider_name model=$use_model");
 
-    # Reuse v1 provider client (OpenAI-compatible, grok, ollama)
-    my $provider = try { $c->model('AI')->provider->get_client($c,
-        provider => $provider_name, model => $use_model) }
-    catch { undef };
+    # Dispatch to the correct self-contained v2 provider client.
+    my $dispatch = {
+        ollama     => 'AI2::Provider::Ollama',
+        grok       => 'AI2::Provider::Grok',
+        openrouter => 'AI2::Provider::OpenRouter',
+        external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
+    };
+    my $prov_class = $dispatch->{$provider_name} || 'AI2::Provider::Ollama';
+    my $provider = try { $c->model($prov_class) } catch { undef };
 
-    unless ($provider && $provider->{chat}) {
+    unless ($provider && $provider->can('chat')) {
         return { success => 0, error => "No client available for provider $provider_name" };
     }
 
+    my ($ollama_host, $ollama_port) = ($c->config->{Ollama}{host} || '192.168.1.199',
+                                      $c->config->{Ollama}{port} || 11434);
+
     my $resp = try {
-        $provider->{chat}->(messages => $messages, use_search => $args{use_search} ? 1 : 0);
+        $provider->chat($c,
+            messages => $messages,
+            model    => $use_model,
+            host     => $ollama_host,
+            port     => $ollama_port,
+        );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
