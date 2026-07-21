@@ -28,3 +28,7 @@ config/dev_tls/
 # Auto-generated editor caches (runtime, re-creatable)
 /.file_index_cache.json
 /.route_map_cache.json
+
+# Secrets: real credentials live ONLY in ~/.comserv/secrets (outside the repo).
+# Never commit Comserv/secrets/ — it may contain live DB passwords.
+/secrets/

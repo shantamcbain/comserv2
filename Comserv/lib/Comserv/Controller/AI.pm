@@ -1900,14 +1900,32 @@ sub generate :Local :Args(0) {
                 }
             }
 
-            # Normalise response text (chat vs generate API have different keys)
-            my $r_text = (ref($response->{message}) eq 'HASH' && $response->{message}->{content})
-                       ? $response->{message}->{content}
-                       : ($response->{response} // '');
-            $model_used = $response->{model} || $use_model;
+            # Normalise response text. `chat()` returns a hashref
+            # {message=>{content}, response, model, ...}; `query()` (the
+            # /api/generate path) returns a bare string. Handle both so a
+            # single-turn no-history request can't deref a string as a hash.
+            my $r_text;
+            my $resp_model;
+            if (ref($response) eq 'HASH') {
+                $r_text     = (ref($response->{message}) eq 'HASH' && $response->{message}->{content})
+                           ? $response->{message}->{content}
+                           : ($response->{response} // '');
+                $resp_model = $response->{model};
+            } else {
+                $r_text     = $response // '';
+                $resp_model = undef;
+            }
+            $model_used = $resp_model || $use_model;
+
+            # Coerce to a hashref so all downstream derefs ($response->{response},
+            # ->{model}, ->{usage}, ->{eval_count}, ->{total_duration}) work
+            # whether the source was chat() (hashref) or query() (bare string).
+            if (ref($response) ne 'HASH') {
+                $response = { response => $r_text, model => $model_used };
+            }
 
             push @trace, sprintf("✅ Tier-1 responded in %ds — %d tokens | %d chars",
-                $query_elapsed, $response->{eval_count} || 0, length($r_text));
+                $query_elapsed, (ref($response) eq 'HASH' ? ($response->{eval_count} || 0) : 0), length($r_text));
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'generate', "Tier-1 SUCCESS elapsed=${query_elapsed}s model=$model_used");
 
@@ -1934,13 +1952,15 @@ sub generate :Local :Args(0) {
                     );
                 }
                 if ($resp2) {
-                    my $text2 = (ref($resp2->{message}) eq 'HASH' && $resp2->{message}->{content})
-                              ? $resp2->{message}->{content}
-                              : ($resp2->{response} // '');
+                    my $text2 = (ref($resp2) eq 'HASH')
+                        ? ((ref($resp2->{message}) eq 'HASH' && $resp2->{message}->{content})
+                            ? $resp2->{message}->{content}
+                            : ($resp2->{response} // ''))
+                        : $resp2;
                     if ($text2) {
                         $r_text     = $text2;
-                        $model_used = $resp2->{model} || $tier_large;
-                        $response   = $resp2;
+                        $model_used = (ref($resp2) eq 'HASH' ? ($resp2->{model} || $tier_large) : $tier_large);
+                        $response   = (ref($resp2) eq 'HASH') ? $resp2 : { response => $text2, model => $model_used };
                         push @trace, sprintf("✅ Tier-2 SUCCESS in %ds — %d chars",
                             time() - $t2_start, length($text2));
                     }

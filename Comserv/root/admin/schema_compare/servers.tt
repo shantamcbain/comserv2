@@ -29,7 +29,31 @@
                     <strong>Types:</strong> [% server.type_display || '—' %]
                 </p>
                 <p class="card-text mb-1 server-card-text">
+                    <strong>Host:</strong>
+                    [% IF server.routes.size > 1 %]
+                    <span class="server-routes">
+                        [% FOREACH r IN server.routes %]
+                        <span class="server-route [% IF r.reachable %]text-success[% ELSE %]text-danger[% END %]"
+                              title="[% r.host %]:[% r.port %] — [% IF r.reachable %]reachable[% ELSE %]unreachable[% END %][% IF r.error %] ([% r.error | html %])[% END %]">
+                            <i class="fas [% IF r.reachable %]fa-check-circle[% ELSE %]fa-times-circle[% END %]"></i>
+                            [% r.host %]:[% r.port %]
+                        </span>[% UNLESS loop.last %]<br>[% END %]
+                        [% END %]
+                    </span>
+                    [% ELSE %]
+                    [% server.ips.join(', ') | html %]
+                    [% END %]
+                </p>
+                <p class="card-text mb-1 server-card-text">
                     <strong>Status:</strong> <span class="server-status">[% server.status | ucfirst %]</span>
+                </p>
+                <p class="card-text mb-1 server-card-text">
+                    <strong>DB:</strong>
+                    [% IF server.db_error %]
+                    <span class="server-db-error text-danger" title="[% server.db_error | html %]">error</span>
+                    [% ELSE %]
+                    <span class="server-db-ok text-success">ok</span>
+                    [% END %]
                 </p>
                 <button class="btn btn-sm btn-outline-primary refresh-btn" data-action="refresh-server" data-server="[% server.server_group | html %]">
                     <i class="fa fa-sync"></i> Refresh

@@ -2047,9 +2047,9 @@ sub schema_compare :Private {
 
     # Group connections so each distinct DB server process gets its own card.
     # Two connections are the SAME server if they share server_group AND port
-    # (even across different IPs — e.g. .222:3306 + .198:3306 on prod01).
+    # (even across different IPs — e.g. .222:3306 + .198:3306 on db-server-2).
     # They are DIFFERENT servers if they are on different ports (e.g.
-    # MySQL:3307 vs PostgreSQL:5433 on prod02) — those each get their own card.
+    # MySQL:3307 vs PostgreSQL:5433 on db-server-1) — those each get their own card.
     my %grouped;
     foreach my $name (@primary_conns) {
         my $cfg = $all_conns->{$name}{config};
@@ -2071,7 +2071,11 @@ sub schema_compare :Private {
     foreach my $group (sort keys %grouped) {
         my $g = $grouped{$group};
         my @group_ips = sort keys %{ $g->{ips} };
-        my $display_name = join(', ', @group_ips);
+        # Display name = canonical server_group (e.g. "db-server-1:3307"),
+        # NOT the raw IPs. The group key already encodes host+port and matches
+        # the /admin/schema_compare/server/<group_key> route. Using the raw IP
+        # string here broke drill-down navigation (route matches server_group).
+        my $display_name = $group;
         my $type_display = join(', ', map { ucfirst($_) } sort keys %{ $g->{types} });
         my $db_count = scalar keys %{ $g->{dbs} };
 
@@ -2080,12 +2084,15 @@ sub schema_compare :Private {
 
         push @servers, {
             name         => $display_name,
+            server_group => $group,
             ips          => \@group_ips,
             db_count     => $db_count,
             type_display => $type_display,
             running      => $status->{running},
             status       => $status->{status},
-            server_group => $group,
+            db_ok        => $status->{db_ok},
+            db_error     => $status->{db_error} || '',
+            routes       => $status->{routes} || [],
         };
     }
 
@@ -2109,43 +2116,106 @@ sub schema_compare :Private {
 }
 
 # ---------------------------------------------------------------
-# Quick fork-based live check for a server group.
-# Times out after ~4 seconds if the server is unreachable.
-# Returns { running => 0|1, status => 'active'|'offline' }
+# Two-tier live check for a server group.
+#
+# ---------------------------------------------------------------
+# Two-tier live check for a server group.
+#
+# A group may have several routes to the SAME physical server (e.g.
+# db-server-dev is reached both via LAN 192.168.1.198 and via ZeroTier
+# 172.30.161.222). We therefore probe EVERY connection in the group and
+# report the best outcome: reachable if ANY route's TCP connect() succeeds,
+# login-OK if ANY route authenticates. This way a card stays "Active" when
+# at least one route works, even if another route (e.g. a LAN interface with
+# a stalled reverse-DNS handshake) is currently dead.
+#
+# Tier 1 — reachability: TCP connect() to host:port confirms the server
+#   process is listening. Drives `status` (active/offline).
+# Tier 2 — login: a real authenticated DBI connect + SELECT 1, surfaced as
+#   `db_error` so config problems are visible separately from liveness.
+#
+# Returns { running, status, db_ok, db_error, routes }
+#   status  => 'active' | 'offline'
+#   db_ok   => 0|1
+#   db_error=> '' | '<message>'   (last failing route's error, if any)
+#   routes  => [ { host, port, reachable, db_ok, error } ]  (per-route detail)
 # ---------------------------------------------------------------
 sub _check_server_live {
     my ($self, $c, $remote_db, $group_name, $conns_for_group) = @_;
 
-    return { running => 0, status => 'offline' }
+    return { running => 0, status => 'offline', db_ok => 0, db_error => '', routes => [] }
         unless $conns_for_group && @$conns_for_group;
 
-    my $conn_name = $conns_for_group->[0];
     my $all = $remote_db->get_all_connections();
-    my $cfg = $all->{$conn_name}{config}
-        or return { running => 0, status => 'offline' };
-    my $host = $cfg->{host}  || 'localhost';
-    my $port = $cfg->{port}  || 3306;
-
-    # TCP socket check — faster than DBI fork, credential-free, just confirms
-    # the database server process is running and listening on its port.
     require IO::Socket::INET;
-    my $sock = IO::Socket::INET->new(
-        PeerHost => $host,
-        PeerPort => $port,
-        Proto    => 'tcp',
-        Timeout  => 3,
-    );
-    if ($sock) {
-        close($sock);
-        return { running => 1, status => 'active' };
+
+    my $any_reachable = 0;
+    my $any_db_ok     = 0;
+    my $last_error    = '';
+    my @routes;
+
+    for my $conn_name (@$conns_for_group) {
+        my $cfg = $all->{$conn_name}{config}
+            or next;
+        my $host = $cfg->{host}  || 'localhost';
+        my $port = $cfg->{port}  || 3306;
+
+        # Tier 1: is this route's server process listening?
+        my $sock = IO::Socket::INET->new(
+            PeerHost => $host,
+            PeerPort => $port,
+            Proto    => 'tcp',
+            Timeout  => 3,
+        );
+        my $reachable = $sock ? 1 : 0;
+        close($sock) if $sock;
+        $any_reachable ||= $reachable;
+
+        # Tier 2: only attempt a login if the route is reachable.
+        my ($db_ok, $err) = (0, '');
+        if ($reachable) {
+            my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+            if ($dbh) {
+                $db_ok = eval {
+                    my $sth = $dbh->prepare('SELECT 1');
+                    $sth->execute();
+                    $sth->finish;
+                    1;
+                } ? 1 : 0;
+                $dbh->disconnect;
+            } else {
+                $err = $remote_db->last_connection_error || 'login failed';
+                $err =~ s/\s+/ /g;
+                $err = substr($err, 0, 160);
+            }
+            $any_db_ok ||= $db_ok;
+            $last_error = $err if $err;
+        } else {
+            $err = "no service on $host:$port (TCP)";
+            $last_error ||= $err;
+        }
+
+        push @routes, {
+            host      => $host,
+            port      => $port,
+            reachable => $reachable,
+            db_ok     => $db_ok,
+            error     => $err,
+        };
     }
 
-    return { running => 0, status => 'offline' };
+    return {
+        running   => $any_reachable,
+        status    => $any_reachable ? 'active' : 'offline',
+        db_ok     => $any_db_ok,
+        db_error  => $any_db_ok ? '' : $last_error,
+        routes    => \@routes,
+    };
 }
 
 # ==================================================================
 # Helper: match connections by group key
-# Group key format is "server_group:port" (e.g. "prod01:3306")
+# Group key format is "server_group:port" (e.g. "db-server-1:3307")
 # or "host:port:dbtype" (e.g. "192.168.1.20:3307:mysql").
 # ==================================================================
 sub _match_group_connections {
@@ -2607,6 +2677,7 @@ sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1)
 
     my $running = 0;
     my $table_count = 0;
+    my $db_error = '';
     foreach my $c (@conns_for_group) {
         my $dbh = eval { $remote_db->get_connection(undef, $c) };
         if ($dbh) {
@@ -2625,6 +2696,10 @@ sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1)
             };
             $dbh->disconnect;
             # do NOT break – we want the sum from all databases
+        } else {
+            $db_error = $remote_db->last_connection_error || 'login failed';
+            $db_error =~ s/\s+/ /g;
+            $db_error = substr($db_error, 0, 160);
         }
     }
 
@@ -2633,6 +2708,7 @@ sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1)
         running     => $running,
         table_count => $table_count,
         status      => $running ? 'active' : 'offline',
+        db_error    => $db_error,
     };
 
     $c->stash(json => {
@@ -2641,6 +2717,7 @@ sub refresh_server_status :Path('/admin/schema_compare/refresh_server') :Args(1)
         running     => $running,
         table_count => $table_count,
         status      => $running ? 'active' : 'offline',
+        db_error    => $db_error,
     });
     $c->forward('View::JSON');
 }
