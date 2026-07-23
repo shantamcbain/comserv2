@@ -3,11 +3,8 @@ package Comserv::Util::Encryption;
 use strict;
 use warnings;
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
-# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
-# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
-INIT { Try::Tiny->import }
 use Crypt::CBC;
 use Crypt::OpenSSL::AES;
 use Crypt::URandom qw(urandom);

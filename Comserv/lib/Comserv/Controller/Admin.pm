@@ -3,7 +3,7 @@ package Comserv::Controller::Admin;
 
 
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Comserv::Util::Logging;
 use Comserv::Util::DeployStatus;
 use Comserv::Util::AdminAuth;
@@ -16,9 +16,6 @@ use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
-# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
-# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
-INIT { Try::Tiny->import }
 use Time::HiRes qw(time);
 use MIME::Base64;
 use File::Slurp qw(read_file write_file);

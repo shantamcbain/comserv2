@@ -86,6 +86,13 @@ my $_in_todo_create    = 0;  # recursion guard for auto-error-todo creation
 # Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
 my $_email_failed_at = 0;  # epoch time of last email send failure
 my $_email_backoff_s = 300; # seconds to pause email sending after a failure
+# Email storm throttle: suppress repeat notifications for the same subject
+# and cap total notification emails per hour. Prevents floods like the
+# 2026-07-23 try/catch storm (1000+ identical alert emails from :5000).
+my %_email_last_sent;            # subject → epoch of last email actually sent
+my $_email_repeat_window = 900;  # min seconds between emails with the same subject
+my @_email_sent_times;           # epochs of all notification emails, for hourly cap
+my $_email_hourly_cap  = 20;     # max notification emails per rolling hour
 my $_last_rotation_attempt_at = 0; # epoch time of last preemptive log rotation attempt
 
 my $MAX_LOG_SIZE = 50 * 1024 * 1024; # 50 MB max log size
@@ -827,6 +834,19 @@ sub send_error_notification {
         return;
     }
 
+    # Storm throttle 1: same subject within the repeat window → suppress.
+    my $now = time();
+    if (($now - ($_email_last_sent{$subject} // 0)) < $_email_repeat_window) {
+        _print_log("[EMAIL-THROTTLE] duplicate subject within ${_email_repeat_window}s, suppressed: $subject");
+        return;
+    }
+    # Storm throttle 2: rolling hourly cap across ALL notification emails.
+    @_email_sent_times = grep { $now - $_ < 3600 } @_email_sent_times;
+    if (@_email_sent_times >= $_email_hourly_cap) {
+        _print_log("[EMAIL-THROTTLE] hourly cap ($_email_hourly_cap) reached, suppressed: $subject");
+        return;
+    }
+
     # Always notify CSC Admin for all errors
     my $csc_admin_email = 'helpdesk@computersystemconsulting.ca';
     my $site_admin_email;
@@ -861,6 +881,10 @@ sub send_error_notification {
     if ($@ || !$email_ok) {
         $_email_failed_at = time();
         _print_log("[EMAIL-CB] email failed, circuit breaker set for ${_email_backoff_s}s: " . ($@ || 'send returned false'));
+    } else {
+        # Record successful send for the storm throttles above.
+        $_email_last_sent{$subject} = $now;
+        push @_email_sent_times, $now;
     }
 }
 
