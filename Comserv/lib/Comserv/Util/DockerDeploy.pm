@@ -138,6 +138,7 @@ sub _backup_container {
     my $bk_cname = "bk-$container_name-$ts";
     my $create_cmd_body =
         "docker create --name $bk_cname"
+      . " -p $self->{_svc_port}:$self->{_svc_port}"
       . " --label com.docker.compose.project=backup"
       . " --label com.docker.compose.service=backup"
       . " --label comserv.backup=1"
@@ -149,7 +150,8 @@ sub _backup_container {
         : $create_cmd_body;
     my $crc = $self->_stream_command($create_cmd);
     if ($crc == 0) {
-        $self->_log("  Created stopped backup container: $bk_cname (start it manually to run this backup)");
+        $self->{_backup_cname} = $bk_cname;
+        $self->_log("  Created stopped backup container: $bk_cname (port $self->{_svc_port} mapped — can be started directly)");
     } else {
         $self->_error("  WARNING: backup image OK but could not create visible backup container $bk_cname (exit=$crc)");
     }
@@ -160,6 +162,34 @@ sub _backup_container {
 # recreate the service from it via compose (no pull). Returns 1 on success.
 sub _restore_backup_image {
     my ($self, $backup_image, $service, $compose_files, $repo, $is_remote, $ssh_prefix) = @_;
+
+    # ── Preferred path: visible-container rollback (user requirement) ──
+    # 1. Stop the FAILED new container and rename it failed-<name>-<ts> so it
+    #    stays visible in `docker ps -a` as evidence of what failed.
+    # 2. START the stopped bk- backup container (it has the port mapping).
+    # Result at a glance: failed-* = stopped broken deploy, bk-* Up = the
+    # exact backup now serving traffic.
+    my $bk_cname = $self->{_backup_cname} || '';
+    if ($bk_cname) {
+        my $svc_container = $self->{_svc_container} || '';
+        my $now = DateTime->now(time_zone => 'local');
+        my $fts = $now->ymd('') . '_' . $now->hms('');
+        if ($svc_container) {
+            my $failed_name = "failed-$svc_container-$fts";
+            my $stop_rename = "docker stop $svc_container 2>&1 || true; docker rename $svc_container $failed_name 2>&1 || true";
+            $self->_stream_command($is_remote ? "$ssh_prefix \"$stop_rename\"" : $stop_rename);
+            $self->_log("  Failed container preserved as $failed_name (stopped).");
+        }
+        my $start_bk = "docker start $bk_cname 2>&1";
+        my $rc = $self->_stream_command($is_remote ? "$ssh_prefix \"$start_bk\"" : $start_bk);
+        if ($rc == 0) {
+            $self->_log("  ✅ ROLLBACK: backup container $bk_cname is now RUNNING (visible by name in docker ps).");
+            return 1;
+        }
+        $self->_error("  Could not start backup container $bk_cname (exit=$rc) — falling back to image-based restore.");
+    }
+
+    # ── Fallback path: retag backup image and compose-recreate ──
     my $img_ref = $self->{_backup_image_ref} || '';
     unless ($backup_image && $img_ref) {
         $self->_error("  Cannot restore: missing backup image or source image_ref.");
@@ -376,6 +406,8 @@ sub deploy {
 
     # 3. Backup old container (handles "no container" gracefully)
     $self->_log("Step 4: Backing up old $container_name...");
+    $self->{_svc_port} = $port;   # used by _backup_container for the visible backup container's port mapping
+    $self->{_svc_container} = $container_name;  # used by rollback to rename the failed container
     my $backup  = $self->_backup_container($container_name, $is_remote, $ssh_prefix);
 
     # ── eval wrap: exception safety from here through health check ──
@@ -627,6 +659,24 @@ sub _prune_backups {
         $self->_stream_command($rm_cmd);
     }
     $self->_log("Pruned " . scalar(@to_remove) . " old backup(s) (container+image), keeping $max_keep.");
+
+    # Also prune old failed-* containers (preserved failed deploys) — keep 2.
+    my $failed_list_cmd = $is_remote
+        ? "$ssh_prefix \"docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^failed-$base_name-' | sort\""
+        : "docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^failed-$base_name-' | sort";
+    my $failed_out = `$failed_list_cmd` || '';
+    my @failed = grep { /\S/ } split /\n/, $failed_out;
+    if (@failed > 2) {
+        my @rm_failed = splice @failed, 0, (@failed - 2);
+        foreach my $fc (@rm_failed) {
+            chomp $fc;
+            $self->_log("Pruning old failed-deploy container: $fc");
+            my $cmd = $is_remote
+                ? "$ssh_prefix \"docker rm -f $fc 2>&1 || true\""
+                : "docker rm -f $fc 2>&1 || true";
+            $self->_stream_command($cmd);
+        }
+    }
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
