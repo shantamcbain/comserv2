@@ -16,6 +16,9 @@ use HTTP::Request;
 use JSON;
 use Data::Dumper;
 use Try::Tiny;
+# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
+# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
+INIT { Try::Tiny->import }
 use Comserv::Util::Logging;
 
 extends 'Catalyst::Model';

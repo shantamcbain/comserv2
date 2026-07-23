@@ -8,6 +8,9 @@ use File::Basename;
 use File::Spec;
 use FindBin;
 use Try::Tiny;
+# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
+# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
+INIT { Try::Tiny->import }
 use Comserv::Util::Logging;
 use Comserv::Util::DocumentationConfig;
 

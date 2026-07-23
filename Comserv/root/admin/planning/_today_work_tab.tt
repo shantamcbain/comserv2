@@ -52,7 +52,7 @@
                 <summary class="AuditSummary">
                     <span class="AuditSummaryLabel">🚨 Application Error Audit</span>
                     [% IF audit_todos && audit_todos.size %]
-                    <span class="AuditSummaryCount">[% audit_todos.size %] item(s)</span>
+                    <span class="AuditSummaryCount">[% audit_todos.size %] item(s)[% IF audit_open_count && audit_open_count > audit_todos.size %] — [% audit_open_count %] open in total[% END %]</span>
                     [% ELSE %]
                     <span id="audit-status-msg" class="AuditSummaryCount">no unresolved errors</span>
                     [% END %]

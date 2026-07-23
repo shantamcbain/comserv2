@@ -635,11 +635,16 @@ sub log_with_details {
             my $todo_priority = ($top_level eq 'CRITICAL') ? 1 : ($top_level eq 'ERROR') ? 2 : 3;
             my $fp_tag       = "Fingerprint: $meta->{fingerprint}";
 
-            # One open audit todo per error fingerprint — refresh on repeat.
+            # One open audit todo per error AREA (controller::action) — refresh on repeat.
+            # Area-level matching (not full-subject/fingerprint) prevents floods of
+            # near-duplicate todos when the variable part of the message differs on
+            # every hit (e.g. SQL-injection bot probes against WorkShop::workshop).
+            my $area_prefix = "[Error] $meta->{controller_action}";
+            $area_prefix =~ s/([%_\\])/\\$1/g;   # escape LIKE wildcards
             my $existing = $c->model('DBEncy')->resultset('Todo')->search(
                 { -or => [
                     { comments => { -like => "%$fp_tag%" } },
-                    { subject  => { -like => $todo_subject . '%' } },
+                    { subject  => { -like => $area_prefix . '%' } },
                   ],
                   status => { -not_in => [3, 4, 'done', 'Done', 'DONE', 'completed', 'Completed', 'Closed', 'closed'] } },
                 { order_by => { -desc => 'last_mod_date' }, rows => 1 }

@@ -12,6 +12,9 @@ use File::Basename;
 use FindBin;
 use DBI;
 use Try::Tiny;
+# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
+# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
+INIT { Try::Tiny->import }
 use Log::Log4perl qw(:easy);
 use Comserv::Model::DBEncy;
 use Data::Dumper;
