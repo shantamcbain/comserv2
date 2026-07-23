@@ -126,6 +126,33 @@ sub _backup_container {
         return undef;
     }
     $self->_log("  Backed up $container_name → image $backup (source image_ref=$img_ref)");
+
+    # Also create a VISIBLE stopped backup container from the committed image,
+    # so backups can be seen at a glance in `docker ps -a` / the admin browser,
+    # restarted by name, and deleted individually (user requirement).
+    #
+    # CRITICAL: labels are wiped (com.docker.compose.* overridden to a distinct
+    # project) so `docker compose up --force-recreate` can NEVER match and
+    # destroy it — that label-match destruction is why plain `docker rename`
+    # backups kept disappearing.
+    my $bk_cname = "bk-$container_name-$ts";
+    my $create_cmd_body =
+        "docker create --name $bk_cname"
+      . " --label com.docker.compose.project=backup"
+      . " --label com.docker.compose.service=backup"
+      . " --label comserv.backup=1"
+      . " --label comserv.backup.of=$container_name"
+      . " --label comserv.backup.ts=$ts"
+      . " $backup 2>&1";
+    my $create_cmd = $is_remote
+        ? "$ssh_prefix \"$create_cmd_body\""
+        : $create_cmd_body;
+    my $crc = $self->_stream_command($create_cmd);
+    if ($crc == 0) {
+        $self->_log("  Created stopped backup container: $bk_cname (start it manually to run this backup)");
+    } else {
+        $self->_error("  WARNING: backup image OK but could not create visible backup container $bk_cname (exit=$crc)");
+    }
     return $backup;
 }
 
@@ -284,6 +311,31 @@ sub deploy {
         # 2. Build (local) then push if remote
         my $git_hash = `cd $repo && git rev-parse --short HEAD 2>/dev/null` || 'unknown';
         chomp $git_hash;
+
+        # Regenerate version.json so the in-app footer (pagetop.tt via Root.pm)
+        # reports the REAL build. Previously this was a stale committed file
+        # (frozen at 2026-06-26/91c59fc5), so every image lied about its build —
+        # making build/push/pull verification impossible from the browser.
+        eval {
+            my $branch = `cd $repo && git rev-parse --abbrev-ref HEAD 2>/dev/null` || 'unknown';
+            chomp $branch;
+            my $dirty = `cd $repo && git status --porcelain 2>/dev/null` ? '+local' : '';
+            my $build_utc = do {
+                my @t = gmtime(time);
+                sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+            };
+            my $host = `hostname -f 2>/dev/null` || `hostname` || 'unknown';
+            chomp $host;
+            if (open my $vf, '>', "$repo/Comserv/version.json") {
+                printf $vf '{"branch":"%s","commit":"%s%s","build_date":"%s","build_host":"%s"}',
+                    $branch, $git_hash, $dirty, $build_utc, $host;
+                close $vf;
+                $self->_log("  version.json regenerated: $branch\@$git_hash$dirty $build_utc");
+            } else {
+                $self->_error("  WARNING: could not write version.json: $!");
+            }
+        };
+
         $self->_log("Step 2: Building $service container (commit=$git_hash)" . ($self->{no_cache} ? ' [--no-cache]' : '') . "...");
         my $no_cache_flag = $self->{no_cache} ? ' --no-cache' : '';
         my $build_rc = $self->_stream_command("cd $repo && docker compose $compose_files build --progress plain$no_cache_flag $service 2>&1");
@@ -561,12 +613,20 @@ sub _prune_backups {
     foreach my $old (@to_remove) {
         chomp $old;
         $self->_log("Pruning old backup image: $old");
+        # Remove the matching visible backup container first (bk-<name>-<ts>),
+        # then the image. Container name = image repo:tag with ':' → '-'.
+        my $cname = $old;
+        $cname =~ s/:/-/;
+        my $rm_ctr_cmd = $is_remote
+            ? "$ssh_prefix \"docker rm -f $cname 2>&1 || true\""
+            : "docker rm -f $cname 2>&1 || true";
+        $self->_stream_command($rm_ctr_cmd);
         my $rm_cmd = $is_remote
             ? "$ssh_prefix \"docker rmi $old 2>&1 || true\""
             : "docker rmi $old 2>&1 || true";
         $self->_stream_command($rm_cmd);
     }
-    $self->_log("Pruned " . scalar(@to_remove) . " old backup image(s), keeping $max_keep.");
+    $self->_log("Pruned " . scalar(@to_remove) . " old backup(s) (container+image), keeping $max_keep.");
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
