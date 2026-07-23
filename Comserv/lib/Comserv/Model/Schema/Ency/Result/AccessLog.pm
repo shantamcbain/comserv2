@@ -32,7 +32,8 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     status_code => {
-        data_type   => 'smallint',
+        data_type => 'smallint',
+        size => 6,
         is_nullable => 1,
     },
     ip_address => {

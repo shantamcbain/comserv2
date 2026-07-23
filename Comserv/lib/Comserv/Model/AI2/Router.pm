@@ -53,17 +53,17 @@ sub _detect_provider {
 # Ported from Controller::AI::_select_model_for_context.
 # -------------------------------------------------------------------
 my %CONTEXT_PREFS = (
-    chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
-    helpdesk    => ['llama3.1', 'llama3', 'mistral'],
-    ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-    bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-    csc         => ['llama3.1', 'llama3', 'mistral'],
-    general     => ['llama3.1', 'llama3', 'mistral'],
-    navigation  => ['llama3.1', 'llama3'],
-    simple      => ['llama3.1', 'llama3'],
-    code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
-    developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
-    docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
+    chat        => ['phi4', 'gemma4', 'qwen2.5', 'qwen3-coder'],
+    helpdesk    => ['phi4', 'gemma4', 'qwen2.5'],
+    ency        => ['qwen2.5', 'gemma4', 'phi4'],
+    bmaster     => ['qwen2.5', 'gemma4', 'phi4'],
+    csc         => ['phi4', 'gemma4', 'qwen2.5'],
+    general     => ['phi4', 'gemma4', 'qwen2.5-coder', 'qwen3-coder'],
+    navigation  => ['phi4', 'gemma4'],
+    simple      => ['phi4', 'gemma4'],
+    code        => ['qwen3-coder', 'qwen2.5-coder', 'phi4', 'gemma4'],
+    developer   => ['qwen3-coder', 'qwen2.5-coder', 'phi4'],
+    docker      => ['phi4', 'gemma4'],
 );
 
 my %ROLE_TO_CONTEXT = (
@@ -154,8 +154,8 @@ sub select_model {
     my @chat = grep { $self->_is_chat_model($_) } values %installed;
     return ('ollama', $chat[0]) if @chat;
 
-    # 6) Hardcoded safe fallback (local-first).
-    return ('ollama', 'llama3.1:latest');
+    # 6) Hardcoded safe fallback (local-first) — must match an installed model.
+    return ('ollama', 'phi4:14b');
 }
 
 # -------------------------------------------------------------------

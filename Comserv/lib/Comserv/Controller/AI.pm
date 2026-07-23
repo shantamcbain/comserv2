@@ -6342,7 +6342,7 @@ sub _get_current_ollama_config {
     my $ollama = $c->model('Ollama');
     my $current_host  = $primary_host;
     my $current_port  = $config_port;
-    my $current_model = 'llama3.1:latest';
+    my $current_model = 'phi4:14b';
     my $installed_models = [];
 
     # Session override (admin/privileged users can switch host via /ai/models UI)

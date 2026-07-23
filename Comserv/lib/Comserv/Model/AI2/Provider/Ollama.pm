@@ -63,7 +63,7 @@ sub chat {
     my ($self, $c, %args) = @_;
 
     my $messages = $args{messages} || [];
-    my $model    = $args{model}    || 'llama3.1:latest';
+    my $model    = $args{model}    || 'phi4:14b';
     my $host     = $args{host}     || $c->config->{Ollama}{host} || '192.168.1.199';
     my $port     = $args{port}     || $c->config->{Ollama}{port} || 11434;
 

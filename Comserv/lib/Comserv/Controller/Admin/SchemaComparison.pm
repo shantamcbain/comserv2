@@ -60,6 +60,54 @@ sub database_env {
     return Comserv::Util::DatabaseEnv->new();
 }
 
+# Map database name (e.g. 'ency_production', 'forager_staging', 'ency') to schema type
+sub _resolve_schema_name {
+    my ($self, $database) = @_;
+    return 'forager' if lc($database // '') =~ /forager/;
+    return 'ency';
+}
+
+# Map schema name to Catalyst model name
+sub _schema_to_model_name {
+    my ($self, $schema_name) = @_;
+    return $schema_name eq 'forager' ? 'DBForager' : 'DBEncy';
+}
+
+# Get a fresh DB connection via RemoteDB — avoids stale cached model handles
+# Get a fresh DB connection via RemoteDB — uses highest-priority connection for the selected database
+sub _get_fresh_dbh {
+    my ($self, $c, $database) = @_;
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->new();
+    $remote_db->config({});
+    my $all_conns = $remote_db->get_all_connections();
+
+    # Filter to only connections matching this database name exactly
+    my @group_conns = grep {
+        my $cfg = $all_conns->{$_}{config};
+        (lc($cfg->{database} // '') eq lc($database))
+    } keys %$all_conns;
+
+    # Sort by priority (lower = higher priority)
+    @group_conns = sort {
+        ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
+        || $a cmp $b
+    } @group_conns;
+
+    unless (@group_conns) {
+        die "No connection found for database '$database'";
+    }
+
+    # Use the highest-priority connection — one attempt, done
+    my $conn_name = $group_conns[0];
+    my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+    unless ($dbh) {
+        die "Failed to connect to database '$database' via '$conn_name': $@";
+    }
+
+    return $dbh;
+}
+
 sub _write_result_file_safe {
     my ($self, $result_file_path, $content) = @_;
     my $tmpfile = $result_file_path . '.syntaxcheck.tmp';
@@ -288,12 +336,7 @@ sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_tabl
         
         my $pk_list = join(', ', @$pks);
         
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        }
+        my $dbh = $self->_get_fresh_dbh($c, $database);
         
         # Try to drop existing PK first, ignore error if none exists
         eval { $dbh->do("ALTER TABLE $table_name DROP PRIMARY KEY") };
@@ -352,12 +395,7 @@ sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constr
         
         my $cols_list = join(', ', @{$constraint->{columns}});
         
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        }
+        my $dbh = $self->_get_fresh_dbh($c, $database);
         
         # Try to drop existing index first, ignore error if none exists
         eval { $dbh->do("ALTER TABLE $table_name DROP INDEX $constraint_name") };
@@ -1054,9 +1092,9 @@ sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') 
 
 sub get_table_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
-    
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
-    my $dbh = $c->model($model_name)->schema->storage->dbh;
+
+    # Use RemoteDB for fresh connection — avoids stale cached model handles
+    my $dbh = $self->_get_fresh_dbh($c, $database);
     
     my $sth = $dbh->prepare("DESCRIBE $table_name $field_name");
     $sth->execute();
@@ -1239,14 +1277,7 @@ sub update_table_field_from_result {
     my $extra = "";
     $extra = "AUTO_INCREMENT" if $result_field_info->{is_auto_increment};
     
-    my $dbh;
-    if ($database eq 'ency') {
-        $dbh = $c->model('DBEncy')->schema->storage->dbh;
-    } elsif ($database eq 'forager') {
-        $dbh = $c->model('DBForager')->schema->storage->dbh;
-    } else {
-        die "Invalid database: $database";
-    }
+    my $dbh = $self->_get_fresh_dbh($c, $database);
 
     # Check if column exists to determine if we should use ADD or MODIFY
     my $column_exists = 0;
@@ -1264,11 +1295,91 @@ sub update_table_field_from_result {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
         "Executing SQL ($action): $sql");
     
-    try {
-        $dbh->do($sql);
-    } catch {
-        die "Error executing SQL: $_";
-    };
+    # Execute with reconnect-on-lost-connection and corrupt-index repair support
+    my $sql_ok = 0;
+    my $original_err = '';
+    my $db_retries = 3;
+    my $attempt = 0;
+    my $index_repaired = 0;
+    while ($attempt < $db_retries && !$sql_ok) {
+        eval {
+            $dbh->do($sql);
+        };
+        if ($@) {
+            $original_err = $@ unless $original_err;
+            my $err_msg = $@;
+            
+            # Check for corrupt index — try rebuilding table and retry
+            if ($err_msg =~ /Index for table.*is corrupt/i || $err_msg =~ /MYI.*corrupt/i) {
+                unless ($index_repaired) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_table_field_from_result',
+                        "Corrupt index detected on '$table_name', attempting table rebuild...");
+                    # Check if table is InnoDB (doesn't support REPAIR TABLE)
+                    my $engine_check = $dbh->selectrow_hashref("SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='$table_name'");
+                    if ($engine_check && $engine_check->{ENGINE} =~ /innodb/i) {
+                        # InnoDB: rebuild with ALTER TABLE ... FORCE
+                        $dbh->do("ALTER TABLE `$table_name` FORCE");
+                    } else {
+                        # MyISAM: use REPAIR TABLE
+                        $dbh->do("REPAIR TABLE `$table_name`");
+                    }
+                    $index_repaired = 1;
+                    $attempt++;
+                    next;
+                }
+            }
+            # Check for "Lost connection to MySQL server during query"
+            if ($err_msg =~ /Lost connection/i) {
+                $attempt++;
+                if ($attempt < $db_retries) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_table_field_from_result',
+                        "Lost connection during ALTER (attempt $attempt/$db_retries), reconnecting...");
+                    # Get a fresh connection
+                    my $new_dbh;
+                    eval { $new_dbh = $self->_get_fresh_dbh($c, $database) };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_table_field_from_result',
+                            "Failed to get fresh connection on attempt $attempt: $@");
+                        # Don't die yet — if this is the last attempt, report the original ALTER error
+                        next;
+                    }
+                    # Set connection timeout parameters for this connection
+                    eval {
+                        $new_dbh->do("SET SESSION wait_timeout = 600");
+                        $new_dbh->do("SET SESSION max_allowed_packet = 1073741824");  # 1GB
+                    };
+                    $dbh = $new_dbh;
+                    next;  # retry with fresh connection
+                }
+            }
+            die "Error executing SQL: $err_msg";
+        }
+        $sql_ok = 1;
+    }
+    
+    unless ($sql_ok) {
+        # All retries exhausted — report original ALTER error, not the connection error
+        die "ALTER TABLE failed after $db_retries retries (original error: $original_err). "
+          . "The ALTER may have partially succeeded. Check the table manually.";
+    }
+    
+    # Verify the column now matches the expected definition
+    my $verify_sth = $dbh->prepare("DESCRIBE $table_name $field_name");
+    $verify_sth->execute();
+    my $row = $verify_sth->fetchrow_hashref;
+    if (!$row) {
+        die "Could not verify column '$field_name' in table '$table_name' after ALTER";
+    }
+    my $current_type = $row->{Type};
+    my $expected_type = $data_type;
+    # Extract type size from expected for comparison (e.g. "varchar(512)" -> "varchar(512)")
+    if ($current_type ne $expected_type) {
+        # Allow some flexibility for ENUM/SET types with different option ordering
+        unless ($expected_type =~ /^enum/i && $current_type =~ /^enum/i) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_table_field_from_result',
+                "Column type mismatch after ALTER: expected '$expected_type', got '$current_type'");
+        }
+    }
     
     return $sql;
 }
@@ -1399,7 +1510,7 @@ sub scan_result_directory_recursive {
 
 sub get_ency_table_schema {
     my ($self, $c, $table_name) = @_;
-    
+
     my $schema_info = {
         columns => {},
         primary_keys => [],
@@ -1407,9 +1518,9 @@ sub get_ency_table_schema {
         foreign_keys => [],
         indexes => []
     };
-    
+
     try {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $dbh = $self->_get_fresh_dbh($c, 'ency');
         
         my $sth = $dbh->prepare("DESCRIBE $table_name");
         $sth->execute();
