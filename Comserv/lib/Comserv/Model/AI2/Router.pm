@@ -81,6 +81,13 @@ my %ROLE_TO_CONTEXT = (
     navagent => 'navigation',
 );
 
+# Read-only accessor for the context-preference table (used by the
+# /ai2/diagnostics snapshot so the routing brain's choices are visible).
+sub context_prefs {
+    my ($self) = @_;
+    return { %CONTEXT_PREFS };
+}
+
 sub _context_for {
     my ($self, $agent_id) = @_;
     $agent_id //= 'general';

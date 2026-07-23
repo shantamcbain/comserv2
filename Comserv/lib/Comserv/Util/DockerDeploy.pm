@@ -333,8 +333,9 @@ sub deploy {
     # backup image and compose-recreates from it (honoring undef gracefully).
     my $healthy = 0;
     my $deploy_ok = eval {
-        # 4. Rotate backup images — keep up to 5 per container (global cap).
-    $self->_prune_backups($container_name, 5, $is_remote, $ssh_prefix);
+        # 4. Rotate backup images — keep 5 locally, but only 3 on remote
+        #    (production1) targets to conserve disk space there.
+    $self->_prune_backups($container_name, ($is_remote ? 3 : 5), $is_remote, $ssh_prefix);
 
     # 4.5 (Backups are images now — no bk- containers to stop. compose
     #      --force-recreate below replaces the old container in place.)
