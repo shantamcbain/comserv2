@@ -5,6 +5,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 
 use Try::Tiny;
 use JSON;
+use File::Path qw(make_path);
 use Comserv::Util::EditorFile;
 use DateTime;
 
@@ -226,6 +227,279 @@ sub save_file :Local :Args(0) {
         $c->res->status($status);
         $c->res->body(encode_json($result));
     }
+}
+
+# -------------------------------------------------------------------
+# Diagnostic / test surface for the v2 AI system.
+#
+# These exist so the system can be inspected and exercised WITHOUT a browser
+# login — the AI tester logs in via /ai2/token-login (acting as the real
+# user) and then calls /ai2/diagnostics and /ai2/test_model to see
+# exactly what the user would see. No app restart required (Starman -r
+# reloads .pm on save).
+# -------------------------------------------------------------------
+
+# Resolve the path to the application event log (Util::Logging writes here).
+sub _app_log_file {
+    my ($self, $c) = @_;
+    my $dir = $ENV{'COMSERV_LOG_DIR'}
+        || File::Spec->catdir($c->path_to('')->stringify, 'logs');
+    return File::Spec->catfile($dir, 'application.log');
+}
+
+# GET /ai2/diagnostics — live "what is the system doing" snapshot.
+# Auth: any logged-in user may read their own view; admins see key state.
+sub diagnostics :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->res->status(401);
+        $c->res->body(encode_json({ success => 0, error => 'Authentication required' }));
+        return;
+    }
+
+    my $is_admin = grep { $_ =~ /^(admin|developer|editor)$/i }
+        (ref($c->session->{roles}) ? @{$c->session->{roles}}
+         : split(/\s*,\s*/, $c->session->{roles} || ''));
+
+    my %diag;
+
+    # --- Ollama: live model tags from the configured host ---
+    try {
+        my $cfg  = $c->config->{Ollama} || {};
+        my $host = $cfg->{host} || '192.168.1.199';
+        my $port = $cfg->{port} || 11434;
+        my $ua   = LWP::UserAgent->new(timeout => 5);
+        my $res  = $ua->get("http://$host:$port/api/tags");
+        if ($res && $res->is_success) {
+            my $d = eval { decode_json($res->decoded_content) };
+            $diag{ollama} = {
+                host        => $host,
+                port        => $port,
+                reachable   => 1,
+                model_count => $d && $d->{models} ? scalar(@{$d->{models}}) : 0,
+                models      => [ map { $_->{name} } @{$d->{models} || []} ],
+            };
+        } else {
+            $diag{ollama} = { host => $host, port => $port, reachable => 0 };
+        }
+    } catch {
+        $diag{ollama} = { error => "probe failed: $_" };
+    };
+
+    # --- Provider key state (admin only — never expose keys) ---
+    if ($is_admin) {
+        my %keys;
+        for my $svc (qw(grok openrouter)) {
+            my $cls = $svc eq 'grok' ? 'AI2::Provider::Grok'
+                                         : 'AI2::Provider::OpenRouter';
+            my $prov = try { $c->model($cls) } catch { undef };
+            my $has  = try { $prov && $prov->can('_resolve_api_key')
+                                  && $prov->_resolve_api_key($c) } catch { undef };
+            $keys{$svc} = $has ? 1 : 0;
+        }
+        $diag{provider_keys} = \%keys;
+    }
+
+    # --- Router context preferences (what the brain prefers per role) ---
+    try {
+        my $router = $c->model('AI2::Router');
+        $diag{router} = {
+            context_prefs => $router->context_prefs,
+            hardcoded_fallback => 'phi4:14b',
+        };
+    } catch {
+        $diag{router} = { error => "unavailable: $_" };
+    };
+
+    # --- v2 catalog the widget would actually show (as this user) ---
+    try {
+        $diag{catalog} = $c->model('AI2')->get_available_models($c);
+    } catch {
+        $diag{catalog} = { error => "unavailable: $_" };
+    };
+
+    # --- Recent application.log lines (tail) ---
+    try {
+        my $log = $self->_app_log_file($c);
+        my @lines;
+        if (-f $log) {
+            open my $fh, '<', $log or die "open $log: $!";
+            my @all = <$fh>;
+            close $fh;
+            my @tail = @all > 40 ? @all[-40 .. $#all] : @all;
+            @lines = map { s/^\s+|\s+$//gr } @tail;
+        }
+        $diag{recent_log} = \@lines;
+    } catch {
+        $diag{recent_log} = [ "log read failed: $_" ];
+    };
+
+    $diag{auth} = {
+        username  => $c->session->{username},
+        is_admin  => $is_admin ? 1 : 0,
+        roles     => $c->session->{roles},
+    };
+
+    # --- Persist the snapshot so it can be reviewed later (the
+    # "translation" of live system state, not lost in a terminal). ---
+    try {
+        my $dir = File::Spec->catdir($c->path_to('')->stringify, 'logs', 'ai2_diagnostics');
+        make_path($dir) unless -d $dir;
+        my $stamp = DateTime->now->ymd . '-' . do { my @t = localtime; sprintf '%02d%02d%02d', $t[2], $t[1], $t[0] };
+        my $who = $c->session->{username} || 'guest';
+        $who =~ s/[^A-Za-z0-9_.-]/_/g;
+        my $out = File::Spec->catfile($dir, "$stamp-$who.json");
+        if (open my $ofh, '>', $out) {
+            print $ofh encode_json({ %diag });
+            close $ofh;
+            $diag{saved_snapshot} = "logs/ai2_diagnostics/" . "$stamp-$who.json";
+        }
+    } catch {
+        $diag{saved_snapshot} = "save failed: $_";
+    };
+
+    $c->res->body(encode_json({ success => 1, diagnostics => \%diag }));
+}
+
+# GET /ai2/test_model?provider=ollama&model=phi4:14b — self-test a
+# provider/model the way the user would, returning the raw model reply.
+# Auth: any logged-in user (admin for external providers).
+sub test_model :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->res->status(401);
+        $c->res->body(encode_json({ success => 0, error => 'Authentication required' }));
+        return;
+    }
+
+    my $provider = $c->req->param('provider') || 'ollama';
+    my $model    = $c->req->param('model')    || '';
+    unless ($model) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'model parameter required' }));
+        return;
+    }
+
+    # External providers require admin key resolution.
+    my $is_admin = grep { $_ =~ /^(admin|developer|editor)$/i }
+        (ref($c->session->{roles}) ? @{$c->session->{roles}}
+         : split(/\s*,\s*/, $c->session->{roles} || ''));
+    if ($provider ne 'ollama' && !$is_admin) {
+        $c->res->status(403);
+        $c->res->body(encode_json({ success => 0, error => 'Admin role required for external provider test' }));
+        return;
+    }
+
+    my $result = try {
+        my $dispatch = {
+            ollama     => 'AI2::Provider::Ollama',
+            grok       => 'AI2::Provider::Grok',
+            openrouter => 'AI2::Provider::OpenRouter',
+            external   => 'AI2::Provider::OpenRouter',
+        };
+        my $cls = $dispatch->{$provider} || 'AI2::Provider::Ollama';
+        my $prov = $c->model($cls);
+        unless ($prov && $prov->can('chat')) {
+            die "No chat client for provider $provider";
+        }
+        my ($host, $port) = ($c->config->{Ollama}{host} || '192.168.1.199',
+                               $c->config->{Ollama}{port} || 11434);
+        $prov->chat($c,
+            messages => [{ role => 'user',
+                content => "Reply with exactly the word PONG to confirm you are working." }],
+            model    => $model,
+            host     => $host,
+            port     => $port,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_test_model', "test failed: $_");
+        { success => 0, error => "Test threw: $_" };
+    };
+
+    $result //= { success => 0, error => 'No response' };
+    $c->res->body(encode_json({
+        success  => $result->{success} ? 1 : 0,
+        provider => $provider,
+        model    => $result->{model} || $model,
+        response => $result->{response} // '',
+        error    => $result->{error},
+    }));
+}
+
+# POST /ai2/token-login — agent/test harness login.
+#
+# Mirrors the existing /api/* Bearer-token model: an admin generates a
+# token (here, via the same ApiToken table), and this endpoint exchanges a
+# token for a real authenticated Catalyst session — so a CLI/agent can act
+# as the user and see exactly what the user would see (the v2 catalog,
+# chat, diagnostics). Local + token only; never a browser login.
+sub token_login :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->content_type('application/json');
+
+    unless ($c->request->method eq 'POST') {
+        $c->res->status(405);
+        $c->res->body(encode_json({ success => 0, error => 'Method not allowed' }));
+        return;
+    }
+
+    my $body;
+    try {
+        my $raw = $c->req->can('content') ? $c->req->content : $c->request->body;
+        $raw = do { local $/; <$raw> } if ref($raw);
+        $body = decode_json($raw) if $raw && length($raw);
+    } catch {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid JSON' }));
+        return;
+    };
+
+    my $token = $body->{token} || '';
+    unless ($token) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'token required' }));
+        return;
+    }
+
+    my $validation = Comserv::Util::ApiTokenValidator->validate_token($c, $token);
+    unless ($validation->{valid}) {
+        $c->res->status(401);
+        $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Invalid token' }));
+        return;
+    }
+
+    my $schema = try { $c->model('DBEncy')->schema } catch { undef };
+    my $user   = $schema && $schema->resultset('User')->find($validation->{user_id});
+    unless ($user) {
+        $c->res->status(401);
+        $c->res->body(encode_json({ success => 0, error => 'Token user not found' }));
+        return;
+    }
+
+    # Establish the real Catalyst session exactly as User.pm login does.
+    $c->session->{user_id}  = $user->id;
+    $c->session->{username} = $user->username;
+    $c->session->{roles}    = $user->roles || 'user';
+    $c->session->{SiteName} = $user->sitename if $user->can('sitename') && $user->sitename;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'ai2_token_login', "Agent session established for user " . $user->username);
+
+    $c->res->body(encode_json({
+        success  => 1,
+        user_id  => $user->id,
+        username => $user->username,
+        roles    => $user->roles,
+        message  => 'Session established. Subsequent /ai2/* calls act as this user.',
+    }));
 }
 
 # -------------------------------------------------------------------

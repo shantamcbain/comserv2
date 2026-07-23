@@ -60,7 +60,15 @@ sub api_generate_token :Local :Args(0) {
     my $params;
     eval {
         my $body = $c->request->body;
-        $params = decode_json($body) if $body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw_body = do { local $/; <$body> };
+                $params = decode_json($raw_body);
+            } else {
+                $params = decode_json($body);
+            }
+        }
     };
     if ($@) {
         $c->res->status(400);
