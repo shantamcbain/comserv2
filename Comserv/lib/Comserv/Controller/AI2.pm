@@ -259,7 +259,7 @@ sub chat :Local :Args(0) {
     $json_data //= {};
 
     my $prompt  = $json_data->{prompt} // '';
-    my $model   = $json_data->{model}  // $json_data->{provider} // '';
+    my $model   = $json_data->{model}  // '';
     my $history = $json_data->{history} // [];
     my $agent_id= $json_data->{agent_id} // '';
     my $system  = $json_data->{system} // '';
