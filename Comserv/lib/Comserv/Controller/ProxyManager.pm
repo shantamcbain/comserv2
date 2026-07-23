@@ -5,6 +5,9 @@ use Comserv::Util::Logging;
 use JSON::MaybeXS qw(encode_json decode_json);
 use LWP::UserAgent;
 use Try::Tiny;
+# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
+# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
+INIT { Try::Tiny->import }
 use Config::General;
 use File::Temp qw(tempfile);
 use Path::Tiny qw(path);

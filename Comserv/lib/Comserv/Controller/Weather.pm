@@ -4,6 +4,9 @@ use namespace::autoclean;
 use DateTime;
 use JSON;
 use Try::Tiny;
+# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
+# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
+INIT { Try::Tiny->import }
 use Comserv::Util::Logging;
 use Comserv::Service::WeatherAPI;
 use Comserv::Model::Weather;
