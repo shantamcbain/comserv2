@@ -1,12 +1,9 @@
 package Comserv::Controller::Proxmox;
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use JSON;
 use Data::Dumper;
 use Try::Tiny;
-# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
-# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
-INIT { Try::Tiny->import }
 use File::Slurp qw(read_file);
 use LWP::UserAgent;
 use HTTP::Request;

@@ -1,12 +1,9 @@
 package Comserv::Controller::HostingSignup;
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Comserv::Util::Logging;
 use Comserv::Util::PointSystem;
 use Try::Tiny;
-# Perl 5.40: namespace::autoclean strips imported try/catch; re-import after
-# its BEGIN so the Try::Tiny idiom keeps working (perl-try-tiny-autoclean-debug).
-INIT { Try::Tiny->import }
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }

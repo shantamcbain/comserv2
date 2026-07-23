@@ -1,14 +1,8 @@
 package Comserv::Model::Site;
 
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
-# Perl 5.40 + newer namespace::autoclean strips the imported try/catch subs,
-# reverting try/catch to the native keywords (which require `catch ($e)`).
-# Re-import after autoclean's BEGIN so the Try::Tiny idiom keeps working
-# (see perl-try-tiny-autoclean-debug — fixes the Docker :3000/:5000
-# "try() encountered an unexpected argument" errors).
-INIT { Try::Tiny->import }
 use Comserv::Util::Logging;
 use JSON;
 use File::Slurp;
