@@ -1,6 +1,6 @@
 package Comserv::Controller::Root;
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Template;
 use Data::Dumper;
 use DateTime;
@@ -2197,6 +2197,8 @@ sub begin :Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "[REQUEST_START] Method: " . $c->req->method . 
         " Path: " . $c->req->path . 
+        " Host: " . ($c->req->header('Host') // '(none)') . 
+        " URI: " . $c->req->uri . 
         " at " . scalar(localtime($c->stash->{_request_start_time})));
 
     $self->_track_nav_back_url($c);
