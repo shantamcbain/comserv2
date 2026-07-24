@@ -505,11 +505,11 @@ sub index :Path('/Documentation') :Args(0) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "Processing page $page_name, is_admin: $is_admin");
 
-        # Skip if this is site-specific documentation for a different site
-        # But allow admins to see all site-specific documentation
+        # Skip if this is site-specific documentation for a different site.
+        # Site policy (Shanta 2026-07-24): only CSC shows ALL docs; other
+        # sites show only their own (+ 'all'), even for admins.
         if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
-            # Only skip for non-admins
-            next unless $is_admin;
+            next unless ($is_admin && $site_name eq 'CSC');
         }
 
         # Skip if the user doesn't have the required role
@@ -1964,9 +1964,12 @@ sub search :Path('/documentation/search') :Args(0) {
         foreach my $page_name (keys %$pages) {
             my $metadata = $pages->{$page_name};
             
-            # Apply same role and site filtering as index method
+            # Apply same role and site filtering as index method.
+            # Site policy (Shanta 2026-07-24): only the CSC site shows ALL
+            # documentation; every other site shows only its own docs (+ 'all').
+            # Admin no longer bypasses the site filter except on CSC.
             if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
-                next unless $is_admin;
+                next unless ($is_admin && $site_name eq 'CSC');
             }
             
             # Check role access

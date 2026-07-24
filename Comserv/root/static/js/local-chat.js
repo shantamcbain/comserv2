@@ -1333,7 +1333,7 @@
                 var fd = new FormData();
                 fd.append('audio', file, file.name);
                 fd.append('diarize', '0');
-                fetch('/ai/transcribe', { method: 'POST', credentials: 'include', body: fd })
+                fetch('/ai2/transcribe', { method: 'POST', credentials: 'include', body: fd })
                 .then(function(r){ return r.json(); })
                 .then(function(data) {
                     if (!_voiceActive) return;
@@ -4333,7 +4333,7 @@
             var elapsed = Math.round(attempt * 5);
             if (statusEl) { statusEl.textContent = '⏳ Transcribing… (' + elapsed + 's elapsed, checking every 5s)'; }
             setTimeout(function() {
-                fetch('/ai/transcribe_status?job_id=' + encodeURIComponent(jobId), {
+                fetch('/ai2/transcribe_status?job_id=' + encodeURIComponent(jobId), {
                     credentials: 'include'
                 })
                 .then(function(r) { return r.json(); })
@@ -4350,7 +4350,7 @@
             }, 5000);
         }
 
-        fetch('/ai/transcribe', {
+        fetch('/ai2/transcribe', {
             method: 'POST',
             credentials: 'include',
             body: formData
@@ -4412,7 +4412,7 @@
 
     function _postWizardAction(actionName, params, msgEl) {
         msgEl.textContent = '⏳ Saving…';
-        fetch('/ai/action', {
+        fetch('/ai2/action', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -4807,7 +4807,7 @@
             return;
         }
 
-        fetch('/ai/action', {
+        fetch('/ai2/action', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

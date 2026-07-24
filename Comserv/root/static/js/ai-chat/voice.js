@@ -224,7 +224,7 @@
                 var fd = new FormData();
                 fd.append('audio', file, file.name);
                 fd.append('diarize', '0');
-                fetch('/ai/transcribe', { method: 'POST', credentials: 'include', body: fd })
+                fetch('/ai2/transcribe', { method: 'POST', credentials: 'include', body: fd })
                 .then(function(r){ return r.json(); })
                 .then(function(data) {
                     if (!_voiceActive) return;

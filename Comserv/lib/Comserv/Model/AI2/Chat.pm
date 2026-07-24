@@ -52,6 +52,14 @@ sub build_agent_prompt {
     return $existing if $existing;
 
     my $aid = lc($agent_id // '');
+
+    # BMaster gets the full beekeeping-aware prompt (apiary schema, voice
+    # inspection workflow, ACTION contract) — ported from v1 (2026-07-24).
+    if ($aid eq 'bmaster') {
+        my $p = eval { $c->model('AI2::Prompts')->build_bmaster($c) };
+        return $p if $p;
+    }
+
     my %agent = (
         helpdesk => "You are a helpful support agent for the Comserv system. Be concise and practical.",
         ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",

@@ -583,6 +583,31 @@ sub chat :Local :Args(0) {
     }));
 }
 
+# -------------------------------------------------------------------
+# v2 voice pipeline + agentic actions (ported from v1 /ai/* 2026-07-24).
+# Thin dispatch: all logic lives in Model::AI2::{Transcribe,Actions}.
+# -------------------------------------------------------------------
+
+# POST /ai2/transcribe — audio upload -> whisper background job (job_id).
+sub transcribe :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->model('AI2::Transcribe')->run($c);
+}
+
+# GET /ai2/transcribe_status?job_id= — poll; on done returns transcript
+# + archives audio/transcript File rows.
+sub transcribe_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->model('AI2::Transcribe')->status($c);
+}
+
+# POST /ai2/action — agentic write actions (create_inspection, create_hive,
+# create_yard, create_queen, todos, projects, helpdesk...).
+sub action :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->model('AI2::Actions')->perform($c);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

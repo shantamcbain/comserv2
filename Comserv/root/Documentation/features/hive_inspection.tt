@@ -79,7 +79,7 @@ on both the inspection view page and the hive management page.
 
 <h2 id="calendar">4. Inspection Calendar</h2>
 <p>
-<a href="/Apiary/inspection_calendar">/Apiary/inspection_calendar</a> shows a calendar grid with inspection
+<a href="/Apiary/inspections/calendar">/Apiary/inspections/calendar</a> shows a calendar grid with inspection
 dates highlighted. Click any date with an inspection to jump to that inspection's record.
 This gives you a quick overview of inspection frequency and history for all hives.
 </p>
@@ -128,7 +128,24 @@ was in which hive at any point in time.
 
 <hr>
 
-<h2 id="urls">8. URL Reference</h2>
+<h2 id="voice">8. Voice Inspections (AI pipeline)</h2>
+<p>
+Inspections can also be recorded by voice through the Chat with AI widget (BeeMaster agent):
+record audio with the mic button, the server transcribes it (Whisper via <code>/ai2/transcribe</code>),
+the BeeMaster agent extracts the inspection data and records it via <code>/ai2/action</code>
+(<code>create_inspection</code>). Past recordings and transcripts are listed at
+<a href="/Apiary/voice_recordings">/Apiary/voice_recordings</a>.
+</p>
+<p>
+The active development plan for this pipeline (voice/transcript links on inspection records,
+per-frame dictation grammar, queen health graph, frame inventory) is
+<a href="/Documentation/VoiceInspectionPlan">VoiceInspectionPlan</a>. Queen rearing timelines are
+documented separately in <a href="/Documentation/Queens">Queens</a>.
+</p>
+
+<hr>
+
+<h2 id="urls">9. URL Reference</h2>
 <table class="doc-table">
     <thead><tr><th>URL</th><th>Description</th><th>Access</th></tr></thead>
     <tbody>
@@ -138,7 +155,8 @@ was in which hive at any point in time.
         <tr><td><code>/Apiary/inspections/view/&lt;id&gt;</code></td><td>View a single inspection + hive diagram</td><td>Admin/staff</td></tr>
         <tr><td><code>/Apiary/inspections/edit/&lt;id&gt;</code></td><td>Edit inspection</td><td>Admin</td></tr>
         <tr><td><code>/Apiary/inspections/reports</code></td><td>Printable inspection reports</td><td>Admin/staff</td></tr>
-        <tr><td><code>/Apiary/inspection_calendar</code></td><td>Inspection calendar</td><td>Admin/staff</td></tr>
+        <tr><td><code>/Apiary/inspections/calendar</code></td><td>Inspection calendar</td><td>Admin/staff</td></tr>
+        <tr><td><code>/Apiary/voice_recordings</code></td><td>Voice recordings + transcripts</td><td>Logged-in users</td></tr>
         <tr><td><code>/Apiary/HiveManagement</code></td><td>Hive configuration and queen management</td><td>Admin</td></tr>
         <tr><td><code>/Apiary/QueenRearing</code></td><td>Queen rearing records</td><td>Admin</td></tr>
         <tr><td><code>/Apiary/BeeHealth</code></td><td>Bee health records</td><td>Admin</td></tr>

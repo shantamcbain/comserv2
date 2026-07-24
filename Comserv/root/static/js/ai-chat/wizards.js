@@ -42,7 +42,7 @@
 
     function _postWizardAction(actionName, params, msgEl) {
         msgEl.textContent = '⏳ Saving…';
-        fetch('/ai/action', {
+        fetch('/ai2/action', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
