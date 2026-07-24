@@ -274,6 +274,10 @@
                 '</div>' : '';
 
             // data-action buttons (no onclick)
+            const isBk = !!container.is_backup_container;
+            const deleteBtn = isBk
+                ? '<button data-action="delete" data-service="' + container.name + '" class="compact-btn" style="background-color: #6c1420; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 12px;">🗑 Delete</button>'
+                : '';
             const actionButtons = container.state === 'not_created'
                 ? '<button data-action="create" data-service="' + container.name + '" class="compact-btn" style="background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 12px;">🚀 Create & Start</button>'
                 : isRunning
@@ -281,7 +285,8 @@
                   '<button data-action="restart" data-service="' + container.name + '" class="compact-btn" style="background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 12px;">↻ Restart</button>' +
                   '<button data-action="logs" data-service="' + container.name + '" class="compact-btn" style="background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 12px;">📋 Logs</button>'
                 : '<button data-action="start" data-service="' + container.name + '" class="compact-btn" style="background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 12px;">▶ Start</button>' +
-                  '<button data-action="logs" data-service="' + container.name + '" class="compact-btn" style="background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 12px;">📋 Logs</button>';
+                  '<button data-action="logs" data-service="' + container.name + '" class="compact-btn" style="background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 12px;">📋 Logs</button>' +
+                  deleteBtn;
 
             html +=
                 '<div style="border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 15px; background-color: rgba(255,255,255,0.88);">' +
@@ -353,6 +358,18 @@
             .then(r => r.json()).then(data => {
                 if (data.success) { appendOutput('✓ ' + service + ' started successfully!\n' + (data.stdout || '')); showResultPopup('Start ' + service, '✓ ' + service + ' started successfully!\n\n' + (data.stdout || ''), true); setTimeout(refreshContainers, 1000); }
                 else { const err = data.stderr || data.error || 'Unknown error'; appendOutput('✗ Failed to start ' + service + ':\n' + err); showResultPopup('Start ' + service + ' Failed', '✗ Failed to start ' + service + ':\n\n' + err, false); }
+            }).catch(error => { appendOutput('Error: ' + error.message); showResultPopup('Error', error.message, false); });
+    }
+
+    function deleteContainerDirect(service) {
+        if (!confirm('PERMANENTLY delete container "' + service + '"?\n\nThis removes the backup container (the bk- image, if any, is kept until pruned). This cannot be undone.')) return;
+        appendOutput('Deleting ' + service + '...');
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup('Delete ' + service, '⏳ Deleting ' + service + ' on target: ' + target.toUpperCase() + '...', 'loading');
+        safeFetch('/admin/docker/delete/' + encodeURIComponent(service), { method: 'POST' })
+            .then(r => r.json()).then(data => {
+                if (data.success) { appendOutput('✓ ' + service + ' deleted.'); showResultPopup('Delete ' + service, '✓ ' + (data.message || 'Deleted.'), true); setTimeout(refreshContainers, 1000); }
+                else { const err = data.stderr || data.error || 'Unknown error'; appendOutput('✗ Delete failed: ' + err); showResultPopup('Delete ' + service + ' Failed', '✗ ' + err, false); }
             }).catch(error => { appendOutput('Error: ' + error.message); showResultPopup('Error', error.message, false); });
     }
 
@@ -791,6 +808,7 @@
             case 'restart': restartContainerDirect(service); break;
             case 'logs': viewLogsDirect(service); break;
             case 'rebuild': rebuildContainerDirect(service); break;
+            case 'delete': deleteContainerDirect(service); break;
             case 'toggle-section':
                 const sid = btn.getAttribute('data-section');
                 if (sid) window.toggleSection(sid);

@@ -204,29 +204,76 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         #       and local workstation deploy to port 5000 (web-prod service)
         my $target = $c->req->body_params->{target} || '';
         if ($target =~ /^(local-staging|staging-4000|workstation|web-dev|local-test)$/) {
-            push @lines, "[${\\scalar localtime}] $target DEPLOY requested";
-            require Comserv::Util::DockerDeploy;
-            my $deploy = Comserv::Util::DockerDeploy->new(
-                log_fh  => undef,
-                logging => $self->logging,
-                repo    => "$repo_path/Comserv",
-                target  => $target,
-                trigger => $trigger_source,
-                no_cache => $c->req->body_params->{no_cache} // 0,
-            );
-            # Use the shared safe entry point (ensures volumes first for any target)
-            my $ok = $deploy->deploy_to_target_safe();
-            push @lines, "[${\scalar localtime}] deploy_to_target_safe returned: " . ($ok ? "success" : "error");
-            $success = $ok;
-            push @lines, "[${\\scalar localtime}] Deploy to $target complete.";
-            # Early return for local targets
-            my $elapsed = time() - $t0;
+            # Run the deploy in a BACKGROUND child process. The web server
+            # (single-threaded Twiggy in dev) must stay free to answer the
+            # /admin/docker-deploy-status polls — a synchronous 10-15 min build
+            # here made every poll fail with NetworkError. deploy_status()
+            # already expects /tmp/comserv_deploy.pid + /tmp/comserv_deploy.log.
+            my $no_cache = $c->req->body_params->{no_cache} // 0;
+            my $pid_file = '/tmp/comserv_deploy.pid';
+            my $log_file = '/tmp/comserv_deploy.log';
+
+            # Refuse to start a second concurrent deploy
+            if (-f $pid_file) {
+                my $old_pid = do { open my $fh, '<', $pid_file; local $/; <$fh> // '' };
+                chomp $old_pid;
+                if ($old_pid && kill 0, $old_pid) {
+                    $c->response->body(encode_json({
+                        success => 0,
+                        message => "A deploy is already running (pid $old_pid). Wait for it to finish.",
+                        log_id  => $log_id,
+                    }));
+                    return;
+                }
+                unlink $pid_file;  # stale
+            }
+
+            my $pid = fork();
+            unless (defined $pid) {
+                $c->response->body(encode_json({ success => 0, message => "fork failed: $!", log_id => $log_id }));
+                return;
+            }
+            if ($pid == 0) {
+                # ── Child: detach from Catalyst and run the deploy ──
+                eval {
+                    require POSIX;
+                    POSIX::setsid();
+                    open my $log_fh, '>', $log_file or POSIX::_exit(1);
+                    $log_fh->autoflush(1);
+                    open my $pfh, '>', $pid_file; print $pfh $$; close $pfh;
+                    # Detach stdio so the web server socket is fully released
+                    open STDIN,  '<', '/dev/null';
+                    open STDOUT, '>>', $log_file;
+                    open STDERR, '>>', $log_file;
+
+                    require Comserv::Util::DockerDeploy;
+                    my $deploy = Comserv::Util::DockerDeploy->new(
+                        log_fh   => $log_fh,
+                        logging  => $self->logging,
+                        repo     => "$repo_path/Comserv",
+                        target   => $target,
+                        trigger  => $trigger_source,
+                        no_cache => $no_cache,
+                    );
+                    my $ok = $deploy->deploy_to_target_safe();
+                    print $log_fh "[" . scalar(localtime) . "] === FINAL RESULT: " . ($ok ? "SUCCESS" : "FAILED") . " ===\n";
+                    close $log_fh;
+                };
+                unlink $pid_file;
+                POSIX::_exit(0);
+            }
+
+            # ── Parent: reply immediately; the UI polls deploy_status ──
+            push @lines, "[${\scalar localtime}] $target deploy started in background (pid $pid, trigger: $trigger_source" . ($no_cache ? ", --no-cache" : "") . ").";
+            push @lines, "Progress streams to the log below via status polling.";
             $c->response->body(encode_json({
-                success => $success ? 1 : 0,
-                message => $success ? 'Staging deploy complete' : 'Staging deploy had errors',
-                log_id  => $log_id,
-                output  => join("\n", @lines),
-                title   => $title,
+                success     => 1,
+                started     => 1,
+                pid         => $pid,
+                message     => "Deploy to $target started in background",
+                log_id      => $log_id,
+                output      => join("\n", @lines),
+                title       => $title,
                 server_role => $server_role,
                 trigger_source => $trigger_source,
             }));
@@ -655,7 +702,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
             next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports, $created, $running_for, $state, $mounts, $networks) = split /\|/, $line, 10;
             $id = substr($id, 0, 12) if $id;
-            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
+            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /^failed-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
 
             # Get image creation date
             my $img_created = '';
@@ -711,7 +758,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
             my ($id, $name, $image, $status, $ports, $created, $running_for, $state, $mounts, $networks) = split /\|/, $line, 10;
             $id = substr($id, 0, 12) if $id;
             # Detect dated backup containers
-            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
+            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /^failed-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
 
             # Get image creation date via remote SSH
             my $img_created = '';
@@ -752,8 +799,8 @@ sub list :Path('/admin/docker/list') :Args(0) {
     # Backup Images
     my @backups = ();
     my $img_cmd = ($host eq 'workstation' || $host eq 'localhost' || $host eq '127.0.0.1')
-        ? 'docker images --filter "reference=*backup*" --format "{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}" 2>/dev/null'
-        : qq{$ssh_prefix "docker images --filter 'reference=*backup*' --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}' 2>/dev/null"};
+        ? 'docker images --format "{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}" 2>/dev/null | grep -Ei "^(bk-|[^|]*backup)" '
+        : qq{$ssh_prefix "docker images --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.CreatedAt}}|{{.Size}}' 2>/dev/null | grep -Ei '^(bk-|[^|]*backup)'"};
 
     my $img_out = `$img_cmd` || '';
     foreach my $line (split /\n/, $img_out) {

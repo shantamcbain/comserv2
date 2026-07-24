@@ -269,8 +269,15 @@ sub _get_timestamp {
 }
 
 # Helper function to get the system identifier (Production, Workstation2, etc.)
+# Cached after first resolution: the identity of the host/container cannot
+# change during the life of the process, and re-resolving it (DNS socket probe,
+# hostname lookup) on every log line is wasteful and — worse — could flap if a
+# transient probe fails. Compute once, reuse forever (user requirement:
+# "once found it should not change").
+my $_cached_system_identifier;
 sub get_system_identifier {
     my ($class) = @_;
+    return $_cached_system_identifier if defined $_cached_system_identifier;
 
     # Determine listening port from env or ARGV (same logic as Comserv.pm session isolation)
     my $port = $ENV{WEB_PORT} || $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
@@ -360,6 +367,7 @@ sub get_system_identifier {
     $port //= $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || ( $is_docker ? '3000' : '3001' );
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
+    $_cached_system_identifier = $identifier;   # cache for the life of the process
     return $identifier;
 }
 
