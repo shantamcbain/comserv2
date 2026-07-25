@@ -360,7 +360,7 @@ sub _get_default_site_name {
         }
     } catch {
         # Ignore errors, fall through
-    }
+    };
     
     # 3. Try to find the first site alphabetically
     try {
@@ -377,7 +377,7 @@ sub _get_default_site_name {
         }
     } catch {
         # Ignore errors
-    }
+    };
     
     # 4. No site found
     $self->logging->log_with_details(
