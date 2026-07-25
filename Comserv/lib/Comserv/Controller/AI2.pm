@@ -601,6 +601,54 @@ sub transcribe_status :Local :Args(0) {
     $c->model('AI2::Transcribe')->status($c);
 }
 
+# -------------------------------------------------------------------
+# Beekeeping voice endpoints (2026-07-25).
+# Thin dispatch to Model::AI2::Beekeeping (domain logic). The actual
+# whisper transcription is performed by /ai2/transcribe (which reads the
+# hive_id/inspection_id form fields and persists to voice_transcripts +
+# an editable inspection draft). These two endpoints cover the form-side
+# operations: fetch hives for the selected yard, and save the edited draft.
+# -------------------------------------------------------------------
+
+# GET /ai2/apiary_voice_hives?yard_id= — JSON list of hives for the voice form.
+sub apiary_voice_hives :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => 0, error => 'Authentication required' }));
+        return;
+    }
+
+    my $yard_id = int($c->request->param('yard_id') || 0);
+    my @hives;
+    try {
+        my $schema = $c->model('DBEncy');
+        my $rs = $schema->resultset('Hive');
+        my $search = $yard_id ? { yard_id => $yard_id } : {};
+        @hives = map { { id => $_->id, label => ($_->hive_number // '') . ($_->queen_code ? ' (' . $_->queen_code . ')' : '') } }
+                 $rs->search($search, { order_by => 'hive_number' })->all;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'apiary_voice_hives', "$_");
+    };
+
+    $c->response->body(encode_json({ success => 1, hives => \@hives }));
+}
+
+# POST /ai2/apiary_voice_save — save the edited inspection draft (from the
+# voice form). Delegates to AI2::Beekeeping->update_inspection.
+sub apiary_voice_save :Local :Args(0) {
+    my ($self, $c) = @_;
+    if ($c->request->method ne 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+    $c->model('AI2::Beekeeping')->update_inspection($c);
+}
+
 # POST /ai2/action — agentic write actions (create_inspection, create_hive,
 # create_yard, create_queen, todos, projects, helpdesk...).
 sub action :Local :Args(0) {

@@ -250,6 +250,13 @@ PYSCRIPT
     my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
     my $upload_size    = $upload->size;
 
+    # Beekeeping context (2026-07-25): any hive_id / inspection_id posted
+    # with the audio is threaded through to the background job so a
+    # completed transcription can persist to voice_transcripts + draft an
+    # inspection. Absent for the generic chat-widget transcription path.
+    my $ctx_hive_id        = int($c->request->param('hive_id')       // 0);
+    my $ctx_inspection_id  = int($c->request->param('inspection_id') // 0);
+
     {
         open(my $sf, '>', $status_file) or do { };
         print $sf encode_json({ status => 'processing', started => $timestamp });
@@ -347,6 +354,8 @@ PYSCRIPT
                 username           => $username,
                 ext                => $ext,
                 source_type        => $source_type,
+                hive_id            => $ctx_hive_id,
+                inspection_id      => $ctx_inspection_id,
             });
             close $rf;
 
@@ -397,6 +406,70 @@ sub status {
             eval {
                 my $schema  = $c->model('DBEncy');
                 my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
+
+                # --- Beekeeping persistence (2026-07-25) -----------------
+                # Values travel from the original POST through the result
+                # file (hive_id / inspection_id). When absent (0) this is the
+                # generic chat-widget transcription path and is skipped.
+                my $hive_id       = int($result->{hive_id}       // 0);
+                my $inspection_id = int($result->{inspection_id} // 0);
+                if ($hive_id || $inspection_id) {
+                my $parsed        = try {
+                    my $bk = $c->model('AI2::Beekeeping');
+                    $bk->parse_voice_transcript($result->{transcript} // '');
+                } catch { undef };
+                if (defined $parsed) {
+                    try {
+                        my $vt_rs = $schema->resultset('VoiceTranscripts');
+                        my %vt_cols = (
+                            transcript         => $result->{transcript} // '',
+                            username           => $result->{username}  || ($c->session->{username} // ''),
+                            original_filename  => $result->{orig_name} // '',
+                            audio_path         => $result->{audio_nfs_path},
+                            file_size          => $result->{file_size} || 0,
+                            model_used         => $result->{model_used} // 'small',
+                        );
+                        my $insp_id_int = int($inspection_id || 0);
+                        $vt_cols{inspection_id} = $insp_id_int if $insp_id_int;
+                        my $vt = $vt_rs->create(\%vt_cols);
+                        $result->{voice_transcript_id} = $vt->id + 0;
+                    } catch {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'transcribe_voice_persist',
+                            "voice_transcripts write skipped: $_");
+                    };
+
+                    if (int($hive_id || 0)) {
+                        try {
+                            my $existing = $schema->resultset('Inspection')
+                                ->find({ id => $inspection_id })
+                                if int($inspection_id || 0);
+                            unless ($existing) {
+                                require POSIX;
+                                my $today = POSIX::strftime('%Y-%m-%d', localtime);
+                                my $insp = $schema->resultset('Inspection')->create({
+                                    hive_id          => int($hive_id),
+                                    inspection_date  => $today,
+                                    inspector        => $result->{username} || ($c->session->{username} // ''),
+                                    inspection_type  => 'routine',
+                                    general_notes    => $result->{transcript} // '',
+                                    %$parsed,
+                                });
+                                $result->{inspection_id} = $insp->id + 0;
+                            } else {
+                                $result->{inspection_id} = $existing->id + 0;
+                            }
+                        } catch {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                'transcribe_inspection_draft',
+                                "inspection draft skipped: $_");
+                        };
+                    }
+                }
+                # --- end beekeeping persistence --------------------------
+
+                }
+
                 my $audio_row = $schema->resultset('File')->find({ nfs_path => $result->{audio_nfs_path} });
                 unless ($audio_row) {
                     require POSIX;
@@ -464,6 +537,8 @@ sub status {
         }
 
         delete $result->{$_} for qw(audio_nfs_path transcript_nfs_path orig_name file_size sitename username ext);
+        # Keep voice_transcript_id / inspection_id so the beekeeping voice form
+        # can show the saved draft and link the transcript.
         $c->response->body(encode_json($result));
     } elsif ($status->{status} eq 'error') {
         unlink $status_file;
