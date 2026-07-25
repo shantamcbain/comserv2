@@ -79,6 +79,108 @@
             </div>
 
             <div class="app-section">
+                <h2>Voice Inspection Recording</h2>
+                <div class="content-section">
+                    <p>Record a spoken hive inspection. It is transcribed (Whisper) and saved as a draft inspection you can review and edit before keeping.</p>
+                    <div id="apiary-voice" class="apiary-voice" data-transcribe="/ai2/transcribe" data-status="/ai2/transcribe_status" data-hives="/ai2/apiary_voice_hives" data-save="/ai2/apiary_voice_save" data-recordings="/Apiary/voice_recordings">
+                        <label for="av-yard" class="av-label">Yard:</label>
+                        <input type="text" id="av-yard" name="av-yard" class="av-input" placeholder="Yard ID (optional — shows all hives if blank)">
+
+                        <label for="av-hive" class="av-label">Hive:</label>
+                        <select id="av-hive" name="av-hive" class="av-input">
+                            <option value="">— select hive —</option>
+                        </select>
+
+                        <div class="av-controls">
+                            <button type="button" id="av-mic" class="av-btn" title="Record voice inspection — click to start, click again to stop">🎤 Record</button>
+                            <label class="av-btn av-btn-file" title="Upload a saved audio file for transcription">📂 Upload
+                                <input type="file" id="av-file" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" hidden>
+                            </label>
+                            <span id="av-status" class="av-status"></span>
+                        </div>
+
+                        <div id="av-transcript-wrap" class="av-transcript-wrap" hidden>
+                            <h3>Transcript</h3>
+                            <textarea id="av-transcript" class="av-transcript" rows="6" readonly></textarea>
+
+                            <h3>Inspection draft</h3>
+                            <div class="av-fields">
+                                <label class="av-field"><input type="checkbox" id="av-queen_seen"> Queen seen</label>
+                                <label class="av-field"><input type="checkbox" id="av-queen_marked"> Queen marked</label>
+                                <label class="av-field"><input type="checkbox" id="av-eggs_seen"> Eggs seen</label>
+                                <label class="av-field"><input type="checkbox" id="av-larvae_seen"> Larvae seen</label>
+                                <label class="av-field"><input type="checkbox" id="av-capped_brood_seen"> Capped brood</label>
+                                <label class="av-field"><input type="checkbox" id="av-feeding_done"> Feeding done</label>
+                            </div>
+                            <div class="av-fields">
+                                <label class="av-field">Population:
+                                    <select id="av-population_estimate">
+                                        <option value="">—</option>
+                                        <option value="very_strong">very strong</option>
+                                        <option value="strong">strong</option>
+                                        <option value="moderate">moderate</option>
+                                        <option value="weak">weak</option>
+                                        <option value="very_weak">very weak</option>
+                                    </select>
+                                </label>
+                                <label class="av-field">Temperament:
+                                    <select id="av-temperament">
+                                        <option value="">—</option>
+                                        <option value="calm">calm</option>
+                                        <option value="moderate">moderate</option>
+                                        <option value="aggressive">aggressive</option>
+                                        <option value="very_aggressive">very aggressive</option>
+                                    </select>
+                                </label>
+                                <label class="av-field">Status:
+                                    <select id="av-overall_status">
+                                        <option value="">—</option>
+                                        <option value="excellent">excellent</option>
+                                        <option value="good">good</option>
+                                        <option value="fair">fair</option>
+                                        <option value="poor">poor</option>
+                                        <option value="critical">critical</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="av-fields">
+                                <label class="av-field">Swarm cells: <input type="number" id="av-swarm_cells" min="0" class="av-num"></label>
+                                <label class="av-field">Queen cells: <input type="number" id="av-queen_cells" min="0" class="av-num"></label>
+                                <label class="av-field">Supersedure: <input type="number" id="av-supersedure_cells" min="0" class="av-num"></label>
+                            </div>
+                            <label class="av-field" style="display:block;">Notes:
+                                <textarea id="av-general_notes" class="av-transcript" rows="3"></textarea>
+                            </label>
+
+                            <div class="av-save-row">
+                                <button type="button" id="av-save" class="av-btn av-btn-primary" disabled>Save inspection draft</button>
+                                <span id="av-save-status" class="av-status"></span>
+                                <a href="/Apiary/voice_recordings" class="av-link">View recordings →</a>
+                            </div>
+                        </div>
+                    </div>
+                    <style>
+                        .apiary-voice .av-label{display:inline-block;min-width:48px;font-weight:600;margin-right:.4rem;}
+                        .apiary-voice .av-input{margin:.2rem .8rem .6rem 0;padding:.4rem .6rem;border:1px solid var(--border-color,#ccc);border-radius:6px;background:var(--background-color,#fff);color:var(--text-color,#222);}
+                        .apiary-voice .av-controls{margin:.4rem 0 1rem;}
+                        .apiary-voice .av-btn{display:inline-block;padding:.45rem .9rem;border:1px solid var(--button-border,#ccc);border-radius:6px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);cursor:pointer;font-size:1rem;line-height:1.2;margin-right:.5rem;}
+                        .apiary-voice .av-btn-file{position:relative;}
+                        .apiary-voice .av-btn-primary{background:var(--button-primary-bg,#2563eb);color:var(--button-primary-text,#fff);border-color:var(--button-primary-bg,#2563eb);}
+                        .apiary-voice .av-btn:disabled{opacity:.55;cursor:not-allowed;}
+                        .apiary-voice .av-status{font-size:.85em;color:var(--text-muted,#666);}
+                        .apiary-voice .av-transcript-wrap{margin-top:.6rem;padding:.8rem;border:1px solid var(--border-color,#ddd);border-radius:8px;background:var(--table-header-bg,#f8fbff);}
+                        .apiary-voice .av-transcript{width:100%;margin:.3rem 0 .8rem;padding:.5rem;border:1px solid var(--border-color,#ccc);border-radius:6px;background:var(--background-color,#fff);color:var(--text-color,#222);font-family:inherit;}
+                        .apiary-voice .av-fields{display:flex;flex-wrap:wrap;gap:.6rem 1.2rem;margin:.4rem 0;}
+                        .apiary-voice .av-field{font-size:.92em;display:flex;align-items:center;gap:.3rem;}
+                        .apiary-voice .av-num{width:4.5rem;padding:.25rem .4rem;border:1px solid var(--border-color,#ccc);border-radius:5px;}
+                        .apiary-voice .av-link{margin-left:auto;color:var(--link-color,#2563eb);text-decoration:none;}
+                        .apiary-voice .av-save-row{display:flex;align-items:center;gap:.8rem;margin-top:.6rem;flex-wrap:wrap;}
+                        .apiary-voice .recording{background:#dc2626;color:#fff;border-color:#dc2626;}
+                    </style>
+                </div>
+            </div>
+
+            <div class="app-section">
                 <h2>Hive Records</h2>
                 <div class="content-section">
                     <p>Keeping detailed records is essential for successful beekeeping. For each hive, track:</p>
