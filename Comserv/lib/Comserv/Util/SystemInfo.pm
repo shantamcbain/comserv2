@@ -48,9 +48,17 @@ Returns the IP address of the server
 sub get_server_ip {
     my $ip;
 
+    # Cache the resolved IP for the life of the worker. This function shells out
+    # (ip route / hostname -I) or opens a socket, and it was being called on
+    # EVERY request via Root::auto's debug-bar block. The server IP does not
+    # change while the process runs, so resolve it once and reuse.
+    our $_cached_server_ip;
+    return $_cached_server_ip if defined $_cached_server_ip;
+
     # Method 0: Operator-supplied override via env var (highest priority)
     if ($ENV{CATALYST_SERVER_IP} && $ENV{CATALYST_SERVER_IP} ne '') {
-        return $ENV{CATALYST_SERVER_IP};
+        $_cached_server_ip = $ENV{CATALYST_SERVER_IP};
+        return $_cached_server_ip;
     }
 
     # Method 1: Use the OS routing table to find the IP used for outbound traffic
@@ -92,7 +100,8 @@ sub get_server_ip {
         $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_server_ip', "Error: $@");
     }
 
-    return $ip || 'Unknown';
+    $_cached_server_ip = $ip || 'Unknown';
+    return $_cached_server_ip;
 }
 
 =head2 get_system_info
@@ -102,15 +111,21 @@ Returns a hash of system information
 =cut
 
 sub get_system_info {
+    # Cached for the life of the worker — none of these values change while the
+    # process runs, and this was called on every request via the debug bar.
+    our $_cached_system_info;
+    return $_cached_system_info if $_cached_system_info;
+
     my $hostname = get_server_hostname();
     my $ip = get_server_ip();
     
-    return {
+    $_cached_system_info = {
         hostname => $hostname,
         ip => $ip,
         os => $^O,
         perl_version => $^V,
     };
+    return $_cached_system_info;
 }
 
 =head2 get_app_workflow
