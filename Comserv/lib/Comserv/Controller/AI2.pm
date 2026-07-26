@@ -541,6 +541,9 @@ sub chat :Local :Args(0) {
     my $page_title  = $json_data->{page_title} // '';
     my $page_content= $json_data->{page_content} // '';
     my $use_search  = $json_data->{use_search} ? 1 : 0;
+    my $conversation_id = $json_data->{conversation_id};
+    my $project_id = $json_data->{project_id};
+    my $task_id    = $json_data->{task_id};
 
     # The dropdown sends "provider|model" (e.g. openrouter|anthropic/...,
     # grok|grok-4..., ollama|llama3...). Extract the real model name.
@@ -555,15 +558,18 @@ sub chat :Local :Args(0) {
 
     my $result = try {
         $c->model('AI2::Chat')->process($c,
-            prompt       => $prompt,
-            model        => $model,
-            history      => $history,
-            agent_id     => $agent_id,
-            system       => $system,
-            page_path    => $page_path,
-            page_title   => $page_title,
-            page_content => $page_content,
-            use_search   => $use_search,
+            prompt          => $prompt,
+            model           => $model,
+            history         => $history,
+            agent_id        => $agent_id,
+            system          => $system,
+            page_path       => $page_path,
+            page_title      => $page_title,
+            page_content    => $page_content,
+            use_search      => $use_search,
+            conversation_id => $conversation_id,
+            project_id      => $project_id,
+            task_id         => $task_id,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -580,6 +586,10 @@ sub chat :Local :Args(0) {
         provider         => $result->{provider} // '',
         needs_web_search => 0,
         error            => $result->{error},
+        conversation_id  => $result->{conversation_id},
+        title            => $result->{title},
+        created_at       => $result->{created_at},
+        thinking         => $result->{thinking} // [],
     }));
 }
 

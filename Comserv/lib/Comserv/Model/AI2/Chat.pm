@@ -184,12 +184,72 @@ sub process {
         return { success => 0, error => $resp->{error} // 'AI provider error' };
     }
 
+    # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
+    # Without this, no conversation_id is ever created, so the widget can
+    # never "start a new conversation" and nothing is saved to history.
+    my $conversation_id = $args{conversation_id};
+    my $saved_title;
+    my $created_at = '';
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $uid    = $c->session->{user_id} // 199;
+        my $agent  = $args{agent_id} // 'general';
+
+        # Create a new conversation only when none was supplied (first turn)
+        unless ($conversation_id && $conversation_id =~ /^\d+$/) {
+            $saved_title = $prompt ? substr($prompt, 0, 80) : 'Chat Conversation';
+            $saved_title =~ s/\n/ /g;
+            my $conv = $schema->resultset('AiConversation')->create({
+                user_id    => $uid,
+                title      => $saved_title,
+                project_id => $args{project_id},
+                task_id    => $args{task_id},
+                model      => $resp->{model} // $use_model // '',
+                status     => 'active',
+                metadata   => encode_json({ agent_id => $agent }),
+            });
+            $conversation_id = $conv ? $conv->id : undef;
+        }
+
+        if ($conversation_id) {
+            # Share the id across widget + /ai page (mirrors v1)
+            $c->session->{current_conversation_id} = $conversation_id;
+
+            my $model_used = $resp->{model} // $use_model // '';
+            $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id         => $uid,
+                role            => 'user',
+                content         => $prompt,
+                agent_type      => $agent,
+                model_used      => $model_used,
+            });
+            $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id         => $uid,
+                role            => 'assistant',
+                content         => $resp->{response} // '',
+                agent_type      => $agent,
+                model_used      => $model_used,
+            });
+            $created_at = scalar(localtime);
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "Failed to persist v2 conversation: $_");
+        # Non-fatal: still return the AI response to the user.
+    };
+
     return {
-        success  => 1,
-        response => $resp->{response} // '',
-        model    => $resp->{model} || $use_model,
-        provider => $provider_name,
-        usage    => $resp->{usage} || {},
+        success         => 1,
+        response        => $resp->{response} // '',
+        model           => $resp->{model} || $use_model,
+        provider        => $provider_name,
+        usage           => $resp->{usage} || {},
+        conversation_id => $conversation_id,
+        title           => $saved_title,
+        created_at      => $created_at,
+        thinking        => [],
     };
 }
 
