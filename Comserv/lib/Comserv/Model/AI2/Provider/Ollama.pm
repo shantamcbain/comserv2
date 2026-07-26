@@ -52,6 +52,48 @@ sub check_connection {
     return $res && $res->is_success ? 1 : 0;
 }
 
+# Resolve the FIRST reachable Ollama host/port for THIS deployment.
+#
+# The workstation is reachable at two addresses for the same machine:
+#   192.168.1.199   (LAN — works from the host process on :3001)
+#   172.30.131.126  (ZeroTier — works from remote hosts like production1)
+# A Docker container on the workstation reaches the host via
+# host.docker.internal (mapped in the compose extra_hosts).
+#
+# Because a single hardcoded IP can't be correct from all three vantage
+# points, we probe candidates in priority order and return the first that
+# answers /api/tags. Order:
+#   1) $ENV{OLLAMA_HOST}            (per-deployment override, e.g. compose env)
+#   2) comserv.conf <Ollama> host   (primary — LAN)
+#   3) comserv.conf fallback_host   (ZeroTier / alternate)
+# Returns ($host, $port). Falls back to the primary host (unprobed) if none
+# answer, so callers still get a sane value and can emit their own sentinel.
+sub resolve_host {
+    my ($self, $c) = @_;
+    my $cfg      = ($c && $c->config->{Ollama}) || {};
+    my $primary  = $cfg->{host}          || '192.168.1.199';
+    my $fallback = $cfg->{fallback_host} || $primary;
+    my $port     = ($ENV{OLLAMA_PORT} && $ENV{OLLAMA_PORT} =~ /^\d+$/)
+                 ? $ENV{OLLAMA_PORT} : ($cfg->{port} || 11434);
+
+    my @candidates;
+    push @candidates, $ENV{OLLAMA_HOST} if $ENV{OLLAMA_HOST};
+    push @candidates, $primary;
+    push @candidates, $fallback if $fallback ne $primary;
+
+    my %seen;
+    for my $h (grep { $_ && !$seen{$_}++ } @candidates) {
+        if ($self->check_connection($c, $h, $port)) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                'ollama_resolve_host', "Ollama reachable at $h:$port");
+            return ($h, $port);
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'ollama_resolve_host', "Ollama not reachable at $h:$port, trying next");
+    }
+    return ($primary, $port);   # nothing answered — return primary unprobed
+}
+
 # Migrated from v1 Controller::AI generate path (cold-start timeout logic).
 #
 # Returns a hashref { success, response, model, usage } so it matches the
@@ -64,8 +106,9 @@ sub chat {
 
     my $messages = $args{messages} || [];
     my $model    = $args{model}    || 'phi4:14b';
-    my $host     = $args{host}     || $c->config->{Ollama}{host} || '192.168.1.199';
-    my $port     = $args{port}     || $c->config->{Ollama}{port} || 11434;
+    my ($rhost, $rport) = $self->resolve_host($c);
+    my $host     = $args{host}     || $rhost;
+    my $port     = $args{port}     || $rport;
 
     my $ollama = try {
         Comserv::Model::Ollama->new(host => $host, port => $port);

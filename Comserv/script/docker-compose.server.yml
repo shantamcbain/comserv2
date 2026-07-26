@@ -22,6 +22,14 @@ services:
       COMSERV_SESSION_COOKIE: comserv_session
       SYSTEM_IDENTIFIER: ${SYSTEM_IDENTIFIER:-production1}
       TTYD_HOST_PORT: "7682"
+      # Ollama address for THIS deployment. Overrides comserv.conf <Ollama> host
+      # ONLY if set. Leave unset so the app auto-probes the fastest reachable
+      # address: comserv.conf host (192.168.1.199 LAN) first, then fallback_host
+      # (172.30.131.126 ZeroTier). production1 is on the same LAN, so it uses the
+      # fast unencrypted LAN path and only falls back to ZeroTier if the LAN IP
+      # is unreachable. Set OLLAMA_HOST in .env to pin a specific address.
+      OLLAMA_HOST: ${OLLAMA_HOST:-}
+      OLLAMA_PORT: ${OLLAMA_PORT:-11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

@@ -6330,9 +6330,10 @@ sub _get_current_ollama_config {
 
     # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
     my $ollama_cfg      = $c->config->{Ollama} || {};
-    my $primary_host    = $ollama_cfg->{host}          || '192.168.1.199';
+    my $primary_host    = $ENV{OLLAMA_HOST}    || $ollama_cfg->{host}          || '192.168.1.199';
     my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
-    my $config_port     = $ollama_cfg->{port}          || 11434;
+    my $config_port     = ($ENV{OLLAMA_PORT} && $ENV{OLLAMA_PORT} =~ /^\d+$/)
+                        ? $ENV{OLLAMA_PORT} : ($ollama_cfg->{port} || 11434);
     # Never silently fall back to localhost — production Docker has no local Ollama.
     # If fallback is localhost/127.0.0.1 and primary is a real host, keep primary.
     if ($fallback_host =~ /^(localhost|127\.0\.0\.1)$/i && $primary_host !~ /^(localhost|127\.0\.0\.1)$/i) {
@@ -11961,6 +11962,17 @@ PYSCRIPT
             open(STDIN,  '<', '/dev/null');
             open(STDOUT, '>', '/dev/null');
             open(STDERR, '>>', '/tmp/whisper_bg.log');
+
+            # CRITICAL: close every other inherited file descriptor. Under
+            # Starman/PSGI the parent worker is mid-request, so this process
+            # inherited a dup of the client's connection socket. Leaving it open
+            # while whisper runs (minutes) keeps the browser connection alive,
+            # so the client reports "Content-Length of network response exceeds
+            # response body" (truncated/hung response). Closing fds 3..255
+            # releases the socket so the parent's response completes immediately.
+            for my $fd (3 .. 255) {
+                POSIX::close($fd);
+            }
 
             my $json_out = '';
             eval {

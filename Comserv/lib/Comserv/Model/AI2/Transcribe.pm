@@ -280,6 +280,17 @@ PYSCRIPT
             open(STDOUT, '>', '/dev/null');
             open(STDERR, '>>', '/tmp/whisper_bg.log');
 
+            # CRITICAL: close every other inherited file descriptor. Under
+            # Starman/PSGI the parent worker is mid-request, so this process
+            # inherited a dup of the client's connection socket. If we leave it
+            # open while whisper runs (minutes), the browser's connection never
+            # closes and the client reports "Content-Length of network response
+            # exceeds response body" (a truncated/hung response). Closing fds
+            # 3..255 releases the socket so the parent's response completes.
+            for my $fd (3 .. 255) {
+                POSIX::close($fd);
+            }
+
             my $json_out = '';
             eval {
                 my $py_pid = open(my $py_out, '-|', $python_bin, $py_script_file,
