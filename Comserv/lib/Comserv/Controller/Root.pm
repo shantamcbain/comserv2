@@ -34,6 +34,7 @@ my $_REMOTEDB_TTL          = 300;     # seconds between re-checks
 # portion is cached — per-user overrides/grants still run live below.
 my %_site_modules_cache;              # sitename => { modules => {...}, at => epoch }
 my $_SITE_MODULES_TTL      = 120;     # seconds between re-checks
+my %_shop_flag_cache;                 # sitename => { val => 0|1, at => epoch }
 
 
 # Add user_exists method
@@ -754,12 +755,22 @@ sub auto :Private {
         # Check if current site has active priced inventory items (for Shop nav visibility)
         eval {
             my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
-            my $shop_count = $c->model('DBEncy')->resultset('Accounting::InventoryItem')->search({
-                sitename     => $shop_site,
-                status       => 'active',
-                show_in_shop => 1,
-            }, { rows => 1 })->count;
-            $c->stash->{site_has_shop} = $shop_count ? 1 : 0;
+            # Site-wide + static-ish: cache per-worker with the module TTL so this
+            # COUNT doesn't run on every request (multiplies under DB latency).
+            my $now_shop = time();
+            my $sc = $_shop_flag_cache{$shop_site};
+            if ($sc && ($now_shop - $sc->{at}) < $_SITE_MODULES_TTL) {
+                $c->stash->{site_has_shop} = $sc->{val};
+            } else {
+                my $shop_count = $c->model('DBEncy')->resultset('Accounting::InventoryItem')->search({
+                    sitename     => $shop_site,
+                    status       => 'active',
+                    show_in_shop => 1,
+                }, { rows => 1 })->count;
+                my $val = $shop_count ? 1 : 0;
+                $_shop_flag_cache{$shop_site} = { val => $val, at => $now_shop };
+                $c->stash->{site_has_shop} = $val;
+            }
         };
         if ($@) {
             $c->stash->{site_has_shop} = 0;
