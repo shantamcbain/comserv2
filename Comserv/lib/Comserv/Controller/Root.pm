@@ -25,6 +25,16 @@ my $_remotedb_status       = undef;   # 'ok', 'missing', 'error', 'fallback'
 my $_remotedb_last_checked = 0;
 my $_REMOTEDB_TTL          = 300;     # seconds between re-checks
 
+# Cache the per-site enabled-modules result (SiteModule + HostingAccount addon
+# resolution) so the ~4-6 DB round-trips it costs don't run on EVERY request.
+# This is the single biggest per-request DB cost for anonymous visitors, and
+# under a high-latency DB link (e.g. production origin) it stacks up enough to
+# blow past Cloudflare's origin timeout (HTTP 521). Keyed by SiteName; each
+# Starman worker keeps its own copy. Only the site-wide (non-user-specific)
+# portion is cached — per-user overrides/grants still run live below.
+my %_site_modules_cache;              # sitename => { modules => {...}, at => epoch }
+my $_SITE_MODULES_TTL      = 120;     # seconds between re-checks
+
 
 # Add user_exists method
 sub user_exists {
@@ -597,49 +607,63 @@ sub auto :Private {
         eval {
             my $mod_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
             my %enabled;
-            my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search(
-                { -or => [
-                    { sitename => $mod_site },
-                    { sitename => lc($mod_site) },
-                    { sitename => uc($mod_site) },
-                    \[ 'LOWER(sitename) = ?', lc($mod_site) ],
-                ] },
-                { columns  => [qw(module_name enabled)] }
-            )->all;
-            for my $row (@site_mods) {
-                $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
-            }
 
-            # Check hosting account for subscribed addons to enable them by default
-            my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
-                -or => [
-                    { sitename => $mod_site },
-                    { sitename => lc($mod_site) },
-                    { sitename => uc($mod_site) },
-                    \[ 'LOWER(sitename) = ?', lc($mod_site) ],
-                ]
-            }, { rows => 1 })->single;
-            if ($hosting && $hosting->requested_addons) {
-                my @addons = split(/\s*,\s*/, $hosting->requested_addons);
-                for my $a (@addons) {
-                    my $lc_addon = lc($a);
-                    $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
-                    if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
-                        $enabled{'3d'} = 1 unless exists $enabled{'3d'};
-                        $enabled{'printing_3d'} = 1 unless exists $enabled{'printing_3d'};
-                    }
-                    if ($lc_addon eq 'workshops' || $lc_addon eq 'workshop') {
-                        $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
-                        $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
-                    }
-                    if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
-                        $enabled{'brew'} = 1 unless exists $enabled{'brew'};
-                    }
-                    if ($lc_addon eq 'beekeeping' || $lc_addon eq 'apiary' || $lc_addon eq 'bmaster') {
-                        $enabled{'beekeeping'} = 1 unless exists $enabled{'beekeeping'};
-                        $enabled{'apiary'}     = 1 unless exists $enabled{'apiary'};
+            # Site-wide module resolution (SiteModule + HostingAccount addons) is
+            # identical for every visitor to a site and costs several DB round-trips,
+            # so cache it per-worker with a short TTL. Per-user overrides/grants
+            # below always run live against the fresh copy.
+            my $now_sm  = time();
+            my $cache   = $_site_modules_cache{$mod_site};
+            if ($cache && ($now_sm - $cache->{at}) < $_SITE_MODULES_TTL) {
+                %enabled = %{ $cache->{modules} };
+            } else {
+                my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search(
+                    { -or => [
+                        { sitename => $mod_site },
+                        { sitename => lc($mod_site) },
+                        { sitename => uc($mod_site) },
+                        \[ 'LOWER(sitename) = ?', lc($mod_site) ],
+                    ] },
+                    { columns  => [qw(module_name enabled)] }
+                )->all;
+                for my $row (@site_mods) {
+                    $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+                }
+
+                # Check hosting account for subscribed addons to enable them by default
+                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                    -or => [
+                        { sitename => $mod_site },
+                        { sitename => lc($mod_site) },
+                        { sitename => uc($mod_site) },
+                        \[ 'LOWER(sitename) = ?', lc($mod_site) ],
+                    ]
+                }, { rows => 1 })->single;
+                if ($hosting && $hosting->requested_addons) {
+                    my @addons = split(/\s*,\s*/, $hosting->requested_addons);
+                    for my $a (@addons) {
+                        my $lc_addon = lc($a);
+                        $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
+                        if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
+                            $enabled{'3d'} = 1 unless exists $enabled{'3d'};
+                            $enabled{'printing_3d'} = 1 unless exists $enabled{'printing_3d'};
+                        }
+                        if ($lc_addon eq 'workshops' || $lc_addon eq 'workshop') {
+                            $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
+                            $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
+                        }
+                        if ($lc_addon eq 'brew' || $lc_addon eq 'brewhouse') {
+                            $enabled{'brew'} = 1 unless exists $enabled{'brew'};
+                        }
+                        if ($lc_addon eq 'beekeeping' || $lc_addon eq 'apiary' || $lc_addon eq 'bmaster') {
+                            $enabled{'beekeeping'} = 1 unless exists $enabled{'beekeeping'};
+                            $enabled{'apiary'}     = 1 unless exists $enabled{'apiary'};
+                        }
                     }
                 }
+
+                # Store a copy so later per-request mutation can't corrupt the cache.
+                $_site_modules_cache{$mod_site} = { modules => { %enabled }, at => $now_sm };
             }
 
             # Brew site / brew.* hostnames / brew addon → nav + brew home
