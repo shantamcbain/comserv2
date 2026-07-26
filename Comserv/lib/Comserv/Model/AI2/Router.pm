@@ -187,27 +187,64 @@ sub get_available_models {
     my @all;
 
     # --- Local Ollama ---
+    # v2 parity with v1 get_user_providers: ALWAYS emit Ollama entries so the
+    # dropdown never collapses to just external providers. The controller
+    # groups these flat per-model entries by provider. If Ollama is
+    # unreachable at catalog time, emit a single unreachable sentinel (instead
+    # of nothing) so the widget can show a clear note rather than hiding local AI.
     try {
         my $ollama = $c->model('AI2::Provider::Ollama');
-        my $cfg    = $c->config->{Ollama} || {};
-        my $host   = $cfg->{host} || 'localhost';
-        my $port   = $cfg->{port} || 11434;
-        if ($ollama && $ollama->check_connection($c, $host, $port)) {
+        my ($host, $port) = $ollama->resolve_host($c);
+        my $reachable = $ollama && $ollama->check_connection($c, $host, $port);
+        if ($reachable) {
             my $models = $ollama->list_models($c, $host, $port) || [];
+            my $added = 0;
             for my $m (@$models) {
                 my $name = ref($m) ? ($m->{name} || '') : $m;
                 next unless $name;
                 push @all, {
+                    id       => $name,
                     name     => $name,
                     provider => 'ollama',
                     label    => "Ollama: $name",
                     local    => 1,
                 };
+                $added++;
             }
+            unless ($added) {
+                # Reachable but no models installed — still surface the group.
+                push @all, {
+                    id       => 'ollama_empty',
+                    name     => 'ollama_empty',
+                    provider => 'ollama',
+                    label    => 'Ollama (no models installed)',
+                    local    => 1,
+                    unreachable => 0,
+                };
+            }
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'get_available_models', "Ollama unreachable at $host:$port — emitting sentinel");
+            push @all, {
+                id          => 'ollama_unreachable',
+                name        => 'ollama_unreachable',
+                provider    => 'ollama',
+                label       => "Ollama ($host:$port unreachable)",
+                local       => 1,
+                unreachable => 1,
+            };
         }
     } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'get_available_models', "Ollama discovery failed: $_");
+        push @all, {
+            id          => 'ollama_unreachable',
+            name        => 'ollama_unreachable',
+            provider    => 'ollama',
+            label       => 'Ollama (unreachable)',
+            local       => 1,
+            unreachable => 1,
+        };
     };
 
     # --- External (x.AI / OpenRouter) ---

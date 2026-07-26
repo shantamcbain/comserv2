@@ -40,7 +40,11 @@ services:
       # NFS resource library path. Dev: local dir; Prod: /data/apis (NFS mount)
       NFS_DATA_PATH: "${NFS_DATA_PATH:-/opt/comserv/workshop_resources}"
       TTYD_HOST_PORT: "7682"
-      # Database credentials from K8s Secrets or .env file (gitignored)
+      # Ollama: container on the workstation reaches host Ollama via host.docker.internal
+      # (mapped below in extra_hosts). Override with OLLAMA_HOST in .env if needed.
+      # App also probes comserv.conf host/fallback_host if this is unreachable.
+      OLLAMA_HOST: "${OLLAMA_HOST:-host.docker.internal}"
+      OLLAMA_PORT: "${OLLAMA_PORT:-11434}"
       # Load from: kubernetes secrets -> environment variables -> .env file (local dev)
       # Never use hardcoded defaults in this file - require explicit configuration
       COMSERV_DB_PRODUCTION_SERVER_HOST: "${COMSERV_DB_PRODUCTION_SERVER_HOST}"

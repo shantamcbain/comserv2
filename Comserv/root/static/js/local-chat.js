@@ -1790,6 +1790,13 @@
                             const opt = document.createElement('option');
                             opt.value = 'ollama|' + m.id;
                             opt.textContent = m.id;
+                            // Unreachable sentinel (e.g. "Ollama (host:port unreachable)")
+                            // — show it so the user knows local AI exists, but
+                            // disable selection so a dead request isn't sent.
+                            if (m.unreachable) {
+                                opt.disabled = true;
+                                opt.textContent = m.label || 'Ollama (unreachable)';
+                            }
                             grp.appendChild(opt);
                         });
                     } else {

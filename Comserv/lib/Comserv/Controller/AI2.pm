@@ -74,7 +74,11 @@ sub providers :Local :Args(0) {
     for my $m (@$catalog) {
         my $svc = $m->{provider} || 'unknown';
         $by_service{$svc} ||= { service => $svc, models => [], name => ucfirst($svc) };
-        push @{ $by_service{$svc}{models} }, { id => $m->{name}, label => $m->{label} };
+        push @{ $by_service{$svc}{models} }, {
+            id         => $m->{name},
+            label      => $m->{label},
+            unreachable=> $m->{unreachable} ? 1 : 0,
+        };
     }
 
     my @providers = values %by_service;
@@ -83,7 +87,10 @@ sub providers :Local :Args(0) {
     for my $p (@providers) {
         if ($p->{service} eq 'ollama') {
             $p->{name}       = 'Ollama (Local AI)';
-            $p->{active_host}= ($c->config->{Ollama}{host} || '192.168.1.199');
+            $p->{active_host}= do {
+                my ($h) = $c->model('AI2::Provider::Ollama')->resolve_host($c);
+                $h;
+            };
         }
     }
 
@@ -268,9 +275,8 @@ sub diagnostics :Local :Args(0) {
 
     # --- Ollama: live model tags from the configured host ---
     try {
-        my $cfg  = $c->config->{Ollama} || {};
-        my $host = $cfg->{host} || '192.168.1.199';
-        my $port = $cfg->{port} || 11434;
+        my $ollama = $c->model('AI2::Provider::Ollama');
+        my ($host, $port) = $ollama->resolve_host($c);
         my $ua   = LWP::UserAgent->new(timeout => 5);
         my $res  = $ua->get("http://$host:$port/api/tags");
         if ($res && $res->is_success) {
@@ -408,8 +414,10 @@ sub test_model :Local :Args(0) {
         unless ($prov && $prov->can('chat')) {
             die "No chat client for provider $provider";
         }
-        my ($host, $port) = ($c->config->{Ollama}{host} || '192.168.1.199',
-                               $c->config->{Ollama}{port} || 11434);
+        my ($host, $port) = $prov->can('resolve_host')
+            ? $prov->resolve_host($c)
+            : ($c->config->{Ollama}{host} || '192.168.1.199',
+               $c->config->{Ollama}{port} || 11434);
         $prov->chat($c,
             messages => [{ role => 'user',
                 content => "Reply with exactly the word PONG to confirm you are working." }],
@@ -544,6 +552,11 @@ sub chat :Local :Args(0) {
     my $conversation_id = $json_data->{conversation_id};
     my $project_id = $json_data->{project_id};
     my $task_id    = $json_data->{task_id};
+    # Voice recording linkage: when the prompt is a voice transcript, the widget
+    # sends the File-table ids from /ai2/transcribe so the saved conversation
+    # message can be attached to its audio + transcript files.
+    my $audio_file_id      = $json_data->{audio_file_id};
+    my $transcript_file_id = $json_data->{transcript_file_id};
 
     # The dropdown sends "provider|model" (e.g. openrouter|anthropic/...,
     # grok|grok-4..., ollama|llama3...). Extract the real model name.
@@ -570,6 +583,8 @@ sub chat :Local :Args(0) {
             conversation_id => $conversation_id,
             project_id      => $project_id,
             task_id         => $task_id,
+            audio_file_id      => $audio_file_id,
+            transcript_file_id => $transcript_file_id,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,

@@ -164,8 +164,12 @@ sub process {
         return { success => 0, error => "No client available for provider $provider_name" };
     }
 
-    my ($ollama_host, $ollama_port) = ($c->config->{Ollama}{host} || '192.168.1.199',
-                                      $c->config->{Ollama}{port} || 11434);
+    # For Ollama, resolve the first reachable workstation address (LAN vs
+    # ZeroTier vs OLLAMA_HOST). Non-Ollama providers ignore host/port.
+    my ($ollama_host, $ollama_port);
+    if ($provider->can('resolve_host')) {
+        ($ollama_host, $ollama_port) = $provider->resolve_host($c);
+    }
 
     my $resp = try {
         $provider->chat($c,
@@ -216,6 +220,17 @@ sub process {
             $c->session->{current_conversation_id} = $conversation_id;
 
             my $model_used = $resp->{model} // $use_model // '';
+            # Attach voice recording file refs to the user message when this
+            # turn came from a voice transcript. Stored in metadata JSON so the
+            # conversation history / voice page can locate and replay the audio.
+            my $user_meta;
+            if ($args{audio_file_id} || $args{transcript_file_id}) {
+                $user_meta = encode_json({
+                    ($args{audio_file_id}      ? (audio_file_id      => int($args{audio_file_id}))      : ()),
+                    ($args{transcript_file_id} ? (transcript_file_id => int($args{transcript_file_id})) : ()),
+                    source => 'voice',
+                });
+            }
             $schema->resultset('AiMessage')->create({
                 conversation_id => $conversation_id,
                 user_id         => $uid,
@@ -223,6 +238,7 @@ sub process {
                 content         => $prompt,
                 agent_type      => $agent,
                 model_used      => $model_used,
+                ($user_meta ? (metadata => $user_meta) : ()),
             });
             $schema->resultset('AiMessage')->create({
                 conversation_id => $conversation_id,
