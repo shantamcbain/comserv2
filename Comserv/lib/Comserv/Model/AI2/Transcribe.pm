@@ -408,17 +408,20 @@ sub status {
                 my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
 
                 # --- Beekeeping persistence (2026-07-25) -----------------
-                # Values travel from the original POST through the result
-                # file (hive_id / inspection_id). When absent (0) this is the
-                # generic chat-widget transcription path and is skipped.
+                # hive_id / inspection_id travel from the original POST through
+                # the result file. The transcript is ALWAYS archived to
+                # voice_transcripts when present (so every widget/Retry upload
+                # is captured regardless of hive linkage). Drafting an
+                # Inspection row additionally requires a hive_id.
                 my $hive_id       = int($result->{hive_id}       // 0);
                 my $inspection_id = int($result->{inspection_id} // 0);
-                if ($hive_id || $inspection_id) {
-                my $parsed        = try {
-                    my $bk = $c->model('AI2::Beekeeping');
-                    $bk->parse_voice_transcript($result->{transcript} // '');
-                } catch { undef };
-                if (defined $parsed) {
+
+                if ($result->{transcript}) {
+                    my $parsed = try {
+                        my $bk = $c->model('AI2::Beekeeping');
+                        $bk->parse_voice_transcript($result->{transcript} // '');
+                    } catch { undef };
+
                     try {
                         my $vt_rs = $schema->resultset('VoiceTranscripts');
                         my %vt_cols = (
@@ -429,8 +432,7 @@ sub status {
                             file_size          => $result->{file_size} || 0,
                             model_used         => $result->{model_used} // 'small',
                         );
-                        my $insp_id_int = int($inspection_id || 0);
-                        $vt_cols{inspection_id} = $insp_id_int if $insp_id_int;
+                        $vt_cols{inspection_id} = $inspection_id if $inspection_id;
                         my $vt = $vt_rs->create(\%vt_cols);
                         $result->{voice_transcript_id} = $vt->id + 0;
                     } catch {
@@ -439,21 +441,21 @@ sub status {
                             "voice_transcripts write skipped: $_");
                     };
 
-                    if (int($hive_id || 0)) {
+                    if ($hive_id) {
                         try {
-                            my $existing = $schema->resultset('Inspection')
-                                ->find({ id => $inspection_id })
-                                if int($inspection_id || 0);
+                            my $existing = $inspection_id
+                                ? $schema->resultset('Inspection')->find({ id => $inspection_id })
+                                : undef;
                             unless ($existing) {
                                 require POSIX;
                                 my $today = POSIX::strftime('%Y-%m-%d', localtime);
                                 my $insp = $schema->resultset('Inspection')->create({
-                                    hive_id          => int($hive_id),
+                                    hive_id          => $hive_id,
                                     inspection_date  => $today,
                                     inspector        => $result->{username} || ($c->session->{username} // ''),
                                     inspection_type  => 'routine',
                                     general_notes    => $result->{transcript} // '',
-                                    %$parsed,
+                                    $parsed ? %$parsed : (),
                                 });
                                 $result->{inspection_id} = $insp->id + 0;
                             } else {
@@ -467,8 +469,6 @@ sub status {
                     }
                 }
                 # --- end beekeeping persistence --------------------------
-
-                }
 
                 my $audio_row = $schema->resultset('File')->find({ nfs_path => $result->{audio_nfs_path} });
                 unless ($audio_row) {

@@ -76,6 +76,7 @@ __PACKAGE__->register_class('HiveConfiguration',    'Comserv::Model::Schema::Enc
 __PACKAGE__->register_class('HiveFrame',            'Comserv::Model::Schema::Ency::Result::Beekeeping::HiveFrame');
 __PACKAGE__->register_class('HoneyHarvest',         'Comserv::Model::Schema::Ency::Result::Beekeeping::HoneyHarvest');
 __PACKAGE__->register_class('Treatment',            'Comserv::Model::Schema::Ency::Result::Ency::Treatment');
+__PACKAGE__->register_class('VoiceTranscripts',      'Comserv::Model::Schema::Ency::Result::VoiceTranscripts');
 
 # Unified recipes (herbal / food / brew) — create tables from Result via Admin schema compare
 __PACKAGE__->register_class('Ency::Recipe',         'Comserv::Model::Schema::Ency::Result::Ency::Recipe');
