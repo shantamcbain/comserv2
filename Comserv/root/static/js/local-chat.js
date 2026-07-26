@@ -1208,7 +1208,13 @@
                         var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
                         var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
                         var elapsed = _recStart ? _fmtElapsed(Date.now() - _recStart) : '';
-                        var file = new File([blob], 'recording.' + ext, { type: blob.type });
+                        // Unique, human-readable name so recordings don't collide and are
+                        // distinguishable later (was hardcoded 'recording.webm').
+                        var _d = new Date();
+                        var _pad = function(n){ return (n < 10 ? '0' : '') + n; };
+                        var _stamp = '' + _d.getFullYear() + _pad(_d.getMonth()+1) + _pad(_d.getDate())
+                                   + '-' + _pad(_d.getHours()) + _pad(_d.getMinutes()) + _pad(_d.getSeconds());
+                        var file = new File([blob], 'voice-' + _stamp + (elapsed ? '-' + elapsed : '') + '.' + ext, { type: blob.type });
 
                         var backupId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
                         _saveAudioBackup(backupId, file, elapsed).then(function() {
@@ -1329,11 +1335,14 @@
                 if (!blob || blob.size < 1000) { _startListening(); return; }
                 _setVoiceStatus('⏳ Transcribing speech…');
                 var ext = (blob.type.indexOf('ogg') !== -1) ? 'ogg' : 'webm';
-                var file = new File([blob], 'voice.' + ext, { type: blob.type });
+                var d = new Date();
+                var p = function(n){ return (n < 10 ? '0' : '') + n; };
+                var stamp = '' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+                var file = new File([blob], 'voice-' + stamp + '.' + ext, { type: blob.type });
                 var fd = new FormData();
                 fd.append('audio', file, file.name);
                 fd.append('diarize', '0');
-                fetch('/ai2/transcribe', { method: 'POST', credentials: 'include', body: fd })
+                fetch('/ai/transcribe', { method: 'POST', credentials: 'include', body: fd })
                 .then(function(r){ return r.json(); })
                 .then(function(data) {
                     if (!_voiceActive) return;
@@ -4333,7 +4342,7 @@
             var elapsed = Math.round(attempt * 5);
             if (statusEl) { statusEl.textContent = '⏳ Transcribing… (' + elapsed + 's elapsed, checking every 5s)'; }
             setTimeout(function() {
-                fetch('/ai2/transcribe_status?job_id=' + encodeURIComponent(jobId), {
+                fetch('/ai/transcribe_status?job_id=' + encodeURIComponent(jobId), {
                     credentials: 'include'
                 })
                 .then(function(r) { return r.json(); })
@@ -4350,7 +4359,7 @@
             }, 5000);
         }
 
-        fetch('/ai2/transcribe', {
+        fetch('/ai/transcribe', {
             method: 'POST',
             credentials: 'include',
             body: formData
