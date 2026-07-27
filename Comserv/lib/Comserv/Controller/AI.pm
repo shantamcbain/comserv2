@@ -11849,6 +11849,65 @@ sub transcribe :Local :Args(0) {
     }
 
     unless ($python_bin) {
+        # ── Remote transcription dispatch (2026-07) ─────────────────────────
+        # No local whisper (e.g. production1 — 30 GB disk cannot hold torch).
+        # The audio is ALREADY on NFS ($nfs_audio_file_early). Queue a job file
+        # on NFS; the workstation's whisper_nfs_worker.pl picks it up, runs
+        # whisper with its own venv, and writes the result JSON back to NFS.
+        # transcribe_status promotes the NFS result when it appears.
+        if ($source_type eq 'nfs') {
+            my $jobs_dir        = "${nfs_base_early}/bmaster/jobs";
+            my $nfs_job_file    = "${jobs_dir}/whisper_job_${job_id}.json";
+            my $nfs_result_file = "${jobs_dir}/whisper_job_${job_id}_result.json";
+            my $dispatch_ok = eval {
+                require File::Path; File::Path::make_path($jobs_dir);
+                my $want_diarize_r = ($c->request->param('diarize') || $c->request->body_parameters->{diarize} || '') ? 1 : 0;
+                my $num_speakers_r = int($c->request->param('num_speakers') || $c->request->body_parameters->{num_speakers} || 2);
+                $num_speakers_r = 2 if $num_speakers_r < 2 || $num_speakers_r > 8;
+                open(my $jf, '>:utf8', $nfs_job_file) or die "cannot write job file: $!";
+                print $jf encode_json({
+                    job_id          => $job_id,
+                    audio_path      => $nfs_audio_file_early,
+                    transcript_path => $nfs_transcript_file_early,
+                    result_path     => $nfs_result_file,
+                    model           => 'small',
+                    diarize         => $want_diarize_r,
+                    num_speakers    => $num_speakers_r,
+                    orig_name       => $orig_name,
+                    file_size       => $upload_size_early,
+                    sitename        => $sitename_early,
+                    username        => $username,
+                    ext             => $ext,
+                    source_type     => $source_type,
+                    created         => time(),
+                });
+                close $jf;
+                1;
+            };
+            if ($dispatch_ok) {
+                unlink $tmp_file;
+                my $status_file_r = "$tmp_dir/whisper_job_${job_id}.status";
+                open(my $sf, '>', $status_file_r);
+                print $sf encode_json({
+                    status     => 'processing',
+                    remote     => 1,
+                    nfs_result => $nfs_result_file,
+                    started    => time(),
+                });
+                close $sf;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'transcribe',
+                    "No local whisper - dispatched job $job_id to NFS worker queue ($nfs_job_file)");
+                $c->response->body(encode_json({
+                    success => JSON::true,
+                    job_id  => $job_id,
+                    status  => 'processing',
+                    remote  => JSON::true,
+                }));
+                return;
+            }
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'transcribe',
+                "Remote whisper dispatch failed: $@");
+        }
         unlink $tmp_file;
         $c->response->status(503);
         $c->response->body(encode_json({
@@ -12087,6 +12146,35 @@ sub transcribe_status :Local :Args(0) {
 
     my $status_json = do { local $/; open(my $f, '<', $status_file) or return; <$f> };
     my $status = eval { decode_json($status_json) } || { status => 'processing' };
+
+    # ── Remote (NFS worker) job promotion (2026-07) ─────────────────────────
+    # For jobs dispatched to the workstation whisper worker, the result JSON
+    # appears on NFS. When it does, copy it to the local result file and mark
+    # the job done so the standard 'done' path below handles DB rows + reply.
+    if ($status->{status} eq 'processing' && $status->{remote} && $status->{nfs_result}) {
+        my $nfs_result = $status->{nfs_result};
+        # Path sanity: must be a whisper result JSON under the NFS jobs dir
+        if ($nfs_result =~ m{/bmaster/jobs/whisper_job_[\d_]+_result\.json$} && -f $nfs_result) {
+            my $rj = do { local $/; open(my $rfh, '<', $nfs_result) or undef; $rfh ? <$rfh> : undef };
+            my $parsed = $rj ? eval { decode_json($rj) } : undef;
+            if ($parsed) {
+                open(my $lf, '>', "/tmp/whisper_job_${job_id}_result.json");
+                print $lf $rj;
+                close $lf;
+                open(my $sf, '>', $status_file);
+                print $sf encode_json({ status => ($parsed->{success} ? 'done' : 'error'), error => $parsed->{error} });
+                close $sf;
+                unlink $nfs_result;
+                $status = { status => ($parsed->{success} ? 'done' : 'error'), error => $parsed->{error} };
+            }
+        } elsif (($status->{started} || 0) && time() - $status->{started} > 900) {
+            # Worker never picked it up / crashed — give up after 15 min
+            open(my $sf, '>', $status_file);
+            print $sf encode_json({ status => 'error', error => 'Remote transcription timed out (worker offline?)' });
+            close $sf;
+            $status = { status => 'error', error => 'Remote transcription timed out (worker offline?)' };
+        }
+    }
 
     if ($status->{status} eq 'done') {
         my $result_file = "/tmp/whisper_job_${job_id}_result.json";
