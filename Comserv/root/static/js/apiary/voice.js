@@ -84,6 +84,7 @@
     function submitAudio(root, blob, statusEl) {
         var fd = new FormData();
         fd.append('audio', blob, 'inspection.' + (blob.type.indexOf('webm') !== -1 ? 'webm' : 'wav'));
+        if (blob && blob.lastModified) { fd.append('recorded_at', String(blob.lastModified)); }
         var hiveId = $('av-hive') ? $('av-hive').value : '';
         if (hiveId) fd.append('hive_id', hiveId);
         // inspection_id is only known after a draft exists; left blank here.

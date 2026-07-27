@@ -47,24 +47,59 @@ sub run {
     (my $ext = lc($orig_name)) =~ s/.*\.//;
     $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
 
+    # Date the on-disk audio by the VOICE FILE's creation time when the
+    # client supplies it (file.lastModified, epoch ms); else by server
+    # receive time. A random 4-hex token guarantees uniqueness so two
+    # uploads of the same original name (or two in the same second) never
+    # collide on disk. The token is fixed per request so the early copy and
+    # the background-job copy write the SAME path.
+    require POSIX;
+    my $recorded_at = $c->request->param('recorded_at') || $c->request->body_parameters->{recorded_at} || 0;
+    my $voice_date  = ($recorded_at && $recorded_at =~ /^\d+$/)
+        ? POSIX::strftime('%Y%m%d_%H%M%S', localtime($recorded_at / 1000))
+        : POSIX::strftime('%Y%m%d_%H%M%S', localtime(time()));
+    my $voice_uniq  = sprintf('%04X', int(rand(65536)));
+
     my $job_id   = time() . '_' . $$;
     my $tmp_dir  = '/tmp';
     my $tmp_file = "$tmp_dir/whisper_job_${job_id}.${ext}";
 
     eval { $upload->copy_to($tmp_file) };
     if ($@ || !-f $tmp_file) {
+        warn "VOICE UPLOAD FAILED (temp save): user=$username orig=$orig_name size=" . ($upload->size // 0) . " err=$@\n";
         $c->response->status(500);
         $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio file: $@" }));
         return;
+    }
+
+    # Normalize the upload to a clean 16 kHz mono WAV for Whisper. The original
+    # is ALWAYS preserved on disk (we never reject or delete a user upload —
+    # voice files contain data that must not be lost). We try to produce a
+    # decodable copy; if conversion fails we fall back to the original and let
+    # Whisper attempt it. Forging the matroska demuxer rescues mobile webm
+    # files that ship a valid audio Cluster but no EBML header.
+    my $whisper_src = $tmp_file;
+    my $converted   = '';
+    {
+        my $cand = "$tmp_file.conv.wav";
+        my $force = (lc($ext) eq 'webm') ? '-f matroska' : '';
+        my $rc = system(qq{ffmpeg -y -v error $force -i "$tmp_file" -ar 16000 -ac 1 -c:a pcm_s16le "$cand" 2>/dev/null});
+        if ($rc == 0 && -s $cand) {
+            $converted   = $cand;
+            $whisper_src = $cand;
+            warn "VOICE UPLOAD: converted $orig_name -> $cand for transcription\n";
+        } else {
+            warn "VOICE UPLOAD: ffmpeg conversion skipped/failed for $orig_name (rc=$rc) - using original for whisper\n";
+            unlink $cand;
+        }
     }
 
     my $safe_user_early = $username; $safe_user_early =~ s/[^a-zA-Z0-9_-]/_/g;
     my $nfs_base_early       = $c->config->{workshop_upload_dir} || '/data/nfs';
     my $audio_nfs_early      = "${nfs_base_early}/bmaster/audio";
     my $transcript_nfs_early = "${nfs_base_early}/bmaster/transcripts";
-    my $timestamp_early      = time();
-    my $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
-    my $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
+    my $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${voice_date}_${voice_uniq}.${ext}";
+    my $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${voice_date}_${voice_uniq}.json";
     my $sitename_early  = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
     my $upload_size_early = $upload->size;
 
@@ -78,8 +113,8 @@ sub run {
         my $local_base = $c->path_to('root', 'uploads')->stringify;
         $audio_nfs_early = "${local_base}/bmaster/audio";
         $transcript_nfs_early = "${local_base}/bmaster/transcripts";
-        $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
-        $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
+        $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${voice_date}_${voice_uniq}.${ext}";
+        $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${voice_date}_${voice_uniq}.json";
         $source_type = 'local';
         eval {
             require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
@@ -245,8 +280,8 @@ PYSCRIPT
     my $audio_nfs      = "${nfs_base}/bmaster/audio";
     my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
     my $timestamp      = time();
-    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
-    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
+    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${voice_date}_${voice_uniq}.${ext}";
+    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${voice_date}_${voice_uniq}.json";
     my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
     my $upload_size    = $upload->size;
 
@@ -294,14 +329,14 @@ PYSCRIPT
             my $json_out = '';
             eval {
                 my $py_pid = open(my $py_out, '-|', $python_bin, $py_script_file,
-                    $tmp_file, $whisper_model, ($has_diarizer ? '1' : '0'), "$num_speakers")
+                    $whisper_src, $whisper_model, ($has_diarizer ? '1' : '0'), "$num_speakers")
                     or die "Cannot start python: $!";
                 $json_out = do { local $/; <$py_out> } // '';
                 close $py_out;
                 waitpid($py_pid, 0);
             };
 
-            unlink $py_script_file;
+            unlink $py_script_file, $converted if $converted;
 
             if ($@ || !$json_out) {
                 unlink $tmp_file;
@@ -381,10 +416,15 @@ PYSCRIPT
 
     waitpid($child, 0);
 
+    # The audio file is already saved to NFS + its File DB row is created
+    # above; report the upload as confirmed now. Whisper runs in the forked
+    # child and the client polls /ai/transcribe_status for the transcript.
     $c->response->body(encode_json({
-        success => JSON::true,
-        job_id  => $job_id,
-        status  => 'processing',
+        success       => JSON::true,
+        uploaded      => JSON::true,
+        audio_file_id => ($audio_file_id // 0) + 0,
+        job_id        => $job_id,
+        status        => 'processing',
     }));
 }
 
