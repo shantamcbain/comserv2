@@ -836,7 +836,17 @@ sub list :Path('/admin/docker/list') :Args(0) {
     );
     foreach my $vname (split /\n/, $vol_out) {
         chomp $vname;
-        next unless $canonical{$vname};
+        # Match canonical names exactly OR compose-prefixed variants
+        # (e.g. comserv-deploy_comserv2_logs on production hosts) so the
+        # Volumes panel doesn't appear empty on servers where compose
+        # prefixes the project name.
+        my $matches = $canonical{$vname};
+        unless ($matches) {
+            foreach my $canon (keys %canonical) {
+                if ($vname =~ /_\Q$canon\E$/) { $matches = 1; last; }
+            }
+        }
+        next unless $matches;
         my $inspect_cmd = ($host eq 'workstation' || $host eq 'localhost')
             ? "docker volume inspect $vname 2>/dev/null"
             : qq{$ssh_prefix "docker volume inspect $vname 2>/dev/null"};

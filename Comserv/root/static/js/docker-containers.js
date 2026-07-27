@@ -144,11 +144,12 @@
                             } else if (finalLine.match(/FAIL|CRASH|ERROR|FAILED/)) {
                                 setStatus('err', 'Deploy failed ✗');
                                 log('❌ DEPLOY FAILED', 'err');
+                                log('Refreshing container list to show current state...', 'dim');
                             } else {
                                 setStatus('ok', 'Deploy done');
                                 log('Deploy finished.', 'ok');
                             }
-                            // Reload container list to reflect changes
+                            // Reload container list to reflect changes (success OR failure)
                             setTimeout(loadAll, 2000);
                         }
                     }
@@ -457,34 +458,34 @@
                 '  </div>' +
                 '</div>' +
                 '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">' +
-                '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="logs" style="background:#17a2b8;color:#fff;padding:2px 8px;font-size:0.78em;">Logs</button>' +
+                '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="logs" title="Show the last 200 lines of Docker logs for this container" style="background:#17a2b8;color:#fff;padding:2px 8px;font-size:0.78em;">Logs</button>' +
                 (running
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="stop" style="background:#dc3545;color:#fff;padding:2px 8px;font-size:0.78em;">Stop</button>' +
-                      '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="restart" style="background:#0066cc;color:#fff;padding:2px 8px;font-size:0.78em;">Restart</button>'
-                    : '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="start" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Start</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="stop" title="Stop this container (it stays on disk and can be started again)" style="background:#dc3545;color:#fff;padding:2px 8px;font-size:0.78em;">Stop</button>' +
+                      '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="restart" title="Restart this container (brief downtime while it comes back up)" style="background:#0066cc;color:#fff;padding:2px 8px;font-size:0.78em;">Restart</button>'
+                    : '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="start" title="Start this stopped container" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Start</button>'
                 ) +
-                '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="deploy-log" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Deploy Log</button>' +
+                '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.id) + '" data-act="deploy-log" title="Show the most recent deploy log recorded for this container" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Deploy Log</button>' +
                 (c.name && c.name.match(/comserv/)
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" title="Full pipeline on the selected host: volume check, image build, backup of the old container, health check, zero-downtime handover" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
                     : '') +
                 // Build & Push: only on workstation for comserv-web-prod
                 (c.name && c.name.match(/^comserv2?-web-prod/) && isLocal
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="build-push" style="background:#17a2b8;color:#fff;padding:2px 8px;font-size:0.78em;">Build &amp; Push</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="build-push" title="Build the image locally and push it to Docker Hub. The running container is NOT touched. Then use Pull &amp; Deploy on the production server" style="background:#17a2b8;color:#fff;padding:2px 8px;font-size:0.78em;">Build &amp; Push</button>'
                     : '') +
                 // Push Image (no-build): just push the existing image, workstation only
                 (c.name && c.name.match(/^comserv2?-web-prod/) && isLocal
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="push-only" style="background:#0056b3;color:#fff;padding:2px 8px;font-size:0.78em;">Push Image</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="push-only" title="Push the current local image to Docker Hub without rebuilding" style="background:#0056b3;color:#fff;padding:2px 8px;font-size:0.78em;">Push Image</button>'
                     : '') +
                 // Pull & Deploy: only on production targets for comserv-web-prod
                 (c.name && c.name.match(/^comserv2?-web-prod/) && !isLocal
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="pull-deploy" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Pull &amp; Deploy</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="pull-deploy" title="Pull the latest image from Docker Hub and deploy it here with zero-downtime handover (old container kept as a date-stamped backup)" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Pull &amp; Deploy</button>'
                     : '') +
                 (c.is_backup_container
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="restore-backup" data-host="' + esc(currentTarget) + '" style="background:#6a0dad;color:#fff;padding:2px 8px;font-size:0.78em;font-weight:bold;">↩ Restore as Active</button>' +
-                      '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Delete</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="restore-backup" title="Make this backup the active container; the currently running container is stopped and preserved as a backup" data-host="' + esc(currentTarget) + '" style="background:#6a0dad;color:#fff;padding:2px 8px;font-size:0.78em;font-weight:bold;">↩ Restore as Active</button>' +
+                      '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" title="Permanently remove this container from the host (cannot be undone; volumes are not deleted)" style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Delete</button>'
                     : '') +
                 (!running && !c.is_backup_container
-                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Delete</button>'
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" title="Permanently remove this container from the host (cannot be undone; volumes are not deleted)" style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Delete</button>'
                     : '') +
                 '</div>' +
             '</div>';
@@ -521,7 +522,7 @@
                 '  <span style="font-size:0.75em;color:#666;margin-left:8px;">' + esc(driver) + '</span>' +
                 '</div>' +
                 '<div style="display:flex;gap:4px;">' +
-                '  <button class="btn btn-sm" data-action="volume-act" data-vname="' + esc(name) + '" data-act="inspect" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Inspect</button>' +
+                '  <button class="btn btn-sm" data-action="volume-act" data-vname="' + esc(name) + '" data-act="inspect" title="Show volume details (driver, mountpoint, size, labels)" style="background:#6c757d;color:#fff;padding:2px 8px;font-size:0.78em;">Inspect</button>' +
                 '</div>' +
             '</div>';
         });
