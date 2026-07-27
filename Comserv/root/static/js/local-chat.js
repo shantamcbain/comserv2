@@ -3309,6 +3309,7 @@
         { url: '/ENCY/Constituent',      concepts: ['active compounds', 'chemical constituents', 'phytochemicals', 'active ingredients'] },
         { url: '/ENCY/formula',          concepts: ['remedy', 'remedies', 'preparation', 'preparations', 'compound formula', 'herbal recipe'] },
         { url: '/Inventory/invoice/new', concepts: ['new invoice', 'add invoice', 'create invoice', 'log bill', 'record bill', 'enter bill', 'new bill'] },
+        { url: '/Apiary/voice_recordings', concepts: ['voice recordings', 'voice recording library', 'voice notes', 'all voice recordings', 'transcripts', 'voice transcripts', 'recorded inspections'] },
         { url: '/HelpDesk',              concepts: ['get help', 'support system', 'contact support', 'tech support', 'it support'] },
         { url: '/BMaster',              concepts: ['beekeeping home', 'bee management', 'beemaster', 'bee master home'] },
         { url: '/Apiary/HiveManagement', concepts: ['manage hives', 'my hives', 'hive list', 'hive overview'] },
@@ -3381,6 +3382,10 @@
         { label: 'queens',                     url: '/Apiary/QueenRearing' },
         { label: 'bee health',                 url: '/Apiary/BeeHealth' },
         { label: 'bee forage',                 url: '/ENCY/BeePastureView' },
+        { label: 'voice recordings',            url: '/Apiary/voice_recordings' },
+        { label: 'voice recording library',     url: '/Apiary/voice_recordings' },
+        { label: 'voice notes',                url: '/Apiary/voice_recordings' },
+        { label: 'transcripts',                url: '/Apiary/voice_recordings' },
         { label: 'bee pasture',                url: '/ENCY/BeePastureView' },
         { label: 'forage plants',              url: '/ENCY/BeePastureView' },
         { label: 'forage',                     url: '/ENCY/BeePastureView' },
@@ -3524,8 +3529,15 @@
         const starts = map.filter(function(item) { return item.label.startsWith(q) || q.startsWith(item.label); });
         if (starts.length) return starts;
         const partial = map.filter(function(item) {
-            return words.every(function(w) { return item.label.includes(w); })
-                || item.label.split(/\s+/).some(function(w) { return words.includes(w) && w.length > 3; });
+            const labelWords = item.label.split(/\s+/);
+            const label = ' ' + item.label + ' ';
+            // Word-boundary match: a query word must equal a whole label word
+            // (not be a substring of it) — prevents "voice" matching "invoices".
+            return words.every(function(w) {
+                    return labelWords.some(function(lw) { return lw === w; })
+                        || label.indexOf(' ' + w + ' ') !== -1;
+                })
+                || labelWords.some(function(lw) { return words.indexOf(lw) !== -1 && lw.length > 3; });
         });
         if (partial.length) return partial;
         // Typo-tolerant fallback: fuzzy match each query word against label words
@@ -4272,6 +4284,7 @@
 
         var formData = new FormData();
         formData.append('audio', file, file.name || 'recording.webm');
+        if (file && file.lastModified) { formData.append('recorded_at', String(file.lastModified)); }
         formData.append('diarize', '1');
         formData.append('num_speakers', '2');
 
@@ -4382,14 +4395,25 @@
         .then(function(data) {
             if (!data.success) {
                 if (sendBtn) sendBtn.disabled = false;
-                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                if (statusEl) { statusEl.textContent = '⚠️ Upload failed: ' + (data.error || 'unknown error'); }
                 if (backupId) {
                     _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
                 }
                 return;
             }
+            // The server saves the audio file immediately and confirms it with
+            // uploaded:true — BEFORE Whisper finishes. Treat that as success so
+            // the user sees the file is saved right away; the transcript still
+            // streams into the chat input when transcription completes in the
+            // background. Mark the local backup 'uploaded' so it leaves the
+            // "Unsent Voice Recordings" list immediately.
+            if (data.uploaded) {
+                if (statusEl) { statusEl.textContent = '✅ Voice file uploaded — transcribing in the background…'; }
+                if (sendBtn) sendBtn.disabled = false;
+                if (backupId) { _updateAudioBackupStatus(backupId, 'uploaded').then(_renderLocalAudioBackups); }
+            }
             if (data.job_id) {
-                if (statusEl) { statusEl.textContent = '⏳ Transcription started (job ' + data.job_id + ') — checking progress…'; }
+                if (!data.uploaded && statusEl) { statusEl.textContent = '⏳ Transcription started (job ' + data.job_id + ') — checking progress…'; }
                 _pollTranscribeStatus(data.job_id, 1);
             } else {
                 _handleTranscriptResult(data);

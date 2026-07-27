@@ -1006,13 +1006,33 @@ sub transcribe_recording :Path('/Apiary/transcribe_recording') :Args(1) {
             file_type => 'audio',
         });
     };
-    unless ($row && $row->nfs_path && -f $row->nfs_path) {
+    unless ($row) {
         $c->response->status(404);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Audio file not found' }));
+        $c->response->body(encode_json({ success => JSON::false, error => 'Recording not found in your library' }));
         return;
     }
 
-    my $nfs_path  = $row->nfs_path;
+    # Resolve the on-disk audio path. Prefer the stored nfs_path; if it is
+    # missing/stale, fall back to locating the file by its stored name under
+    # the audio NFS base so a stale path doesn't block transcription when the
+    # bytes are actually present on this host.
+    my $nfs_path = $row->nfs_path || '';
+    unless ($nfs_path && -f $nfs_path) {
+        my $base = '/data/nfs/bmaster/audio';
+        if ($row->file_name) {
+            my $cand = "$base/" . $row->file_name;
+            $nfs_path = $cand if -f $cand;
+        }
+    }
+    unless ($nfs_path && -f $nfs_path) {
+        $c->response->status(404);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Audio file not found on storage for this recording',
+        }));
+        return;
+    }
+
     my $orig_name = $row->file_name || 'recording.webm';
     (my $ext = lc($orig_name)) =~ s/.*\.//;
     $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;

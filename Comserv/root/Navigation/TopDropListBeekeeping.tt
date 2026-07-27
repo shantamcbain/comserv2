@@ -71,6 +71,23 @@
             </div>
         </div>
 
+        <!-- Voice Recordings — members get the library, guests get the landing teaser -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-mic"></i>Voice Recordings</span>
+            <div class="submenu">
+                [% IF logged_in %]
+                <a href="/Apiary/voice_recordings" class="submenu-link"><i class="icon-mic"></i>All Voice Recordings</a>
+                <a href="/Apiary/HiveManagement" class="submenu-link"><i class="icon-hive"></i>Record a New Inspection Voice Note</a>
+                [% ELSE %]
+                <a href="/BMaster/apiary" class="submenu-link"><i class="icon-mic"></i>About Voice Recordings</a>
+                [% END %]
+                [% INCLUDE 'Navigation/inc/submenu_add_link.tt'
+                    add_link_category = 'Beekeeping_links'
+                    add_link_submenu = 'top'
+                    add_link_menu = 'Beekeeping' %]
+            </div>
+        </div>
+
         <!-- Hive Inspections — members get working pages, guests get teaser -->
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-inspect"></i>Hive Inspections</span>

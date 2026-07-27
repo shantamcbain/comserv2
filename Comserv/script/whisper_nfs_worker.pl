@@ -81,8 +81,30 @@ sub process_job {
     my $jid = $job->{job_id} || basename($job_file);
     logline("processing job $jid audio=$job->{audio_path}");
 
-    unless (-f $job->{audio_path}) {
-        write_result($job, { success => JSON::false, error => "Audio file not found on NFS: $job->{audio_path}" });
+    # Normalize the audio to a clean 16 kHz mono WAV before transcribing. The
+    # original on NFS is NEVER modified or deleted — voice files hold data that
+    # must be preserved. Forcing the matroska demuxer rescues mobile webm files
+    # that ship a valid audio Cluster but no EBML header (which Whisper can't
+    # read). If conversion fails we fall back to the original path.
+    my $whisper_src = $job->{audio_path};
+    my $converted   = '';
+    {
+        my $ext = lc($job->{ext} || '');
+        my $cand = "$job->{audio_path}.conv.wav";
+        my $force = ($ext eq 'webm') ? '-f matroska' : '';
+        my $rc = system(qq{ffmpeg -y -v error $force -i "$job->{audio_path}" -ar 16000 -ac 1 -c:a pcm_s16le "$cand" 2>/dev/null});
+        if ($rc == 0 && -s $cand) {
+            $converted   = $cand;
+            $whisper_src = $cand;
+            logline("job $jid: converted audio -> $cand for whisper");
+        } else {
+            unlink $cand;
+            logline("job $jid: ffmpeg conversion skipped/failed (rc=$rc) - using original");
+        }
+    }
+
+    unless (-f $whisper_src) {
+        write_result($job, { success => JSON::false, error => "Audio file not found on NFS: $whisper_src" });
         unlink $claim;
         return;
     }
@@ -145,12 +167,13 @@ PYSCRIPT
     my $json_out = '';
     eval {
         my $pid = open(my $out, '-|', $python_bin, $py_file,
-            $job->{audio_path}, $model, $want_diarize, "$num_speakers")
+            $whisper_src, $model, $want_diarize, "$num_speakers")
             or die "cannot start python: $!";
         $json_out = do { local $/; <$out> } // '';
         close $out;
         waitpid($pid, 0);
     };
+    unlink $converted if $converted;
     my $elapsed = time() - $t0;
     unlink $py_file;
 
