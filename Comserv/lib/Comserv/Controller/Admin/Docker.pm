@@ -970,7 +970,9 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         $deploy_target = 'web-dev';
     } elsif ($service eq 'comserv2-web-staging') {
         $deploy_target = 'staging-4000';
-    } elsif ($service eq 'comserv2-web-prod') {
+    } elsif ($service eq 'comserv2-web-prod' || $service eq 'comserv-web-prod') {
+        # Accept legacy name too — containers created before the 2026-07
+        # rename still report "comserv-web-prod" in the UI list.
         $deploy_target = $host;
     } else {
         $c->stash->{json} = { success => 0, error => "Unknown container: $service" };
