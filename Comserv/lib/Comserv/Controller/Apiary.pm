@@ -966,6 +966,91 @@ sub audio_serve :Path('/Apiary/audio_serve') :Args(1) {
     close $fh;
 }
 
+# ----------------------------------------------------------------------------
+# TRANSCRIBE A STORED RECORDING
+# Re-runs the Whisper pipeline against an already-uploaded audio File row so
+# recordings that were never transcribed at capture time (e.g. Android webm
+# uploads) can be transcribed on demand from the voice_recordings library.
+# ----------------------------------------------------------------------------
+
+sub transcribe_recording :Path('/Apiary/transcribe_recording') :Args(1) {
+    my ($self, $c, $file_id) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || '';
+    unless ($username) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+    unless ($file_id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid file id' }));
+        return;
+    }
+
+    my $sitename = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+
+    my $row;
+    eval {
+        $row = $c->model('DBEncy')->resultset('File')->find({
+            id        => $file_id,
+            sitename  => $sitename,
+            file_type => 'audio',
+        });
+    };
+    unless ($row && $row->nfs_path && -f $row->nfs_path) {
+        $c->response->status(404);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Audio file not found' }));
+        return;
+    }
+
+    my $nfs_path  = $row->nfs_path;
+    my $orig_name = $row->file_name || 'recording.webm';
+    (my $ext = lc($orig_name)) =~ s/.*\.//;
+    $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
+
+    # The v2 pipeline ($c->model('AI2::Transcribe')->run) only accepts an
+    # uploaded file via the 'audio' request field, so we stage the existing
+    # NFS audio into a temp file and re-POST it through that same proven path.
+    my $tmp_dir  = '/tmp';
+    my $job_id   = time() . '_' . $$;
+    my $tmp_file = "$tmp_dir/whisper_retranscribe_${job_id}.${ext}";
+
+    require File::Copy;
+    unless (File::Copy::copy($nfs_path, $tmp_file)) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to stage audio: $!" }));
+        return;
+    }
+
+    # Build a real Catalyst upload object pointing at the staged temp file so
+    # $c->model('AI2::Transcribe')->run (which reads $c->request->upload('audio'))
+    # can drive the existing, proven Whisper pipeline unchanged.
+    require Catalyst::Request::Upload;
+    my $staged = Catalyst::Request::Upload->new(
+        filename => $orig_name,
+        tempname => $tmp_file,
+        size     => -s $tmp_file,
+        type     => ($row->file_format || "audio/$ext"),
+    );
+
+    # Swap the staged upload into the request under the 'audio' field the model reads.
+    local $c->request->{uploads}{audio} = $staged;
+
+    $c->model('AI2::Transcribe')->run($c);
+
+    # run() may have left a partial temp; the child job owns its own copy.
+    return;
+}
+
 # ============================================================================
 # PRIVATE HELPERS
 # ============================================================================

@@ -60,6 +60,11 @@
                             style="font-size:0.88em;">
                             📋 Copy Transcript
                         </button>
+                        <button class="btn btn-outline"
+                            onclick="transcribeRecording('[% rec.id %]', this)"
+                            style="font-size:0.88em;">
+                            🔄 Re-transcribe
+                        </button>
                     </div>
 
                     <div id="rec-status-[% rec.id %]" style="display:none;margin-top:0.5rem;font-size:0.85em;padding:4px 8px;border-radius:4px;"></div>
@@ -67,7 +72,13 @@
                     <textarea id="rec-transcript-[% rec.id %]" style="display:none;">[% rec.transcript | html %]</textarea>
 
                     [% ELSE %]
-                    <div style="color:var(--text-muted,#888);font-size:0.88em;font-style:italic;">No transcript available for this recording.</div>
+                    <div style="color:var(--text-muted,#888);font-size:0.88em;font-style:italic;margin-bottom:0.75rem;">No transcript available for this recording.</div>
+                    <button class="btn btn-primary"
+                        onclick="transcribeRecording('[% rec.id %]', this)"
+                        style="font-size:0.88em;">
+                        🎯 Transcribe Recording
+                    </button>
+                    <div id="rec-status-[% rec.id %]" style="display:none;margin-top:0.5rem;font-size:0.85em;padding:4px 8px;border-radius:4px;"></div>
                     [% END %]
                 </div>
 
@@ -113,6 +124,91 @@ function copyTranscript(id) {
         var st = document.getElementById('rec-status-' + id);
         if (st) { st.textContent = '⚠️ Copy failed — select the transcript text manually.'; st.style.display=''; st.style.background='#fff3cd'; st.style.color='#856404'; }
     });
+}
+
+function transcribeRecording(id, btn) {
+    var st = document.getElementById('rec-status-' + id);
+    if (!st) return;
+    btn.disabled = true;
+    var origText = btn.textContent;
+    btn.textContent = '⏳ Transcribing…';
+    st.style.display = '';
+    st.style.background = 'var(--info-bg,#e8f4fd)';
+    st.style.color = '';
+    st.textContent = 'Starting Whisper transcription…';
+
+    var fd = new FormData();
+    var req = new XMLHttpRequest();
+    req.open('POST', '/Apiary/transcribe_recording/' + encodeURIComponent(id), true);
+    req.onload = function () {
+        var data;
+        try { data = JSON.parse(req.responseText); } catch (e) { data = {}; }
+        if (!data.success || !data.job_id) {
+            btn.disabled = false;
+            btn.textContent = origText;
+            st.style.background = '#fff3cd';
+            st.style.color = '#856404';
+            st.textContent = '⚠️ Could not start transcription: ' + (data.error || 'unknown error');
+            return;
+        }
+        st.textContent = 'Transcribing… (this can take a minute)';
+        pollTranscribeStatus(id, data.job_id, btn, origText, st);
+    };
+    req.onerror = function () {
+        btn.disabled = false;
+        btn.textContent = origText;
+        st.style.background = '#fff3cd';
+        st.style.color = '#856404';
+        st.textContent = '⚠️ Network error starting transcription.';
+    };
+    req.send(fd);
+}
+
+function pollTranscribeStatus(id, jobId, btn, origText, st) {
+    var url = '/ai2/transcribe_status?job_id=' + encodeURIComponent(jobId);
+    var attempts = 0;
+    var timer = setInterval(function () {
+        attempts++;
+        var req = new XMLHttpRequest();
+        req.open('GET', url, true);
+        req.onload = function () {
+            var data;
+            try { data = JSON.parse(req.responseText); } catch (e) { data = {}; }
+            if (data.status === 'processing' || (data.success === true && !data.transcript)) {
+                if (attempts > 90) { // ~1.5 min cap
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                    st.style.background = '#fff3cd';
+                    st.style.color = '#856404';
+                    st.textContent = '⚠️ Transcription timed out. Try again.';
+                }
+                return;
+            }
+            clearInterval(timer);
+            if (data.success && data.transcript) {
+                st.style.background = '#d4edda';
+                st.style.color = '#155724';
+                st.textContent = '✅ Transcription complete — reloading to show the transcript.';
+                setTimeout(function () { location.reload(); }, 800);
+            } else {
+                btn.disabled = false;
+                btn.textContent = origText;
+                st.style.background = '#fff3cd';
+                st.style.color = '#856404';
+                st.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error');
+            }
+        };
+        req.onerror = function () {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = origText;
+            st.style.background = '#fff3cd';
+            st.style.color = '#856404';
+            st.textContent = '⚠️ Network error during transcription.';
+        };
+        req.send();
+    }, 1000);
 }
 
 function sendToInspection(id, btn) {
