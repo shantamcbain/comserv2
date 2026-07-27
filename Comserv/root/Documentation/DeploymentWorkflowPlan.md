@@ -1,8 +1,39 @@
 # Deployment Workflow Plan
 
-**Version:** 1.0  
-**Last Updated:** 2025-01-10  
-**Status:** Planning Phase
+**Version:** 1.1  
+**Last Updated:** 2026-07-27  
+**Status:** Planning Phase (see "Incidents & Fixes" for shipped deploy.sh changes)
+
+## Incidents & Fixes
+
+### 2026-07-27 — Production "restart loop" (FIXED, commit 76135ef0)
+
+**Symptom:** production1 repeatedly restarted the `comserv2-web-prod` container, making the site intermittently unusable.
+
+**What was actually wrong:** the container was never crashing (Docker showed RestartCount=0, clean exit, healthy). The restarts were self-inflicted by the monitoring cron:
+
+```
+*/10 * * * * DEPLOY_MODE=monitor /opt/comserv/Comserv/script/deploy.sh
+```
+
+In monitor mode, `sync_host_app_lib()` in `script/deploy.sh` unconditionally `docker cp`'d the host `lib/` into the container and then `docker restart`ed it on EVERY 10-minute tick — even when `git pull` reported "Already up to date". Result: 6 production restarts per hour, each with a ~60s health-check start period during which the site was down.
+
+**Fix (deploy.sh):** `sync_host_app_lib()` now computes a sha256 checksum over the host `lib/**/*.pm` tree and stamps it inside the container at `/opt/comserv/.lib_sync_hash`. Sync + restart only occur when the hash differs from the stamp; otherwise it logs `lib unchanged — skipping sync and restart`. The stamp survives `docker restart` but dies with container recreation (correct — a fresh container gets a fresh sync).
+
+**Verified on production1:** first monitor run after the fix synced + restarted once (stamping the hash); the immediately-following run skipped. 
+
+**Lesson:** a "restart loop" is not always the app crashing — check `docker inspect` RestartCount/ExitCode and `docker events` before assuming the container is at fault; our own automation was the actor.
+
+### 2026-07-27 — Production disk at 99% (cleaned up, watch item)
+
+**What was wrong:** 30G root LV at 99% (448M free). At 100% the container really does die (session/log writes fail) — this was the second, genuine flavor of production outage.
+
+**Done:** removed stale `bk-comserv2-web-prod` backup image (3.3GB) + dangling layers, and 42 orphaned Docker volumes from earlier deploy runs (`comserv-deploy-2026070*_*`, doubled `comserv2_comserv2_*` names, old whisper venvs). Preserved `comserv2_nfs_data` and all volumes mounted by the running container. Result: 91% used, 2.8G free.
+
+**Watch items / future work:**
+- The 8.5GB prod image (baked Whisper venv) dominates the disk; long-term either slim the Whisper layer or grow the 30G LV.
+- The deploy backup step creates `bk-comserv2-web-prod:*` images (3.3GB each); ensure old backups are pruned after a successful deploy so they don't re-fill the disk.
+- Volume-normalization in deploy.sh previously left doubled `comserv2_comserv2_*` names behind; if these reappear, the normalization step is recreating rather than renaming.
 
 ## Overview
 

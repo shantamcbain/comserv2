@@ -17,6 +17,29 @@
 <h2>[Unreleased]</h2>
 <p><em>Add bullets here while working; move to a dated section when shipped.</em></p>
 
+<h2>[2026-07-27] — Production1 stability: restart loop, disk, AI2 providers 500</h2>
+
+<h3>Fixed — Deploy system: production "restart loop" (commit 76135ef0)</h3>
+<ul>
+    <li><strong>What was wrong:</strong> production1 appeared to be in a Docker restart loop. Diagnosis showed the container itself was healthy (RestartCount=0, exit 0, no OOM) — the bounce was self-inflicted: the <code>*/10min DEPLOY_MODE=monitor</code> cron ran <code>sync_host_app_lib()</code> in <code>script/deploy.sh</code>, which <em>unconditionally</em> <code>docker cp</code>'d <code>lib/</code> and <code>docker restart</code>ed <code>comserv2-web-prod</code> every tick — 6 restarts/hour, each with a ~60s startup window where the site was down.</li>
+    <li><strong>Fix:</strong> <code>sync_host_app_lib()</code> now computes a sha256 over host <code>lib/*.pm</code> and stamps it into the container (<code>/opt/comserv/.lib_sync_hash</code>). Sync + restart only run when the hash differs; unchanged lib logs "skipping sync and restart".</li>
+    <li><strong>Verified:</strong> first monitor run after deploy synced/restarted once and stamped the hash; second run skipped. Cron now leaves the container alone unless lib actually changes.</li>
+</ul>
+
+<h3>Fixed — AI2 system: /ai2/providers returned 500 (commit 835307d1)</h3>
+<ul>
+    <li><strong>What was wrong:</strong> <code>Model/AI2/Provider/Ollama.pm</code>, <code>Grok.pm</code>, <code>OpenRouter.pm</code>, and <code>ModelManager.pm</code> were plain Moose classes with no <code>extends 'Catalyst::Model'</code>. Catalyst could not instantiate them, so <code>$c-&gt;model('AI2::Provider::Ollama')</code> returned the bare class-name <em>string</em>; calling <code>-&gt;logging</code> on it died with <em>"Can't use string as HASH ref"</em> → unhandled 500 on <code>/ai2/providers</code> and "Ollama discovery failed" in Router.</li>
+    <li><strong>Fix:</strong> added <code>extends 'Catalyst::Model';</code> to all four modules; <code>perl -c</code> clean.</li>
+    <li><strong>Verified:</strong> <code>/ai2/providers</code> now returns HTTP 200 on production1.</li>
+</ul>
+
+<h3>Fixed — Production1 disk at 99% (operational cleanup, no code change)</h3>
+<ul>
+    <li><strong>What was wrong:</strong> 30G root volume at 99% (448M free). At 100% the container genuinely dies (session/log writes fail) — the second flavor of outage.</li>
+    <li><strong>Done:</strong> removed stale backup image <code>bk-comserv2-web-prod:20260727_000133</code> (3.3GB) + dangling layers, and 42 orphaned Docker volumes from old deploy runs (<code>comserv-deploy-2026070*_*</code>, doubled <code>comserv2_comserv2_*</code> names, old whisper venvs). Kept <code>comserv2_nfs_data</code> and every volume mounted by the running container.</li>
+    <li><strong>Result:</strong> 91% used, 2.8G free. Remaining usage is legitimate (8.5GB prod image with baked Whisper venv). Long-term options: slim the Whisper layer or grow the 30G LV.</li>
+</ul>
+
 <h2>[2026-06-13] — HelpDesk member guide (newsletter / mailing)</h2>
 <ul>
     <li>Stable guide: <a href="/Documentation/helpdesk-how-to-use">helpdesk-how-to-use</a> — web <code>/HelpDesk/ticket/new</code>, AI prescreen, Chat with AI widget, email <code>[FIRST_NAME]</code> tags.</li>
