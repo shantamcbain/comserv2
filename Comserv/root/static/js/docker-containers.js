@@ -468,15 +468,15 @@
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rebuild" style="background:#ffc107;color:#333;padding:2px 8px;font-size:0.78em;">Rebuild</button>'
                     : '') +
                 // Build & Push: only on workstation for comserv-web-prod
-                (c.name && c.name.match(/^comserv-web-prod/) && isLocal
+                (c.name && c.name.match(/^comserv2?-web-prod/) && isLocal
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="build-push" style="background:#17a2b8;color:#fff;padding:2px 8px;font-size:0.78em;">Build &amp; Push</button>'
                     : '') +
                 // Push Image (no-build): just push the existing image, workstation only
-                (c.name && c.name.match(/^comserv-web-prod/) && isLocal
+                (c.name && c.name.match(/^comserv2?-web-prod/) && isLocal
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="push-only" style="background:#0056b3;color:#fff;padding:2px 8px;font-size:0.78em;">Push Image</button>'
                     : '') +
                 // Pull & Deploy: only on production targets for comserv-web-prod
-                (c.name && c.name.match(/^comserv-web-prod/) && !isLocal
+                (c.name && c.name.match(/^comserv2?-web-prod/) && !isLocal
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="pull-deploy" style="background:#28a745;color:#fff;padding:2px 8px;font-size:0.78em;">Pull &amp; Deploy</button>'
                     : '') +
                 (c.is_backup_container

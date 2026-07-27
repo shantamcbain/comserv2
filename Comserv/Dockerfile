@@ -69,16 +69,12 @@ RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
-# ── Whisper transcription (baked into image, 2026-07) ──────────────────────
-# CPU-only torch keeps the layer as small as possible (~1.5 GB vs ~5 GB CUDA).
-# Path matches AI.pm's python_candidates ($app_root/whisper_venv/bin/python3).
-# The comserv2_whisper_venv named volume mounts over this path; Docker copies
-# the baked venv into the volume on first start when the volume is empty.
-RUN python3 -m venv /opt/comserv/whisper_venv && \
-    /opt/comserv/whisper_venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/comserv/whisper_venv/bin/pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-    /opt/comserv/whisper_venv/bin/pip install --no-cache-dir openai-whisper && \
-    /opt/comserv/whisper_venv/bin/python3 -c "import whisper; print('whisper OK:', whisper.__version__)"
+# NOTE (2026-07): Whisper is intentionally NOT baked into this image.
+# A CPU-torch whisper venv adds ~5.7 GB — too large for production1's 30 GB
+# disk. Transcription is offloaded: prod saves voice files to NFS
+# (/data/nfs/bmaster/audio) and the WORKSTATION runs whisper against them
+# (see script/whisper_nfs_worker.pl). The whisper_venv volume mount remains
+# for hosts that populate it manually (e.g. the workstation).
 
 # Create application user
 RUN useradd -m -s /bin/bash comserv && mkdir -p /opt/comserv && \
