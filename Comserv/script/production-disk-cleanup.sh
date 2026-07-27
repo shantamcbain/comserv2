@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # production-disk-cleanup.sh — Safe disk cleanup for Comserv production hosts
 # Run on 192.168.1.126 (or via admin SSH cleanup endpoint).
-# Does NOT remove named volumes or the running comserv-web-prod image.
+# Does NOT remove named volumes or the running comserv2-web-prod image.
 
 set -euo pipefail
 

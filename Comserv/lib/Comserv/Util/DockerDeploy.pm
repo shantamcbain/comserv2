@@ -45,7 +45,7 @@ sub _error {
 # Canonical volumes required on every server
 our @CANONICAL_VOLUMES = qw(
     comserv2_config_db_data comserv2_redis_data comserv2_logs
-    comserv2_sessions comserv2_workshop_files comserv2_whisper_venv
+    comserv2_sessions comserv2_nfs_data comserv2_whisper_venv
     comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
 );
 
@@ -260,7 +260,7 @@ sub deploy {
     } elsif ($target eq 'workstation') {
         # Workstation: identical to production but runs locally
         $service        = 'web-prod';
-        $container_name = 'comserv-web-prod';
+        $container_name = 'comserv2-web-prod';
         $port           = 5000;
         $compose_files  = '-f docker-compose.yml -f docker-compose.prod.yml';
         $is_remote      = 0;
@@ -270,7 +270,7 @@ sub deploy {
     } elsif ($target eq 'local-test') {
         # Build & test only — build the prod image, quick verify, no deploy
         $service        = 'web-prod';
-        $container_name = 'comserv-web-prod';
+        $container_name = 'comserv2-web-prod';
         $port           = 5000;
         $compose_files  = '-f docker-compose.yml -f docker-compose.prod.yml';
         $is_remote      = 0;
@@ -278,7 +278,7 @@ sub deploy {
         $ENV{STATIC_SRC}       = "$repo/root/static";
     } else {
         $service        = 'web-prod';
-        $container_name = 'comserv-web-prod';
+        $container_name = 'comserv2-web-prod';
         $port           = 5000;
         $is_remote      = 1;
         my $ssh_host    = $target eq 'production1' ? '192.168.1.126'

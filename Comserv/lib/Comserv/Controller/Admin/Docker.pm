@@ -198,7 +198,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         my $base_compose = "$repo_path/Comserv/docker-compose.yml";
         my $prod_compose = "$repo_path/Comserv/docker-compose.prod.yml";
         my $nfs_compose  = "$repo_path/Comserv/docker-compose.prod.nfs.yml";
-        my $container    = 'comserv-web-prod';
+        my $container    = 'comserv2-web-prod';
 
         # NEW: Support local staging deploy to port 4000 (web-staging service)
         #       and local workstation deploy to port 5000 (web-prod service)
@@ -311,7 +311,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         # === Consistency Check (all servers must use the same comserv2_* volumes) ===
         my @canonical_volumes = qw(
             comserv2_config_db_data comserv2_redis_data comserv2_logs
-            comserv2_sessions comserv2_workshop_files comserv2_whisper_venv
+            comserv2_sessions comserv2_nfs_data comserv2_whisper_venv
             comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
         );
         my $config_out = `cd '$repo_path/Comserv' && docker compose $compose_args config 2>/dev/null`;
@@ -831,7 +831,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
     my $vol_out = `$vol_cmd` || '';
     my %canonical = map { $_ => 1 } qw(
         comserv2_config_db_data comserv2_redis_data comserv2_logs
-        comserv2_sessions comserv2_workshop_files comserv2_whisper_venv
+        comserv2_sessions comserv2_nfs_data comserv2_whisper_venv
         comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
     );
     foreach my $vname (split /\n/, $vol_out) {
@@ -970,7 +970,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         $deploy_target = 'web-dev';
     } elsif ($service eq 'comserv2-web-staging') {
         $deploy_target = 'staging-4000';
-    } elsif ($service eq 'comserv-web-prod') {
+    } elsif ($service eq 'comserv2-web-prod') {
         $deploy_target = $host;
     } else {
         $c->stash->{json} = { success => 0, error => "Unknown container: $service" };

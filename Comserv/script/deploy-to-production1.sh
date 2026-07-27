@@ -20,7 +20,7 @@ set -euo pipefail
 PROD_HOST="production1"
 PROD_USER="shanta"
 IMAGE_NAME="shantamcsbain/comserv-web-prod:latest"
-CONTAINER_NAME="comserv-web-prod"
+CONTAINER_NAME="comserv2-web-prod"
 OLD_CONTAINER_PREFIX="comservproduction1-old"
 HEALTH_ENDPOINT="http://localhost:5000/health"
 MAX_OLD_CONTAINERS=5
