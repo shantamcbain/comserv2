@@ -277,6 +277,20 @@ sync_host_app_lib() {
         return 0
     fi
 
+    # Compute a checksum of the host lib tree so we only sync/restart when it
+    # actually changed. Unconditional restarts every monitor tick (10 min) were
+    # bouncing production 6x/hour — the "restart loop".
+    local LIB_HASH
+    LIB_HASH=$(cd "$HOST_LIB" && find . -type f -name '*.pm' -print0 | sort -z | xargs -0 sha256sum 2>/dev/null | sha256sum | awk '{print $1}')
+    local STAMP_FILE="/opt/comserv/.lib_sync_hash"
+    local CUR_HASH
+    CUR_HASH=$(docker exec "$CONTAINER" cat "$STAMP_FILE" 2>/dev/null || echo "none")
+
+    if [ -n "$LIB_HASH" ] && [ "$LIB_HASH" = "$CUR_HASH" ]; then
+        echo "   ✓ lib unchanged (hash $LIB_HASH) — skipping sync and restart"
+        return 0
+    fi
+
     if docker inspect "$CONTAINER" --format '{{range .Mounts}}{{println .Destination}}{{end}}' 2>/dev/null \
         | grep -qx '/opt/comserv/lib'; then
         echo "   ✓ Application lib mounted from host ($HOST_LIB)"
@@ -287,6 +301,9 @@ sync_host_app_lib() {
             return 1
         }
     fi
+
+    # Record the synced hash inside the container (survives restart, dies with recreate — which is correct)
+    docker exec "$CONTAINER" sh -c "echo '$LIB_HASH' > '$STAMP_FILE'" 2>/dev/null || true
 
     echo "   Restarting $CONTAINER to load updated Perl modules..."
     docker restart "$CONTAINER" >/dev/null 2>&1 \
