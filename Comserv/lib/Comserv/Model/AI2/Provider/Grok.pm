@@ -1,6 +1,7 @@
 package Comserv::Model::AI2::Provider::Grok;
 
 use Moose;
+extends 'Catalyst::Model';
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 
 use Try::Tiny;
