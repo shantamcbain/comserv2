@@ -35,7 +35,11 @@ services:
     volumes:
       - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - ${COMSERV_LOGS_DIR:-/var/log/comserv}:/opt/comserv/applogs
-      - ${WORKSHOP_LOCAL_DIR:-/var/lib/comserv/data}:/data/nfs:rw
+      # Shared NFS storage — the ONE source of truth for uploads/voice files.
+      # NFS-backed named volume (see volumes: below) pointing at the same export
+      # root the workstation uses. Replaces the old local bind mount that made
+      # /data/nfs ephemeral per-host (voice files never reached shared storage).
+      - comserv2_nfs_data:/data/nfs:rw
       - /home/ubuntu/comserv-sessions:/tmp/comserv/session:rw
       # Live Perl fixes from host git (deploy.sh pulls /opt/comserv/Comserv before compose up)
       - /opt/comserv/Comserv/lib:/opt/comserv/lib:ro
@@ -48,7 +52,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 60s
     logging:
       driver: "json-file"
       options:
@@ -58,3 +62,13 @@ services:
 volumes:
   whisper-venv:
     driver: local
+  # Shared NFS storage for /data/nfs — same export root as the workstation
+  # (192.168.1.175:/mnt/data), so every container + host share one tree
+  # (bmaster/audio, bmaster/transcripts, workshop files). nfsvers=3 matches
+  # the workstation's live, proven mount.
+  comserv2_nfs_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2"
+      device: ":/mnt/data"

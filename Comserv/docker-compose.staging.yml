@@ -58,7 +58,7 @@ services:
       # Standardized comserv2_* named volumes
       - comserv2_logs:/opt/comserv/root/log
       - comserv2_sessions:/opt/comserv/root/session
-      - comserv2_workshop_files:/opt/comserv/backups
+      - comserv2_nfs_data:/opt/comserv/backups
       - comserv2_whisper_venv:/opt/comserv/whisper_venv
       - comserv2_cpan_cache:/root/.cpan
       - comserv2_cache:/cache
@@ -95,7 +95,7 @@ volumes:
     driver: local
   comserv2_sessions:
     driver: local
-  comserv2_workshop_files:
+  comserv2_nfs_data:
     driver: local
   comserv2_whisper_venv:
     driver: local

@@ -3,7 +3,7 @@ services:
     build:
       context: ./Comserv
       dockerfile: Dockerfile
-    container_name: comserv-web-prod
+    container_name: comserv2-web-prod
     restart: always
     labels:
       - "description=Production web server with Starman workers and monitoring"

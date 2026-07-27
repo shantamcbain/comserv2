@@ -7,7 +7,7 @@
 #   comserv2_redis_data       - Redis persistence
 #   comserv2_logs             - Application logs
 #   comserv2_sessions         - Session storage
-#   comserv2_workshop_files   - Workshop/uploads (NFS or local)
+#   comserv2_nfs_data   - Workshop/uploads (NFS or local)
 #   comserv2_whisper_venv     - Whisper Python venv (shared)
 #   comserv2_cpan_cache       - Perl CPAN cache
 #   comserv2_temp             - Temporary files
@@ -82,7 +82,7 @@ services:
     volumes:
       - ${COMSERV_SECRETS_DIR:-~/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       - comserv2_logs:/opt/comserv/root/log
-      - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_nfs_data:/data/nfs:rw
       - comserv2_sessions:/tmp/comserv/session:rw
       - comserv2_whisper_venv:/opt/comserv/whisper_venv
       - comserv2_cpan_cache:/root/.cpan
@@ -126,7 +126,7 @@ services:
       - ./config:/opt/comserv/config:ro
       - ./t:/opt/comserv/t:ro
       - comserv2_logs:/opt/comserv/root/log
-      - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_nfs_data:/data/nfs:rw
       - comserv2_sessions:/tmp/comserv/session:rw
       - comserv2_cache:/cache
       - comserv2_temp:/tmp/comserv/temp
@@ -173,7 +173,7 @@ services:
       - ${COMSERV_SECRETS_DIR:-~/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
       # Core comserv2_* volumes (standardized across all environments)
       - comserv2_logs:/opt/comserv/root/log
-      - comserv2_workshop_files:/data/nfs:rw
+      - comserv2_nfs_data:/data/nfs:rw
       - comserv2_sessions:/tmp/comserv/session:rw
       - comserv2_whisper_venv:/opt/comserv/whisper_venv
       - comserv2_cpan_cache:/root/.cpan
@@ -209,8 +209,19 @@ volumes:
     driver: local
   comserv2_sessions:
     driver: local
-  comserv2_workshop_files:
+  comserv2_nfs_data:
+    # NFS-backed shared storage — the ONE source of truth for uploads/voice files.
+    # Points at the SAME export root the workstation mounts at /data/nfs
+    # (192.168.1.175:/mnt/data), so every container and the host share the exact
+    # same tree (bmaster/audio, bmaster/transcripts, workshop resources, etc.).
+    # Previously driver:local = ephemeral per-host disk, which is why voice files
+    # saved inside a container never reached shared storage. nfsvers=3 matches the
+    # workstation's live, proven mount.
     driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2"
+      device: ":/mnt/data"
   comserv2_whisper_venv:
     driver: local
   comserv2_cpan_cache:

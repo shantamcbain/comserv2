@@ -102,7 +102,15 @@ else
     COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 fi
 IMAGE="shantamcsbain/comserv-web-prod:latest"
+# Standard container name is "comserv2-web-prod" (matches comserv2-config-db,
+# comserv2-redis, etc.). A legacy container may still exist under the old name
+# "comserv-web-prod" — detect it so the monitor/deploy manages it instead of
+# thinking the container is dead (that mismatch caused a 2-min restart loop).
 CONTAINER="comserv2-web-prod"
+if ! docker inspect "$CONTAINER" >/dev/null 2>&1 && docker inspect "comserv-web-prod" >/dev/null 2>&1; then
+    CONTAINER="comserv-web-prod"
+    echo "NOTE: managing legacy-named container 'comserv-web-prod'. Next full deploy will recreate it as 'comserv2-web-prod'."
+fi
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 export SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-$HOSTNAME_VAL}"
@@ -765,16 +773,18 @@ normalize_volumes() {
         ["comserv_comserv2_temp"]="comserv2_temp"
         ["comserv_comserv2_themes"]="comserv2_themes"
         ["comserv_comserv2_whisper_venv"]="comserv2_whisper_venv"
-        ["comserv_comserv2_workshop_files"]="comserv2_workshop_files"
+        ["comserv_comserv2_nfs_data"]="comserv2_nfs_data"
+        ["comserv2_workshop_files"]="comserv2_nfs_data"
+        ["comserv_comserv2_workshop_files"]="comserv2_nfs_data"
         ["comserv_comserv_cache"]="comserv2_cache"
         ["comserv_comserv-config-db-data"]="comserv2_config_db_data"
-        ["comserv_comserv-prod-backups"]="comserv2_workshop_files"
+        ["comserv_comserv-prod-backups"]="comserv2_nfs_data"
         ["comserv_comserv-prod-logs"]="comserv2_logs"
         ["comserv_comserv-prod-sessions"]="comserv2_sessions"
         ["comserv_comserv-temp"]="comserv2_temp"
         ["comserv_comserv-themes"]="comserv2_themes"
         ["comserv2_whisper-venv"]="comserv2_whisper_venv"
-        ["comserv2_workshop_files_nfs"]="comserv2_workshop_files"
+        ["comserv2_workshop_files_nfs"]="comserv2_nfs_data"
         ["comserv2_mysql_data"]="comserv2_config_db_data"
     )
 
@@ -917,7 +927,56 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
     echo "Checking container viability for $CONTAINER..."
     CONTAINER_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
     CONTAINER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unhealthy")
-    
+
+    # ── Loop-proofing (2026-07) ───────────────────────────────────────────────
+    # A container that was just (re)started reports health "starting" and low
+    # uptime. Restarting it in that window creates a self-sustaining restart
+    # loop (observed: 28 restarts, "Up 1 second" forever). Rules:
+    #   1. NEVER restart while health is "starting" — let the healthcheck's
+    #      start_period play out.
+    #   2. Require a minimum uptime (120s) before we're allowed to restart.
+    #   3. Require "unhealthy" to persist across 3 re-checks 20s apart before
+    #      acting — a single failed healthcheck (slow request, busy worker)
+    #      must not trigger recovery.
+    if [ "$CONTAINER_RUNNING" = "true" ] && [ "$CONTAINER_HEALTH" = "starting" ]; then
+        echo "   Container is in healthcheck start_period ('starting') — skipping recovery, not restarting."
+        CONTAINER_HEALTH="healthy"  # treat as OK for this pass
+    fi
+
+    if [ "$CONTAINER_RUNNING" = "true" ] && [ "$CONTAINER_HEALTH" = "unhealthy" ]; then
+        STARTED_AT=$(docker inspect --format='{{.State.StartedAt}}' "$CONTAINER" 2>/dev/null || echo "")
+        UPTIME_S=0
+        if [ -n "$STARTED_AT" ]; then
+            START_EPOCH=$(date -d "$STARTED_AT" +%s 2>/dev/null || echo 0)
+            [ "$START_EPOCH" -gt 0 ] && UPTIME_S=$(( $(date +%s) - START_EPOCH ))
+        fi
+        if [ "$UPTIME_S" -lt 120 ]; then
+            echo "   Container unhealthy but uptime is only ${UPTIME_S}s (<120s) — skipping recovery to avoid a restart loop."
+            CONTAINER_HEALTH="healthy"  # treat as OK for this pass
+        else
+            # Confirm the unhealthy state is sustained, not a blip
+            CONFIRMED=0
+            for RECHECK in 1 2 3; do
+                sleep 20
+                RC_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
+                RC_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
+                echo "   [Confirm $RECHECK/3] running=$RC_RUNNING health=$RC_HEALTH"
+                if [ "$RC_RUNNING" != "true" ]; then
+                    CONFIRMED=3; CONTAINER_RUNNING="false"; break
+                fi
+                if [ "$RC_HEALTH" = "unhealthy" ]; then
+                    CONFIRMED=$((CONFIRMED + 1))
+                else
+                    CONFIRMED=0
+                fi
+            done
+            if [ "$CONFIRMED" -lt 3 ]; then
+                echo "   Unhealthy state did not persist across 3 checks — skipping recovery."
+                CONTAINER_HEALTH="healthy"  # treat as OK for this pass
+            fi
+        fi
+    fi
+
     if [ "$CONTAINER_RUNNING" != "true" ] || [ "$CONTAINER_HEALTH" = "unhealthy" ]; then
         echo "⚠️  CRITICAL: Container $CONTAINER is dead or unhealthy! (Running: $CONTAINER_RUNNING, Health: $CONTAINER_HEALTH)"
         echo "   Initiating automatic recovery procedure..."
