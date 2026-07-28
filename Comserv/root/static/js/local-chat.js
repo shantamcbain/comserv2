@@ -4276,7 +4276,16 @@
         var inputEl   = document.getElementById('message-input');
         var sendBtn   = document.getElementById('send-message');
 
-        if (!file) return;
+        // Log the REAL byte count the tablet is about to send. If this prints
+        // 0, the stored backup blob is empty (the original capture recorded
+        // nothing) and no amount of retrying will recover it — re-record.
+        console.log('[transcribe] sending audio:', (file && file.name), 'size=', (file && file.size), 'type=', (file && file.type));
+        if (!file || !file.size) {
+            if (statusEl) { statusEl.textContent = '⚠️ Recording has no audio data (0 bytes on device) — please re-record.'; statusEl.style.display = ''; }
+            if (sendBtn) sendBtn.disabled = false;
+            if (backupId) { _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups); }
+            return;
+        }
 
         var sizeMB = (file.size / 1048576).toFixed(1);
         if (statusEl) { statusEl.textContent = '⏳ Uploading ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }

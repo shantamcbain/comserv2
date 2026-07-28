@@ -42,6 +42,14 @@ sub run {
         $c->response->body(encode_json({ success => JSON::false, error => 'No audio file uploaded (field name: audio)' }));
         return;
     }
+    # Reject empty uploads. A 0-byte body passes the field check above but must
+    # never be saved as a "successful" no-size file row. This is what let the
+    # Retry button loop forever re-sending an empty IndexedDB blob.
+    unless ($upload->size) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Empty audio upload (0 bytes)' }));
+        return;
+    }
 
     my $orig_name = $upload->filename || 'recording.wav';
     (my $ext = lc($orig_name)) =~ s/.*\.//;
@@ -110,23 +118,41 @@ sub run {
             or die "copy to NFS failed: $!";
     };
     if ($@) {
-        my $local_base = $c->path_to('root', 'uploads')->stringify;
-        $audio_nfs_early = "${local_base}/bmaster/audio";
-        $transcript_nfs_early = "${local_base}/bmaster/transcripts";
-        $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${voice_date}_${voice_uniq}.${ext}";
-        $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${voice_date}_${voice_uniq}.json";
-        $source_type = 'local';
-        eval {
-            require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
-            require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
-                or die "copy to local fallback failed: $!";
-        };
-        if ($@) {
+        # NFS write failed. NEVER fall back to the container-private
+        # root/uploads directory — files written there are invisible to the
+        # NFS worker and every other host, which strands them (no playback,
+        # no re-transcription from other hosts). Fall back to the shared
+        # Docker NFS mount (/data/nfs/...) instead, which all hosts see.
+        my $shared_base = '/data/nfs';
+        my $local_base  = $c->path_to('root', 'uploads')->stringify;
+        # Prefer the shared mount; only use container-local as a last resort.
+        my @fallbacks = ($shared_base);
+        push @fallbacks, $local_base unless $shared_base eq $local_base;
+        my $saved = 0;
+        for my $base (@fallbacks) {
+            my $a = "${base}/bmaster/audio";
+            my $t = "${base}/bmaster/transcripts";
+            eval {
+                require File::Path; File::Path::make_path($a, $t);
+                require File::Copy; File::Copy::copy($tmp_file, "${a}/${safe_user_early}_${voice_date}_${voice_uniq}.${ext}")
+                    or die "copy to $a failed: $!";
+            };
+            if (!$@) {
+                $audio_nfs_early      = $a;
+                $transcript_nfs_early = $t;
+                $nfs_audio_file_early = "${a}/${safe_user_early}_${voice_date}_${voice_uniq}.${ext}";
+                $nfs_transcript_file_early = "${t}/${safe_user_early}_${voice_date}_${voice_uniq}.json";
+                $saved = 1;
+                last;
+            }
+        }
+        unless ($saved) {
             unlink $tmp_file;
             $c->response->status(500);
-            $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to NFS and local fallback: $@" }));
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to shared storage: $@" }));
             return;
         }
+        $source_type = 'shared';
     }
 
     my $audio_file_id = undef;
