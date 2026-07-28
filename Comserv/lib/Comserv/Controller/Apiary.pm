@@ -941,13 +941,20 @@ sub audio_serve :Path('/Apiary/audio_serve') :Args(1) {
         });
     };
 
-    unless ($row && $row->nfs_path && -f $row->nfs_path) {
+    unless ($row) {
         $c->response->status(404);
         $c->response->body('Not found');
         return;
     }
 
-    my $nfs_path = $row->nfs_path;
+    # The stored nfs_path may point at a container-local fallback that is
+    # invisible from this host; search all known storage locations.
+    my $nfs_path = $self->_resolve_audio_file_path($c, $row);
+    unless ($nfs_path) {
+        $c->response->status(404);
+        $c->response->body('Not found');
+        return;
+    }
     my $fmt      = $row->file_format || 'audio/mpeg';
     my $size     = -s $nfs_path;
 
@@ -1012,19 +1019,12 @@ sub transcribe_recording :Path('/Apiary/transcribe_recording') :Args(1) {
         return;
     }
 
-    # Resolve the on-disk audio path. Prefer the stored nfs_path; if it is
-    # missing/stale, fall back to locating the file by its stored name under
-    # the audio NFS base so a stale path doesn't block transcription when the
-    # bytes are actually present on this host.
-    my $nfs_path = $row->nfs_path || '';
-    unless ($nfs_path && -f $nfs_path) {
-        my $base = '/data/nfs/bmaster/audio';
-        if ($row->file_name) {
-            my $cand = "$base/" . $row->file_name;
-            $nfs_path = $cand if -f $cand;
-        }
-    }
-    unless ($nfs_path && -f $nfs_path) {
+    # Resolve the on-disk audio path across all storage locations the capture
+    # pipeline could have used (shared NFS, container-local fallback, etc).
+    # This repairs stranded paths so re-transcription works even when the file
+    # was originally saved to a host-private directory.
+    my $nfs_path = $self->_resolve_audio_file_path($c, $row);
+    unless ($nfs_path) {
         $c->response->status(404);
         $c->response->body(encode_json({
             success => JSON::false,
@@ -1074,6 +1074,40 @@ sub transcribe_recording :Path('/Apiary/transcribe_recording') :Args(1) {
 # ============================================================================
 # PRIVATE HELPERS
 # ============================================================================
+
+# Resolve the on-disk path for a stored audio File row. Voice files may have
+# been written either to the shared NFS mount (/data/nfs/...) or to the
+# container-local fallback (/opt/comserv/root/uploads/...) when NFS was
+# unavailable at capture time. A container-local file is invisible to the NFS
+# worker and to any other host, so bare nfs_path lookups fail there. This
+# helper searches every location the capture pipeline could have used and
+# returns the first that actually exists on THIS host. It also repairs the
+# row's nfs_path when the file is found under a different (shared) location,
+# so subsequent lookups are instant and correct.
+sub _resolve_audio_file_path {
+    my ($self, $c, $row) = @_;
+    return '' unless $row;
+
+    my @candidates;
+    push @candidates, $row->nfs_path if $row->nfs_path;
+    if (my $name = $row->file_name) {
+        push @candidates, "/data/nfs/bmaster/audio/$name";
+        push @candidates, "/opt/comserv/root/uploads/bmaster/audio/$name";
+        push @candidates, $c->path_to('root', 'uploads', 'bmaster', 'audio', $name)->stringify
+            if $c->can('path_to');
+    }
+
+    for my $p (@candidates) {
+        next unless $p && -f $p;
+        # Repair a stale/container-local path so playback + re-transcription
+        # keep working and the file becomes discoverable from any host.
+        if (($row->nfs_path // '') ne $p) {
+            eval { $row->update({ nfs_path => $p }); };
+        }
+        return $p;
+    }
+    return '';
+}
 
 sub _parse_voice_transcript {
     my ($text) = @_;
