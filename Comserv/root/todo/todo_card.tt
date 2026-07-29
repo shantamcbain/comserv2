@@ -106,6 +106,14 @@
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#c45d00;color:#fff;">AUDIT ROOT</span>
       [% END %]
 
+      [%# Occurrence count badge — how many times this same error has recurred
+          while its audit todo remained open (de-duped; no email per hit). %]
+      [% SET tci_occ = 0 %]
+      [% IF tc.occurrence_count && tc.occurrence_count > 1 %][% SET tci_occ = tc.occurrence_count %][% END %]
+      [% IF tci_occ > 1 %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#c45d00;color:#fff;font-weight:bold;" title="This error has recurred [% tci_occ %] times — occurrences are counted, not emailed individually">↻ [% tci_occ %]×</span>
+      [% END %]
+
       [%# Todo type badge (appointment / meeting / event / reminder) %]
       [% SET tci_type = tc.todo_type || 'task' %]
       [% IF tci_type == 'appointment' %]

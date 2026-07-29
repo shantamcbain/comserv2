@@ -4,32 +4,42 @@ use warnings FATAL => 'all';
 
 __PACKAGE__->table('todo');
 __PACKAGE__->add_columns(record_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_auto_increment => 1,
+        is_nullable => 0,
     },
     sitename => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 0,
     },
     start_date => {
         data_type => 'date',
+        is_nullable => 0,
     },
     parent_todo => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 0,
     },
     due_date => {
         data_type => 'date',
+        is_nullable => 0,
     },
     subject => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 0,
     },
     description => {
         data_type => 'text',
+        is_nullable => 0,
     },
     estimated_man_hours => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
     },
     comments => {
         data_type => 'text',
@@ -60,6 +70,7 @@ __PACKAGE__->add_columns(record_id => {
     project_code => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 0,
     },
     developer => {
         data_type => 'varchar',
@@ -76,31 +87,41 @@ __PACKAGE__->add_columns(record_id => {
     status => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 0,
     },
     priority => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
     },
     share => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
     },
     last_mod_by => {
         data_type => 'varchar',
         size => 255,
         is_nullable => 0,
-        default_value => 'system',
     },
     last_mod_date => {
         data_type => 'date',
+        is_nullable => 0,
     },
     group_of_poster => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 0,
     },
     user_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
     },
     project_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
     },
     date_time_posted => {
         data_type => 'varchar',
@@ -109,26 +130,31 @@ __PACKAGE__->add_columns(record_id => {
         default_value => '',
     },
     plan_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
     },
     blocked_by_todo_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
     },
     parent_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
     },
     sort_order => {
-        data_type => 'integer',
-        default_value => 0,
+        data_type => 'int',
+        size => 11,
         is_nullable => 0,
+        default_value => 0,
     },
     is_blocking => {
-        data_type => 'boolean',
-        default_value => 0,
+        data_type => 'tinyint',
+        size => 1,
         is_nullable => 0,
+        default_value => 0,
     },
     scheduled_date => {
         data_type => 'date',
@@ -147,14 +173,14 @@ __PACKAGE__->add_columns(record_id => {
         is_nullable => 1,
     },
     billable => {
-        data_type     => 'tinyint',
-        size          => 1,
-        is_nullable   => 0,
+        data_type => 'tinyint',
+        size => 4,
+        is_nullable => 0,
         default_value => 1,
     },
     point_rate => {
         data_type   => 'decimal',
-        size        => [10, 4],
+        size        => '10,0',
         is_nullable => 1,
     },
     todo_type => {
@@ -184,6 +210,12 @@ __PACKAGE__->add_columns(record_id => {
         size          => 1,
         is_nullable   => 0,
         default_value => 0,
+    },
+    occurrence_count => {
+        data_type     => 'int',
+        size          => 11,
+        is_nullable   => 0,
+        default_value => 1,
     },
 );
 

@@ -178,6 +178,30 @@
                 <td style="white-space:nowrap">
                   <a href="[% c.uri_for('/file/edit', file.id) %]" class="btn btn-sm btn-edit">Edit</a>
                   <a href="[% c.uri_for('/file/download', file.id) %]" class="btn btn-sm" title="Download">&#8595;</a>
+                  [% IF (file.file_type || '') == 'audio' %]
+                  <button type="button" class="btn btn-sm btn-secondary"
+                          onclick="flToggleConvert('[% loop.index %]')"
+                          title="Convert this audio file to another format (mp3, m4a, wav, ogg)">&#8644; Convert</button>
+                  <div id="fl-convert-[% loop.index %]" style="display:none;margin-top:6px;background:#f8f8f8;border:1px solid var(--border-color, #ddd);border-radius:4px;padding:8px 10px;min-width:300px;">
+                    <form method="post" action="[% c.uri_for('/file/convert') %]" onsubmit="return flConfirmConvert(this, '[% loop.index %]')">
+                      <input type="hidden" name="file_id" value="[% file.id %]">
+                      <div style="font-size:.78rem;color: var(--text-muted-color, #555);margin-bottom:5px;">
+                        Convert <code style="font-size:.76rem">[% file.file_name | html %]</code>
+                      </div>
+                      <label style="font-size:.82rem;font-weight:600">To format:</label>
+                      <select name="format" style="margin:4px 0 6px;padding:3px 6px;font-size:.82rem;border:1px solid #ccc;border-radius:3px;">
+                        <option value="mp3">MP3 (most compatible)</option>
+                        <option value="m4a">M4A / AAC (small, universal)</option>
+                        <option value="wav">WAV (lossless)</option>
+                        <option value="ogg">OGG Vorbis</option>
+                      </select>
+                      <button type="submit" class="btn btn-sm btn-primary">Convert</button>
+                      <button type="button" class="btn btn-sm btn-secondary"
+                              onclick="flToggleConvert('[% loop.index %]')">Cancel</button>
+                      <div id="fl-convert-status-[% loop.index %]" style="display:none;margin-top:6px;font-size:.8rem;"></div>
+                    </form>
+                  </div>
+                  [% END %]
                   [% SET fp = file.nfs_path || file.file_path %]
                   [% IF fp %]
                   <button type="button" class="btn btn-sm btn-secondary"
@@ -217,9 +241,4 @@
     </div>
   </div>
 </div>
-<script>
-function flToggleMove(idx) {
-    var el = document.getElementById('fl-move-' + idx);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-</script>
+

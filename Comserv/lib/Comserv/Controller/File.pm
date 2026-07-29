@@ -1127,6 +1127,148 @@ sub download :Path('/file/download') :Args(1) {
     $c->response->body($content);
 }
 
+# ----------------------------------------------------------------------------
+# POST /file/convert — Convert an existing audio file to another format using
+# ffmpeg and register the result as a new File row. Available for ANY audio
+# file in the File Manager (not just beekeeping), so a voice recording captured
+# as webm/ogg can be turned into a universally-playable mp3/m4a. The converted
+# file is written into the SAME storage directory as the source so it stays on
+# the same host/volume (NFS or container-local) and is immediately visible in
+# the File Manager list.
+# ----------------------------------------------------------------------------
+sub convert :Path('/file/convert') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+    unless ($is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin privileges required to convert files' }));
+        return;
+    }
+
+    my $id     = $c->request->param('file_id') // '';
+    my $format = lc($c->request->param('format') // 'mp3');
+    unless ($id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid file id' }));
+        return;
+    }
+    unless ($format =~ /^(mp3|m4a|wav|ogg)$/) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => "Unsupported format: $format (use mp3, m4a, wav, ogg)" }));
+        return;
+    }
+
+    my $file = $c->model('File')->get_file_by_id($c, $id);
+    unless ($file) {
+        $c->response->status(404);
+        $c->response->body(encode_json({ success => JSON::false, error => "File #$id not found or access denied" }));
+        return;
+    }
+    unless (($file->file_type // '') eq 'audio') {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Only audio files can be converted' }));
+        return;
+    }
+
+    # Resolve the on-disk source across all storage roots the capture pipeline
+    # could have used (shared NFS, container-local fallback, app uploads dir).
+    my $src = $self->_resolve_file_fs_path($c, $file);
+    unless ($src && -f $src) {
+        $c->response->status(404);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Source audio not found on storage' }));
+        return;
+    }
+
+    # Write the converted file next to the source so it lands on the same
+    # volume (NFS or container-local) and inherits the same visibility.
+    my ($vol, $dirs, $base) = File::Spec->splitpath($src);
+    my $src_name = ($base =~ s/\.[^.]+$//r);
+    my $dst = File::Spec->catfile($dirs, "${src_name}_converted.${format}");
+
+    my %codec = (mp3 => 'libmp3lame', m4a => 'aac', wav => 'pcm_s16le', ogg => 'libvorbis');
+    my $rc = system('ffmpeg', '-y', '-v', 'error', '-i', $src, '-c:a', $codec{$format}, $dst);
+    if ($rc != 0 || !-s $dst) {
+        unlink $dst;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "ffmpeg failed to convert to $format" }));
+        return;
+    }
+
+    # Register the converted file as a new File row in the same site.
+    my $schema  = $c->model('DBEncy');
+    my $new_row;
+    eval {
+        $new_row = $schema->resultset('File')->create({
+            file_name    => "${src_name}_converted.${format}",
+            file_type    => 'audio',
+            file_data    => '',
+            site_id      => $file->site_id // 0,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => "Converted from file #$id (" . ($file->file_name // '') . ')',
+            upload_date  => POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime),
+            file_size    => -s $dst,
+            file_path    => $dst,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => "audio/$format",
+            user_id      => $c->session->{user_id} // 0,
+            nfs_path     => $dst,
+            external_url => '',
+            access_level => $file->access_level // 'site_only',
+            source_type  => 'converted',
+            sitename     => $file->sitename // $sitename,
+        });
+    };
+    if ($@ || !$new_row) {
+        unlink $dst;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Converted file saved but DB record failed: $@" }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'convert',
+        "Converted file #$id -> #" . $new_row->id . " format=$format dst=$dst");
+    $c->response->body(encode_json({
+        success    => JSON::true,
+        new_id     => $new_row->id + 0,
+        new_path   => $dst,
+        format     => $format,
+        new_name   => $new_row->file_name,
+    }));
+}
+
+# Resolve the on-disk path for a File row across every storage root the capture
+# pipeline could have used. Mirrors the stranded-path repair in Apiary.pm so
+# files saved to a container-local fallback are still found.
+sub _resolve_file_fs_path {
+    my ($self, $c, $file) = @_;
+    return '' unless $file;
+
+    my @candidates;
+    push @candidates, $file->nfs_path if $file->nfs_path;
+    push @candidates, $file->file_path if $file->file_path;
+    if (my $name = $file->file_name) {
+        push @candidates, "/data/nfs/bmaster/audio/$name";
+        push @candidates, "/opt/comserv/root/uploads/bmaster/audio/$name";
+        push @candidates, $c->path_to('root', 'uploads', 'bmaster', 'audio', $name)->stringify
+            if $c->can('path_to');
+    }
+    for my $p (@candidates) {
+        next unless $p && -f $p;
+        return $p;
+    }
+    return '';
+}
+
 sub _disk_usage {
     my ($self, $path) = @_;
     return {} unless defined $path && -d $path;

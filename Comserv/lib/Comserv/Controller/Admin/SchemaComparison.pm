@@ -112,8 +112,25 @@ sub _write_result_file_safe {
     my ($self, $result_file_path, $content) = @_;
     my $tmpfile = $result_file_path . '.syntaxcheck.tmp';
     write_file($tmpfile, $content);
-    my $check = `perl -c "$tmpfile" 2>&1`;
+
+    # Run the syntax check under an alarm so a misbehaving `perl -c` can never
+    # wedge the web worker (a hung worker is what surfaced to users as a bare
+    # "NetworkError" on the schema-compare page).
+    my $check = '';
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm(15);
+        $check = `perl -c "$tmpfile" 2>&1`;
+        alarm(0);
+    };
+    my $alarm_err = $@;
+    alarm(0);
     unlink $tmpfile;
+
+    if ($alarm_err && $alarm_err =~ /timeout/) {
+        die "Generated code could not be syntax-checked in time (the check timed out). "
+          . "The Result file was NOT modified. Please retry; if this persists, check the server.";
+    }
     unless ($check =~ /syntax OK/) {
         die "Generated code failed Perl syntax check — file NOT written.\n"
           . "Error: $check";
@@ -1171,27 +1188,35 @@ sub get_result_field_info {
 
 sub update_result_field_from_table {
     my ($self, $c, $table_name, $field_name, $database, $table_field_info) = @_;
-    
+
     my $result_table_mapping = Comserv::Util::Schema::ResultParser->new->build_result_table_mapping($database, $c);
     my $result_file_path;
-    
+
     my $table_key = lc($table_name);
     if (exists $result_table_mapping->{$table_key}) {
         $result_file_path = $result_table_mapping->{$table_key}->{result_path};
     }
-    
+
     unless ($result_file_path && -f $result_file_path) {
         die "Result file not found for table '$table_name'";
     }
-    
+
     my $content = read_file($result_file_path);
-    
+
+    # Build the new field definition block from the table info.
     my $new_field_def = "{\n        data_type => '$table_field_info->{data_type}',";
     if ($table_field_info->{enum_list} && @{$table_field_info->{enum_list}}) {
         my $list_str = join("', '", @{$table_field_info->{enum_list}});
         $new_field_def .= "\n        extra => { list => ['$list_str'] },";
     }
-    $new_field_def .= "\n        size => $table_field_info->{size}," if $table_field_info->{size};
+    # Size may be a scalar (e.g. 255) or an array ref (e.g. [10, 0]) from the parser.
+    if (my $sz = $table_field_info->{size}) {
+        if (ref($sz) eq 'ARRAY') {
+            $new_field_def .= "\n        size => [" . join(', ', @$sz) . "],";
+        } else {
+            $new_field_def .= "\n        size => $sz,";
+        }
+    }
     $new_field_def .= "\n        is_nullable => " . ($table_field_info->{is_nullable} ? 1 : 0) . ",";
     $new_field_def .= "\n        is_auto_increment => 1," if $table_field_info->{is_auto_increment};
     if (defined $table_field_info->{default_value}) {
@@ -1200,39 +1225,69 @@ sub update_result_field_from_table {
         $new_field_def .= "\n        default_value => '$def',";
     }
     $new_field_def .= "\n    }";
-    
-    if ($content =~ /(__PACKAGE__->add_columns\s*\()(.*?)(\)\s*;)/s) {
-        my ($prefix, $columns_section, $suffix) = ($1, $2, $3);
-        
-        # Look for field name followed by => { ... }
-        # Must match at start-of-line/after comma (not inside string values)
-        # Use (?:^|,)\s* anchor to avoid matching field names inside comment/string values
-        if ($columns_section =~ /(?:^|,)\s*(['"]?)$field_name\1\s*=>\s*\{/ms) {
-            # Update existing field — anchored to start of field definition
-            $columns_section =~ s/(?:^|(?<=,))\s*(['"]?)$field_name\1\s*=>\s*\{.*?\}(?=\s*(?:,|\s*\z))/\n    $field_name => $new_field_def/ms;
-        } else {
-            # Add new field definition
-            # Ensure there's a comma before if not empty
-            $columns_section =~ s/\s+$//;
-            if ($columns_section =~ /\S/ && $columns_section !~ /,\s*$/) {
-                $columns_section .= ",";
-            }
-            $columns_section .= "\n    $field_name => $new_field_def,\n";
-        }
-        
-        # Reconstruct content
-        my $new_add_columns = "__PACKAGE__->add_columns($columns_section);";
-        my $new_content = $content;
-        $new_content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_add_columns/s;
 
-        $self->_write_result_file_safe($result_file_path, $new_content);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
-            "Updated/Added field '$field_name' in result file '$result_file_path'");
-        
-        return 1;
+    # --- Safe, bracket-aware field replacement ---------------------------------
+    # The old approach used a non-greedy /ms regex across the entire add_columns
+    # block; on large multi-field tables it could match the wrong field or
+    # backtrack badly and corrupt the file (which then wedged the worker and
+    # surfaced to the user as a bare "NetworkError"). We now locate the exact
+    # "$field_name => { ... }" block by counting braces, rebuild ONLY that block,
+    # and leave every other field untouched.
+    my $new_content = $self->_replace_result_field_block($content, $field_name, $new_field_def);
+    unless (defined $new_content) {
+        die "Could not locate field '$field_name' in result file '$result_file_path'";
     }
-    
-    die "Could not update field '$field_name' in result file";
+
+    $self->_write_result_file_safe($result_file_path, $new_content);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
+        "Updated/Added field '$field_name' in result file '$result_file_path'");
+
+    return 1;
+}
+
+# Replace a single "field_name => { ... }" definition inside an add_columns block
+# using brace counting (not a cross-block regex). Returns the new full file content,
+# or undef if the field could not be found. NEVER mutates other fields.
+sub _replace_result_field_block {
+    my ($self, $content, $field_name, $new_field_def) = @_;
+
+    # Only operate inside the __PACKAGE__->add_columns( ... ); region.
+    return undef unless $content =~ /__PACKAGE__->add_columns\s*\(/;
+
+    # Find the start of the target field definition: "field_name => {"
+    # anchored to a comma or the open-paren, with optional whitespace.
+    # We scan character by character from the first candidate position.
+    my $pattern = qr/(?:^|,|\()\s*(['"]?)\Q$field_name\E\1\s*=>\s*\{/;
+    my $search_from = 0;
+    my $match_start;
+    while ($content =~ /$pattern/gc) {
+        $match_start = pos($content) - length($&);
+        last;
+    }
+    return undef unless defined $match_start;
+
+    # The "{" we want is the last "{" in the matched portion.
+    my $brace_pos = index($content, '{', $match_start);
+    # Count braces from there to find the matching close.
+    my $depth = 0;
+    my $i = $brace_pos;
+    my $len = length($content);
+    my $block_end;
+    while ($i < $len) {
+        my $ch = substr($content, $i, 1);
+        if ($ch eq '{') { $depth++; }
+        elsif ($ch eq '}') {
+            $depth--;
+            if ($depth == 0) { $block_end = $i; last; }
+        }
+        $i++;
+    }
+    return undef unless defined $block_end;
+
+    # Reconstruct: everything before the "{" + new block + everything after "}".
+    my $prefix  = substr($content, 0, $brace_pos);
+    my $suffix  = substr($content, $block_end + 1);
+    return $prefix . $new_field_def . $suffix;
 }
 
 sub update_table_field_from_result {

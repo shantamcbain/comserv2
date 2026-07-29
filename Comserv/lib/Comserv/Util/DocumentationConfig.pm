@@ -71,8 +71,11 @@ sub load_config {
     my $config_file = File::Spec->catfile('root', 'Documentation', 'config', 'DocumentationConfig.json');
 
     try {
-        # Read the JSON file
-        open my $fh, '<:encoding(UTF-8)', $config_file or die "Cannot open $config_file: $!";
+        # Read the JSON file as raw octets — decode_json expects bytes, not
+        # character strings. (Opening with a :encoding(UTF-8) layer turns the
+        # content into wide chars, which makes decode_json die with
+        # "Wide character in subroutine entry" and 500s the request.)
+        open my $fh, '<', $config_file or die "Cannot open $config_file: $!";
         my $json_content = do { local $/; <$fh> };
         close $fh;
 
