@@ -211,16 +211,28 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ table_name: tableName, field_name: fieldName, database: database, database_environment: 'production', allow_production: 1, confirmed: true })
     })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().catch(function () { return null; }).then(function (d) {
+            throw new Error((d && d.error) ? d.error : ('Request failed (HTTP ' + r.status + '). The schema change could not be applied.'));
+          });
+        }
+        return r.json();
+      })
       .then(function (data) {
         if (data.success) {
           alert('Column "' + fieldName + '" updated to match Result file.');
           location.reload();
         } else {
-          alert('Failed to update column: ' + (data.error || 'unknown error'));
+          alert('Could not update column "' + fieldName + '":\n' + (data.error || 'unknown error'));
         }
       })
-      .catch(function (err) { alert('Server error: ' + err.message); });
+      .catch(function (err) {
+        alert('The request was interrupted before the server responded.\n\n' +
+              'This can happen if the database was busy applying the change. ' +
+              'Please refresh the page and check whether the column already matches.\n\n' +
+              '(Technical detail: ' + (err && err.message ? err.message : 'connection reset') + ')');
+      });
   }
 
   function updateResultFromTable(fieldName, tableName, database, server) {
@@ -230,16 +242,28 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ table_name: tableName, field_name: fieldName, database: database, database_environment: 'production', allow_production: 1, confirmed: true })
     })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().catch(function () { return null; }).then(function (d) {
+            throw new Error((d && d.error) ? d.error : ('Request failed (HTTP ' + r.status + '). The schema change could not be applied.'));
+          });
+        }
+        return r.json();
+      })
       .then(function (data) {
         if (data.success) {
           alert('Result file column "' + fieldName + '" updated to match DB table.');
           location.reload();
         } else {
-          alert('Failed to update Result file: ' + (data.error || 'unknown error'));
+          alert('Could not update Result file column "' + fieldName + '":\n' + (data.error || 'unknown error'));
         }
       })
-      .catch(function (err) { alert('Server error: ' + err.message); });
+      .catch(function (err) {
+        alert('The request was interrupted before the server responded.\n\n' +
+              'This can happen if the database was busy applying the change. ' +
+              'Please refresh the page and check whether the column already matches.\n\n' +
+              '(Technical detail: ' + (err && err.message ? err.message : 'connection reset') + ')');
+      });
   }
 
   function dropColumn(fieldName, tableName) {

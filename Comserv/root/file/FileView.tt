@@ -95,6 +95,31 @@
         </form>
       </div>
 
+      [% IF (file.file_type || '') == 'audio' %]
+      <div class="content-section">
+        <h3>Convert Audio</h3>
+        <form method="post" action="[% c.uri_for('/file/convert') %]" id="fv-convert-form" class="app-form">
+          <input type="hidden" name="file_id" value="[% file.id %]">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="fv-format">Convert <code>[% file.file_name | html %]</code> to:</label>
+              <select id="fv-format" name="format" class="form-input">
+                <option value="mp3">MP3 (most compatible)</option>
+                <option value="m4a">M4A / AAC (small, universal)</option>
+                <option value="wav">WAV (lossless)</option>
+                <option value="ogg">OGG Vorbis</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Convert</button>
+          </div>
+          <div id="fv-convert-status" style="display:none;margin-top:8px;font-size:.85rem;"></div>
+        </form>
+      </div>
+      [% END %]
+
     </div>
   </div>
 </div>
+

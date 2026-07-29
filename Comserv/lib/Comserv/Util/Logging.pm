@@ -609,26 +609,16 @@ sub log_with_details {
         }
     }
 
-    # Automatically send email notification for levels >= $EMAIL_NOTIFY_THRESHOLD
-    my $current_prio = $LEVEL_PRIORITY{uc($level)} || 0;
-    my $notify_prio  = $LEVEL_PRIORITY{uc($EMAIL_NOTIFY_THRESHOLD)} || 3; # Default to WARN priority
-    
-    if ($current_prio >= $notify_prio) {
-        # We don't want to cause recursion if send_error_notification calls logging
-        # So we use a flag or just be careful. 
-        # EmailNotification already logs things.
-        eval {
-            if (ref($self) || ($self && $self eq __PACKAGE__)) {
-                $self->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
-            } else {
-                __PACKAGE__->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
-            }
-        };
-        # Don't log the error of sending the error notification to avoid infinite loop
-    }
+    # NOTE: Email notification for error-level logs is intentionally emitted ONLY
+    # when a NEW audit todo is created below (inside the todo-create block). If an
+    # open audit todo for this error area already exists we INCREMENT its
+    # occurrence_count instead and send no new email — this keeps the todo table
+    # and the admin inbox from being flooded by the same recurring error.
 
     # Auto-create a Todo in the audit panel for every EMAIL-threshold+ error.
     # This ensures errors show up immediately without waiting for Start Day.
+    my $current_prio = $LEVEL_PRIORITY{uc($level)} || 0;
+    my $notify_prio  = $LEVEL_PRIORITY{uc($EMAIL_NOTIFY_THRESHOLD)} || 3; # Default to WARN priority
     if ($current_prio >= $notify_prio
         && $c && blessed($c) && $c->can('model')
         && !$_in_todo_create) {
@@ -673,19 +663,34 @@ sub log_with_details {
                 . "\n";
 
             if ($existing) {
-                my $new_desc = $audit_header . $log_message;
+                # Same open error already tracked. INCREMENT the occurrence counter
+                # instead of creating a new todo or sending a new email. This is the
+                # core of the error-audit de-duplication: the Application Error Audit
+                # can sort/filter open todos by occurrence_count to surface the most
+                # frequently recurring errors first, while the todo table and the
+                # admin inbox no longer get flooded by the same recurring fault.
+                my $occ = eval { $existing->occurrence_count } // 0;
+                $occ = 0 unless defined $occ && $occ =~ /^\d+$/;
                 my %upd = (
-                    subject       => $todo_subject,
-                    description   => $new_desc,
-                    last_mod_date => $now_date,
-                    last_mod_by   => $username,
-                    due_date      => $now_date,
+                    occurrence_count => $occ + 1,
+                    last_mod_date     => $now_date,
+                    last_mod_by       => $username,
+                    due_date          => $now_date,
                 );
                 $upd{priority} = $todo_priority
                     if ($todo_priority // 99) < (eval { $existing->priority } // 99);
                 eval { $existing->update(\%upd) };
             }
             else {
+                # Genuinely NEW error area → create the audit todo AND send the
+                # email notification. Subsequent hits for this area will only
+                # increment occurrence_count (above) and stay silent.
+                if (ref($self) || ($self && $self eq __PACKAGE__)) {
+                    $self->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+                } else {
+                    __PACKAGE__->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+                }
+
                 # Try to match the error's file/subroutine to a project.
                 # The file path (e.g. "Comserv/Controller/Todo.pm") and
                 # subroutine (e.g. "Comserv::Controller::Todo::modify_todo")

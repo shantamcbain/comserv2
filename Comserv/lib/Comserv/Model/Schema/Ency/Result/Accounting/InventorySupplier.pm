@@ -8,9 +8,10 @@ __PACKAGE__->table('inventory_suppliers');
 
 __PACKAGE__->add_columns(
     id => {
-        data_type         => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
         is_auto_increment => 1,
-        is_nullable       => 0,
     },
     sitename => {
         data_type   => 'varchar',
@@ -47,9 +48,10 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     lead_time_days => {
-        data_type     => 'integer',
-        is_nullable   => 1,
-        default_value => 0,
+        data_type => 'int',
+        size => 11,
+        is_nullable => 1,
+        default_value => '0',
     },
     status => {
         data_type     => 'varchar',
@@ -78,9 +80,9 @@ __PACKAGE__->add_columns(
         set_on_update => 1,
     },
     prepaid_accno_id => {
-        data_type      => 'integer',
-        is_nullable    => 1,
-        is_foreign_key => 1,
+        data_type => 'int',
+        size => 11,
+        is_nullable => 1,
     },
 );
 

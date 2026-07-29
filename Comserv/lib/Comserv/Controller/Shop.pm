@@ -38,6 +38,20 @@ sub _ecommerce_enabled {
     return $em->{ecommerce} ? 1 : 0;
 }
 
+# Filament items are internal-use only and must never appear in the public
+# catalog. Returns a NULL-safe where clause that excludes any item whose
+# category, item_origin, or name matches '%filament%'.
+sub _exclude_filament_where {
+    my ($self) = @_;
+    return [
+        -and => [
+            -or => [ category    => undef, category    => { -not_like => '%filament%' } ],
+            -or => [ item_origin => undef, item_origin => { -not_like => '%filament%' } ],
+            -or => [ name        => undef, name        => { -not_like => '%filament%' } ],
+        ],
+    ];
+}
+
 sub _cart_count {
     my ($self, $c) = @_;
     my $cart = $c->session->{cart} // {};
@@ -99,6 +113,7 @@ sub index :Path('/shop') :Args(0) {
                 category => { -not_in => ['Cost Centre', 'Equipment'] },
             ],
             item_origin => { -not_in => ['overhead', '3d_printer', 'purchased_equipment'] },
+            -and => $self->_exclude_filament_where,
         ],
     );
     $where{category} = $category if $category;
@@ -160,7 +175,7 @@ sub item :Path('/shop/item') :Args(1) {
     my $item;
     eval {
         $item = $schema->resultset('Accounting::InventoryItem')->find(
-            { id => $id, sitename => $sitename, status => 'active', show_in_shop => 1 },
+            { id => $id, sitename => $sitename, status => 'active', show_in_shop => 1, -and => $self->_exclude_filament_where },
             { prefetch => 'stock_levels' }
         );
         $item ||= $schema->resultset('Accounting::InventoryItem')->find(
@@ -190,8 +205,9 @@ sub item :Path('/shop/item') :Args(1) {
         eval {
             my @filaments = $schema->resultset('Accounting::InventoryItem')->search(
                 {
-                    'me.sitename' => $sitename,
-                    'me.status'   => 'active',
+                    'me.sitename'     => $sitename,
+                    'me.status'       => 'active',
+                    'me.show_in_shop' => 1,
                     -or => [
                         'me.category'    => { -like => '%filament%' },
                         'me.item_origin' => { -like => '%filament%' },
