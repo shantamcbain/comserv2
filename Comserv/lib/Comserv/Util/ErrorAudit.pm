@@ -308,6 +308,12 @@ sub _build_error_todo {
             status              => 1,
             priority            => $ai_priority,
             is_blocking         => 0,
+            # Persist the recurrence count so the todo card header can show
+            # "↻ N×" (todo_card.tt renders the badge only when > 1). The scan
+            # already grouped $count occurrences of this error area into the
+            # window; with this set, the badge surfaces the most-frequently
+            # recurring errors without needing to open the todo.
+            occurrence_count    => $count,
             blocked_by_todo_id  => $root_id,
             parent_id           => $root_id,
             sitename            => $sitename,
