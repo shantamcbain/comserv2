@@ -1,0 +1,78 @@
+[% META
+   title = "Herb Sign Generator"
+   description = "Create printable herb signs from the herbal encyclopedia"
+   roles = "admin,developer,editor,normal"
+   TemplateType = "Application"
+   category = "SignGenerator"
+   page_version = "0.01"
+%]
+
+<div class="app-page">
+    <nav class="breadcrumb">
+        <a href="/3d">3D Printing</a> &raquo;
+        <strong>Herb Sign Generator</strong>
+        &nbsp;|&nbsp; <a href="/3d/browse?q=sign">My signs</a>
+        &nbsp;|&nbsp; <a href="/Documentation/SignGenerator">Help</a>
+    </nav>
+    <h1>Herb Sign Generator</h1>
+
+    [% IF error_msg %]
+        <div class="alert alert-error">[% error_msg %]</div>
+    [% END %]
+
+    <div class="app-section">
+        [% IF service_status.ok %]
+            <p style="color: var(--success-color, green);">Render service: healthy ([% service_status.url %])</p>
+        [% ELSE %]
+            <p style="color: var(--error-color, red);">
+                Render service unavailable ([% service_status.detail %]).
+                Sign generation will fail until comserv2-openscad is running.
+            </p>
+        [% END %]
+    </div>
+
+    <div class="app-section">
+        <h2>1. Find your herb</h2>
+        <form class="app-form" method="get" action="/signgenerator">
+            <div class="form-group">
+                <label for="q">Search (common or botanical name)</label>
+                <input type="text" id="q" name="q" value="[% q | html %]" placeholder="e.g. yarrow" />
+            </div>
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
+
+    [% IF search_done %]
+    <div class="app-section">
+        <h2>Results</h2>
+        [% IF herbs.size %]
+        <table class="data-table">
+            <thead>
+                <tr><th>Common names</th><th>Botanical name</th><th>Make sign</th></tr>
+            </thead>
+            <tbody>
+                [% FOREACH h IN herbs %]
+                <tr>
+                    <td>[% h.common_names | html %]</td>
+                    <td><em>[% h.botanical_name | html %]</em></td>
+                    <td>
+                        [% FOREACH t IN targets %]
+                            <a class="btn btn-secondary" href="/signgenerator/preview/[% h.record_id %]?target=[% t %]">[% t %]</a>
+                        [% END %]
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+        [% ELSE %]
+        <p>No herbs matched "<strong>[% q | html %]</strong>".</p>
+        <p>
+            <a class="btn btn-primary" href="/ENCY/add_herb?botanical_name=[% q | uri %]" target="_blank" rel="noopener">
+                Add "[% q | html %]" to the herbal encyclopedia
+            </a>
+            — then search again here.
+        </p>
+        [% END %]
+    </div>
+    [% END %]
+</div>

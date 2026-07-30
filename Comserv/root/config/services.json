@@ -1,0 +1,20 @@
+{
+  "_comment": "Network service endpoints (portable containers). Full URLs only — never container names — so services can move to any docker host by editing this file. Pattern: db_config.json for DBs, services.json for tool services.",
+  "openscad": {
+    "url": "http://workstation.local:8083",
+    "timeout": 150,
+    "container": "comserv2-openscad",
+    "notes": "Headless OpenSCAD render service. POST /render, GET /healthz, GET /templates. Source: services/openscad/"
+  },
+  "whisper": {
+    "url": null,
+    "timeout": 300,
+    "container": "comserv2-whisper (planned, port 8082)",
+    "notes": "Not yet containerized — transcription still via whisper_nfs_worker.pl on workstation."
+  },
+  "ollama": {
+    "url": "http://workstation.local:11434",
+    "timeout": 300,
+    "notes": "Existing service; listed here for the full services map. AI code may still use its own config."
+  }
+}

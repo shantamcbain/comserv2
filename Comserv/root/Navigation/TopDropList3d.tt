@@ -11,6 +11,7 @@
 
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>
+        <a href="/signgenerator" class="menu-item"><i class="icon-edit"></i>Herb Sign Generator</a>
         <a href="/3d/my_orders" class="menu-item"><i class="icon-briefcase"></i>My Orders</a>
         [% END %]
 

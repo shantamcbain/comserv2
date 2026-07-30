@@ -119,6 +119,11 @@
 <script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Herb Sign Generator live preview -->
+[% IF c.request.uri.match('/signgenerator') %]
+<script src="/static/js/sign-preview.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Legacy menu (conditional) -->
 [% UNLESS c.session.use_db_menu || c.stash.use_db_menu %]
 <script src="/static/js/sub-menu.js" defer></script>

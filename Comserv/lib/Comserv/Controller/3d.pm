@@ -3,7 +3,9 @@ use Moose;
 use namespace::autoclean;
 use POSIX qw(strftime);
 use JSON qw(encode_json);
+use Try::Tiny;
 use Comserv::Util::Logging;
+use Comserv::Util::SignGenerator;
 
 has 'logging' => (
     is      => 'ro',
@@ -274,11 +276,22 @@ sub browse :Path('/3d/browse') :Args(0) {
     };
     push @{$c->stash->{debug_errors}}, "Error loading models: $@" if $@;
 
+    # For herb signs, attach the stored sign layout (sidecar JSON) so the
+    # browse cards can show the PDF and identify each build by size/colour.
+    my $signutil = Comserv::Util::SignGenerator->new;
+    my %sign_meta;
+    for my $m (@models) {
+        next unless $m->source && $m->source eq 'sign_generator';
+        my $meta = try { $signutil->load_metadata($m) } || {};
+        $sign_meta{ $m->id } = $meta if %$meta;
+    }
+
     $c->stash(
-        sitename => $sitename,
-        models   => \@models,
-        q        => $q,
-        template => '3d/browse.tt',
+        sitename  => $sitename,
+        models    => \@models,
+        sign_meta => \%sign_meta,
+        q         => $q,
+        template  => '3d/browse.tt',
     );
 }
 

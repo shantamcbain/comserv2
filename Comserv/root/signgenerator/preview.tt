@@ -1,0 +1,98 @@
+[% META
+   title = "Herb Sign Preview"
+   description = "Tune wording and size before generating the sign STL"
+   roles = "admin,developer,editor,normal"
+   TemplateType = "Application"
+   category = "SignGenerator"
+   page_version = "0.01"
+%]
+
+<div class="app-page">
+    <nav class="breadcrumb">
+        <a href="/3d">3D Printing</a> &raquo;
+        <a href="/signgenerator">Herb Sign Generator</a> &raquo;
+        <strong>Preview</strong>
+        &nbsp;|&nbsp; <a href="/signgenerator?q=[% herb.botanical_name | uri %]">Back to search</a>
+        &nbsp;|&nbsp; <a href="/Documentation/SignGenerator">Help</a>
+    </nav>
+    <h1>Sign: [% herb.botanical_name | html %]</h1>
+
+    [% IF c.request.params.error %]
+        <div class="alert alert-error">[% c.request.params.error | html %]</div>
+    [% END %]
+
+    [% UNLESS service_status.ok %]
+        <div class="alert alert-error">
+            Render service unavailable ([% service_status.detail %]) — generation will fail.
+        </div>
+    [% END %]
+
+    <div class="app-section">
+        <h2>Preview</h2>
+        <p>Live preview — updates as you type.</p>
+        <div style="width: 100%;">
+            <canvas id="sign-preview-canvas" data-qr-data="[% qr_url | html %]" style="border: 1px solid var(--border-color, #999); background: var(--card-bg, transparent); max-width: 100%;"></canvas>
+        </div>
+        <p class="hint">Dashed outline = 230&times;230 mm printer bed, shown at actual size when your screen allows — the sign on screen is the size it will print. The QR is live — try scanning it.</p>
+    </div>
+
+    <div class="app-section">
+        <h2>2. Tune the wording</h2>
+        <p>
+            Prefilled from the herbal DB for target <strong>[% target | html %]</strong>.
+            Switch target:
+            [% FOREACH t IN targets %]
+                [% IF t == target %]
+                    <strong>[% t %]</strong>
+                [% ELSE %]
+                    <a href="/signgenerator/preview/[% herb.record_id %]?target=[% t %]">[% t %]</a>
+                [% END %]
+            [% END %]
+        </p>
+
+        <form class="app-form" method="post" action="/signgenerator/generate">
+            <input type="hidden" name="herb_id" value="[% herb.record_id %]" />
+            <input type="hidden" name="target" value="[% target | html %]" />
+
+            <div class="form-group">
+                <label for="title">Title (large) <span id="title-limit-hint" class="hint"></span></label>
+                <input type="text" id="title" name="title" value="[% wording.title | html %]" />
+            </div>
+            <div class="form-group">
+                <label for="subtitle">Subtitle (botanical name) <span id="subtitle-limit-hint" class="hint"></span></label>
+                <input type="text" id="subtitle" name="subtitle" value="[% wording.subtitle | html %]" />
+            </div>
+            <div class="form-group">
+                <label for="body1">Body line 1 <span id="body1-limit-hint" class="hint"></span></label>
+                <input type="text" id="body1" name="body1" value="[% wording.body1 | html %]" />
+            </div>
+            <div class="form-group">
+                <label for="body2">Body line 2 <span id="body2-limit-hint" class="hint"></span></label>
+                <input type="text" id="body2" name="body2" value="[% wording.body2 | html %]" />
+            </div>
+            <div class="form-group">
+                <label for="url_text">URL line <span id="url_text-limit-hint" class="hint"></span></label>
+                <input type="text" id="url_text" name="url_text" value="[% wording.url_text | html %]" />
+            </div>
+            <div class="form-group">
+                <label for="sign_w">Width (mm, max 230)</label>
+                <input type="number" id="sign_w" name="sign_w" value="[% sign_w %]" min="40" max="230" />
+            </div>
+            <div class="form-group">
+                <label for="sign_h">Height (mm, max 230)</label>
+                <input type="number" id="sign_h" name="sign_h" value="[% sign_h %]" min="30" max="230" />
+            </div>
+            <div class="form-group">
+                <label for="plate_color">Plate colour (base filament)</label>
+                <input type="color" id="plate_color" name="plate_color" value="[% plate_color || '#d8cfa8' %]" />
+            </div>
+            <div class="form-group">
+                <label for="text_color">Text colour (raised text/QR filament or paint)</label>
+                <input type="color" id="text_color" name="text_color" value="[% text_color || '#4a3b18' %]" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Generate STL</button>
+            <a class="btn btn-secondary" href="/signgenerator">Back to search</a>
+        </form>
+    </div>
+</div>
