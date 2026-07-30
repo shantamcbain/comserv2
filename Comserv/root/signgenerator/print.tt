@@ -1,0 +1,45 @@
+[% META
+   title = "Sign Print View"
+   description = "Print-ready sign layout (save as PDF via the browser/system print dialog)"
+   roles = "admin,developer,editor,normal"
+   TemplateType = "Application"
+   category = "SignGenerator"
+   page_version = "0.01"
+%]
+
+[%# Print-ready rendition: the sign at TRUE physical size using CSS mm
+    units. User prints or saves as PDF through the browser/system dialog;
+    the resulting PDF is the paper rendition of the sign document. %]
+
+<div class="app-page sign-print-page">
+    <div class="app-section sign-print-controls">
+        <nav class="breadcrumb">
+            <a href="/3d">3D Printing</a> &raquo;
+            <a href="/signgenerator">Herb Sign Generator</a> &raquo;
+            <strong>Print view</strong>
+            [% IF model %]&nbsp;|&nbsp; <a href="/signgenerator/pdf/[% model.id %]">Stored PDF</a>
+            &nbsp;|&nbsp; <a href="/signgenerator/download/[% model.id %]">STL</a>[% END %]
+            &nbsp;|&nbsp; <a href="/Documentation/SignGenerator">Help</a>
+        </nav>
+        <button type="button" class="btn btn-primary" data-action="sign-print">Print / Save as PDF</button>
+        <a class="btn btn-secondary" href="/signgenerator">Back to Sign Generator</a>
+        <p class="hint">Use your system print dialog: choose a printer for paper, or "Save as PDF" for a file.</p>
+    </div>
+
+    <div class="sign-sheet"
+         style="width: [% meta.size_mm.w %]mm; height: [% meta.size_mm.h %]mm;
+                background: [% meta.plate_color || '#d8cfa8' %];
+                color: [% meta.text_color || '#4a3b18' %];
+                border: 1.2mm solid [% meta.text_color || '#4a3b18' %];
+                border-radius: 4mm; position: relative; overflow: hidden;
+                display: flex; flex-direction: column; justify-content: center;
+                text-align: center; font-family: 'DejaVu Sans', sans-serif;">
+        <div style="font-weight: bold; font-size: [% meta.size_mm.h * 0.16 %]mm; line-height: 1.1;">[% meta.title | html %]</div>
+        <div style="font-style: italic; font-size: [% meta.size_mm.h * 0.085 %]mm; line-height: 1.2;">[% meta.subtitle | html %]</div>
+        <div style="font-size: [% meta.size_mm.h * 0.075 %]mm; line-height: 1.3; padding: 0 [% meta.size_mm.h * 0.08 %]mm;">[% meta.body | html %]</div>
+        <div style="font-size: [% meta.size_mm.h * 0.065 %]mm; margin-top: [% meta.size_mm.h * 0.04 %]mm;">[% meta.url | html %]</div>
+        <canvas id="sign-print-qr" data-qr-data="[% qr_url | html %]"
+                style="position: absolute; right: [% meta.size_mm.h * 0.08 %]mm; bottom: [% meta.size_mm.h * 0.08 %]mm;
+                       width: 24mm; height: 24mm; background: #fff;"></canvas>
+    </div>
+</div>

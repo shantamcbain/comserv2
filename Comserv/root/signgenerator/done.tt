@@ -1,0 +1,98 @@
+[% META
+   title = "Herb Sign Generated"
+   description = "Download the generated sign STL"
+   roles = "admin,developer,editor,normal"
+   TemplateType = "Application"
+   category = "SignGenerator"
+   page_version = "0.01"
+%]
+
+<div class="app-page">
+    <nav class="breadcrumb">
+        <a href="/3d">3D Printing</a> &raquo;
+        <a href="/signgenerator">Herb Sign Generator</a> &raquo;
+        <strong>Result</strong>
+        [% IF herb %]&nbsp;|&nbsp; <a href="/signgenerator/preview/[% herb.record_id %]?target=[% target | uri %]">Edit &amp; regenerate</a>[% END %]
+        &nbsp;|&nbsp; <a href="/Documentation/SignGenerator">Help</a>
+    </nav>
+    <h1>Sign generated</h1>
+
+    <div class="app-section">
+        <h2>3. Download and print</h2>
+        <p>
+            STL created ([% result.size %] bytes) for
+            <strong>[% herb.botanical_name | html %]</strong> — target <strong>[% target | html %]</strong>.
+        </p>
+        <p>File: <code>[% result.stl_path | html %]</code></p>
+
+        [% IF model_id %]
+            <p>
+                <a class="btn btn-primary" href="/signgenerator/download/[% model_id %]">Download STL (single solid)</a>
+                [% IF result.metadata.threemf_file %]
+                <a class="btn btn-primary" href="/signgenerator/download/[% model_id %]/3mf">Download 3MF (two filaments)</a>
+                [% END %]
+                <a class="btn btn-primary" href="/signgenerator/pdf/[% model_id %]" target="_blank">Sign PDF (layout / review)</a>
+                <a class="btn btn-secondary" href="/signgenerator/print/[% model_id %]">Print-page view</a>
+            </p>
+            [% IF result.metadata.pdf_file %]
+            <div class="app-section">
+                <h3>Sign layout (PDF — stored on the server)</h3>
+                <p>This is the saved sign document showing the exact layout, colours and QR as they will print. Review it here; if anything is wrong, go back, fix the wording, and regenerate.</p>
+                <embed src="/signgenerator/pdf/[% model_id %]" type="application/pdf"
+                       style="width:100%; height:520px; border:1px solid var(--border-color, #888);"/>
+            </div>
+            [% END %]
+            [% IF result.metadata.threemf_file %]
+            <div class="app-section">
+                <h3>Two-filament print (3MF)</h3>
+                <p>
+                    Load the <strong>3MF</strong> into Anycubic Slicer Next. It contains the sign as
+                    <strong>two separate objects</strong> (base plate + text/QR), each colour-tagged, so the
+                    slicer shows <strong>two filament slots</strong> — assign a different filament to each.
+                    The single solid STL above is for one-colour / paint-fill printing only.
+                </p>
+                <table class="data-table">
+                    <tr><th>Object</th><th>Part</th><th>Colour</th></tr>
+                    <tr><td>1</td><td>Base plate</td>
+                        <td><span style="display:inline-block;width:1em;height:1em;vertical-align:middle;border:1px solid #333;background:[% result.metadata.plate_color | html %]"></span>
+                            [% result.metadata.plate_color | html %]</td></tr>
+                    <tr><td>2</td><td>Text &amp; QR</td>
+                        <td><span style="display:inline-block;width:1em;height:1em;vertical-align:middle;border:1px solid #333;background:[% result.metadata.text_color | html %]"></span>
+                            [% result.metadata.text_color | html %]</td></tr>
+                </table>
+                <p>
+                    <a class="btn btn-secondary" href="/signgenerator/download/[% model_id %]/3mf">Download 3MF</a>
+                </p>
+            </div>
+            [% ELSIF result.part_paths %]
+            <p>
+                Legacy two-colour print files (import BOTH into the slicer; they align automatically):
+                <br/>
+                <a class="btn btn-secondary" href="/signgenerator/download/[% model_id %]/base" rel="noopener">Base plate STL</a>
+                <a class="btn btn-secondary" href="/signgenerator/download/[% model_id %]/text" rel="noopener">Text &amp; QR STL</a>
+            </p>
+            <table class="data-table">
+                <tr><th>Filament slot</th><th>Part</th><th>Colour</th></tr>
+                <tr><td>1</td><td>Base plate</td>
+                    <td><span style="display:inline-block;width:1em;height:1em;vertical-align:middle;border:1px solid #333;background:[% result.metadata.plate_color | html %]"></span>
+                        [% result.metadata.plate_color | html %]</td></tr>
+                <tr><td>2</td><td>Text &amp; QR</td>
+                    <td><span style="display:inline-block;width:1em;height:1em;vertical-align:middle;border:1px solid #333;background:[% result.metadata.text_color | html %]"></span>
+                        [% result.metadata.text_color | html %]</td></tr>
+            </table>
+            [% END %]
+            <p>Recorded as 3D model #[% model_id %] in the printing inventory (source: sign_generator).</p>
+        [% ELSE %]
+            <div class="alert alert-error">
+                STL saved, but the inventory record could not be created — see logs.
+            </div>
+        [% END %]
+
+        <p>
+            Open the STL in your slicer (Anycubic Slicer Next / PrusaSlicer), slice with your
+            PLA profile, and print. Then record the print job in the
+            <a href="/3d">3D Printing module</a>.
+        </p>
+        <p><a class="btn btn-secondary" href="/signgenerator">Make another sign</a></p>
+    </div>
+</div>

@@ -1,0 +1,38 @@
+# comserv2-openscad — standalone compose
+#
+# Use this to run the render service ALONE on any docker host (services VM,
+# production1, workstation). The main comserv2 docker-compose.yml also carries
+# this service; this file exists so the service can be placed on a host that
+# does not run the web stack.
+#
+#   docker compose up -d --build
+#
+# Moving hosts: rebuild there, or
+#   docker save comserv2-openscad:latest | ssh <host> docker load
+#
+# App config points at it via Comserv/root/config/services.json (full URL).
+
+services:
+  openscad:
+    build: .
+    image: comserv2-openscad:latest
+    container_name: comserv2-openscad
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

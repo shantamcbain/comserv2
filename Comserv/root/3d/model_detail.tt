@@ -124,6 +124,16 @@
             <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Open in Bambu Studio, PrusaSlicer, Cura, etc.</small>
         </p>
         [% END %]
+        [% IF model.source == 'sign_generator' %]
+        <p style="margin-top:0.6em;">
+            <a href="/signgenerator/pdf/[% model.id %]" target="_blank"
+               style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color, #eee);color:var(--link-color,#007bff);border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;"
+               title="Open the saved sign layout PDF showing the sign's exact text, colours and QR">
+                📄 View sign layout (PDF)
+            </a>
+            <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Shows the exact layout as it will print.</small>
+        </p>
+        [% END %]
     </div>
 </div>
 

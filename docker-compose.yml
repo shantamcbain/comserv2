@@ -192,6 +192,35 @@ services:
     networks:
       - comserv-network
 
+  # ────────────────────────────────────────────────────────────────────────────
+  # OpenSCAD Render Service (comserv2-openscad)
+  # Stateless HTTP render service: POST /render -> STL. Self-contained image,
+  # no volume mounts — can run on ANY docker host (see services/openscad/).
+  # Apps reach it via full URL from Comserv/root/config/services.json,
+  # NEVER via container name, so it can move hosts freely.
+  # ────────────────────────────────────────────────────────────────────────────
+  openscad:
+    build:
+      context: ./services/openscad
+    image: comserv2-openscad:latest
+    container_name: comserv2-openscad
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - comserv-network
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
 networks:
   comserv-network:
     driver: bridge

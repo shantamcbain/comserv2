@@ -362,8 +362,12 @@ sub add_single :Path('add_single') :Args(0) {
     my $config = Comserv::Util::DocumentationConfig->instance;
     
     try {
-        $config->add_page($file_data);
-        $config->save_config();
+        $file_data->{id} //= $self->generate_id($file_data->{path});
+        my $ok = $config->add_page($file_data);
+        
+        unless ($ok) {
+            die "save_config returned false";
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_single_success',
             "Successfully added file to configuration: $file_data->{path}");
@@ -533,29 +537,23 @@ sub parse_roles {
 sub update_config_file {
     my ($self, $c, $files_to_add) = @_;
     
-    my $config_file = File::Spec->catfile($FindBin::Bin, 'root', 'Documentation', 'config', 'documentation_config.json');
+    # Persist through the canonical DocumentationConfig util, which writes to
+    # the runtime overlay (the file every reader falls back to). Previously this
+    # wrote to the orphan lowercase documentation_config.json, which nothing
+    # read back — so additions were silently lost.
+    my $config = Comserv::Util::DocumentationConfig->instance;
     
     try {
-        # Read current configuration
-        open my $fh, '<:encoding(UTF-8)', $config_file or die "Cannot open $config_file: $!";
-        my $json_content = do { local $/; <$fh> };
-        close $fh;
-        
-        my $config = decode_json($json_content);
-        
-        # Add new files to pages array
-        push @{$config->{pages}}, @$files_to_add;
-        
-        # Write updated configuration
-        open $fh, '>:encoding(UTF-8)', $config_file or die "Cannot write to $config_file: $!";
-        print $fh JSON->new->pretty->encode($config);
-        close $fh;
-        
-        # Reload the configuration in the utility class
-        Comserv::Util::DocumentationConfig->instance->reload_config();
+        my $added = 0;
+        for my $file_data (@$files_to_add) {
+            # Ensure a stable id for subsequent replace/lookup
+            $file_data->{id} //= $self->generate_id($file_data->{path});
+            $config->add_page($file_data);
+            $added++;
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'config_updated',
-            "Added " . scalar(@$files_to_add) . " files to documentation configuration");
+            "Added $added file(s) to documentation configuration");
         
         return { success => 1 };
         

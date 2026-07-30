@@ -1,0 +1,143 @@
+[% META
+   title = "Herb Sign Generator"
+   description = "Create printable 3D herb signs from the herbal encyclopedia"
+   roles = "admin,developer,editor,normal"
+   TemplateType = "Documentation"
+   category = "modules"
+   page_version = "0.01"
+%]
+
+<div class="app-page">
+    <h1>Herb Sign Generator</h1>
+
+    <div class="app-section">
+        <h2>Overview</h2>
+        <p>
+            The Herb Sign Generator (<a href="/signgenerator">/signgenerator</a>) creates printable
+            herb signs from the herbal encyclopedia. Pick a herb, choose a target audience, tune the
+            wording, and generate the sign. Every generation produces <strong>three stored files</strong>:
+        </p>
+        <ul>
+            <li><strong>STL</strong> — for 3D printing (Anycubic Slicer Next / PrusaSlicer);</li>
+            <li><strong>PDF</strong> — the universal sign document, true physical size:
+                view it in the browser to review/fix mistakes before printing, print it on any
+                paper printer, or feed it to a laser;</li>
+            <li><strong>JSON sidecar</strong> — the layout source of truth (wording, size, colours,
+                filament assignments) used for re-prints and future regeneration.</li>
+        </ul>
+        <p>Navigation: <strong>3D Printing &rarr; Herb Sign Generator</strong> (login required).</p>
+    </div>
+
+    <div class="app-section">
+        <h2>Workflow</h2>
+        <ol>
+            <li><strong>Search</strong> for a herb by common or botanical name.
+                If it is missing, the page links to <code>/ENCY/add_herb</code> so it can be added first.</li>
+            <li><strong>Choose a target</strong>: <em>pollinator</em>, <em>herbal</em>, or <em>culinary</em>.
+                Wording is prefilled from the matching encyclopedia fields
+                (pollinator/pollen/nectar notes, therapeutic action/medical uses, culinary).</li>
+            <li><strong>Tune the wording</strong> — title, subtitle (botanical name), two body lines,
+                URL line — and the sign size (default 120&times;80 mm, max 230&times;230 for the Anycubic bed).
+                The live preview shows the sign at <em>actual physical size</em> with the printer-bed
+                outline; pick the <strong>plate colour</strong> and <strong>text colour</strong>
+                (they become the filament assignments).</li>
+            <li><strong>Generate</strong>. The OpenSCAD render service produces the STL(s) and the PDF;
+                the sign is recorded in the 3D printing inventory (<code>printing_3d_models</code>,
+                source <code>sign_generator</code>) with a human-readable description; the layout
+                JSON is stored beside the STL.</li>
+            <li><strong>Review the PDF</strong> — it is embedded on the result page and available at
+                <code>/signgenerator/pdf/&lt;model_id&gt;</code>. If anything is wrong, fix the
+                wording and regenerate before wasting filament.</li>
+            <li><strong>Print</strong>:
+                <ul>
+                    <li><em>3D</em>: download the <strong>3MF</strong> (two filaments) — it contains the
+                        sign as two separate objects (base plate + text/QR), each colour-tagged, so the
+                        Anycubic slicer shows <strong>two filament slots</strong>; assign a different
+                        filament to each. For one-colour / paint-fill printing, the single solid STL
+                        is also available. (Legacy path: the separate <code>base</code> and
+                        <code>text</code> STLs still exist for split import.) Slice, print, and record
+                        the job in the <a href="/3d">3D Printing module</a>.</li>
+                    <li><em>Paper / laser</em>: print the stored PDF on any printer.</li>
+                </ul></li>
+        </ol>
+    </div>
+
+    <div class="app-section">
+        <h2>Routes</h2>
+        <table class="data-table">
+            <tr><th>Route</th><th>Purpose</th></tr>
+            <tr><td><code>GET /signgenerator</code></td><td>Herb search form (+ render-service health banner)</td></tr>
+            <tr><td><code>GET /signgenerator/preview/&lt;herb_id&gt;</code></td><td>Prefilled wording form with true-size live preview, colours, QR</td></tr>
+            <tr><td><code>POST /signgenerator/generate</code></td><td>Render STL(s) + PDF, save files + sidecar JSON, create inventory row</td></tr>
+            <tr><td><code>GET /signgenerator/download/&lt;model_id&gt;[/base|/text|/3mf]</code></td><td>Stream the 3D file — solid STL, a two-colour part STL, or the multi-object 3MF (two filaments)</td></tr>
+            <tr><td><code>GET /signgenerator/pdf/&lt;model_id&gt;</code></td><td>Show the stored sign PDF inline (print/save from the browser viewer)</td></tr>
+            <tr><td><code>GET /signgenerator/print/&lt;model_id&gt;</code></td><td>HTML print-page view (browser print dialog fallback for older signs)</td></tr>
+            <tr><td><code>GET /signgenerator/qr_matrix?data=...</code></td><td>QR matrix proxy for the live preview</td></tr>
+        </table>
+    </div>
+
+    <div class="app-section">
+        <h2>Architecture</h2>
+        <ul>
+            <li><code>Comserv::Controller::SignGenerator</code> — thin routes (see Routes table above).</li>
+            <li><code>Comserv::Util::SignGenerator</code> — wording mapping, render-service client
+                (STL + PDF), sidecar metadata read/write.</li>
+            <li><strong>comserv2-openscad</strong> — stateless Docker render service (port 8083,
+                source <code>services/openscad/</code>). Endpoints: POST <code>/render</code> (STL,
+                params include <code>part=full|base|text</code> for two-colour),
+                POST <code>/render_3mf</code> (multi-object 3MF: each part rendered to OFF, assembled
+                as separate colour-tagged objects — the file format the 4-colour Anycubic needs for
+                two filaments),
+                POST <code>/render_pdf</code> (true-size vector PDF with live QR),
+                GET <code>/qr</code>, GET <code>/healthz</code>, GET <code>/templates</code>.
+                Template <code>herb_sign_v1</code> baked in.
+                The service URL lives in <code>root/config/services.json</code> — a full URL, never a
+                container name, so the container can run on any docker host.</li>
+            <li>Files stored under <code>/data/nfs/signs/</code> (NFS) or
+                <code>root/static/signs/</code> as fallback:
+                <code>sign_&lt;slug&gt;_&lt;target&gt;_&lt;WxH&gt;_&lt;stamp&gt;.stl</code>
+                <code>.pdf</code>, <code>.3mf</code> (multi-object two-filament), and <code>.json</code> sidecar.</li>
+            <li>Sidecar JSON fields: herb_id, target, size_mm, title/subtitle/body/url, qr flag,
+                plate_color, text_color, <code>filaments</code> (slot → part + colour),
+                pdf_file, <code>threemf_file</code>, part_files, layout_version.</li>
+        </ul>
+        <p>
+            Planning document: see <em>Herb Sign Generator Plan</em>
+            (Documentation/HerbSignGeneratorPlan.md) for the phased roadmap
+            (3MF multi-colour export, print queue routing to the next available printer,
+            Moonraker adapter, laser/SVG export).
+        </p>
+    </div>
+
+    <div class="app-section">
+        <h2>Known limitations / TODO</h2>
+        <ul>
+            <li><strong>Browse Models shows the sign PDF</strong> — the
+                <a href="/3d/browse">/3d/browse</a> list (and model detail page) shows a
+                &ldquo;Sign layout&rdquo; link for <code>sign_generator</code> models; for Adobe/paper
+                viewers the link opens <code>/signgenerator/pdf/&lt;model_id&gt;</code> (the stored PDF).
+                Eventually a thumbnail will be shown via <code>printing_3d_models.thumbnail_url</code>.</li>
+        </ul>
+    </div>
+
+    <div class="app-section">
+        <h2>Troubleshooting</h2>
+        <ul>
+            <li><strong>"Render service unavailable"</strong> — the comserv2-openscad container is not
+                running or unreachable. Check: <code>docker ps | grep openscad</code> and
+                <code>curl http://&lt;host&gt;:8083/healthz</code>. Start with
+                <code>docker compose up -d openscad</code> from the repo root.</li>
+            <li><strong>Slicer will not open the STL</strong> — files are binary STL; verify with
+                PrusaSlicer first. If Anycubic Slicer Next fails on files that PrusaSlicer opens,
+                the slicer installation is at fault (see plan doc, 2026-07-29 session notes).</li>
+            <li><strong>Empty wording fields</strong> — the herb record has no text for the chosen
+                target; type wording manually or update the herb record.</li>
+            <li><strong>No embedded PDF on the result page</strong> — the PDF render failed (see
+                app log, warning "PDF render failed"); the STL is still saved. Rebuild/restart the
+                openscad container (it needs the <code>reportlab</code> lib baked in since 2026-07)
+                and regenerate.</li>
+            <li><strong>Older signs</strong> (before stored PDFs): <code>/signgenerator/pdf/&lt;id&gt;</code>
+                redirects to the HTML print-page view; use its Print button to make a paper copy.</li>
+        </ul>
+    </div>
+</div>
