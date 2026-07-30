@@ -21,6 +21,9 @@ workspace.xml
 # AI session history and working files (not tracked)
 root/Documentation/session_history/
 *.md
+# Exception: the Documentation System Standard is the single source of truth and
+# MUST be version-controlled and browser-served. Track exactly this file.
+!root/Documentation/STANDARD.md
 
 # Dev workstation TLS certs (never commit private keys)
 config/dev_tls/

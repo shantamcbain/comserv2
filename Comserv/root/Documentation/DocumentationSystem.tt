@@ -116,7 +116,7 @@
             <li style="margin-bottom: var(--spacing-small);"><strong>Structured Content</strong> - Use proper headings, table of contents, and code blocks</li>
             <li style="margin-bottom: var(--spacing-small);"><strong>Comprehensive Coverage</strong> - Cover all aspects, include examples and address common questions</li>
             <li style="margin-bottom: var(--spacing-small);"><strong>Regular Updates</strong> - Keep documentation current with system changes and note update dates</li>
-            <li style="margin-bottom: var(--spacing-small);"><strong>Configuration Management</strong> - Update documentation_config.json when adding or moving documentation</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Configuration Management</strong> - Add new documentation via the indexer; metadata (category, roles) is owned by SQL per the <a href="/Documentation/STANDARD" style="color: var(--link-color);">Documentation Standard</a> — do not hand-edit a config file</li>
         </ol>
         <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
     </div>
@@ -127,7 +127,7 @@
         <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
             <li style="margin-bottom: var(--spacing-small);"><strong>Debug Mode</strong> - Enable debug mode to see detailed information about documentation loading and categorization</li>
             <li style="margin-bottom: var(--spacing-small);"><strong>Logging</strong> - The system logs documentation scanning and categorization; check application logs for errors</li>
-            <li style="margin-bottom: var(--spacing-small);"><strong>Configuration Validation</strong> - The system validates documentation_config.json file; errors are logged</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Configuration Validation</strong> - The system validates documentation metadata in SQL; errors are logged</li>
         </ul>
         <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
     </div>
@@ -153,5 +153,6 @@
 
     <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border-color);">
         <a href="/Documentation/index" style="background-color: var(--primary-color); color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;">← Return to Documentation Menu</a>
+        <a href="/Documentation/STANDARD" style="margin-left: 10px; background-color: var(--bg-secondary, #f8f9fa); color: var(--text-color); padding: 10px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; border: 1px solid var(--border-color);">📐 Documentation Standard (S1–S7)</a>
     </div>
 </div>
