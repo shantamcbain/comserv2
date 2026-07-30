@@ -11,6 +11,9 @@
 <div class="initiative">
     <h3>1. Documentation System Improvements</h3>
 
+    <div style="margin: 10px 0; padding: 10px 14px; border-left: 4px solid var(--caution-border, #ffc107); background: var(--caution-bg, #fff3cd); color: var(--text-color); border-radius: 4px;">
+        <strong>⚠ Superseded:</strong> This initiative is replaced by the <a href="/Documentation/STANDARD" style="color: var(--link-color);">Documentation System Standard (S1–S7)</a>. Do not start new work here; the standard is the single source of truth.
+    </div>
     <div class="initiative-meta">
         <p><strong>Status:</strong> In Progress</p>
         <p><strong>Priority:</strong> High</p>

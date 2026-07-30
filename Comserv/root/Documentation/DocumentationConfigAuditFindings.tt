@@ -10,6 +10,9 @@
    site_specific = "false"
 %]
 [% TRY %][% INCLUDE 'documentation_header.tt' %][% CATCH %][% END %]
+<div style="margin: 10px 0; padding: 10px 14px; border-left: 4px solid var(--caution-border, #ffc107); background: var(--caution-bg, #fff3cd); color: var(--text-color); border-radius: 4px;">
+    <strong>⚠ Superseded:</strong> This audit is replaced by the <a href="/Documentation/STANDARD" style="color: var(--link-color);">Documentation System Standard (S1–S7)</a>. The JSON-config discrepancy work it describes is resolved by consolidating on SQL (see the plan at <code>.hermes/plans/2026-07-30_061000-documentation-system-standard.md</code>).
+</div>
 [% PageVersion = 'Documentation/DOCUMENTATION_CONFIG_AUDIT_FINDINGS.tt,v 0.01 2025/12/25 Zencoder AI - Complete audit findings with missing and unindexed files' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
