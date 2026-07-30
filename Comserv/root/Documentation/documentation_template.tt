@@ -8,8 +8,6 @@
 <!-- Documentation page for documentation_template -->
 <div class="documentation-content">
 
-<!-- SUPERSEDED NOTE: this template's metadata approach is replaced by the Documentation System Standard (S1–S7) at /Documentation/STANDARD. New docs still use a META block for title/roles/category, but categorization/visibility is owned by SQL via the indexer — not hand-edited JSON/META. -->
-
 
 
 <!-- Documentation CSS is now included in the theme system -->

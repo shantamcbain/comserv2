@@ -14,6 +14,14 @@
     [% PageVersion %]
 [% END %]
 [%#
+  DOCUMENTATION SYSTEM STANDARD (S1–S7) — see /Documentation/STANDARD:
+  This .tt template REMAINS the live master template (META block, theme checklist,
+  flat /Documentation/FILENAME links). What changed: document CATEGORIZATION and
+  ROLE VISIBILITY are now owned by SQL (documentationmetadataindex), populated by
+  the indexer — authors do NOT hand-edit JSON/META for category/role. The META
+  title/description/page_version/last_updated fields here stay as-is.
+%]
+[%#
   TWO THEME GOALS (do not conflate):
   A) Author a theme → static/config/theme_definitions.json (see /Documentation/CssThemes)
   B) Template compliance → this checklist (fix opportunistically when editing .tt files)

@@ -26,8 +26,11 @@ The documentation system accumulated **five overlapping mechanisms** because eve
    them. Abandoned.
 2. **JSON config layer** — `DocumentationConfig.json` (shipped) + a runtime session overlay.
    Three files, three schemas. This was the de-facto live store.
-3. **META / frontmatter block** — a YAML `---` convention in `documentation_template.tt`,
-   half-parsed by `ScanMethods.pm`. Experimental.
+3. **META block convention** — a `[% META ... %]` directive (title, description, roles,
+   category, page_version, last_updated) in the live master template
+   `DocumentationTtTemplate.tt`; historically also half-parsed from disk by `ScanMethods.pm`.
+   The META block stays as the per-file authoring standard, but its category/role values
+   are now mirrored into SQL by the indexer (see S1/S5) rather than read ad-hoc.
 4. **Ad-hoc `.md` files** — ~40 of them, no enforced indexing, referenced inconsistently.
 5. **A graveyard of prior plans** — each spawned a new mechanism without retiring the old.
 
