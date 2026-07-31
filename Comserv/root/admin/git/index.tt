@@ -88,18 +88,35 @@
                 </div>
                 <div class="admin-panel-body">
                     <div class="admin-form-actions">
-                        <a href="[% c.uri_for('/admin/git_pull') %]" class="admin-btn admin-btn-primary">
-                            <i class="fas fa-download"></i> Pull
-                        </a>
-                        <a href="[% c.uri_for('/admin/safe_git_pull') %]" class="admin-btn">
-                            <i class="fas fa-shield-alt"></i> Safe Pull
-                        </a>
-                        <a href="[% c.uri_for('/admin/git_commit') %]" class="admin-btn">
-                            <i class="fas fa-check"></i> Stage &amp; Commit
-                        </a>
-                        <a href="[% c.uri_for('/admin/git_stash') %]" class="admin-btn">
-                            <i class="fas fa-box"></i> Stash
-                        </a>
+                        [%# Pull / Safe Pull are POST forms to the existing safe actions %]
+                        <form method="post" action="[% c.uri_for('/admin/git_pull') %]" class="inline-form">
+                            <input type="hidden" name="confirm" value="1">
+                            <button type="submit" class="admin-btn admin-btn-primary">
+                                <i class="fas fa-download"></i> Pull
+                            </button>
+                        </form>
+                        <form method="post" action="[% c.uri_for('/admin/safe_git_pull') %]" class="inline-form">
+                            <input type="hidden" name="confirm" value="1">
+                            <button type="submit" class="admin-btn">
+                                <i class="fas fa-shield-alt"></i> Safe Pull
+                            </button>
+                        </form>
+                        [%# Push — posts to the unified dashboard action endpoint %]
+                        <form method="post" action="[% c.uri_for('/admin/git/action') %]" class="inline-form"
+                              data-git-confirm="Push [% tracking.ahead %] commit(s) on '[% current_branch | html %]' to origin?">
+                            <input type="hidden" name="op" value="push">
+                            <input type="hidden" name="confirm" value="1">
+                            [% IF !tracking.upstream %]
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="set_upstream" value="1"> set upstream
+                            </label>
+                            [% END %]
+                            <button type="submit" class="admin-btn"
+                                    [% IF tracking.upstream && tracking.ahead == 0 %]disabled[% END %]>
+                                <i class="fas fa-upload"></i> Push
+                                [% IF tracking.ahead > 0 %]([% tracking.ahead %])[% END %]
+                            </button>
+                        </form>
                         <a href="[% c.uri_for('/admin/branch_management') %]" class="admin-btn">
                             <i class="fas fa-code-branch"></i> Branches
                         </a>
@@ -107,39 +124,91 @@
                 </div>
             </div>
 
-            [%# ---------------- Working tree status ---------------- %]
+            [%# ---------------- Working tree: select files + act ---------------- %]
             <div class="admin-panel">
                 <div class="admin-panel-header">
                     <h3>Working Tree</h3>
                 </div>
                 <div class="admin-panel-body">
                     [% IF git_status.has_changes %]
-                        [% IF git_status.staged_files.size %]
-                        <p><strong>Staged ([% git_status.staged_files.size %])</strong></p>
-                        <ul>
-                            [% FOREACH f IN git_status.staged_files %]
-                            <li><code class="code-inline">[% f | html %]</code></li>
-                            [% END %]
-                        </ul>
-                        [% END %]
+                    <form method="post" action="[% c.uri_for('/admin/git/action') %]"
+                          id="git-file-form" data-git-file-form="1">
+                        <input type="hidden" name="confirm" value="1">
+                        <input type="hidden" name="op" value="" data-git-op-field="1">
+                        <input type="hidden" name="confirm_permanent" value="" data-git-permanent-field="1">
 
-                        [% IF git_status.modified_files.size %]
-                        <p><strong>Modified ([% git_status.modified_files.size %])</strong></p>
-                        <ul>
-                            [% FOREACH f IN git_status.modified_files %]
-                            <li><code class="code-inline">[% f | html %]</code></li>
-                            [% END %]
-                        </ul>
-                        [% END %]
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:2rem">
+                                        <input type="checkbox" data-git-check-all="1" title="Select all">
+                                    </th>
+                                    <th>File</th>
+                                    <th style="width:8rem">State</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH f IN git_status.staged_files %]
+                                <tr>
+                                    <td><input type="checkbox" name="paths" value="[% f | html %]" data-git-file="1"></td>
+                                    <td><code class="code-inline">[% f | html %]</code></td>
+                                    <td><span class="status-badge">staged</span></td>
+                                </tr>
+                                [% END %]
+                                [% FOREACH f IN git_status.modified_files %]
+                                <tr>
+                                    <td><input type="checkbox" name="paths" value="[% f | html %]" data-git-file="1"></td>
+                                    <td><code class="code-inline">[% f | html %]</code></td>
+                                    <td><span class="status-badge">modified</span></td>
+                                </tr>
+                                [% END %]
+                                [% FOREACH f IN git_status.untracked_files %]
+                                <tr>
+                                    <td><input type="checkbox" name="paths" value="[% f | html %]"
+                                               data-git-file="1" data-git-untracked="1"></td>
+                                    <td><code class="code-inline">[% f | html %]</code></td>
+                                    <td><span class="status-badge">untracked</span></td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
 
-                        [% IF git_status.untracked_files.size %]
-                        <p><strong>Untracked ([% git_status.untracked_files.size %])</strong></p>
-                        <ul>
-                            [% FOREACH f IN git_status.untracked_files %]
-                            <li><code class="code-inline">[% f | html %]</code></li>
-                            [% END %]
-                        </ul>
-                        [% END %]
+                        <p>
+                            <input type="text" name="message" placeholder="Commit / stash message"
+                                   class="form-control" data-git-message="1">
+                        </p>
+
+                        <div class="admin-form-actions">
+                            <button type="button" class="admin-btn admin-btn-primary"
+                                    data-git-action="stage">
+                                <i class="fas fa-plus"></i> Stage
+                            </button>
+                            <button type="button" class="admin-btn"
+                                    data-git-action="unstage">
+                                <i class="fas fa-minus"></i> Unstage
+                            </button>
+                            <button type="button" class="admin-btn admin-btn-primary"
+                                    data-git-action="commit"
+                                    data-git-confirm="Commit currently staged changes?">
+                                <i class="fas fa-check"></i> Commit
+                            </button>
+                            <button type="button" class="admin-btn"
+                                    data-git-action="stash"
+                                    data-git-confirm="Stash the selected file(s)?">
+                                <i class="fas fa-box"></i> Stash Selected
+                            </button>
+                            <button type="button" class="admin-btn"
+                                    data-git-action="gitignore"
+                                    data-git-confirm="Add the selected untracked file(s) to .gitignore?">
+                                <i class="fas fa-eye-slash"></i> Add to .gitignore
+                            </button>
+                            <button type="button" class="admin-btn admin-btn-danger"
+                                    data-git-action="delete"
+                                    data-git-confirm="Delete the selected file(s)? Tracked files are removed via git (recoverable); untracked files are permanently deleted.">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </form>
                     [% ELSE %]
                         <p><i class="fas fa-check"></i> Working tree clean.</p>
                     [% END %]
