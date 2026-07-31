@@ -815,3 +815,127 @@
 .ticket-subject-mono a {
     font-family:monospace;
 }
+
+/* =============================================================================
+   ADMIN UI COMPONENTS (V2)
+   Added 2026-07-31 for the Git subsystem refactor.
+
+   WHY THESE EXIST: admin pages were written against Bootstrap class names
+   (.alert, .card, .btn, .form-control, .badge, .mb-3, .bg-info, .text-white).
+   Bootstrap is NOT loaded anywhere in this application, and the CSS that does
+   define .alert/.btn/.form-control — themes/base-containers.css — is only
+   pulled in by themes/documentation.css via @import. The admin themes
+   (default, csc, dark, ...) never import it, so on an admin page those class
+   names resolve to nothing and the markup renders unstyled.
+
+   Rather than load Bootstrap or make every theme import base-containers.css
+   (either would be a large, risky, out-of-scope change), admin pages use these
+   explicitly-namespaced admin-* components. They are self-contained and use
+   only theme variables that base.css/themes actually define, so they follow
+   the active theme automatically.
+
+   Theme tokens used (all verified present): --border-color, --text-color,
+   --text-muted-color, --light-color, --bg-secondary, --card-bg,
+   --primary-color, --secondary-color, --info-color, --success-color,
+   --warning-color, --danger-color, --link-color.
+   ========================================================================== */
+
+/* --- Panels (replaces Bootstrap .card) --- */
+.admin-panel {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 5px;
+    background: var(--card-bg, var(--bg-secondary, #fff));
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+}
+.admin-panel-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color, #ddd);
+    background: var(--light-color, #f8f9fa);
+}
+.admin-panel-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+.admin-panel-body {
+    padding: 1rem;
+}
+
+/* --- Alerts (replaces Bootstrap .alert) --- */
+.admin-alert {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-left-width: 4px;
+    border-radius: 4px;
+    background: var(--light-color, #f8f9fa);
+    color: var(--text-color, #333);
+}
+.admin-alert ul {
+    margin: 0.5rem 0 0 1.25rem;
+}
+.admin-alert-info    { border-left-color: var(--info-color, #17a2b8); }
+.admin-alert-success { border-left-color: var(--success-color, #28a745); }
+.admin-alert-warning { border-left-color: var(--warning-color, #ffc107); }
+.admin-alert-danger  { border-left-color: var(--danger-color, #dc3545); }
+
+/* --- Buttons (replaces Bootstrap .btn) --- */
+.admin-btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: var(--light-color, #f8f9fa);
+    color: var(--text-color, #333);
+    font-size: 1rem;
+    line-height: 1.4;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+.admin-btn:hover    { opacity: 0.85; text-decoration: none; }
+.admin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.admin-btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.2rem;
+}
+.admin-btn-primary   { background: var(--primary-color, #007bff);   border-color: var(--primary-color, #007bff);   color: #fff; }
+.admin-btn-secondary { background: var(--secondary-color, #6c757d); border-color: var(--secondary-color, #6c757d); color: #fff; }
+.admin-btn-info      { background: var(--info-color, #17a2b8);      border-color: var(--info-color, #17a2b8);      color: #fff; }
+.admin-btn-success   { background: var(--success-color, #28a745);   border-color: var(--success-color, #28a745);   color: #fff; }
+.admin-btn-danger    { background: var(--danger-color, #dc3545);    border-color: var(--danger-color, #dc3545);    color: #fff; }
+
+/* --- Forms (replaces Bootstrap .form-group / .form-control / .form-text) --- */
+.admin-form-group {
+    margin-bottom: 1rem;
+}
+.admin-form-group label {
+    display: block;
+    margin-bottom: 0.35rem;
+}
+.admin-form-control {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: var(--card-bg, #fff);
+    color: var(--text-color, #333);
+    font-size: 1rem;
+    font-family: inherit;
+}
+.admin-form-help {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--text-muted-color, #888);
+    font-size: 0.85em;
+}
+.admin-form-actions {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
