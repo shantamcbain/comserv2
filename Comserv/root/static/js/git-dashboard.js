@@ -44,6 +44,22 @@
             });
         }
 
+        // Branch switch via dropdown: submit the parent form on change, with a
+        // confirm (uncommitted changes are auto-stashed server-side).
+        var switchSelect = document.querySelector('[data-git-switch-select]');
+        if (switchSelect) {
+            switchSelect._gitPrev = switchSelect.value;
+            switchSelect.addEventListener('change', function () {
+                if (!window.confirm("Switch to branch '" + this.value +
+                        "'? Uncommitted changes are auto-stashed.")) {
+                    this.value = this._gitPrev;   // revert selection
+                    return;
+                }
+                var f = this.closest('form[data-git-switch-form]');
+                if (f) { f.submit(); }
+            });
+        }
+
         if (!form) { return; }
 
         var opField        = form.querySelector('[data-git-op-field]');

@@ -139,6 +139,10 @@
     <link rel="stylesheet" type="text/css" href="/static/css/themes/schema_compare.css">
     [% END %]
 
+    [% IF c.stash.template.match('admin/git/') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/git-dashboard.css?v=[% cv %]">
+    [% END %]
+
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% cv %]">
 

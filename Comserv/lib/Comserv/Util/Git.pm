@@ -56,7 +56,7 @@ my %ALLOWED_FLAGS = (
     log      => { map { $_ => 1 } qw(--oneline --no-color --stat -n) },
     'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short) },
     'rev-list'  => { map { $_ => 1 } qw(--left-right --count) },
-    branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color) },
+    branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color --format) },
     diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only) },
     fetch    => { map { $_ => 1 } qw(--prune) },
     pull     => { map { $_ => 1 } qw(--ff-only) },
@@ -241,6 +241,53 @@ sub get_local_branches {
         push @branches, $line;
     }
     return \@branches;
+}
+
+=head2 get_branch_details($c)
+
+Rich per-branch metadata for the dashboard branch card. Uses a single
+C<git for-each-ref> so it's one cheap call regardless of branch count.
+
+Returns an arrayref of hashrefs, current branch first, each:
+  { name, is_current, last_commit_date (YYYY-MM-DD), last_commit_relative,
+    last_commit_subject, upstream (or ''), removable (0 for protected/current) }
+
+=cut
+
+sub get_branch_details {
+    my ($self, $c) = @_;
+
+    my $current = $self->get_current_branch($c);
+    my %protected = (main => 1, master => 1, Production => 1);
+
+    # Field-separated, one line per branch. %(committerdate:short) = YYYY-MM-DD.
+    my $fmt = '%(refname:short)%09%(committerdate:short)%09%(committerdate:relative)%09%(upstream:short)%09%(contents:subject)';
+    my $r = $self->_run($c, 'branch', '--no-color', '--format', $fmt);
+
+    my @rows;
+    for my $line (split /\n/, $r->{output}) {
+        next unless length $line;
+        my ($name, $date, $rel, $upstream, $subject) = split /\t/, $line, 5;
+        next unless defined $name && length $name;
+        my $is_current = ($name eq $current) ? 1 : 0;
+        push @rows, {
+            name                 => $name,
+            is_current           => $is_current,
+            last_commit_date     => $date    // '',
+            last_commit_relative => $rel     // '',
+            last_commit_subject  => $subject // '',
+            upstream             => $upstream // '',
+            removable            => ($is_current || $protected{$name}) ? 0 : 1,
+        };
+    }
+
+    # Current branch first, then most-recently-committed.
+    @rows = sort {
+        $b->{is_current} <=> $a->{is_current}
+            || ($b->{last_commit_date} cmp $a->{last_commit_date})
+    } @rows;
+
+    return \@rows;
 }
 
 =head2 get_recent_commits($c, $count)

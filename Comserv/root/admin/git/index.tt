@@ -1,10 +1,13 @@
 [% META title = 'Git Dashboard' %]
 [%# File: root/admin/git/index.tt
     Single entry point for all git functionality. Route: Admin::Git::index (/admin/git).
-    Read-only in this phase; write operations still live on their own pages and are
-    linked from the Actions panel below.
+    Compact vertical layout: a top summary strip (Repository + branch dropdown +
+    push/pull) sits on one row; only the Working Tree card is open by default;
+    branches / commits / stashes are collapsed <details> to save vertical space.
+    Styles: /static/css/git-dashboard.css (loaded via Header.tt on this route).
+    JS: /static/js/git-dashboard.js (js_load.tt). No inline <script>/<style>.
 %]
-[% PageVersion = 'admin/git/index.tt,v 0.01 2026/07/31 shanta Exp shanta ' %]
+[% PageVersion = 'admin/git/index.tt,v 0.02 2026/07/31 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -41,94 +44,85 @@
                 </div>
             [% END %]
 
-            [%# ---------------- Repository summary ---------------- %]
-            <div class="admin-panel">
-                <div class="admin-panel-header">
-                    <h3>Repository</h3>
-                </div>
-                <div class="admin-panel-body">
-                    <p>
-                        <strong>Branch:</strong>
-                        <span class="status-badge">[% current_branch | html %]</span>
+            [%# ============ Top summary strip (one row, cards fit content) ============ %]
+            <div class="git-strip">
+
+                [%# ---- Repository + branch selector (replaces the old Branches card) ---- %]
+                <div class="git-card git-card--grow">
+                    <h4>Repository</h4>
+                    <div class="git-inline">
+                        [%# Switch branch by selecting from the dropdown %]
+                        <form method="post" action="[% c.uri_for('/admin/git/action') %]"
+                              class="inline-form" data-git-switch-form="1">
+                            <input type="hidden" name="op" value="switch">
+                            <input type="hidden" name="confirm" value="1">
+                            <select name="branch" class="form-control git-select"
+                                    data-git-switch-select="1" title="Switch branch">
+                                [% FOREACH b IN branch_details %]
+                                <option value="[% b.name | html %]"
+                                    [% IF b.is_current %]selected[% END %]>
+                                    [% b.name | html %][% IF b.last_commit_relative %] · [% b.last_commit_relative | html %][% END %]
+                                </option>
+                                [% END %]
+                            </select>
+                        </form>
+
                         [% IF tracking.upstream %]
-                            &bull; <strong>Tracking:</strong>
-                            <code class="code-inline">[% tracking.upstream | html %]</code>
+                            [% IF tracking.ahead == 0 && tracking.behind == 0 %]
+                                <span class="section-info"><i class="fas fa-check"></i> up to date</span>
+                            [% ELSE %]
+                                [% IF tracking.ahead > 0 %]
+                                <span class="section-info-warn"><i class="fas fa-upload"></i> [% tracking.ahead %] to push</span>
+                                [% END %]
+                                [% IF tracking.behind > 0 %]
+                                <span class="section-info-warn"><i class="fas fa-download"></i> [% tracking.behind %] behind</span>
+                                [% END %]
+                            [% END %]
                         [% ELSE %]
-                            &bull; <em>No upstream configured</em>
+                            <span class="section-info-warn">no upstream</span>
                         [% END %]
-                    </p>
-                    <p>
-                        [% IF tracking.ahead > 0 %]
-                            <span class="section-info-warn">
-                                <i class="fas fa-upload"></i>
-                                [% tracking.ahead %] commit[% IF tracking.ahead != 1 %]s[% END %] to push
-                            </span>
-                        [% END %]
-                        [% IF tracking.behind > 0 %]
-                            [% IF tracking.ahead > 0 %]&bull;[% END %]
-                            <span class="section-info-warn">
-                                <i class="fas fa-download"></i>
-                                [% tracking.behind %] commit[% IF tracking.behind != 1 %]s[% END %] behind
-                            </span>
-                        [% END %]
-                        [% IF tracking.ahead == 0 && tracking.behind == 0 && tracking.upstream %]
-                            <i class="fas fa-check"></i> Up to date with remote
-                        [% END %]
-                    </p>
+                    </div>
                     [% IF c.session.debug_mode == 1 %]
-                    <p><small>Repo path: <code class="code-inline">[% repo_path | html %]</code></small></p>
+                    <div class="git-branch-meta">Repo: <code class="code-inline">[% repo_path | html %]</code></div>
                     [% END %]
                 </div>
-            </div>
 
-            [%# ---------------- Actions ---------------- %]
-            <div class="admin-panel">
-                <div class="admin-panel-header">
-                    <h3>Actions</h3>
-                </div>
-                <div class="admin-panel-body">
-                    <div class="admin-form-actions">
-                        [%# Pull / Safe Pull are POST forms to the existing safe actions %]
+                [%# ---- Remote actions (fit width) ---- %]
+                <div class="git-card git-card--fit">
+                    <h4>Remote</h4>
+                    <div class="git-inline">
                         <form method="post" action="[% c.uri_for('/admin/git_pull') %]" class="inline-form">
                             <input type="hidden" name="confirm" value="1">
-                            <button type="submit" class="admin-btn admin-btn-primary">
+                            <button type="submit" class="admin-btn admin-btn-sm admin-btn-primary">
                                 <i class="fas fa-download"></i> Pull
                             </button>
                         </form>
                         <form method="post" action="[% c.uri_for('/admin/safe_git_pull') %]" class="inline-form">
                             <input type="hidden" name="confirm" value="1">
-                            <button type="submit" class="admin-btn">
+                            <button type="submit" class="admin-btn admin-btn-sm">
                                 <i class="fas fa-shield-alt"></i> Safe Pull
                             </button>
                         </form>
-                        [%# Push — posts to the unified dashboard action endpoint %]
                         <form method="post" action="[% c.uri_for('/admin/git/action') %]" class="inline-form"
                               data-git-confirm="Push [% tracking.ahead %] commit(s) on '[% current_branch | html %]' to origin?">
                             <input type="hidden" name="op" value="push">
                             <input type="hidden" name="confirm" value="1">
                             [% IF !tracking.upstream %]
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="set_upstream" value="1"> set upstream
-                            </label>
+                            <label class="checkbox-label"><input type="checkbox" name="set_upstream" value="1"> upstream</label>
                             [% END %]
-                            <button type="submit" class="admin-btn"
+                            <button type="submit" class="admin-btn admin-btn-sm"
                                     [% IF tracking.upstream && tracking.ahead == 0 %]disabled[% END %]>
-                                <i class="fas fa-upload"></i> Push
-                                [% IF tracking.ahead > 0 %]([% tracking.ahead %])[% END %]
+                                <i class="fas fa-upload"></i> Push[% IF tracking.ahead > 0 %] ([% tracking.ahead %])[% END %]
                             </button>
                         </form>
-                        <a href="[% c.uri_for('/admin/branch_management') %]" class="admin-btn">
-                            <i class="fas fa-code-branch"></i> Branches
-                        </a>
                     </div>
                 </div>
+
             </div>
 
-            [%# ---------------- Working tree: select files + act ---------------- %]
-            <div class="admin-panel">
-                <div class="admin-panel-header">
-                    <h3>Working Tree</h3>
-                </div>
+            [%# ==================== Working Tree (the only open card) ==================== %]
+            <div class="admin-panel git-worktree">
+                <div class="admin-panel-header"><h3>Working Tree</h3></div>
                 <div class="admin-panel-body">
                     [% IF git_status.has_changes %]
                     <form method="post" action="[% c.uri_for('/admin/git/action') %]"
@@ -144,7 +138,7 @@
                                         <input type="checkbox" data-git-check-all="1" title="Select all">
                                     </th>
                                     <th>File</th>
-                                    <th style="width:8rem">State</th>
+                                    <th style="width:7rem">State</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -175,7 +169,7 @@
 
                         <p>
                             <textarea name="message" placeholder="Commit / stash message"
-                                      class="form-control" rows="3" data-git-message="1"></textarea>
+                                      class="form-control" rows="2" data-git-message="1"></textarea>
                         </p>
                         <p>
                             <button type="button" class="admin-btn admin-btn-sm"
@@ -186,31 +180,26 @@
                             <span data-git-suggest-status="1" class="section-info-warn"></span>
                         </p>
 
-                        <div class="admin-form-actions">
-                            <button type="button" class="admin-btn admin-btn-primary"
-                                    data-git-action="stage">
+                        <div class="git-actions">
+                            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary" data-git-action="stage">
                                 <i class="fas fa-plus"></i> Stage
                             </button>
-                            <button type="button" class="admin-btn"
-                                    data-git-action="unstage">
+                            <button type="button" class="admin-btn admin-btn-sm" data-git-action="unstage">
                                 <i class="fas fa-minus"></i> Unstage
                             </button>
-                            <button type="button" class="admin-btn admin-btn-primary"
-                                    data-git-action="commit"
-                                    data-git-confirm="Commit currently staged changes?">
+                            <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                    data-git-action="commit" data-git-confirm="Commit the selected / staged changes?">
                                 <i class="fas fa-check"></i> Commit
                             </button>
-                            <button type="button" class="admin-btn"
-                                    data-git-action="stash"
-                                    data-git-confirm="Stash the selected file(s)?">
-                                <i class="fas fa-box"></i> Stash Selected
+                            <button type="button" class="admin-btn admin-btn-sm"
+                                    data-git-action="stash" data-git-confirm="Stash the selected file(s)?">
+                                <i class="fas fa-box"></i> Stash
                             </button>
-                            <button type="button" class="admin-btn"
-                                    data-git-action="gitignore"
-                                    data-git-confirm="Add the selected untracked file(s) to .gitignore?">
-                                <i class="fas fa-eye-slash"></i> Add to .gitignore
+                            <button type="button" class="admin-btn admin-btn-sm"
+                                    data-git-action="gitignore" data-git-confirm="Add the selected untracked file(s) to .gitignore?">
+                                <i class="fas fa-eye-slash"></i> .gitignore
                             </button>
-                            <button type="button" class="admin-btn admin-btn-danger"
+                            <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
                                     data-git-action="delete"
                                     data-git-confirm="Delete the selected file(s)? Tracked files are removed via git (recoverable); untracked files are permanently deleted.">
                                 <i class="fas fa-trash"></i> Delete
@@ -223,70 +212,89 @@
                 </div>
             </div>
 
-            [%# ---------------- Recent commits ---------------- %]
-            <div class="admin-panel">
-                <div class="admin-panel-header">
-                    <h3>Recent Commits</h3>
+            [%# ==================== Branches (collapsed) ==================== %]
+            <details class="git-collapse">
+                <summary>Branches <span class="git-count">([% branch_details.size %])</span></summary>
+                <div class="git-collapse-body">
+                    <div class="git-branch-grid">
+                        [% FOREACH b IN branch_details %]
+                        <div class="git-branch-item[% IF b.is_current %] is-current[% END %]">
+                            <div class="git-branch-name">
+                                [% b.name | html %]
+                                [% IF b.is_current %]<span class="status-badge">current</span>[% END %]
+                            </div>
+                            <div class="git-branch-meta">
+                                [% IF b.last_commit_relative %][% b.last_commit_relative | html %][% END %]
+                                [% IF b.upstream %] · tracks [% b.upstream | html %][% ELSE %] · local only[% END %]
+                            </div>
+                            [% IF b.last_commit_subject %]
+                            <div class="git-branch-meta">[% b.last_commit_subject | html %]</div>
+                            [% END %]
+                            <div class="git-branch-actions">
+                                [% UNLESS b.is_current %]
+                                <form method="post" action="[% c.uri_for('/admin/git/action') %]" class="inline-form"
+                                      data-git-confirm="Switch to branch '[% b.name | html %]'? Uncommitted changes are auto-stashed.">
+                                    <input type="hidden" name="op" value="switch">
+                                    <input type="hidden" name="confirm" value="1">
+                                    <input type="hidden" name="branch" value="[% b.name | html %]">
+                                    <button type="submit" class="admin-btn admin-btn-sm">
+                                        <i class="fas fa-exchange-alt"></i> Switch
+                                    </button>
+                                </form>
+                                [% END %]
+                                [% IF b.removable %]
+                                <form method="post" action="[% c.uri_for('/admin/git/action') %]" class="inline-form"
+                                      data-git-confirm="Delete branch '[% b.name | html %]' locally and on origin? This cannot be undone.">
+                                    <input type="hidden" name="op" value="delbranch">
+                                    <input type="hidden" name="confirm" value="1">
+                                    <input type="hidden" name="branch" value="[% b.name | html %]">
+                                    <button type="submit" class="admin-btn admin-btn-sm admin-btn-danger">
+                                        <i class="fas fa-trash"></i> Remove
+                                    </button>
+                                </form>
+                                [% END %]
+                            </div>
+                        </div>
+                        [% END %]
+                    </div>
                 </div>
-                <div class="admin-panel-body">
+            </details>
+
+            [%# ==================== Recent commits (collapsed) ==================== %]
+            <details class="git-collapse">
+                <summary>Recent Commits <span class="git-count">([% recent_commits.size %])</span></summary>
+                <div class="git-collapse-body">
                     [% IF recent_commits.size %]
-                    <ul>
+                    <ul class="git-list">
                         [% FOREACH cmt IN recent_commits %]
                         <li>
                             <code class="code-inline">[% cmt.hash | html %]</code>
-                            [% cmt.message | html %]
+                            <span>[% cmt.message | html %]</span>
                         </li>
                         [% END %]
                     </ul>
-                    [% ELSE %]
-                    <p>No commits found.</p>
-                    [% END %]
+                    [% ELSE %]<p>No commits found.</p>[% END %]
                 </div>
-            </div>
+            </details>
 
-            [%# ---------------- Branches ---------------- %]
-            <div class="admin-panel">
-                <div class="admin-panel-header">
-                    <h3>Local Branches</h3>
-                </div>
-                <div class="admin-panel-body">
-                    [% IF local_branches.size %]
-                    <ul>
-                        [% FOREACH b IN local_branches %]
-                        <li>
-                            <code class="code-inline">[% b | html %]</code>
-                            [% IF b == current_branch %] <span class="status-badge">current</span>[% END %]
-                        </li>
-                        [% END %]
-                    </ul>
-                    [% ELSE %]
-                    <p>No branches found.</p>
-                    [% END %]
-                </div>
-            </div>
-
-            [%# ---------------- Stashes ---------------- %]
+            [%# ==================== Stashes (collapsed, only if any) ==================== %]
             [% IF stash_list.size %]
-            <div class="admin-panel">
-                <div class="admin-panel-header">
-                    <h3>Stashes ([% stash_list.size %])</h3>
-                </div>
-                <div class="admin-panel-body">
-                    <ul>
+            <details class="git-collapse">
+                <summary>Stashes <span class="git-count">([% stash_list.size %])</span></summary>
+                <div class="git-collapse-body">
+                    <ul class="git-list">
                         [% FOREACH s IN stash_list %]
                         <li>
                             <code class="code-inline">[% s.ref | html %]</code>
-                            [% s.message | html %]
+                            <span>[% s.message | html %]</span>
                         </li>
                         [% END %]
                     </ul>
-                    <div class="admin-form-actions">
-                        <a href="[% c.uri_for('/admin/git_stash') %]" class="admin-btn admin-btn-sm">
-                            Manage stashes
-                        </a>
+                    <div class="git-actions">
+                        <a href="[% c.uri_for('/admin/git_stash') %]" class="admin-btn admin-btn-sm">Manage stashes</a>
                     </div>
                 </div>
-            </div>
+            </details>
             [% END %]
 
         </div>
