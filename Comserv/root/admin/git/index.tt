@@ -174,8 +174,16 @@
                         </table>
 
                         <p>
-                            <input type="text" name="message" placeholder="Commit / stash message"
-                                   class="form-control" data-git-message="1">
+                            <textarea name="message" placeholder="Commit / stash message"
+                                      class="form-control" rows="3" data-git-message="1"></textarea>
+                        </p>
+                        <p>
+                            <button type="button" class="admin-btn admin-btn-sm"
+                                    data-git-suggest="1"
+                                    data-git-suggest-url="[% c.uri_for('/admin/git/suggest_message') %]">
+                                <i class="fas fa-robot"></i> Suggest message with AI
+                            </button>
+                            <span data-git-suggest-status="1" class="section-info-warn"></span>
                         </p>
 
                         <div class="admin-form-actions">

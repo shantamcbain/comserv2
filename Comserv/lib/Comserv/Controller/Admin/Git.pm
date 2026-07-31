@@ -337,6 +337,153 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     $c->response->redirect($c->uri_for('/admin/git'));
 }
 
+=head2 suggest_commit_message
+
+AJAX endpoint: read the current diff and ask the local AI to draft a commit message.
+
+POST /admin/git/suggest_message
+  - optional repeated 'paths' params: diff only those files (validated against git status);
+    with none, uses the staged diff, falling back to the full working-tree diff.
+
+Reuses the existing AI2 provider stack (Router picks provider+model, Ollama client runs it)
+so no new AI plumbing is introduced. One-shot call — does NOT create a conversation. Returns
+JSON: { success, message, model } or { success => 0, error }.
+
+=cut
+
+sub suggest_commit_message :Path('/admin/git/suggest_message') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_suggest_message');
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    # Build the diff. Selected paths (validated) narrow it; else staged, else working tree.
+    my @paths = $c->req->param('paths');
+    my $diff  = '';
+    my $scope = '';
+
+    if (@paths) {
+        my $v = $self->_validate_paths($c, \@paths);
+        if (@{ $v->{invalid} }) {
+            $c->response->body(encode_json({
+                success => 0,
+                error   => 'Rejected unsafe/unknown path(s): ' . join(', ', @{ $v->{invalid} }),
+            }));
+            return;
+        }
+        if (@{ $v->{valid} }) {
+            my ($out, $code) = $self->_git_list($c, 'diff', 'HEAD', '--', @{ $v->{valid} });
+            $diff  = $out;
+            $scope = 'selected files: ' . join(', ', @{ $v->{valid} });
+        }
+    }
+
+    if (!length $diff) {
+        my ($staged) = $self->_git_list($c, 'diff', '--cached');
+        if (length $staged) { $diff = $staged; $scope = 'staged changes'; }
+    }
+    if (!length $diff) {
+        my ($wt) = $self->_git_list($c, 'diff', 'HEAD');
+        if (length $wt) { $diff = $wt; $scope = 'working-tree changes'; }
+    }
+
+    unless (length $diff) {
+        $c->response->body(encode_json({
+            success => 0,
+            error   => 'No changes to describe (nothing staged or modified).',
+        }));
+        return;
+    }
+
+    # Cap the diff so a huge changeset can't blow the model context / timeout.
+    my $MAX = 12000;
+    my $truncated = 0;
+    if (length($diff) > $MAX) {
+        $diff = substr($diff, 0, $MAX);
+        $truncated = 1;
+    }
+
+    # Also give the model the file name-status for structure.
+    my ($namestat) = $self->_git_list($c, 'diff', '--stat', 'HEAD');
+
+    my $prompt = <<"PROMPT";
+You are writing a git commit message for a Perl/Catalyst web application (Comserv2).
+Write a Conventional Commits style message: a concise imperative subject line
+(<= 72 chars, e.g. "fix(git): ..."), a blank line, then 1-4 short bullet points
+explaining WHAT changed and WHY. Do NOT include backticks, code fences, or any
+preamble like "Here is". Output ONLY the commit message text.
+
+Scope: $scope
+
+File summary:
+$namestat
+
+Diff${\ ($truncated ? ' (truncated)' : '')}:
+$diff
+PROMPT
+
+    # Resolve an installed local model via the same Router the chat uses.
+    my $provider = try { $c->model('AI2::Provider::Ollama') } catch { undef };
+    unless ($provider && $provider->can('chat')) {
+        $c->response->body(encode_json({ success => 0, error => 'AI provider unavailable' }));
+        return;
+    }
+
+    my $installed = try { $provider->list_models($c) } catch { [] };
+    my ($prov_name, $model) = $c->model('AI2::Router')->select_model($c,
+        installed_models => $installed,
+        agent_id         => 'coding',
+    );
+
+    my ($host, $port) = $provider->resolve_host($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
+        "Generating commit message via $prov_name/$model for $scope");
+
+    my $resp = try {
+        $provider->chat($c,
+            model    => $model,
+            host     => $host,
+            port     => $port,
+            messages => [
+                { role => 'system', content => 'You are a precise git commit message generator.' },
+                { role => 'user',   content => $prompt },
+            ],
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'suggest_commit_message', "AI call threw: $_");
+        undef;
+    };
+
+    unless ($resp && $resp->{success} && length($resp->{response} // '')) {
+        $c->response->body(encode_json({
+            success => 0,
+            error   => ($resp && $resp->{error}) ? $resp->{error} : 'AI returned no message',
+        }));
+        return;
+    }
+
+    my $message = $resp->{response};
+    $message =~ s/^\s+//; $message =~ s/\s+$//;
+    # Strip any stray code fences the model may add despite instructions.
+    $message =~ s/^```[a-zA-Z]*\n?//; $message =~ s/\n?```$//;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
+        "Suggested commit message (" . length($message) . " chars) via $model");
+
+    $c->response->body(encode_json({
+        success => 1,
+        message => $message,
+        model   => $resp->{model} // $model,
+    }));
+}
+
 =head2 _append_gitignore
 
 Append paths to the repo-root .gitignore, one per line, skipping any already present.

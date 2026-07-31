@@ -53,6 +53,53 @@
             return form.querySelectorAll('[data-git-file]:checked');
         }
 
+        // "Suggest message with AI" — POST selected paths (if any) to the suggest
+        // endpoint and drop the returned message into the commit/stash input.
+        var suggestBtn = document.querySelector('[data-git-suggest]');
+        if (suggestBtn) {
+            suggestBtn.addEventListener('click', function () {
+                var url    = suggestBtn.getAttribute('data-git-suggest-url');
+                var status = document.querySelector('[data-git-suggest-status]');
+                var msgInput = form.querySelector('[data-git-message]');
+                if (!url) { return; }
+
+                var body = new URLSearchParams();
+                var boxes = selectedBoxes();
+                for (var k = 0; k < boxes.length; k++) {
+                    body.append('paths', boxes[k].value);
+                }
+
+                suggestBtn.disabled = true;
+                if (status) { status.textContent = 'Asking AI…'; }
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString(),
+                    credentials: 'same-origin'
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data && data.success && data.message) {
+                        if (msgInput) { msgInput.value = data.message; }
+                        if (status) {
+                            status.textContent = 'Drafted with ' + (data.model || 'AI') +
+                                ' — review before committing.';
+                        }
+                    } else {
+                        if (status) {
+                            status.textContent = 'AI could not draft a message: ' +
+                                ((data && data.error) || 'unknown error');
+                        }
+                    }
+                })
+                .catch(function (err) {
+                    if (status) { status.textContent = 'Request failed: ' + err; }
+                })
+                .finally(function () { suggestBtn.disabled = false; });
+            });
+        }
+
         function anyUntrackedSelected() {
             var boxes = selectedBoxes();
             for (var j = 0; j < boxes.length; j++) {
