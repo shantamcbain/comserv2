@@ -119,6 +119,11 @@
 <script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Git Dashboard JS -->
+[% IF c.request.uri.match('/admin/git') %]
+<script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
+[% END %]
+
 <!-- Herb Sign Generator live preview -->
 [% IF c.request.uri.match('/signgenerator') %]
 <script src="/static/js/sign-preview.js?v=[% cv %]" defer></script>

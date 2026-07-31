@@ -99,6 +99,286 @@ sub _git {
     return `git -C "$repo" $args`;
 }
 
+=head2 _git_list
+
+Run a git command with EXPLICIT ARGUMENT LIST — no shell, no interpolation.
+
+Unlike _git (which builds a shell string and is fine for fixed internal commands), _git_list
+is the ONLY safe way to pass browser-supplied values (file paths, messages) to git: each argument
+is handed to git as a distinct argv element via IPC::Run3, so shell metacharacters in a filename
+or commit message can never be interpreted.
+
+Usage: my ($out, $code) = $self->_git_list($c, 'add', '--', @paths);
+Returns (combined_output, exit_code). Returns ('', -1) if the repo path can't be resolved.
+
+=cut
+
+sub _git_list {
+    my ($self, $c, @argv) = @_;
+
+    my $repo = $self->repo_path($c);
+    return ('', -1) unless defined $repo && length $repo;
+
+    require IPC::Run3;
+    my $out = '';
+    IPC::Run3::run3([ 'git', '-C', $repo, @argv ], \undef, \$out, \$out);
+    my $code = $? >> 8;
+    return ($out, $code);
+}
+
+=head2 _validate_paths
+
+Gate browser-supplied file paths before any write. A path is accepted ONLY if it appears in the
+current C<git status --porcelain> (tracked-changed OR untracked). Anything else — a path not in the
+working-tree change set, an absolute path, a C<..> traversal, or a symlink whose real target escapes
+the repo root — is rejected and logged at 'warn'.
+
+Returns a hashref:
+  { valid => [\@ok_paths], invalid => [\@rejected], untracked => { path => 1, ... } }
+
+=cut
+
+sub _validate_paths {
+    my ($self, $c, $paths) = @_;
+
+    my %known;       # path => tracked|untracked
+    my $porcelain = $self->_git($c, 'status --porcelain 2>&1');
+    for my $line (split /\n/, $porcelain) {
+        # format: XY <path>   (XY = two status chars, then a space)
+        next unless $line =~ /^(..)\s(.+)$/;
+        my ($xy, $file) = ($1, $2);
+        # porcelain may quote paths with odd chars or show "old -> new" on renames
+        $file =~ s/^"(.*)"$/$1/;
+        $file = (split / -> /, $file)[-1] if $file =~ / -> /;
+        $known{$file} = ($xy eq '??') ? 'untracked' : 'tracked';
+    }
+
+    my $repo = $self->repo_path($c);
+    my (@valid, @invalid, %untracked);
+
+    for my $p (@{ $paths || [] }) {
+        next unless defined $p && length $p;
+
+        if ($p =~ m{(?:^|/)\.\.(?:/|$)} || $p =~ m{^/}) {
+            push @invalid, $p; next;   # traversal or absolute
+        }
+        unless (exists $known{$p}) {
+            push @invalid, $p; next;   # not in the working-tree change set
+        }
+        # symlink-escape guard: real path must sit under the repo root
+        my $full = "$repo/$p";
+        if (-l $full) {
+            require Cwd;
+            my $real = Cwd::abs_path($full);
+            if (!$real || index($real, $repo) != 0) { push @invalid, $p; next; }
+        }
+
+        push @valid, $p;
+        $untracked{$p} = 1 if $known{$p} eq 'untracked';
+    }
+
+    if (@invalid) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_validate_paths',
+            "Rejected git paths (not in working-tree change set or unsafe): " . join(', ', @invalid));
+    }
+
+    return { valid => \@valid, invalid => \@invalid, untracked => \%untracked };
+}
+
+=head2 dashboard_action
+
+Single POST endpoint for all Git dashboard write operations. POST-only, admin-gated,
+requires C<confirm=1>, and dispatches on the C<op> parameter. Every file-targeted op runs its
+paths through _validate_paths first and passes them to git as an explicit argv list (never a shell
+string). On completion it redirects back to /admin/git with a flash message (PRG pattern).
+
+Ops: stage, unstage, commit, push, delete, gitignore, stash.
+
+=cut
+
+sub dashboard_action :Path('/admin/git/action') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $self->admin_auth->require_admin_access($c, 'git_dashboard_action');
+
+    # Every write is POST + confirm.
+    unless ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        $c->flash->{error_msg} = 'Git actions require a confirmed POST.';
+        $c->response->redirect($c->uri_for('/admin/git'));
+        return;
+    }
+
+    my $op       = $c->req->param('op') || '';
+    my @paths    = $c->req->param('paths');
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : 'unknown');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dashboard_action',
+        "user=$username op=$op paths=" . join(',', @paths));
+
+    my %needs_paths = map { $_ => 1 } qw(stage unstage delete gitignore stash);
+    my $validated;
+    if ($needs_paths{$op}) {
+        $validated = $self->_validate_paths($c, \@paths);
+        if (@{ $validated->{invalid} }) {
+            $c->flash->{error_msg} =
+                "Rejected unsafe or unknown path(s): " . join(', ', @{ $validated->{invalid} });
+            $c->response->redirect($c->uri_for('/admin/git'));
+            return;
+        }
+        unless (@{ $validated->{valid} }) {
+            $c->flash->{error_msg} = 'No files selected.';
+            $c->response->redirect($c->uri_for('/admin/git'));
+            return;
+        }
+    }
+
+    my $ok = 0;
+    my $msg = '';
+
+    if ($op eq 'stage') {
+        my ($out, $code) = $self->_git_list($c, 'add', '--', @{ $validated->{valid} });
+        $ok = ($code == 0);
+        $msg = $ok ? "Staged " . scalar(@{ $validated->{valid} }) . " file(s)." : "Stage failed: $out";
+    }
+    elsif ($op eq 'unstage') {
+        my ($out, $code) = $self->_git_list($c, 'restore', '--staged', '--', @{ $validated->{valid} });
+        $ok = ($code == 0);
+        $msg = $ok ? "Unstaged " . scalar(@{ $validated->{valid} }) . " file(s)." : "Unstage failed: $out";
+    }
+    elsif ($op eq 'commit') {
+        my $message = $c->req->param('message') || '';
+        $message =~ s/^\s+|\s+$//g;
+        $message = substr($message, 0, 2000);
+        if (!length $message) {
+            $msg = 'Commit message is required.';
+        }
+        else {
+            my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
+            $ok = ($code == 0);
+            $msg = $ok ? "Committed staged changes." : "Commit failed: $out";
+        }
+    }
+    elsif ($op eq 'push') {
+        my $branch = $self->get_current_branch($c);
+        my $tracking = $self->get_tracking_info($c);
+        if (!$tracking->{upstream} && !$c->req->param('set_upstream')) {
+            $msg = "Branch '$branch' has no upstream. Re-submit with 'set upstream' checked to push.";
+        }
+        else {
+            my @cmd = ('push');
+            push @cmd, '--set-upstream' if !$tracking->{upstream};
+            push @cmd, 'origin', $branch;
+            my ($out, $code) = $self->_git_list($c, @cmd);
+            $ok = ($code == 0);
+            $msg = $ok ? "Pushed '$branch' to origin." : "Push failed: $out";
+        }
+    }
+    elsif ($op eq 'delete') {
+        my @tracked   = grep { !$validated->{untracked}{$_} } @{ $validated->{valid} };
+        my @untracked = grep {  $validated->{untracked}{$_} } @{ $validated->{valid} };
+        my @done;
+
+        # Tracked files: git rm (recoverable via history).
+        if (@tracked) {
+            my ($out, $code) = $self->_git_list($c, 'rm', '--', @tracked);
+            if ($code == 0) { push @done, @tracked; } else { $msg .= "git rm failed: $out "; }
+        }
+
+        # Untracked files: irreversible unlink -> requires the SECOND confirmation.
+        if (@untracked) {
+            if (!$c->req->param('confirm_permanent')) {
+                $msg .= "Permanent delete of untracked file(s) needs the extra confirmation: "
+                      . join(', ', @untracked) . ". ";
+            }
+            else {
+                my $repo = $self->repo_path($c);
+                for my $p (@untracked) {
+                    if (unlink "$repo/$p") { push @done, $p; }
+                    else { $msg .= "Failed to delete $p: $! "; }
+                }
+            }
+        }
+
+        $ok = (@done > 0);
+        $msg = "Deleted: " . join(', ', @done) . ". $msg" if @done;
+        $msg ||= 'Nothing deleted.';
+    }
+    elsif ($op eq 'gitignore') {
+        # Only untracked files may be gitignored (tracked ones need git rm --cached first).
+        my @tracked = grep { !$validated->{untracked}{$_} } @{ $validated->{valid} };
+        my @ignore  = grep {  $validated->{untracked}{$_} } @{ $validated->{valid} };
+        $ok = $self->_append_gitignore($c, \@ignore);
+        $msg  = @ignore ? ($ok ? "Added to .gitignore: " . join(', ', @ignore) . "."
+                               : "Failed to update .gitignore.") : '';
+        $msg .= " Skipped (tracked — run 'git rm --cached' first): " . join(', ', @tracked) . "."
+            if @tracked;
+        $ok = 1 if @tracked && !@ignore;   # informational, not a failure
+    }
+    elsif ($op eq 'stash') {
+        my $message = $c->req->param('message') || '';
+        $message =~ s/^\s+|\s+$//g;
+        my @cmd = ('stash', 'push');
+        push @cmd, '-m', substr($message, 0, 500) if length $message;
+        push @cmd, '--', @{ $validated->{valid} };
+        my ($out, $code) = $self->_git_list($c, @cmd);
+        $ok = ($code == 0);
+        $msg = $ok ? "Stashed " . scalar(@{ $validated->{valid} }) . " file(s)." : "Stash failed: $out";
+    }
+    else {
+        $msg = "Unknown git operation: $op";
+    }
+
+    $self->logging->log_with_details($c, ($ok ? 'info' : 'warn'), __FILE__, __LINE__,
+        'dashboard_action', "op=$op result=" . ($ok ? 'ok' : 'fail') . " : $msg");
+
+    if ($ok) { $c->flash->{success_msg} = $msg; }
+    else     { $c->flash->{error_msg}   = $msg; }
+
+    $c->response->redirect($c->uri_for('/admin/git'));
+}
+
+=head2 _append_gitignore
+
+Append paths to the repo-root .gitignore, one per line, skipping any already present.
+Pure file operation — does not call git. Returns 1 on success.
+
+=cut
+
+sub _append_gitignore {
+    my ($self, $c, $paths) = @_;
+    return 1 unless $paths && @$paths;
+
+    my $repo = $self->repo_path($c);
+    return 0 unless defined $repo && length $repo;
+    my $file = "$repo/.gitignore";
+
+    my %existing;
+    if (-f $file) {
+        open my $rfh, '<', $file or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_append_gitignore',
+                "Cannot read $file: $!");
+            return 0;
+        };
+        while (my $l = <$rfh>) { chomp $l; $existing{$l} = 1; }
+        close $rfh;
+    }
+
+    my @to_add = grep { !$existing{$_} } @$paths;
+    return 1 unless @to_add;   # nothing new
+
+    open my $wfh, '>>', $file or do {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_append_gitignore',
+            "Cannot write $file: $!");
+        return 0;
+    };
+    print $wfh "$_\n" for @to_add;
+    close $wfh;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_append_gitignore',
+        "Added to .gitignore: " . join(', ', @to_add));
+    return 1;
+}
+
 =head2 index
 
 Git dashboard — the SINGLE entry point for all git functionality.
