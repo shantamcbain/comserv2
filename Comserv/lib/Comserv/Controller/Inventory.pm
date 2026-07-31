@@ -218,11 +218,21 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
         )->all;
     };
 
+    # Linked 3D print model (if this finished good is produced by the print farm)
+    my $print_model;
+    eval {
+        $print_model = $schema->resultset('Printing3dModel')->search(
+            { item_id => $id, sitename => $sitename, is_active => 1 },
+            { order_by => { -asc => 'id' } },
+        )->first;
+    };
+
     $c->stash(
         item          => $item,
         transactions  => \@transactions,
         all_items     => \@all_items,
         all_suppliers => \@all_suppliers,
+        print_model   => $print_model,
         sitename      => $sitename,
         template      => 'Inventory/items/view.tt',
     );

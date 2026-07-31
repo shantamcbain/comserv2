@@ -735,10 +735,12 @@ sub log_with_details {
 
                 my $effective_uid = defined($uid) ? $uid : 178;
 
-                my ($src_server, $src_branch, $src_file) = ('', '', '');
-                if ($log_message =~ /\[([^\]]+:\d+)\]/) {
-                    $src_server = $1;
-                }
+                # Server identity comes straight from get_system_identifier()
+                # (host + runtime tag + port, e.g. "workstation (Standalone):3001").
+                # Do NOT scrape it back out of $log_message: the timestamp bracket
+                # "[2026-07-29 12:49:25]" also matches /\[([^\]]+:\d+)\]/ and won,
+                # so every audit todo recorded "Server: <timestamp>" instead of the host.
+                my ($src_server, $src_branch, $src_file) = ($system_id // '', '', '');
                 if ($log_message =~ m{/worktrees/([^/]+)/}) {
                     $src_branch = $1;
                 } elsif ($file && $file =~ m{/worktrees/([^/]+)/}) {

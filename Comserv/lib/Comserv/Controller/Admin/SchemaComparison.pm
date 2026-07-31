@@ -2693,12 +2693,20 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
                 my $sth = $dbh->prepare("SHOW FULL COLUMNS FROM $qt");
                 $sth->execute();
                 while (my $row = $sth->fetchrow_hashref) {
-                    # Parse data_type and size from e.g. "varchar(255)" or "int(11)"
-                    my ($data_type, $size) = $row->{Type} =~ /^(\w+)(\([^)]+\))?/;
+                    # Parse data_type and size from e.g. "varchar(255)" or "int(11)".
+                    # For enum/set the parenthetical holds the ALLOWED VALUES, not a
+                    # length — keep it attached to data_type so it doesn't spill into
+                    # the "size" column (which is meant for numeric lengths like (11)).
+                    my $type_raw = $row->{Type} // '';
+                    my ($data_type, $size) = $type_raw =~ /^(\w+)(\([^)]+\))?/;
                     $size //= '';
+                    if ($data_type && $data_type =~ /^(enum|set)$/i) {
+                        $data_type = $type_raw;   # keep full "enum('a','b')" together
+                        $size      = '';
+                    }
                     $db_columns{ lc($row->{Field}) } = {
                         name          => $row->{Field},
-                        data_type     => $data_type // $row->{Type},
+                        data_type     => $data_type // $type_raw,
                         size          => $size,
                         is_nullable   => ($row->{Null} // 'YES') eq 'NO' ? 'NO' : 'YES',
                         default_value => $row->{Default},

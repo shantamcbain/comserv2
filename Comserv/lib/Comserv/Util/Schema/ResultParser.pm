@@ -190,6 +190,94 @@ sub get_result_file_schema {
     return $schema_info;
 }
 
+# Parse a single "{ ... }" block's inner content into a hashref.
+# Walks the block character-by-character, balancing [] and {} so array and
+# nested-hash values (e.g. enum `extra => { list => [ 'tt', 'md' ] }`) are
+# captured verbatim instead of being mis-parsed as an opaque string.
+sub _parse_result_inner_hash {
+    my ($self, $block) = @_;
+    $block = '' unless defined $block;
+    my $info = {};
+
+    my $i = 0;
+    my $len = length($block);
+
+    while ($i < $len) {
+        # Skip whitespace
+        $i++ while $i < $len && substr($block, $i, 1) =~ /\s/;
+
+        # Read attribute name up to '=>'
+        my $name = '';
+        while ($i < $len && substr($block, $i, 1) ne '=' && substr($block, $i, 1) =~ /\S/) {
+            $name .= substr($block, $i, 1); $i++;
+        }
+        $name =~ s/\s+$//;
+        last unless length $name;
+
+        # Skip past '=>'
+        $i++ while $i < $len && substr($block, $i, 1) ne '>';
+        $i++; # consume '>'
+
+        # Skip whitespace
+        $i++ while $i < $len && substr($block, $i, 1) =~ /\s/;
+        next if $i >= $len;
+
+        my $ch = substr($block, $i, 1);
+
+        if ($ch eq '[') {
+            my $depth = 1; my $j = $i + 1;
+            while ($j < $len && $depth > 0) {
+                my $c = substr($block, $j, 1);
+                $depth++ if $c eq '[';
+                $depth-- if $c eq ']';
+                $j++;
+            }
+            my $inner = substr($block, $i + 1, $j - $i - 2);
+            my @items;
+            while ($inner =~ /['"]\s*([^'"]*)\s*['"]/g) { push @items, $1; }
+            $info->{$name} = \@items;
+            $i = $j;
+        }
+        elsif ($ch eq '{') {
+            my $depth = 1; my $j = $i + 1;
+            while ($j < $len && $depth > 0) {
+                my $c = substr($block, $j, 1);
+                $depth++ if $c eq '{';
+                $depth-- if $c eq '}';
+                $j++;
+            }
+            my $inner = substr($block, $i + 1, $j - $i - 2);
+            $info->{$name} = $self->_parse_result_inner_hash($inner);
+            $i = $j;
+        }
+        elsif ($ch eq "'" || $ch eq '"') {
+            my $q = $ch; my $j = $i + 1; my $val = '';
+            while ($j < $len) {
+                my $c = substr($block, $j, 1);
+                last if $c eq $q;
+                $val .= $c; $j++;
+            }
+            $info->{$name} = $val;
+            $i = $j + 1;
+        }
+        else {
+            # bareword / number / undef
+            my $val = '';
+            while ($i < $len && substr($block, $i, 1) !~ /[,\s]/) {
+                $val .= substr($block, $i, 1); $i++;
+            }
+            if ($val eq 'undef') { $info->{$name} = undef; }
+            elsif ($val =~ /^\d+$/) { $info->{$name} = $val + 0; }
+            else { $info->{$name} = $val; }
+        }
+
+        # Skip comma / separator
+        $i++ while $i < $len && substr($block, $i, 1) =~ /[,\s]/;
+    }
+
+    return $info;
+}
+
 # The robust brace-walking parser (consolidated from previous fixes)
 sub parse_result_file_columns {
     my ($self, $text) = @_;
@@ -211,17 +299,17 @@ sub parse_result_file_columns {
         pos($def) = 0 if defined pos($def);
         while ($def =~ /(\w+)\s*=>\s*/g) {
             my $attr = $1; my $val;
-            if ($def =~ /\G\s*\\?['"]([^'"]*)['"]/gc) { $val = $1; }
+            if ($def =~ /\G\s*(['"])((?:(?!\1).)*)\1/gc) { $val = $2; }
             elsif ($def =~ /\G\s*(\d+)/gc) { $val = $1 + 0; }
             elsif ($def =~ /\G\s*undef\b/gc) { $val = undef; }
-            elsif ($def =~ /\G\s*\\(['"])([^'"]*)\1/gc) { $val = $2; }
             elsif ($def =~ /\G\s*\{/gc) {
                 my $hstart = pos($def)-1; my $hdepth=1; my $j=pos($def);
                 while ($j < length($def) && $hdepth>0) { my $ch=substr($def,$j,1); $hdepth++ if $ch eq '{'; $hdepth-- if $ch eq '}'; $j++; }
-                $val = substr($def, $hstart, $j-$hstart);
+                my $block = substr($def, $hstart+1, $j-$hstart-2);
+                $val = $self->_parse_result_inner_hash($block);
                 pos($def) = $j;
             } else {
-                if ($def =~ /\G\s*(\w+)/gc) { $val = $1; }
+                if ($def =~ /\G\s*(\w+(?:\([^)]*\))?)/gc) { $val = $1; }
             }
             if (defined $val || !exists $info->{$attr}) {
                 $info->{$attr} = $val;

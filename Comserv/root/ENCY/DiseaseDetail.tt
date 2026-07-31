@@ -109,7 +109,7 @@
         <td><strong>ICD Code</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="icd_code" value="[% disease.icd_code | html %]" size="20" />
+            <input type="text" name="icd_code" value="[% disease.icd_code | html %]" size="20" maxlength="20" />
             [% ELSE %]
             [% disease.icd_code | html %]
             [% END %]

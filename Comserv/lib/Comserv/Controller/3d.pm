@@ -98,6 +98,19 @@ sub _require_admin {
     }
 }
 
+# Farm-role gate: admin now; add 'print_farm' here when farm workers get a role.
+# This is the single extension point for non-admin print-farm staff.
+sub _require_farm_role {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my $ok    = grep { $_ eq 'admin' || $_ eq 'print_farm' } @{$roles};
+    unless ($ok) {
+        $c->stash->{error_msg} = 'Print-farm access required.';
+        $c->res->redirect($c->uri_for('/3d'));
+        $c->detach;
+    }
+}
+
 # ============================================================
 # Inventory accounting helper
 # Records a transaction AND updates stock level in one txn
@@ -552,6 +565,38 @@ sub order :Path('/3d/order') :Args(0) {
         filaments => \@filaments,
         template  => '3d/order.tt',
     );
+}
+
+# ============================================================
+# Reorder a finished-goods item — queue a reprint to restock
+# (admin / farm role). Called from the item view and order pages.
+# ============================================================
+sub reorder_item :Path('/3d/reorder_item') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_farm_role($c);
+
+    my $item_id = $c->req->params->{item_id};
+    my $return_to = $c->req->params->{return_to}
+        || ($item_id ? $c->uri_for('/Inventory/item/view', [$item_id]) : $c->uri_for('/3d'));
+
+    unless ($item_id) {
+        $c->flash->{error_msg} = 'No item specified.';
+        $c->res->redirect($c->uri_for('/3d'));
+        $c->detach;
+    }
+
+    my $util = Comserv::Util::Printing3d->new;
+    my $res  = $util->reorder_item($c, $item_id);
+
+    if ($res->{ok}) {
+        $c->flash->{success_msg} =
+            "Reorder queued (job #" . $res->{job_id} . "). Check the print queue.";
+    } else {
+        $c->flash->{error_msg} = $res->{error};
+    }
+    $c->res->redirect($return_to);
+    $c->detach;
 }
 
 # ============================================================

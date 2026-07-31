@@ -5,7 +5,9 @@ use warnings FATAL => 'all';
 __PACKAGE__->table('documentationmetadataindex');
 __PACKAGE__->add_columns(
     id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
         is_auto_increment => 1,
     },
     file_path => {
@@ -14,9 +16,9 @@ __PACKAGE__->add_columns(
         is_nullable => 0,
     },
     file_type => {
-        data_type => 'enum',
-        extra => { list => ['tt', 'md'] },
+        data_type => "enum('md','tt')",
         is_nullable => 0,
+        default_value => 'md',
     },
     title => {
         data_type => 'varchar',
@@ -37,7 +39,11 @@ __PACKAGE__->add_columns(
         is_nullable => 0,
     },
     role_access => {
-        data_type => 'json',
+        data_type => 'longtext',
+        is_nullable => 1,
+    },
+    categories => {
+        data_type => 'longtext',
         is_nullable => 1,
     },
     indexed_at => {
@@ -50,7 +56,8 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     file_size => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
     },
 );
