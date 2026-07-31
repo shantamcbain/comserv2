@@ -262,10 +262,32 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             $msg = 'Commit message is required.';
         }
         else {
+            # Convenience: if files were ticked, stage them first so a single
+            # "select + message + Commit" click works. Selected paths are already
+            # validated against git status above. With nothing ticked, commit
+            # whatever is already staged.
+            if ($validated && @{ $validated->{valid} }) {
+                my ($aout, $acode) = $self->_git_list($c, 'add', '--', @{ $validated->{valid} });
+                if ($acode != 0) {
+                    $msg = "Stage-before-commit failed: $aout";
+                    goto COMMIT_DONE;
+                }
+            }
+
+            # Refuse early with a clear message when there is nothing staged,
+            # instead of surfacing raw "nothing to commit" git output.
+            my ($staged_out) = $self->_git_list($c, 'diff', '--cached', '--name-only');
+            if (!length $staged_out) {
+                $msg = 'Nothing staged to commit. Tick the file(s) you want, then Commit '
+                     . '(or use Stage first).';
+                goto COMMIT_DONE;
+            }
+
             my ($out, $code) = $self->_git_list($c, 'commit', '-m', $message);
             $ok = ($code == 0);
             $msg = $ok ? "Committed staged changes." : "Commit failed: $out";
         }
+        COMMIT_DONE:
     }
     elsif ($op eq 'push') {
         my $branch = $self->get_current_branch($c);
