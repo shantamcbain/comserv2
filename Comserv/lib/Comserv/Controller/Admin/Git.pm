@@ -5,6 +5,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::BackupManager;
+use Comserv::Util::Git;
 use Try::Tiny;
 use File::Temp;
 use File::Copy;
@@ -48,6 +49,14 @@ sub backup_manager {
     my ($self, $c) = @_;
     my $app_dir = $c ? $c->config->{home} : undef;
     return Comserv::Util::BackupManager->new($app_dir ? (app_dir => $app_dir) : ());
+}
+
+# Returns the Git service (Comserv::Util::Git). All low-level git execution now
+# lives there; controller methods are thin delegates (Phase C).
+sub git_service {
+    my ($self) = @_;
+    $self->{_git_service} ||= Comserv::Util::Git->new(logging => $self->logging);
+    return $self->{_git_service};
 }
 
 =head2 repo_path
@@ -579,30 +588,7 @@ Returns a hashref: upstream, ahead, behind. upstream is undef when the branch ha
 
 sub get_tracking_info {
     my ($self, $c) = @_;
-
-    my $info = { upstream => undef, ahead => 0, behind => 0 };
-
-    try {
-        my $upstream = $self->_git($c, 'rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1');
-        chomp $upstream;
-
-        # No upstream configured -> git prints an error; leave counts at zero.
-        return $info if !$upstream || $upstream =~ /fatal|no upstream/i;
-
-        $info->{upstream} = $upstream;
-
-        my $counts = $self->_git($c, 'rev-list --left-right --count @{u}...HEAD 2>&1');
-        chomp $counts;
-        if ($counts =~ /^(\d+)\s+(\d+)$/) {
-            $info->{behind} = $1;
-            $info->{ahead}  = $2;
-        }
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_tracking_info',
-            "Error getting tracking info: $_");
-    };
-
-    return $info;
+    return $self->git_service->get_tracking_info($c);
 }
 
 =head2 git_pull
@@ -702,95 +688,7 @@ Execute the actual git pull operation
 
 sub execute_git_pull {
     my ($self, $c, $branch) = @_;
-    
-    $branch ||= 'main';
-    my $output = '';
-    my $success = 0;
-    my $warning = undef;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-        "Starting git pull execution for branch '$branch'");
-    
-    try {
-        my $app_dir = $self->repo_path($c);
-
-        # Check if theme_mappings.json has local changes
-        my $theme_file = "$app_dir/Comserv/root/static/config/theme_mappings.json";
-        my $has_theme_changes = 0;
-        
-        if (-f $theme_file) {
-            my $git_status = $self->_git($c, "status --porcelain \"$theme_file\" 2>&1");
-            if ($git_status && $git_status =~ /^\s*M/) {
-                $has_theme_changes = 1;
-                $output .= "Detected local changes in theme_mappings.json\n";
-                
-                # Create backup
-                my $backup_file = "$theme_file.backup." . time();
-                if (copy($theme_file, $backup_file)) {
-                    $output .= "Created backup: $backup_file\n";
-                } else {
-                    $output .= "Warning: Could not create backup of theme_mappings.json\n";
-                }
-                
-                # Stash changes
-                my $stash_output = $self->_git($c, "stash push -m \"Auto-stash theme_mappings.json before pull\" \"$theme_file\" 2>&1");
-                $output .= "Stashed changes: $stash_output\n";
-            }
-        }
-        
-        # Fetch latest changes
-        $output .= "Fetching latest changes...\n";
-        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
-        $output .= $fetch_output;
-        
-        # Switch to the specified branch if not already on it
-        my $current_branch = $self->_git($c, "branch --show-current 2>&1");
-        chomp($current_branch);
-        
-        if ($current_branch ne $branch) {
-            $output .= "Switching to branch '$branch'...\n";
-            my $checkout_output = $self->_git($c, "checkout \"$branch\" 2>&1");
-            $output .= $checkout_output;
-            
-            if ($? != 0) {
-                die "Failed to switch to branch '$branch'";
-            }
-        }
-        
-        # Pull changes
-        $output .= "Pulling changes from origin/$branch...\n";
-        my $pull_output = $self->_git($c, "pull origin \"$branch\" 2>&1");
-        $output .= $pull_output;
-        
-        if ($? == 0) {
-            $success = 1;
-            $output .= "Git pull completed successfully.\n";
-            
-            # If we had theme changes, try to reapply them
-            if ($has_theme_changes) {
-                $output .= "Attempting to reapply theme_mappings.json changes...\n";
-                my $stash_pop_output = $self->_git($c, "stash pop 2>&1");
-                $output .= $stash_pop_output;
-                
-                if ($? != 0) {
-                    $warning = "Git pull successful, but could not automatically reapply theme_mappings.json changes. Please check the backup file and resolve manually.";
-                }
-            }
-        } else {
-            die "Git pull failed";
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-            "Git pull completed successfully");
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
-            "Error during git pull: $error");
-        $output .= "Error: $error\n";
-        return (0, $output, undef);
-    };
-    
-    return ($success, $output, $warning);
+    return $self->git_service->pull($c, $branch);
 }
 
 =head2 get_current_branch
@@ -801,17 +699,7 @@ Get the current Git branch
 
 sub get_current_branch {
     my ($self, $c) = @_;
-    
-    try {
-        
-        my $branch = $self->_git($c, "branch --show-current 2>&1");
-        chomp($branch);
-        return $branch || 'unknown';
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_current_branch', 
-            "Error getting current branch: $_");
-        return 'unknown';
-    };
+    return $self->git_service->get_current_branch($c);
 }
 
 =head2 get_available_branches
@@ -822,60 +710,7 @@ Get list of available Git branches
 
 sub get_available_branches {
     my ($self, $c) = @_;
-    
-    try {
-        
-        # First fetch to ensure we have latest remote branch info
-        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
-        
-        # Use --no-color to avoid ANSI color codes that interfere with parsing
-        my $branches_output = $self->_git($c, "branch -r --no-color 2>&1");
-        my @branches = ();
-        my %excluded_branches = (
-            'master' => 1,    # Exclude master branch as requested
-            'master2' => 1,   # Exclude master2 as well
-            'HEAD' => 1       # Always exclude HEAD
-        );
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_available_branches', 
-            "Raw git branch output: $branches_output");
-        
-        for my $line (split /\n/, $branches_output) {
-            $line =~ s/^\s+|\s+$//g;  # trim whitespace
-            $line =~ s/\x1b\[[0-9;]*m//g;  # remove any remaining ANSI color codes
-            
-            if ($line =~ /^origin\/(.+)$/) {
-                my $branch_name = $1;
-                # Skip excluded branches and HEAD pointer
-                unless ($excluded_branches{$branch_name} || $branch_name =~ /^HEAD\s*->/) {
-                    push @branches, $branch_name;
-                }
-            }
-        }
-        
-        # Sort branches with main first, then alphabetically
-        @branches = sort {
-            return -1 if $a eq 'main' && $b ne 'main';
-            return 1 if $b eq 'main' && $a ne 'main';
-            return $a cmp $b;
-        } @branches;
-        
-        # If no remote branches found, use main as fallback (no master)
-        if (@branches == 0) {
-            @branches = ('main');
-            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'get_available_branches', 
-                "No remote branches found, using fallback: main");
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_available_branches', 
-            "Found branches: " . join(', ', @branches));
-        
-        return \@branches;
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_available_branches', 
-            "Error getting available branches: $_");
-        return ['main'];  # fallback without master
-    };
+    return $self->git_service->get_available_branches($c);
 }
 
 =head2 safe_git_pull
@@ -1324,32 +1159,12 @@ Execute git stash push operation
 
 sub execute_git_stash_push {
     my ($self, $c, $message) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        message => $message
-    };
-    
-    try {
-        
-        # Execute git stash push with message
-        my $stash_output = $self->_git($c, "stash push -m \"$message\" 2>&1");
-        $result->{output} = $stash_output;
-        
-        if ($? == 0) {
-            $result->{success} = 1;
-            $result->{success_msg} = "Changes stashed successfully with message: '$message'";
-        } else {
-            die "Git stash push failed: $stash_output";
-        }
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Stash operation failed: $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
+    my $result = { success => 0, output => '', message => $message };
+    my $r = $self->git_service->stash_push($c, [], $message);
+    $result->{output}  = $r->{output} . ($r->{error} // '');
+    $result->{success} = $r->{success};
+    if ($r->{success}) { $result->{success_msg} = "Changes stashed successfully with message: '$message'"; }
+    else               { $result->{error_msg}   = "Stash operation failed: " . ($r->{error} || $r->{output}); }
     return $result;
 }
 
@@ -1361,33 +1176,12 @@ Execute git stash pop operation
 
 sub execute_git_stash_pop {
     my ($self, $c, $stash_index) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        stash_index => $stash_index
-    };
-    
-    try {
-        
-        # Execute git stash pop
-        my $stash_ref = $stash_index ? "stash\@{$stash_index}" : "stash\@{0}";
-        my $pop_output = $self->_git($c, "stash pop \"$stash_ref\" 2>&1");
-        $result->{output} = $pop_output;
-        
-        if ($? == 0) {
-            $result->{success} = 1;
-            $result->{success_msg} = "Stash applied and removed successfully";
-        } else {
-            die "Git stash pop failed: $pop_output";
-        }
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Stash pop operation failed: $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
+    my $result = { success => 0, output => '', stash_index => $stash_index };
+    my $r = $self->git_service->stash_pop($c, $stash_index);
+    $result->{output}  = $r->{output} . ($r->{error} // '');
+    $result->{success} = $r->{success};
+    if ($r->{success}) { $result->{success_msg} = "Stash applied and removed successfully"; }
+    else               { $result->{error_msg}   = "Stash pop operation failed: " . ($r->{error} || $r->{output}); }
     return $result;
 }
 
@@ -1399,33 +1193,12 @@ Execute git stash drop operation
 
 sub execute_git_stash_drop {
     my ($self, $c, $stash_index) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        stash_index => $stash_index
-    };
-    
-    try {
-        
-        # Execute git stash drop
-        my $stash_ref = $stash_index ? "stash\@{$stash_index}" : "stash\@{0}";
-        my $drop_output = $self->_git($c, "stash drop \"$stash_ref\" 2>&1");
-        $result->{output} = $drop_output;
-        
-        if ($? == 0) {
-            $result->{success} = 1;
-            $result->{success_msg} = "Stash dropped successfully";
-        } else {
-            die "Git stash drop failed: $drop_output";
-        }
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Stash drop operation failed: $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
+    my $result = { success => 0, output => '', stash_index => $stash_index };
+    my $r = $self->git_service->stash_drop($c, $stash_index);
+    $result->{output}  = $r->{output} . ($r->{error} // '');
+    $result->{success} = $r->{success};
+    if ($r->{success}) { $result->{success_msg} = "Stash dropped successfully"; }
+    else               { $result->{error_msg}   = "Stash drop operation failed: " . ($r->{error} || $r->{output}); }
     return $result;
 }
 
@@ -1437,32 +1210,7 @@ Get list of current git stashes
 
 sub get_git_stash_list {
     my ($self, $c) = @_;
-    
-    my $stashes = [];
-    
-    try {
-        
-        my $stash_output = $self->_git($c, "stash list 2>&1");
-        
-        if ($? == 0 && $stash_output) {
-            my @lines = split /\n/, $stash_output;
-            for my $line (@lines) {
-                if ($line =~ /^(stash@\{(\d+)\}):\s*(.+)$/) {
-                    push @$stashes, {
-                        ref => $1,
-                        index => $2,
-                        message => $3
-                    };
-                }
-            }
-        }
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_git_stash_list', 
-            "Error getting stash list: $_");
-    };
-    
-    return $stashes;
+    return $self->git_service->get_git_stash_list($c);
 }
 
 =head2 get_git_status
@@ -1473,47 +1221,7 @@ Get current git status
 
 sub get_git_status {
     my ($self, $c) = @_;
-    
-    my $status = {
-        has_changes => 0,
-        staged_files => [],
-        modified_files => [],
-        untracked_files => [],
-        output => ''
-    };
-    
-    try {
-        
-        my $status_output = $self->_git($c, "status --porcelain 2>&1");
-        $status->{output} = $status_output;
-        
-        if ($? == 0 && $status_output) {
-            $status->{has_changes} = 1;
-            
-            my @lines = split /\n/, $status_output;
-            for my $line (@lines) {
-                if ($line =~ /^(.)(.) (.+)$/) {
-                    my ($staged, $modified, $file) = ($1, $2, $3);
-                    
-                    if ($staged ne ' ' && $staged ne '?') {
-                        push @{$status->{staged_files}}, $file;
-                    }
-                    if ($modified ne ' ') {
-                        push @{$status->{modified_files}}, $file;
-                    }
-                    if ($staged eq '?' && $modified eq '?') {
-                        push @{$status->{untracked_files}}, $file;
-                    }
-                }
-            }
-        }
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_git_status', 
-            "Error getting git status: $_");
-    };
-    
-    return $status;
+    return $self->git_service->get_git_status($c);
 }
 
 =head2 git_commit_management
@@ -1570,36 +1278,13 @@ Execute git add operation
 
 sub execute_git_add {
     my ($self, $c, $files) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        files => $files
-    };
-    
+    my $result = { success => 0, output => '', files => $files };
     return $result unless $files && @$files;
-    
-    try {
-        
-        # Add each file
-        for my $file (@$files) {
-            my $add_output = $self->_git($c, "add \"$file\" 2>&1");
-            $result->{output} .= "Adding $file: $add_output\n";
-            
-            if ($? != 0) {
-                die "Failed to add file '$file': $add_output";
-            }
-        }
-        
-        $result->{success} = 1;
-        $result->{success_msg} = "Files added to staging area successfully";
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Git add operation failed: $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
+    my $r = $self->git_service->stage($c, $files);
+    $result->{output}  = $r->{output} . ($r->{error} // '');
+    $result->{success} = $r->{success};
+    if ($r->{success}) { $result->{success_msg} = "Files added to staging area successfully"; }
+    else               { $result->{error_msg}   = "Git add operation failed: " . ($r->{error} || $r->{output}); }
     return $result;
 }
 
@@ -1611,34 +1296,13 @@ Execute git commit operation
 
 sub execute_git_commit {
     my ($self, $c, $message) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        message => $message
-    };
-    
+    my $result = { success => 0, output => '', message => $message };
     return $result unless $message;
-    
-    try {
-        
-        # Execute git commit
-        my $commit_output = $self->_git($c, "commit -m \"$message\" 2>&1");
-        $result->{output} = $commit_output;
-        
-        if ($? == 0) {
-            $result->{success} = 1;
-            $result->{success_msg} = "Commit created successfully";
-        } else {
-            die "Git commit failed: $commit_output";
-        }
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Git commit operation failed: $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
+    my $r = $self->git_service->commit($c, $message);
+    $result->{output}  = $r->{output} . ($r->{error} // '');
+    $result->{success} = $r->{success};
+    if ($r->{success}) { $result->{success_msg} = "Commit created successfully"; }
+    else               { $result->{error_msg}   = "Git commit operation failed: " . ($r->{error} || $r->{output}); }
     return $result;
 }
 
@@ -1697,31 +1361,7 @@ Get list of recent commits
 
 sub get_recent_commits {
     my ($self, $c) = @_;
-    
-    my $commits = [];
-    
-    try {
-        
-        my $log_output = $self->_git($c, "log --oneline -10 2>&1");
-        
-        if ($? == 0 && $log_output) {
-            my @lines = split /\n/, $log_output;
-            for my $line (@lines) {
-                if ($line =~ /^([a-f0-9]+)\s+(.+)$/) {
-                    push @$commits, {
-                        hash => $1,
-                        message => $2
-                    };
-                }
-            }
-        }
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_recent_commits', 
-            "Error getting recent commits: $_");
-    };
-    
-    return $commits;
+    return $self->git_service->get_recent_commits($c, 10);
 }
 
 =head2 branch_management
@@ -1789,29 +1429,7 @@ Get list of local Git branches
 
 sub get_local_branches {
     my ($self, $c) = @_;
-    
-    try {
-        
-        my $branches_output = $self->_git($c, "branch --no-color 2>&1");
-        my @branches = ();
-        
-        for my $line (split /\n/, $branches_output) {
-            $line =~ s/^\s*\*?\s*//;  # remove asterisk and whitespace
-            $line =~ s/^\s+|\s+$//g;  # trim whitespace
-            $line =~ s/\x1b\[[0-9;]*m//g;  # remove ANSI color codes
-            
-            # Skip empty lines and detached HEAD states
-            next if !$line || $line =~ /^\(.*\)$/;
-            
-            push @branches, $line;
-        }
-        
-        return \@branches;
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_local_branches', 
-            "Error getting local branches: $_");
-        return [];
-    };
+    return $self->git_service->get_local_branches($c);
 }
 
 =head2 create_branch
@@ -1822,73 +1440,7 @@ Create a new Git branch
 
 sub create_branch {
     my ($self, $c, $branch_name, $source_branch) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        action => 'create_branch'
-    };
-    
-    # Validate branch name
-    if (!$branch_name || $branch_name !~ /^[a-zA-Z0-9_\-\/]+$/) {
-        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, underscores, hyphens, and forward slashes.";
-        return $result;
-    }
-    
-    $source_branch ||= 'main';
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_branch', 
-        "Creating branch '$branch_name' from '$source_branch'");
-    
-    try {
-        
-        # First, fetch latest changes
-        $result->{output} .= "Fetching latest changes...\n";
-        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
-        $result->{output} .= $fetch_output;
-        
-        # Check if branch already exists locally
-        my $local_check = $self->_git($c, "branch --list \"$branch_name\" 2>&1");
-        if ($local_check) {
-            $result->{error_msg} = "Branch '$branch_name' already exists locally.";
-            return $result;
-        }
-        
-        # Check if branch exists on remote
-        my $remote_check = $self->_git($c, "branch -r --list \"origin/$branch_name\" 2>&1");
-        if ($remote_check) {
-            $result->{error_msg} = "Branch '$branch_name' already exists on remote.";
-            return $result;
-        }
-        
-        # Create and switch to new branch
-        $result->{output} .= "Creating branch '$branch_name' from '$source_branch'...\n";
-        my $create_output = $self->_git($c, "checkout -b \"$branch_name\" \"origin/$source_branch\" 2>&1");
-        $result->{output} .= $create_output;
-        
-        if ($? != 0) {
-            die "Failed to create branch '$branch_name'";
-        }
-        
-        # Push the new branch to remote
-        $result->{output} .= "Pushing new branch to remote...\n";
-        my $push_output = $self->_git($c, "push -u origin \"$branch_name\" 2>&1");
-        $result->{output} .= $push_output;
-        
-        if ($? != 0) {
-            die "Failed to push branch '$branch_name' to remote";
-        }
-        
-        $result->{success} = 1;
-        $result->{success_msg} = "Branch '$branch_name' created successfully and pushed to remote.";
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Failed to create branch '$branch_name': $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
-    return $result;
+    return $self->git_service->create_branch($c, $branch_name, $source_branch);
 }
 
 =head2 delete_branch
@@ -1899,64 +1451,7 @@ Delete a Git branch (both local and remote)
 
 sub delete_branch {
     my ($self, $c, $branch_name) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        action => 'delete_branch'
-    };
-    
-    # Validate branch name and prevent deletion of important branches
-    if (!$branch_name) {
-        $result->{error_msg} = "Branch name is required.";
-        return $result;
-    }
-    
-    if ($branch_name eq 'main' || $branch_name eq 'master' || $branch_name eq 'Production') {
-        $result->{error_msg} = "Cannot delete protected branch '$branch_name'.";
-        return $result;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_branch', 
-        "Deleting branch '$branch_name'");
-    
-    try {
-        
-        # Get current branch to ensure we're not deleting the current branch
-        my $current_branch = $self->_git($c, "branch --show-current 2>&1");
-        chomp($current_branch);
-        
-        if ($current_branch eq $branch_name) {
-            # Switch to main before deleting
-            $result->{output} .= "Switching to main branch before deletion...\n";
-            my $checkout_output = $self->_git($c, "checkout main 2>&1");
-            $result->{output} .= $checkout_output;
-            
-            if ($? != 0) {
-                die "Failed to switch to main branch";
-            }
-        }
-        
-        # Delete local branch
-        $result->{output} .= "Deleting local branch '$branch_name'...\n";
-        my $delete_local = $self->_git($c, "branch -D \"$branch_name\" 2>&1");
-        $result->{output} .= $delete_local;
-        
-        # Delete remote branch (don't fail if it doesn't exist)
-        $result->{output} .= "Deleting remote branch '$branch_name'...\n";
-        my $delete_remote = $self->_git($c, "push origin --delete \"$branch_name\" 2>&1");
-        $result->{output} .= $delete_remote;
-        
-        $result->{success} = 1;
-        $result->{success_msg} = "Branch '$branch_name' deleted successfully.";
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Failed to delete branch '$branch_name': $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
-    return $result;
+    return $self->git_service->delete_branch($c, $branch_name);
 }
 
 =head2 switch_branch
@@ -1967,68 +1462,7 @@ Switch to a different Git branch
 
 sub switch_branch {
     my ($self, $c, $branch_name) = @_;
-    
-    my $result = {
-        success => 0,
-        output => '',
-        action => 'switch_branch'
-    };
-    
-    if (!$branch_name) {
-        $result->{error_msg} = "Branch name is required.";
-        return $result;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'switch_branch', 
-        "Switching to branch '$branch_name'");
-    
-    try {
-        
-        # Fetch latest changes
-        $result->{output} .= "Fetching latest changes...\n";
-        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
-        $result->{output} .= $fetch_output;
-        
-        # Check if we have uncommitted changes
-        my $status_output = $self->_git($c, "status --porcelain 2>&1");
-        if ($status_output) {
-            $result->{output} .= "Warning: You have uncommitted changes:\n$status_output\n";
-            $result->{output} .= "Stashing changes before branch switch...\n";
-            my $stash_output = $self->_git($c, "stash push -m \"Auto-stash before branch switch to $branch_name\" 2>&1");
-            $result->{output} .= $stash_output;
-        }
-        
-        # Switch to the branch
-        $result->{output} .= "Switching to branch '$branch_name'...\n";
-        my $checkout_output = $self->_git($c, "checkout \"$branch_name\" 2>&1");
-        $result->{output} .= $checkout_output;
-        
-        if ($? != 0) {
-            # Try to create local branch from remote if it doesn't exist locally
-            $result->{output} .= "Local branch not found, creating from remote...\n";
-            my $create_output = $self->_git($c, "checkout -b \"$branch_name\" \"origin/$branch_name\" 2>&1");
-            $result->{output} .= $create_output;
-            
-            if ($? != 0) {
-                die "Failed to switch to or create branch '$branch_name'";
-            }
-        }
-        
-        # Pull latest changes for the branch
-        $result->{output} .= "Pulling latest changes for branch '$branch_name'...\n";
-        my $pull_output = $self->_git($c, "pull origin \"$branch_name\" 2>&1");
-        $result->{output} .= $pull_output;
-        
-        $result->{success} = 1;
-        $result->{success_msg} = "Successfully switched to branch '$branch_name'.";
-        
-    } catch {
-        my $error = $_;
-        $result->{error_msg} = "Failed to switch to branch '$branch_name': $error";
-        $result->{output} .= "\nError: $error";
-    };
-    
-    return $result;
+    return $self->git_service->switch_branch($c, $branch_name);
 }
 
 __PACKAGE__->meta->make_immutable;
