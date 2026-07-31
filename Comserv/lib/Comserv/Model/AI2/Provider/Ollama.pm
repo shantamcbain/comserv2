@@ -163,6 +163,30 @@ sub sync_models {
     return { success => 1, models => [] };
 }
 
+# Return the list of models currently RESIDENT in the Ollama server (loaded in
+# RAM/VRAM), newest-first by nothing in particular — just what /api/ps reports.
+# Used to prefer an already-warm model and avoid a cold weight-load when the
+# task (e.g. commit-message drafting) doesn't need a specific model.
+sub running_models {
+    my ($self, $c, $host, $port) = @_;
+    ($host, $port) = $self->resolve_host($c) unless $host && $port;
+
+    my $ua  = LWP::UserAgent->new(timeout => 5);
+    my $url = "http://$host:$port/api/ps";
+
+    my $res = try { $ua->get($url) } catch {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'ollama_running_models', "ps failed at $url: $_");
+        undef;
+    };
+    return [] unless $res && $res->is_success;
+
+    my $data = try { decode_json($res->decoded_content) } catch { undef };
+    return [] unless $data && $data->{models};
+
+    return [ map { ref($_) ? ($_->{name} // '') : $_ } @{ $data->{models} } ];
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

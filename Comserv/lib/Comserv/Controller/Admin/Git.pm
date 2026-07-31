@@ -464,16 +464,33 @@ PROMPT
         return;
     }
 
-    my $installed = try { $provider->list_models($c) } catch { [] };
-    my ($prov_name, $model) = $c->model('AI2::Router')->select_model($c,
-        installed_models => $installed,
-        agent_id         => 'coding',
-    );
-
     my ($host, $port) = $provider->resolve_host($c);
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
-        "Generating commit message via $prov_name/$model for $scope");
+    # Prefer a model that is ALREADY resident in Ollama — a commit message only
+    # describes a diff (which already contains the code + your comments), so
+    # code-awareness buys little, and paying a cold ~9GB weight-load is the main
+    # cost. If something chat-capable is warm, use it; otherwise let the Router
+    # pick (which may trigger a load).
+    my $model;
+    my $running = try { $provider->running_models($c, $host, $port) } catch { [] };
+    my @warm_chat = grep {
+        $_ && $_ !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
+    } @$running;
+
+    if (@warm_chat) {
+        $model = $warm_chat[0];
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
+            "Reusing already-loaded model '$model' (warm) for $scope");
+    }
+    else {
+        my $installed = try { $provider->list_models($c) } catch { [] };
+        (my $prov_name, $model) = $c->model('AI2::Router')->select_model($c,
+            installed_models => $installed,
+            agent_id         => 'coding',
+        );
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
+            "No warm model; Router selected '$model' (cold load likely) for $scope");
+    }
 
     my $resp = try {
         $provider->chat($c,
