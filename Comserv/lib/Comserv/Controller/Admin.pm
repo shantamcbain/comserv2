@@ -1060,8 +1060,8 @@ sub _get_software_status {
                 type    => 'warning',
                 icon    => 'fas fa-exclamation-triangle',
                 message => "Your branch is $commits_behind commit(s) behind origin/main.",
-                action  => 'Run Git Pull to update.',
-                link    => '/admin/git_pull',
+                action  => 'Open the Git Dashboard to update.',
+                link    => '/admin/git',
             };
         }
     };

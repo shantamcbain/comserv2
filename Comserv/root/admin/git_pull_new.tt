@@ -8,8 +8,8 @@
 
 <!-- Quick Navigation -->
 <div class="quick-nav">
-    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
-        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    <a href="[% c.uri_for('/admin/git') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Git Dashboard
     </a>
 </div>
 
@@ -138,7 +138,7 @@
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-code-branch"></i> Yes, Pull from Git
                             </button>
-                            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                            <a href="[% c.uri_for('/admin/git') %]" class="btn btn-secondary">
                                 <i class="fas fa-times"></i> Cancel
                             </a>
                         </form>
@@ -149,8 +149,8 @@
                     <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-primary">
                         <i class="fas fa-sync"></i> Pull Again
                     </a>
-                    <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+                    <a href="[% c.uri_for('/admin/git') %]" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Git Dashboard
                     </a>
                 </div>
             [% END %]

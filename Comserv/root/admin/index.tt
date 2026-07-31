@@ -76,26 +76,17 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/git_pull') %]" class="admin-link">
-                        <i class="fas fa-download"></i>
-                        <span>Git Pull</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/git_push') %]" class="admin-link">
-                        <i class="fas fa-upload"></i>
-                        <span>Git Push[% IF software_status.git_status.commits_ahead > 0 %] ([% software_status.git_status.commits_ahead %])[% END %]</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/git_commit') %]" class="admin-link">
+                    [%# Single Git entry point — all git operations live on /admin/git.
+                        Previously four separate links (Pull / Push / Commit / Branches); Push
+                        pointed at /admin/git_push which has no action and 404'd. %]
+                    <a href="[% c.uri_for('/admin/git') %]" class="admin-link">
                         <i class="fas fa-code-branch"></i>
-                        <span>Git Commit</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/branch_management') %]" class="admin-link">
-                        <i class="fas fa-code-branch"></i>
-                        <span>Branches</span>
+                        <span>Git[% IF software_status.git_status.commits_ahead > 0 %] ([% software_status.git_status.commits_ahead %] to push)[% END %]</span>
                     </a>
                 </div>
                 [% IF software_status.git_status.commits_ahead > 0 %]
                 <div class="push-banner-wrapper">
-                    <a href="[% c.uri_for('/admin/git_push') %]" class="push-banner">
+                    <a href="[% c.uri_for('/admin/git') %]" class="push-banner">
                         <i class="fas fa-upload"></i>
                         Push [% software_status.git_status.commits_ahead %] commit[% IF software_status.git_status.commits_ahead != 1 %]s[% END %] to remote
                     </a>

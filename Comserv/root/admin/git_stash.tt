@@ -172,8 +172,8 @@
             <a href="[% c.uri_for('/admin/safe_git_pull') %]" class="btn btn-outline-primary">
                 <i class="fas fa-shield-alt"></i> Safe Git Pull
             </a>
-            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Admin
+            <a href="[% c.uri_for('/admin/git') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Git Dashboard
             </a>
         </div>
     </div>
