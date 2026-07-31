@@ -377,18 +377,17 @@ sub suggest_commit_message :Path('/admin/git/suggest_message') :Args(0) {
     my $scope = '';
 
     if (@paths) {
+        # Drafting a message is READ-ONLY, so unknown/clean paths are not an error
+        # here (unlike the write actions). Diff only the valid ones; if the selection
+        # yields nothing (e.g. all selected files are already committed), fall through
+        # to the staged / working-tree diff below.
         my $v = $self->_validate_paths($c, \@paths);
-        if (@{ $v->{invalid} }) {
-            $c->response->body(encode_json({
-                success => 0,
-                error   => 'Rejected unsafe/unknown path(s): ' . join(', ', @{ $v->{invalid} }),
-            }));
-            return;
-        }
         if (@{ $v->{valid} }) {
             my ($out, $code) = $self->_git_list($c, 'diff', 'HEAD', '--', @{ $v->{valid} });
-            $diff  = $out;
-            $scope = 'selected files: ' . join(', ', @{ $v->{valid} });
+            if (length $out) {
+                $diff  = $out;
+                $scope = 'selected files: ' . join(', ', @{ $v->{valid} });
+            }
         }
     }
 
