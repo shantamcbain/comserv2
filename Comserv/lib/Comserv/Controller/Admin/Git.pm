@@ -50,6 +50,55 @@ sub backup_manager {
     return Comserv::Util::BackupManager->new($app_dir ? (app_dir => $app_dir) : ());
 }
 
+=head2 repo_path
+
+Resolve the git repository root.
+
+CRITICAL: this replaced 15 hardcoded C<chdir('/home/shanta/PycharmProjects/comserv2')> calls.
+Those calls permanently changed the working directory of the persistent Twiggy/Starman worker,
+which broke Plack::Middleware::Static / Catalyst::Plugin::Static::Simple. Static::Simple is
+configured in Comserv.pm with C<< include_path => [ 'root' ] >> — a RELATIVE path. Once the worker
+chdir'd to the repo root, 'root' resolved to C<comserv2/root> (which exists but contains only
+ai/ and session/, no static/) instead of C<comserv2/Comserv/root>, so every /static/*.css and
+/static/*.js 404'd for that worker until the app was manually restarted.
+
+Never chdir in a request handler. Use C<git -C $repo> instead.
+
+Resolution order: config C<git_repo_path> -> env COMSERV_GIT_REPO -> C<< $c->path_to('..') >>.
+
+=cut
+
+sub repo_path {
+    my ($self, $c) = @_;
+
+    my $path;
+    $path = $c->config->{git_repo_path} if $c && $c->config->{git_repo_path};
+    $path ||= $ENV{COMSERV_GIT_REPO};
+    $path ||= $c->path_to('..')->stringify if $c;
+
+    return $path;
+}
+
+=head2 _git
+
+Run a git command against the repository WITHOUT changing the process working directory.
+
+Takes the argument string exactly as it would appear after 'git' (e.g. 'status --porcelain').
+Returns the combined stdout/stderr, matching the previous backtick behaviour so callers are
+unchanged.
+
+=cut
+
+sub _git {
+    my ($self, $c, $args) = @_;
+
+    my $repo = $self->repo_path($c);
+    return '' unless defined $repo && length $repo;
+
+    # -C makes git operate on $repo without touching our cwd.
+    return `git -C "$repo" $args`;
+}
+
 =head2 git_pull
 
 Git pull functionality with enhanced CSC admin support
@@ -157,16 +206,14 @@ sub execute_git_pull {
         "Starting git pull execution for branch '$branch'");
     
     try {
-        # Change to the application directory
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
-        
+        my $app_dir = $self->repo_path($c);
+
         # Check if theme_mappings.json has local changes
         my $theme_file = "$app_dir/Comserv/root/static/config/theme_mappings.json";
         my $has_theme_changes = 0;
         
         if (-f $theme_file) {
-            my $git_status = `git status --porcelain "$theme_file" 2>&1`;
+            my $git_status = $self->_git($c, "status --porcelain \"$theme_file\" 2>&1");
             if ($git_status && $git_status =~ /^\s*M/) {
                 $has_theme_changes = 1;
                 $output .= "Detected local changes in theme_mappings.json\n";
@@ -180,23 +227,23 @@ sub execute_git_pull {
                 }
                 
                 # Stash changes
-                my $stash_output = `git stash push -m "Auto-stash theme_mappings.json before pull" "$theme_file" 2>&1`;
+                my $stash_output = $self->_git($c, "stash push -m \"Auto-stash theme_mappings.json before pull\" \"$theme_file\" 2>&1");
                 $output .= "Stashed changes: $stash_output\n";
             }
         }
         
         # Fetch latest changes
         $output .= "Fetching latest changes...\n";
-        my $fetch_output = `git fetch origin 2>&1`;
+        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
         $output .= $fetch_output;
         
         # Switch to the specified branch if not already on it
-        my $current_branch = `git branch --show-current 2>&1`;
+        my $current_branch = $self->_git($c, "branch --show-current 2>&1");
         chomp($current_branch);
         
         if ($current_branch ne $branch) {
             $output .= "Switching to branch '$branch'...\n";
-            my $checkout_output = `git checkout "$branch" 2>&1`;
+            my $checkout_output = $self->_git($c, "checkout \"$branch\" 2>&1");
             $output .= $checkout_output;
             
             if ($? != 0) {
@@ -206,7 +253,7 @@ sub execute_git_pull {
         
         # Pull changes
         $output .= "Pulling changes from origin/$branch...\n";
-        my $pull_output = `git pull origin "$branch" 2>&1`;
+        my $pull_output = $self->_git($c, "pull origin \"$branch\" 2>&1");
         $output .= $pull_output;
         
         if ($? == 0) {
@@ -216,7 +263,7 @@ sub execute_git_pull {
             # If we had theme changes, try to reapply them
             if ($has_theme_changes) {
                 $output .= "Attempting to reapply theme_mappings.json changes...\n";
-                my $stash_pop_output = `git stash pop 2>&1`;
+                my $stash_pop_output = $self->_git($c, "stash pop 2>&1");
                 $output .= $stash_pop_output;
                 
                 if ($? != 0) {
@@ -250,10 +297,8 @@ sub get_current_branch {
     my ($self, $c) = @_;
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
-        my $branch = `git branch --show-current 2>&1`;
+        my $branch = $self->_git($c, "branch --show-current 2>&1");
         chomp($branch);
         return $branch || 'unknown';
     } catch {
@@ -273,14 +318,12 @@ sub get_available_branches {
     my ($self, $c) = @_;
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # First fetch to ensure we have latest remote branch info
-        my $fetch_output = `git fetch origin 2>&1`;
+        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
         
         # Use --no-color to avoid ANSI color codes that interfere with parsing
-        my $branches_output = `git branch -r --no-color 2>&1`;
+        my $branches_output = $self->_git($c, "branch -r --no-color 2>&1");
         my @branches = ();
         my %excluded_branches = (
             'master' => 1,    # Exclude master branch as requested
@@ -506,7 +549,7 @@ sub restore_protected_files {
     return $result unless $backup_id;
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+        my $app_dir = $self->repo_path($c);
         my $backup_dir = "$app_dir/Comserv/backups";
         my $backup_path = "$backup_dir/$backup_id.tar.gz";
         
@@ -601,7 +644,7 @@ sub execute_individual_restore {
     };
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+        my $app_dir = $self->repo_path($c);
         my $backup_dir = "$app_dir/Comserv/backups";
         my $backup_path = "$backup_dir/$backup_id.tar.gz";
         
@@ -673,7 +716,7 @@ sub get_available_backups {
     my $backups = [];
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+        my $app_dir = $self->repo_path($c);
         my $backup_dir = "$app_dir/Comserv/backups";
         
         return $backups unless -d $backup_dir;
@@ -783,11 +826,9 @@ sub execute_git_stash_push {
     };
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Execute git stash push with message
-        my $stash_output = `git stash push -m "$message" 2>&1`;
+        my $stash_output = $self->_git($c, "stash push -m \"$message\" 2>&1");
         $result->{output} = $stash_output;
         
         if ($? == 0) {
@@ -822,12 +863,10 @@ sub execute_git_stash_pop {
     };
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Execute git stash pop
         my $stash_ref = $stash_index ? "stash\@{$stash_index}" : "stash\@{0}";
-        my $pop_output = `git stash pop "$stash_ref" 2>&1`;
+        my $pop_output = $self->_git($c, "stash pop \"$stash_ref\" 2>&1");
         $result->{output} = $pop_output;
         
         if ($? == 0) {
@@ -862,12 +901,10 @@ sub execute_git_stash_drop {
     };
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Execute git stash drop
         my $stash_ref = $stash_index ? "stash\@{$stash_index}" : "stash\@{0}";
-        my $drop_output = `git stash drop "$stash_ref" 2>&1`;
+        my $drop_output = $self->_git($c, "stash drop \"$stash_ref\" 2>&1");
         $result->{output} = $drop_output;
         
         if ($? == 0) {
@@ -898,10 +935,8 @@ sub get_git_stash_list {
     my $stashes = [];
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
-        my $stash_output = `git stash list 2>&1`;
+        my $stash_output = $self->_git($c, "stash list 2>&1");
         
         if ($? == 0 && $stash_output) {
             my @lines = split /\n/, $stash_output;
@@ -942,10 +977,8 @@ sub get_git_status {
     };
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
-        my $status_output = `git status --porcelain 2>&1`;
+        my $status_output = $self->_git($c, "status --porcelain 2>&1");
         $status->{output} = $status_output;
         
         if ($? == 0 && $status_output) {
@@ -1041,12 +1074,10 @@ sub execute_git_add {
     return $result unless $files && @$files;
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Add each file
         for my $file (@$files) {
-            my $add_output = `git add "$file" 2>&1`;
+            my $add_output = $self->_git($c, "add \"$file\" 2>&1");
             $result->{output} .= "Adding $file: $add_output\n";
             
             if ($? != 0) {
@@ -1084,11 +1115,9 @@ sub execute_git_commit {
     return $result unless $message;
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Execute git commit
-        my $commit_output = `git commit -m "$message" 2>&1`;
+        my $commit_output = $self->_git($c, "commit -m \"$message\" 2>&1");
         $result->{output} = $commit_output;
         
         if ($? == 0) {
@@ -1166,10 +1195,8 @@ sub get_recent_commits {
     my $commits = [];
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
-        my $log_output = `git log --oneline -10 2>&1`;
+        my $log_output = $self->_git($c, "log --oneline -10 2>&1");
         
         if ($? == 0 && $log_output) {
             my @lines = split /\n/, $log_output;
@@ -1258,10 +1285,8 @@ sub get_local_branches {
     my ($self, $c) = @_;
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
-        my $branches_output = `git branch --no-color 2>&1`;
+        my $branches_output = $self->_git($c, "branch --no-color 2>&1");
         my @branches = ();
         
         for my $line (split /\n/, $branches_output) {
@@ -1310,23 +1335,21 @@ sub create_branch {
         "Creating branch '$branch_name' from '$source_branch'");
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # First, fetch latest changes
         $result->{output} .= "Fetching latest changes...\n";
-        my $fetch_output = `git fetch origin 2>&1`;
+        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
         $result->{output} .= $fetch_output;
         
         # Check if branch already exists locally
-        my $local_check = `git branch --list "$branch_name" 2>&1`;
+        my $local_check = $self->_git($c, "branch --list \"$branch_name\" 2>&1");
         if ($local_check) {
             $result->{error_msg} = "Branch '$branch_name' already exists locally.";
             return $result;
         }
         
         # Check if branch exists on remote
-        my $remote_check = `git branch -r --list "origin/$branch_name" 2>&1`;
+        my $remote_check = $self->_git($c, "branch -r --list \"origin/$branch_name\" 2>&1");
         if ($remote_check) {
             $result->{error_msg} = "Branch '$branch_name' already exists on remote.";
             return $result;
@@ -1334,7 +1357,7 @@ sub create_branch {
         
         # Create and switch to new branch
         $result->{output} .= "Creating branch '$branch_name' from '$source_branch'...\n";
-        my $create_output = `git checkout -b "$branch_name" "origin/$source_branch" 2>&1`;
+        my $create_output = $self->_git($c, "checkout -b \"$branch_name\" \"origin/$source_branch\" 2>&1");
         $result->{output} .= $create_output;
         
         if ($? != 0) {
@@ -1343,7 +1366,7 @@ sub create_branch {
         
         # Push the new branch to remote
         $result->{output} .= "Pushing new branch to remote...\n";
-        my $push_output = `git push -u origin "$branch_name" 2>&1`;
+        my $push_output = $self->_git($c, "push -u origin \"$branch_name\" 2>&1");
         $result->{output} .= $push_output;
         
         if ($? != 0) {
@@ -1392,17 +1415,15 @@ sub delete_branch {
         "Deleting branch '$branch_name'");
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Get current branch to ensure we're not deleting the current branch
-        my $current_branch = `git branch --show-current 2>&1`;
+        my $current_branch = $self->_git($c, "branch --show-current 2>&1");
         chomp($current_branch);
         
         if ($current_branch eq $branch_name) {
             # Switch to main before deleting
             $result->{output} .= "Switching to main branch before deletion...\n";
-            my $checkout_output = `git checkout main 2>&1`;
+            my $checkout_output = $self->_git($c, "checkout main 2>&1");
             $result->{output} .= $checkout_output;
             
             if ($? != 0) {
@@ -1412,12 +1433,12 @@ sub delete_branch {
         
         # Delete local branch
         $result->{output} .= "Deleting local branch '$branch_name'...\n";
-        my $delete_local = `git branch -D "$branch_name" 2>&1`;
+        my $delete_local = $self->_git($c, "branch -D \"$branch_name\" 2>&1");
         $result->{output} .= $delete_local;
         
         # Delete remote branch (don't fail if it doesn't exist)
         $result->{output} .= "Deleting remote branch '$branch_name'...\n";
-        my $delete_remote = `git push origin --delete "$branch_name" 2>&1`;
+        my $delete_remote = $self->_git($c, "push origin --delete \"$branch_name\" 2>&1");
         $result->{output} .= $delete_remote;
         
         $result->{success} = 1;
@@ -1456,32 +1477,30 @@ sub switch_branch {
         "Switching to branch '$branch_name'");
     
     try {
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Fetch latest changes
         $result->{output} .= "Fetching latest changes...\n";
-        my $fetch_output = `git fetch origin 2>&1`;
+        my $fetch_output = $self->_git($c, "fetch origin 2>&1");
         $result->{output} .= $fetch_output;
         
         # Check if we have uncommitted changes
-        my $status_output = `git status --porcelain 2>&1`;
+        my $status_output = $self->_git($c, "status --porcelain 2>&1");
         if ($status_output) {
             $result->{output} .= "Warning: You have uncommitted changes:\n$status_output\n";
             $result->{output} .= "Stashing changes before branch switch...\n";
-            my $stash_output = `git stash push -m "Auto-stash before branch switch to $branch_name" 2>&1`;
+            my $stash_output = $self->_git($c, "stash push -m \"Auto-stash before branch switch to $branch_name\" 2>&1");
             $result->{output} .= $stash_output;
         }
         
         # Switch to the branch
         $result->{output} .= "Switching to branch '$branch_name'...\n";
-        my $checkout_output = `git checkout "$branch_name" 2>&1`;
+        my $checkout_output = $self->_git($c, "checkout \"$branch_name\" 2>&1");
         $result->{output} .= $checkout_output;
         
         if ($? != 0) {
             # Try to create local branch from remote if it doesn't exist locally
             $result->{output} .= "Local branch not found, creating from remote...\n";
-            my $create_output = `git checkout -b "$branch_name" "origin/$branch_name" 2>&1`;
+            my $create_output = $self->_git($c, "checkout -b \"$branch_name\" \"origin/$branch_name\" 2>&1");
             $result->{output} .= $create_output;
             
             if ($? != 0) {
@@ -1491,7 +1510,7 @@ sub switch_branch {
         
         # Pull latest changes for the branch
         $result->{output} .= "Pulling latest changes for branch '$branch_name'...\n";
-        my $pull_output = `git pull origin "$branch_name" 2>&1`;
+        my $pull_output = $self->_git($c, "pull origin \"$branch_name\" 2>&1");
         $result->{output} .= $pull_output;
         
         $result->{success} = 1;
