@@ -11,6 +11,7 @@ use Comserv::Util::UserVerification;
 use Comserv::Util::BackupManager;
 use Comserv::Util::DiskStats;
 use Comserv::Util::HardwareAgent;
+use Comserv::Util::AdminDashboard;
 use Comserv::Util::CodingAccess;
 use DateTime;
 use Data::Dumper;
@@ -929,22 +930,32 @@ sub index :Path :Args(0) {
     eval { Comserv::Util::HardwareAgent->report_if_due($c, 300) };
     $step->('hardware_report');
 
+    # The two heavy / slow dashboard queries (remote-server hardware metrics scan
+    # and the per-request `git fetch` for software status) are served by
+    # Comserv::Util::AdminDashboard, which caches them per-worker. That kills the
+    # ~50s hardware_metrics full-scan that previously ran on every /admin load.
+    # The lighter queries (system stats, activity, notifications) stay in this
+    # controller. See Comserv::Util::AdminDashboard.
+    my $dash = Comserv::Util::AdminDashboard->new;
+
     # Get system stats
     my $stats = $self->get_system_stats($c);
     $step->('system_stats');
 
-    # Get remote server stats (db + prod catalyst servers)
-    my $remote_servers = $self->get_remote_server_stats($c);
-    $step->('remote_server_stats');
-    
+    # Remote server stats (the ~50s hardware_metrics scan) are NO LONGER computed
+    # here — they are lazy-loaded on first expand via /admin/api/card/remote_servers
+    # (cached per-worker in Comserv::Util::AdminDashboard). This keeps the initial
+    # /admin page load fast; the heavy query only runs when the card is opened.
+    my $remote_servers = [];   # placeholder; lazy card fills it via AJAX
+
     # Get recent user activity
     my $recent_activity = $self->get_recent_activity($c);
     $step->('recent_activity');
-    
+
     # Get system notifications
     my $notifications = $self->get_system_notifications($c);
     $step->('notifications');
-    
+
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
@@ -1027,55 +1038,36 @@ sub index :Path :Args(0) {
         has_accounting         => $has_accounting,
     );
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Completed Admin index action");
+}
+
+# Lazy-load endpoint for the Infrastructure Servers card. Returns the rendered
+# card body HTML so admin-dashboard.js can inject it on first expand (and cache
+# it in sessionStorage). The heavy hardware_metrics query is served (cached
+# per-worker) by Comserv::Util::AdminDashboard.
+sub api_card_remote_servers :Path('/admin/api/card/remote_servers') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_dashboard')) {
+        $c->response->status(403);
+        $c->res->body('Access denied');
+        return;
+    }
+
+    my $dash = Comserv::Util::AdminDashboard->new;
+    $c->stash(remote_servers => $dash->remote_server_stats($c));
+    $c->stash(stats         => $self->get_system_stats($c));
+    $c->stash(template      => 'admin/partials/remote_server_stats.tt');
+    $c->forward('View::TT');
 }
 
 sub _get_software_status {
     my ($self, $c) = @_;
-
-    my $repo_dir = $c->path_to('..')->stringify;
-
-    my $current_branch  = '';
-    my $last_commit     = '';
-    my $commits_behind  = 0;
-    my $has_uncommitted = 0;
-    my $has_untracked   = 0;
-    my @recommendations;
-
-    eval {
-        chomp($current_branch = `git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null`);
-        chomp($last_commit    = `git -C "$repo_dir" log -1 --format="%h %s" 2>/dev/null`);
-
-        my $fetch_out = `git -C "$repo_dir" fetch origin 2>&1`;
-        chomp(my $behind_raw = `git -C "$repo_dir" rev-list --count HEAD..origin/main 2>/dev/null`);
-        $commits_behind = ($behind_raw =~ /^\d+$/) ? $behind_raw + 0 : 0;
-
-        my $status_out = `git -C "$repo_dir" status --porcelain 2>/dev/null`;
-        $has_uncommitted = ($status_out =~ /^[MADRCU]/m) ? 1 : 0;
-        $has_untracked   = ($status_out =~ /^\?\?/m)     ? 1 : 0;
-
-        if ($commits_behind > 0) {
-            push @recommendations, {
-                type    => 'warning',
-                icon    => 'fas fa-exclamation-triangle',
-                message => "Your branch is $commits_behind commit(s) behind origin/main.",
-                action  => 'Open the Git Dashboard to update.',
-                link    => '/admin/git',
-            };
-        }
-    };
-
-    return {
-        git_status => {
-            current_branch          => $current_branch  || 'Unknown',
-            last_commit             => $last_commit      || 'No commits',
-            commits_behind          => $commits_behind,
-            has_uncommitted_changes => $has_uncommitted,
-            has_untracked_files     => $has_untracked,
-        },
-        recommendations => \@recommendations,
-    };
+    # Heavy: shells out to `git fetch origin` on every call. Delegated to
+    # Comserv::Util::AdminDashboard, which caches the result per-worker.
+    return Comserv::Util::AdminDashboard->new->software_status($c);
 }
 
 # Get system statistics for the admin dashboard
@@ -1267,59 +1259,11 @@ sub _resolve_ssh_target {
 
 sub get_remote_server_stats {
     my ($self, $c) = @_;
-    my @servers;
-    eval {
-        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
-        for my $srv (@MONITORED_SERVERS) {
-            my @names = @{ $srv->{names} };
-            push @names, $srv->{ip} if $srv->{ip};
-            my %latest;
-            my @rows = $rs->search(
-                {
-                    -or => [
-                        { hostname => { -in => \@names } },
-                        { system_identifier => { -like => $srv->{ip} . '%' } },
-                    ],
-                    timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL 24 HOUR)" },
-                },
-                { order_by => { -desc => 'timestamp' }, rows => 500 },
-            )->all;
-            for my $row (@rows) {
-                my $mn = $row->metric_name;
-                next if exists $latest{$mn};
-                $latest{$mn} = {
-                    value => $row->metric_value,
-                    text  => $row->metric_text,
-                    unit  => $row->unit,
-                    level => $row->level,
-                    ts    => $row->timestamp,
-                };
-            }
-            my $reported_hostname = @rows ? $rows[0]->hostname : undef;
-            my $last_seen         = @rows ? $rows[0]->timestamp : undef;
-            my $fresh_count = $rs->search(
-                {
-                    -or => [
-                        { hostname => { -in => \@names } },
-                        { system_identifier => { -like => $srv->{ip} . '%' } },
-                    ],
-                    timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL 2 HOUR)" },
-                },
-                { rows => 1 },
-            )->count;
-            push @servers, {
-                name      => $srv->{ip},
-                ip        => $srv->{ip},
-                label     => $srv->{label},
-                hostname  => $reported_hostname,
-                metrics   => \%latest,
-                last_seen => $last_seen,
-                online    => scalar(@rows) ? 1 : 0,
-                stale     => (scalar(@rows) && !$fresh_count) ? 1 : 0,
-            };
-        }
-    };
-    return \@servers;
+    # Previously ran a ~50s uncached full-scan of hardware_metrics on every
+    # /admin load. Delegated to Comserv::Util::AdminDashboard, which caches the
+    # result per-worker (TTL 120s). The heavy query + helpers live there now so
+    # the hardware-monitor history feature keeps its own copies in this file.
+    return Comserv::Util::AdminDashboard->new->remote_server_stats($c);
 }
 
 my @HW_GRAPH_METRICS = qw(
