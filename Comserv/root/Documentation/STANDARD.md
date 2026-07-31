@@ -54,10 +54,14 @@ change.**
     but do not need app navigation.
   - A doc's `file_type` column records `tt` or `md`. Both are first-class; do not convert one
     format to the other just to unify.
-- **S4 — Routing is flat and stable.** Every doc is served at `/Documentation/<rel-path>`
-  (e.g. `/Documentation/admin/schema-compare-guide.tt`). The path equals the disk path under
-  `root/Documentation/`. Never rename a doc without a redirect entry. This kills the
-  broken-link churn.
+- **S4 — Routing is flat, stable, and extensionless.** There is ONE catch-all route
+  (`/Documentation/<page>`) — no separate route per document. The `<page>` is a **stable
+  page key** (e.g. `admin/schema-compare-guide`, `DocumentationTtTemplate`), NOT the disk
+  path. The catalog stores the real `path` (e.g. `Documentation/admin/schema-compare-guide.tt`)
+  and resolves the key → file. This avoids a new route per doc and survives rapid renames.
+  Never rename a page key without a redirect entry, and keep the `path` in sync via the
+  indexer. (Mirrors the `DocumentationTtTemplate.tt` rule: links are `/Documentation/FILENAME`,
+  no subdirs, no `.tt` suffix.)
 - **S5 — Metadata is declared once, by the indexer.** When a `.tt`/`.md` is added or changed,
   its `documentationmetadataindex` row (title, categories, role_access, excerpt,
   content_hash) is created/updated by the indexer. Authors do NOT hand-edit JSON or META

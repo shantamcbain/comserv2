@@ -309,6 +309,138 @@ sub reload_config {
 }
 
 #------------------------------------------------------------------------------
+# SQL-backed loader (Phase 1 of the documentation-system-standard plan).
+#
+# ADDITIVE ONLY at this step: this method is NOT yet called by load_config /
+# instance. Step 5 will make load_config try this first and fall back to the
+# JSON/disk loader on any failure. Keeping it separate here means it cannot
+# break the live JSON path.
+#
+# Builds the same in-memory structures (categories, pages, pages_by_id,
+# pages_by_category, pages_by_site) that load_config produces, but from the
+# `documentationmetadataindex` table instead of JSON.
+#
+# KNOWN SCHEMA GAP (tracked, not fixed here): `documentationmetadataindex` has
+# no `categories` column yet — only file_path, file_type, title, excerpt,
+# searchable_text, content_hash, role_access (JSON), timestamps, file_size.
+# The legacy JSON catalog stored a `categories` ARRAY per page (a file can be in
+# several categories, e.g. admin_guides + documentation). PLAN DECISION: add a
+# `categories` JSON column to documentationmetadataindex via the in-app
+# schema-compare workflow (Result-file first; never raw ALTER). Until that
+# column exists, we DERIVE a single fallback category from the file's directory
+# so the structures stay well-formed. When the column exists, load_from_db reads
+# it as the authoritative (possibly multiple) categories. The indexer (Step 12)
+# populates it.
+#
+# Returns 1 on success, 0 if DB is unavailable or any error occurs (so the
+# caller can fall back to JSON).
+#------------------------------------------------------------------------------
+sub load_from_db {
+    my ($self, $c) = @_;
+
+    return 0 unless $c && $c->can('model');
+
+    my $schema = eval { $c->model('DBEncy')->schema };
+    unless ($schema) {
+        Comserv::Util::Logging::log_with_details($c, 'debug', __FILE__, __LINE__,
+            'doc_config_load_from_db', "No DB schema available; caller will fall back to JSON");
+        return 0;
+    }
+
+    my $rs = eval { $schema->resultset('DocumentationMetadataIndex') };
+    unless ($rs) {
+        Comserv::Util::Logging::log_with_details($c, 'debug', __FILE__, __LINE__,
+            'doc_config_load_from_db', "documentationmetadataindex resultset unavailable; falling back to JSON");
+        return 0;
+    }
+
+    my (@pages, %categories_seen);
+
+    try {
+        while (my $row = $rs->next) {
+            my $file_path = $row->file_path or next;
+
+            # Stable page key = file path without the leading "Documentation/"
+            # prefix and without the extension. Matches the extensionless
+            # /Documentation/<page> URL convention (see STANDARD.md S4).
+            my $key = $file_path;
+            $key =~ s{^Documentation/}{};
+            $key =~ s{\.[^.]+$}{};
+
+            # role_access: stored as JSON; decode if it came back as a string.
+            my $raw_roles = $row->role_access;
+            my @roles;
+            if (ref $raw_roles eq 'ARRAY') {
+                @roles = @$raw_roles;
+            }
+            elsif (defined $raw_roles && length $raw_roles) {
+                try { @roles = @{ decode_json($raw_roles) }; }
+                catch { @roles = (); };
+            }
+            @roles = ('normal', 'editor', 'admin', 'developer') unless @roles;
+
+            # categories: prefer the `categories` column (JSON array) when it
+            # exists; otherwise derive a single fallback from the directory.
+            my @cats;
+            my $raw_cats = eval { $row->categories };
+            if (ref $raw_cats eq 'ARRAY') {
+                @cats = @$raw_cats;
+            }
+            elsif (defined $raw_cats && length $raw_cats) {
+                try { @cats = @{ decode_json($raw_cats) }; }
+                catch { @cats = (); };
+            }
+            unless (@cats) {
+                my ($dir) = $file_path =~ m{^Documentation/(?:([^/]+)/)?};
+                @cats = ($dir ? lc($dir) : 'documentation');
+            }
+            $categories_seen{$_} = 1 for @cats;
+
+            push @pages, {
+                id          => $key,
+                title       => $row->title,
+                description => $row->excerpt,
+                path        => $file_path,
+                categories  => \@cats,
+                roles       => \@roles,
+                site        => 'all',
+                format      => ($row->file_type eq 'md' ? 'markdown' : 'template'),
+                (defined $row->indexed_at      ? (last_scanned => $row->indexed_at->iso8601)      : ()),
+                (defined $row->last_file_modified ? (last_updated => $row->last_file_modified->iso8601) : ()),
+            };
+        }
+    }
+    catch {
+        Comserv::Util::Logging::log_with_details($c, 'error', __FILE__, __LINE__,
+            'doc_config_load_from_db', "Failed to load documentation from DB: $_");
+        return 0;
+    };
+
+    # Store categories (derive a minimal category descriptor for each seen).
+    my $categories = {};
+    for my $cat (keys %categories_seen) {
+        $categories->{$cat} = {
+            title    => ucfirst($cat),
+            roles    => ['normal', 'editor', 'admin', 'developer'],
+            site_specific => 0,
+        };
+    }
+
+    $self->{categories}          = $categories;
+    $self->{pages}               = \@pages;
+    $self->{pages_by_id}         = {};
+    $self->{pages_by_category}   = {};
+    $self->{pages_by_site}       = {};
+
+    $self->_reindex_pages();
+
+    Comserv::Util::Logging::log_with_details($c, 'info', __FILE__, __LINE__,
+        'doc_config_load_from_db', "Loaded " . scalar(@pages) . " documentation pages from SQL");
+
+    return 1;
+}
+
+#------------------------------------------------------------------------------
 # Canonical read/write layer
 #
 # The documentation system historically had three JSON files with three

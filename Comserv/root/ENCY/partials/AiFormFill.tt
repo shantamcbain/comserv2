@@ -747,7 +747,7 @@
 
     // --- Field tooltip definitions ---
     var FIELD_TIPS = {
-        icd_code:              'ICD Code — International Classification of Diseases code (WHO standard). e.g. L70 for Acne vulgaris. Used for clinical documentation and insurance billing.',
+        icd_code:              'ICD Code — International Classification of Diseases code (WHO standard). Bare code only, max 20 characters. e.g. L70 for Acne vulgaris. Leave EMPTY if no ICD-10 code applies (e.g. a TCM pattern or a plant/animal disease) — put any explanation in Diagnosis. Used for clinical documentation and insurance billing.',
         causative_agent:       'The organism, substance, or factor that directly causes the disease. e.g. bacteria (Staphylococcus), virus (influenza A), fungus (Candida), toxin, or nutritional deficiency.',
         host_type:             'The organism that the disease affects: Human, Animal, Plant, or Insect.',
         transmission:          'How the disease spreads — person to person, vector-borne (mosquito, tick), airborne, foodborne, contact, etc.',

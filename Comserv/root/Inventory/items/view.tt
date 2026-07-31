@@ -20,6 +20,17 @@
   &nbsp;|&nbsp;
   <a href="/Inventory/print/label/[% item.id %]" target="_blank">&#128438; Print Label</a>
   &nbsp;|&nbsp;
+  <a href="/shop/item/[% item.id %]"><strong>Order</strong></a>
+  [% IF c.session.roles.grep('admin').size && print_model %]
+  &nbsp;|&nbsp;
+  <form method="post" action="/3d/reorder_item" style="display:inline;"
+        onsubmit="return confirm('Queue a reprint of [% item.name | html %] to restock (reorder qty [% item.reorder_quantity || 1 %])?');">
+    <input type="hidden" name="item_id" value="[% item.id %]">
+    <input type="hidden" name="return_to" value="/Inventory/item/view/[% item.id %]">
+    <button type="submit" style="background:none;border:none;color:var(--primary-color);cursor:pointer;font:inherit;padding:0;">&#8635; Reorder</button>
+  </form>
+  [% END %]
+  &nbsp;|&nbsp;
   <a href="/Inventory/items">Back to List</a>
 </div>
 

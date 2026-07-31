@@ -41,14 +41,37 @@ sub _service_config {
     try {
         open my $fh, '<', $path or die "open $path: $!";
         local $/;
-        $cfg = decode_json(scalar <$fh>);
+        my $raw = scalar <$fh>;
         close $fh;
+        $cfg = decode_json($raw);
     } catch {
+        my $err = $_;
+        # Say WHAT is wrong and WHAT TO DO — a bare "cannot read" tells the
+        # operator nothing about which failure of three this is.
+        my $why = ! -e $path ? "file does not exist on this server"
+                : ! -r $path ? "file exists but is not readable by the app user (uid $<)"
+                :              "file exists and is readable but is not valid JSON";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'service_config', "Cannot read services.json: $_");
+            'service_config',
+            "OpenSCAD service config unusable — $why. path=$path; "
+          . "fix: ensure root/config/services.json is deployed with an "
+          . "{\"openscad\":{\"url\":\"http://<host>:8083\"}} entry. raw error: $err");
         $cfg = {};
     };
-    return $cfg->{openscad} || {};
+
+    my $svc = $cfg->{openscad};
+    if (!$svc || ref($svc) ne 'HASH' || !$svc->{url}) {
+        # Distinguish "config missing" from "config present but openscad entry absent/urlless".
+        if ($cfg && %$cfg) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'service_config',
+                "services.json loaded from $path but has no usable 'openscad.url' "
+              . "(keys found: " . join(', ', sort keys %$cfg) . "). "
+              . "fix: add {\"openscad\":{\"url\":\"http://<host>:8083\",\"timeout\":150}}");
+        }
+        return {};
+    }
+    return $svc;
 }
 
 # ------------------------------------------------------------------
@@ -142,8 +165,12 @@ sub generate_stl {
     my ($self, $c, %args) = @_;
 
     my $cfg = $self->_service_config($c);
-    my $base_url = $cfg->{url}
-        or return { error => 'OpenSCAD render service is not configured (services.json).' };
+    my $base_url = $cfg->{url} or return { error => sprintf(
+        'OpenSCAD render service is not configured on %s. '
+      . 'Expected an "openscad": {"url": "http://<host>:8083"} entry in %s. '
+      . 'See the application log for the exact reason (missing file, unreadable, bad JSON, or missing key).',
+        Comserv::Util::Logging->get_system_identifier(),
+        $c->path_to('root', 'config', 'services.json')->stringify) };
     my $timeout = $cfg->{timeout} || 150;
 
     my %params = (
@@ -380,7 +407,9 @@ sub qr_matrix {
 sub service_status {
     my ($self, $c) = @_;
     my $cfg = $self->_service_config($c);
-    return { ok => 0, detail => 'not configured' } unless $cfg->{url};
+    return { ok => 0, detail => sprintf('not configured on %s (no openscad.url in %s)',
+        Comserv::Util::Logging->get_system_identifier(),
+        $c->path_to('root', 'config', 'services.json')->stringify) } unless $cfg->{url};
     my $res = HTTP::Tiny->new(timeout => 5)->get("$cfg->{url}/healthz");
     return { ok => $res->{success} ? 1 : 0,
              url => $cfg->{url},

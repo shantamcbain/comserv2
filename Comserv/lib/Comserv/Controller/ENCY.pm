@@ -109,6 +109,21 @@ sub fungi_alias        : Path('/ENCY/fungi')               : Args(0) { $_[1]->re
 sub ecosystems_alias   : Path('/ENCY/ecosystems')          : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'ecosystem' })) }
 sub conservation_alias : Path('/ENCY/conservation')        : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'conservation' })) }
 sub cultivation_alias  : Path('/ENCY/cultivation')         : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'cultivation' })) }
+sub _disease_ai_prompt {
+    return
+        'common_name, scientific_name, disease_type, host_type, causative_agent, '
+      . 'transmission, symptoms_description, diagnosis, treatment_conventional, '
+      . 'treatment_herbal, prevention, prognosis, icd_code, distribution, history, '
+      . 'reference, url. '
+      . 'For host_type use a semicolon-separated list of one or more of: '
+      . 'human; animal; plant; insect; bird; fish; fungal host; bacterial host. '
+      . 'icd_code MUST be a bare ICD-10 code ONLY (e.g. "L70", "A15.0", "R19.8") '
+      . 'and MUST NOT exceed 20 characters. Do NOT write explanations, notes, '
+      . '"N/A", "not applicable", or mapping commentary in icd_code — if the entity '
+      . 'has no ICD-10 code (for example a TCM pattern or a plant/animal disease), '
+      . 'leave icd_code EMPTY and put any explanation in the diagnosis field instead.';
+}
+
 sub _herb_ai_prompt {
     return
         'botanical_name (Latin binomial — Genus species), '
@@ -1814,7 +1829,24 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
         }
 
         my $return_to = $p->{return_to} // '';
-        $c->model('ENCYModel')->add_disease($c, $data);
+        my ($ok, $result) = $c->model('ENCYModel')->add_disease($c, $data);
+        unless ($ok) {
+            # The insert FAILED — do not tell the user it succeeded. Re-render the
+            # form with their data intact and the real DB reason.
+            my $reason = $result // 'Unknown database error';
+            $reason =~ s/\s+at\s+\S+\s+line\s+\d+.*\z//s;   # trim Perl file/line tail
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_disease',
+                "Disease NOT added ($data->{common_name}): $reason");
+            $self->_stash_image_files($c);
+            $c->stash(
+                error_msg => "Could not add disease: $reason",
+                disease   => $data,
+                edit_mode => 1,
+                return_to => $return_to,
+                template  => 'ENCY/DiseaseDetail.tt',
+            );
+            return;
+        }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Disease added: $data->{common_name}");
         $c->flash->{success_msg} = 'Disease added successfully.';
         $self->_advance_resolve_queue($c, $return_to || '/ENCY/Disease');
@@ -1834,7 +1866,7 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
         resolve_field       => $resolve_field,
         resolve_type        => $resolve_type,
         resolve_remaining   => $resolve_remaining,
-        ency_ai_prompt      => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url. For host_type use a semicolon-separated list of one or more of: human; animal; plant; insect; bird; fish; fungal host; bacterial host',
+        ency_ai_prompt      => _disease_ai_prompt(),
         template            => 'ENCY/DiseaseDetail.tt',
     );
 }
@@ -1941,7 +1973,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
     $c->stash(
         disease         => $disease,
         edit_mode       => 1,
-        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url. For host_type use a semicolon-separated list of one or more of: human; animal; plant; insect; bird; fish; fungal host; bacterial host',
+        ency_ai_prompt  => _disease_ai_prompt(),
         template        => 'ENCY/DiseaseDetail.tt',
     );
 }

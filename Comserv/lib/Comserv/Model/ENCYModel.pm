@@ -442,13 +442,17 @@ sub get_insect_related {
 sub add_disease {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Adding new disease: " . ($data->{common_name} || ''));
+    my $new_record;
     eval {
-        $self->ency_schema->resultset('Ency::Disease')->create($data);
+        $new_record = $self->ency_schema->resultset('Ency::Disease')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Disease added successfully.");
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_disease', "Error adding disease: $error");
+        return (0, $error);
     };
+    return (1, $new_record);
 }
 
 sub update_disease {

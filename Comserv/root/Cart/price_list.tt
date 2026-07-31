@@ -129,6 +129,10 @@
       <a href="mailto:[% sitename %]@cscoop.ca" style="color:var(--primary-color);font-size:var(--font-size-small)">Enquire by email</a>
     </div>
     [% END %]
+    <div style="border-top:1px solid var(--border-color);padding:0.5em var(--spacing-medium);background:var(--bg-secondary,var(--secondary-color));display:flex;gap:1em;flex-wrap:wrap">
+      <a href="/Inventory/item/view/[% item.id %]" style="color:var(--primary-color);font-size:var(--font-size-small)"><i class="fas fa-box-open"></i> View item</a>
+      <a href="/shop/item/[% item.id %]" style="color:var(--primary-color);font-size:var(--font-size-small)"><i class="fas fa-shopping-cart"></i> Order</a>
+    </div>
   </div>
 [% END %]
 </div>
