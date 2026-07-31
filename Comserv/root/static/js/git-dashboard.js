@@ -44,6 +44,33 @@
             });
         }
 
+        // Host / target selector: re-scope the whole dashboard to the chosen host
+        // (local, or a remote host the app SSHes into). Reloading with ?target=KEY
+        // keeps everything else (branch, working tree) consistent for that host.
+        var targetSelect = document.getElementById('git-target-select');
+        if (targetSelect) {
+            targetSelect.addEventListener('change', function () {
+                var key = this.value || 'local';
+                var base = window.location.pathname.split('?')[0];
+                var q = new URLSearchParams(window.location.search);
+                q.set('target', key);
+                window.location.href = base + '?' + q.toString();
+            });
+        }
+
+        // Before any action form posts, make sure it carries the current host
+        // target so the write lands on the right machine.
+        function appendTarget(formEl) {
+            if (!formEl || !targetSelect) { return; }
+            var existing = formEl.querySelector('input[name="target"]');
+            if (existing) { existing.value = targetSelect.value; return; }
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'target';
+            hidden.value = targetSelect.value;
+            formEl.appendChild(hidden);
+        }
+
         // Branch switch via dropdown: submit the parent form on change, with a
         // confirm (uncommitted changes are auto-stashed server-side).
         var switchSelect = document.querySelector('[data-git-switch-select]');
@@ -56,8 +83,17 @@
                     return;
                 }
                 var f = this.closest('form[data-git-switch-form]');
+                appendTarget(f);
                 if (f) { f.submit(); }
             });
+        }
+
+        // All POST action forms (Pull / Safe Pull / Push / Switch / Remove) need
+        // the target so they run against the selected host.
+        var postForms = document.querySelectorAll('form[action*="/admin/git/action"],'
+            + 'form[action*="/admin/git_pull"],form[action*="/admin/safe_git_pull"]');
+        for (var p = 0; p < postForms.length; p++) {
+            appendTarget(postForms[p]);
         }
 
         if (!form) { return; }
@@ -150,6 +186,7 @@
                 }
 
                 if (opField) { opField.value = op; }
+                appendTarget(form);
                 form.submit();
             });
         }

@@ -108,6 +108,23 @@ sub _git {
     return `git -C "$repo" $args`;
 }
 
+=head2 _bind_target
+
+Read the dashboard "target" selector (param 'target') and stash it for the rest
+of the request. Every git op in this controller then runs against that target:
+local (this app host) or a remote host reached over SSH by the service layer.
+Returns the resolved key (or '' for local).
+
+=cut
+
+sub _bind_target {
+    my ($self, $c) = @_;
+    my $t = $c->req->param('target');
+    $t = '' unless defined $t;
+    $c->stash->{git_target} = $t;
+    return $t;
+}
+
 =head2 _git_list
 
 Run a git command with EXPLICIT ARGUMENT LIST — no shell, no interpolation.
@@ -124,6 +141,17 @@ Returns (combined_output, exit_code). Returns ('', -1) if the repo path can't be
 
 sub _git_list {
     my ($self, $c, @argv) = @_;
+
+    # Honor the per-request target bound by _bind_target (dashboard selector).
+    # For a remote target we delegate to the service's SSH runner so file paths
+    # and messages are still passed as discrete argv elements (no shell).
+    if (my $t = $c->stash->{git_target}) {
+        my $tinfo = $self->git_service->resolve_target($c, $t);
+        if ($tinfo->{mode} eq 'ssh') {
+            my $r = $self->git_service->_ssh_exec_git($c, $tinfo, @argv);
+            return ($r->{output}, $r->{exit_code});
+        }
+    }
 
     my $repo = $self->repo_path($c);
     return ('', -1) unless defined $repo && length $repo;
@@ -150,9 +178,16 @@ Returns a hashref:
 sub _validate_paths {
     my ($self, $c, $paths) = @_;
 
+    my $tkey = $c->stash->{git_target} // '';
+    my $tinfo = $self->git_service->resolve_target($c, $tkey);
+    my $is_remote = ($tinfo->{mode} eq 'ssh');
+
     my %known;       # path => tracked|untracked
-    my $porcelain = $self->_git($c, 'status --porcelain 2>&1');
-    for my $line (split /\n/, $porcelain) {
+    # Read the change set from the TARGET repo (local or remote-over-SSH). For a
+    # remote target this queries the remote server, so the file list we validate
+    # against is the right one for where the write will actually land.
+    my ($porcelain) = $self->_git_list($c, 'status', '--porcelain');
+    for my $line (split /\n/, $porcelain // '') {
         # format: XY <path>   (XY = two status chars, then a space)
         next unless $line =~ /^(..)\s(.+)$/;
         my ($xy, $file) = ($1, $2);
@@ -162,7 +197,7 @@ sub _validate_paths {
         $known{$file} = ($xy eq '??') ? 'untracked' : 'tracked';
     }
 
-    my $repo = $self->repo_path($c);
+    my $repo = $tinfo->{repo};
     my (@valid, @invalid, %untracked);
 
     for my $p (@{ $paths || [] }) {
@@ -174,12 +209,15 @@ sub _validate_paths {
         unless (exists $known{$p}) {
             push @invalid, $p; next;   # not in the working-tree change set
         }
-        # symlink-escape guard: real path must sit under the repo root
-        my $full = "$repo/$p";
-        if (-l $full) {
-            require Cwd;
-            my $real = Cwd::abs_path($full);
-            if (!$real || index($real, $repo) != 0) { push @invalid, $p; next; }
+        # symlink-escape guard: real path must sit under the repo root. Only
+        # possible to check for a LOCAL target (remote files aren't stat-able here).
+        if (!$is_remote) {
+            my $full = "$repo/$p";
+            if (-l $full) {
+                require Cwd;
+                my $real = Cwd::abs_path($full);
+                if (!$real || index($real, $repo) != 0) { push @invalid, $p; next; }
+            }
         }
 
         push @valid, $p;
@@ -209,6 +247,9 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
     my ($self, $c) = @_;
 
     return unless $self->admin_auth->require_admin_access($c, 'git_dashboard_action');
+
+    # Route every op below to the selected target (local or remote-over-SSH).
+    $self->_bind_target($c);
 
     # Every write is POST + confirm.
     unless ($c->req->method eq 'POST' && $c->req->param('confirm')) {
@@ -631,6 +672,10 @@ sub index :Path('/admin/git') :Args(0) {
 
     return unless $self->admin_auth->require_admin_access($c, 'git_dashboard');
 
+    # Honor ?target= so a direct link or the selector opens on a given host.
+    $self->_bind_target($c);
+    my $target_key = $c->stash->{git_target} // '';
+
     my $status = $self->get_git_status($c);
 
     $c->stash(
@@ -642,6 +687,8 @@ sub index :Path('/admin/git') :Args(0) {
         git_status      => $status,
         stash_list      => $self->get_git_stash_list($c),
         tracking        => $self->get_tracking_info($c),
+        git_targets     => $self->git_service->list_targets($c),
+        git_target      => $target_key,
         template        => 'admin/git/index.tt',
     );
 
