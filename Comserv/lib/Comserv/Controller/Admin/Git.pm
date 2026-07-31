@@ -99,6 +99,85 @@ sub _git {
     return `git -C "$repo" $args`;
 }
 
+=head2 index
+
+Git dashboard — the SINGLE entry point for all git functionality.
+
+Route lives HERE in Admin::Git, deliberately NOT in Admin.pm: every route added to this
+controller instead of Admin.pm keeps Admin.pm shrinking (see the Git Subsystem Refactor Plan,
+Appendix A — Admin.pm is 7,882 lines against a 4,000 hard limit).
+
+Read-only. All write operations remain on their existing pages until Phase G moves them here
+as panels.
+
+=cut
+
+sub index :Path('/admin/git') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "Starting git dashboard");
+
+    return unless $self->admin_auth->require_admin_access($c, 'git_dashboard');
+
+    my $status = $self->get_git_status($c);
+
+    $c->stash(
+        repo_path       => $self->repo_path($c),
+        current_branch  => $self->get_current_branch($c),
+        local_branches  => $self->get_local_branches($c),
+        recent_commits  => $self->get_recent_commits($c),
+        git_status      => $status,
+        stash_list      => $self->get_git_stash_list($c),
+        tracking        => $self->get_tracking_info($c),
+        template        => 'admin/git/index.tt',
+    );
+
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Git dashboard - Template: admin/git/index.tt";
+        push @{$c->stash->{debug_msg}}, "Repo: " . ($self->repo_path($c) || 'unresolved');
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "Completed git dashboard");
+}
+
+=head2 get_tracking_info
+
+Ahead/behind counts against the upstream branch. Read-only; does not fetch.
+
+Returns a hashref: upstream, ahead, behind. upstream is undef when the branch has no upstream.
+
+=cut
+
+sub get_tracking_info {
+    my ($self, $c) = @_;
+
+    my $info = { upstream => undef, ahead => 0, behind => 0 };
+
+    try {
+        my $upstream = $self->_git($c, 'rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1');
+        chomp $upstream;
+
+        # No upstream configured -> git prints an error; leave counts at zero.
+        return $info if !$upstream || $upstream =~ /fatal|no upstream/i;
+
+        $info->{upstream} = $upstream;
+
+        my $counts = $self->_git($c, 'rev-list --left-right --count @{u}...HEAD 2>&1');
+        chomp $counts;
+        if ($counts =~ /^(\d+)\s+(\d+)$/) {
+            $info->{behind} = $1;
+            $info->{ahead}  = $2;
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_tracking_info',
+            "Error getting tracking info: $_");
+    };
+
+    return $info;
+}
+
 =head2 git_pull
 
 Git pull functionality with enhanced CSC admin support

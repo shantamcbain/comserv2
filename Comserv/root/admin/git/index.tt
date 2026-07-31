@@ -1,0 +1,217 @@
+[% META title = 'Git Dashboard' %]
+[%# File: root/admin/git/index.tt
+    Single entry point for all git functionality. Route: Admin::Git::index (/admin/git).
+    Read-only in this phase; write operations still live on their own pages and are
+    linked from the Actions panel below.
+%]
+[% PageVersion = 'admin/git/index.tt,v 0.01 2026/07/31 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="admin-btn admin-btn-secondary admin-btn-sm">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+</div>
+
+<div class="app-container">
+    <div class="content-container">
+        <div class="content-primary">
+            <h1><i class="fas fa-code-branch"></i> Git Dashboard</h1>
+
+            [% IF debug_msg && c.session.debug_mode == 1 %]
+                <div class="admin-alert admin-alert-info">
+                    <strong>Debug Information:</strong>
+                    [% FOREACH msg IN debug_msg %]
+                        <p>[% msg | html %]</p>
+                    [% END %]
+                </div>
+            [% END %]
+
+            [% IF c.flash.error_msg %]
+                <div class="admin-alert admin-alert-danger">
+                    <strong>Error:</strong> [% c.flash.error_msg | html %]
+                </div>
+            [% END %]
+            [% IF c.flash.success_msg %]
+                <div class="admin-alert admin-alert-success">
+                    <strong>Success:</strong> [% c.flash.success_msg | html %]
+                </div>
+            [% END %]
+
+            [%# ---------------- Repository summary ---------------- %]
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h3>Repository</h3>
+                </div>
+                <div class="admin-panel-body">
+                    <p>
+                        <strong>Branch:</strong>
+                        <span class="status-badge">[% current_branch | html %]</span>
+                        [% IF tracking.upstream %]
+                            &bull; <strong>Tracking:</strong>
+                            <code class="code-inline">[% tracking.upstream | html %]</code>
+                        [% ELSE %]
+                            &bull; <em>No upstream configured</em>
+                        [% END %]
+                    </p>
+                    <p>
+                        [% IF tracking.ahead > 0 %]
+                            <span class="section-info-warn">
+                                <i class="fas fa-upload"></i>
+                                [% tracking.ahead %] commit[% IF tracking.ahead != 1 %]s[% END %] to push
+                            </span>
+                        [% END %]
+                        [% IF tracking.behind > 0 %]
+                            [% IF tracking.ahead > 0 %]&bull;[% END %]
+                            <span class="section-info-warn">
+                                <i class="fas fa-download"></i>
+                                [% tracking.behind %] commit[% IF tracking.behind != 1 %]s[% END %] behind
+                            </span>
+                        [% END %]
+                        [% IF tracking.ahead == 0 && tracking.behind == 0 && tracking.upstream %]
+                            <i class="fas fa-check"></i> Up to date with remote
+                        [% END %]
+                    </p>
+                    [% IF c.session.debug_mode == 1 %]
+                    <p><small>Repo path: <code class="code-inline">[% repo_path | html %]</code></small></p>
+                    [% END %]
+                </div>
+            </div>
+
+            [%# ---------------- Actions ---------------- %]
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h3>Actions</h3>
+                </div>
+                <div class="admin-panel-body">
+                    <div class="admin-form-actions">
+                        <a href="[% c.uri_for('/admin/git_pull') %]" class="admin-btn admin-btn-primary">
+                            <i class="fas fa-download"></i> Pull
+                        </a>
+                        <a href="[% c.uri_for('/admin/safe_git_pull') %]" class="admin-btn">
+                            <i class="fas fa-shield-alt"></i> Safe Pull
+                        </a>
+                        <a href="[% c.uri_for('/admin/git_commit') %]" class="admin-btn">
+                            <i class="fas fa-check"></i> Stage &amp; Commit
+                        </a>
+                        <a href="[% c.uri_for('/admin/git_stash') %]" class="admin-btn">
+                            <i class="fas fa-box"></i> Stash
+                        </a>
+                        <a href="[% c.uri_for('/admin/branch_management') %]" class="admin-btn">
+                            <i class="fas fa-code-branch"></i> Branches
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            [%# ---------------- Working tree status ---------------- %]
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h3>Working Tree</h3>
+                </div>
+                <div class="admin-panel-body">
+                    [% IF git_status.has_changes %]
+                        [% IF git_status.staged_files.size %]
+                        <p><strong>Staged ([% git_status.staged_files.size %])</strong></p>
+                        <ul>
+                            [% FOREACH f IN git_status.staged_files %]
+                            <li><code class="code-inline">[% f | html %]</code></li>
+                            [% END %]
+                        </ul>
+                        [% END %]
+
+                        [% IF git_status.modified_files.size %]
+                        <p><strong>Modified ([% git_status.modified_files.size %])</strong></p>
+                        <ul>
+                            [% FOREACH f IN git_status.modified_files %]
+                            <li><code class="code-inline">[% f | html %]</code></li>
+                            [% END %]
+                        </ul>
+                        [% END %]
+
+                        [% IF git_status.untracked_files.size %]
+                        <p><strong>Untracked ([% git_status.untracked_files.size %])</strong></p>
+                        <ul>
+                            [% FOREACH f IN git_status.untracked_files %]
+                            <li><code class="code-inline">[% f | html %]</code></li>
+                            [% END %]
+                        </ul>
+                        [% END %]
+                    [% ELSE %]
+                        <p><i class="fas fa-check"></i> Working tree clean.</p>
+                    [% END %]
+                </div>
+            </div>
+
+            [%# ---------------- Recent commits ---------------- %]
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h3>Recent Commits</h3>
+                </div>
+                <div class="admin-panel-body">
+                    [% IF recent_commits.size %]
+                    <ul>
+                        [% FOREACH cmt IN recent_commits %]
+                        <li>
+                            <code class="code-inline">[% cmt.hash | html %]</code>
+                            [% cmt.message | html %]
+                        </li>
+                        [% END %]
+                    </ul>
+                    [% ELSE %]
+                    <p>No commits found.</p>
+                    [% END %]
+                </div>
+            </div>
+
+            [%# ---------------- Branches ---------------- %]
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h3>Local Branches</h3>
+                </div>
+                <div class="admin-panel-body">
+                    [% IF local_branches.size %]
+                    <ul>
+                        [% FOREACH b IN local_branches %]
+                        <li>
+                            <code class="code-inline">[% b | html %]</code>
+                            [% IF b == current_branch %] <span class="status-badge">current</span>[% END %]
+                        </li>
+                        [% END %]
+                    </ul>
+                    [% ELSE %]
+                    <p>No branches found.</p>
+                    [% END %]
+                </div>
+            </div>
+
+            [%# ---------------- Stashes ---------------- %]
+            [% IF stash_list.size %]
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h3>Stashes ([% stash_list.size %])</h3>
+                </div>
+                <div class="admin-panel-body">
+                    <ul>
+                        [% FOREACH s IN stash_list %]
+                        <li>
+                            <code class="code-inline">[% s.ref | html %]</code>
+                            [% s.message | html %]
+                        </li>
+                        [% END %]
+                    </ul>
+                    <div class="admin-form-actions">
+                        <a href="[% c.uri_for('/admin/git_stash') %]" class="admin-btn admin-btn-sm">
+                            Manage stashes
+                        </a>
+                    </div>
+                </div>
+            </div>
+            [% END %]
+
+        </div>
+    </div>
+</div>
