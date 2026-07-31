@@ -1048,8 +1048,31 @@
         var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
             || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
         chatButton.addEventListener('click', function() {
-            if ((state._popupWindow && !state._popupWindow.closed) || localStorage.getItem('ai_popup_active') === '1') {
-                detachToPopup();
+            // Toggle: if the chat is currently open (inline panel or popup window),
+            // clicking the button closes it. Otherwise open it.
+            var popupOpen = (state._popupWindow && !state._popupWindow.closed)
+                || localStorage.getItem('ai_popup_active') === '1';
+            var panel = document.getElementById('chat-panel');
+            var inlineOpen = state.isOpen
+                || (panel && panel.style.display !== 'none' && panel.style.display !== '');
+
+            if (popupOpen) {
+                // Close the detached popup window and clear its active flag.
+                try {
+                    if (state._popupWindow && !state._popupWindow.closed) {
+                        state._popupWindow.close();
+                    }
+                } catch (e) {}
+                state._popupWindow = null;
+                try { localStorage.removeItem('ai_popup_active'); } catch (e) {}
+                var cb = document.getElementById('chat-button');
+                if (cb) {
+                    cb.classList.remove('popup-active');
+                    cb.title = 'Open AI assistant';
+                }
+                closeChat();
+            } else if (inlineOpen) {
+                closeChat();
             } else {
                 openChatPreferred();
             }
