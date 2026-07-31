@@ -225,8 +225,11 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         "user=$username op=$op paths=" . join(',', @paths));
 
     my %needs_paths = map { $_ => 1 } qw(stage unstage delete gitignore stash);
+    # 'commit' also accepts ticked paths (to auto-stage them) but, unlike the
+    # others, an empty selection is valid — it commits whatever is already staged.
+    my %requires_selection = map { $_ => 1 } qw(stage unstage delete gitignore stash);
     my $validated;
-    if ($needs_paths{$op}) {
+    if ($needs_paths{$op} || $op eq 'commit') {
         $validated = $self->_validate_paths($c, \@paths);
         if (@{ $validated->{invalid} }) {
             $c->flash->{error_msg} =
@@ -234,7 +237,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             $c->response->redirect($c->uri_for('/admin/git'));
             return;
         }
-        unless (@{ $validated->{valid} }) {
+        if ($requires_selection{$op} && !@{ $validated->{valid} }) {
             $c->flash->{error_msg} = 'No files selected.';
             $c->response->redirect($c->uri_for('/admin/git'));
             return;
