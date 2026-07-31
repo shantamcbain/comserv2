@@ -308,9 +308,13 @@ sub get_git_status {
     for my $line (split /\n/, $r->{output}) {
         if ($line =~ /^(.)(.) (.+)$/) {
             my ($staged, $modified, $file) = ($1, $2, $3);
-            push @{ $status->{staged_files} },  $file if $staged ne ' ' && $staged ne '?';
+            # Untracked ("??") is its own bucket — don't also count it as staged/modified.
+            if ($staged eq '?' && $modified eq '?') {
+                push @{ $status->{untracked_files} }, $file;
+                next;
+            }
+            push @{ $status->{staged_files} },   $file if $staged   ne ' ';
             push @{ $status->{modified_files} }, $file if $modified ne ' ';
-            push @{ $status->{untracked_files} }, $file if $staged eq '?' && $modified eq '?';
         }
     }
     return $status;
