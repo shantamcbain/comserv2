@@ -1,0 +1,148 @@
+/*
+ * git-dashboard.css
+ * Compact, vertically-efficient layout for the Admin Git dashboard (/admin/git).
+ * Loaded from Header.tt only on the git route. Theme-compliant: colours come from
+ * CSS variables with sensible fallbacks; no hard-coded palette.
+ */
+
+/* Top summary strip: cards sit side by side and only take the width they need. */
+.git-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: stretch;
+    margin-bottom: 0.75rem;
+}
+
+/* A card that hugs its content horizontally instead of spanning the row. */
+.git-card {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    background: var(--card-bg, var(--panel-bg, #fff));
+    padding: 0.5rem 0.75rem;
+    min-width: 0;
+}
+.git-card--grow { flex: 1 1 auto; }
+.git-card--fit  { flex: 0 0 auto; }
+
+.git-card h4 {
+    margin: 0 0 0.35rem 0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted-color, #666);
+}
+
+/* Inline rows inside cards — keep everything on as few lines as possible. */
+.git-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.6rem;
+}
+.git-inline > form { margin: 0; }
+
+.git-select {
+    max-width: 22ch;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.85rem;
+}
+
+/* Collapsible section built on native <details> — zero JS, remembers nothing,
+   but starts collapsed so only the Working Tree is open by default. */
+.git-collapse {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    margin-bottom: 0.6rem;
+    background: var(--card-bg, var(--panel-bg, #fff));
+}
+.git-collapse > summary {
+    cursor: pointer;
+    padding: 0.45rem 0.75rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+}
+.git-collapse > summary::-webkit-details-marker { display: none; }
+.git-collapse > summary::before {
+    content: "\25B6";          /* ▶ */
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+    color: var(--muted-color, #888);
+}
+.git-collapse[open] > summary::before { transform: rotate(90deg); }
+.git-collapse > summary .git-count {
+    color: var(--muted-color, #888);
+    font-weight: 400;
+    font-size: 0.85rem;
+}
+.git-collapse .git-collapse-body { padding: 0.25rem 0.75rem 0.6rem; }
+
+/* Working tree is the always-open card; keep it visually primary. */
+.git-worktree { margin-bottom: 0.75rem; }
+
+/* Dense list — small line-height, no bullet gutters. */
+.git-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.85rem;
+}
+.git-list li {
+    padding: 0.15rem 0;
+    border-bottom: 1px solid var(--border-color-subtle, rgba(0,0,0,0.06));
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+}
+.git-list li:last-child { border-bottom: none; }
+
+/* Per-branch mini-cards inside the expanded branch section. */
+.git-branch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 0.5rem;
+}
+.git-branch-item {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 5px;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.82rem;
+}
+.git-branch-item.is-current {
+    border-color: var(--primary-color, #2d7);
+    background: var(--primary-color-subtle, rgba(40,200,120,0.08));
+}
+.git-branch-item .git-branch-name {
+    font-weight: 600;
+    word-break: break-all;
+}
+.git-branch-item .git-branch-meta {
+    color: var(--muted-color, #777);
+    font-size: 0.75rem;
+    margin-top: 0.15rem;
+}
+.git-branch-item .git-branch-actions {
+    margin-top: 0.35rem;
+    display: flex;
+    gap: 0.35rem;
+}
+
+/* Tighten the working-tree table so more rows fit per screen. */
+.git-worktree .data-table th,
+.git-worktree .data-table td {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+/* Compact button row wrapping instead of forcing height. */
+.git-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+}

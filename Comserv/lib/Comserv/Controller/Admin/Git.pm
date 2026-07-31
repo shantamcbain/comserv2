@@ -307,6 +307,40 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             $msg = $ok ? "Pushed '$branch' to origin." : "Push failed: $out";
         }
     }
+    elsif ($op eq 'switch') {
+        # Switch to a branch that exists in the local branch list. Name validated
+        # against that list — never interpolated or free-form.
+        my $target = $c->req->param('branch') // '';
+        my %known  = map { $_ => 1 } @{ $self->get_local_branches($c) };
+        if (!$known{$target}) {
+            $msg = "Unknown local branch: '$target'.";
+        }
+        elsif ($target eq $self->get_current_branch($c)) {
+            $ok = 1;
+            $msg = "Already on '$target'.";
+        }
+        else {
+            my $r = $self->git_service->switch_branch($c, $target);
+            $ok  = $r->{success};
+            $msg = $r->{success} ? ($r->{success_msg} || "Switched to '$target'.")
+                                 : ($r->{error_msg}   || "Switch to '$target' failed.");
+        }
+    }
+    elsif ($op eq 'delbranch') {
+        # Delete a local branch from the branch card. Name validated against the
+        # local list; the service refuses protected/current branches.
+        my $target = $c->req->param('branch') // '';
+        my %known  = map { $_ => 1 } @{ $self->get_local_branches($c) };
+        if (!$known{$target}) {
+            $msg = "Unknown local branch: '$target'.";
+        }
+        else {
+            my $r = $self->git_service->delete_branch($c, $target);
+            $ok  = $r->{success};
+            $msg = $r->{success} ? ($r->{success_msg} || "Deleted '$target'.")
+                                 : ($r->{error_msg}   || "Delete of '$target' failed.");
+        }
+    }
     elsif ($op eq 'delete') {
         my @tracked   = grep { !$validated->{untracked}{$_} } @{ $validated->{valid} };
         my @untracked = grep {  $validated->{untracked}{$_} } @{ $validated->{valid} };
@@ -603,6 +637,7 @@ sub index :Path('/admin/git') :Args(0) {
         repo_path       => $self->repo_path($c),
         current_branch  => $self->get_current_branch($c),
         local_branches  => $self->get_local_branches($c),
+        branch_details  => $self->git_service->get_branch_details($c),
         recent_commits  => $self->get_recent_commits($c),
         git_status      => $status,
         stash_list      => $self->get_git_stash_list($c),
