@@ -1,0 +1,46 @@
+# Gitleaks configuration for Comserv2
+# Scans source for accidentally-committed secrets.
+# Large / generated / vendored dirs are excluded to keep scans fast and avoid
+# false positives from lockfiles and minified assets.
+
+title = "Comserv2 Gitleaks Config"
+
+[extend]
+# Use the built-in default rules (AWS, GCP, Stripe, private keys, JWT, etc.)
+useDefault = true
+
+[whitelist]
+# Paths that should never be scanned
+paths = [
+    '''.*/node_modules/.*''',
+    '''.*/\.git/.*''',
+    '''.*/local/.*''',
+    '''.*/Comserv/local/.*''',
+    '''.*/whisper_venv/.*''',
+    '''.*/venv/.*''',
+    '''.*/blib/.*''',
+    '''.*/\.next/.*''',
+    '''.*/build/.*''',
+    '''.*/dist/.*''',
+    '''.*/Coverage/.*''',
+    '''.*/\.coverage.*''',
+    '''.*/\.hermes/.*''',
+    # Minified front-end assets produce noisy false positives
+    '''.*/static/js/.*\.min\.js$''',
+    # Existing audit/export JSON in Documentation (not secrets)
+    '''.*/root/Documentation/session_history/.*\.json$''',
+    '''.*/root/Documentation/.*Audit.*\.json$''',
+]
+
+# Allowlist specific harmless regexes that trip the default rules
+[allowlist]
+description = "Common false positives in this repo"
+regexes = [
+    # Example/placeholder keys in documentation
+    '''your[-_][a-z]+[-_]?key''',
+    '''example[-_][a-z]+[-_]?token''',
+    # DBI DSN strings (contain host/db but no credential)
+    '''dbi:mysql:.*''',
+    # JWT-ish example in docs
+    '''eyJ[A-Za-z0-9_-]{0,10}\.\.\.''',
+]
