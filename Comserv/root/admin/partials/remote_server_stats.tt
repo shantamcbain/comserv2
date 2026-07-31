@@ -1,0 +1,58 @@
+[% # Card body for "Infrastructure Servers" — rendered both server-side (initial
+   # load, cached) and via the lazy AJAX endpoint /admin/api/card/remote_servers.
+   # Single source of markup so the dashboard and the lazy loader never desync. %]
+[% IF remote_servers.size %]
+<div class="stat-panel">
+    <h3 class="stat-panel-title">Infrastructure Servers</h3>
+    <div class="stat-grid">
+    [% FOR srv IN remote_servers %]
+        <a href="[% c.uri_for('/admin/system_info') %]?host=[% srv.ip | uri %]"
+           class="stat-item stat-item-link server-stat-item"
+           title="View full metrics for [% srv.label %]">
+            [% IF srv.online %]
+                <div class="server-label">
+                    [% srv.label %][% IF srv.stale %] <span class="server-label-stale">(stale)</span>[% END %]
+                </div>
+                [% IF srv.hostname %]<div class="server-hostname">reported as [% srv.hostname | html %]</div>[% END %]
+                [% # Disk %]
+                [% SET dp = srv.metrics.disk_used_pct_root || srv.metrics.disk_used_pct %]
+                [% IF dp %]
+                    [% SET dlvl = dp.level || 'ok' %]
+                    <div class="server-metric">Disk: <span class="stat-disk-[% dlvl %]"><strong>[% dp.value %]%</strong></span>
+                    [% IF dp.text %]<span class="metric-detail"> ([% dp.text %])</span>[% END %]</div>
+                [% END %]
+                [% # Memory %]
+                [% SET mp = srv.metrics.mem_used_pct %]
+                [% IF mp %]
+                    [% SET mlvl = mp.level || 'ok' %]
+                    <div class="server-metric">Mem: <span class="stat-disk-[% mlvl %]"><strong>[% mp.value %]%</strong></span></div>
+                [% END %]
+                [% # CPU load %]
+                [% SET lp = srv.metrics.cpu_load_pct %]
+                [% IF lp %]
+                    [% SET llvl = lp.level || 'ok' %]
+                    <div class="server-metric">CPU: <span class="stat-disk-[% llvl %]"><strong>[% lp.value %]%</strong></span></div>
+                [% END %]
+                [% IF srv.last_seen %]
+                <div class="server-last-seen">[% srv.last_seen %]</div>
+                [% END %]
+            [% ELSE %]
+                <div class="server-label server-label-offline">[% srv.label %]</div>
+                <div class="server-offline-msg">No data (24h)</div>
+                <div class="server-offline-hint">
+                  <button type="button" class="hw-agent-install" data-ip="[% srv.ip %]" data-hw-install>
+                    Install hardware agent
+                  </button>
+                </div>
+            [% END %]
+        </a>
+    [% END %]
+    </div>
+    <div class="stat-panel-footer">
+        Servers report via <a href="[% c.uri_for('/admin/hardware_monitor') %]">Hardware Monitor</a> ingest agent (every 5 min). Stale if &gt;2h old.
+        [% IF stats.disk_level == 'critical' || stats.disk_level == 'warn' %]
+        &middot; <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]">Disk cleanup</a>
+        [% END %]
+    </div>
+</div>
+[% END %]

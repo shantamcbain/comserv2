@@ -39,7 +39,65 @@
 
     // ── Collapsible Admin Sections ─────────────────────────────────────────
     function toggleSection(section) {
+        var wasExpanded = section.classList.contains('expanded');
         section.classList.toggle('expanded');
+        // On first expand, lazy-load any cards inside this section
+        if (!wasExpanded && section.classList.contains('expanded')) {
+            lazyLoadCards(section);
+        }
+    }
+
+    // ── Lazy-load dashboard cards ───────────────────────────────────────────
+    // Cards marked with data-card are fetched on first expand and cached in
+    // sessionStorage so they don't re-run their (potentially heavy) query on
+    // every page reload. See Comserv::Util::AdminDashboard + /admin/api/card/*.
+    function lazyLoadCards(scope) {
+        var cards = scope.querySelectorAll('.lazy-card[data-card]');
+        cards.forEach(function (card) {
+            var name = card.getAttribute('data-card');
+            if (card.getAttribute('data-loaded') === '1') return;
+
+            var cacheKey = 'comserv_card_' + name;
+            var cached = null;
+            try { cached = sessionStorage.getItem(cacheKey); } catch (e) {}
+
+            if (cached) {
+                card.innerHTML = cached;
+                card.setAttribute('data-loaded', '1');
+                rebindCardWidgets(card);
+                return;
+            }
+
+            card.setAttribute('data-loaded', 'loading');
+            fetch('/admin/api/card/' + name, { credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.text();
+                })
+                .then(function (html) {
+                    card.innerHTML = html;
+                    card.setAttribute('data-loaded', '1');
+                    try { sessionStorage.setItem(cacheKey, html); } catch (e) {}
+                    rebindCardWidgets(card);
+                })
+                .catch(function (err) {
+                    card.innerHTML = '<div class="stat-panel-error">Failed to load: ' +
+                        err.message + ' — <a href="/admin/api/card/' + name +
+                        '" target="_blank">open directly</a></div>';
+                    card.setAttribute('data-loaded', '0');
+                });
+        });
+    }
+
+    // The lazy card HTML is injected after page load, so re-bind any
+    // delegation-based widgets it contains (e.g. hardware-agent install buttons
+    // already use event delegation, so this is a no-op safety hook).
+    function rebindCardWidgets(card) { /* delegation handles these; nothing needed */ }
+
+    // Also lazy-load any card whose section is opened via URL hash on load
+    function lazyLoadOpenCards() {
+        document.querySelectorAll('.admin-section.expanded .lazy-card[data-card]')
+            .forEach(function (card) { lazyLoadCards(card.closest('.admin-section')); });
     }
 
     function expandFromHash() {
@@ -48,6 +106,7 @@
             var target = document.querySelector(hash);
             if (target && target.classList.contains('admin-section')) {
                 target.classList.add('expanded');
+                lazyLoadCards(target);
                 target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
@@ -74,8 +133,11 @@
             }
         });
 
-        // Auto-expand from URL hash
+        // Auto-expand from URL hash (also lazy-loads any card in that section)
         expandFromHash();
+
+        // Lazy-load any card already expanded on initial render
+        lazyLoadOpenCards();
     });
 
     // Also handle hash changes (back/forward nav)
