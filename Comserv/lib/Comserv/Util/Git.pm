@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Try::Tiny;
 use IPC::Run3 ();
+use JSON::MaybeXS;   # imports decode_json/encode_json
 use Cwd ();
 use File::Copy qw(copy);
 
@@ -97,20 +98,229 @@ sub repo_path {
     return $path;
 }
 
-=head2 _run($c, @argv)
+=head2 resolve_target($c, $target)
+
+Map a dashboard "target" selector to where git should actually run.
+
+  target                 meaning
+  -----                 -------
+  '' / 'local'          run git on THIS app host (the default, legacy behavior)
+  'workstation'         SSH into the dev workstation and run git there
+  'production1'..       SSH into that monitored host and run git there
+
+For a non-local target we need (a) the SSH destination and (b) the path to the
+git repo ON that host. Both come from the TARGET_HOSTS table below, which is the
+single source of truth for "which repo lives where". Add entries there to make
+more hosts targetable.
+
+Returns a hashref:
+  { mode => 'local'|'ssh', repo => $path, host => $ip, user => $ssh_user,
+    port => $port, label => $human }
+
+Local mode returns mode 'local' and the normal repo_path(). SSH mode returns the
+remote repo path and connection details. An unknown target falls back to local
+and logs a warning (fail-safe, never runs a command on an undeclared host).
+
+=cut
+
+# repo_path ON each host + its SSH coordinates. Edit here to add a targetable host.
+my %TARGET_HOSTS = (
+    workstation => {
+        label => 'Workstation (dev box)',
+        host  => '192.168.1.199',
+        user  => 'shanta',
+        port  => 22,
+        repo  => '/home/shanta/PycharmProjects/comserv2',
+    },
+    production1 => {
+        label => 'Production 1',
+        host  => '192.168.1.126',
+        user  => 'ubuntu',
+        port  => 22,
+        repo  => '/home/shanta/PycharmProjects/comserv2',
+    },
+);
+
+sub resolve_target {
+    my ($self, $c, $target) = @_;
+    $target = '' unless defined $target;
+    $target = lc($target);
+
+    # local / default
+    return {
+        mode  => 'local',
+        repo  => $self->repo_path($c),
+        host  => '', user => '', port => 22,
+        label => 'Local (this app host)',
+    } if $target eq '' || $target eq 'local';
+
+    my $spec = $TARGET_HOSTS{$target}   # exact alias
+            || $TARGET_HOSTS{lc $target}
+            || undef;
+
+    # also accept a raw IP if it matches a declared host
+    unless ($spec) {
+        for my $k (keys %TARGET_HOSTS) {
+            if (($TARGET_HOSTS{$k}{host} // '') eq $target) {
+                $spec = $TARGET_HOSTS{$k};
+                $target = $k;
+                last;
+            }
+        }
+    }
+
+    unless ($spec) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_target',
+            "Unknown git target '$target' -> falling back to local");
+        return {
+            mode  => 'local',
+            repo  => $self->repo_path($c),
+            host  => '', user => '', port => 22,
+            label => 'Local (this app host)',
+        };
+    }
+
+    return {
+        mode  => 'ssh',
+        repo  => $spec->{repo},
+        host  => $spec->{host},
+        user  => $spec->{user},
+        port  => $spec->{port} || 22,
+        label => $spec->{label} // $target,
+        key   => $target,
+    };
+}
+
+=head2 list_targets($c)
+
+The options for the dashboard target selector. Always includes Local first.
+
+=cut
+
+sub list_targets {
+    my ($self, $c) = @_;
+    my @out = ({ key => 'local', label => 'Local (this app host)' });
+    for my $k (sort keys %TARGET_HOSTS) {
+        push @out, { key => $k, label => $TARGET_HOSTS{$k}{label} // $k };
+    }
+    return \@out;
+}
+
+=head2 _ssh_exec_git($c, $tinfo, @argv)
+
+Run a (whitelisted) git argv on a remote host via sshpass + ssh. Each argv
+element is single-shell-quoted so filenames/branches/commit messages with spaces
+or metacharacters are passed verbatim. Returns the same uniform hash as _run.
+
+Requires the shared credentials file (~/.comserv/secrets/ssh_credentials.json)
+to carry the SSH password for the destination. If absent, the call fails closed
+with a clear error (no command is sent).
+
+=cut
+
+sub _ssh_exec_git {
+    my ($self, $c, $tinfo, @argv) = @_;
+
+    my $result = { success => 0, exit_code => -1, output => '', error => '', data => {} };
+
+    my $creds_path = "$ENV{HOME}/.comserv/secrets/ssh_credentials.json";
+    $creds_path = '/home/shanta/.comserv/secrets/ssh_credentials.json' unless $ENV{HOME};
+    unless (-f $creds_path) {
+        $result->{error} = "SSH credentials file not found ($creds_path). Cannot reach $tinfo->{host}.";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_ssh', $result->{error});
+        return $result;
+    }
+    open my $cf, '<', $creds_path or do {
+        $result->{error} = "Cannot open SSH credentials file: $!";
+        return $result;
+    };
+    local $/;
+    my $json = <$cf>;
+    close $cf;
+    my $creds = eval { decode_json($json) };
+    my $password = $creds && ref $creds eq 'HASH' ? ($creds->{ssh_password} // '') : '';
+    unless (length $password) {
+        $result->{error} = "No ssh_password in credentials file for $tinfo->{host}. Save credentials via Test Connection first.";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_ssh', $result->{error});
+        return $result;
+    }
+
+    # Build the git command and embed it in a single shell-quoted token on the
+    # remote. We wrap the WHOLE command in one layer of single quotes on the
+    # remote, which preserves spaces in filenames/branches/messages automatically;
+    # the only escaping needed is for embedded single quotes (e.g. in a commit
+    # message). This avoids the nested-quoting trap of quoting each argv element.
+    my $remote_cmd = 'git -C ' . $tinfo->{repo} . ' ' . join(' ', @argv);
+    my $esc = q{'\''};   # literal 4 chars: ' \ ' '  (the shell single-quote escape)
+    $remote_cmd =~ s/'/$esc/g;
+
+    local $ENV{SSHPASS} = $password;
+    my $ssh = "sshpass -e ssh -p $tinfo->{port} -o ConnectTimeout=10 "
+            . "-o StrictHostKeyChecking=no $tinfo->{user}\@$tinfo->{host} "
+            . "'$remote_cmd' 2>&1";
+    my $out = `$ssh`;
+    my $code = $? >> 8;
+
+    $result->{exit_code} = $code;
+    $result->{output}    = defined $out ? $out : '';
+    $result->{success}   = ($code == 0) ? 1 : 0;
+    $self->logging->log_with_details($c, $result->{success} ? 'info' : 'error',
+        __FILE__, __LINE__, 'git_ssh',
+        "ssh $tinfo->{host} git " . join(' ', @argv) . " -> exit=$code");
+    return $result;
+}
+
+=head2 _run($c, @argv, \%opts)
 
 The one command runner. C<@argv> is the git subcommand plus its arguments (no
 'git', no '-C', no shell). Enforces the whitelist, runs via IPC::Run3 with
 C<git -C $repo>, captures stdout+stderr separately, and returns the uniform hash.
+
+C<%opts> may carry a C<target> key (dashboard "run git on host X" selector).
+With no target (or 'local') the command runs on this app host. With a remote
+target the whitelisted argv is sent over SSH to that host and run against the
+repo path declared for it (see L</resolve_target>). Every public method in this
+class passes its C<$c>-level target through, so the entire subsystem is
+target-aware from a single choke point.
 
 =cut
 
 sub _run {
     my ($self, $c, @argv) = @_;
 
+    # opts may be the last positional (hashref) for readability
+    my %opts;
+    if (@argv && ref $argv[-1] eq 'HASH') {
+        %opts = %{ pop @argv };
+    }
+
     my $result = { success => 0, exit_code => -1, output => '', error => '', data => {} };
 
-    my $repo = $self->repo_path($c);
+    my $tinfo = $self->resolve_target($c, $opts{target});
+
+    # If the caller didn't pass an explicit target, honor the one bound for this
+    # request (set once by the controller from the dashboard's target selector).
+    # This lets the whole subsystem route to a remote host with a single line of
+    # controller code rather than threading target through every public method.
+    unless ($opts{target}) {
+        my $req_target = $c->stash->{git_target}
+                      // ($c->req ? $c->req->param('target') : undef);
+        $tinfo = $self->resolve_target($c, $req_target) if defined $req_target;
+    }
+
+    if ($tinfo->{mode} eq 'ssh') {
+        # Re-validate argv through the same whitelist on the way out, then ship.
+        my $subcmd = $argv[0] // '';
+        unless ($ALLOWED_SUBCMD{$subcmd}) {
+            $result->{error} = "Refused: '$subcmd' is not an allowed git subcommand";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_run',
+                $result->{error});
+            return $result;
+        }
+        return $self->_ssh_exec_git($c, $tinfo, @argv);
+    }
+
+    my $repo = $tinfo->{repo};
     unless (defined $repo && length $repo) {
         $result->{error} = 'Repository path could not be resolved';
         return $result;

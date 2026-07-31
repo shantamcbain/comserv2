@@ -47,6 +47,23 @@
             [%# ============ Top summary strip (one row, cards fit content) ============ %]
             <div class="git-strip">
 
+                [%# ---- Host / target selector (run git on local or a remote host over SSH) ---- %]
+                <div class="git-card git-card--fit">
+                    <h4>Host</h4>
+                    <div class="git-inline">
+                        <select name="target" class="form-control git-select" id="git-target-select"
+                                title="Run git on this host">
+                            [% FOREACH t IN git_targets %]
+                            <option value="[% t.key | html %]"
+                                [% IF t.key == git_target %]selected[% END %]>
+                                [% t.label | html %]
+                            </option>
+                            [% END %]
+                        </select>
+                    </div>
+                    <div class="git-branch-meta" id="git-target-path">[% IF git_target == 'local' || !git_target %]local: <code class="code-inline">[% repo_path | html %]</code>[% END %]</div>
+                </div>
+
                 [%# ---- Repository + branch selector (replaces the old Branches card) ---- %]
                 <div class="git-card git-card--grow">
                     <h4>Repository</h4>
