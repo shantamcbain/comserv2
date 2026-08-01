@@ -874,11 +874,28 @@ sub delete_branch {
         }
     }
 
-    $result->{output} .= "Deleting local branch '$branch_name'...\n";
-    $result->{output} .= $self->_run($c, 'branch', '-D', $branch_name)->{output};
+    # Local branch: delete only if it actually exists, so we don't raise a
+    # spurious "branch not found" error on an already-deleted / no-op delete.
+    my $local = $self->_run($c, 'branch', '--list', $branch_name);
+    if ($local->{output} =~ /\S/) {
+        $result->{output} .= "Deleting local branch '$branch_name'...\n";
+        $result->{output} .= $self->_run($c, 'branch', '-D', $branch_name)->{output};
+    }
+    else {
+        $result->{output} .= "Local branch '$branch_name' not found — skipping local delete.\n";
+    }
 
-    $result->{output} .= "Deleting remote branch '$branch_name'...\n";
-    $result->{output} .= $self->_run($c, 'push', 'origin', '--delete', $branch_name)->{output};
+    # Remote branch: only `push --delete` when origin/$branch_name exists.
+    # Pushing --delete for a branch that was never pushed (or already deleted)
+    # returns exit=1 with empty output and raises a false ERROR audit todo.
+    my $remote = $self->_run($c, 'branch', '-r', '--list', "origin/$branch_name");
+    if ($remote->{output} =~ /\S/) {
+        $result->{output} .= "Deleting remote branch '$branch_name'...\n";
+        $result->{output} .= $self->_run($c, 'push', 'origin', '--delete', $branch_name)->{output};
+    }
+    else {
+        $result->{output} .= "Remote branch 'origin/$branch_name' not found — skipping remote delete.\n";
+    }
 
     $result->{success}     = 1;
     $result->{success_msg} = "Branch '$branch_name' deleted successfully.";

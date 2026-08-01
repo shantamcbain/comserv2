@@ -229,7 +229,7 @@
 
             '    <div style="display:flex;align-items:flex-end;padding-bottom:4px;">' +
             '      <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82em;cursor:pointer;">' +
-            '        <input type="checkbox" id="deploy-no-cache" style="width:14px;height:14px;cursor:pointer;">' +
+            '        <input type="checkbox" id="deploy-no-cache" checked style="width:14px;height:14px;cursor:pointer;">' +
             '        <span style="color:#d97706;">No Cache</span>' +
             '      </label>' +
             '    </div>' +

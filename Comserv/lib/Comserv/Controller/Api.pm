@@ -412,6 +412,23 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         $poster_user_id = $poster_row ? $poster_row->id : undef;
     }
 
+    # user_id is NOT NULL and carries an FK to users.id, so it must resolve to a real
+    # user. Fall back to the session user, then fail with a clear validation error
+    # rather than letting the INSERT die with a raw DBI/FK exception.
+    $poster_user_id = $c->session->{user_id} unless defined $poster_user_id;
+    unless ($poster_user_id
+        && $schema->resultset('User')->find($poster_user_id)) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({
+            success => 0,
+            error   => 'Could not resolve a valid user for this todo. Pass "developer" '
+                     . 'or "assigned_to" matching an existing username.',
+            code    => 'invalid_user',
+        }));
+        $c->detach();
+    }
+
     my $todo = $schema->resultset('Todo')->create({
         subject => $params->{subject},
         description => $params->{description} || '',
@@ -430,9 +447,9 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         estimated_man_hours => 0,
         accumulative_time => '00:00:00',
         group_of_poster => 'admin',
-        project_code => 'system',
+        project_code => $params->{project_code} || 'system',
         share => 0,
-        ($poster_user_id ? (user_id => $poster_user_id) : ()),
+        user_id => $poster_user_id,
     });
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
@@ -931,6 +948,322 @@ sub api_system_logs :Path('system_logs') :Args(0) {
         logs => \@log_list,
     }));
     $c->detach();
+}
+
+=head2 _api_authenticate
+
+Shared auth gate for the data endpoints. Requests originating from localhost or the
+192.168.1.0/24 LAN bypass token validation (development/workstation convenience); everything
+else must present a valid API token.
+
+Returns the C<User> row behind the API token when one was used, or undef for local requests.
+Detaches with a JSON error response when authentication fails.
+
+=cut
+
+sub _api_authenticate {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    return undef if $is_local;
+
+    my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+    unless ($validation->{valid}) {
+        $self->_json_error($c, $validation->{code} || 401,
+            $validation->{error} || 'Authentication required', 'unauthorized');
+    }
+
+    my $api_token = $c->model('DBEncy')->resultset('ApiToken')->find($validation->{api_token_id});
+    return $api_token ? $api_token->user : undef;
+}
+
+=head2 _parse_json_body
+
+Decode the JSON request body. Detaches with a 400 when the body is not valid JSON.
+
+=cut
+
+sub _parse_json_body {
+    my ($self, $c) = @_;
+
+    my $params;
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw_body = do { local $/; <$body> };
+                $params = decode_json($raw_body);
+            }
+            else {
+                $params = decode_json($body);
+            }
+        }
+    };
+    if ($@) {
+        $self->_json_error($c, 400, "Invalid JSON: $@", 'json_parse_error');
+    }
+
+    unless (ref $params eq 'HASH') {
+        $self->_json_error($c, 400, 'Request body must be a JSON object', 'validation_error');
+    }
+
+    return $params;
+}
+
+=head2 _json_error
+
+Emit a JSON error response and detach.
+
+=cut
+
+sub _json_error {
+    my ($self, $c, $status, $message, $code) = @_;
+
+    $c->res->status($status || 400);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 0,
+        error   => $message,
+        ($code ? (code => $code) : ()),
+    }));
+    $c->detach();
+}
+
+=head2 _json_ok
+
+Emit a JSON success response and detach.
+
+=cut
+
+sub _json_ok {
+    my ($self, $c, $payload) = @_;
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 1, %{ $payload || {} } }));
+    $c->detach();
+}
+
+=head2 _apply_updates
+
+Copy whitelisted fields from the request params onto a DBIC row.
+
+Only keys present in the request are touched, so a partial update leaves every other column
+alone. An explicit JSON null clears a nullable column. Returns the list of changed field names.
+
+=cut
+
+sub _apply_updates {
+    my ($self, $row, $params, $allowed, $nullable) = @_;
+
+    my %nullable = map { $_ => 1 } @{ $nullable || [] };
+    my %updates;
+
+    for my $field (@$allowed) {
+        next unless exists $params->{$field};
+
+        my $value = $params->{$field};
+
+        if (!defined $value || (!ref $value && $value eq '')) {
+            next unless $nullable{$field};
+            $updates{$field} = undef;
+            next;
+        }
+
+        $updates{$field} = $value;
+    }
+
+    return () unless %updates;
+
+    $row->update(\%updates);
+    return sort keys %updates;
+}
+
+=head2 api_todo_update
+
+POST /api/todo/update - Update an existing todo (bypass token for local/workstation.local)
+
+Body: { record_id | todo_id, <any updatable field> }
+
+Only the fields present in the body are changed. Nullable fields (parent_id,
+blocked_by_todo_id, plan_id, scheduled_date) accept an explicit null to clear them.
+
+Returns: { success, message, updated: [ field, ... ], todo: { ... } }
+
+=cut
+
+sub api_todo_update :Path('todo/update') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $api_user = $self->_api_authenticate($c);
+    my $params   = $self->_parse_json_body($c);
+
+    my $todo_id = $params->{record_id} || $params->{todo_id} || $params->{id};
+    unless ($todo_id) {
+        $self->_json_error($c, 400, 'Missing required field: record_id', 'validation_error');
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $todo   = $schema->resultset('Todo')->find($todo_id);
+    unless ($todo) {
+        $self->_json_error($c, 404, "Todo $todo_id not found", 'not_found');
+    }
+
+    # Validate a referenced project before pointing the todo at it
+    if ($params->{project_id}) {
+        unless ($schema->resultset('Project')->find($params->{project_id})) {
+            $self->_json_error($c, 400, "Invalid project_id: $params->{project_id}", 'invalid_project');
+        }
+    }
+
+    # Keep the date range coherent using whichever side is being changed
+    my $start_date = defined $params->{start_date} ? $params->{start_date} : $todo->start_date;
+    my $due_date   = defined $params->{due_date}   ? $params->{due_date}   : $todo->due_date;
+    if ($start_date && $due_date && "$start_date" gt "$due_date") {
+        $self->_json_error($c, 400, 'Start date cannot be after due date', 'date_validation_error');
+    }
+
+    # A todo may not block itself
+    if (defined $params->{blocked_by_todo_id} && $params->{blocked_by_todo_id}
+        && $params->{blocked_by_todo_id} == $todo->record_id) {
+        $self->_json_error($c, 400, 'A todo cannot be blocked by itself', 'validation_error');
+    }
+
+    my @allowed = qw(
+        subject description project_id project_code sitename
+        start_date due_date scheduled_date priority status
+        estimated_man_hours accumulative_time comments
+        developer owner reporter company_code
+        parent_id parent_todo sort_order is_blocking blocked_by_todo_id
+        plan_id share billable todo_type
+    );
+    my @nullable = qw(parent_id blocked_by_todo_id plan_id scheduled_date comments);
+
+    my $current_user = $api_user ? $api_user->username : ($c->session->{username} || 'system');
+
+    my @updated;
+    eval {
+        @updated = $self->_apply_updates($todo, $params, \@allowed, \@nullable);
+        if (@updated) {
+            $todo->update({
+                last_mod_by   => $current_user,
+                last_mod_date => DateTime->now->ymd,
+            });
+        }
+    };
+    if ($@) {
+        my $err = "$@"; $err =~ s/\s+at\s+.*//s;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_update',
+            "Failed to update todo $todo_id: $err");
+        $self->_json_error($c, 500, "Failed to update todo: $err", 'update_failed');
+    }
+
+    unless (@updated) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_todo_update',
+            "Todo $todo_id update requested with no recognised fields");
+        $self->_json_ok($c, {
+            message => 'No updatable fields supplied — nothing changed',
+            updated => [],
+            todo    => $self->_todo_to_hash($todo),
+        });
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
+        "Todo updated via API: ID=$todo_id, fields=" . join(',', @updated));
+
+    $self->_json_ok($c, {
+        message => 'Todo updated successfully',
+        todo_id => $todo->record_id,
+        updated => \@updated,
+        todo    => $self->_todo_to_hash($todo),
+    });
+}
+
+=head2 api_project_update
+
+POST /api/project/update - Update an existing project (bypass token for local/workstation.local)
+
+Body: { project_id | id, <any updatable field> }
+
+Only the fields present in the body are changed. Passing C<append_comments> instead of
+C<comments> appends to the existing comments rather than replacing them — useful for adding
+plan links without destroying existing notes.
+
+Returns: { success, message, updated: [ field, ... ], project: { ... } }
+
+=cut
+
+sub api_project_update :Path('project/update') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $api_user = $self->_api_authenticate($c);
+    my $params   = $self->_parse_json_body($c);
+
+    my $project_id = $params->{project_id} || $params->{id};
+    unless ($project_id) {
+        $self->_json_error($c, 400, 'Missing required field: project_id', 'validation_error');
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $project = $schema->resultset('Project')->find($project_id);
+    unless ($project) {
+        $self->_json_error($c, 404, "Project $project_id not found", 'not_found');
+    }
+
+    # Guard against a project becoming its own parent
+    if (defined $params->{parent_id} && $params->{parent_id}
+        && $params->{parent_id} == $project->id) {
+        $self->_json_error($c, 400, 'A project cannot be its own parent', 'validation_error');
+    }
+
+    # Append mode for comments — add without destroying what is already there
+    if (defined $params->{append_comments} && $params->{append_comments} ne '') {
+        my $existing = $project->comments // '';
+        $params->{comments} = $existing eq ''
+            ? $params->{append_comments}
+            : $existing . "\n" . $params->{append_comments};
+    }
+
+    my @allowed = qw(
+        name description start_date end_date status
+        project_code project_size estimated_man_hours
+        developer_name client_name sitename comments
+        parent_id sort_order
+    );
+    my @nullable = qw(parent_id);
+
+    my @updated;
+    eval {
+        @updated = $self->_apply_updates($project, $params, \@allowed, \@nullable);
+    };
+    if ($@) {
+        my $err = "$@"; $err =~ s/\s+at\s+.*//s;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_project_update',
+            "Failed to update project $project_id: $err");
+        $self->_json_error($c, 500, "Failed to update project: $err", 'update_failed');
+    }
+
+    unless (@updated) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_project_update',
+            "Project $project_id update requested with no recognised fields");
+        $self->_json_ok($c, {
+            message => 'No updatable fields supplied — nothing changed',
+            updated => [],
+            project => { $project->get_columns },
+        });
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_project_update',
+        "Project updated via API: ID=$project_id, fields=" . join(',', @updated));
+
+    $self->_json_ok($c, {
+        message    => 'Project updated successfully',
+        project_id => $project->id,
+        updated    => \@updated,
+        project    => { $project->get_columns },
+    });
 }
 
 sub _todo_to_hash {

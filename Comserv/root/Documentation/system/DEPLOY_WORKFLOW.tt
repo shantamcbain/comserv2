@@ -1,0 +1,112 @@
+[% PageVersion = 'Documentation/system/DEPLOY_WORKFLOW.tt,v 1.0 2026/07/31 Shanta Exp ' %]
+
+<h1 id="deploy_top">Canonical Deploy Workflow (Production)</h1>
+
+<div class="container warning">
+    <div class="container-header">Single Source of Truth</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <p><strong>This is the ONLY supported procedure for getting new code onto production1.</strong>
+            Every deploy goes through these three steps, in this order, all initiated from the
+            <strong>workstation</strong> web UI. There is no other path.</p>
+            <p>The previous document <code>REBUILD_AND_DEPLOY_INSTRUCTIONS.tt</code> described a different,
+            outdated flow (building inside the production container, <code>docker-compose.server.yml</code>)
+            and is <strong>superseded</strong> — do not follow it.</p>
+        </div>
+    </div>
+</div>
+
+<h2 id="why">Why this exists</h2>
+<p>Production1 is a <strong>Docker container</strong>. You cannot build or run Docker commands from inside it,
+and the app explicitly blocks Docker management when reached from a container. All image building happens on
+the <strong>workstation</strong> (which has the source, the Docker daemon, and registry credentials). The
+container on production1 only ever receives a pre-built image pulled from Docker Hub.</p>
+
+<p>The recurring failure mode was: build + push succeeded, but the <em>pull onto production1</em> step was
+skipped or forgotten, so the running container kept serving the old image. This workflow makes the pull an
+explicit, required final step, and verification (below) catches any mismatch before customers see it.</p>
+
+<h2 id="prereqs">Prerequisites</h2>
+<ul>
+    <li>Code committed and pushed to <code>main</code> on the workstation (the build reads <code>git rev-parse HEAD</code>).</li>
+    <li>Workstation has Docker Hub credentials configured (registry login works during push).</li>
+    <li>You are on the <strong>workstation</strong> web UI at <code>/admin/docker-containers</code>.</li>
+</ul>
+
+<h2 id="steps">The three steps</h2>
+
+<h3>Step 1 — Build on workstation</h3>
+<p>In the Docker Servers page, set the <strong>Target</strong> to the workstation (or use the inline
+<em>Rebuild</em> control) and trigger a build of <code>comserv-web-prod</code>.</p>
+<ul>
+    <li><strong>No Cache is ON by default.</strong> A clean rebuild avoids the classic "built but nothing
+        changed" failure where a stale layer masks your edits. Uncheck only if you have a specific reason.</li>
+    <li>The build regenerates <code>version.json</code> from the current git commit + build timestamp, so the
+        resulting image is self-identifying.</li>
+</ul>
+
+<h3>Step 2 — Push the image to Docker Hub</h3>
+<p>Use <strong>Build &amp; Push only</strong> mode (or the Full Rebuild which includes this). This tags the
+image as <code>shantamcsbain/comserv-web-prod:latest</code> and pushes it to Docker Hub.</p>
+<ul>
+    <li>Confirm the push completes (watch the streaming log for the push success line).</li>
+    <li>Do NOT consider the deploy done at this point — production1 still runs the old image.</li>
+</ul>
+
+<h3>Step 3 — Pull &amp; Deploy onto production1</h3>
+<p>On the same Docker Servers page, set the <strong>Target</strong> to
+<strong>Production 1 (192.168.1.126)</strong>, select mode
+<strong>Pull &amp; Deploy (from registry)</strong>, and start it. This:</p>
+<ol>
+    <li>Pulls <code>shantamcsbain/comserv-web-prod:latest</code> from Docker Hub onto production1.</li>
+    <li>Backs up the current container image (rollback point).</li>
+    <li>Recreates the <code>comserv2-web-prod</code> container from the fresh image.</li>
+    <li>Runs the health-check loop (up to 90s). On failure it auto-rolls back to the backup.</li>
+</ol>
+<p><strong>Alternative:</strong> the <strong>Full Rebuild</strong> mode combines Steps 1–3 in one shot
+(build → push → pull → recreate). Use it when you want a single click; use the split steps when you want to
+verify the pushed image before touching production.</p>
+
+<h2 id="verify">Verification (mandatory)</h2>
+<p>After Step 3, confirm production1 is actually running the new code. The app footer reports the build
+identity pulled from <code>version.json</code>:</p>
+<ul>
+    <li>Open the production site (computersystemconsulting.ca or the production1 LAN URL).</li>
+    <li>Check the footer <strong>Build</strong> date and <strong>Git</strong> commit hash.</li>
+    <li>It must match the commit you just built (e.g. <code>main@&lt;new_hash&gt;</code>) and a current
+        timestamp — <strong>not</strong> an old date or an old hash.</li>
+    <li>If the footer still shows the prior build, the pull did not take effect: re-run Step 3 and watch the
+        log for pull errors or a health-check rollback.</li>
+</ul>
+<p>This single check is what catches the "old server" problem before customers hit it.</p>
+
+<h2 id="trouble">Troubleshooting</h2>
+<table class="diagnostic-table">
+    <tbody>
+        <tr><td><strong>Footer still shows old build</strong></td>
+            <td>Pull &amp; Deploy did not update the image. Re-run Step 3; check the deploy log for
+                <code>pull</code> errors or a health-check failure that triggered rollback.</td></tr>
+        <tr><td><strong>Container "unhealthy" after deploy</strong></td>
+            <td>New code failed the health check → auto-rolled back to the previous image. Read the container
+                logs (<code>docker logs comserv2-web-prod</code>) for the boot error. Fix, then redeploy.</td></tr>
+        <tr><td><strong>"Built but nothing changed"</strong></td>
+            <td>Stale Docker layer. No Cache is default-on now; if you unchecked it, re-run with it checked.</td></tr>
+        <tr><td><strong>Cannot deploy from inside production1</strong></td>
+            <td>Expected. Production1 is a container; Docker management is blocked there. Always drive deploys
+                from the workstation UI.</td></tr>
+    </tbody>
+</table>
+
+<h2 id="future">Reserved / Future</h2>
+<p>The code retains an internal path that triggers a deploy from inside a production container (it SSHes back to
+the workstation to perform the build). This is <strong>not part of the supported workflow today</strong> and is
+kept intentionally: as the AI code-editor capability matures, managing workstation build/ deploy actions
+remotely from the Docker UI may become desirable. Until then, follow Steps 1–3 above and ignore that path.</p>
+
+<div style="margin-top: 40px; padding: 20px; background-color: var(--bg-secondary, #f5f5f5); border-radius: 4px;">
+    <p style="font-size: 12px; color: var(--text-muted-color, #666);">
+        <strong>Document Version:</strong> 1.0<br>
+        <strong>Created:</strong> 2026-07-31<br>
+        <strong>Status:</strong> Canonical — supersedes REBUILD_AND_DEPLOY_INSTRUCTIONS.tt
+    </p>
+</div>

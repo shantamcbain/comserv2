@@ -26,9 +26,13 @@
         var tabEl = document.getElementById(tabName);
         if (!tabEl) return;
         tabEl.classList.add('active');
-        if (evt && evt.currentTarget && evt.currentTarget.classList.contains('tab-button')) {
-            evt.currentTarget.classList.add('active');
-        }
+        // evt.currentTarget is the element the listener is bound to. When switchTab is
+        // invoked from the document-level click delegation (currentTarget === document)
+        // or with a null event, document/classList is undefined — guard before use.
+        var activeBtn = (evt && evt.currentTarget && evt.currentTarget.classList)
+            ? evt.currentTarget
+            : (evt && evt.target && evt.target.closest ? evt.target.closest('.tab-button') : null);
+        if (activeBtn) activeBtn.classList.add('active');
         if (history.pushState) {
             history.pushState(null, null, '#' + tabName);
         } else {
