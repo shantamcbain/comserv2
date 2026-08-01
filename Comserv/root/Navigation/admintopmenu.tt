@@ -129,10 +129,22 @@
                 <!-- Other Options -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">Switch Site Context</span>
-                    <a href="?site=Dev" class="site-dropdown-item" onclick="activateSite('Dev')">Development</a>
-                    <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>
-                    <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')">Default home</a>
-                </div>
+                    [% IF c.stash.is_csc_admin %]
+                        [% SET _cur = c.stash.SiteName || c.session.SiteName || '' %]
+                        <form action="/switch_site" method="get" class="site-switch-form">
+                            <select name="site" class="site-switch-select" onchange="this.form.action = '/switch_site/' + encodeURIComponent(this.value); this.form.submit();">
+                                <option value="" disabled [% IF !_cur %]selected[% END %]>Switch active site…</option>
+                                [% FOREACH s IN c.stash.all_site_names %]
+                                    <option value="[% s | html %]" [% IF s == _cur %]selected[% END %]>[% s | html %]</option>
+                                [% END %]
+                            </select>
+                        </form>
+                        <small class="text-muted">CSC admin: switch your active site context.</small>
+                    [% ELSE %]
+                    <a href="?site=Dev" class="site-dropdown-item">Development</a>
+                    <a href="?site=None" class="site-dropdown-item">None</a>
+                    <a href="/?site=home" class="site-dropdown-item">Default home</a>
+                    [% END %]
             </div>
         </div>
 

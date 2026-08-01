@@ -431,6 +431,47 @@ sub auto :Private {
         $c->stash->{user_id} = $user_id;
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
+
+        # Durable CSC-admin capability flag for the site switcher.
+        # AdminAuth->is_csc_admin() returns false once a CSC admin has *switched*
+        # their active site away from 'CSC' — which would hide the switcher and
+        # trap them. So: capture it as a durable session flag that is SET (never
+        # cleared) the moment AdminAuth confirms CSC admin status. Existing
+        # sessions that predate this code get it on their next CSC-scoped request.
+        if (!$c->session->{is_csc_admin}) {
+            eval {
+                require Comserv::Util::AdminAuth;
+                my $aa = Comserv::Util::AdminAuth->new;
+                if ($aa->can('is_csc_admin')) {
+                    $c->session->{is_csc_admin} = $aa->is_csc_admin($c) ? 1 : 0;
+                }
+            };
+        }
+        # Safety net: if the durable flag is somehow still unset but the live
+        # AdminAuth check passes (e.g. first request as CSC before session write
+        # committed), derive it for THIS request so the switcher still renders.
+        my $live_csc = 0;
+        eval {
+            require Comserv::Util::AdminAuth;
+            $live_csc = Comserv::Util::AdminAuth->new->is_csc_admin($c) ? 1 : 0
+                if Comserv::Util::AdminAuth->can('is_csc_admin');
+        };
+        my $effective_csc = ($c->session->{is_csc_admin} || $live_csc) ? 1 : 0;
+        $c->stash->{is_csc_admin} = $effective_csc;
+
+        # Expose the full list of SiteNames for the CSC-admin site switcher.
+        # Only populated for CSC admins so the switcher can render a complete
+        # dropdown; non-admins never see it and pay no query cost.
+        if ($c->stash->{is_csc_admin}) {
+            eval {
+                my @names;
+                my $sites = $c->model('Site')->get_all_sites($c) || [];
+                for my $s (@$sites) {
+                    push @names, $s->name if $s->can('name') && defined $s->name;
+                }
+                $c->stash->{all_site_names} = \@names if @names;
+            };
+        }
         $c->stash->{is_editor} = ($user_logged_in && grep { /^(admin|editor|developer)$/i } @$user_roles) ? 1 : 0;
         $c->stash->{user_logged_in} = $user_logged_in;
 
@@ -1386,6 +1427,59 @@ sub fetch_and_set {
     }
 
     return $value;
+}
+
+=head2 switch_site
+
+CSC-admin persistent site switcher. GET /switch_site/<SiteName> re-scopes the
+admin's active session to <SiteName> (sets $c->session->{SiteName}) and redirects
+back to the referring page. This is the durable equivalent of the per-request
+?SiteName= param: the whole app re-scopes to the chosen site until switched again.
+
+Gated by the durable session flag is_csc_admin (captured at login), NOT
+AdminAuth->is_csc_admin — the latter returns false once the active SiteName is no
+longer 'CSC', which would lock a switched admin out of switching back.
+
+=cut
+
+sub switch_site :Path('/switch_site') :Args(1) {
+    my ($self, $c, $target) = @_;
+
+    # Gate: only a CSC/system admin (durable flag) may switch active site.
+    unless ($c->session->{is_csc_admin}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'switch_site',
+            "Non-CSC-admin attempted site switch to '$target' (blocked)");
+        $c->response->redirect($c->req->referer || $c->uri_for('/admin'));
+        return;
+    }
+
+    $target = '' unless defined $target;
+    $target =~ s/^\s+|\s+$//g;
+    $target =~ s/[^a-zA-Z0-9._-]//g;   # sanitise — site names are simple identifiers
+
+    if ($target eq '') {
+        $c->response->redirect($c->req->referer || $c->uri_for('/admin'));
+        return;
+    }
+
+    # Validate the target actually exists as a Site.
+    my $site = eval { $c->model('Site')->get_site_details_by_name($c, $target) };
+    if (!$site) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'switch_site',
+            "Site switch requested for unknown site '$target' (ignored)");
+        $c->response->redirect($c->req->referer || $c->uri_for('/admin'));
+        return;
+    }
+
+    # Persist the new active site for the session (mirrors fetch_and_set's write).
+    $c->session->{SiteName} = $target;
+    $c->stash->{SiteName}   = $target;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'switch_site',
+        "CSC admin switched active site to '$target'");
+
+    # Redirect back to where they were so the page reloads re-scoped.
+    $c->response->redirect($c->req->referer || $c->uri_for('/admin'));
 }
 
 sub track_application_start {
