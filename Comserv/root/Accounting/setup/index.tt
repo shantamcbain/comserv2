@@ -1,0 +1,135 @@
+[% INCLUDE Accounting/_acct_inv_nav.tt %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+  [% IF c.flash.error_msg %]
+  <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.success_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.info_msg %]
+  <div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.info_msg | html %]</div>
+  [% END %]
+
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
+    <h1 style="margin:0;">&#9881;&#65039; Accounting Setup — [% sitename | html %]</h1>
+    <a href="/Accounting" class="btn btn-secondary" style="font-size:0.88rem;">&larr; Accounting Dashboard</a>
+  </div>
+
+  <p style="font-size:0.9rem;color:var(--text-muted-color,#666);margin-top:0;">
+    You are running this setup for your own site, <strong>[% sitename | html %]</strong>.
+    Each step is resumable — come back any time and continue where you left off.
+  </p>
+
+  [%# ── Step 1: module ───────────────────────────────────────────── %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      1. Accounting module
+      [% IF module_enabled %]<span style="color:#065f46;">&#10004; enabled</span>
+      [% ELSE %]<span style="color:#991b1b;">&#10007; not enabled</span>[% END %]
+    </h2>
+    [% IF !module_enabled %]
+    <p style="margin:0;font-size:0.88rem;">
+      The Accounting/Commerce module must be enabled for [% sitename | html %] before a
+      database can be provisioned.
+      [% IF is_csc_admin %]<a href="/admin/site_modules">Manage site modules</a>.
+      [% ELSE %]Please contact your CSC administrator to enable it.[% END %]
+    </p>
+    [% END %]
+  </div>
+
+  [%# ── Step 2: provision ────────────────────────────────────────── %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      2. Accounting database
+      [% IF provisioned && db_ok %]<span style="color:#065f46;">&#10004; provisioned &amp; reachable</span>
+      [% ELSIF provisioned %]<span style="color:#92400e;">&#9888; provisioned, not reachable</span>
+      [% ELSE %]<span style="color:#6b7280;">not provisioned</span>[% END %]
+    </h2>
+
+    [% IF provisioned %]
+      <p style="margin:0 0 0.4rem;font-size:0.88rem;">
+        <code>[% reg.db_name | html %]@[% reg.db_host | html %]:[% reg.db_port %]</code>
+        &nbsp;<span style="background:#e0e7ff;color:#3730a3;border-radius:4px;padding:2px 8px;font-size:0.8rem;">[% reg.jurisdiction | html %] / [% reg.currency | html %]</span>
+        [% IF db_ok %]&nbsp;<span style="font-size:0.85rem;color:#6b7280;">[% schema_tables %] tables</span>[% END %]
+      </p>
+      [% IF db_error %]
+      <p style="margin:0;font-size:0.85rem;color:#991b1b;">Error: [% db_error | html %]</p>
+      [% END %]
+      <a href="/Accounting/my_database" class="btn btn-secondary" style="font-size:0.85rem;margin-top:0.5rem;">View database details</a>
+
+    [% ELSIF module_enabled %]
+      <form method="post" action="/Accounting/setup/provision"
+            onsubmit="return confirm('Provision a PostgreSQL accounting database for [% sitename | html %]? This is a one-time setup step.');"
+            style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:flex-end;margin:0;">
+        <label style="font-size:0.85rem;">Jurisdiction<br>
+          <input type="text" name="jurisdiction" value="CA" maxlength="2" size="4" class="form-control">
+        </label>
+        <label style="font-size:0.85rem;">Currency<br>
+          <input type="text" name="currency" value="CAD" maxlength="3" size="5" class="form-control">
+        </label>
+        <label style="font-size:0.85rem;display:flex;align-items:center;gap:0.35rem;">
+          <input type="checkbox" name="confirm" value="1" required> I confirm
+        </label>
+        <button type="submit" class="btn btn-primary">Provision my accounting database</button>
+      </form>
+      <p style="margin:0.5rem 0 0;font-size:0.8rem;color:var(--text-muted-color,#666);">
+        The server chooses the host, database name and database user. Safe to re-run — an
+        existing database is never re-created.
+      </p>
+    [% ELSE %]
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 1 first.</p>
+    [% END %]
+  </div>
+
+  [%# ── Step 3: chart of accounts ────────────────────────────────── %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      3. Chart of accounts
+      [% IF coa_count %]<span style="color:#065f46;">&#10004; [% coa_count %] accounts</span>
+      [% ELSE %]<span style="color:#6b7280;">empty</span>[% END %]
+    </h2>
+    [% IF provisioned %]
+      [% IF coa_count %]
+        <a href="/Accounting/coa" class="btn btn-secondary" style="font-size:0.85rem;">Review / edit chart</a>
+      [% ELSE %]
+        <form method="post" action="/Accounting/coa/seed" style="display:inline;margin:0;"
+              onsubmit="return confirm('Seed the standard chart of accounts for [% sitename | html %]?');">
+          <button type="submit" class="btn btn-primary" style="font-size:0.88rem;">Use the standard template</button>
+        </form>
+        <span style="font-size:0.82rem;color:var(--text-muted-color,#666);margin-left:0.6rem;">
+          A generated / imported chart is added in ACCON Ph.1.
+        </span>
+      [% END %]
+    [% ELSE %]
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 2 first.</p>
+    [% END %]
+  </div>
+
+  [%# ── Step 4: import ───────────────────────────────────────────── %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      4. Import existing data <span style="font-weight:normal;font-size:0.85rem;color:var(--text-muted-color,#666);">(optional)</span>
+      [% IF gl_count %]<span style="color:#065f46;">&#10004; [% gl_count %] GL entries</span>[% END %]
+    </h2>
+    [% IF provisioned && coa_count %]
+      <form method="post" action="/Accounting/migrate_to_pg" style="margin:0;"
+            onsubmit="return confirm('Copy existing MariaDB accounting data for [% sitename | html %] into PostgreSQL? Already-migrated records are skipped.');">
+        <button type="submit" class="btn btn-secondary" style="font-size:0.88rem;">Import my existing accounting data</button>
+      </form>
+    [% ELSE %]
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 3 first.</p>
+    [% END %]
+  </div>
+
+  [%# ── Step 5: done ─────────────────────────────────────────────── %]
+  [% IF step >= 5 %]
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.25rem;">
+    <strong style="color:#065f46;">&#10004; Accounting setup complete for [% sitename | html %].</strong>
+    <a href="/Accounting" class="btn btn-primary" style="font-size:0.85rem;margin-left:0.75rem;">Go to the dashboard</a>
+  </div>
+  [% END %]
+
+</div>

@@ -160,6 +160,121 @@ sub is_csc_admin {
             $has_admin_role);
 }
 
+=head2 administers_site
+
+    $admin_auth->administers_site($c, $sitename)
+
+Site-scoped authorisation check. Returns 1 when the logged-in user is entitled to
+administer the named SiteName, 0 otherwise.
+
+Rules (ACCON Ph.1a):
+
+=over
+
+=item * CSC admin — entitled for ALL sites.
+
+=item * SiteName owner / site admin — entitled for THEIR OWN site only. Proven by an
+active row in C<user_site_roles> (role admin|site_admin|accounting) for that site,
+or by being the hosting-account contact for that site.
+
+=item * A global 'admin' role alone is NOT sufficient for a site the user is not
+attached to — that was the hole this method closes.
+
+=back
+
+=cut
+
+sub administers_site {
+    my ($self, $c, $sitename) = @_;
+
+    return 0 unless defined $sitename && length $sitename;
+
+    # CSC admin (and the system/bootstrap user) may act on every site
+    return 1 if $self->is_csc_admin($c);
+
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : undef) || '';
+    return 1 if $username eq 'ai_assistant';
+
+    my $user_id = $c->session->{user_id} || ($c->user ? eval { $c->user->id } : undef);
+
+    # Resolve user_id from username if the session did not carry it
+    if (!$user_id && $username) {
+        eval {
+            my $u = $c->model('DBEncy')->resultset('User')->search({ username => $username })->first;
+            $user_id = $u->id if $u;
+        };
+    }
+    unless ($user_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'administers_site',
+            "Denied: cannot resolve user_id for '$username' (site '$sitename')");
+        return 0;
+    }
+
+    my $entitled = 0;
+
+    eval {
+        my $schema   = $c->model('DBEncy');
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->first;
+
+        if ($site_obj) {
+            my $count = $schema->resultset('UserSiteRole')->search({
+                user_id   => $user_id,
+                site_id   => $site_obj->id,
+                role      => { -in => [qw(admin site_admin accounting)] },
+                is_active => 1,
+            })->count;
+            $entitled = 1 if $count;
+        }
+
+        # Hosting-account contact for the site is treated as the site owner
+        unless ($entitled) {
+            my $hosting = $schema->resultset('Accounting::HostingAccount')->search(
+                { sitename => $sitename }, { rows => 1 })->single;
+            if ($hosting && $hosting->contact_email) {
+                my $user_obj = $schema->resultset('User')->find($user_id);
+                $entitled = 1
+                    if $user_obj && $user_obj->email
+                    && lc($user_obj->email) eq lc($hosting->contact_email);
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'administers_site',
+            "Site entitlement lookup failed for '$username' on '$sitename': $@");
+        return 0;
+    }
+
+    $self->logging->log_with_details($c, ($entitled ? 'info' : 'warn'), __FILE__, __LINE__,
+        'administers_site',
+        ($entitled ? 'Granted' : 'Denied') . ": user '$username' (id $user_id) on site '$sitename'");
+
+    return $entitled ? 1 : 0;
+}
+
+=head2 require_site_admin
+
+Like C<administers_site> but sets a flash error and redirects to login when the
+check fails. Returns 1 on success, 0 after redirecting.
+
+=cut
+
+sub require_site_admin {
+    my ($self, $c, $sitename, $action_name) = @_;
+
+    $action_name ||= 'unknown_action';
+
+    return 1 if $self->administers_site($c, $sitename);
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'require_site_admin',
+        "Access denied for $action_name on site '" . ($sitename // '') . "'");
+
+    $c->flash->{error_msg} =
+        "You are not authorised to administer site '" . ($sitename // '') . "'.";
+    $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+
+    return 0;
+}
+
 =head2 get_admin_type
 
 Returns the type of admin: 'standard', 'csc', 'special', or 'none'
