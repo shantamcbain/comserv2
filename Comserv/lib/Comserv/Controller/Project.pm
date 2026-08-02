@@ -7,6 +7,7 @@ use Try::Tiny;
 use POSIX qw(strftime);
 use JSON ();
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use Comserv::Controller::Site;
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -19,6 +20,102 @@ sub _require_login {
     }
     return 1;
 }
+
+has 'admin_auth' => (
+    is      => 'ro',
+    isa     => 'Comserv::Util::AdminAuth',
+    lazy    => 1,
+    default => sub { Comserv::Util::AdminAuth->new }
+);
+
+=head2 _require_project_write
+
+    $self->_require_project_write($c, $project) or return;
+
+Site-scoped write authorisation for a project (PROJ-OWN Ph1, todo 1848).
+
+Before this existed, update_project called _require_login and nothing else, so ANY
+authenticated user on ANY site could edit ANY project — including silently reassigning
+its sitename to another site.
+
+Rules:
+
+=over
+
+=item * CSC admin may write any project.
+
+=item * A site admin may write projects belonging to a site they administer, proven
+via Comserv::Util::AdminAuth::administers_site (the ACCON Ph.1a check, which requires
+an active user_site_roles row — a bare global 'admin' role is NOT enough).
+
+=item * Everyone else gets 403.
+
+=back
+
+Returns 1 when permitted. On denial it logs, sets a 403 response and returns 0 — the
+caller must return immediately.
+
+=cut
+
+sub _require_project_write {
+    my ($self, $c, $project, $action) = @_;
+    $action //= 'update_project';
+
+    my $username = $c->session->{username} // '';
+    my $sitename = eval { $project->sitename } // '';
+
+    if ($self->admin_auth->administers_site($c, $sitename)) {
+        return 1;
+    }
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $action,
+        "DENIED project write: user '$username' (session site '"
+        . ($c->session->{SiteName} // '') . "') attempted to modify project "
+        . (eval { $project->id } // '?') . " owned by site '$sitename'");
+
+    $c->response->status(403);
+    $c->response->body('Forbidden: you are not authorised to modify projects belonging to site ' . $sitename);
+    return 0;
+}
+
+=head2 _require_sitename_transfer
+
+    $self->_require_sitename_transfer($c, $project, $new_sitename) or return;
+
+Changing a project's sitename is an OWNERSHIP TRANSFER, not an ordinary field edit, so
+it is restricted to CSC admin even when the caller may otherwise write the project.
+
+Returns 1 when the transfer is permitted or when no transfer is being attempted.
+On denial it logs, sets 403 and returns 0.
+
+=cut
+
+sub _require_sitename_transfer {
+    my ($self, $c, $project, $new_sitename) = @_;
+
+    my $current = eval { $project->sitename } // '';
+    return 1 unless defined $new_sitename && length $new_sitename;
+    return 1 if $new_sitename eq $current;
+
+    if ($self->admin_auth->is_csc_admin($c)) {
+        # Ownership transfers are recorded, not silent (PROJ-OWN Q5).
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project',
+            "OWNERSHIP TRANSFER: project " . (eval { $project->id } // '?')
+            . " sitename '$current' -> '$new_sitename' by "
+            . ($c->session->{username} // '?'));
+        return 1;
+    }
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_project',
+        "DENIED sitename transfer: user '" . ($c->session->{username} // '')
+        . "' attempted to move project " . (eval { $project->id } // '?')
+        . " from '$current' to '$new_sitename'");
+
+    $c->response->status(403);
+    $c->response->body('Forbidden: changing a project SiteName is an ownership transfer and requires a CSC administrator');
+    return 0;
+}
+
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -113,6 +210,24 @@ sub  create_project :Local :Args(0) {
         }
     };
     $username ||= 'anonymous';
+
+    # AUTHORISATION (PROJ-OWN Ph1, todo 1848) — a user must not create a project
+    # claiming a site they do not administer. Without this, the update_project fix
+    # is trivially bypassed by creating the row already owned by the target site.
+    my $new_sitename = $form_data->{sitename};
+    if (ref $new_sitename eq 'ARRAY') {
+        $new_sitename = $new_sitename->[0];
+    }
+    $new_sitename = $c->session->{SiteName} // '' unless defined $new_sitename && length $new_sitename;
+
+    unless ($self->admin_auth->administers_site($c, $new_sitename)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',
+            "DENIED project create: user '$username' (session site '"
+            . ($c->session->{SiteName} // '') . "') attempted to create a project owned by site '$new_sitename'");
+        $c->response->status(403);
+        $c->response->body('Forbidden: you are not authorised to create projects for site ' . $new_sitename);
+        return;
+    }
 
     # Handle parent_id properly
     my $parent_id = $form_data->{parent_id};
@@ -685,6 +800,23 @@ sub editproject :Path('editproject') :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'editproject',
         "Found project with ID $project_id: " . $project->name);
 
+    # AUTHORISATION (PROJ-OWN Ph1, todo 1848) — do not render an edit form the user
+    # is not entitled to submit. update_project enforces this again server-side.
+    unless ($self->admin_auth->administers_site($c, (eval { $project->sitename } // ''))) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'editproject',
+            "DENIED edit form: user '" . ($c->session->{username} // '')
+            . "' requested project $project_id owned by site '"
+            . (eval { $project->sitename } // '') . "'");
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "You are not authorised to edit projects belonging to site "
+                       . (eval { $project->sitename } // '') . ".",
+            template  => 'todo/error.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     # Use the fetch_available_sites method from the Site controller to get the sites
     my $site_controller = $c->controller('Site');
     my $sites = $site_controller->fetch_available_sites($c);
@@ -898,6 +1030,17 @@ sub update_project :Local :Args(0)  {
         $c->response->body("Project with ID $project_id not found");
         return;
     }
+
+    # AUTHORISATION (PROJ-OWN Ph1, todo 1848) — must run BEFORE any write.
+    # Previously this action performed only _require_login, so any authenticated user
+    # on any site could edit any project and silently reassign its sitename.
+    $self->_require_project_write($c, $project) or return;
+
+    my $requested_sitename = $form_data->{sitename};
+    if (ref $requested_sitename eq 'ARRAY') {
+        $requested_sitename = $requested_sitename->[0];
+    }
+    $self->_require_sitename_transfer($c, $project, $requested_sitename) or return;
 
     # Handle parent_id properly
     my $parent_id = $form_data->{parent_id};

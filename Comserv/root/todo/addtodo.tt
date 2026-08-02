@@ -232,7 +232,10 @@ function syncDur() {
     <div>
         <label for="priority">Priority:</label>
         <select id="priority" name="priority" class="form-select">
-            [% SET current_priority = todo.priority %]
+            [%# Default new todos to the planned-dev midpoint, never 1. With no
+                selected option the browser picks the first (P1), which is how
+                91% of the backlog ended up at priority 1. %]
+            [% SET current_priority = todo.priority || default_priority || 5 %]
             [% INCLUDE 'todo/priority_select.tt' %]
         </select>
     </div>
