@@ -72,6 +72,18 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
         default_value => 9999,
     },
+    # NOTE (2026-08-01): declared here so the admin schema-compare UI can offer
+    # "sync result -> table" and create the DB column. The comparison reads THIS
+    # FILE (Util::Schema::ResultParser), not the loaded class, so the field must
+    # be present here to be addable. Until the column exists in `projects`,
+    # DBIC will emit SELECT me.priority and the project list will fail with
+    # "Unknown column 'me.priority'". Run /schema-comparison/sync_result_to_table
+    # for projects.priority to resolve.
+    priority => {
+        data_type     => 'integer',
+        is_nullable   => 1,
+        default_value => 5,
+    },
     );
 
 __PACKAGE__->set_primary_key('id');

@@ -217,6 +217,16 @@ __PACKAGE__->add_columns(record_id => {
         is_nullable   => 0,
         default_value => 1,
     },
+    # Role visibility category for the Planning Focus Queue.
+    # Comma-separated set drawn from: developer, editor, admin, general.
+    # NULL = not yet classified; read as 'general'.
+    # See /Documentation/PlanningQueueRoleVisibilityPlan (project 234 PLAN-QUEUE).
+    role_category => {
+        data_type     => 'varchar',
+        size          => 64,
+        is_nullable   => 1,
+        default_value => undef,
+    },
 );
 
 __PACKAGE__->set_primary_key('record_id');

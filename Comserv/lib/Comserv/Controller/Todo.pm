@@ -679,6 +679,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         current_project => $current_project,
         users           => \@users,
         build_priority  => $self->priority_options,
+        default_priority => Comserv::Util::Priority::default_priority(),
         build_status    => \%status_options,
         return_to       => $return_to,
         start_date      => $c->request->params->{start_date} || DateTime->now->ymd,
@@ -1219,7 +1220,7 @@ sub create :Local {
         developer => $params->{developer} || $current_user,
         username_of_poster => $current_user,
         status => $self->convert_status_to_string($params->{status}) || 'NEW',
-        priority => $params->{priority} || 3, # Medium priority by default
+        priority => $params->{priority} || Comserv::Util::Priority::default_priority(),
         time_of_day => ($params->{time_of_day} && $params->{time_of_day} ne '') ? $params->{time_of_day} : undef,
         share => $params->{share} ? 1 : 0,
         last_mod_by => $current_user,
