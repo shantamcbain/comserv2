@@ -20,4 +20,6 @@
   <a href="/Inventory/stock/levels" style="color:#a5b4fc;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">Stock</a>
   <span style="color:#475569;">|</span>
   <a href="/Inventory/timesheet" style="color:#6ee7b7;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">&#9200; Timesheets</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Accounting/setup" style="color:#fcd34d;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">&#9881; Setup</a>
 </nav>

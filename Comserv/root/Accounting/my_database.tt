@@ -42,7 +42,8 @@
   <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:1.2rem 1.5rem;">
     <strong style="color:#991b1b;">❌ No accounting database provisioned for [% sitename | html %].</strong>
     <p style="margin:0.5rem 0 0;font-size:0.9rem;">
-      Contact your CSC administrator to enable the Accounting add-on for your site.
+      You can provision it yourself from the
+      <a href="/Accounting/setup">Accounting Setup wizard</a>.
     </p>
   </div>
 

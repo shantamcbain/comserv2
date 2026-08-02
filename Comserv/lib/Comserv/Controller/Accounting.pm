@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Model::AccountingDB;
+use Comserv::Util::AdminAuth;
 use POSIX qw(strftime);
 use LWP::UserAgent;
 use JSON;
@@ -15,20 +16,38 @@ has 'logging' => (
 BEGIN { extends 'Catalyst::Controller'; }
 
 # -------------------------------------------------------------------------
-# Admin-only gate — runs before every action in this controller
+# Site-scoped accounting gate — runs before every action in this controller
+#
+# ACCON Ph.1a security fix: the role check alone (admin|site_admin|accounting)
+# is NOT sufficient. A site_admin of site A must not act on site B's books.
+# The user must ALSO administer the SiteName currently in session. CSC admins
+# keep all-site access via AdminAuth::administers_site.
 # -------------------------------------------------------------------------
+
+has 'admin_auth' => (
+    is      => 'ro',
+    isa     => 'Comserv::Util::AdminAuth',
+    default => sub { Comserv::Util::AdminAuth->new }
+);
 
 sub auto :Private {
     my ($self, $c) = @_;
+
     my $roles = $c->session->{roles} // [];
-    my $is_admin = 0;
+    my $has_role = 0;
     if (ref($roles) eq 'ARRAY') {
-        $is_admin = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
+        $has_role = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
     } elsif (!ref($roles) && $roles) {
-        $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
+        $has_role = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
-    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
-    unless ($is_admin) {
+
+    my $sitename = $self->_sitename($c);
+
+    # Both conditions must hold: an accounting-capable role AND entitlement
+    # to administer THIS SiteName.
+    my $allowed = $has_role && $self->admin_auth->administers_site($c, $sitename);
+
+    unless ($allowed) {
         my $path = $c->req->path;
         if ($path =~ m{/Accounting/api/}i) {
             my $token    = $c->req->header('X-API-Token') || $c->req->params->{api_token};
@@ -38,8 +57,11 @@ sub auto :Private {
             }
         }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
-            'Accounting: access denied for user ' . ($c->session->{username} || 'guest'));
-        $c->flash->{error_msg} = 'Accounting requires admin, site_admin, or accounting role.';
+            "Accounting: access denied for user " . ($c->session->{username} || 'guest')
+            . " on site '$sitename' (role=" . ($has_role ? 'yes' : 'no') . ")");
+        $c->flash->{error_msg} = $has_role
+            ? "You are not authorised to administer accounting for site '$sitename'."
+            : 'Accounting requires admin, site_admin, or accounting role.';
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return 0;
     }
@@ -610,7 +632,9 @@ sub _api_auth {
     } elsif (!ref($roles) && $roles) {
         $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
-    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
+
+    # ACCON Ph.1a: role alone is not enough — must administer the session site
+    $is_admin &&= $self->admin_auth->administers_site($c, $self->_sitename($c));
 
     unless ($is_admin) {
         my $token    = $c->req->header('X-API-Token') || $c->req->params->{api_token};
@@ -624,6 +648,7 @@ sub _api_auth {
             $c->detach;
             return 0;
         }
+        $c->stash->{accounting_api_token_auth} = 1;
     }
     return 1;
 }
@@ -730,6 +755,18 @@ sub api_gl :Path('/Accounting/api/gl') :Args(0) {
 
     my $schema   = $self->_schema($c);
     my $sitename = $data->{sitename} || $self->_sitename($c);
+
+    # ACCON Ph.1a: a session user may only post to a site they administer.
+    # System token auth (no session) may target any site.
+    if (!$c->stash->{accounting_api_token_auth}
+        && !$self->admin_auth->administers_site($c, $sitename)) {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ error => "Not authorised for site '$sitename'" }));
+        $c->detach;
+        return;
+    }
+
     my $today    = $self->_now();
     my $post_date = $data->{post_date} || substr($today, 0, 10);
 
@@ -1202,7 +1239,7 @@ sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
 sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{SiteName} eq 'CSC' || ($c->session->{roles} && grep { /^admin$/ } @{$c->session->{roles} // []})) {
+    unless ($self->admin_auth->is_csc_admin($c)) {
         $c->flash->{error_msg} = 'CSC admin access required.';
         $c->response->redirect($c->uri_for('/Accounting'));
         return;

@@ -126,6 +126,133 @@ sub _generate_password {
     return join '', map { $chars[int rand @chars] } 1..$len;
 }
 
+=head2 provision_site_for_owner
+
+    my ($ok, $msg) = Comserv::Model::AccountingDB->instance
+                        ->provision_site_for_owner($c, $sitename, %opts);
+
+ACCON Ph.1a — self-serve wrapper so a SiteName owner (site admin) can provision
+THEIR OWN accounting database without holding CSC-admin context. The PostgreSQL
+admin credentials are never exposed to the caller: provision_site still reads
+them server-side from the secrets file.
+
+Guard rails applied here (the raw provision_site has none):
+
+=over
+
+=item * Entitlement — caller must administer $sitename (CSC admin: any site).
+
+=item * Server-derived identifiers — db_host / db_port / db_name / db_user are
+never taken from caller input; only jurisdiction and currency pass through.
+
+=item * One accounting DB per SiteName — registry is unique on sitename, and an
+existing active row short-circuits as a success (idempotent).
+
+=item * Module gate — the 'accounting' (or 'commerce') site module must be enabled.
+
+=item * Rate limit — at most one provisioning attempt per site per 60 seconds.
+
+=item * Audit — actor, site and outcome are logged and stamped on the registry row.
+
+=back
+
+=cut
+
+my %_provision_attempts;   # sitename => epoch of last attempt
+my $PROVISION_MIN_INTERVAL = 60;
+
+sub provision_site_for_owner {
+    my ($self, $c, $sitename, %opts) = @_;
+
+    $sitename = '' unless defined $sitename;
+    my $actor = $c->session->{username}
+        || ($c->user ? eval { $c->user->username } : undef)
+        || 'unknown';
+
+    unless (length $sitename) {
+        return (0, 'No SiteName supplied.');
+    }
+
+    # ── 1. Entitlement ────────────────────────────────────────────────
+    require Comserv::Util::AdminAuth;
+    my $auth = Comserv::Util::AdminAuth->new;
+    unless ($auth->administers_site($c, $sitename)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'provision_site_for_owner',
+            "DENIED: '$actor' attempted to provision accounting DB for '$sitename'");
+        return (0, "You are not authorised to provision the accounting database for '$sitename'.");
+    }
+
+    # ── 2. Module gate ────────────────────────────────────────────────
+    my $module_ok = 0;
+    eval {
+        $module_ok = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename    => $sitename,
+            module_name => { -in => [qw(accounting commerce Accounting Commerce)] },
+            enabled     => 1,
+        })->count ? 1 : 0;
+    };
+    $module_ok = 1 if $auth->is_csc_admin($c);   # CSC admin may pre-provision
+    unless ($module_ok) {
+        return (0, "The Accounting/Commerce module is not enabled for '$sitename'. "
+                 . "Enable it in Site Modules before provisioning.");
+    }
+
+    # ── 3. Already provisioned? (idempotent, one DB per site) ─────────
+    my $existing;
+    eval {
+        $existing = $c->model('DBEncy')->resultset('SiteAccountingDb')
+                        ->find({ sitename => $sitename });
+    };
+    if ($existing && ($existing->status // '') eq 'active') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site_for_owner',
+            "AUDIT actor='$actor' site='$sitename' action=provision result=already_provisioned "
+            . "db=" . $existing->db_name);
+        return (1, "Accounting database '" . $existing->db_name . "' already exists for '$sitename'.");
+    }
+
+    # ── 4. Rate limit ─────────────────────────────────────────────────
+    my $now  = time;
+    my $last = $_provision_attempts{$sitename} || 0;
+    if ($now - $last < $PROVISION_MIN_INTERVAL) {
+        my $wait = $PROVISION_MIN_INTERVAL - ($now - $last);
+        return (0, "A provisioning attempt for '$sitename' is already in progress. "
+                 . "Please wait ${wait}s and try again.");
+    }
+    $_provision_attempts{$sitename} = $now;
+
+    # ── 5. Provision — server-derived identifiers only ────────────────
+    my %safe_opts = (
+        jurisdiction => $opts{jurisdiction} || 'CA',
+        currency     => $opts{currency}     || 'CAD',
+    );
+
+    my ($ok, $msg) = eval { $self->provision_site($c, $sitename, %safe_opts) };
+    if ($@) {
+        ($ok, $msg) = (0, "Provisioning error: $@");
+    }
+
+    # ── 6. Audit ──────────────────────────────────────────────────────
+    $self->logging->log_with_details($c, ($ok ? 'info' : 'error'), __FILE__, __LINE__,
+        'provision_site_for_owner',
+        "AUDIT actor='$actor' site='$sitename' action=provision result="
+        . ($ok ? 'ok' : 'fail') . " detail=" . ($msg // ''));
+
+    if ($ok) {
+        eval {
+            my $reg = $c->model('DBEncy')->resultset('SiteAccountingDb')
+                          ->find({ sitename => $sitename });
+            if ($reg) {
+                my $stamp = scalar(localtime);
+                my $note  = "Provisioned by '$actor' on $stamp (self-serve).";
+                my $prev  = $reg->notes // '';
+                $reg->update({ notes => ($prev ? "$prev\n$note" : $note) });
+            }
+        };
+    }
+
+    return ($ok, $msg);
+}
+
 sub provision_site {
     my ($self, $c, $sitename, %opts) = @_;
 
