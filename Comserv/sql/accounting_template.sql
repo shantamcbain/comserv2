@@ -17,6 +17,12 @@ SET standard_conforming_strings = on;
 -- ----------------------------------------------------------------------------
 -- defaults — site configuration (one row per key)
 -- Seeded at provisioning time with jurisdiction-specific values
+--
+-- ACCPG Ph.1: the 'schema_version' key is the accounting schema version marker.
+-- It must match $Comserv::Util::Accounting::Migrator::SCHEMA_VERSION. Bump BOTH
+-- whenever this file changes shape; /Accounting/admin/databases reports any site
+-- database whose value differs (or is missing, i.e. provisioned before the
+-- marker existed) as outdated/unversioned.
 -- ----------------------------------------------------------------------------
 CREATE TABLE defaults (
     setting_key  varchar(50)  PRIMARY KEY,
@@ -562,6 +568,7 @@ CREATE INDEX project_number_idx ON project(projectnumber);
 INSERT INTO taxmodule (taxmodulename) VALUES ('Simple');
 
 INSERT INTO defaults (setting_key, value) VALUES
+    ('schema_version',       '1'),
     ('curr',                 'CAD'),
     ('weightunit',           'kg'),
     ('precision',            '2'),

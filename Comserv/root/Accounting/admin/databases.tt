@@ -41,6 +41,26 @@
     </div>
     [% END %]
 
+    [% IF row.db_ok %]
+    [%# ACCPG Ph.1 — per-site accounting schema version %]
+    [% SET sv_bg = row.schema_state == 'current' ? '#d1fae5'
+                 : (row.schema_state == 'unversioned' ? '#fef9c3'
+                 : (row.schema_state == 'unknown'     ? '#e5e7eb' : '#fee2e2')) %]
+    [% SET sv_fg = row.schema_state == 'current' ? '#065f46'
+                 : (row.schema_state == 'unversioned' ? '#92400e'
+                 : (row.schema_state == 'unknown'     ? '#374151' : '#991b1b')) %]
+    [% SET sv_txt = row.schema_state == 'current'     ? 'schema v' _ row.schema_version
+                  : (row.schema_state == 'unversioned' ? 'schema unversioned (pre-marker)'
+                  : (row.schema_state == 'ahead'       ? 'schema v' _ row.schema_version _ ' AHEAD of app v' _ row.schema_expected
+                  : (row.schema_state == 'unknown'     ? 'schema version unreadable'
+                  : 'schema v' _ row.schema_version _ ' OUTDATED — app expects v' _ row.schema_expected))) %]
+    <div style="flex:1 1 100%;margin-top:0.35rem;">
+      <span style="background:[% sv_bg %];color:[% sv_fg %];border-radius:4px;padding:2px 9px;font-size:0.78rem;font-weight:bold;">
+        [% sv_txt | html %]
+      </span>
+    </div>
+    [% END %]
+
     [% IF !row.registered || (row.registered && !row.db_ok) %]
     <div style="flex:1 1 100%;margin-top:0.6rem;">
       <form method="post" action="/Accounting/admin/databases"
