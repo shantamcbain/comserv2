@@ -1230,7 +1230,7 @@ sub api_project_update :Path('project/update') :Args(0) {
         name description start_date end_date status
         project_code project_size estimated_man_hours
         developer_name client_name sitename comments
-        parent_id sort_order
+        parent_id sort_order priority
     );
     my @nullable = qw(parent_id);
 
