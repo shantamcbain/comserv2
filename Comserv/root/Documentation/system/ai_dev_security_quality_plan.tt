@@ -1,0 +1,103 @@
+[% META
+   title = "AI in Application Development — Security, Code Quality, Consistency & Checks"
+   description = "Sub-project plan: how AI (agents, coding assistants, the evaluator+editor pattern) is used to build and maintain Comserv2 safely — the gates, consistency rules, and checks that keep AI-generated code production-grade."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "ai-systems,security,development-plan,code-quality"
+   page_version = "0.1"
+   last_updated = "Mon Aug 03 10:30:00 UTC 2026"
+   site_specific = "false"
+%]
+
+<div class="container">
+    <h1>AI in Application Development — Security, Code Quality, Consistency &amp; Checks</h1>
+
+    <div class="last-updated">
+        Status: 📋 DRAFT sub-project plan for the AI Chat / AI Development workstream.
+        Intended to become a sub-project under the AI development project (parent ~114, "AI Chat Integration").
+        Purpose: define HOW we use AI to write and review Comserv2 code without regressing quality or security.
+    </div>
+
+    <h2>1. Why this sub-project exists</h2>
+    <p>We already use AI heavily: Ollama chat open to all roles, autonomous delegates (claude-code / codex /
+    opencode), and the evaluator+editor pattern (cheap model plans, better model executes). The BrightTALK talk
+    "From AI Experiments to Production" (Coder) names the failure modes we must guard: weak guardrails, no
+    workspace isolation, ungoverned context, and no quality gates. This plan codifies our answers.</p>
+
+    <h2>2. The gates we already have (baseline)</h2>
+    <table style="width:100%; border-collapse:collapse;">
+        <tr style="background-color: rgba(255,255,255,0.15);">
+            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Gate</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">What it catches</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">File</th>
+        </tr>
+        <tr><td style="padding:8px; border:1px solid var(--border-color);">Perl compile check</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">Random syntax errors at commit</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">.git/hooks/pre-commit (perl -c)</td></tr>
+        <tr><td style="padding:8px; border:1px solid var(--border-color);">Secrets scan</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">Leaked credentials in history</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">pre-commit (gitleaks) + deploy (security_scan.sh)</td></tr>
+        <tr><td style="padding:8px; border:1px solid var(--border-color);">Test gate</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">Logic regressions before merge</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">script/test_gate.sh (pre-merge)</td></tr>
+        <tr><td style="padding:8px; border:1px solid var(--border-color);">Security scan</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">CPAN/trivy/gitleaks on deploy</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">deploy.sh COMSERV_SECURITY_GATE=1</td></tr>
+        <tr><td style="padding:8px; border:1px solid var(--border-color);">Whitelisted git runner</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">Shell-injection via git ops</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">Comserv::Util::Git</td></tr>
+        <tr><td style="padding:8px; border:1px solid var(--border-color);">Schema-compare only</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">AI bypassing DB schema API</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">.ai-policy.md §5</td></tr>
+    </table>
+
+    <h2>3. Consistency rules the AI must obey</h2>
+    <ul>
+        <li><strong>File size targets</strong> (Controllers &le;2000 soft / 4000 hard; Util/Model/Result &le;800 / 1500;
+            templates &le;1000 / 2000) — from .ai-policy.md §1.</li>
+        <li><strong>Naming:</strong> PascalCase packages/classes, snake_case DB columns/fields.</li>
+        <li><strong>Catalyst structure:</strong> heavy logic in <code>Comserv::Util::*</code> /
+            <code>Comserv::Model::*</code>; Result classes are the single source of truth for columns.</li>
+        <li><strong>JS migration:</strong> no inline &lt;script&gt; in js_load.tt templates; extend existing modules
+            under <code>static/js/</code>.</li>
+        <li><strong>Theme:</strong> only <code>var(--*)</code> colours and existing component classes.</li>
+        <li><strong>Logging:</strong> full <code>log_with_details($c, LEVEL, __FILE__, __LINE__, ...)</code> during
+            active development.</li>
+    </ul>
+
+    <h2>4. Human-in-the-loop (the hard gate)</h2>
+    <p>Per standing policy, the agent WAITS indefinitely for an explicit answer on any decision — it never
+    auto-picks a default. Schema changes go through the in-app schema-compare workflow (a human action). The
+    agent does not commit/push/deploy without being asked. This is our primary guardrail and must remain
+    non-negotiable even as automation grows.</p>
+
+    <h2>5. Workspace isolation (extends dev_isolation_and_backups_plan.tt)</h2>
+    <p>Feature branches already run in git worktrees (zenflow) with their own server instance. The remaining
+    gap is <strong>database isolation</strong>: worktree agents currently resolve to production. The companion
+    plan forces <code>ACTIVE_DB_ENVIRONMENT=dev</code> for any non-main instance so AI agents can never mutate
+    live data. This sub-project owns the <em>policy</em>; the companion plan owns the <em>mechanism</em>.</p>
+
+    <h2>6. How we "check" AI output (the loop)</h2>
+    <ol>
+        <li><strong>Plan (cheap model):</strong> propose the change against the existing gates above.</li>
+        <li><strong>Execute (better model / delegate):</strong> implement, confined to task scope.</li>
+        <li><strong>Self-check:</strong> pre-commit hook (compile + secrets) runs automatically on commit.</li>
+        <li><strong>Gate:</strong> agent runs <code>script/test_gate.sh</code> before reporting done; must be green.</li>
+        <li><strong>Review:</strong> human merges to main; deploy runs the security scan when
+            <code>COMSERV_SECURITY_GATE=1</code>.</li>
+        <li><strong>Audit:</strong> every error &rarr; todo &rarr; email pipeline already records regressions for
+            follow-up.</li>
+    </ol>
+
+    <h2>7. Gaps to close (roadmap)</h2>
+    <ul>
+        <li>Make <code>test_gate.sh</code> the default pre-merge step in the agent workflow (not opt-in).</li>
+        <li>Run <code>perlcritic</code> on changed <code>.pm</code> in pre-commit (configurable severity).</li>
+        <li>Enforce <code>COMSERV_SECURITY_GATE=1</code> on production deploys by default.</li>
+        <li>Wire dev-DB isolation (companion plan) so agent runs are prod-safe by construction.</li>
+        <li>Track AI-introduced regressions via the error-audit pipeline to measure quality over time.</li>
+    </ul>
+
+    <p style="margin-top:20px;"><em>Next: promote to a sub-project (parent ~114), then implement the §7 roadmap items
+    incrementally, each behind the §6 loop.</em></p>
+</div>

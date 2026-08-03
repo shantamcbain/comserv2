@@ -5,13 +5,13 @@ use Test::More;
 BEGIN { use_ok 'Comserv::Controller::AI' }
 
 can_ok('Comserv::Controller::AI', 'models');
-can_ok('Comserv::Controller::AI', 'auto_sync_models');
+can_ok('Comserv::Controller::AI', 'sync_models');
 
 {
     my $controller = bless {}, 'Comserv::Controller::AI';
     
     ok($controller->can('models'), 'models method is available');
-    ok($controller->can('auto_sync_models'), 'auto_sync_models method is available');
+    ok($controller->can('sync_models'), 'sync_models method is available');
 }
 
 # Test AI controller loads without errors

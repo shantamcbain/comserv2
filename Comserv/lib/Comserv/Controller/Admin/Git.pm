@@ -1588,6 +1588,145 @@ sub switch_branch {
     return $self->git_service->switch_branch($c, $branch_name);
 }
 
+=head2 worktree_list
+
+GET /admin/git/worktrees
+List git worktrees (main repo + each zenflow branch checkout) with branch, port,
+and ahead/behind counts vs main. Drives the human review picker.
+
+=cut
+
+sub worktree_list :Path('/admin/git/worktrees') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_worktrees');
+
+    my $wts = $self->git_service->list_worktrees($c) || [];
+    my $main_branch = 'main';
+    for my $wt (@$wts) {
+        next if $wt->{is_main};
+        # ahead/behind of this worktree's branch vs main
+        my $r = $self->git_service->_run($c, 'rev-list', '--left-right', '--count',
+            "$main_branch...$wt->{branch}");
+        if ($r->{success} && $r->{output} =~ /^(\d+)\s+(\d+)/) {
+            $wt->{ahead}  = $1 + 0;
+            $wt->{behind} = $2 + 0;
+        }
+        else {
+            $wt->{ahead} = $wt->{behind} = 0;
+        }
+    }
+    $c->response->body(encode_json({ success => 1, worktrees => $wts }));
+}
+
+=head2 review_diff
+
+GET /admin/git/review/:branch
+Return the unified diff of :branch vs main (context=8) for the human review panel.
+Read-only.
+
+=cut
+
+sub review_diff :Path('/admin/git/review') :Args(1) {
+    my ($self, $c, $branch) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_review');
+
+    $branch //= '';
+    if (!$branch || $branch eq 'main') {
+        $c->response->body(encode_json({ success => 0, error => 'Select a worktree branch to review.' }));
+        return;
+    }
+    my $diff = $self->git_service->diff_against_main($c, $branch, 8);
+    $c->response->body(encode_json({ success => 1, branch => $branch, diff => $diff }));
+}
+
+=head2 merge_to_main
+
+POST /admin/git/merge_to_main
+Human-gated: runs the worktree test gate, then merges :branch into main (--no-ff).
+Refuses if tests fail or the branch is protected. On conflict, reports it.
+
+=cut
+
+sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $branch = $c->req->param('branch') // '';
+    if (!$branch || $branch eq 'main') {
+        $c->response->body(encode_json({ success => 0, error => 'A worktree branch is required.' }));
+        return;
+    }
+
+    # Ensure we are on main before merging.
+    my $cur = $self->get_current_branch($c);
+    if ($cur ne 'main') {
+        my $sw = $self->git_service->switch_branch($c, 'main');
+        unless ($sw->{success}) {
+            $c->response->body(encode_json({ success => 0, error => "Could not switch to main: $sw->{error_msg}" }));
+            return;
+        }
+    }
+
+    # Gate: tests must be green in the worktree before merge.
+    my $gate = $self->git_service->run_test_gate($c, $branch);
+    unless ($gate->{success}) {
+        $c->response->body(encode_json({
+            success => 0,
+            error   => "Test gate FAILED for '$branch' — merge blocked. Fix tests in the worktree first.",
+            detail  => $gate->{output},
+        }));
+        return;
+    }
+
+    my $res = $self->git_service->merge_branch($c, $branch);
+    if ($res->{conflict}) {
+        $c->response->body(encode_json({
+            success  => 0,
+            conflict => 1,
+            error    => "Merge conflict in '$branch'. Resolve in the worktree, then retry (or abort).",
+            output   => $res->{output},
+        }));
+        return;
+    }
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        output  => $res->{output},
+        error   => $res->{error_msg},
+    }));
+}
+
+=head2 push_main
+
+POST /admin/git/push_main
+Human-driven push of main to origin (restores the deliberate GitHub push that
+deploy.sh currently leaves disabled). Admin-only.
+
+=cut
+
+sub push_main :Path('/admin/git/push_main') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_push');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $res = $self->git_service->push_main($c);
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        output  => $res->{output},
+        error   => $res->{error_msg},
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

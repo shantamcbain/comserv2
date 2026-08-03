@@ -1,0 +1,143 @@
+[% META
+   title = "In-App Git: Worktree AI-Commit → Human Merge-to-Main Workflow"
+   description = "Design for the Git subsystem so AI agents commit in a zenflow worktree, all testing happens there, and a human admin on the main instance (3001) reviews a contextual diff, then merges the worktree branch into main and pushes to GitHub. Same commit rules apply to any AI (in-app, Hermes, browser editor)."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "git,ai-systems,security,development-plan"
+   page_version = "0.1"
+   last_updated = "Mon Aug 03 11:10:00 UTC 2026"
+   site_specific = "false"
+%]
+
+<div class="container">
+    <h1>In-App Git: Worktree AI-Commit &rarr; Human Merge-to-Main</h1>
+
+    <div class="last-updated">
+        Status: 📋 DRAFT for review &middot; Scope: extend Comserv::Util::Git + Admin::Git so the
+        AI-commits-in-worktree / human-merges-on-main model from the BrightTALK talk is enforced by the tooling.
+    </div>
+
+    <h2>1. The target workflow (matches the talk)</h2>
+    <ol>
+        <li><strong>AI works in a worktree.</strong> Agent (in-app AI, Hermes, or browser AI editor) edits files
+            in <code>~/.zenflow/worktrees/&lt;branch&gt;/Comserv</code> and commits there. The repo-level
+            <code>.git/hooks/pre-commit</code> (perl -c + gitleaks) gates every commit — same rule for all AIs.</li>
+        <li><strong>Testing happens in the worktree.</strong> The branch's own instance runs on its port
+            (aichatsystem-ef4e &rarr; 4010, etc., see _planning_tab.tt). <code>script/test_gate.sh</code> runs
+            there; must be green before merge.</li>
+        <li><strong>Human reviews on main (3001).</strong> The main instance dashboard lists worktree branches,
+            shows a per-file diff <em>with context</em>, lets the admin view/edit/stage changes, then
+            <strong>Merge to main</strong>.</li>
+        <li><strong>Human pushes to GitHub.</strong> After merge, main pushes <code>origin/main</code>.</li>
+    </ol>
+
+    <h2>2. Current state (what exists, what's missing)</h2>
+    <table style="width:100%; border-collapse:collapse;">
+        <tr style="background-color: rgba(255,255,255,0.15);">
+            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Capability</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Today</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Gap</th>
+        </tr>
+        <tr>
+            <td style="padding:8px; border:1px solid var(--border-color);">AI commit in worktree (gated)</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">✅ pre-commit hook covers it</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">—</td>
+        </tr>
+        <tr>
+            <td style="padding:8px; border:1px solid var(--border-color);">Test in worktree</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">✅ test_gate.sh + per-branch port</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">not yet a required pre-merge step</td>
+        </tr>
+        <tr>
+            <td style="padding:8px; border:1px solid var(--border-color);">Main sees worktree branch</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">✅ shared .git — branch IS visible</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">no UI to pick/inspect it</td>
+        </tr>
+        <tr>
+            <td style="padding:8px; border:1px solid var(--border-color);">Contextual diff review</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">partial (suggest_message reads diff)</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">no per-file view/edit/stage UI</td>
+        </tr>
+        <tr>
+            <td style="padding:8px; border:1px solid var(--border-color);">Merge worktree &rarr; main</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">❌ not in app</td>
+            <td style="padding:8px; border:1px solid var(--border-color);"><code>merge</code> not in Util::Git whitelist</td>
+        </tr>
+        <tr>
+            <td style="padding:8px; border:1px solid var(--border-color);">Push main &rarr; GitHub</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">✅ push exists (but deploy.sh pushes are currently disabled)</td>
+            <td style="padding:8px; border:1px solid var(--border-color);">wire as explicit human action</td>
+        </tr>
+    </table>
+
+    <h2>3. Changes required</h2>
+
+    <h3>3.1 Util::Git — add merge + worktree to the whitelist</h3>
+    <p>Add <code>merge</code> to <code>%ALLOWED_SUBCMD</code> and give it a tight flag allow-list
+    (<code>--no-ff</code>, <code>--no-commit</code>, <code>--abort</code>, <code>--squash</code>). Add
+    <code>worktree</code> (subcommands <code>list</code>, <code>prune</code> only — never <code>add</code> from the
+    app). Keep the no-shell / no-chdir / whitelist enforcement already in place.</p>
+
+    <h3>3.2 Admin::Git — worktree branch list + diff review endpoints</h3>
+    <ul>
+        <li><code>/admin/git/worktrees</code> (GET): list branches that have a worktree dir under
+            <code>~/.zenflow/worktrees/</code>, with ahead/behind vs main and last commit.</li>
+        <li><code>/admin/git/review/&lt;branch&gt;</code> (GET): for the chosen worktree branch, return a
+            structured per-file diff (<code>git diff main...&lt;branch&gt;</code>) with N lines of context,
+            file mode, and the worktree path. Front-end renders it as a reviewable, editable panel.</li>
+        <li><code>/admin/git/review/edit</code> (POST, admin-only): accept a corrected file body for a single
+            changed file (admin edits before merge); writes it into the worktree checkout and stages it there,
+            so the human's edits are part of the merged result. (Guard: only within the worktree dir;
+            path validated against the diff file list — no free-form paths.)</li>
+    </ul>
+
+    <h3>3.3 Admin::Git — the merge + push action (human-gated)</h3>
+    <ul>
+        <li><code>/admin/git/merge_to_main</code> (POST, admin-only):
+            <ol>
+                <li>Switch main repo to <code>main</code> (already have switch).</li>
+                <li>Run <code>script/test_gate.sh</code> against the worktree path; if not green, refuse merge
+                    with the failing output.</li>
+                <li><code>git merge --no-ff &lt;branch&gt;</code> (via the new whitelist entry).</li>
+                <li>On conflict, abort and report; human resolves in worktree then retries.</li>
+            </ol>
+        </li>
+        <li><code>/admin/git/push_main</code> (POST, admin-only): <code>git push origin main</code> from the main
+            repo — the explicit "push to GitHub" the human performs (currently deploy.sh leaves push disabled,
+            so this restores a deliberate, human-driven push).</li>
+    </ul>
+
+    <h3>3.4 Same rules for Hermes / browser AI editor</h3>
+    <p>The rule "AI commits only in the worktree, never to main" is enforced by two things that already cover
+    any AI: (a) the pre-commit hook is repo-level and shared by the worktree; (b) the app provides
+    <strong>no merge/push path for non-admins</strong> — <code>merge_to_main</code> and <code>push_main</code>
+    are admin-only. For Hermes/browser editors, the constraint is operational: they must be told to edit only
+    inside the worktree checkout path, exactly like the in-app AI. Add a one-line note to the AI dev-security
+    sub-project (ai_dev_security_quality_plan.tt) stating any AI — in-app, Hermes, or browser — commits solely
+    in the worktree and is merged only via the human merge action.</p>
+
+    <h2>4. Safety / guardrails</h2>
+    <ul>
+        <li><code>main</code> and <code>master</code> are protected: the app refuses to delete/force-push them
+            (already in <code>get_branch_details</code>).</li>
+        <li>Merge is admin-only and requires a green test gate; the app never auto-merges.</li>
+        <li>All git ops stay no-shell, no-chdir, whitelisted (existing Util::Git contract).</li>
+        <li>Worktree edits are path-confined to the diff's file list — no arbitrary file writes.</li>
+    </ul>
+
+    <h2>5. Sequencing (proposed)</h2>
+    <ol>
+        <li><strong>Step 1:</strong> Util::Git whitelist: add <code>merge</code> + <code>worktree</code> (low risk).</li>
+        <li><strong>Step 2:</strong> Admin::Git endpoints: worktrees list + review diff (read-only, safe).</li>
+        <li><strong>Step 3:</strong> Admin::Git: review/edit (admin edits a file) + merge_to_main (gated on test_gate).</li>
+        <li><strong>Step 4:</strong> Admin::Git: push_main (explicit human push to GitHub).</li>
+        <li><strong>Step 5:</strong> Front-end review panel in root/admin/git/index.tt (per-file diff with context + edit + Merge/Push buttons).</li>
+        <li><strong>Step 6:</strong> Document the all-AI rule in ai_dev_security_quality_plan.tt.</li>
+    </ol>
+
+    <h2>6. Open question for the user</h2>
+    <p>Should the worktree diff review UI let the admin <strong>edit individual files</strong> before merge
+    (writes into the worktree checkout), or only <strong>view + stage/unstage</strong> (edits done by the AI in
+    the worktree, human just approves)? Editing in-app is more powerful but a larger surface; view-only is
+    simpler and safer. Recommend view + stage first, edit later.</p>
+</div>

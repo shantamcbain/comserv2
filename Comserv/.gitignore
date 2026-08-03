@@ -28,6 +28,7 @@ root/Documentation/session_history/
 !root/Documentation/PlanningQueueRoleVisibilityPlan.md
 !root/Documentation/ProjectsPageFilterSearchPriorityPlan.md
 !root/Documentation/ProjectOwnershipBillingPlan.md
+!root/Documentation/AccountingEntityStructurePlan.md
 
 # Dev workstation TLS certs (never commit private keys)
 config/dev_tls/

@@ -2126,6 +2126,76 @@ sub normalize_data_type {
     return $mapping{$data_type} || $data_type;
 }
 
+=head2 _is_width_only_type
+
+True for types whose parenthetical is a meaningless DISPLAY WIDTH rather than a
+real length. MariaDB always reports C<int(11)> / C<tinyint(4)> even though the
+storage size is fixed by the type alone, and DBIx::Class Result files
+conventionally declare C<< data_type => 'integer' >> with no size. Comparing
+those two literally produces a permanent false "Update needed".
+
+=cut
+
+sub _is_width_only_type {
+    my ($self, $normalized_type) = @_;
+    return 0 unless defined $normalized_type;
+    return $normalized_type =~ /^(integer|boolean|bigint|smallint|mediumint)$/ ? 1 : 0;
+}
+
+=head2 _fields_equivalent
+
+Single comparison used by BOTH the Table row and the Result row so the two can
+never disagree. Normalizes the data type through C<normalize_data_type> (so
+MariaDB's C<int> matches a Result file's C<integer>) and ignores numeric display
+width. Returns true when the live column and the Result declaration mean the
+same thing.
+
+=cut
+
+sub _fields_equivalent {
+    my ($self, $d, $r) = @_;
+    return 0 unless $d && $r;
+
+    my $d_type = $self->normalize_data_type($d->{data_type} // '');
+    my $r_type = $self->normalize_data_type($r->{data_type} // '');
+    return 0 unless $d_type eq $r_type;
+
+    # Display width on integer/boolean types is cosmetic — MariaDB reports
+    # int(11)/tinyint(4) regardless of what was requested.
+    unless ($self->_is_width_only_type($d_type)) {
+        my $d_size = lc($d->{size} // '');
+        my $r_size = lc($r->{size} // '');
+        $d_size =~ s/[()\s]//g;
+        $r_size =~ s/[()\s]//g;
+        return 0 unless $d_size eq $r_size;
+    }
+
+    # Nullability: only compare when the Result file actually DECLARES it.
+    # An absent is_nullable is unknown, not a claim of NOT NULL -- see the
+    # comment at the result_columns build site.
+    if (defined $r->{is_nullable} && $r->{is_nullable} ne '') {
+        return 0 unless lc($d->{is_nullable} // '') eq lc($r->{is_nullable});
+    }
+
+    # CURRENT_TIMESTAMP has several spellings across MariaDB versions and
+    # Result files (current_timestamp() vs CURRENT_TIMESTAMP).
+    my $d_def = $d->{default_value} // 'NULL';
+    my $r_def = $r->{default_value} // 'NULL';
+    for ($d_def, $r_def) {
+        s/^\s+|\s+$//g;
+        # MariaDB reports "ON UPDATE CURRENT_TIMESTAMP" in the Extra column,
+        # while Result files fold it into default_value. Compare only the
+        # DEFAULT portion so the two spellings agree.
+        s/\s*ON\s+UPDATE\s+CURRENT_TIMESTAMP\s*(\(\))?//i;
+        s/\(\)$//;
+        $_ = uc($_) if /^current_timestamp/i;
+        $_ = 'NULL' if $_ eq '';
+    }
+    return 0 unless $d_def eq $r_def;
+
+    return 1;
+}
+
 sub clean_scalar_refs {
     my ($self, $data) = @_;
     
@@ -2746,11 +2816,28 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
                 my $sz = (defined $c->{size}       && $c->{size} ne '')
                       || (defined $c->{data_length} && $c->{data_length} ne '')
                     ? '(' . ($c->{size} // $c->{data_length} // '255') . ')' : '';
+                # DBIx::Class documents is_nullable as defaulting to false, but
+                # in this codebase many Result files simply OMIT the key on
+                # columns that are nullable in the database. Inferring NOT NULL
+                # from an absent key therefore flags ~14 populated nullable
+                # columns (files.*, workshop.*) as drift and offers an "Update
+                # Table" button that would ALTER them to NOT NULL -- which can
+                # fail or reject existing rows. Absent means UNKNOWN: record
+                # undef and let _fields_equivalent skip the nullability check
+                # rather than guess destructively.
+                my $nullable;
+                if (defined $c->{is_nullable}) {
+                    $nullable = ($c->{is_nullable} =~ /^(0|no|false)$/i) ? 'NO' : 'YES';
+                } elsif ($c->{is_auto_increment}) {
+                    $nullable = 'NO';   # auto-increment is always NOT NULL
+                } else {
+                    $nullable = undef;  # not declared -> do not compare
+                }
                 $result_columns{ lc($col_name) } = {
                     name          => $col_name,
                     data_type     => $dt,
                     size          => $sz,
-                    is_nullable   => (defined $c->{is_nullable} && $c->{is_nullable} eq '0') ? 'NO' : 'YES',
+                    is_nullable   => $nullable,
                     default_value => $c->{default_value},
                 };
             }
@@ -2770,11 +2857,7 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
 
         # --- Table row (always shown if field exists in DB) ---
         if ($d) {
-            my $match = $r
-                && lc($d->{data_type} // '')    eq lc($r->{data_type} // '')
-                && lc($d->{size} // '')          eq lc($r->{size} // '')
-                && lc($d->{is_nullable} // '')   eq lc($r->{is_nullable} // '')
-                && ($d->{default_value}//'NULL') eq ($r->{default_value}//'NULL');
+            my $match = $self->_fields_equivalent($d, $r);
             my $row_class = 'table-row';
             $row_class .= ' all-match' if $match;
             $row_class .= ' has-diff'   if !$match;
@@ -2799,11 +2882,7 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
 
         # --- Result row (only shown if field exists in Result file) ---
         if ($r) {
-            my $match = $d
-                && lc($d->{data_type} // '')    eq lc($r->{data_type} // '')
-                && lc($d->{size} // '')          eq lc($r->{size} // '')
-                && lc($d->{is_nullable} // '')   eq lc($r->{is_nullable} // '')
-                && ($d->{default_value}//'NULL') eq ($r->{default_value}//'NULL');
+            my $match = $self->_fields_equivalent($d, $r);
             my $row_class = 'result-row';
             $row_class .= ' all-match' if $match;
             $row_class .= ' has-diff'   if !$match;
