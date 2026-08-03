@@ -6,13 +6,23 @@ use warnings;
 __PACKAGE__->load_components(qw/TimeStamp/);
 __PACKAGE__->table('mailing_list_campaigns');
 
+# SCHEMA NOTE (2026-08-03): page_id, email_teaser, status, success_count and
+# fail_count are declared here but were absent from the live ency table, so DBIC
+# emitted them in every SELECT and newsletter sending died with
+# "Unknown column ... in 'SELECT'". Apply via /admin/schema_compare ->
+# sync_result_to_table. Verify with SHOW COLUMNS before trusting this comment --
+# it documents a condition that may already be resolved.
+
 __PACKAGE__->add_columns(
     id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
         is_auto_increment => 1,
     },
     mailing_list_id => {
-        data_type => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 0,
     },
     subject => {
@@ -38,11 +48,14 @@ __PACKAGE__->add_columns(
         set_on_create => 1,
     },
     recipient_count => {
-        data_type => 'integer',
-        default_value => 0,
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
+        default_value => '0',
     },
     page_id => {
-        data_type   => 'integer',
+        data_type => 'int',
+        size => 11,
         is_nullable => 1,
     },
     email_teaser => {
@@ -56,12 +69,16 @@ __PACKAGE__->add_columns(
         default_value => 'sent',
     },
     success_count => {
-        data_type     => 'integer',
-        default_value => 0,
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
+        default_value => '0',
     },
     fail_count => {
-        data_type     => 'integer',
-        default_value => 0,
+        data_type => 'int',
+        size => 11,
+        is_nullable => 0,
+        default_value => '0',
     },
     role_filter => {
         data_type => 'varchar',

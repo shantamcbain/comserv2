@@ -151,7 +151,7 @@
                         <summary id="site-summary" class="FilterDropdownSummary">Site: [% cal_filter_site || 'All' %] ▾</summary>
                         <div class="FilterDropdownMenu">
                             <label class="FilterDropdownItem">
-                                <input type="checkbox" class="site-cb" value="" [% UNLESS cal_filter_site %]checked[% END %] data-filter="apply">
+                                <input type="checkbox" class="site-all-cb" value="" [% UNLESS cal_filter_site %]checked[% END %] data-filter="site-all">
                                 All Sites
                             </label>
                             [% FOREACH sname IN ap_all_sitenames %]

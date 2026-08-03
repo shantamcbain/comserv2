@@ -65,9 +65,17 @@ __PACKAGE__->add_columns(
         is_nullable => 0,
         default_value => '1',
     },
-    # status column removed - does not exist in DB table
-    # unsubscribed_at => { data_type => 'timestamp', is_nullable => 1 },  # column missing in DB - commented to stop fatal error
-
+    status => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 0,
+        default_value => 'subscribed',
+        # Values: 'subscribed', 'unsubscribed', 'blocked'
+    },
+    unsubscribed_at => {
+        data_type   => 'timestamp',
+        is_nullable => 1,
+    },
     blocked_by => {
         data_type => 'int',
         size => 11,
@@ -94,16 +102,24 @@ __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint('unique_subscription' => ['mailing_list_id', 'user_id', 'source_id']);
 
 # Relationships
+#
+# NOTE: these are belongs_to (child -> parent). cascade_delete on a belongs_to
+# means "when this SUBSCRIPTION is deleted, delete the PARENT too" -- i.e.
+# removing one subscription would attempt to delete the whole mailing list and
+# the user account. Verified 2026-08-03: deleting a single throwaway
+# subscription issued DELETE FROM users WHERE id = 178 (a real admin account)
+# and was stopped only by an unrelated foreign key constraint. Never set
+# cascade_delete on a belongs_to; it belongs on has_many, where the parent
+# owns the children.
 __PACKAGE__->belongs_to(
     mailing_list => 'Comserv::Model::Schema::Ency::Result::MailingList',
     { 'foreign.id' => 'self.mailing_list_id' },
-    { cascade_delete => 1 },
 );
 
 __PACKAGE__->belongs_to(
     user => 'Comserv::Model::Schema::Ency::Result::User',
     { 'foreign.id' => 'self.user_id' },
-    { cascade_delete => 1 },
+    { join_type => 'left' },   # user_id is nullable (anonymous subscribers)
 );
 
 # Optional relationship to workshop if subscription_source is 'workshop'

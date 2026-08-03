@@ -1,0 +1,113 @@
+[% META
+   title = "Dev DB Isolation, Automated Backups & Availability — Implementation Plan"
+   description = "Focused plan extending the existing DatabaseEnv, BackupManager, and K3s/Docker strategies: force feature/worktree app instances onto a throwaway dev DB, automate scheduled backups, and raise availability via the already-planned K3s path."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "infrastructure,security,development-plan,deployment"
+   page_version = "0.1"
+   last_updated = "Mon Aug 03 10:30:00 UTC 2026"
+   site_specific = "false"
+%]
+
+<div class="container">
+    <h1>Dev DB Isolation, Automated Backups &amp; Availability — Implementation Plan</h1>
+
+    <div class="last-updated">
+        Status: 📋 DRAFT for review &middot; Scope: fills the gap between existing plans and a safe AI-assisted dev workflow.
+        This plan does NOT re-plan K8s/Docker HA (see DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt and
+        PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt). It extends the already-built
+        <code>Comserv::Util::DatabaseEnv</code> and <code>Comserv::Util::BackupManager</code> utilities.
+    </div>
+
+    <h2>1. Problem Statement (the gap)</h2>
+    <p>We run AI agents and feature branches inside git worktrees (zenflow) that boot a second Catalyst
+    instance per branch. The code is isolated, but the <strong>runtime database is not</strong>. The
+    default environment is <code>production</code> (<code>DatabaseEnv::get_active_environment</code> returns
+    <code>production</code> unless <code>ACTIVE_DB_ENVIRONMENT</code> is set), so a feature-branch server
+    still resolves to the live production DB (verified: a workstation test run connected to
+    <code>192.168.1.20:3307</code> = production). A "random error" or a bad agent mutation therefore writes
+    to real prod data. There is also no automated, scheduled backup job — <code>BackupManager</code> exists
+    for on-demand/manual backups but nothing runs it on a timer.</p>
+
+    <h2>2. Target State</h2>
+    <ul>
+        <li><strong>Isolation:</strong> any non-<code>main</code> / worktree / feature instance must run against a
+            <em>throwaway dev DB</em> — never production. Production is touched only by the real production container.</li>
+        <li><strong>Backups:</strong> automated, scheduled, off-host backups of production (and key config) with retention
+            and a tested restore path.</li>
+        <li><strong>Availability:</strong> reuse the already-approved K3s/Docker HA path for the app + DB; this plan only
+            adds the dev-isolation + backup automation that the HA plan assumes but does not cover.</li>
+    </ul>
+
+    <h2>3. Dev DB Isolation — Implementation</h2>
+    <p>The <code>DatabaseEnv</code> system already supports <code>production|staging|dev</code> and
+    <code>RemoteDB</code> already has <code>db_dev_mysql</code> and <code>db_dev_postgres</code> connection
+    profiles. We only need to <strong>force</strong> the dev profile for non-production instances.</p>
+
+    <h3>3.1 Force dev environment for worktree/feature instances</h3>
+    <p>In <code>Comserv.pm</code> startup (and/or <code>DatabaseEnv::get_active_environment</code>), add an
+    override: if <code>IS_DEV_WORKTREE</code> is true (already computed in <code>Root.pm:15</code>) OR the
+    instance is a feature-branch server, default <code>ACTIVE_DB_ENVIRONMENT</code> to <code>dev</code> unless an
+    explicit env var says otherwise. This mirrors how <code>BranchServerControl.pm</code> already distinguishes
+    <code>main</code> from worktree branches.</p>
+
+    <h3>3.2 Point dev connections at throwaway databases</h3>
+    <ul>
+        <li>Provision a dedicated dev MariaDB/Postgres (already referenced as <code>db_dev_mysql</code> /
+            <code>db_dev_postgres</code>). For agent work, seed it from a sanitized production snapshot or an
+            empty schema so agents never see live PII.</li>
+        <li>Set <code>ACTIVE_DB_ENVIRONMENT=dev</code> in the worktree instance's environment (e.g. in the
+            <code>BranchServerControl</code> start command, alongside <code>CATALYST_DEBUG=1</code>).</li>
+        <li>Document the one-liner: a feature branch server must export <code>ACTIVE_DB_ENVIRONMENT=dev</code>
+            before <code>comserv_server.pl</code> boots.</li>
+    </ul>
+
+    <h3>3.3 Guardrail</h3>
+    <p>Keep the existing <code>DatabaseEnv</code> metadata: <code>production</code> is
+    <code>confirmation_required =&gt; 1</code> and <code>read_only_recommended =&gt; 1</code>. Add a startup
+    assertion that a worktree instance may NEVER bind <code>production</code> — if it detects prod binding from a
+    worktree, refuse to boot (fail closed).</p>
+
+    <h2>4. Automated Backups — Implementation</h2>
+    <p><code>BackupManager</code> already archives protected files (PSGI, db_config, credentials) and can list/restore.
+    It does not run on a schedule. Add a thin scheduler:</p>
+    <ul>
+        <li>Create <code>script/backup_cron.sh</code> that calls <code>BackupManager</code> (and a
+            <code>mysqldump</code>/<code>pg_dump</code> for the prod DB) and writes to
+            <code>/data/nfs/backups</code> (BackupManager already prefers NFS when present).</li>
+        <li>Install a cron entry (e.g. daily 02:00, retained 14 days, with off-host copy to a second Proxmox
+            host or the existing backup VM 500).</li>
+        <li>Production DB dump must use the existing <code>db_production_mysql</code> read credentials — never
+            the app write path.</li>
+        <li>Log each run to the application log + emit a health event on failure (reuse
+            <code>Comserv::Util::HealthLogger</code> pattern already used by deploy failover).</li>
+    </ul>
+
+    <h2>5. Availability — Reuse, Don't Re-plan</h2>
+    <p>The HA work (K3s master on stable hardware, Galera/zero-downtime cutover, Docker Compose for dev) is
+    already specified in <code>DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</code> and
+    <code>PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt</code>. This plan adds only what those assume but omit:
+    <strong>dev isolation</strong> (§3) and <strong>backup automation</strong> (§4). No new HA design here.</p>
+
+    <h2>6. Sequencing</h2>
+    <ol>
+        <li><strong>Phase A (this sprint, low risk):</strong> §3.1–3.3 force dev env for worktrees + fail-closed guard.
+            Immediately stops agent runs from touching prod.</li>
+        <li><strong>Phase B:</strong> §4 backup cron + off-host copy + restore test.</li>
+        <li><strong>Phase C:</strong> align with the K3s cutover in the existing migration plans; carry the dev-isolation
+            rule into the K8s dev namespace.</li>
+    </ol>
+
+    <h2>7. Verification</h2>
+    <ul>
+        <li>Boot a worktree instance with no env override → assert its DB connection is <code>db_dev_*</code>, not
+            <code>db_production_mysql</code>.</li>
+        <li>Boot a worktree instance and force <code>ACTIVE_DB_ENVIRONMENT=production</code> → assert it refuses to
+            start.</li>
+        <li>Run <code>script/backup_cron.sh</code> manually → assert a dated archive appears in
+            <code>/data/nfs/backups</code> and a restore from it succeeds on a scratch DB.</li>
+    </ul>
+
+    <p style="margin-top:20px;"><em>Next: review, then implement Phase A (dev-isolation) as code; Phase B (backups) as
+    script + cron; Phase C tracks the existing K3s plan.</em></p>
+</div>

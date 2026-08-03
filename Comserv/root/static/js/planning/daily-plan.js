@@ -145,6 +145,11 @@
         var allRoleCbs    = document.querySelectorAll('.role-cb');
         var checkedRoles  = new Set(Array.from(document.querySelectorAll('.role-cb:checked')).map(function(cb){ return cb.value; }));
         var allRoleVals   = new Set(Array.from(allRoleCbs).map(function(cb){ return cb.value; }));
+        // NOTE: .site-cb are the real per-site boxes only. The "All Sites" master
+        // toggle is .site-all-cb and is deliberately EXCLUDED here — when it carried
+        // class site-cb with value="", it inflated allSiteCbs and put '' into
+        // checkedSites, so the siteFiltered comparison mis-counted and unchecking
+        // "All Sites" alone silently filtered nothing.
         var allSiteCbs    = document.querySelectorAll('.site-cb');
         var checkedSites  = new Set(Array.from(document.querySelectorAll('.site-cb:checked')).map(function(cb){ return cb.value; }));
         var siteFiltered  = allSiteCbs.length > 0 && checkedSites.size < allSiteCbs.length;
@@ -181,6 +186,23 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ site: sessionSite })
         }).catch(function(){});
+    }
+
+    function onSiteAllChange(masterCb) {
+        // Master toggle: drive every real site checkbox from "All Sites".
+        document.querySelectorAll('.site-cb').forEach(function(cb) { cb.checked = masterCb.checked; });
+        masterCb.indeterminate = false;
+        applyAllFilters();
+    }
+
+    function syncSiteAllCb() {
+        // Reflect partial selections back onto the master toggle.
+        var master = document.querySelector('.site-all-cb');
+        if (!master) return;
+        var all     = document.querySelectorAll('.site-cb').length;
+        var checked = document.querySelectorAll('.site-cb:checked').length;
+        master.checked       = (all > 0 && checked === all);
+        master.indeterminate = (checked > 0 && checked < all);
     }
 
     function onProjectParentChange(cb) {
@@ -227,10 +249,14 @@
                 : 'Site: ' + Array.from(checkedS).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
         }
         updateProjectSummary();
+        syncSiteAllCb();
     }
 
     window.clearAllFilters = function() {
-        document.querySelectorAll('.role-cb,.site-cb,.project-cb').forEach(function(cb){ cb.checked = true; });
+        document.querySelectorAll('.role-cb,.site-cb,.project-cb,.site-all-cb').forEach(function(cb){
+            cb.checked = true;
+            cb.indeterminate = false;
+        });
         applyAllFilters();
     };
 
@@ -282,6 +308,7 @@
     // Expose filter functions if needed elsewhere
     window.applyAllFilters = applyAllFilters;
     window.onProjectParentChange = onProjectParentChange;
+    window.onSiteAllChange = onSiteAllChange;
     window.updateProjectSummary = updateProjectSummary;
 
     document.addEventListener('DOMContentLoaded', initFilters);

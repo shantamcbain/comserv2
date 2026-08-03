@@ -299,7 +299,13 @@ sub parse_result_file_columns {
         pos($def) = 0 if defined pos($def);
         while ($def =~ /(\w+)\s*=>\s*/g) {
             my $attr = $1; my $val;
-            if ($def =~ /\G\s*(['"])((?:(?!\1).)*)\1/gc) { $val = $2; }
+            # Scalar-ref literal SQL, e.g. default_value => \'CURRENT_TIMESTAMP'.
+            # Must be tested BEFORE the plain-quote branch: the leading backslash
+            # makes /\G\s*(['"])/ fail, so these previously fell through to the
+            # bareword branch and parsed as undef -- which made every
+            # set_on_create timestamp read as a permanent "Update needed".
+            if ($def =~ /\G\s*\\\s*(['"])((?:(?!\1).)*)\1/gc) { $val = $2; }
+            elsif ($def =~ /\G\s*(['"])((?:(?!\1).)*)\1/gc) { $val = $2; }
             elsif ($def =~ /\G\s*(\d+)/gc) { $val = $1 + 0; }
             elsif ($def =~ /\G\s*undef\b/gc) { $val = undef; }
             elsif ($def =~ /\G\s*\{/gc) {

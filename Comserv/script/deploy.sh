@@ -1355,6 +1355,29 @@ else
     echo "   ⚠ Warning: /opt/comserv/Comserv/db_config.json not found on host"
 fi
 
+# ── Security scan gate (pre-deploy) ─────────────────────────────────────────
+# Runs the free hardening stack (gitleaks + cpan-audit + trivy) with STRICT=1 so
+# a hard finding blocks the deploy instead of merely printing a summary.
+# Opt-in via COMSERV_SECURITY_GATE=1 (keeps default deploy flows unchanged and
+# avoids requiring the binaries on every routine call). The scan only inspects
+# git-tracked source, never runtime/secret files.
+if [ "${COMSERV_SECURITY_GATE:-0}" = "1" ]; then
+    echo "=== SECURITY SCAN GATE (STRICT) ==="
+    SCAN_SCRIPT="$SCRIPT_DIR/security_scan.sh"
+    if [ -x "$SCAN_SCRIPT" ]; then
+        if STRICT=1 bash "$SCAN_SCRIPT"; then
+            echo "   ✅ Security scan passed — proceeding with deploy."
+        else
+            echo "🛑 SECURITY SCAN GATE FAILED — deploy aborted to protect production."
+            echo "   Review the findings above (secrets / CPAN advisories / image vulns),"
+            echo "   remedy, then re-run deploy with COMSERV_SECURITY_GATE=1."
+            exit 1
+        fi
+    else
+        echo "   ⚠️  security_scan.sh not found at $SCAN_SCRIPT — skipping gate (set COMSERV_SKIP_SECURITY_GATE=1 to silence)."
+    fi
+fi
+
 echo "3. Starting new container..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
 

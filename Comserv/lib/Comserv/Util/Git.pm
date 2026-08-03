@@ -48,7 +48,7 @@ Logging uses the standard helper; all public methods therefore take C<$c>.
 # Allowed git subcommands. Anything else is refused by _run.
 my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
     status log rev-parse rev-list branch diff fetch pull push
-    add commit stash checkout show restore rm
+    add commit stash checkout show restore rm merge worktree
 );
 
 # Per-subcommand allow-list of flags (leading '-'). User values are NEVER flags.
@@ -58,7 +58,7 @@ my %ALLOWED_FLAGS = (
     'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short) },
     'rev-list'  => { map { $_ => 1 } qw(--left-right --count) },
     branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color --format) },
-    diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only) },
+    diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified) },
     fetch    => { map { $_ => 1 } qw(--prune) },
     pull     => { map { $_ => 1 } qw(--ff-only) },
     push     => { map { $_ => 1 } qw(--set-upstream -u --delete) },
@@ -69,6 +69,13 @@ my %ALLOWED_FLAGS = (
     show     => { map { $_ => 1 } qw(--no-color) },
     restore  => { map { $_ => 1 } qw(--staged) },
     rm       => { map { $_ => 1 } qw(--cached -r) },
+    # Merge is human-gated (admin-only in the controller). Allowed flags keep it safe:
+    # --no-ff (always create a merge commit), --no-commit (review then commit),
+    # --abort (cancel a conflicted merge), --squash (optional single-commit merge).
+    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash) },
+    # Worktree is read/maintenance only from the app: list + prune. Never 'add'
+    # (worktrees are created out-of-band by the branch-server tooling).
+    worktree => { map { $_ => 1 } qw(list prune) },
 );
 
 sub new {
@@ -947,6 +954,200 @@ sub switch_branch {
 
     $result->{success}     = 1;
     $result->{success_msg} = "Successfully switched to branch '$branch_name'.";
+    return $result;
+}
+
+=head2 list_worktrees($c)
+
+Return an arrayref of worktree entries for the repo:
+  { path, branch, is_main, port }
+Port is derived from the known worktree layout (~/.zenflow/worktrees/<branch>/Comserv)
+using the same port map the dashboard uses (BranchServerControl / _planning_tab.tt).
+Main repo (no .zenflow/worktrees in its path) is reported as is_main => 1.
+
+=cut
+
+sub list_worktrees {
+    my ($self, $c) = @_;
+
+    my $repo = $self->repo_path($c) // return [];
+    my $r = $self->_run($c, 'worktree', 'list', '--porcelain');
+    my @rows;
+    return \@rows unless $r->{success};
+
+    # git worktree list --porcelain emits, per worktree:
+    #   <worktree-path>
+    #   HEAD <sha>
+    #   branch refs/heads/<name>     (or "detached")
+    my ($path, $branch);
+    for my $line (split /\n/, $r->{output}) {
+        if ($line =~ /^(\S.*)$/) {
+            $path  = $1;  $branch = undef;
+        }
+        elsif ($line =~ /^branch\s+refs\/heads\/(.+)$/) {
+            $branch = $1;
+        }
+        elsif ($line eq '' && defined $path) {
+            push @rows, _worktree_row($path, $branch);
+            $path = undef;
+        }
+    }
+    push @rows, _worktree_row($path, $branch) if defined $path;
+    return \@rows;
+}
+
+sub _worktree_row {
+    my ($path, $branch) = @_;
+    my $is_main = ($path !~ m{\.zenflow[/\\]worktrees[/\\]});
+    my $wt_branch;
+    if ($path =~ m{\.zenflow[/\\]worktrees[/\\]([^/\\]+)}) {
+        $wt_branch = $1;
+    }
+    return {
+        path     => $path,
+        branch   => $branch // ($wt_branch // 'detached'),
+        is_main  => $is_main ? 1 : 0,
+        port     => $is_main ? 3001 : _worktree_port($wt_branch // ''),
+    };
+}
+
+# Port map mirrored from root/admin/planning/_planning_tab.tt so the dashboard
+# can deep-link each worktree's running instance.
+my %WORKTREE_PORTS = (
+    'aichatsystem-ef4e'                    => 4010,
+    'schema-managment-system-7eb3'        => 4002,
+    'infrastructuremanagement-d133'        => 4003,
+    'workshops-7d21'                       => 4004,
+    'users-e5b8'                           => 4005,
+    'new-task-bb05'                        => 4006,
+    'unified-mail-system-site-managed-2c53' => 4007,
+    'membership-1304'                      => 4008,
+    'pointsystem-3230'                     => 4009,
+    'cssthemes-9195'                       => 4011,
+    'ency-53b0'                            => 4012,
+    'helpdesk-7217'                        => 4013,
+    'healthplanning-9db9'                  => 4014,
+    'productionserverhealth-82fb'          => 4015,
+    'security-764f'                        => 4016,
+    'documentation-9122'                   => 4017,
+    'api-bc05'                             => 4018,
+    'bmaster-f0fd'                         => 4019,
+    'aichatsystem-planning-system-int-f187' => 4020,
+    'inventory-system-104a'                => 4021,
+    '3dprinting-use-this-as-the-branc-41f3' => 4030,
+    'developer-time-logging-points-ba-542a' => 4022,
+    'page-management-system-implement-41a1' => 4023,
+    'docker-5c15'                          => 4024,
+    'planning-system-continue-from-pl-bdac' => 4001,
+);
+
+sub _worktree_port {
+    my ($branch) = @_;
+    return $WORKTREE_PORTS{$branch} // 0;
+}
+
+=head2 diff_against_main($c, $branch, $context)
+
+Return the unified diff of $branch vs main (three-dot range main...$branch) with
+$context lines of context per hunk (default 5). Used by the human review panel so
+admins see exactly what the AI changed before merging.
+
+=cut
+
+sub diff_against_main {
+    my ($self, $c, $branch, $context) = @_;
+    $context //= 5;
+    $context = 5 if $context !~ /^\d+$/ || $context < 0 || $context > 50;
+
+    my $r = $self->_run($c, 'diff', "-U$context", 'main...' . $branch);
+    return $r->{output} // '';
+}
+
+=head2 merge_branch($c, $branch)
+
+Human-gated merge of $branch into the current branch (expected to be main) using
+--no-ff so a merge commit is always created (auditable). Caller must have already
+verified the branch is non-protected and tests are green. On conflict, --abort is
+NOT auto-run here; the controller reports the conflict and offers abort.
+
+=cut
+
+sub merge_branch {
+    my ($self, $c, $branch) = @_;
+    my $result = { success => 0, output => '', action => 'merge_branch' };
+
+    if (!$branch) {
+        $result->{error_msg} = "Branch name is required.";
+        return $result;
+    }
+    if ($branch eq 'main' || $branch eq 'master' || $branch eq 'Production') {
+        $result->{error_msg} = "Refusing to merge a protected branch into itself.";
+        return $result;
+    }
+
+    my $r = $self->_run($c, 'merge', '--no-ff', $branch);
+    $result->{output} = $r->{output};
+    if ($r->{success}) {
+        $result->{success}     = 1;
+        $result->{success_msg} = "Merged '$branch' into current branch.";
+    }
+    else {
+        # Detect conflict so the UI can offer --abort.
+        if ($r->{output} =~ /CONFLICT|Automatic merge failed/) {
+            $result->{conflict} = 1;
+        }
+        $result->{error_msg} = "Merge of '$branch' failed (see output).";
+    }
+    return $result;
+}
+
+=head2 run_test_gate($c, $branch)
+
+Run script/test_gate.sh against the worktree checkout for $branch so the merge is
+blocked unless tests are green. Returns { success, output }. The worktree checkout
+path is derived from the standard layout; falls back to the repo root if unknown.
+
+=cut
+
+sub run_test_gate {
+    my ($self, $c, $branch) = @_;
+    my $repo = $self->repo_path($c) // return { success => 0, output => 'no repo' };
+
+    my $wt_dir = ($branch && $branch ne 'main')
+        ? "$ENV{HOME}/.zenflow/worktrees/$branch/Comserv"
+        : $repo;
+    $wt_dir = $repo unless $wt_dir && -d $wt_dir;
+
+    my $script = "$wt_dir/script/test_gate.sh";
+    $script = "$repo/script/test_gate.sh" unless -f $script;
+    return { success => 0, output => "test_gate.sh not found at $script" } unless -f $script;
+
+    my $out = `cd "$wt_dir" && bash "$script" --fast 2>&1`;
+    my $code = $? >> 8;
+    return { success => ($code == 0 ? 1 : 0), output => $out // '' };
+}
+
+=head2 push_main($c)
+
+Explicit, human-driven push of the current branch (expected main) to origin.
+This restores the deliberate GitHub push that deploy.sh currently leaves disabled.
+
+=cut
+
+sub push_main {
+    my ($self, $c) = @_;
+    my $result = { success => 0, output => '', action => 'push_main' };
+
+    my $branch = $self->get_current_branch($c);
+    my $r = $self->_run($c, 'push', 'origin', $branch);
+    $result->{output} = $r->{output};
+    if ($r->{success}) {
+        $result->{success}     = 1;
+        $result->{success_msg} = "Pushed '$branch' to origin.";
+    }
+    else {
+        $result->{error_msg} = "Push of '$branch' failed (see output).";
+    }
     return $result;
 }
 

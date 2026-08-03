@@ -791,6 +791,7 @@
         if (cb && cb.tagName === 'INPUT' && cb.type === 'checkbox') {
             var filterAction = cb.getAttribute('data-filter');
             if (filterAction === 'apply') { applyAllFilters(); return; }
+            if (filterAction === 'site-all') { onSiteAllChange(cb); return; }
             if (filterAction === 'parent-change') { onProjectParentChange(cb); return; }
             if (filterAction === 'apply-update') { applyAllFilters(); updateProjectSummary(); return; }
         }
