@@ -1,0 +1,413 @@
+[% META
+    title        = "Immutable Image Deploy Plan (IMGDEP)"
+    description  = "Replace the bind-mount + git-pull + docker-cp deploy model with a single immutable, git-sha-tagged container image as the only production artifact."
+    roles        = "admin,developer"
+    TemplateType = "Documentation"
+    category     = "System / Infrastructure"
+    page_version = "1.0"
+    last_updated = "2026-08-04"
+    site_specific = "false"
+%]
+
+<div class="container">
+
+    <h1>Immutable Image Deploy Plan (IMGDEP)</h1>
+
+    <div class="last-updated" style="color: var(--text-muted-color); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px;">
+        Last Updated: 2026-08-04 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Status: <strong style="color: var(--warning-color);">DRAFT — awaiting review</strong>
+    </div>
+
+    <div id="toc" class="row" style="border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-bottom: 24px;">
+        <div class="col-100">
+            <strong style="color: var(--text-color);">Quick Navigation</strong><br>
+            <a class="btn btn-secondary" href="#problem">1. The Problem</a>
+            <a class="btn btn-secondary" href="#evidence">2. Evidence</a>
+            <a class="btn btn-secondary" href="#rootcause">3. Root Cause</a>
+            <a class="btn btn-secondary" href="#target">4. Target Model</a>
+            <a class="btn btn-secondary" href="#tradeoffs">5. Trade-offs</a>
+            <a class="btn btn-secondary" href="#phases">6. Phases</a>
+            <a class="btn btn-secondary" href="#rollback">7. Rollback</a>
+            <a class="btn btn-secondary" href="#decisions">8. Open Decisions</a>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="problem">1. The Problem</h2>
+
+    <p style="color: var(--text-color);">
+        Production deploys are not reliably verifiable. After a deploy, the question
+        <em>"is my code actually live?"</em> cannot be answered from any single source of truth.
+        This has consumed multiple days of engineering time and has produced repeated
+        false conclusions in both directions — believing prod was stale when it was current,
+        and believing it was current when it was stale.
+    </p>
+
+    <p style="color: var(--text-color);">
+        The observable symptom on 2026-08-04: a deploy served new code to production while
+        <code>DEPLOY_STATUS.json</code> still reported a commit from six weeks earlier, and
+        <code>deploy-logs/</code> received no new entry. Meanwhile <code>version.json</code> had been
+        stamped with the new commit. Two deploy artifacts, written by the same script,
+        disagreed with each other. The only way to establish the truth was to fetch production
+        URLs and grep the returned HTML for database error strings.
+    </p>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <!-- ============================================================ -->
+    <h2 id="evidence">2. Evidence</h2>
+
+    <table class="data-table">
+        <thead>
+            <tr><th>Measurement</th><th>Value</th><th>Interpretation</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Deploy logs on disk</td>
+                <td><strong>110</strong> (<code>deploy-logs/*.log</code>)</td>
+                <td>Deploying is a frequent, high-friction, retry-heavy activity.</td>
+            </tr>
+            <tr>
+                <td><code>Comserv/script/deploy.sh</code></td>
+                <td><strong>1,658 lines</strong></td>
+                <td>Deploy logic has grown to absorb the ambiguity of the artifact model.</td>
+            </tr>
+            <tr>
+                <td>Competing delivery mechanisms in one script</td>
+                <td><strong>3</strong></td>
+                <td>docker build/push/pull; <code>git pull</code> on the prod host (11 call sites); <code>docker cp</code> of host <code>lib/</code> into the running container.</td>
+            </tr>
+            <tr>
+                <td>Production bind mount</td>
+                <td><code>./Comserv:/opt/comserv:ro</code> (<code>docker-compose.yml:145</code>)</td>
+                <td>The container serves the host working directory, not the image contents.</td>
+            </tr>
+            <tr>
+                <td>Deploy script comment at <code>:268</code></td>
+                <td>"Docker image alone does not include git pull."</td>
+                <td>The artifact model is documented as insufficient, in the code itself.</td>
+            </tr>
+            <tr>
+                <td>Restart-loop mitigation at <code>:283</code></td>
+                <td>Lib-tree SHA-256 stamp file</td>
+                <td>Added because unconditional restarts were "bouncing production 6x/hour".</td>
+            </tr>
+            <tr>
+                <td>Compose build context</td>
+                <td><code>context: .</code> + <code>dockerfile: Dockerfile</code></td>
+                <td><strong>No <code>Dockerfile</code> exists at repo root</strong> — it is at <code>Comserv/Dockerfile</code>. The prod build stanza cannot work as written.</td>
+            </tr>
+            <tr>
+                <td>Compose build target</td>
+                <td><code>target: production</code></td>
+                <td><strong>No stage named <code>production</code> exists.</strong> <code>Comserv/Dockerfile</code> declares only <code>builder</code>; the runtime stage is unnamed.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="border-left: 4px solid var(--warning-color); padding: 10px 14px; margin: 16px 0; background: var(--bg-alt-color);">
+        <strong style="color: var(--text-color);">Key inference:</strong>
+        <span style="color: var(--text-color);">
+        The last two rows mean the <code>web-prod</code> service <em>cannot presently be built from
+        compose at all</em>. Production therefore runs an image built by some other path, with the
+        real application code supplied by the bind mount. This is why the image tag carries no
+        information about what is running.
+        </span>
+    </div>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <!-- ============================================================ -->
+    <h2 id="rootcause">3. Root Cause</h2>
+
+    <p style="color: var(--text-color);">
+        <strong>There is no deployment artifact.</strong> The container image is a Perl runtime
+        wrapper; the application code arrives separately via bind mount, <code>git pull</code>, or
+        <code>docker cp</code>. Because code identity is decoupled from image identity, no
+        <code>docker</code> command can report what is running, and every "what is live?" question
+        must be answered by out-of-band bookkeeping files that are written non-atomically and
+        therefore drift.
+    </p>
+
+    <p style="color: var(--text-color);">
+        Every persistent deploy defect is downstream of this one fact:
+    </p>
+
+    <ul style="color: var(--text-color);">
+        <li><strong>Unverifiable deploys</strong> — no immutable identity to inspect.</li>
+        <li><strong>Bookkeeping drift</strong> — <code>DEPLOY_STATUS.json</code> vs <code>version.json</code> vs <code>deploy-logs/</code> vs the container's own state are four independent writes; any can fail silently.</li>
+        <li><strong>The lib-sync / restart loop</strong> — a workaround for the image not containing the code.</li>
+        <li><strong>No real rollback</strong> — reverting means re-running git operations on the prod host, not re-pulling a known-good artifact.</li>
+        <li><strong>Deploy-script growth</strong> — the 1,658 lines are almost entirely reconciliation logic between the three delivery paths.</li>
+    </ul>
+
+    <p style="color: var(--text-color);">
+        We are paying the full complexity cost of containers while receiving none of their
+        central guarantee: that a running container is a known, reproducible artifact.
+    </p>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <!-- ============================================================ -->
+    <h2 id="target">4. Target Model</h2>
+
+    <p style="color: var(--text-color);">
+        <strong>The image is the only artifact. It is immutable and tagged by git SHA.</strong>
+    </p>
+
+    <table class="data-table">
+        <thead><tr><th>Rule</th><th>Detail</th></tr></thead>
+        <tbody>
+            <tr><td>Code enters the image at build time</td><td><code>COPY</code> only. No bind mount of application code in production.</td></tr>
+            <tr><td>Tag by content, never by <code>:latest</code></td><td><code>comserv-web-prod:&lt;git-sha&gt;</code>. <code>:latest</code> may exist as a moving alias but is never what a deploy references.</td></tr>
+            <tr><td>Deploy is pull + up</td><td><code>docker pull &lt;sha&gt;</code> then <code>docker compose up -d</code>. No git operations on the production host.</td></tr>
+            <tr><td>Identity is queryable</td><td><code>docker inspect</code> returns the running SHA. This replaces <code>DEPLOY_STATUS.json</code>, <code>version.json</code>, and the lib-hash stamp file.</td></tr>
+            <tr><td>Rollback is a tag change</td><td>Re-pull the previous SHA and restart. No reverse-migration of source on the host.</td></tr>
+            <tr><td>Refuse to deploy a dirty tree</td><td>A build from uncommitted code produces a SHA that does not exist in git. The build must fail loudly rather than auto-commit.</td></tr>
+        </tbody>
+    </table>
+
+    <p style="color: var(--text-color);">
+        Mounts that <em>remain</em> in production (these are data and config, not code, and are
+        correctly external to the image): the secrets directory, the NFS data path, the
+        whisper venv volume, and the CPAN cache volume.
+    </p>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <!-- ============================================================ -->
+    <h2 id="tradeoffs">5. Trade-offs (read before approving)</h2>
+
+    <table class="data-table">
+        <thead><tr><th>What we gain</th><th>What we give up</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>A deploy can be verified in one command.</td>
+                <td><strong>No hot-editing <code>.pm</code> files on production.</strong> Today a file can be changed on the prod host and picked up by a restart. That stops.</td>
+            </tr>
+            <tr>
+                <td>Rollback becomes trivial and safe.</td>
+                <td><strong>Every change requires a build.</strong> A one-line fix costs a full image build and push (minutes, not seconds).</td>
+            </tr>
+            <tr>
+                <td>Most of <code>deploy.sh</code> becomes deletable.</td>
+                <td>Build infrastructure must be reliable, because there is no longer a manual bypass.</td>
+            </tr>
+            <tr>
+                <td>Bookkeeping files and their drift disappear.</td>
+                <td>Registry storage grows — needs a tag retention policy.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="border-left: 4px solid var(--info-color); padding: 10px 14px; margin: 16px 0; background: var(--bg-alt-color);">
+        <span style="color: var(--text-color);">
+        The loss of hot-editing is the real cost and should not be minimised. The counter-argument
+        is that hot-editing is precisely the mechanism that makes the current system unverifiable:
+        it is the reason a running container's contents cannot be predicted from its tag.
+        </span>
+    </div>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <!-- ============================================================ -->
+    <h2 id="phases">6. Phases</h2>
+
+    <p style="color: var(--text-color);">
+        Infrastructure first, then a gate, then application cutover — consistent with the
+        project's standing deploy-work convention. <strong>No phase after Ph.0 begins until the
+        preceding gate is demonstrated.</strong>
+    </p>
+
+    <h3 style="color: var(--text-color);">Ph.0 — Repair the build definition <span style="color: var(--danger-color);">(blocker)</span></h3>
+    <ul style="color: var(--text-color);">
+        <li>Name the runtime stage in <code>Comserv/Dockerfile</code> (<code>FROM ${BASE_IMAGE} AS production</code>).</li>
+        <li>Correct <code>docker-compose.yml</code> <code>web-prod.build</code> to point at the real Dockerfile path and context.</li>
+        <li>Audit <code>.dockerignore</code> so that <code>COPY . .</code> captures the application and excludes secrets, logs, and <code>blib/</code>.</li>
+    </ul>
+    <p style="color: var(--text-color);"><strong>GATE 0:</strong> <code>docker compose build web-prod</code> succeeds from a clean checkout, unassisted.</p>
+
+    <h3 style="color: var(--text-color);">Ph.1 — Prove the image is self-sufficient</h3>
+    <ul style="color: var(--text-color);">
+        <li>Run the freshly built image locally with <strong>the code bind mount removed</strong> (data/secret mounts retained).</li>
+        <li>Exercise the routes that previously exposed deploy failures: <code>/</code>, <code>/shop</code>, <code>/membership</code>, <code>/planning/daily</code>.</li>
+    </ul>
+    <p style="color: var(--text-color);"><strong>GATE 1:</strong> All four routes return HTTP 200 with no database or template error signatures, with no application code mounted from the host.</p>
+
+    <h3 id="registry" style="color: var(--text-color);">Ph.1.5 — Stand up the LAN registry <span style="color: var(--danger-color);">(prerequisite for Ph.2/Ph.3)</span></h3>
+    <p style="color: var(--text-color);">
+        Decided 2026-08-04 (D1/D2): build locally on the workstation; push to a <strong>LAN-local</strong>
+        registry; production pulls over the LAN. GitHub Actions is rejected — it adds a cloud round-trip
+        to a LAN-internal problem. The registry is our own infrastructure: it must exist before a deploy
+        can run, and its storage must be monitored. It is a portable Docker LAN service, consistent with
+        the project convention.
+    </p>
+    <ul style="color: var(--text-color);">
+        <li>Run <code>registry:2</code> on a LAN host (e.g. the NFS host or the workstation itself) on port <code>5000</code>; give it a named volume so tags persist across registry restarts.</li>
+        <li>Because the registry is HTTP (not TLS), every Docker daemon that pulls from it must list it as an insecure registry (<code>/etc/docker/daemon.json</code> → <code>"insecure-registries": ["&lt;lan-host&gt;:5000"]</code>, then <code>systemctl restart docker</code>) on <strong>both</strong> the workstation and production1.</li>
+        <li>Tag scheme: <code>&lt;lan-host&gt;:5000/comserv-web-prod:&lt;git-sha&gt;</code> and a floating <code>:latest</code> alias (never what a deploy references).</li>
+    </ul>
+    <p style="color: var(--text-color);"><strong>GATE 1.5:</strong> <code>docker push</code> from the workstation and <code>docker pull</code> from production1 both succeed against the LAN registry; <code>docker inspect</code> on a pulled image reports the pushed SHA tag.</p>
+
+    <h3 style="color: var(--text-color);">Ph.2 — SHA tagging, provenance, and push</h3>
+    <ul style="color: var(--text-color);">
+        <li>Compute the SHA from the <em>committed</em> tree: <code>SHA=$(git rev-parse --short HEAD)</code>. <strong>Refuse to build on a dirty tree</strong> — a build from uncommitted code produces a SHA that does not exist in git, which is exactly the "which build is this?" ambiguity we are removing. Fail loudly instead of auto-committing.</li>
+        <li>Build and tag: <code>docker build -t &lt;lan-host&gt;:5000/comserv-web-prod:$SHA -f Comserv/Dockerfile Comserv/</code> then <code>docker push &lt;lan-host&gt;:5000/comserv-web-prod:$SHA</code>.</li>
+        <li>Embed the SHA as an OCI label (<code>--label com.comserv.build.git_sha=$SHA</code>) so it survives even without the tag.</li>
+    </ul>
+    <p style="color: var(--text-color);"><strong>GATE 2:</strong> <code>docker inspect</code> on a running container reports a SHA that resolves to a real commit in <code>git log</code>; <code>docker pull</code> of that tag from production1 succeeds.</p>
+
+    <h3 style="color: var(--text-color);">Ph.3 — Production cutover (pull + up, no git on prod)</h3>
+    <ul style="color: var(--text-color);">
+        <li>Remove <code>./Comserv:/opt/comserv:ro</code> from the <code>web-prod</code> service in <code>docker-compose.yml</code>.</li>
+        <li>On production1: <code>docker pull &lt;lan-host&gt;:5000/comserv-web-prod:$SHA</code> then restart the service pinned to that tag. No <code>git pull</code>, no <code>docker cp</code>.</li>
+        <li>Verify by <code>docker inspect</code> (the SHA must match the workstation build) <em>and</em> by symptom probe (the method that settled the 2026-08-04 question): fetch the route groups and grep for error signatures.</li>
+        <li>Supply <code>db_config.json</code> as an explicit runtime mount (not the whole code tree) until the bootstrap retirement (IMGSEC #1884) lands.</li>
+    </ul>
+    <p style="color: var(--text-color);"><strong>GATE 3:</strong> Production1 server header reports the same Git SHA as the workstation (<code>main@&lt;sha&gt;</code>); a deliberate rollback to the prior SHA (re-pull + restart) succeeds and is verified. <strong>Note:</strong> as of 2026-08-04 production1 was 3 days stale on a divergent commit (<code>c58120ed</code> vs workstation <code>850bd3fb</code>) — GATE 3 is not met until both nodes agree.</p>
+
+    <h3 style="color: var(--text-color);">Ph.4 — Retire the superseded mechanisms</h3>
+    <ul style="color: var(--text-color);">
+        <li>Delete <code>sync_host_app_lib()</code> and the lib-hash stamp file.</li>
+        <li>Remove <code>git pull</code> from the production path.</li>
+        <li>Retire <code>DEPLOY_STATUS.json</code> and <code>version.json</code> as deploy-truth sources; <code>docker inspect</code> replaces both.</li>
+        <li>Reduce <code>deploy.sh</code> to build / push / pull / up / rollback.</li>
+    </ul>
+    <p style="color: var(--text-color);"><strong>GATE 4:</strong> Two consecutive deploys performed with no manual intervention and no reconciliation step.</p>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <!-- ============================================================ -->
+    <h2 id="rollback">7. Rollback &amp; Safety</h2>
+
+    <ul style="color: var(--text-color);">
+        <li>Phases 0–2 are entirely non-destructive: they add a correct build path beside the existing one and change nothing about how production currently runs.</li>
+        <li>The single irreversible-feeling step is Ph.3 (removing the code bind mount). Its rollback is to restore one line in <code>docker-compose.yml</code> and restart.</li>
+        <li>The previous image SHA remains pullable, so Ph.3 has a second, artifact-level rollback path independent of the compose file.</li>
+        <li>Retirement of old mechanisms (Ph.4) happens <em>only after</em> two clean deploys, per gate 4.</li>
+    </ul>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <!-- ============================================================ -->
+    <h2 id="decisions">8. Open Decisions</h2>
+
+    <table class="data-table">
+        <thead><tr><th>#</th><th>Decision</th><th>Resolution</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>D1</td>
+                <td>Where do builds run?</td>
+                <td><strong style="color: var(--success-color);">DECIDED 2026-08-04 — build locally on the workstation.</strong>
+                    The existing local-build → push → pull path already works and is retained.
+                    GitHub Actions is <em>rejected</em>: it adds a cloud dependency, a second credential
+                    system, and slower shared-runner builds to solve a problem we do not have. The
+                    unreliability was never about where the image was built — it was that the image
+                    was not the artifact being deployed. <strong>Action:</strong> delete
+                    <code>.github/workflows/</code> so the half-built path cannot be mistaken for a
+                    supported one.</td>
+            </tr>
+            <tr>
+                <td>D2</td>
+                <td>Registry</td>
+                <td><strong style="color: var(--success-color);">DECIDED 2026-08-04 — LAN-local registry.</strong>
+                    Nothing needs to leave the LAN. A <code>registry:2</code> container on a LAN host
+                    replaces the Docker Hub round-trip: build on the workstation, push to
+                    <code>&lt;lan-host&gt;:5000/comserv-web-prod:&lt;sha&gt;</code>, pull from production over
+                    the LAN. Faster, works during an internet outage, no external account, no rate
+                    limits. Consistent with the project convention of running heavy tools as portable
+                    Docker LAN services. <strong>Accepted cost:</strong> the registry is now our own
+                    infrastructure — it must exist before a deploy can run, and its storage must be
+                    monitored.</td>
+            </tr>
+            <tr>
+                <td>D3</td>
+                <td>Emergency hot-fix policy</td>
+                <td><strong style="color: var(--warning-color);">DEFERRED — to be decided on Ph.1 evidence.</strong>
+                    The existing hot-edit fallback was introduced to keep production available despite
+                    unreliable deploys. Note the circularity: the fallback exists because deploys are
+                    unreliable, and deploys are unreliable because the fallback bypasses the artifact
+                    model. Note also that on 2026-08-04 the fallback did not keep production
+                    <em>correct</em> — five real errors ran live for six weeks and were undetectable
+                    precisely because running code could not be tied to a build. Ph.1 answers this
+                    empirically: run the image with the code mount removed and observe whether it
+                    stands up. A middle option remains available — retain the bind mount line in the
+                    production compose file but commented out, as a documented break-glass that
+                    requires a deliberate edit and leaves a trace.</td>
+            </tr>
+            <tr>
+                <td>D4</td>
+                <td>Tag scheme and retention</td>
+                <td><strong style="color: var(--success-color);">DECIDED 2026-08-04 — tag = git commit SHA; keep ~10.</strong>
+                    "SHA" here means simply the git commit id (e.g. <code>850bd3fb</code>) — the same
+                    string <code>git log</code> prints. This is not a new mechanism: builds were
+                    <em>already</em> being tagged to bridge Docker labels to build identity, which was
+                    the right instinct. The only change is that the tag becomes the commit and the code
+                    lives inside the tagged image, so the label cannot lie. Today a tag can read
+                    <code>850bd3fb</code> while the bind mount serves something else — that gap is what
+                    the tagging was trying to close and could not. Retain the last ~10 SHA tags plus any
+                    currently deployed; storage is cheap on a LAN registry.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 id="ha" style="color: var(--text-color);">Why this is a prerequisite for HA / Kubernetes</h3>
+    <p style="color: var(--text-color);">
+        When an error surfaces on <code>production1</code> rather than another node, the question
+        <em>"which build is this node running?"</em> must have a one-command answer <strong>per
+        node</strong>. Under the bind-mount model every node can silently diverge, because node
+        identity is a function of that host's working directory rather than of the image it was
+        given. Kubernetes cannot schedule a pod without naming an exact image, so the immutable-image
+        model is an <em>assumption</em> of the platform, not an option within it. Completing this plan
+        is therefore a precondition for the planned multi-node high-availability and k8s work — not a
+        detour from it.
+    </p>
+
+    <h3 id="creds" style="color: var(--text-color);">Credential handling and the db_config.json retirement</h3>
+    <p style="color: var(--text-color);">
+        This plan removes the application-<em>code</em> bind mount, but it must not recreate the
+        credential-leak class it is meant to kill. Two facts, both tracked under project
+        <a href="/project/details?project_id=239" style="color: var(--link-color);">IMGSEC (#239)</a>:
+    </p>
+    <ul style="color: var(--text-color);">
+        <li><strong>Image-layer secrets are now excluded</strong> — <code>Comserv/.dockerignore</code>
+            (Ph.0) blocks <code>db_config.json</code>, <code>*.key</code>, <code>*.pem</code>,
+            <code>id_rsa*</code>, <code>ssh_credentials.json</code>, <code>.env*</code>, and
+            <code>**/secrets/</code> from <code>COPY . .</code>. gitleaks guards git; this guards images;
+            the two are not yet cross-checked (see Ph.4 / IMGSEC #1883).</li>
+        <li><strong><code>db_config.json</code> was a bootstrap-only source by original design.</strong>
+            It was to load initial credentials until the env-var / K8s Secrets system was in place, after
+            which it was to be <strong>discontinued</strong>. That retirement never completed. Under this
+            plan, during Ph.3 the file is supplied as an explicit runtime mount (not the whole code tree);
+            in the end-state (IMGSEC #1884) it is removed entirely once env/K8s credential loading is the
+            verified primary. The immutable-image model makes that retirement enforceable: with no code
+            bind mount, the file's presence is a deliberate, reviewable compose entry — not an accident of
+            <code>COPY . .</code>.</li>
+    </ul>
+
+    <h3 id="livedefects" style="color: var(--text-color);">Known live defects (discovered 2026-08-04, tracked under IMGSEC)</h3>
+    <p style="color: var(--text-color);">
+        Server-header evidence on 2026-08-04 exposed two independent production defects that the deploy
+        rework must not mask. They are owned as IMGSEC todos, not folded silently into the cutover:
+    </p>
+    <ul style="color: var(--text-color);">
+        <li><strong>Production drift (IMGSEC #1885):</strong> production1 (computersystemconsulting.ca)
+            reported <code>Build: 2026-08-01 02:24</code> / <code>Git: main@c58120ed+local</code> while the
+            workstation reported <code>Build: 2026-08-04 16:10</code> / <code>Git: main@850bd3fb+local</code>.
+            Two nodes, two different "latest" states. GATE 3 of this plan is not met until both nodes
+            report the same SHA.</li>
+        <li><strong>Forager unresolved on prod (IMGSEC #1886):</strong> production1 reports
+            <code>DBForager(Forager)@Unknown</code> while the workstation resolves
+            <code>Forager@172.30.161.222</code>. A separate live defect (not the image-leak class), likely
+            the cause of prod-only Forager errors. Diagnose DNS / ZeroTier reachability between hosts
+            before assuming it is fixed by the image cutover.</li>
+    </ul>
+
+    <p><a href="#toc" style="color: var(--link-color);">↑ Back to Top</a></p>
+
+    <div style="border-top: 1px solid var(--border-color); margin-top: 28px; padding-top: 12px; color: var(--text-muted-color);">
+        Related: <a href="/Documentation/DEPLOY_WORKFLOW" style="color: var(--link-color);">Deploy Workflow</a>.
+        This plan supersedes the bind-mount deployment model described there once Ph.3 completes.
+        Tracking project/todos to be created on approval.
+    </div>
+
+</div>

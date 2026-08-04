@@ -33,7 +33,10 @@ services:
   # ────────────────────────────────────────────────────────────────────────────
   web:
     build:
-      context: .
+      # IMGDEP Ph.0: context is ./Comserv (the app root), because
+      # Comserv/Dockerfile does `COPY . .` expecting the application at the
+      # context root. There is no Dockerfile at the repo root.
+      context: ./Comserv
       dockerfile: Dockerfile
       target: development
     image: comserv-web:dev
@@ -100,7 +103,8 @@ services:
   # ────────────────────────────────────────────────────────────────────────────
   web-prod:
     build:
-      context: .
+      # IMGDEP Ph.0: see the `web` service above for why context is ./Comserv.
+      context: ./Comserv
       dockerfile: Dockerfile
       target: production
     image: comserv-web:prod

@@ -3,7 +3,7 @@
 ARG PERL_VERSION=5.40.0
 ARG BASE_IMAGE=perl:5.40.0
 
-FROM ${BASE_IMAGE} as builder
+FROM ${BASE_IMAGE} AS builder
 
 # Install system dependencies for building Comserv (Debian 12 compatible)
 RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
@@ -55,7 +55,10 @@ RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Co
 
 # ===================================================================
 # Stage 2: Runtime image
-FROM ${BASE_IMAGE}
+# Named `production` so compose can target it explicitly (IMGDEP Ph.0).
+# This stage is self-sufficient: application code arrives via the COPY from
+# the builder stage below, NOT via a host bind mount.
+FROM ${BASE_IMAGE} AS production
 
 RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
     (sleep 10 && apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60) && \
@@ -144,3 +147,15 @@ CMD []
 LABEL maintainer="Comserv Development Team"
 LABEL description="Comserv Catalyst Web Application - Production Container"
 LABEL version="1.0"
+
+# ===================================================================
+# Stage 3: Development image (IMGDEP Ph.0)
+# Identical to production, but named so `docker-compose.yml` service `web`
+# can target it. Development DOES bind-mount ./Comserv read-write for live
+# editing — that is correct and intended for dev. Production must not.
+FROM production AS development
+
+ENV CATALYST_ENV=development CATALYST_DEBUG=1
+
+LABEL description="Comserv Catalyst Web Application - Development Container"
+
