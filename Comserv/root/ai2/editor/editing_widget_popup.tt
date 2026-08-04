@@ -44,7 +44,7 @@
                 [% END %]
             </select>
         </label>
-        <button onclick="alert('Merge functionality coming soon')">Merge</button>
+        <button id="merge-main-btn" style="background:#2e7d32;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">Merge</button>
 
         <label style="margin-left:auto">Model:
             <select id="model-select">
@@ -81,6 +81,14 @@
                 <div class="icon">💻</div>
                 <div class="label">Terminal</div>
             </div>
+            <div class="sidebar-icon" data-panel="review" title="Review & Merge">
+                <div class="icon">🔍</div>
+                <div class="label">Review</div>
+            </div>
+            <div class="sidebar-icon" data-panel="hermes" title="Hermes Dashboard">
+                <div class="icon">🤖</div>
+                <div class="label">Hermes</div>
+            </div>
             <div class="sidebar-icon" data-panel="settings" title="Settings">
                 <div class="icon">⚙️</div>
                 <div class="label">Settings</div>
@@ -115,6 +123,40 @@
                     $ git status<br>
                     On branch main<br>
                     Your branch is up to date.
+                </div>
+            </div>
+
+            <div id="panel-review" class="sidebar-panel" style="display:none; padding:0; width:340px; background:#2b2b2b; font-size:13px; overflow:auto;">
+                <div style="padding:12px;">
+                    <h4 style="margin:0 0 8px 0; font-size:12px; color:#aaa;">REVIEW &amp; MERGE WORKTREE</h4>
+                    <p style="font-size:11px;color:#888;margin:0 0 8px;">AI commits in the worktree; you merge to main here.</p>
+                    <select id="review-branch" style="width:100%;background:#313335;color:#ddd;border:1px solid #555;padding:4px;border-radius:3px;margin-bottom:8px;">
+                        <option value="">— select worktree branch —</option>
+                    </select>
+                    <div style="display:flex;gap:8px;margin-bottom:8px;">
+                        <button id="review-load-btn" style="flex:1;background:#0e639c;color:#fff;border:none;padding:6px;border-radius:4px;cursor:pointer;">Load Diff</button>
+                        <button id="review-testgate-btn" style="flex:1;background:#555;color:#fff;border:none;padding:6px;border-radius:4px;cursor:pointer;">Run Tests</button>
+                    </div>
+                    <div id="review-testgate-out" style="font-size:11px;color:#888;white-space:pre-wrap;margin-bottom:8px;"></div>
+                    <pre id="review-diff" style="background:#1e1f22;color:#9cdcfe;padding:8px;border:1px solid #444;border-radius:4px;height:200px;overflow:auto;white-space:pre-wrap;font-size:11px;"></pre>
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <button id="review-merge-btn" style="flex:1;background:#2e7d32;color:#fff;border:none;padding:8px;border-radius:4px;cursor:pointer;">Merge → main</button>
+                        <button id="review-push-btn" style="flex:1;background:#1565c0;color:#fff;border:none;padding:8px;border-radius:4px;cursor:pointer;">Push GitHub</button>
+                    </div>
+                    <div id="review-status" style="font-size:11px;margin-top:8px;color:#ff9;white-space:pre-wrap;"></div>
+                </div>
+            </div>
+
+            <div id="panel-hermes" class="sidebar-panel" style="display:none; padding:0; width:420px; background:#2b2b2b; overflow:auto;">
+                <div style="padding:8px;">
+                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#aaa;">HERMES DASHBOARD</h4>
+                    <p style="font-size:11px;color:#888;margin:0 0 6px;">Embedded Hermes web view (set HERMES_DASHBOARD_URL to enable).</p>
+                    [% IF c.config.hermes_dashboard_url %]
+                        <iframe src="[% c.config.hermes_dashboard_url | html %]" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;"></iframe>
+                    [% ELSE %]
+                        <iframe id="hermes-iframe" src="" style="width:100%;height:420px;border:1px solid #555;border-radius:4px;display:none;"></iframe>
+                        <div id="hermes-placeholder" style="color:#888;font-size:12px;padding:12px;">No Hermes dashboard URL configured. Set <code>HERMES_DASHBOARD_URL</code> in the app config or pass <code>?hermes=URL</code> to this page.</div>
+                    [% END %]
                 </div>
             </div>
 

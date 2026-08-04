@@ -998,10 +998,16 @@ sub list_worktrees {
 
 sub _worktree_row {
     my ($path, $branch) = @_;
-    my $is_main = ($path !~ m{\.zenflow[/\\]worktrees[/\\]});
+    my $cfg     = _worktree_config();
+    my $base    = $cfg->{base_dir} // '';
+    my $is_main = ($base && $path =~ m{\Q$base\E})
+               || ($path !~ m{worktrees[/\\]});
     my $wt_branch;
-    if ($path =~ m{\.zenflow[/\\]worktrees[/\\]([^/\\]+)}) {
+    if ($base && $path =~ m{\Q$base\E[/\\]([^/\\]+)}) {
         $wt_branch = $1;
+    }
+    elsif ($path =~ m{worktrees[/\\]([^/\\]+)[/\\]Comserv}) {
+        $wt_branch = $1;   # fallback for any legacy worktree dirs still on disk
     }
     return {
         path     => $path,
@@ -1010,6 +1016,30 @@ sub _worktree_row {
         port     => $is_main ? 3001 : _worktree_port($wt_branch // ''),
     };
 }
+
+# Cached worktree config loaded from root/config/worktrees.json. This is the
+# single source of truth for the worktree base dir + branch→port map, replacing
+# the old hardcoded .zenflow layout. Falls back to the static WORKTREE_PORTS hash
+# (below) if the JSON is missing.
+my $_wt_config;
+sub _worktree_config {
+    return $_wt_config if $_wt_config;
+    my $file = __FILE__;
+    $file =~ s{lib/Comserv/Util/Git\.pm$}{root/config/worktrees.json};
+    if (-f $file) {
+        eval {
+            my $raw = do { local $/; open my $fh, '<', $file or die $!; <$fh> };
+            my $j = decode_json($raw);
+            $j->{base_dir} =~ s{^~([/\\]|$)}{$ENV{HOME}$1} if $j->{base_dir};
+            $_wt_config = $j;
+        };
+        return $_wt_config if $_wt_config;
+    }
+    $_wt_config = { base_dir => "$ENV{HOME}/.comserv/worktrees", branches => {} };
+    return $_wt_config;
+}
+
+sub worktree_base_dir { return _worktree_config()->{base_dir}; }
 
 # Port map mirrored from root/admin/planning/_planning_tab.tt so the dashboard
 # can deep-link each worktree's running instance.
@@ -1043,6 +1073,10 @@ my %WORKTREE_PORTS = (
 
 sub _worktree_port {
     my ($branch) = @_;
+    my $cfg = _worktree_config();
+    if ($cfg->{branches} && $cfg->{branches}{$branch}) {
+        return $cfg->{branches}{$branch}{port} // 0;
+    }
     return $WORKTREE_PORTS{$branch} // 0;
 }
 
@@ -1113,8 +1147,9 @@ sub run_test_gate {
     my ($self, $c, $branch) = @_;
     my $repo = $self->repo_path($c) // return { success => 0, output => 'no repo' };
 
+    my $base = $self->worktree_base_dir // "$ENV{HOME}/.comserv/worktrees";
     my $wt_dir = ($branch && $branch ne 'main')
-        ? "$ENV{HOME}/.zenflow/worktrees/$branch/Comserv"
+        ? "$base/$branch/Comserv"
         : $repo;
     $wt_dir = $repo unless $wt_dir && -d $wt_dir;
 

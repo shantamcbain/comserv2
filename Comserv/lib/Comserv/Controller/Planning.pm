@@ -759,6 +759,12 @@ sub daily :Path('/planning/daily') :Args {
         all_plans         => \@all_plans,
         is_admin          => $c->stash->{is_admin},
 
+        # Worktree registry — sourced from root/config/worktrees.json (single
+        # source of truth) so the planning tab no longer carries a duplicated
+        # static branch→port map. Each entry mirrors the old all_branches shape
+        # (name, port, label, url, cmd) but is derived from the config.
+        worktree_list     => _build_worktree_list($c),
+
         current_date_str  => $current_date_str,
         current_display   => $current_display,
         selected_date     => $selected_date,
@@ -1719,6 +1725,39 @@ sub deploy :Path('deploy') :Args(0) {
             message => "Deploy request accepted for $target"
         }));
     }
+}
+
+# Build the worktree registry list for the planning tab from
+# root/config/worktrees.json (via Comserv::Util::Git). Returns
+# [ { name, port, label, url, cmd }, ... ] with main first.
+sub _build_worktree_list {
+    my ($c) = @_;
+    my @list;
+    my $base = eval { Comserv::Util::Git->worktree_base_dir } // "$ENV{HOME}/.comserv/worktrees";
+    my $cfg  = eval { Comserv::Util::Git::_worktree_config() } // { branches => {} };
+
+    # main (primary checkout, port 3001)
+    push @list, {
+        name => 'main',
+        port => 3001,
+        label => 'MAIN',
+        url  => '/planning/daily',
+        cmd  => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
+    };
+
+    my $branches = $cfg->{branches} // {};
+    for my $name (sort keys %$branches) {
+        my $b = $branches->{$name};
+        push @list, {
+            name  => $name,
+            port  => $b->{port} // 0,
+            label => $b->{label} // $name,
+            url   => $b->{url}   // '/planning/daily',
+            cmd   => "cd $base/$name/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
+                   . ($b->{port} // 0) . ' -r',
+        };
+    }
+    return \@list;
 }
 
 __PACKAGE__->meta->make_immutable;
