@@ -39,3 +39,19 @@ root/log/security_scans/
 whisper_venv/
 blib/
 local/
+
+# ── Secrets — MUST NOT be baked into image layers ────────────────────────────
+# Dockerfile uses `COPY . .`, so anything not excluded here is permanently
+# embedded in a pushed, tagged image layer and cannot be retracted after the
+# fact. Secrets are supplied at RUNTIME via the mounted secrets directory
+# (see docker-compose.yml: COMSERV_SECRETS_DIR -> /home/comserv/.comserv/secrets:ro).
+db_config.json
+*db_config*.json
+.comserv/
+**/secrets/
+*.key
+*.pem
+*.p12
+id_rsa*
+ssh_credentials.json
+.env*
