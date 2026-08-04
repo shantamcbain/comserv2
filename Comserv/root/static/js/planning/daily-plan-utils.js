@@ -719,6 +719,24 @@
             }
             return;
         }
+        // Todo card: Chat button <button data-chat-todo="N" data-chat-subject="S">
+        var chatBtn = e.target.closest('[data-chat-todo]');
+        if (chatBtn) {
+            e.preventDefault();
+            var chatId = chatBtn.getAttribute('data-chat-todo');
+            var chatSubject = chatBtn.getAttribute('data-chat-subject') || '';
+            if (typeof window.openAiChat === 'function') {
+                window.openAiChat({
+                    context: 'todo',
+                    record_id: chatId,
+                    subject: chatSubject,
+                    prompt: 'Help me with this task: ' + chatSubject + '. What should I do next?'
+                });
+            } else {
+                window.location.href = '/todo/details?record_id=' + chatId + '&chat=1';
+            }
+            return;
+        }
         // Save log entry: <button data-save-log="ENTRY_ID">
         var sel = e.target.closest('[data-save-log]');
         if (sel) {
@@ -812,10 +830,12 @@
         }
     });
 
-    window.addEventListener('hashchange', function() {
-        var hash = window.location.hash.substring(1);
-        activateHashTarget(hash);
-        updateNavLinks();
-    });
+    /* ── Expose start/done handlers for inline onclick callers (e.g. todo_row.tt
+       on the project-details page, which calls startWorkTodoCard via onclick).
+       Without this, those inline handlers throw ReferenceError because the
+       functions are scoped inside this IIFE. ── */
+    window.startWorkTodoCard   = startWorkTodoCard;
+    window.doneWithLogTodoCard = doneWithLogTodoCard;
+    window.closeLogTodoCard    = closeLogTodoCard;
 
 })();

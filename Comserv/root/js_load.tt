@@ -150,6 +150,8 @@
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/sidebar-toggle.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/git-review.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Other feature modules -->
@@ -165,7 +167,7 @@
 <script src="/static/js/ai-chat/index.js?v=[% cv %]" defer></script>
 
 <!-- Planning / Daily page JS (covers both /planning/daily and /Documentation/DailyPlan) -->
-[% IF c.request.uri.match('/planning/daily') || c.request.uri.match('/Documentation/DailyPlan') %]
+[% IF c.request.uri.match('/planning/daily') || c.request.uri.match('/Documentation/DailyPlan') || c.request.uri.match('/project/') %]
 <script src="/static/js/planning/daily-plan.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-gantt.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-deploy-center.js?v=[% cv %]" defer></script>

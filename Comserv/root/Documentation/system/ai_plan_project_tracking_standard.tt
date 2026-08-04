@@ -1,0 +1,134 @@
+[% META
+   title = "AI Plan → Project/Todo Tracking Standard"
+   description = "Mandatory convention: every AI-authored plan (.tt or .md under root/Documentation) MUST be tracked in the application's Project + Todo system so progress and time spent are managed through the plan. Defines the uniform mapping, the META contract, and the sync tool. Applies identically to all AI plans."
+   roles = "admin,developer,devops,ai-agent"
+   TemplateType = "Documentation"
+   category = "ai-systems,process,documentation-standard,development-plan"
+   page_version = "0.1"
+   last_updated = "Mon Aug 03 20:30:00 UTC 2026"
+   site_specific = "false"
+%]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Plan → Project/Todo Tracking Standard</h1>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-08-03 |
+        Version: 0.1 |
+        Status: Active (standard)
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#rule" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Rule</a>
+                <a href="#mapping" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Mapping</a>
+                <a href="#meta" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">META Contract</a>
+                <a href="#steps" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Step Extraction</a>
+                <a href="#tool" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Sync Tool</a>
+                <a href="#verify" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Verification</a>
+                <a href="#out-of-scope" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Out of Scope</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- RULE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="rule" style="color: var(--text-color); font-family: var(--header-font);">1. Rule (applies to ALL AI-authored plans, uniformly)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Every AI plan document (<code>root/Documentation/**/*.tt</code> and <code>root/Documentation/**/*.md</code>) is registered in the app's Project + Todo system. The plan's steps become Todos attached to a dedicated sub-project. The plan doc carries the link back to that project in its META block. This lets the todo system own progress, time logging, and blockers for the plan.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- MAPPING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="mapping" style="color: var(--text-color); font-family: var(--header-font);">2. Mapping (every plan, identical shape)</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>One sub-project per plan</strong>, created under the most relevant parent. AI/editor/git work → parent <code>id=114</code> (AI Chat Integration). If a plan clearly belongs to another parent, use that parent_id instead (document the choice in the sub-project comments).</li>
+                <li><strong>One Todo per plan step/phase</strong>, attached to that sub-project via <code>project_id</code>. Steps are parsed from the plan body (see §4).</li>
+                <li><strong>Time + blockers:</strong> Todos are worked in the normal todo flow, so time is logged against each step and <code>parent_todo</code> / dependency blockers can be added when one step must precede another.</li>
+                <li><strong>main / production are never touched</strong> by this standard — only Project/Todo rows and a META line in the doc.</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- META CONTRACT SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="meta" style="color: var(--text-color); font-family: var(--header-font);">3. META contract (uniform link, doc ↔ system)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Every AI plan's META block MUST include these two lines (added by the sync tool after creation):</p>
+            <pre style="background:#1e1f22;color:#9cdcfe;padding:10px;border-radius:4px;overflow:auto;"><code>   project_id   = "&lt;numeric id returned by /api/project/create&gt;"
+   project_code = "&lt;PROJECT_CODE chosen at creation&gt;"</code></pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This makes the relationship searchable and verifiable: <code>grep project_id root/Documentation/system/*.tt</code> lists every tracked plan; the code is shown in the project system.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- STEP EXTRACTION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="steps" style="color: var(--text-color); font-family: var(--header-font);">4. Step extraction (how Todos are derived)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The sync tool treats the following as "steps" to turn into Todos, in document order:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Lines beginning with <code>### Phase</code>, <code>### Step</code>, or <code>####</code> headings inside a "Phase" section.</li>
+                <li>Numbered list items under a "Phase" / "Steps" heading (e.g. <code>1. Do X</code>).</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Each becomes a Todo with: <code>subject</code> = the heading text, <code>description</code> = the paragraph/notes that follow it in the doc, <code>project_id</code> = the sub-project, <code>priority</code> = <strong>5 (P5: planned dev)</strong> by default unless the step text says "gate"/"blocker"/"critical" → <strong>2 (P2: active)</strong>, <code>status</code> = <code>Not-Started</code>, <code>start_date</code>/<code>due_date</code> = creation date / +14 days.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SYNC TOOL SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="tool" style="color: var(--text-color); font-family: var(--header-font);">5. The sync tool (reusable for ALL plans)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><code>script/sync_ai_plan_to_projects.pl</code> (Perl, uses the app's own <code>/api/project/create</code> + <code>/api/todo/create</code> on the local instance — local requests bypass auth, so no token needed when run on the workstation). Usage:</p>
+            <pre style="background:#1e1f22;color:#9cdcfe;padding:10px;border-radius:4px;overflow:auto;"><code>perl script/sync_ai_plan_to_projects.pl \
+  --doc root/Documentation/system/git_worktree_new_system_plan.tt \
+  --parent 114 \
+  --base http://localhost:3001 \
+  --code GITWT-NEW</code></pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Behaviour:</p>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>If the doc's META already has a <code>project_id</code>, it re-syncs Todos (skips project creation).</li>
+                <li>Else: <code>POST /api/project/create</code> (sub-project under <code>--parent</code>, <code>project_code=--code</code>, <code>name</code> = doc title, <code>description</code> = doc description), then stamps the returned <code>project_id</code>/<code>project_code</code> into the META block.</li>
+                <li>Parses steps → one <code>POST /api/todo/create</code> each.</li>
+                <li>Idempotent: tracks created todo_ids in the doc comments so a re-run does not duplicate.</li>
+            </ol>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- VERIFICATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verify" style="color: var(--text-color); font-family: var(--header-font);">6. Verification</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>/project/details?project_id=&lt;N&gt;</code> shows the sub-project with one Todo per plan step.</li>
+                <li>The plan doc META contains the matching <code>project_id</code> + <code>project_code</code>.</li>
+                <li><code>grep -l "project_id" root/Documentation/system/*.tt</code> lists all AI plans currently tracked.</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OUT OF SCOPE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="out-of-scope" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">7. Out of scope</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Auto-closing todos when a plan phase completes — done manually in the todo UI (time logging stays accurate).</li>
+                    <li>Cross-plan dependency automation — added as manual <code>parent_todo</code> blockers when needed.</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+</div>

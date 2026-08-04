@@ -12,7 +12,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
 use Comserv::Util::UserPreferences;
 
-use constant IS_DEV_WORKTREE => ($Bin =~ m{\.zenflow[/\\]worktrees[/\\]}) ? 1 : 0;
+use constant IS_DEV_WORKTREE => ($Bin =~ m{\.comserv[/\\]worktrees[/\\]}) ? 1 : 0;
 
 has 'logging' => (
     is => 'ro',

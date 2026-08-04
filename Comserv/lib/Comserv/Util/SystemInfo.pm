@@ -147,9 +147,9 @@ sub get_app_workflow {
         my $parent   = File::Basename::dirname($app_home);
         my $resolved = Cwd::abs_path($parent) || $parent;
 
-        # Zenflow worktree paths contain /.zenflow/worktrees/<branch-name>/
-        # e.g. /home/user/.zenflow/worktrees/planningsystem-59ae/Comserv
-        if ($resolved =~ m{/\.zenflow/worktrees/([^/]+)}) {
+        # Comserv worktree paths contain /.comserv/worktrees/<branch-name>/
+        # e.g. /home/user/.comserv/worktrees/planningsystem-59ae/Comserv
+        if ($resolved =~ m{/\.comserv/worktrees/([^/]+)}) {
             $workflow = $1;
         }
         # Otherwise this is main / production — leave as 'main'

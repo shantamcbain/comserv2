@@ -1641,6 +1641,35 @@ sub review_diff :Path('/admin/git/review') :Args(1) {
     $c->response->body(encode_json({ success => 1, branch => $branch, diff => $diff }));
 }
 
+=head2 test_gate
+
+GET /admin/git/test_gate/:branch
+Read-only: run script/test_gate.sh against the worktree checkout for :branch
+and report pass/fail. Never merges. Drives the editor's "Run Tests" button so
+it can probe the gate without triggering a merge.
+
+=cut
+
+sub test_gate :Path('/admin/git/test_gate') :Args(1) {
+    my ($self, $c, $branch) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_review');
+
+    $branch //= '';
+    if (!$branch || $branch eq 'main') {
+        $c->response->body(encode_json({ success => 0, error => 'Select a worktree branch to test.' }));
+        return;
+    }
+
+    my $res = $self->git_service->run_test_gate($c, $branch);
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        output  => $res->{output},
+        error   => $res->{error_msg},
+    }));
+}
+
 =head2 merge_to_main
 
 POST /admin/git/merge_to_main
