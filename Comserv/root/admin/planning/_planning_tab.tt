@@ -10,63 +10,10 @@
         [% SET host       = c.req.uri.host %]
         [% SET scheme     = c.req.uri.scheme %]
 
-        [%# Static branch → port map (matches Planning.tt overview) %]
-        [% SET bp = {
-            'planning-system-continue-from-pl-bdac'    => 4001,
-            'aichatsystem-ef4e'                        => 4010,
-            'schema-managment-system-7eb3'             => 4002,
-            'infrastructuremanagement-d133'             => 4003,
-            'workshops-7d21'                           => 4004,
-            'users-e5b8'                               => 4005,
-            'new-task-bb05'                            => 4006,
-            'unified-mail-system-site-managed-2c53'    => 4007,
-            'membership-1304'                          => 4008,
-            'pointsystem-3230'                         => 4009,
-            'cssthemes-9195'                           => 4011,
-            'ency-53b0'                                => 4012,
-            'helpdesk-7217'                            => 4013,
-            'healthplanning-9db9'                      => 4014,
-            'productionserverhealth-82fb'              => 4015,
-            'security-764f'                            => 4016,
-            'documentation-9122'                       => 4017,
-            'api-bc05'                                 => 4018,
-            'bmaster-f0fd'                             => 4019,
-            'aichatsystem-planning-system-int-f187'    => 4020,
-            'inventory-system-104a'                    => 4021,
-            '3dprinting-use-this-as-the-branc-41f3'    => 4030,
-            'developer-time-logging-points-ba-542a'    => 4022,
-            'page-management-system-implement-41a1'    => 4023,
-        } %]
-
-        [%# All known branch servers for the overview panel %]
-        [% SET all_branches = [
-            { name => 'main',                                   port => 3001, label => 'MAIN',                url => '/planning/daily', cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r' },
-            { name => 'planning-system-continue-from-pl-bdac',  port => 4001, label => 'PlanningSystem',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4001 -r' },
-            { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4010 -r' },
-            { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4002 -r' },
-            { name => 'infrastructuremanagement-d133',           port => 4003, label => 'InfrastructureMgmt', url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/infrastructuremanagement-d133/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4003 -r' },
-            { name => 'workshops-7d21',                         port => 4004, label => 'WorkShops',           url => '/workshop',       cmd => 'cd /home/shanta/.zenflow/worktrees/workshops-7d21/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4004 -r' },
-            { name => 'users-e5b8',                             port => 4005, label => 'Users',               url => '/user/dashboard', cmd => 'cd /home/shanta/.zenflow/worktrees/users-e5b8/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4005 -r' },
-            { name => 'new-task-bb05',                          port => 4006, label => 'FileManagement',      url => '/admin/planning', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-bb05/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4006 -r' },
-            { name => 'unified-mail-system-site-managed-2c53',  port => 4007, label => 'UnifiedMail',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/unified-mail-system-site-managed-2c53/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4007 -r' },
-            { name => 'membership-1304',                        port => 4008, label => 'Membership',          url => '/membership',     cmd => 'cd /home/shanta/.zenflow/worktrees/membership-1304/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4008 -r' },
-            { name => 'pointsystem-3230',                       port => 4009, label => 'PointSystem',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/pointsystem-3230/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4009 -r' },
-            { name => 'cssthemes-9195',                         port => 4011, label => 'CssThemes',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/cssthemes-9195/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4011 -r' },
-            { name => 'ency-53b0',                              port => 4012, label => 'ENCY',                url => '/ENCY',           cmd => 'cd /home/shanta/.zenflow/worktrees/ency-53b0/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4012 -r' },
-            { name => 'helpdesk-7217',                          port => 4013, label => 'HelpDesk',            url => '/HelpDesk',       cmd => 'cd /home/shanta/.zenflow/worktrees/helpdesk-7217/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4013 -r' },
-            { name => 'healthplanning-9db9',                    port => 4014, label => 'HealthPlanning',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/healthplanning-9db9/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4014 -r' },
-            { name => 'productionserverhealth-82fb',            port => 4015, label => 'ProdServerHealth',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/productionserverhealth-82fb/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4015 -r' },
-            { name => 'security-764f',                          port => 4016, label => 'Security',            url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/security-764f/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4016 -r' },
-            { name => 'documentation-9122',                     port => 4017, label => 'Documentation',       url => '/Documentation',  cmd => 'cd /home/shanta/.zenflow/worktrees/documentation-9122/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4017 -r' },
-            { name => 'api-bc05',                               port => 4018, label => 'APISystem',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/api-bc05/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4018 -r' },
-            { name => 'bmaster-f0fd',                           port => 4019, label => 'BMaster',             url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/bmaster-f0fd/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4019 -r' },
-            { name => 'aichatsystem-planning-system-int-f187',  port => 4020, label => 'AIChatPlanInt',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-planning-system-int-f187/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4020 -r' },
-            { name => 'inventory-system-104a',                  port => 4021, label => 'InventorySystem',     url => '/Inventory',      cmd => 'cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4021 -r' },
-            { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4030 -r' },
-            { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4022 -r' },
-            { name => 'page-management-system-implement-41a1',  port => 4023, label => 'PageManagement',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/page-management-system-implement-41a1/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4023 -r' },
-            { name => 'docker-5c15',                            port => 4024, label => 'Docker',               url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/docker-5c15/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p 4024 -r' },
-        ] %]
+        [%# Worktree registry sourced from the stash (root/config/worktrees.json via
+            Planning.pm _build_worktree_list) — single source of truth, no duplicate map. %]
+        [% SET all_branches = c.stash.worktree_list || [ ] %]
+        [% SET bp = { } %][% FOREACH b IN all_branches %][% bp.$b.name = b.port %][% END %]
 
         [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
         [%# host may include port (e.g. bmast.local:4001) so match without $ anchor %]
@@ -98,15 +45,15 @@
                         </option>
                         [% END %]
                     </select>
-                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value)window.open(s.value,'_blank');})()"
+                    <button data-open-selected
                             style="padding:5px 14px;background:#fd7e14;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;white-space:nowrap;">
                         Open →
                     </button>
-                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value){var url=s.value;var m=url.match(/:(\d+)/);if(m){fetch('/admin/branch_server_action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=stop&branch=main&port='+m[1]}).then(()=>alert('Stop requested'))}}})()"
+                    <button data-branch-action="stop"
                             style="padding:5px 10px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;white-space:nowrap;">
                         Stop
                     </button>
-                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value){var url=s.value;var m=url.match(/:(\d+)/);if(m){fetch('/admin/branch_server_action',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=restart&branch=main&port='+m[1]}).then(()=>alert('Restart requested'))}}})()"
+                    <button data-branch-action="restart"
                             style="padding:5px 10px;background:#ffc107;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;white-space:nowrap;">
                         Restart
                     </button>
@@ -141,11 +88,11 @@
                             <code style="font-size:0.82em;user-select:all;cursor:text;color:var(--text-muted-color);">[% b.cmd %]</code>
                         </td>
                         <td style="padding:5px 8px;white-space:nowrap;">
-                            <button onclick="smartOpenBranch('[% b.name %]', [% b.port %], '[% scheme %]://[% host %]:[% b.port %][% b.url %]')"
+                            <button data-open-branch="[% b.name %]" data-port="[% b.port %]" data-url="[% scheme %]://[% host %]:[% b.port %][% b.url %]"
                                     style="padding:2px 8px;background:var(--primary-color);color:#fff;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Open</button>
-                            <button onclick="branchAction('stop', '[% b.name %]', [% b.port %])"
+                            <button data-branch-action="stop" data-branch="[% b.name %]" data-port="[% b.port %]"
                                     style="padding:2px 6px;background:#dc3545;color:#fff;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Stop</button>
-                            <button onclick="branchAction('restart', '[% b.name %]', [% b.port %])"
+                            <button data-branch-action="restart" data-branch="[% b.name %]" data-port="[% b.port %]"
                                     style="padding:2px 6px;background:#ffc107;color:#000;border:none;border-radius:3px;font-size:0.78em;cursor:pointer;">Restart</button>
                         </td>
                     </tr>
@@ -164,7 +111,7 @@
             </h2>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 [% IF is_csc %]
-                <a href="#planning" onclick="switchTab(event,'planning');return false;"
+                <a href="#planning" data-switch-tab="planning"
                    style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;">[text view ↓]</a>
                 [% END %]
                 [% IF is_admin %]
