@@ -144,7 +144,7 @@ for my $i (0 .. $#steps) {
             next;
         }
         my $r = post_json('/api/todo/update', $ubody);
-        if ($r && $r->{success}) {
+        if (is_ok($r)) {
             push @updated, $tid;
             print "  ~ todo #$tid ($prio): $s->{subject}\n";
         } else {
@@ -170,7 +170,7 @@ for my $i (0 .. $#steps) {
             next;
         }
         my $r = post_json('/api/todo/create', $tbody);
-        if ($r && $r->{success}) {
+        if (is_ok($r)) {
             push @created, $r->{todo_id};
             print "  + todo #$r->{todo_id} ($prio): $s->{subject}\n";
         } else {
@@ -208,14 +208,35 @@ sub post_json {
         'Content-Type' => 'application/json',
         Content => $body);
     my $ct = $resp->header('content-type') // '';
-    if ($ct =~ /json/) {
-        eval { my $d = decode_json($resp->content); return _coerce($d); } || return { success => 0, error => "bad json: ".$resp->content };
+    my $content = $resp->content;
+    # Decode JSON from the body whether or not the server advertised a
+    # JSON content-type. The local /api/* endpoints return a JSON body but
+    # may send text/html (or no content-type), which previously made this
+    # routine report success=>0 even on a 200 with a valid JSON payload --
+    # that broke idempotency stamping and caused duplicate todo creation.
+    if ($ct =~ /json/ || ($content =~ /^\s*\{/ && $content =~ /"success"/)) {
+        eval { my $d = decode_json($content); return _coerce($d); } || return { success => 0, error => "bad json: ".$content };
     }
-    return { success => 0, error => "HTTP ".$resp->code.": ".$resp->content };
+    return { success => 0, error => "HTTP ".$resp->code.": ".$content };
 }
 
 # JSON::MaybeXS may return boolean objects that Perl treats as false. Coerce
 # booleans to 1/0 and recurse through hashes/arrays so all callers see plain values.
+# A response counts as success if it carries an explicit success flag, a
+# created/updated todo id, or a non-empty `updated` array. The /api/* endpoints
+# return a JSON body that may arrive without an application/json content-type,
+# and JSON::MaybeXS booleans are not Perl-truthy -- so testing only
+# $r->{success} misreports real successes as failures (which then skipped the
+# idempotency stamp and caused duplicate todo creation on re-runs).
+sub is_ok {
+    my ($r) = @_;
+    return 0 unless $r && ref $r eq 'HASH';
+    return 1 if $r->{success};
+    return 1 if $r->{todo_id};
+    return 1 if ref $r->{updated} eq 'ARRAY' && @{ $r->{updated} };
+    return 0;
+}
+
 sub _coerce {
     my ($v) = @_;
     return $v unless ref $v;
