@@ -24,6 +24,12 @@ sub new {
         registry_user => $args{registry_user} || '',
         registry_pass => $args{registry_pass} || '',
         image_tag     => $args{image_tag}     || '',
+        # IMGDEP (2026-08-04): image repository ref. Defaults to a LAN-local
+        # registry host (NOT the database server — separation of concerns).
+        # The Docker Hub ref (shantamcsbain/comserv-web-prod) is retired. The
+        # caller MUST pass the real LAN registry host; this default is a
+        # placeholder that must be overridden in production config.
+        image_repo    => $args{image_repo}    || 'comserv-registry.lan:5000/comserv-web-prod',
     }, $class;
 }
 
@@ -241,7 +247,12 @@ sub deploy {
     my $mode   = $self->{mode};
     my $image_tag = $self->{image_tag} || 'latest';
 
-    $self->_log("=== DEPLOY STARTED (target=$target, trigger=$self->{trigger}, mode=$mode) ===");
+    # IMGDEP (2026-08-04): single source of truth for the image repository ref.
+    # Defaults to the LAN-local registry; the caller may override (e.g. to pass
+    # the real LAN host). This is the name compose builds AND tags AND pushes.
+    my $repo_ref = $self->{image_repo};
+
+    $self->_log("=== DEPLOY STARTED (target=$target, trigger=$self->{trigger}, mode=$mode, repo=$repo_ref) ===");
 
     # 0. Map target to service/container/port/ssh details
     my ($service, $container_name, $port, $compose_files, $ssh_prefix, $is_remote);
@@ -312,7 +323,7 @@ sub deploy {
     # ── PUSH ONLY mode ──
     # Just push the existing image without rebuilding
     if ($mode eq 'push-only') {
-        $self->_log("Step 2: Pushing $service to Docker Hub (no rebuild)...");
+        $self->_log("Step 2: Pushing $repo_ref to registry (no rebuild)...");
         my $rc = $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
         if ($rc != 0) {
             $self->_log("✗ Push failed (exit=$rc).");
@@ -342,6 +353,13 @@ sub deploy {
         my $git_hash = `cd $repo && git rev-parse --short HEAD 2>/dev/null` || 'unknown';
         chomp $git_hash;
 
+        # NOTE: builds run from the WORKING TREE, not from git. The git hash is
+        # used only as a tag + in version.json (where a dirty tree is flagged
+        # with +local). We do NOT refuse dirty-tree builds — compose builds
+        # whatever is on disk, and refusing would block building uncommitted
+        # fixes. Traceability of "which build is live" is handled at pull-deploy
+        # time, not by blocking the build here.
+
         # Regenerate version.json so the in-app footer (pagetop.tt via Root.pm)
         # reports the REAL build. Previously this was a stale committed file
         # (frozen at 2026-06-26/91c59fc5), so every image lied about its build —
@@ -366,7 +384,7 @@ sub deploy {
             }
         };
 
-        $self->_log("Step 2: Building $service container (commit=$git_hash)" . ($self->{no_cache} ? ' [--no-cache]' : '') . "...");
+        $self->_log("Step 2: Building $service container (commit=$git_hash, repo=$repo_ref)" . ($self->{no_cache} ? ' [--no-cache]' : '') . "...");
         my $no_cache_flag = $self->{no_cache} ? ' --no-cache' : '';
         my $build_rc = $self->_stream_command("cd $repo && docker compose $compose_files build --progress plain$no_cache_flag $service 2>&1");
         if ($build_rc != 0) {
@@ -374,8 +392,8 @@ sub deploy {
             $self->_save_deploy_log($container_name, $target);
             return 0;
         }
-        # Tag with git hash for traceability
-        system("docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:$git_hash 2>/dev/null");
+        # Tag with git hash for traceability (single source of truth = image_repo)
+        system("docker tag $repo_ref:latest $repo_ref:$git_hash 2>/dev/null");
         $self->_log("Step 2b: Build finished (commit=$git_hash).");
         $self->{_git_hash} = $git_hash;
 
@@ -385,7 +403,7 @@ sub deploy {
                 $self->_save_deploy_log($container_name, $target);
                 return 0;
             };
-            $self->_log("Step 3: Pushing $service to Docker Hub...");
+            $self->_log("Step 3: Pushing $repo_ref to registry...");
             $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
             $self->_log("Step 3b: Push finished.");
         }

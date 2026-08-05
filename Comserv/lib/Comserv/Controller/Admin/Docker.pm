@@ -995,6 +995,9 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
     my $registry_user = $c->req->param('registry_user') || '';
     my $registry_pass = $c->req->param('registry_pass') || '';
     my $image_tag     = $c->req->param('image_tag')     || '';
+    # IMGDEP: optional override of the LAN registry image repo. Empty string
+    # lets DockerDeploy fall back to its LAN-registry default.
+    my $image_repo    = $c->req->param('image_repo')    || '';
     my $log_file = '/tmp/comserv_deploy.log';
     my $pid_file = '/tmp/comserv_deploy.pid';
     unlink $log_file;
@@ -1056,6 +1059,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
                 registry_user => $registry_user,
                 registry_pass => $registry_pass,
                 image_tag     => $image_tag,
+                ($image_repo ? (image_repo => $image_repo) : ()),
             );
         };
         if ($@) {

@@ -107,7 +107,7 @@ services:
       context: ./Comserv
       dockerfile: Dockerfile
       target: production
-    image: comserv-web:prod
+    image: comserv-registry.lan:5000/comserv-web-prod
     container_name: comserv2-web-prod
     restart: unless-stopped
     depends_on:
