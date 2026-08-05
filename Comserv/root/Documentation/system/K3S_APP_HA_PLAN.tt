@@ -1,0 +1,142 @@
+[% META
+        title = "K3s 2-Node App HA  -  Kill the Manual OPNsense Cutover"
+   description = "Focused plan: run Comserv web-prod on a 2-node k3s cluster (.126 + .199) behind health-checked ingress, with the image registry on .199. Eliminates the manual OPNsense switch on .126 failure. DB HA deferred to a future step (currently .198 backup is stale)."
+   roles = "admin,devops,developer"
+   TemplateType = "Documentation"
+   category = "infrastructure,deployment,kubernetes,high-availability"
+   page_version = "0.01"
+   last_updated = "Tue Aug 04 2026"
+   site_specific = "true"
+   project_id = "202"
+   project_code = "INFRA-HA"
+%]
+[%# ai-plan-sync created todo_ids: 1905,1906,1907,1908,1909,1910 under project_id=202 %]
+
+
+<nav style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.12); border: 1px solid var(--border-color);">
+  <a href="[% c.uri_for('/Documentation') %]" style="color: var(--link-color); text-decoration: none;">← Back to Documentation</a>
+  &nbsp;|&nbsp;
+  <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color); text-decoration: none;">📁 Tracked in project #202 (INFRA-HA)</a>
+</nav>
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">K3s 2-Node App HA  -  Kill the Manual OPNsense Cutover</h1>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-bottom: var(--spacing-medium);">
+        Version: 0.01 | Status: 📋 DRAFT FOR REVIEW | Scope: App-layer HA only. DB HA explicitly OUT OF SCOPE (future step).
+    </div>
+
+    <div style="background-color: var(--caution-bg, #fff3cd); border: 2px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px;">
+        <h3 style="margin-top: 0; color: #d84315;">⚠️ DRAFT  -  AWAITING APPROVAL</h3>
+        <p style="color: var(--text-color); margin: 5px 0;">No k3s install, no registry container, no OPNsense change occurs until this plan is approved. All remote-execution steps require explicit go-ahead with credentials handled by the user, not automated scripts.</p>
+    </div>
+
+    <h2>1. Problem Statement</h2>
+    <p>Today <strong>.126 (production1)</strong> is the only live Catalyst app. If it dies, failover to the standby container on <strong>.199 (workstation)</strong> is a <strong>manual OPNsense switch</strong>  -  a human must flip it. Two drivers for change:</p>
+    <ul>
+        <li><strong>Eliminate the manual cutover</strong>  -  auto-fail when .126 dies.</li>
+        <li><strong>Prove a real docker/k3s management system</strong>  -  replace the current "build on .199, push, manually switch" rig with orchestration that self-heals.</li>
+    </ul>
+
+    <h2>2. Actual Current Topology (per 2026-08-04 inventory)</h2>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Host</th><th style="text-align:left; padding:6px;">Role</th><th style="text-align:left; padding:6px;">Docker?</th><th style="text-align:left; padding:6px;">HA relevance</th></tr>
+        <tr><td style="padding:6px;">.126 production1</td><td style="padding:6px;">Live Catalyst app (web-prod)</td><td style="padding:6px;">yes (Docker 29.x)</td><td style="padding:6px;"><strong>SPOF</strong>  -  failure needs manual cutover</td></tr>
+        <tr><td style="padding:6px;">.199 workstation</td><td style="padding:6px;">Builds + pushes image; runs same web-prod as dormant standby</td><td style="padding:6px;">yes (Docker 29.7.1)</td><td style="padding:6px;">Registry host + 2nd app node</td></tr>
+        <tr><td style="padding:6px;">.20</td><td style="padding:6px;">Primary DB (Ency MySQL)</td><td style="padding:6px;">no</td><td style="padding:6px;"><strong>SPOF</strong>  -  accepted for this step (future DB HA)</td></tr>
+        <tr><td style="padding:6px;">.198</td><td style="padding:6px;">Backup DB server</td><td style="padding:6px;">no docker (could add)</td><td style="padding:6px;">NOT kept current  -  drift unknown. Future DB-replica step, NOT this step.</td></tr>
+    </table>
+    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Doc drift note:</strong> Existing k3s docs (<code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code>, <code>DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</code>, <code>Phase0KubernetesReadinessPlan.tt</code>) describe a <em>3-host Proxmox cluster</em> (proxmoxws / proxmox720) and a MariaDB-on-k3s Galera migration. That does not match the bare-metal <code>.126/.199/.20/.198</code> reality above. Those docs are about <strong>DB HA</strong> and must be reconciled separately; this plan covers only <strong>app HA</strong> on the real hardware.</p>
+
+    <h2>3. Target State</h2>
+    <ul>
+        <li>k3s cluster: <strong>2 nodes</strong>  -  .126 (server+worker) and .199 (agent+worker). Control plane tolerates one node; app keeps serving if either dies.</li>
+        <li><strong>Image registry on .199</strong> (<code>registry:2</code> container, port 5000, HTTP/insecure). This is the build→deploy handoff, same as today's plan  -  k3s does NOT eliminate the push, it only automates the last mile.</li>
+        <li>Comserv web-prod deployed as a k3s <strong>Deployment</strong> (replicas=2) with a <strong>health-checked ingress/Service</strong>. .126 dies → kubelet reschedules; ingress stops routing to the dead pod. <strong>No OPNsense manual flip.</strong></li>
+        <li>Shared dependencies already present: <code>comserv2_redis_data</code>, <code>comserv2_sessions</code>, <code>comserv2_nfs_data</code> (sessions + uploads)  -  must be mounted into the pods (hostPath or NFS CSI), not container-local.</li>
+    </ul>
+
+    <h2>4. Does k3s eliminate "pushing to production"?  -  No.</h2>
+    <p>The build→registry→deploy pipeline is unchanged. Only the last mile changes:</p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Phase</th><th style="text-align:left; padding:6px;">Current</th><th style="text-align:left; padding:6px;">k3s</th></tr>
+        <tr><td style="padding:6px;">Build</td><td style="padding:6px;">.199</td><td style="padding:6px;">.199 (unchanged)</td></tr>
+        <tr><td style="padding:6px;">Push target</td><td style="padding:6px;">Docker Hub / LAN registry</td><td style="padding:6px;">LAN registry on .199 (unchanged)</td></tr>
+        <tr><td style="padding:6px;">Deploy to live</td><td style="padding:6px;">manual OPNsense → .199 container</td><td style="padding:6px;"><code>kubectl set image</code> → k3s rolls new tag onto both nodes</td></tr>
+        <tr><td style="padding:6px;">Failover</td><td style="padding:6px;">human flips OPNsense</td><td style="padding:6px;">automatic (health check + reschedule)</td></tr>
+    </table>
+
+    <h2>5. Implementation Phases (high level  -  each needs its own approved sub-step)</h2>
+    <h3>Phase A - Registry on .199 (prereq, already partly planned)</h3>
+    <ul>
+        <li>Stand up <code>registry:2</code> container on .199, port 5000, persistent volume.</li>
+        <li>Add <code>192.168.1.199:5000</code> (or <code>comserv-registry.lan</code>) to <code>insecure-registries</code> on BOTH .126 and .199 docker/k3s config.</li>
+        <li>Verify: <code>docker push</code> a test tag from .199, <code>docker pull</code> on .126.</li>
+    </ul>
+    <h3>Phase B - k3s install</h3>
+    <ul>
+        <li>Install k3s on .126 (server) and .199 (agent joined to .126).</li>
+        <li>Verify cluster: <code>kubectl get nodes</code> shows both Ready.</li>
+        <li><strong>Verify-before-execute:</strong> confirm .126 currently runs web-prod via compose; migration must not disrupt the live container until the Deployment is proven.</li>
+    </ul>
+    <h3>Phase C - App Deployment manifest</h3>
+    <ul>
+        <li>Write Deployment (replicas=2, image <code>&lt;registry&gt;/comserv-web-prod:&lt;sha&gt;</code>, pull policy IfNotPresent), Service (ClusterIP), and Ingress/LoadBalancer with health probe on <code>/</code> or a health route.</li>
+        <li>Mount shared volumes (redis/sessions/nfs) from existing docker volumes or NFS.</li>
+        <li>Pass DB creds via k8s Secret (sourced from existing <code>db_config.json</code>  -  do NOT bake into image; the IMGSEC work already excludes it from layers).</li>
+    </ul>
+    <h3>Phase D - Cutover (zero-downtime intent)</h3>
+    <ul>
+        <li>Bring Deployment up alongside (not replacing) the existing .126 compose container first; validate both serve.</li>
+        <li>Switch the OPNsense / external entry to the k3s ingress.</li>
+        <li>Only after stable: retire the manual-switch compose standby on .199.</li>
+    </ul>
+    <h3>Phase E - Failover proof</h3>
+    <ul>
+        <li>Test: cordon/drain .126 → confirm ingress routes only to .199 pod, app stays up. This is the proof that replaces the manual cutover.</li>
+    </ul>
+
+    <h2>6. Known SPOFs retained (explicitly accepted this step)</h2>
+    <ul>
+        <li><strong>DB .20</strong>  -  if it dies, neither app node serves. Accepted; DB HA is the future step.</li>
+        <li><strong>Registry on .199</strong>  -  if .199 dies, no new pushes/deploys (running pods keep serving). Acceptable; could add .198 later.</li>
+        <li><strong>k3s control plane on .126</strong>  -  single server node. For 2-node app HA this is acceptable; full HA control plane is future.</li>
+    </ul>
+
+    <h2>7. Future Step  -  DB HA (tracked as Phase F todo)</h2>
+    <p>The existing <code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code> covers MariaDB Galera on .198. But reality check from 2026-08-04: <strong>.198 backup is NOT kept current  -  drift is unknown and may already be broken.</strong> Before any Galera/replica work, a standalone task must:</p>
+    <ul>
+        <li>Assess .198 actual state vs .20 (schema + row drift).</li>
+        <li>Decide: repair .198 into a <strong>live replica</strong> (closes DB SPOF) vs. keep it file/sql backup only.</li>
+        <li>Only then reconcile with the existing Galera plan.</li>
+    </ul>
+
+    <h3>Phase F - Future: DB HA (.198 backup repair + live replica)</h3>
+    <p><strong>GATE:</strong> .198 assessed for drift and either promoted to a live replica (DB SPOF closed) or confirmed as file/sql backup only  -  decision recorded. This phase is intentionally deferred; app-HA (Phases A-E) ships first.</p>
+    <ul>
+        <li>Assess .198 vs .20 (schema + row drift)  -  probe, do not assume.</li>
+        <li>Decide live replica vs backup-only; record the decision.</li>
+        <li>Reconcile with <code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code> (note: that doc describes Proxmox/Galera, not bare-metal .198  -  reconcile or retire).</li>
+    </ul>
+
+    <hr style="border-color: var(--border-color); margin: var(--spacing-large) 0;" />
+    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Doc currency:</strong> this plan is kept current as phases complete. Each phase todo in project <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 (INFRA-HA)</a> carries its gate; when a phase's deliverables land, the corresponding todo is closed here and this doc's section is marked done with the commit/evidence. Last reviewed: 2026-08-04.</p>
+
+    <h2>8. Gates / Definition of Done</h2>
+    <ul>
+        <li>[ ] Registry on .199 pushes + pulls from both nodes.</li>
+        <li>[ ] <code>kubectl get nodes</code> → 2 Ready.</li>
+        <li>[ ] Deployment replicas=2, both pods Running, share redis/sessions/nfs.</li>
+        <li>[ ] External entry hits k3s ingress; app serves identically to before.</li>
+        <li>[ ] Drain .126 → app stays up on .199 (manual cutover eliminated).</li>
+        <li>[ ] No DB credential in image layers (IMGSEC verified).</li>
+    </ul>
+
+    <h2>9. References</h2>
+    <ul>
+        <li><code>ImmutableImageDeployPlan.tt</code>  -  LAN registry + dirty-tree/version.json context (DockerDeploy.pm changes).</li>
+        <li><code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code>  -  DB-on-k3s Galera (future step; doc-reality drift noted).</li>
+        <li><code>DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</code>  -  broader strategy (references Proxmox cluster not matching bare-metal reality).</li>
+        <li><code>Phase0KubernetesReadinessPlan.tt</code>  -  K8s readiness (db_config.json authority).</li>
+    </ul>
+</div>
