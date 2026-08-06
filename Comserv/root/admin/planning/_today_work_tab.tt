@@ -127,6 +127,27 @@
 
                 </div>
 
+                [%# ── AI Focus-Tune: ONE compact line, right on the Focus Queue ── %]
+                [% IF is_admin %]
+                <div id="ai-tune-bar" class="AITuneBar AITuneBar--inline">
+                    <button id="ai-tune-btn" class="ActionBarBtn ActionBarBtn--blue" data-action="ai-tune"
+                            title="Run the AI Focus-Tune on the selected model(s) and show the difference vs the code sort">
+                        🤖 AI: Tune
+                    </button>
+                    <button id="ai-tune-models-btn" class="ActionBarBtn ActionBarBtn--blue" data-action="ai-tune-toggle-models"
+                            title="Select 2+ models to compare">
+                        ☑ Models <span id="ai-tune-count">(1)</span>
+                    </button>
+                    <button id="ai-tune-compare" class="ActionBarBtn ActionBarBtn--blue" data-action="ai-tune-compare"
+                            title="Compare every selected model side by side">
+                        ⚖ Compare
+                    </button>
+                    <span id="ai-tune-status" class="AITuneStatus"></span>
+                    <div id="ai-tune-model-pop" class="AITuneModelPop" style="display:none;"></div>
+                </div>
+                <div id="ai-tune-result" class="AITuneResult" style="display:none;"></div>
+                [% END %]
+
                 [%# ── Filter Bar — compact single row with collapsible dropdowns ── %]
                 <div id="ap-filter-bar" class="FilterBar">
 

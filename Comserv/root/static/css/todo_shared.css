@@ -26,6 +26,8 @@
     font-weight: bold;
 }
 
+.view-buttons a.add-todo-link { margin-left: auto; }
+
 /* Common Navigation Styles */
 .view-navigation {
     display: flex;

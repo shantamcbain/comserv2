@@ -699,7 +699,116 @@
     border-color: #6f42c1;
 }
 
-/* ── Dependency Summary ───────────────────────────────────── */
+.ActionBarBtn--blue {
+    color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* ── AI Focus-Tune bar + result ──────────────────────────── */
+
+.AITuneBar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: color-mix(in srgb, #0d6efd 8%, var(--bg-color));
+    border: 1px solid #0d6efd;
+    position: relative;
+}
+
+.AITuneBar--inline {
+    margin: 4px 0 10px;
+    padding: 3px 6px;
+    font-size: 0.9em;
+}
+
+.AITuneModel {
+    font-size: 0.82em;
+    padding: 3px 6px;
+    border-radius: 4px;
+    border: 1px solid #0d6efd;
+    background: var(--bg-color);
+    color: var(--text-color);
+    max-width: 220px;
+}
+
+.AITuneStatus {
+    font-size: 0.82em;
+    color: var(--text-muted-color);
+    margin-left: 4px;
+}
+
+.AITuneResult {
+    margin: 8px 0 14px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid #0d6efd;
+    background: var(--bg-secondary);
+}
+
+.AITuneResult h4 {
+    margin: 14px 0 6px;
+    color: #0d6efd;
+    font-size: 1em;
+}
+
+.AITuneResult table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86em;
+    margin-bottom: 8px;
+}
+
+.AITuneResult th, .AITuneResult td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.AITuneResult .ai-up   { color: #198754; font-weight: bold; }
+.AITuneResult .ai-down { color: #dc3545; font-weight: bold; }
+.AITuneResult .ai-same { color: var(--text-muted-color); }
+
+.AITunePick {
+    border-left: 3px solid #0d6efd;
+    padding: 4px 8px;
+    margin: 4px 0;
+    background: color-mix(in srgb, #0d6efd 6%, var(--bg-color));
+}
+
+.AITunePick a { color: #0d6efd; font-weight: bold; }
+
+.AITunePlanItem { border-left: 3px solid #6f42c1; padding: 4px 8px; margin: 4px 0; background: color-mix(in srgb, #6f42c1 6%, var(--bg-color)); }
+
+.AITuneWeights { font-family: monospace; font-size: 0.85em; }
+
+.AITuneMisSet { border-left: 3px solid #fd7e14; padding: 4px 8px; margin: 4px 0; }
+
+.AITuneCompareGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.AITuneCompareModel { border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; background: var(--bg-color); }
+.AITuneCompareModel h5 { margin: 0 0 4px; color: #0d6efd; }
+.AITuneModelHead { font-weight: bold; color: #0d6efd; margin-bottom: 4px; }
+.AITuneModelHead small { color: var(--text-muted-color); font-weight: normal; }
+
+/* Model multi-select popover (one compact line trigger; popover is absolute) */
+.AITuneModelPop {
+    position: absolute;
+    z-index: 50;
+    margin-top: 4px;
+    background: var(--bg-color);
+    border: 1px solid #0d6efd;
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    max-width: 320px;
+}
+.AITuneModelPopInner { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.AITuneModelOpt { display: flex; align-items: center; gap: 6px; font-size: 0.85em; padding: 2px 0; cursor: pointer; }
+.AITuneModelPopFoot { margin-top: 6px; text-align: right; }
+
 
 .DepSummary {
     cursor: pointer;

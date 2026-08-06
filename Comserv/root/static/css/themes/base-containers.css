@@ -2312,3 +2312,74 @@ mark {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
 }
+
+/* ============================================================================
+   STANDARD UTILITY & COMPONENT CLASSES (promoted from page-local CSS)
+   These are theme-owned and available app-wide so individual pages use the
+   SAME card / badge / button / flex primitives instead of redefining them.
+   ============================================================================ */
+
+/* --- Card --- */
+.card {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg, var(--bg-color, #fff));
+}
+.card-header {
+    padding: 0.75rem 1.25rem;
+    background-color: var(--table-header-bg, rgba(0,0,0,0.03));
+    border-bottom: 1px solid var(--border-color);
+}
+.card-body {
+    padding: 1.25rem;
+}
+
+/* --- Badges --- */
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.4em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+}
+.badge-danger  { color: #fff; background-color: var(--danger-color, #dc3545); }
+.badge-warning { color: var(--text-color, #212529); background-color: var(--caution-color, #ffc107); }
+.badge-info    { color: #fff; background-color: var(--info-color, #17a2b8); }
+.badge-primary { color: #fff; background-color: var(--primary-color, #007bff); }
+.badge-success { color: #fff; background-color: var(--success-color, #28a745); }
+.badge-secondary { color: #fff; background-color: var(--text-muted-color, #6c757d); }
+
+/* Priority scale (theme-owned; used by todo priority badges) */
+.pri-1 { background: var(--danger-color, #dc3545); color: #fff; }
+.pri-2, .pri-3, .pri-4 { background: var(--accent-color, #FF9900); color: var(--text-color, #000); }
+.pri-5, .pri-6 { background: var(--caution-color, #ffc107); color: var(--text-color, #000); }
+.pri-7, .pri-8, .pri-9, .pri-10 { background: var(--text-muted-color, #6c757d); color: #fff; }
+
+/* --- Flex utilities --- */
+.d-flex { display: flex !important; }
+.flex-column { flex-direction: column !important; }
+.flex-wrap { flex-wrap: wrap !important; }
+.justify-content-between { justify-content: space-between !important; }
+.align-items-center { align-items: center !important; }
+.flex-grow-1 { flex: 1 1 auto !important; }
+.flex-shrink-0 { flex: 0 0 auto !important; }
+.min-width-0 { min-width: 0 !important; }
+.ml-1 { margin-left: 0.25rem !important; }
+.mb-2 { margin-bottom: 0.5rem !important; }
+.gap-2 { gap: 0.5rem !important; }
+
+/* Truncate a single line (must pair with min-width-0 parent) */
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- Misc helpers used by cards --- */
+.text-muted { color: var(--text-muted-color, #6c757d) !important; }
+.bg-light { background-color: var(--light-color, #f8f9fa) !important; }

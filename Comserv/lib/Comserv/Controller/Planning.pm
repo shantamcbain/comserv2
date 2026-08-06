@@ -4,6 +4,8 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AccessControl;
 use Comserv::Util::ProjectDependencies;
+use Comserv::Util::TodoRanking;
+use Comserv::Util::FocusRanking;
 use Comserv::Util::TodoTypes qw(recurring_matches_date);
 use Comserv::Util::ErrorAudit;
 use Comserv::Model::Ollama;
@@ -564,53 +566,14 @@ sub daily :Path('/planning/daily') :Args {
             next if ($h{todo_type} // '') =~ /^(appointment|meeting|event|reminder)$/i;
             next if ($h{is_recurring} // 0);
 
-            my $st          = $h{status} // '';
-            my $in_progress = ($st == 2 || $st == 5 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
-            my $status_tier = $in_progress ? 0 : 1;
-
-            my $activity_str = $h{last_mod_date} || $h{date_time_posted} || '';
-            my $days_stale   = 0;
-            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
-                $days_stale = int(($now_epoch - $act_epoch) / 86400) if $act_epoch;
-            }
-            my $stale_penalty = $days_stale > 180 ? 500 : ($days_stale > 90 ? 50 : 0);
-            $h{stale_days} = $days_stale;
-            $h{is_stale}   = $days_stale > 180 ? 1 : 0;
-
-            my $priority         = ($h{priority} || 5);
-            my $block_bonus      = $h{is_blocking} ? -0.4 : 0;
-            my $cross_block_bonus = 0;
-            if ($h{project_id} && $cross_blocker_projects{$h{project_id}} && $h{is_blocking}) {
-                $cross_block_bonus    = -1000;
-                $h{is_cross_blocker}  = 1;
-                $h{blocking_count}    = scalar @{ $cross_blocker_projects{$h{project_id}} };
-                $h{blocking_names}    = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
-            }
-
-            my $due_bonus = 0;
-            if (my $due = $h{due_date}) {
-                if ($due =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                    my $due_epoch = POSIX::mktime(0, 0, 23, $3, $2 - 1, $1 - 1900);
-                    my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
-                    $h{days_until_due} = $days_until_due;
-                    if    ($days_until_due < 0)  { $due_bonus = -5; $h{is_overdue} = 1; }
-                    elsif ($days_until_due == 0) { $due_bonus = -3; $h{due_today}  = 1; }
-                    elsif ($days_until_due <= 3) { $due_bonus = -1; }
-                }
-            }
-
-            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus + $due_bonus) + $stale_penalty;
-
-            if ($h{blocked_by_todo_id}) {
-                my $blocker = $row_by_id{$h{blocked_by_todo_id}}
-                    || eval { $c->model('DBEncy')->resultset('Todo')->find($h{blocked_by_todo_id}) };
-                if ($blocker) {
-                    $h{blocker_subject} = $blocker->subject;
-                    my $bs = $blocker->status // '';
-                    $h{blocker_done} = ($bs == 3 || $bs =~ /^(done|completed|closed)$/i) ? 1 : 0;
-                }
-            }
+            # Score via the shared ranking module (project 240 / TodoRanking.pm).
+            # This keeps the Focus Queue ordering identical to the main Todo list.
+            Comserv::Util::TodoRanking::score_todo(\%h, {
+                now_epoch              => $now_epoch,
+                cross_blocker_projects => \%cross_blocker_projects,
+                cross_blocker_names    => \%cross_blocker_names,
+                row_by_id              => \%row_by_id,
+            });
 
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
@@ -631,6 +594,19 @@ sub daily :Path('/planning/daily') :Args {
                 $h{project_name} // '', $h{project_code} // '', $h{subject} // ''
             );
             $ap_role_cats_seen{$_} = 1 for split ',', $h{role_cats};
+
+            # Site-agnostic filtering via the shared FocusRanking toolkit (project 240).
+            # Mirrors the client applyAllFilters but runs server-side so any controller
+            # (CSC planning, BMaster calendar, etc.) can reuse the same predicate.
+            my %filter_ctx = (
+                all_roles       => { map { $_ => 1 } @{ $c->stash->{user_roles} || [] } },
+                checked_roles   => { map { $_ => 1 } @{ $c->stash->{user_roles} || [] } },
+                site_filtered   => (defined $filter_site && length $filter_site) ? 1 : 0,
+                checked_sites   => { ($filter_site || '') => 1 },
+                proj_filtered   => (defined $filter_project && length $filter_project) ? 1 : 0,
+                checked_projects=> { ($filter_project || '') => 1 },
+            );
+            next unless Comserv::Util::FocusRanking::passes_filters(\%h, \%filter_ctx);
 
             push @scored, \%h;
         }

@@ -11,6 +11,7 @@ use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
 use Comserv::Util::ProjectDependencies;
+use Comserv::Util::TodoRanking;
 use Comserv::Util::TodoTypes qw(recurring_matches_date);
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -402,11 +403,28 @@ sub todo :Path('/todo') :Args(0) {
         $search_conditions->{'-or'} = $date_conditions;
     }
 
-    # Fetch todos with the applied filters
+    # Fetch todos with the applied filters (no DB ordering — we rank in Perl
+    # via the shared TodoRanking score so the main list matches the Focus Queue).
     my @todos = $rs->search(
         $search_conditions,
-        { order_by => { -asc => ['priority', 'start_date'] } }
+        { order_by => { -asc => ['record_id'] } }
     );
+
+    # Rank every fetched row by the shared score (project 240 / TodoRanking.pm).
+    my %row_by_id = map { $_->record_id => { $_->get_columns } } @todos;
+    my $now_epoch = time();
+    for my $t (@todos) {
+        my $h = $row_by_id{$t->record_id};
+        Comserv::Util::TodoRanking::score_todo($h, {
+            now_epoch => $now_epoch,
+            row_by_id => \%row_by_id,
+        });
+    }
+    @todos = sort {
+        ($row_by_id{$a->record_id}{ap_score} // 0) <=> ($row_by_id{$b->record_id}{ap_score} // 0)
+        || ($row_by_id{$a->record_id}{priority} // 5) <=> ($row_by_id{$b->record_id}{priority} // 5)
+        || ($a->due_date // '') cmp ($b->due_date // '')
+    } @todos;
 
     # Fetch all projects for the filter dropdown
     my $projects = [];
@@ -1894,9 +1912,19 @@ sub day :Path('/todo/day') :Args {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
         "After date filtering: " . scalar(@$filtered_todos) . " todos remain for date $date");
 
-    # Sort todos by time_of_day, then priority, then start_date
-    my @sorted_todos = sort { 
+    # Sort todos by time_of_day (lane anchor), then by the shared ranking score
+    # (ap_score) so substantive work surfaces above p1 noise. Falls back to priority
+    # when ap_score is absent. (project 240 / TodoRanking.pm)
+    my $now_epoch_day = time();
+    my %day_score;
+    for my $dt (@$filtered_todos) {
+        my %h = $dt->get_columns;
+        Comserv::Util::TodoRanking::score_todo(\%h, { now_epoch => $now_epoch_day });
+        $day_score{$dt->record_id} = $h{ap_score};
+    }
+    my @sorted_todos = sort {
         ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($day_score{$a->record_id} // 99999) <=> ($day_score{$b->record_id} // 99999) ||
         ($a->priority // 10) <=> ($b->priority // 10) ||
         ($a->start_date // '') cmp ($b->start_date // '')
     } @$filtered_todos;

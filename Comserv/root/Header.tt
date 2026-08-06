@@ -90,6 +90,11 @@
     <!-- Theme CSS: [% theme_name %] -->
     <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css?v=[% cv %]">
 
+    <!-- Universal container/component system (cards, badges, buttons, flex utils).
+         Every theme is expected to inherit these; load it app-wide so all pages
+         (todo, etc.) get the standard theme card instead of being unstyled. -->
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/base-containers.css?v=[% cv %]">
+
     <!-- Theme overrides to ensure proper application -->
     <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css?v=[% cv %]">
 
@@ -123,7 +128,7 @@
     [% END %]
     
     [% IF c.stash.template.match('todo/') %]
-    <link rel="stylesheet" type="text/css" href="/static/css/todo.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/todo.css?v=[% cv %]">
     [% END %]
 
     [% IF c.stash.template.match('membership/') %]
