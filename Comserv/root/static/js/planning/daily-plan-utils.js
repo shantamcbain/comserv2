@@ -469,6 +469,20 @@
         }
     }
 
+    // Ensure a work-log session exists for this todo before a close/done op,
+    // so close_log/done_with_log can never fail with "No open log found".
+    // The server's open_log is idempotent (returns already_open if a session
+    // is live), so calling it unconditionally is safe. The Start button is the
+    // source of truth for session state; close/done build on top of it.
+    function _ensureSession(recordId) {
+        return fetch('/todo/open_log', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ record_id: recordId })
+        }).then(function(r) { return r.json(); }).catch(function() { return { ok: false }; });
+    }
+
     function startWorkTodoCard(btn, recordId) {
         btn.disabled = true;
         btn.textContent = '…';
@@ -498,23 +512,25 @@
         notes = notes || '';
         btn.disabled = true;
         btn.textContent = '…';
-        fetch('/todo/close_log', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ record_id: recordId, notes: notes })
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            if (d.ok) {
-                _todoCardSetStart(btn, recordId);
-            } else {
+        // Start button is the source of truth: guarantee a session exists so the
+        // close can never hit "No open log found" (see _ensureSession).
+        _ensureSession(recordId).then(function() {
+            fetch('/todo/close_log', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ record_id: recordId, notes: notes })
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.ok) {
+                    _todoCardSetStart(btn, recordId);
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = '⏸ Active';
+                }
+            }).catch(function() {
                 btn.disabled = false;
                 btn.textContent = '⏸ Active';
-                alert('Could not close log: ' + (d.error || 'unknown'));
-            }
-        }).catch(function(e) {
-            btn.disabled = false;
-            btn.textContent = '⏸ Active';
-            alert('Error: ' + e);
+            });
         });
     }
 
@@ -524,38 +540,34 @@
         if (notes === null) return;
         notes = notes || '';
         var payload = { record_id: recordId, notes: notes };
-        if (!isActive) {
-            var durStr = prompt('No active log session.\\nHow many minutes did this take? (leave blank for default)');
-            if (durStr === null) return;
-            var durMins = parseInt(durStr, 10);
-            if (!isNaN(durMins) && durMins > 0) { payload.duration_mins = durMins; }
-        }
         btn.disabled = true;
         btn.textContent = '…';
-        fetch('/todo/done_with_log', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            if (d.ok) {
-                var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
-                if (card) {
-                    card.style.opacity = '0.4';
-                    card.style.textDecoration = 'line-through';
-                    card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+        // Start button is the source of truth: ensure a session exists before we
+        // close+mark-done, so done_with_log can never hit "No open log found".
+        _ensureSession(recordId).then(function() {
+            fetch('/todo/done_with_log', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.ok) {
+                    var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
+                    if (card) {
+                        card.style.opacity = '0.4';
+                        card.style.textDecoration = 'line-through';
+                        card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+                    }
+                    btn.textContent = '✓ Done';
+                    btn.disabled = true;
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = 'Done';
                 }
-                btn.textContent = '✓ Done';
-                btn.disabled = true;
-            } else {
+            }).catch(function() {
                 btn.disabled = false;
                 btn.textContent = 'Done';
-                alert('Could not mark done: ' + (d.error || 'unknown'));
-            }
-        }).catch(function(e) {
-            btn.disabled = false;
-            btn.textContent = 'Done';
-            alert('Error: ' + e);
+            });
         });
     }
 
@@ -634,6 +646,219 @@
         if (modal) modal.parentNode.removeChild(modal);
     }
 
+    /* ── AI Focus-Tune (phase 5b): diff the code sort vs what each chosen model
+           thinks, with EXPLICIT multi-model selection (no silent swap) ───────── */
+
+    // Selected models: array of {name, host}. Defaults to the first available.
+    var _aiTuneSelected = [];
+
+    function _aiTuneModelList() {
+        var sel = document.getElementById('ai-tune-model-pop');
+        return sel ? sel : null;
+    }
+
+    function _aiTuneUpdateCount() {
+        var el = document.getElementById('ai-tune-count');
+        if (el) el.textContent = '(' + (_aiTuneSelected.length || 1) + ')';
+    }
+
+    function _aiTuneRenderResult(model, host, data, container) {
+        if (!data || data.success !== 1) {
+            container.innerHTML = '<div class="AITuneMisSet"><strong>' + esc(model) + '</strong> ⚠ '
+                + ((data && (data.error || data.detail)) ? (data.error + ' ' + (data.detail || '')) : 'AI ranking unavailable')
+                + '</div>';
+            container.style.display = 'block';
+            return;
+        }
+        var html = '';
+        html += '<div class="AITuneModelHead">🤖 <code>' + esc(data.model || model) + '</code>'
+            + (host ? ' <small>@' + esc(host) + '</small>' : '') + '</div>';
+
+        if (data.picks && data.picks.length) {
+            html += '<h4>Top picks</h4>';
+            data.picks.forEach(function(p) {
+                if (p.type === 'plan_item') {
+                    html += '<div class="AITunePlanItem"><strong>' + esc(p.step || '(plan step)') + '</strong> '
+                        + '<small>(' + esc(p.title || '') + (p.path ? ' · ' + esc(p.path) : '') + ')</small>'
+                        + (p.why ? '<div><small>' + esc(p.why) + '</small></div>' : '') + '</div>';
+                } else {
+                    html += '<div class="AITunePick"><a href="/todo/details?record_id=' + p.record_id + '" '
+                        + 'target="_blank">#' + p.record_id + '</a> ' + esc(p.why || '') + '</div>';
+                }
+            });
+        } else {
+            html += '<p><small>No picks returned.</small></p>';
+        }
+
+        var comp = data.comparison || {};
+        var coded = comp.coded_top20 || [];
+        var sim   = comp.simulated_top20 || [];
+        if (coded.length || sim.length) {
+            html += '<h4>🔁 Difference vs the code sort (lower = more important)</h4>';
+            html += '<table><thead><tr><th>#</th><th>Code sort</th><th>AI thinks</th><th>Move</th></tr></thead><tbody>';
+            var maxRows = Math.max(coded.length, sim.length);
+            var codedByPos = {};
+            coded.forEach(function(r, i) { codedByPos[r.record_id] = i + 1; });
+            for (var i = 0; i < maxRows; i++) {
+                var c = coded[i], s = sim[i];
+                var cTxt = c ? ('#' + c.record_id + ' ' + esc((c.subject || '').slice(0, 38))) : '—';
+                var sTxt = s ? ('#' + s.record_id + ' ' + esc((s.subject || '').slice(0, 38))) : '—';
+                var move = '';
+                if (c && s) {
+                    if (c.record_id === s.record_id) { move = '<span class="ai-same">same</span>'; }
+                    else {
+                        var aiPos = codedByPos[s.record_id];
+                        if (aiPos) {
+                            var delta = aiPos - (i + 1);
+                            if (delta > 0) move = '<span class="ai-up">▲ +' + delta + '</span>';
+                            else if (delta < 0) move = '<span class="ai-down">▼ ' + delta + '</span>';
+                            else move = '<span class="ai-same">—</span>';
+                        } else { move = '<span class="ai-up">▲ new</span>'; }
+                    }
+                }
+                html += '<tr><td>' + (i + 1) + '</td><td>' + cTxt + '</td><td>' + sTxt + '</td><td>' + move + '</td></tr>';
+            }
+            html += '</tbody></table>';
+            html += '<p><small>' + esc(comp.note || '') + '</small></p>';
+        }
+
+        if (data.weights && Object.keys(data.weights).length) {
+            html += '<h4>⚖ Proposed scorer weights (retune, not replace)</h4>';
+            html += '<div class="AITuneWeights">' + Object.keys(data.weights).map(function(k) {
+                return k + '=' + data.weights[k];
+            }).join('  ') + '</div>';
+            if (data.weights_why) html += '<p><small>' + esc(data.weights_why) + '</small></p>';
+        }
+
+        if (data.mis_set_todos && data.mis_set_todos.length) {
+            html += '<h4>🛠 Mis-set todos to clean up (' + data.mis_set_todos.length + ')</h4>';
+            data.mis_set_todos.forEach(function(m) {
+                html += '<div class="AITuneMisSet"><a href="/todo/details?record_id=' + m.record_id
+                    + '" target="_blank">#' + m.record_id + '</a> — ' + esc(m.issue || '') + '</div>';
+            });
+        }
+
+        container.innerHTML = html;
+        container.style.display = 'block';
+    }
+
+    function _aiTuneCall(target, statusEl, resultEl, onDone) {
+        statusEl.textContent = 'Thinking with ' + target.name + '…';
+        fetch('/api/focus/top5', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            // Send explicit models array (name+host) so the exact model is honored.
+            body: JSON.stringify({ models: [ { name: target.name, host: target.host || '' } ] }),
+            cache: 'no-store'
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            statusEl.textContent = '';
+            if (onDone) onDone(target, d); else _aiTuneRenderResult(target.name, target.host, d, resultEl);
+        }).catch(function(e) {
+            statusEl.textContent = '';
+            if (onDone) onDone(target, { success: 0, error: '' + e });
+            else { resultEl.innerHTML = '<div class="AITuneMisSet">⚠ Request failed: ' + esc('' + e) + '</div>'; resultEl.style.display = 'block'; }
+        });
+    }
+
+    // Render a batch of per-model results side by side inside resultEl.
+    function _aiTuneRenderBatch(models, results, resultEl) {
+        resultEl.innerHTML = '<h4>⚖ Comparison — ' + models.length + ' models side by side</h4>'
+            + '<div class="AITuneCompareGrid"></div>';
+        var grid = resultEl.querySelector('.AITuneCompareGrid');
+        models.forEach(function(m, i) {
+            var block = document.createElement('div');
+            block.className = 'AITuneCompareModel';
+            var holder = document.createElement('div');
+            _aiTuneRenderResult(m.name, m.host, results[i] || {}, holder);
+            block.appendChild(holder);
+            grid.appendChild(block);
+        });
+        resultEl.style.display = 'block';
+    }
+
+    function _aiTuneTargets() {
+        // Use explicit selection if any; else default to first available model.
+        if (_aiTuneSelected.length) return _aiTuneSelected.slice();
+        return [ { name: 'phi4:14b', host: 'localhost' } ];
+    }
+
+    function aiTuneRun() {
+        var statusEl = document.getElementById('ai-tune-status');
+        var resultEl = document.getElementById('ai-tune-result');
+        var targets = _aiTuneTargets();
+        if (targets.length === 1) {
+            resultEl.innerHTML = '';
+            _aiTuneCall(targets[0], statusEl, resultEl, null);
+        } else {
+            var collected = [];
+            var pending = targets.length;
+            targets.forEach(function(t) {
+                _aiTuneCall(t, statusEl, resultEl, function(target, d) {
+                    collected.push(d);
+                    if (--pending === 0) _aiTuneRenderBatch(targets, collected, resultEl);
+                });
+            });
+        }
+    }
+
+    function aiTuneCompare() {
+        aiTuneRun(); // comparison of 2+ selected models is the same side-by-side render
+    }
+
+    function aiTuneToggleModels() {
+        var pop = document.getElementById('ai-tune-model-pop');
+        if (!pop) return;
+        if (pop.style.display === 'block') { pop.style.display = 'none'; return; }
+        fetch('/api/focus/models', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var list = (d && d.models) || [];
+                if (!list.length) list = [ { name: 'phi4:14b', host: 'localhost' } ];
+                // Initialize selection from current _aiTuneSelected or first item.
+                if (!_aiTuneSelected.length && list.length) _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                var html = '<div class="AITuneModelPopInner">';
+                list.forEach(function(m) {
+                    var checked = _aiTuneSelected.some(function(s) { return s.name === m.name; }) ? 'checked' : '';
+                    html += '<label class="AITuneModelOpt"><input type="checkbox" data-model="'
+                        + esc(m.name) + '" data-host="' + esc(m.host || '') + '" ' + checked + '> '
+                        + esc(m.name) + (m.provider && m.provider !== 'ollama' ? ' <small>(' + esc(m.provider) + ')</small>' : '') + '</label>';
+                });
+                html += '<div class="AITuneModelPopFoot"><button class="ActionBarBtn ActionBarBtn--blue" data-action="ai-tune-models-done">Done</button></div>';
+                html += '</div>';
+                pop.innerHTML = html;
+                pop.style.display = 'block';
+                // Wire checkbox changes.
+                Array.prototype.forEach.call(pop.querySelectorAll('input[type=checkbox]'), function(cb) {
+                    cb.addEventListener('change', function() {
+                        var n = cb.getAttribute('data-model'), h = cb.getAttribute('data-host') || '';
+                        if (cb.checked) {
+                            if (!_aiTuneSelected.some(function(s){ return s.name === n; })) _aiTuneSelected.push({ name: n, host: h });
+                        } else {
+                            _aiTuneSelected = _aiTuneSelected.filter(function(s){ return s.name !== n; });
+                        }
+                        if (!_aiTuneSelected.length) _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                        _aiTuneUpdateCount();
+                    });
+                });
+            })
+            .catch(function() {
+                pop.innerHTML = '<div class="AITuneModelPopInner"><label class="AITuneModelOpt"><input type="checkbox" data-model="phi4:14b" data-host="localhost" checked> phi4:14b</label></div>';
+                pop.style.display = 'block';
+            });
+    }
+
+    function aiTuneModelsDone() {
+        var pop = document.getElementById('ai-tune-model-pop');
+        if (pop) pop.style.display = 'none';
+    }
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     /* ── Event delegation — replaces all onclick= in template ──────────── */
 
     document.addEventListener('click', function(e) {
@@ -694,6 +919,11 @@
             if (action === 'sort-project')  { if (typeof window.sortTodos === 'function') { window.sortTodos('project'); return; } }
             if (action === 'sort-due')      { if (typeof window.sortTodos === 'function') { window.sortTodos('due'); return; } }
             if (action === 'clear-filters') { if (typeof window.clearAllFilters === 'function') { window.clearAllFilters(); return; } }
+            // AI Focus-Tune (phase 5b): show code-vs-AI diff, pick the model(s).
+            if (action === 'ai-tune')              { aiTuneRun();              return; }
+            if (action === 'ai-tune-compare')     { aiTuneCompare();          return; }
+            if (action === 'ai-tune-toggle-models'){ aiTuneToggleModels();     return; }
+            if (action === 'ai-tune-models-done')  { aiTuneModelsDone();       return; }
         }
         // Todo card: Start/Active button <button data-start-btn="1" data-record-id="N">
         var startBtn = e.target.closest('[data-start-btn]');
@@ -837,5 +1067,9 @@
     window.startWorkTodoCard   = startWorkTodoCard;
     window.doneWithLogTodoCard = doneWithLogTodoCard;
     window.closeLogTodoCard    = closeLogTodoCard;
+    window.aiTuneRun            = aiTuneRun;
+    window.aiTuneCompare        = aiTuneCompare;
+    window.aiTuneToggleModels   = aiTuneToggleModels;
+    window.aiTuneModelsDone     = aiTuneModelsDone;
 
 })();

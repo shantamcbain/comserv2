@@ -1294,4 +1294,724 @@ sub _generate_random_token {
     return $token;
 }
 
+# ----------------------------------------------------------------------------
+# Time-log open/close actions (project 240 TODOLIST-UI)
+#
+# Mirror Comserv::Controller::Todo::open_log / close_log / done_with_log exactly,
+# but authorize via the same local-network bypass used by /api/todos (localhost /
+# 192.168.1.*), so an agent or script can drive the same log bookkeeping the
+# Start/Done buttons perform without holding a browser session.
+# ----------------------------------------------------------------------------
+
+sub _api_local_ok {
+    my ($c) = @_;
+    my $address = $c->req->address;
+    return ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./) ? 1 : 0;
+}
+
+sub _api_log_unauthorized {
+    my ($c) = @_;
+    $c->res->status(403);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 0, error => 'Local network only' }));
+    $c->detach();
+}
+
+=head2 api_todo_open_log
+
+POST /api/todo/open_log  { record_id, actor?, username?, notes? }
+Opens a work log for a todo (status -> 5). Mirrors Todo::open_log SQL.
+
+IDENTITY CONTRACT: the caller MUST self-identify via C<actor> (legacy alias C<username>).
+The default is the neutral string C<api> so no single agent (Hermes, the in-app AI editor,
+a future Android/iOS app, or an external ENcy integrator) impersonates another actor or the
+site owner. Pass C<actor> explicitly; do not rely on the default for attributable work.
+
+=cut
+
+sub api_todo_open_log :Path('todo/open_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $record_id = $data->{record_id};
+    unless ($record_id) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
+        return;
+    }
+    my $username = $data->{actor} // $data->{username} // 'api';
+
+    my $now   = DateTime->now(time_zone => 'local');
+    my $today = $now->ymd;
+    my $time  = $now->hms;
+
+    eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+
+        my $existing = $dbh->selectrow_hashref(
+            "SELECT record_id FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 LIMIT 1",
+            undef, $record_id
+        );
+        if ($existing) {
+            my $cur = $dbh->selectrow_array("SELECT status FROM todo WHERE record_id=?", undef, $record_id) // 0;
+            $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+                undef, $username, $today, $record_id) if $cur != 5;
+            $c->res->body(encode_json({ success => 1, already_open => 1, log_id => $existing->{record_id} }));
+            return;
+        }
+
+        my $proj_code = '';
+        if ($todo->project_id) {
+            my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
+            $proj_code = $proj ? ($proj->project_code || '') : '';
+        }
+        my $sitename_val = eval { $todo->sitename } || 'CSC';
+        my $due_date_val = eval { my $dd = $todo->due_date; $dd ? (ref($dd) ? $dd->ymd : substr("$dd",0,10)) : $today } // $today;
+        my $priority_val = eval { $todo->priority } // 5;
+        my $comments_val = eval { $todo->comments } // '';
+        my $group_val    = '';
+
+        $dbh->do(
+            'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,"00:00:00","00:00:00",2,?,?,?,?,?)',
+            undef,
+            $record_id, $username, $sitename_val, $proj_code,
+            'Started: ' . ($todo->subject // ''),
+            'Work begun on this step by ' . $username,
+            $today, $due_date_val, $time,
+            $priority_val, $username, $today, $group_val, $comments_val
+        );
+        my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
+        $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+            undef, $username, $today, $record_id);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_open_log',
+            "Log opened for todo $record_id by $username (log_id=$new_log_id)");
+        $c->res->body(encode_json({ success => 1, log_id => ($new_log_id // 0) }));
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_open_log',
+            "Failed open_log for todo $record_id: $@");
+        $c->res->body(encode_json({ success => 0, error => "$@" }));
+    }
+}
+
+=head2 api_todo_close_log
+
+POST /api/todo/close_log  { record_id, notes?, username? }
+Closes an open work log (status -> 3) and sets todo back to IN PROGRESS (2).
+Mirrors Todo::close_log SQL.
+
+=cut
+
+sub api_todo_close_log :Path('todo/close_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $record_id = $data->{record_id};
+    unless ($record_id) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
+        return;
+    }
+    my $username = $data->{actor} // $data->{username} // 'api';
+    my $notes    = $data->{notes} // '';
+
+    my $now_dt   = DateTime->now(time_zone => 'local');
+    my $today    = $now_dt->ymd;
+    my $now_hms  = $now_dt->strftime('%H:%M:%S');
+
+    eval {
+        my $dbh = $c->model('DBEncy')->storage->dbh;
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $record_id
+        );
+        die "No open log found for todo $record_id\n" unless $open_row;
+
+        my $raw_start  = $open_row->{start_time} // '09:00:00';
+        my $start_hms  = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+        my ($sh, $sm)  = ($start_hms =~ /^(\d+):(\d+)/);
+        my ($eh, $em)  = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+        my $dur_mins   = ($eh * 60 + $em) - ($sh * 60 + $sm);
+        $dur_mins = 1 if $dur_mins <= 0;
+        my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+        $dbh->do(
+            'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
+            undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
+        );
+        $dbh->do("UPDATE todo SET status=2, last_mod_by=?, last_mod_date=? WHERE record_id=? AND status=5",
+            undef, $username, $today, $record_id);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_close_log',
+            "Closed log $open_row->{record_id} for todo $record_id ($dur_mins min)");
+        $c->res->body(encode_json({ success => 1, duration_mins => $dur_mins }));
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_close_log',
+            "Failed close_log for todo $record_id: $@");
+        $c->res->body(encode_json({ success => 0, error => "$@" }));
+    }
+}
+
+=head2 api_todo_done_with_log
+
+POST /api/todo/done_with_log  { record_id, notes?, username? }
+Closes an open log (if any) AND marks the todo DONE (status 3).
+Mirrors Todo::done_with_log SQL.
+
+=cut
+
+sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $record_id = $data->{record_id};
+    unless ($record_id) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Missing record_id' }));
+        return;
+    }
+    my $username = $data->{actor} // $data->{username} // 'api';
+    my $notes    = $data->{notes} // '';
+
+    my $now_dt   = DateTime->now(time_zone => 'local');
+    my $today    = $now_dt->ymd;
+    my $now_hms  = $now_dt->strftime('%H:%M:%S');
+
+    eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $record_id
+        );
+        if ($open_row) {
+            my $raw_start  = $open_row->{start_time} // '09:00:00';
+            my $start_hms  = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+            my ($sh, $sm)  = ($start_hms =~ /^(\d+):(\d+)/);
+            my ($eh, $em)  = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+            my $dur_mins   = ($eh * 60 + $em) - ($sh * 60 + $sm);
+            $dur_mins = 1 if $dur_mins <= 0;
+            my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+            $dbh->do(
+                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
+                undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
+            );
+        }
+
+        $dbh->do("UPDATE todo SET status=3, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+            undef, $username, $today, $record_id);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_done_with_log',
+            "Todo $record_id marked done (log closed if open)");
+        $c->res->body(encode_json({ success => 1, log_closed => ($open_row ? 1 : 0) }));
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_done_with_log',
+            "Failed done_with_log for todo $record_id: $@");
+        $c->res->body(encode_json({ success => 0, error => "$@" }));
+    }
+}
+
+=head2 _api_json_body
+
+Read and JSON-decode the request body (best-effort). Returns a hashref.
+
+=cut
+
+sub _api_json_body {
+    my ($self, $c) = @_;
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    return $data && ref($data) eq 'HASH' ? $data : {};
+}
+
+# ----------------------------------------------------------------------------
+# AI "Top 5" for the Focus Queue (project 240 TODOLIST-UI / Phase 5b)
+#
+# Returns the 5 items the AI judges most worth doing next, each with a
+# one-line rationale. The AI reasons over BOTH planning sources, combined:
+#
+#   (a) open todos — the FULL scored CSC-open set (top 50 by ap_score), and
+#   (b) plan docs  — BOTH the on-disk root/Documentation/*.tt/* plan corpus AND
+#                    the DB DailyPlan rows (planning-system plans + their open
+#                    phase todos).
+#
+# The AI is asked to return up to 5 picks. Each pick is either a real todo
+# ({"record_id": <int>, ...}) it can link to, or a plan-doc-only next step
+# ({"plan_item": {...}, ...}) that has no todo yet — surfaced as advisory text,
+# never mutated. The selection is INDEPENDENT of the Focus Queue's Role/Site/
+# Project filter toggles. Advisory only: never reorders, closes, or mutates.
+#
+# Reuses the existing AI2 provider (Model::AI2::Provider::Ollama) so there is
+# no second AI path. Default model = curated local Ollama; if unavailable,
+# fall back to the Router's default model.
+# ----------------------------------------------------------------------------
+
+use File::Find ();
+use Encode     ();
+
+sub api_focus_top5 :Path('focus/top5') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $req_model = $data->{model} // '';
+    my $now_epoch = time();
+
+    # ── (a) Gather CSC open todos, score them, take the top 50 by ap_score. ──
+    my @cands;
+    my %rbid;
+    eval {
+        my $schema = $c->model('DBEncy');
+        my @rows = $schema->resultset('Todo')->search(
+            { sitename => 'CSC', status => { '!=' => '3' } },
+            { order_by => { -asc => ['priority'] }, rows => 5000 }
+        )->all;
+        %rbid = map { $_->record_id => { $_->get_columns } } @rows;
+        for my $t (@rows) {
+            my $h = $rbid{$t->record_id};
+            Comserv::Util::TodoRanking::score_todo($h, { now_epoch => $now_epoch, row_by_id => \%rbid });
+            push @cands, $h;
+        }
+    };
+    @cands = sort { ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0) } @cands;
+    my @top = splice(@cands, 0, 50);
+
+    # ── (b) Gather plan docs: on-disk .tt corpus + DB DailyPlan rows. ──
+    my @plan_docs = _focus_top5_plan_docs($c);
+
+    unless (@top || @plan_docs) {
+        $c->res->body(encode_json({ success => 1, top5 => [], note => 'no open CSC todos or plan docs' }));
+        return;
+    }
+
+    # Build a compact, line-per-todo prompt input.
+    my @lines;
+    for my $h (@top) {
+        push @lines, sprintf(
+            "rec=%s | pri=%s | due=%s | proj=%s | subj=%s",
+            $h->{record_id}, $h->{priority},
+            substr($h->{due_date} // '', 0, 10),
+            $h->{project_code} // $h->{project_id} // '',
+            ($h->{subject} // '') =~ s/\n/ /gr
+        );
+    }
+    my $todo_block = join("\n", @lines);
+
+    # Plan-doc context: one block per doc, with plan_id (if a DB plan) and the
+    # open phase todos that already exist (so the AI can either pick the todo
+    # or cite a doc-only next step).
+    my @plan_blocks;
+    for my $pd (@plan_docs) {
+        my $head = "PLAN: " . ($pd->{title} // $pd->{name} // $pd->{path} // '?');
+        $head .= " [plan_id=" . $pd->{plan_id} . "]" if defined $pd->{plan_id};
+        $head .= " [status=" . ($pd->{status} // '?') . "]" if $pd->{status};
+        $head .= " path=" . ($pd->{path} // '?');
+        my @pb = ($head);
+        if ($pd->{open_phase_todos} && @{$pd->{open_phase_todos}}) {
+            push @pb, "  existing open todos for this plan:";
+            for my $pt (@{$pd->{open_phase_todos}}) {
+                push @pb, sprintf("    rec=%s | pri=%s | subj=%s",
+                    $pt->{record_id}, $pt->{priority} // '?',
+                    ($pt->{subject} // '') =~ s/\n/ /gr);
+            }
+        }
+        if ($pd->{next_steps} && @{$pd->{next_steps}}) {
+            push @pb, "  next steps named in the doc (may NOT yet be todos):";
+            for my $ns (@{$pd->{next_steps}}) {
+                push @pb, "    - " . $ns;
+            }
+        }
+        push @plan_blocks, join("\n", @pb);
+    }
+    my $plan_block = join("\n\n", @plan_blocks);
+
+    my $system = "You are the Comserv2 planning-title ranking tuner. You are given (1) open "
+                . "todos already scored by the current CODE algorithm (ap_score), and (2) the "
+                . "PLAN DOCS (on-disk .tt plan files + DB DailyPlan rows). Your job is to improve "
+                . "the ordering so the most important work for building the app and the plans "
+                . "surfaces first. The current algorithm only rewards stale-penalty, due-soon, "
+                . "blocking, and demotes SUPERSEDED + routine-noise. It cannot reason about "
+                . "business impact, dependencies across plans, or mis-set todo fields. "
+                . "Return ONLY a JSON object (no prose, no markdown fence) with these keys:\n"
+                . "  \"picks\": [ up to 5 objects, each EITHER\n"
+                . "      {\"record_id\": <int from rec=>, \"why\": \"<one short sentence>\"}  when picking an existing todo, OR\n"
+                . "      {\"plan_item\": {\"title\":\"<plan name>\", \"step\":\"<specific next step>\", \"plan_id\": <int|null>, \"path\":\"<doc path|null>\"}, \"why\":\"<one short sentence>\"} when the best next action is a plan-doc step with NO todo yet ];\n"
+                . "  \"proposed_order\": [ an array of ALL record_ids you would put first..last, as a better ordering than the code score — subset of the rec= values you judge most important, up to 50, most-important first ];\n"
+                . "  \"weights\": { a JSON object proposing better scoring weights for the code algorithm, keys: stale_90, stale_180, block, cross_block, due_overdue, due_today, due_soon, superseded, routine, status_tier — numeric. These RETUNE (not replace) the existing weights; explain reasoning in weights_why. };\n"
+                . "  \"weights_why\": \"<one paragraph: why these weights better reflect what to build next>\";\n"
+                . "  \"mis_set\": [ an array of {\"record_id\": <int>, \"issue\": \"<e.g. wrong priority / missing project / status should be done / looks routine-mislabelled>\"} — todos whose settings look WRONG and should be cleaned up (this backlog of mis-set todos is a known problem). Up to 15. ]\n"
+                . "All record_ids MUST be from the rec= values provided. Reasoning beats the raw code score.";
+    my $user_prompt = "";
+    $user_prompt .= "OPEN TODOS (current code ap_score shown; lower = more important):\n$todo_block\n\n" if $todo_block;
+    $user_prompt .= "PLAN DOCS (current intentions):\n$plan_block\n\n" if $plan_block;
+    $user_prompt .= "Return picks (max 5), a proposed full order, proposed retuning weights + "
+                  . "why, and the mis-set todos you would flag for cleanup.";
+
+    # ── Model selection ──
+    # The UI passes the operator's chosen model(s) (the one(s) they want to
+    # compare). We use them EXACTLY — no silent swap to a "better" model. Each
+    # target may carry its own host (qwen lives on localhost:11434; the chat
+    # config default host is 192.168.1.199). We auto-probe both so a model on
+    # either host works, and the chosen model is always honored.
+    $req_model =~ s/^\s+|\s+$//g;
+    my $req_host = $data->{host} // '';
+    my @req_models = ref($data->{models}) eq 'ARRAY' ? @{ $data->{models} } : ();
+    # Normalize models entries to {name, host}.
+    my @targets;
+    if (@req_models) {
+        for my $m (@req_models) {
+            if (ref($m) eq 'HASH' && $m->{name}) {
+                push @targets, { name => $m->{name}, host => $m->{host} // '' };
+            } elsif (!ref($m) && $m) {
+                push @targets, { name => $m, host => '' };
+            }
+        }
+    } elsif ($req_model) {
+        push @targets, { name => $req_model, host => $req_host };
+    }
+
+    my $can_select = 0;
+    my $roles = $c->session->{roles} || [];
+    if (ref($roles) eq 'ARRAY') { $can_select = grep { $_ =~ /^(admin|developer|editor)$/i } @$roles; }
+
+    my $default_model = 'phi4:14b';
+    my $cfg_host = 'localhost';
+    my $cfg_port = 11434;
+    my $ai_facade = eval { $c->model('AI') };
+    if ($ai_facade) {
+        my ($host, $port, $cur, $inst) = eval { $ai_facade->get_current_config($c, $can_select) };
+        $cfg_host = $host if $host;
+        $cfg_port = $port if $port;
+        $default_model = $cur if $cur;
+    }
+    # If no explicit targets, default to the chat system's current model (honoring it).
+    unless (@targets) {
+        push @targets, { name => $default_model, host => '' };
+    }
+
+    # Build the list of models the operator can choose from — uses Comserv::Model::AI
+    # (the SAME facade the chat-header dropdown uses). Surfaced in the response too so
+    # the UI can label hosts. Each entry: { name, provider, host }.
+    my @models;
+    if ($ai_facade) {
+        my ($host, $port, $cur, $inst) = eval { $ai_facade->get_current_config($c, $can_select) };
+        if ($inst && ref($inst) eq 'ARRAY') {
+            for my $m (@$inst) {
+                my $n = ref($m) ? ($m->{name} // $m->{model} // $m) : $m;
+                push @models, { name => $n, provider => 'ollama', host => $host } if $n;
+            }
+        }
+        my @ext = eval { $ai_facade->get_external_models($c) } or ();
+        for my $m (@ext) {
+            push @models, { name => $m->{name}, provider => $m->{provider} // 'external',
+                            label => $m->{label} // ($m->{name} // ''), host => '' };
+        }
+    }
+    push @models, { name => $default_model, provider => 'ollama', host => $cfg_host }
+        unless $default_model eq ($models[0]{name} // '') && @models;
+    my %seen; @models = grep { !$seen{ $_->{name} }++ } @models;
+
+    # Resolve a host for a target: explicit host wins; else probe configured host,
+    # then localhost, using a 2s connection check (so qwen@localhost works too).
+    my $resolve_host = sub {
+        my ($name, $pref) = @_;
+        my @try = ($pref ? ($pref) : ());
+        push @try, $cfg_host if $cfg_host;
+        push @try, 'localhost' unless grep { $_ eq 'localhost' } @try;
+        for my $h (@try) {
+            my $t = Comserv::Model::Ollama->new(host => $h, port => $cfg_port || 11434, timeout => 2);
+            if ($t && $t->check_connection()) { return $h; }
+        }
+        return ($pref || $cfg_host || 'localhost');   # best guess if all probes fail
+    };
+
+    # Run one tuning pass for a single {model,host} target. Returns the parsed payload
+    # or { success => 0, error => ... }. Declared once, used by both single + compare.
+    my $run_one = sub {
+        my ($tgt) = @_;
+        my $model = $tgt->{name};
+        my $host  = $resolve_host->($model, $tgt->{host});
+        my $out = { model => $model, host => $host };
+        eval {
+            my $ollama = $c->model('Ollama');
+            $ollama->set_host($host);
+            $ollama->port($cfg_port) if $cfg_port;
+            $ollama->timeout(300);
+            my $resp = $ollama->chat(model => $model, messages => [
+                { role => 'system', content => $system },
+                { role => 'user',   content => $user_prompt },
+            ]);
+            if ($resp && $resp->{success}) {
+                $out->{success} = 1;
+                $out->{response} = $resp->{response} // '';
+            } else {
+                $out->{success} = 0;
+                $out->{error} = ($resp && $resp->{error}) ? $resp->{error} : 'AI ranking unavailable';
+            }
+        };
+        if ($@) { $out->{success} = 0; $out->{error} = "$@"; }
+        return $out;
+    };
+
+    # Batch mode: run every target and return an array of results.
+    my @results;
+    for my $tgt (@targets) {
+        push @results, $run_one->($tgt);
+    }
+
+    # For the single-model legacy shape, take the first result.
+    my $ai = $results[0];
+    if (!$ai || !$ai->{success}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_focus_top5',
+            "AI ranking unavailable: " . ($ai->{error} // 'unknown'));
+        $c->res->body(encode_json({ success => 0, error => 'AI ranking unavailable', detail => $ai->{error} // '' }));
+        return;
+    }
+
+    # ── Parse one AI result into the structured payload (picks/weights/comparison/
+    #    mis_set/proposed_order). Used for both single + batch responses. ──
+    my $parse_ai = sub {
+        my ($res) = @_;
+        my $out = { success => ($res->{success} ? 1 : 0), model => $res->{model} // '' };
+        unless ($res && $res->{success}) {
+            $out->{error} = $res->{error} // 'AI ranking unavailable';
+            return $out;
+        }
+        my $raw = $res->{response} // '';
+        $raw =~ s/^```(?:json)?\s*//i; $raw =~ s/\s*```$//;
+        my $parsed;
+        eval { require JSON; $parsed = JSON::decode_json($raw); };
+        $parsed = {} unless ref($parsed) eq 'HASH';
+        my %valid = map { $_->{record_id} => 1 } @top;
+
+        my @picks;
+        my $picks_ref = ref($parsed->{picks}) eq 'ARRAY' ? $parsed->{picks} : [];
+        for my $p (@$picks_ref) {
+            next unless ref($p) eq 'HASH';
+            if ($p->{record_id} && $valid{$p->{record_id}}) {
+                push @picks, { type => 'todo', record_id => $p->{record_id} + 0, why => $p->{why} // '' };
+            }
+            elsif ($p->{plan_item} && ref($p->{plan_item}) eq 'HASH' && $p->{plan_item}{step}) {
+                push @picks, {
+                    type    => 'plan_item',
+                    title   => $p->{plan_item}{title}    // '',
+                    step    => $p->{plan_item}{step},
+                    plan_id => (defined $p->{plan_item}{plan_id} ? $p->{plan_item}{plan_id} + 0 : undef),
+                    path    => $p->{plan_item}{path}     // undef,
+                    why     => $p->{why} // '',
+                };
+            }
+            last if @picks >= 5;
+        }
+
+        my %ai_weights;
+        if (ref($parsed->{weights}) eq 'HASH') {
+            for my $k (qw(stale_90 stale_180 block cross_block due_overdue due_today due_soon superseded routine status_tier)) {
+                my $v = $parsed->{weights}{$k};
+                $ai_weights{$k} = $v + 0 if defined $v && $v =~ /^[-+]?\d+(\.\d+)?$/;
+            }
+        }
+
+        my @coded_top = map { { record_id => $_->{record_id}, subject => $_->{subject} // '', ap_score => $_->{ap_score} // 0 } }
+                       @top[0 .. ($#top > 19 ? 19 : $#top)];
+
+        my @simulated = map { { %$_ } } @top;
+        if (%ai_weights) {
+            for my $h (@simulated) {
+                Comserv::Util::TodoRanking::score_todo($h, {
+                    now_epoch => $now_epoch, row_by_id => \%rbid, weights => \%ai_weights,
+                });
+            }
+            @simulated = sort { ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0) } @simulated;
+        }
+        my @sim_top = map { { record_id => $_->{record_id}, subject => $_->{subject} // '', ap_score => $_->{ap_score} // 0 } }
+                     @simulated[0 .. ($#simulated > 19 ? 19 : $#simulated)];
+
+        my @mis_set;
+        if (ref($parsed->{mis_set}) eq 'ARRAY') {
+            for my $m (@{$parsed->{mis_set}}) {
+                next unless ref($m) eq 'HASH' && $m->{record_id} && $valid{$m->{record_id}};
+                push @mis_set, { record_id => $m->{record_id} + 0, issue => $m->{issue} // '' };
+            }
+        }
+
+        my @proposed_order = grep { $valid{$_} } map { $_ + 0 }
+                             grep { /^\d+$/ } @{ ref($parsed->{proposed_order}) eq 'ARRAY' ? $parsed->{proposed_order} : [] };
+
+        $out->{picks}          = \@picks;
+        $out->{proposed_order} = \@proposed_order;
+        $out->{weights}        = \%ai_weights;
+        $out->{weights_why}    = $parsed->{weights_why} // '';
+        $out->{comparison}     = {
+            coded_top20     => \@coded_top,
+            simulated_top20 => \@sim_top,
+            note => 'SIMULATED only — nothing was written. Compare coded vs AI-weighted order before applying any change. The AI weights RETUNE the existing scorer, they do not replace it.',
+        };
+        $out->{mis_set_todos}  = \@mis_set;
+        return $out;
+    };
+
+    my @parsed_results = map { $parse_ai->($_) } @results;
+    my $payload = $parsed_results[0];
+    $payload->{models} = \@models;
+    $payload->{note}   = 'Advisory + tuning preview only — does not reorder, close, or mutate any todo or plan. Independent of Focus Queue filters. Reads both plan docs and the todo system.'
+                        . (@targets > 1 ? ' Batch comparison of ' . scalar(@targets) . ' models.' : '');
+    # When 2+ models requested, include the full per-model array so the UI can
+    # lay them out side by side for direct comparison.
+    if (@targets > 1) {
+        $payload->{results} = \@parsed_results;
+    }
+    $c->res->body(encode_json($payload));
+}
+
+# ----------------------------------------------------------------------------
+# GET /api/focus/models — list the models the AI Focus-Tune picker can offer.
+# Uses Comserv::Model::AI (the SAME facade the chat-header model dropdown uses)
+# so this reflects every actually-available model, not a guessed localhost list.
+# Local-network bypass.
+# ----------------------------------------------------------------------------
+
+sub api_focus_models :Path('focus/models') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my @models;
+    my $can_select = 0;
+    my $roles = $c->session->{roles} || [];
+    if (ref($roles) eq 'ARRAY') { $can_select = grep { $_ =~ /^(admin|developer|editor)$/i } @$roles; }
+
+    eval {
+        my $ai = $c->model('AI');
+        # Installed Ollama models (what the chat header shows).
+        my ($host, $port, $current_model, $installed) = $ai->get_current_config($c, $can_select);
+        if ($installed && ref($installed) eq 'ARRAY') {
+            for my $m (@$installed) {
+                my $n = ref($m) ? ($m->{name} // $m->{model} // $m) : $m;
+                next unless $n;
+                push @models, { name => $n, provider => 'ollama', host => $host };
+            }
+        }
+        # External (Grok/xAI etc.) models.
+        my @ext = $ai->get_external_models($c);
+        for my $m (@ext) {
+            push @models, { name => $m->{name}, provider => $m->{provider} // 'external',
+                            label => $m->{label} // ($m->{name} // '') };
+        }
+    };
+    my %seen; @models = grep { !$seen{ $_->{name} }++ } @models;
+    # Always offer the chat's current default as a fallback so the picker is never empty.
+    unless (@models) {
+        push @models, { name => 'phi4:14b', provider => 'ollama', host => 'localhost' };
+    }
+    $c->res->body(encode_json({ success => 1, models => \@models }));
+}
+
+# Gather the plan-doc context for api_focus_top5: BOTH the on-disk planning
+# corpus (root/Documentation/**/*.{tt,md} that look like plan docs) AND the DB
+# DailyPlan rows (with their open phase todos). Pure, no mutation; returns an
+# array of hashrefs: { title, name, path, plan_id?, status?, open_phase_todos?,
+# next_steps? }. The on-disk scan is bounded and best-effort (errors logged).
+sub _focus_top5_plan_docs {
+    my ($c) = @_;
+    my @docs;
+
+    # ── DB DailyPlan rows (planning-system plans) + their open phase todos ──
+    eval {
+        my $schema = $c->model('DBEncy');
+        my @plans  = $schema->resultset('DailyPlan')->search(
+            { status => { '!=' => 'completed' } },
+            { order_by => { -desc => 'last_modified' }, rows => 50 }
+        )->all;
+        for my $pl (@plans) {
+            my %h = (
+                title   => $pl->plan_name,
+                name    => $pl->plan_name,
+                path    => 'DailyPlan:' . $pl->plan_name,
+                plan_id => $pl->id,
+                status  => $pl->status,
+            );
+            # Open phase todos that already exist for this plan.
+            my @pt;
+            eval {
+                my @rows = $schema->resultset('Todo')->search(
+                    { plan_id => $pl->id, status => { '!=' => '3' } },
+                    { order_by => { -asc => 'priority' }, rows => 200 }
+                )->all;
+                @pt = map { { record_id => $_->record_id, priority => $_->priority,
+                              subject => $_->subject } } @rows;
+            };
+            $h{open_phase_todos} = \@pt if @pt;
+            push @docs, \%h;
+        }
+    };
+    $c->log->warn("api_focus_top5: could not load DailyPlan rows: $@") if $@;
+
+    # ── On-disk planning corpus (root/Documentation/**) ──
+    eval {
+        my $docs_root = $c->path_to('root', 'Documentation');
+        my @tt_files;
+        File::Find::find({
+            wanted => sub {
+                return unless -f $_;
+                return unless /\.(tt|md)$/i;
+                push @tt_files, $File::Find::name;
+            },
+            no_chdir => 1,
+        }, $docs_root);
+
+        # Bound the scan: cap files and prefer names that look like plan docs.
+        my @planish = grep { m{([Pp]lan|roadmap|phase|strategy|design|proposal|todo)}i } @tt_files;
+        my @chosen = @planish ? @planish : @tt_files;
+        @chosen = @chosen[0 .. 60] if @chosen > 60;
+
+        my $cap_bytes = 4_000;   # per-doc excerpt cap to bound the prompt
+        for my $f (@chosen) {
+            my $txt;
+            eval {
+                open my $fh, '<:raw', $f or return;
+                local $/; $txt = <$fh>; close $fh;
+                # Drop the leading Template-Toolkit META/POD-ish header cruft and
+                # HTML tags so the AI sees the plan's prose, not markup.
+                $txt =~ s/\[%[^%]*%\]//g;
+                $txt =~ s/<[^>]+>//g;
+                $txt = Encode::decode('UTF-8', $txt, Encode::FB_DEFAULT) if defined $txt;
+                $txt = substr($txt, 0, $cap_bytes) if length($txt) > $cap_bytes;
+            };
+            next unless defined $txt && length($txt) > 40;
+            my $rel = $f;
+            $rel =~ s{^\Q$docs_root\E/?}{}i;
+            # Pull a terse "next step" list: lines that look like pending work.
+            my @steps = map { s/^\s*[-*]\s*//r }
+                        grep { /^\s*[-*]\s*\S/ && /next|todo|phase|step|task|implement|add|fix|create|wire/i }
+                        split /\n/, $txt;
+            push @docs, {
+                title => $rel,
+                name  => $rel,
+                path  => 'Documentation/' . $rel,
+                next_steps => [ @steps ? @steps[0 .. ($#steps > 9 ? 9 : $#steps)] : () ],
+            };
+        }
+    };
+    $c->log->warn("api_focus_top5: could not scan on-disk plan docs: $@") if $@;
+
+    return @docs;
+}
+
 1;
