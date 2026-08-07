@@ -40,13 +40,17 @@
                 <a href="#goal" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">1. Goal</a>
                 <a href="#current" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">2. Current State</a>
                 <a href="#target" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3. Target</a>
+                <a href="#roles" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3d. Role Eval</a> &middot;
+                <a href="#quorum" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3e. Node Count</a> &middot;
+                <a href="#progression" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3f. Progression Ladder</a> &middot;
+                <a href="#external" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3g. External/ZeroTier</a> &middot;
                 <a href="#pushing" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">4. Deploy Flow</a>
                 <a href="#roadmap" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">5. Roadmap</a>
                 <a href="#shared-state" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">6. Shared State</a>
                 <a href="#maths" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">7. Availability Maths</a>
                 <a href="#spofs" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">8. Retained SPOFs</a>
                 <a href="#gates" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">9. Gates</a>
-                <a href="#credentials" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">11. Credentials</a> &middot;
+                <a href="#credentials" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">11. Auth (dependency)</a> &middot;
                 <a href="#consolidation" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">10. Consolidation</a>
                 <a href="#see-also" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">11. See Also</a>
             </div>
@@ -139,6 +143,54 @@
         <li><strong>Anti-affinity:</strong> force the two web replicas onto <em>different</em> nodes &mdash; without it, Kubernetes may schedule both on one host and the HA is illusory.</li>
     </ul>
 
+    <h2 id="roles">3d. Role assignment must be EVALUATED, never assumed</h2>
+    <div style="border-left: 4px solid var(--caution-color); padding: var(--spacing-small); margin: var(--spacing-medium) 0;">
+        <strong>Retracted assumption.</strong> An earlier draft assumed .199 (workstation) should host the registry <em>because it is the most powerful machine</em>. That reasoning is invalid: raw capability is not availability. A machine that runs AI models can be heavily loaded exactly when it is needed, and may be effectively unavailable for Docker work.
+    </div>
+    <p><strong>Measured 2026-08-07 (not assumed):</strong></p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Host</th><th style="text-align:left; padding:6px;">CPU</th><th style="text-align:left; padding:6px;">Load avg</th><th style="text-align:left; padding:6px;">RAM free</th><th style="text-align:left; padding:6px;">Disk</th><th style="text-align:left; padding:6px;">Reading</th></tr>
+        <tr><td style="padding:6px;">.199 workstation</td><td style="padding:6px;">8 core + Quadro M4000</td><td style="padding:6px;"><strong>8.10</strong> (= 100% of 8 cores)</td><td style="padding:6px;"><strong>0 GB free</strong> / 31 GB</td><td style="padding:6px;">86% (66 GB free)</td><td style="padding:6px;"><strong>Saturated.</strong> 8B model resident in Ollama; sustained load 8.1&ndash;8.7 over 15 min</td></tr>
+        <tr><td style="padding:6px;">.126 production1</td><td style="padding:6px;">2 core</td><td style="padding:6px;"><strong>0.06</strong> (idle)</td><td style="padding:6px;">24 GB avail / 26 GB</td><td style="padding:6px;"><strong>88% (3.5 GB free)</strong></td><td style="padding:6px;">Idle CPU but <strong>disk-critical</strong>; uptime 48 days</td></tr>
+    </table>
+    <p>This <strong>confirms the concern and refutes the earlier draft</strong>: the "most powerful" machine is the <em>busiest</em> one, while the "production" machine is nearly idle but almost out of disk. Neither is an obvious registry host &mdash; .199 for contention, .126 for 3.5 GB of headroom. A registry needs disk and availability, not GPU.</p>
+    <p><strong>Therefore every phase carries its own role-evaluation todo</strong> (the <code>.0</code> todo of each sub-project) which must answer, with measurements taken under realistic load:</p>
+    <ul>
+        <li>Which host should hold this role, and <strong>on what evidence</strong> &mdash; not which is nominally strongest.</li>
+        <li>What happens to this role when the host is <strong>under peak AI/build load</strong>, not when idle.</li>
+        <li><strong>Where does this role go if that host is unavailable?</strong> Every role needs a named second home.</li>
+        <li>Does this role conflict with another role already on that host?</li>
+    </ul>
+
+    <h2 id="quorum">3e. How many nodes? The 2-node quorum problem</h2>
+    <p>A direct answer to "if both production1 and workstation are down or overloaded, what is the next failover  -  so if we need 3+ nodes, is k3s where we should start?"</p>
+    <p><strong>Two nodes is not a real HA cluster.</strong> It survives the loss of a <em>worker</em>, but not the loss of the <em>control plane</em>, and it cannot form a quorum: with 2 nodes there is no majority, so a network split leaves neither side safely authoritative. Today .126 would be the single k3s server &mdash; losing it loses cluster management even if .199 keeps serving.</p>
+    <p><strong>But this does not argue against starting with k3s</strong>, because k3s itself supports 3-node embedded-etcd HA control planes. The node count is a <em>cluster topology</em> question, not a <em>distribution</em> question. Starting on k3s does not cap us at 2 nodes.</p>
+    <p><strong>The honest gap:</strong> we do not currently have a credible third node. .20 is deliberately DB-only (user-confirmed constraint), and .198's capability is unverified. So the third-node question must be <em>answered by evaluation</em>, not assumed &mdash; see the candidate list in &sect;3f. This is why Phase B carries an explicit topology-decision todo rather than a hardcoded "2 nodes".</p>
+
+    <h2 id="progression">3f. The progression ladder &mdash; beyond k3s</h2>
+    <p>A previous draft showed only a k3s solution with no migration up the tree. Corrected: below is the full ladder, each rung with the trigger that justifies climbing to it. <strong>We stop at the lowest rung that meets the availability target</strong>; the ladder exists so the next step is always known and pre-justified.</p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Rung</th><th style="text-align:left; padding:6px;">Solution</th><th style="text-align:left; padding:6px;">Survives</th><th style="text-align:left; padding:6px;">Trigger to climb</th></tr>
+        <tr><td style="padding:6px;">0</td><td style="padding:6px;">Single container (today)</td><td style="padding:6px;">Nothing</td><td style="padding:6px;">Already failed &mdash; 2026-08-07 outage</td></tr>
+        <tr><td style="padding:6px;">1</td><td style="padding:6px;">2-node k3s, replicas=2</td><td style="padding:6px;">One worker/pod failure</td><td style="padding:6px;">Control-plane loss unacceptable</td></tr>
+        <tr><td style="padding:6px;">2</td><td style="padding:6px;">3-node k3s, embedded-etcd HA control plane</td><td style="padding:6px;">Any one node, incl. control plane</td><td style="padding:6px;">Whole-site/LAN loss unacceptable</td></tr>
+        <tr><td style="padding:6px;">3</td><td style="padding:6px;">Geographic node over <strong>ZeroTier</strong> (offsite/remote hardware)</td><td style="padding:6px;">Loss of the physical site</td><td style="padding:6px;">Need capacity/SLA beyond owned hardware</td></tr>
+        <tr><td style="padding:6px;">4</td><td style="padding:6px;">External/cloud node or managed K8s in the same cluster</td><td style="padding:6px;">Site + hardware limits</td><td style="padding:6px;">Scale/compliance/ops beyond self-hosting</td></tr>
+    </table>
+    <p><strong>Rungs 1&ndash;2 are the same technology</strong> &mdash; adding a server node, not a migration. Rungs 3&ndash;4 add nodes to the <em>same</em> cluster, so they are also not rewrites. This is the "progressively better solutions" path: one architecture, climbed incrementally.</p>
+
+    <h3 id="external">3g. External and ZeroTier options (previously missing)</h3>
+    <p>The plan wrongly considered only LAN hardware. Real options that must be <strong>evaluated, not assumed</strong>:</p>
+    <ul>
+        <li><strong>ZeroTier-connected offsite node.</strong> Already proven in this estate: ZeroTier network 172.30.0.0/16 is live, and <code>zerotier_ency.json</code> defines a working priority-3 DB path at 172.30.161.222. A remote machine can therefore join as a k3s node over ZeroTier &mdash; the only option that survives losing the physical site, which no amount of LAN hardware achieves. Caveat to measure: k3s tolerates WAN latency for workers far better than for etcd peers, so a ZeroTier node is a strong <em>worker</em> candidate and a poor <em>control-plane</em> candidate.</li>
+        <li><strong>Unidentified LAN hosts.</strong> The IP registry lists .144, .175, .200, .201, .205, .220 as Active/Unknown. Some may be viable nodes. <strong>Identify before buying or renting anything.</strong></li>
+        <li><strong>Proxmox capacity.</strong> Hypervisors at .2/.3/.12 exist; VMs on them could serve as nodes. Prior plans assumed a Proxmox cluster was the target and were superseded for being unreal &mdash; but the hardware is listed as Active and should be <em>verified</em>, not dismissed by reflex.</li>
+        <li><strong>Small cloud instance</strong> as a third control-plane member purely for quorum &mdash; cheap, and solves the 2-node split-brain problem without new physical hardware.</li>
+        <li><strong>Do nothing beyond rung 2</strong> &mdash; a legitimate outcome if measured availability meets the target.</li>
+    </ul>
+    <p style="margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color);">&uarr; Back to Top</a></p>
+
     <h2 id="pushing">4. Does k3s eliminate "pushing to production"?  -  No.</h2>
     <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
         <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Phase</th><th style="text-align:left; padding:6px;">Current</th><th style="text-align:left; padding:6px;">With k3s</th></tr>
@@ -151,6 +203,15 @@
 
     <h2 id="roadmap">5. Phased roadmap</h2>
     <p>Each phase is a todo in project <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 (INFRA-HA)</a> and carries a GATE that must be demonstrated before the next phase starts.</p>
+    <div style="border-left: 4px solid var(--caution-color); padding: var(--spacing-small); margin: var(--spacing-medium) 0;">
+        <strong>Structural correction: each phase is a SUB-PROJECT, not a todo.</strong> An earlier draft mapped each phase to a single todo (1905&ndash;1910). That is wrong &mdash; "install k3s" is not one doable unit of work. Each phase becomes a <strong>sub-project of #202</strong> (the schema supports this: <code>Project.parent_id</code> with a <code>sub_projects</code> relation, and the UI accepts <code>?parent_id=</code>), broken into small todos that can each be finished in one sitting.
+        <p style="margin: var(--spacing-small) 0 0 0;">The existing todos 1905&ndash;1910 are <strong>converted to sub-projects</strong>, not deleted &mdash; their history and the phase gates are preserved.</p>
+    </div>
+    <p><strong>Every sub-project starts with the same two mandatory todos</strong>, which the earlier draft omitted entirely:</p>
+    <ul>
+        <li><strong>.0 ROLE EVALUATION</strong> &mdash; which host should hold this role, on measured evidence under realistic load, and <strong>where the role fails over to</strong> (&sect;3d). No phase may proceed on an assumed host.</li>
+        <li><strong>.1 DEPENDENCY CHECK</strong> &mdash; does this phase need an auth/credential change? If so, raise the todo <em>on the authentication plan</em> (&sect;11) and accept being blocked.</li>
+    </ul>
     <p>Every phase also states <strong>WHY NEXT</strong> &mdash; the specific limitation that remains after this phase, which is the sole justification for taking the following step. If a phase's WHY NEXT does not actually hurt us, <strong>stop there</strong>: this roadmap is a sequence of earned decisions, not a march to Kubernetes for its own sake.</p>
     <div style="border: 1px solid var(--border-color); padding: var(--spacing-small); margin: var(--spacing-medium) 0;">
         <strong>The chain in one line each:</strong>
@@ -173,6 +234,17 @@
         <li>Add <code>192.168.1.199:5000</code> to <code>insecure-registries</code> on BOTH .126 and .199.</li>
         <li>Naming follows the system, not the feature: <code>comserv2_registry_data</code> for the volume.</li>
     </ul>
+    <p><strong>Sub-project A todos:</strong></p>
+    <ul>
+        <li><strong>A.0 ROLE EVAL:</strong> which host hosts the registry? <strong>Do not default to .199.</strong> Measured 2026-08-07: .199 load 8.10/8 cores, 0 GB RAM free (AI models); .126 idle but only 3.5 GB disk free. Registry needs disk + availability, not GPU. Evaluate both, plus unidentified hosts (&sect;3g). Record evidence.</li>
+        <li><strong>A.1 DEPENDENCY:</strong> does the registry need auth (push credentials)? If yes &rarr; todo on auth plan.</li>
+        <li>A.2 Free disk on the chosen host if needed (.126 at 88% cannot host a registry as-is).</li>
+        <li>A.3 Stand up <code>registry:2</code> with persistent volume <code>comserv2_registry_data</code>.</li>
+        <li>A.4 Configure <code>insecure-registries</code> on all nodes.</li>
+        <li>A.5 Push/pull round-trip test; record the digest.</li>
+        <li>A.6 Decide registry retention/pruning policy (an unpruned registry will fill the disk and recreate the outage).</li>
+        <li><strong>A.7 FAILOVER:</strong> what happens to deploys when the registry host is down or saturated? Document the answer.</li>
+    </ul>
     <p><strong>WHY NEXT:</strong> the registry makes one proven image <em>available</em> to every node, but nothing yet <em>places</em> it. A human still runs it host by host. That gap is what Phase B closes.</p>
 
     <h3>Phase B - k3s install</h3>
@@ -181,6 +253,17 @@
         <li>Install k3s server on .126; join .199 as an agent.</li>
         <li><strong>Verify-before-execute:</strong> k3s must not disturb the live compose container until Phase D proves the Deployment.</li>
         <li>Confirm k3s does not bind port 5000 (the app) or collide with the registry port on .199.</li>
+    </ul>
+    <p><strong>Sub-project B todos:</strong></p>
+    <ul>
+        <li><strong>B.0 ROLE EVAL:</strong> which host is the k3s <em>server</em> (control plane)? A saturated host is a poor control plane; .199's sustained load 8.1+ argues against it.</li>
+        <li><strong>B.1 DEPENDENCY:</strong> cluster access credentials (kubeconfig) &rarr; auth plan if a managed mechanism is required.</li>
+        <li><strong>B.2 TOPOLOGY DECISION (blocking):</strong> 2 nodes or 3? Per &sect;3e, 2 nodes cannot form quorum and leaves a single control plane. Identify a credible third node from &sect;3g candidates (unidentified LAN hosts, Proxmox VM, ZeroTier offsite, small cloud quorum member) or record explicitly that we accept rung 1 for now.</li>
+        <li>B.3 Install k3s server on the chosen host.</li>
+        <li>B.4 Join remaining node(s) as agents.</li>
+        <li>B.5 Label nodes by capability; taint any that must not take general workload (&sect;3c).</li>
+        <li>B.6 Verify no port collision with the live app or registry.</li>
+        <li>B.7 Confirm the live compose container is still serving, untouched.</li>
     </ul>
     <p><strong>WHY NEXT:</strong> we now have a scheduler, but we have not told it what we want running. An empty cluster self-heals nothing. Phase C declares the desired state.</p>
 
@@ -192,6 +275,17 @@
         <li>DB credentials via k8s Secret sourced from <code>db_config.json</code>  -  never baked into the image (IMGSEC).</li>
         <li>Mount shared session/NFS/redis state (&sect;6).</li>
     </ul>
+    <p><strong>Sub-project C todos:</strong></p>
+    <ul>
+        <li><strong>C.0 ROLE EVAL:</strong> which nodes should run web pods, and what are their resource requests/limits? Confirm anti-affinity so both replicas cannot land on one node.</li>
+        <li><strong>C.1 DEPENDENCY (likely BLOCKING):</strong> AUTH-R1 &mdash; credentials must reach a pod without hand-placed files. Raise on the auth plan; this phase waits.</li>
+        <li>C.2 Write Deployment manifest (replicas=2, image pinned by digest).</li>
+        <li>C.3 Service + Ingress with <code>/health</code> probe.</li>
+        <li>C.4 Tune probes: liveness <code>start_period</code> 60s+; app measured at ~90s to healthy. Too short recreates the outage kill-loop.</li>
+        <li>C.5 Mount shared session/NFS/redis state (&sect;6).</li>
+        <li>C.6 Verify no credential is present in any image layer (IMGSEC).</li>
+        <li>C.7 Both pods serving <code>/health</code> independently.</li>
+    </ul>
     <p><strong>WHY NEXT:</strong> two healthy pods now exist and update by digest across both nodes automatically &mdash; but real users are still being served by the old single compose container, so none of that protects anyone yet. Phase D moves the traffic.</p>
 
     <h3>Phase D - Cutover (zero-downtime intent)</h3>
@@ -202,6 +296,16 @@
         <li>Retire the manual-switch compose standby only after a stable period.</li>
         <li>Keep the compose path documented as an emergency escape hatch until Phase E passes.</li>
     </ul>
+    <p><strong>Sub-project D todos:</strong></p>
+    <ul>
+        <li><strong>D.0 ROLE EVAL:</strong> which host terminates external traffic (ingress/OPNsense entry), and where does that role fail over to?</li>
+        <li><strong>D.1 DEPENDENCY (BLOCKING):</strong> AUTH-R2 &mdash; sessions must be valid across both replicas or balanced users get logged out at random. Raise on the auth plan.</li>
+        <li>D.2 Run Deployment alongside the compose container; compare responses.</li>
+        <li>D.3 Rehearse rollback BEFORE cutover, not after.</li>
+        <li>D.4 Switch the external entry to the ingress.</li>
+        <li>D.5 Monitor a stable period; keep compose as escape hatch.</li>
+        <li>D.6 Confirm pods are not falling back to a deprecated credential source (evidence for the auth plan).</li>
+    </ul>
     <p><strong>WHY NEXT:</strong> users are served by the cluster, but we have only <em>assumed</em> it survives a node loss. Untested failover has a poor record. Phase E turns the assumption into evidence.</p>
 
     <h3>Phase E - Failover proof</h3>
@@ -211,6 +315,16 @@
         <li>Repeat in the opposite direction (drain .199).</li>
         <li>Pull the power/network on a node for an unplanned-failure test, not just a graceful drain.</li>
         <li>Record measured recovery time; this is the first real input to the 99% budget.</li>
+    </ul>
+    <p><strong>Sub-project E todos:</strong></p>
+    <ul>
+        <li><strong>E.0 ROLE EVAL:</strong> re-measure each node under realistic load &mdash; does the surviving node have capacity to carry 100% of traffic alone? A 2-core .126 absorbing all load is a real question, not a formality.</li>
+        <li>E.1 Graceful drain of node 1 &rarr; site stays up.</li>
+        <li>E.2 Graceful drain of node 2 &rarr; site stays up.</li>
+        <li>E.3 <strong>Unplanned failure test</strong> (pull power/network), not just a drain.</li>
+        <li>E.4 Test under <em>load</em>, including while the AI workload is saturating a node.</li>
+        <li>E.5 Record measured recovery time &mdash; first real input to the 99% budget.</li>
+        <li>E.6 Re-evaluate rung 2 (3-node) using this evidence (&sect;3f).</li>
     </ul>
     <p><strong>WHY NEXT:</strong> the application layer is now genuinely HA and proven. The remaining hard SPOF is the database: losing .20 takes down both nodes at once, so the 99% target is still arithmetically out of reach (&sect;7). Phase F is not optional if 99% is the goal.</p>
 
@@ -223,6 +337,7 @@
         <li><strong>F.2 Implement</strong> replication .20 &rarr; .198 with monitored lag.</li>
         <li><strong>F.3 Failover procedure:</strong> documented and rehearsed promotion of .198. The app already supports prioritised DB failover via <code>db_config.json</code> priorities  -  wire .198 as priority 2 rather than inventing a new mechanism.</li>
     </ul>
+    <p><strong>Sub-project F todos:</strong> F.0 assess (currently BLOCKED &mdash; see F.1), F.1 dependency AUTH-R4 (.198 SSH credentials are in no managed store; raise on auth plan), F.2 decide async vs Galera, F.3 implement replication with lag monitoring, F.4 wire .198 as priority 2 in the existing failover mechanism, F.5 rehearse promotion, F.6 role eval: is .198 actually capable, or is another host the better replica?</p>
     <p><strong>WHY NEXT:</strong> availability is now genuinely defensible. What remains is <em>effort</em>: every release is still a human running a rollout command at the right moment. Phase G removes that, and is where the "proven container reaches all nodes without touching each one" requirement is fully paid off.</p>
 
     <h3>Phase G - Automated propagation of a proven image</h3>
@@ -236,6 +351,7 @@
         <li>Staging environment on the cluster so "proven" means proven <em>somewhere real</em> before production.</li>
         <li>This phase depends on the credentials decision (&sect;11): automated rollout must not require a human to hand-place a secret file on a node.</li>
     </ul>
+    <p><strong>Sub-project G todos:</strong> G.0 role eval (which host builds images? .199 is the GPU/AI box and is saturated &mdash; building there may be slow or unavailable exactly when needed), G.1 dependency AUTH-R1/R3 (automated rollout cannot require hand-placed secrets), G.2 build-once pipeline with digest promotion, G.3 retire <code>:latest</code>, G.4 rolling update with <code>maxUnavailable: 0</code>, G.5 automatic rollback on failed rollout, G.6 staging environment, G.7 prove a bad build is refused before reaching users.</p>
     <p><strong>WHY NEXT:</strong> at this point availability, balance and propagation are all solved on k3s. Phase H is therefore <strong>conditional, not scheduled</strong>  -  see its trigger.</p>
 
     <h3>Phase H - Full Kubernetes (conditional; do not schedule)</h3>
@@ -246,6 +362,7 @@
         <li><strong>Scale beyond a handful of nodes</strong>, or a need for features/operators k3s does not carry.</li>
         <li><strong>Organisational requirement</strong> (compliance, managed cloud, external ops support).</li>
     </ul>
+    <p><strong>Sub-project H todos:</strong> H.0 role eval for any new/external node, H.1 3-node embedded-etcd control plane (rung 2 &mdash; this is a k3s feature, not a distribution change), H.2 evaluate a ZeroTier offsite node as a worker (rung 3; poor etcd peer due to WAN latency, good worker), H.3 evaluate external/cloud quorum member (rung 4), H.4 decide and record whether to climb or stop.</p>
     <p>Honest assessment for the current estate: <strong>H.1 (control-plane HA) is likely worth doing eventually; a full distribution swap is likely never needed.</strong> Recording that prevents this plan from being re-fragmented later by a doc that assumes a big-bang Kubernetes migration.</p>
 
     <h2 id="shared-state">6. Shared state  -  the thing that breaks naive replica scaling</h2>
@@ -310,47 +427,23 @@
     <div class="row">
         <div class="col-100">
 
-    <h2 id="credentials">11. Credentials strategy &mdash; env vs Docker vs Kubernetes vs DB</h2>
-    <p>This was an open question ("which is best  -  env, docker, kubernetes, db, or a combination?"). It is settled below, and the good news is that <strong>the answer is already implemented in the code</strong>; what is missing is not a mechanism but a stated policy and the retirement of the fallbacks.</p>
+    <h2 id="credentials">11. Authentication &amp; credentials &mdash; a DEPENDENCY, not part of this plan</h2>
+    <div style="border-left: 4px solid var(--warning-color); padding: var(--spacing-small); margin: var(--spacing-medium) 0;">
+        <strong>Scope correction.</strong> An earlier draft of this plan tried to <em>decide</em> the credentials strategy. That was wrong and is retracted. The credential design flaw &mdash; the original assumption that <strong>each table needed its own credential and that these belonged in JSON files</strong> &mdash; was created at the very beginning of the process and is a <strong>separate problem with its own plan</strong>. This plan does not own it, must not redesign it, and must not quietly work around it.
+    </div>
+    <p><strong>The rule:</strong> where HA/load-balancing work <em>requires</em> a change in the authentication/credential system, this plan <strong>states the requirement and raises a todo on the authentication plan</strong> &mdash; it does not implement the change here. That todo may <strong>block</strong> progression of this plan, and that is the correct and accepted outcome. A blocked phase is better than two plans silently redesigning the same subsystem in different directions.</p>
+    <p>Owning plan: <a href="/Documentation/AuthenticationEvolutionPlan" style="color: var(--link-color);">Authentication Evolution Plan</a> (marked ACTIVE &mdash; DO NOT CHANGE WITHOUT EXPLICIT PERMISSION, which is a further reason this plan must not edit it).</p>
 
-    <h3>11a. What the code actually does today (verified, not assumed)</h3>
-    <p><code>lib/Comserv/Model/RemoteDB.pm</code> <code>_load_config()</code> tries sources in a strict order and stops at the first that yields config:</p>
+    <h3>11a. What this plan REQUIRES from the authentication plan</h3>
+    <p>These are requirements raised <em>on</em> the auth plan, each to become a todo <strong>in that plan's project</strong>, blocking the phase named:</p>
     <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
-        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Order</th><th style="text-align:left; padding:6px;">Source</th><th style="text-align:left; padding:6px;">Mechanism</th><th style="text-align:left; padding:6px;">Status in code</th></tr>
-        <tr><td style="padding:6px;">1</td><td style="padding:6px;">Mounted secret files</td><td style="padding:6px;"><code>_load_from_k8s_secrets()</code> &mdash; scans <code>&lt;base&gt;/dbi/*.json</code> across 6 paths incl. <code>~/.comserv/secrets</code> and <code>/var/run/secrets/comserv/</code></td><td style="padding:6px;">Preferred</td></tr>
-        <tr><td style="padding:6px;">2</td><td style="padding:6px;">Environment variables</td><td style="padding:6px;"><code>COMSERV_DB_&lt;CONN&gt;_&lt;FIELD&gt;</code> (host, port, username, password, database, db_type, priority, environment)</td><td style="padding:6px;">Supported fallback</td></tr>
-        <tr><td style="padding:6px;">3</td><td style="padding:6px;"><code>db_config.json</code></td><td style="padding:6px;"><code>_find_db_config_file()</code> &mdash; 6 search paths</td><td style="padding:6px;">Explicitly logged as <strong>DEPRECATED</strong> &mdash; "MIGRATE TO K8S SECRETS"</td></tr>
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Req</th><th style="text-align:left; padding:6px;">What HA needs</th><th style="text-align:left; padding:6px;">Why the current design blocks it</th><th style="text-align:left; padding:6px;">Blocks</th></tr>
+        <tr><td style="padding:6px;">AUTH-R1</td><td style="padding:6px;">Credentials deliverable to a pod without a human placing a file on each node</td><td style="padding:6px;">Per-file JSON on hosts cannot propagate automatically; defeats the whole point of &sect;3a</td><td style="padding:6px;">Phase C / G</td></tr>
+        <tr><td style="padding:6px;">AUTH-R2</td><td style="padding:6px;">Sessions valid across BOTH replicas</td><td style="padding:6px;">Node-local sessions log users out at random when balanced (&sect;6)</td><td style="padding:6px;">Phase D</td></tr>
+        <tr><td style="padding:6px;">AUTH-R3</td><td style="padding:6px;">One credential set per <em>connection</em>, not per table</td><td style="padding:6px;">The original per-table assumption multiplies secrets to rotate per node</td><td style="padding:6px;">Phase G</td></tr>
+        <tr><td style="padding:6px;">AUTH-R4</td><td style="padding:6px;">Managed credentials for .198 and any new node</td><td style="padding:6px;">.198 SSH creds are in no managed store &mdash; this already blocked Phase F.0</td><td style="padding:6px;">Phase F</td></tr>
     </table>
-    <p>So the codebase has <em>already chosen</em>: <strong>mounted secret files first, env second, <code>db_config.json</code> deprecated.</strong> The confusion is not in the code &mdash; it is that all three are still live in different places at once, so no one can say which one a given host is really using.</p>
-
-    <h3>11b. The decision</h3>
-    <p><strong>Kubernetes Secrets mounted as files, as the single production source. Not env, not DB, not a combination.</strong> Reasons, specific to this estate:</p>
-    <ul>
-        <li><strong>It needs no application change.</strong> A k8s Secret mounted at <code>/var/run/secrets/comserv/dbi/</code> is picked up by the existing source-1 loader as-is. This is the strongest argument: the migration is a deployment change, not a code change.</li>
-        <li><strong>Env vars leak.</strong> They appear in <code>docker inspect</code>, <code>/proc/&lt;pid&gt;/environ</code>, crash dumps and child processes. Acceptable for non-secret settings; poor for passwords.</li>
-        <li><strong>Files can be rotated without a rebuild</strong>, and are never baked into an image layer (the IMGSEC rule).</li>
-        <li><strong>The DB cannot hold its own credentials</strong> &mdash; a bootstrap paradox. The DB is therefore excluded by definition, which removes one of the four candidates outright.</li>
-        <li><strong>Automated propagation (Phase G) requires it.</strong> Rollout cannot be automatic if a human must hand-place a secret file on each node; the Secret must be a cluster object.</li>
-    </ul>
-    <p><strong>The permitted "combination"</strong> is narrow and worth stating so it is not re-litigated: <em>non-secret</em> configuration (hostnames, ports, priorities, feature flags) may live in env or ConfigMaps; <em>secrets</em> (passwords, tokens, SSH keys) live only in mounted Secrets. Split on sensitivity, not convenience.</p>
-
-    <h3>11c. Honest limitations to accept</h3>
-    <ul>
-        <li>Kubernetes Secrets are <strong>base64, not encrypted</strong>, at rest in etcd by default. For this estate that is an acceptable improvement over the status quo, but it should be recorded, not glossed over. Enabling etcd encryption-at-rest is a small follow-up; an external manager (Vault/SOPS) is <em>not</em> justified at current scale.</li>
-        <li>Anyone with cluster-admin can read Secrets. With a single operator today this is moot; it matters if access is ever broadened.</li>
-        <li>Migration must be verified per connection: <code>~/.comserv/secrets/dbi/</code> currently holds 16 connection files, several stale (<code>backup_*</code>, <code>zerotier_*</code>, <code>sqlite_*</code>). <strong>Audit before migrating; do not lift all 16 blindly.</strong></li>
-    </ul>
-
-    <h3>11d. Non-DB credentials &mdash; the gap this plan will not pretend to close</h3>
-    <p>SSH credentials are a separate, unsolved problem: <code>~/.comserv/secrets/ssh_credentials.json</code> covers .126, while <strong>.198 uses different credentials that are not yet in any managed store</strong> (this blocked the Phase F.0 assessment). Registry and API tokens are similarly ad hoc. The same policy should extend to them, but that work is <strong>not scheduled here</strong> and should not be assumed done.</p>
-
-    <h3>11e. Credential work by phase (no new phases; folded into existing gates)</h3>
-    <ul>
-        <li><strong>Phase C:</strong> create the k8s Secret from the audited <code>dbi/*.json</code> set; confirm pods load via source 1 (the log line names the source &mdash; use it as proof).</li>
-        <li><strong>Phase D:</strong> confirm the cutover pods are NOT falling back to source 2 or 3; a deprecation warning in the log means the migration is incomplete.</li>
-        <li><strong>Phase F:</strong> add the .198 replica credential as a managed Secret, and obtain/store .198 SSH access properly rather than by hand.</li>
-        <li><strong>Phase G:</strong> retire <code>db_config.json</code> from production hosts once no pod has read it for a full release cycle; keep it for local dev only.</li>
-    </ul>
+    <p><strong>Observation only, decision NOT taken here:</strong> <code>RemoteDB.pm::_load_config</code> already reads mounted secret files first, then <code>COMSERV_DB_*</code> env, then <code>db_config.json</code> (which the code itself logs as DEPRECATED). This is recorded as <em>evidence for the auth plan to use</em>. Whether that ladder is the right end state is the authentication plan's call, not this plan's.</p>
     <p style="margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color);">&uarr; Back to Top</a></p>
 
             <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
