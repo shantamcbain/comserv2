@@ -18,3 +18,25 @@
 
 /* Dim done / blocked cards (opacity only — no colour override) */
 .todo-card.opacity-60 { opacity: 0.6; }
+
+/* ── Card text / layout classes (replace the old inline styles) ── */
+.todo-card { position: relative; }
+.todo-card-subject {
+    color: var(--text-color, #333);
+    font-weight: 600;
+    max-width: 360px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.todo-card-subject:visited { color: var(--text-color, #333); }
+.todo-card-badges .todo-card-subject { margin-left: 4px; }
+.todo-card-actions { gap: 4px; }
+.todo-card-pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.85em;
+}
+
+/* Base button sizing for the shared card (overridable per context) */
+.todo-card .btn { font-size: 0.72em; padding: 1px 6px; line-height: 1.5; }

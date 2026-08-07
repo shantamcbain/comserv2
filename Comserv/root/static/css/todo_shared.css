@@ -74,22 +74,101 @@
     overflow: hidden;
 }
 
-.todo-item-shared.priority-1 {
-    background-color: var(--warning-color);
-    border-color: var(--warning-color);
-}
+/* Priority colour is now a SINGLE scale: .pri-N (defined in
+   base-containers.css, var-based). The calendar chips render the shared
+   todo_card.tt, which emits the .pri-N badge; we alias .todo-item-shared
+   priority colour to the same scale so background + badge agree everywhere.
+   Geometry (background/border/radius) stays on .todo-item-shared; colour
+   comes from the pri-N classes below. */
+.todo-item-shared.pri-1 { background-color: var(--danger-color, #dc3545); border-color: var(--danger-color, #dc3545); color: #fff; }
+.todo-item-shared.pri-2,
+.todo-item-shared.pri-3,
+.todo-item-shared.pri-4 { background-color: var(--accent-color, #FF9900); border-color: var(--accent-color, #FF9900); color: var(--text-color, #000); }
+.todo-item-shared.pri-5,
+.todo-item-shared.pri-6 { background-color: var(--caution-color, #ffc107); border-color: var(--caution-color, #ffc107); color: var(--text-color, #000); }
+.todo-item-shared.pri-7,
+.todo-item-shared.pri-8,
+.todo-item-shared.pri-9,
+.todo-item-shared.pri-10 { background-color: var(--text-muted-color, #6c757d); border-color: var(--text-muted-color, #6c757d); color: #fff; }
 
-.todo-item-shared.priority-2 {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
+/* ── Calendar cards: same shared todo_card.tt, sized to fit tight time-slots ──
+   The card is dropped inside .gcal-ev (fixed height + overflow:hidden) and
+   .todo-item-month/.todo-item-day wrappers (which carry .todo-item-shared's
+   overflow:hidden). Without these overrides the subject is clipped and only
+   the buttons show ("blank card"). Keep the SAME card markup, just make it
+   responsive in calendar contexts: subject on its own line, action buttons
+   wrap below and shrink, and the card is never clipped by the slot. */
+.todo-item-day.todo-card,
+.todo-item-month.todo-card,
+.gcal-ev-card.todo-card {
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
 }
-
-.todo-item-shared.priority-3 {
-    background-color: var(--success-color);
-    border-color: var(--success-color);
+.todo-item-day.todo-card > details,
+.todo-item-month.todo-card > details,
+.gcal-ev-card.todo-card > details {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
-
-/* Todo Subject Styling */
+/* summary: subject on its own line, action buttons wrap below */
+.todo-item-day.todo-card > details > summary,
+.todo-item-month.todo-card > details > summary,
+.gcal-ev-card.todo-card > details > summary {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 2px 4px;
+    gap: 2px 4px;
+}
+.todo-item-day.todo-card > details > summary > div:first-child,
+.todo-item-month.todo-card > details > summary > div:first-child,
+.gcal-ev-card.todo-card > details > summary > div:first-child {
+    flex: 1 1 100%;
+    min-width: 0;
+}
+/* compact action buttons so they fit the limited calendar space.
+   !important beats any leftover Bootstrap/inline sizing in tight cells. */
+.todo-card .btn { font-size: 0.72em !important; padding: 1px 6px !important; line-height: 1.5 !important; }
+.todo-item-day.todo-card .btn,
+.todo-item-month.todo-card .btn,
+.gcal-ev-card.todo-card .btn {
+    font-size: 0.66em !important;
+    padding: 0 4px !important;
+    line-height: 1.4 !important;
+}
+/* shrink priority/status badges in the compact calendar cells */
+.todo-item-day.todo-card .badge,
+.todo-item-month.todo-card .badge,
+.gcal-ev-card.todo-card .badge {
+    font-size: 0.6em;
+    padding: 1px 4px;
+    line-height: 1.3;
+}
+/* Hover popup (not confined to the card window) carries the action buttons
+   in calendar-compact mode, so the closed card stays just title + priority. */
+.todo-card-popup {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 99999;
+    margin-top: 2px;
+    background: var(--background-color, #fff);
+    border: 2px solid var(--primary-color, #4CAF50);
+    border-radius: 8px;
+    padding: 6px 8px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+    white-space: nowrap;
+    color: var(--text-color, #333);
+}
+.todo-card-popup .todo-popup-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.todo-card-popup .todo-popup-meta { width: 100%; font-size: 0.7em; color: var(--text-muted-color, #666); margin-top: 2px; }
+.todo-card:hover .todo-card-popup { display: block; }
+/* the gcal time-lane keeps its own height; the card fills it.
+   raise min-height a touch so even a short event shows its subject. */
+.gcal-ev .todo-card { height: 100%; box-sizing: border-box; }
+.gcal-ev { min-height: 22px; }
 .todo-subject-shared {
     font-weight: bold;
     margin-bottom: 3px;

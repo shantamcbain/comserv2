@@ -24,6 +24,7 @@ root/Documentation/session_history/
 # Exception: the Documentation System Standard is the single source of truth and
 # MUST be version-controlled and browser-served. Track exactly this file.
 !root/Documentation/STANDARD.md
+!root/Documentation/TodoCardUnificationPlan.tt
 # Exception: active plan documents that AI sessions and deploys must both see.
 !root/Documentation/PlanningQueueRoleVisibilityPlan.md
 !root/Documentation/ProjectsPageFilterSearchPriorityPlan.md

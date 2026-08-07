@@ -1,0 +1,127 @@
+# Todo Card Unification Plan — one card, every list, theme-compliant
+
+- **Project:** 240 TODOLIST-UI (sub-project of 138 PLANNING)
+- **Created:** 2026-08-06
+- **Purpose:** Make EVERY todo render through the SAME theme-compliant shared card
+  (`root/todo/todo_card.tt`) so it looks and functions identically on every page —
+  the main /todo list, the 🎯 Today's Focus Queue, the project pages, and the
+  day / week / month calendar views. No more three divergent renderings.
+
+## Diagnosis (three different todo renderings today)
+
+| Surface | Template | Rendering | Priority class | Theme-compliant? |
+|---|---|---|---|---|
+| 🎯 Focus Queue | `admin/planning/_today_work_tab.tt` | `todo_card.tt` | `pri-N` (var-based) | ✅ source of truth |
+| Main `/todo` list | `todo/todo.tt` | `todo_card.tt` | `pri-N` | ✅ |
+| **Project page** | `todo/project.tt` (×2) | `todo_row.tt` (inline hex, link-out) | inline `background:#dc3545` | ❌ old system |
+| **Project details** | `todo/ProjectTodosList.tt` | `todo_row.tt` | inline | ❌ old system |
+| **Day view** | `todo/day.tt` (overdue + gcal-ev lane) | bespoke chips | `priority-N` | ❌ |
+| **Week view** | `todo/week.tt` → `INCLUDE day.tt` | same chips | `priority-N` | ❌ |
+| **Month view** | `todo/month.tt` | `.todo-item-month` chips | `priority-N` | ❌ |
+
+Observed inconsistencies from reading the code:
+1. **Three priority-colour systems.** Card = `pri-N` (base-containers.css, `var(--*)`);
+   calendar = `priority-N` (todo_shared.css, `var(--*)`); project row = inline
+   hex. Same priority renders a *different colour* on different pages.
+2. **Calendar chips have no 💬 Chat button** (the card has it).
+3. **Project-row cards link out** to a separate `/todo/details` page instead of
+   expanding inline like the card.
+4. **Three Start/Done JS paths**: `daily-plan-utils.js` (`startWorkTodoCard` /
+   `doneWithLogTodoCard`) for the card; `day.tt` `startWorkGcal` /
+   `doneWithNotesGcal` for the gcal lane; inline buttons in `todo_row.tt`. The
+   card path already hits `/todo/open_log` / `close_log` / `done_with_log`.
+
+## Design principles (from Rule 23 + the user's instruction)
+
+- `todo_card.tt` is the SINGLE SOURCE OF TRUTH for every todo list. Edit it once;
+  every list renders identical markup + actions.
+- **No inline CSS/JS.** All colours via `var(--*)` (already the case in the card);
+  all behaviour via delegated `data-*` handlers bound once in a shared JS file.
+- **Time tracking must survive.** The calendar is a positioned, draggable
+  time-grid (drag-to-reschedule calls `/todo/update_time*` + `/todo/reschedule`).
+  The drag is bound by **class** (`.todo-item-day`, `.todo-item-shared`,
+  `.todo-item-month`) and reads `data-todo-id` / `data-todo-date` /
+  `data-is-recurring`. The card must keep these attributes + a wrapper carrying
+  the position class so drag/positioning keeps working.
+- **One action-binding path.** Collapse the three Start/Done handlers into the
+  single delegated `data-start-btn` / `data-done-btn` handler (the card's
+  `daily-plan-utils.js` path), which already writes the time log. The gcal lane's
+  clipboard-copy-to-AI behaviour is folded into that handler too.
+
+## Phase 0 — Make `todo_card.tt` calendar-safe (the shared surface change)
+The card is currently a plain `<details>` block. For the calendar it must also be
+usable inside a positioned time-slot while preserving drag. Changes, all inside
+`todo_card.tt`:
+- Add optional context flags `tc_drag_class` (e.g. `todo-item-day todo-item-shared`)
+  and `tc_wrapper_extra` (raw attrs for the outer wrapper: `data-todo-id`,
+  `data-todo-date`, `data-is-recurring`, `draggable`, positioning `style`).
+- When `tc_drag_class` is set, the outer `<div class="todo-card ...">` also gets
+  that class + the wrapper data attrs, so `todo_drag_drop.js` keeps selecting it.
+- Keep `data-start-btn` / `data-done-btn` / `data-chat-todo` exactly as-is —
+  they are already consumed by the delegated handler.
+- GATE: TT render smoke test (per Rule 23) shows a card WITH the drag wrapper
+  still emits `<details>` with `pri-N` badge + no inline style except the
+  data-driven one, and the wrapper carries `data-todo-id`.
+
+## Phase 1 — Project pages → shared card (closes rec 1942)
+- `todo/project.tt:406` (Associated Todos) → `INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1`.
+- `todo/project.tt:625` (sub-project Associated Todos) → same.
+- `todo/ProjectTodosList.tt:16` → same.
+- After this, `grep -rn "INCLUDE 'todo/todo_row.tt'" root/` returns **zero**.
+- `todo_row.tt` is left in place but becomes orphaned (no include). Delete it only
+  after confirming no other include (grep above) — tracked as a follow-up, not
+  in this phase, to avoid breaking anything that references it by path.
+- GATE: project page renders inline-expanding cards identical to the Focus Queue;
+  Start/Done/Log work for an admin.
+
+## Phase 2 — Calendar views → shared card (day / week / month)
+- `todo/day.tt` overdue block (1675-1728): wrap each card in the gcal positioning
+  context — `INCLUDE 'todo/todo_card.tt' tc=todo tc_drag_class="todo-item-day todo-item-shared" tc_wrapper_extra="data-todo-id=... data-todo-date=... draggable=true"`.
+- `todo/day.tt` gcal-ev lane (1849-1977): the lane is positioned by `top/height`.
+  Keep the `.gcal-ev` positioning wrapper, but render the card INSIDE it (the
+  wrapper holds `data-todo-id`/position; the card supplies badges+actions). The
+  `startWorkGcal`/`doneWithNotesGcal` handlers are retired in favour of the
+  delegated `data-start-btn`/`data-done-btn` path (Phase 4), so the gcal lane's
+  copy-to-AI is added to that handler.
+- `todo/month.tt` (588, 604): wrap each `.todo-item-month` slot with the card the
+  same way (`tc_drag_class="todo-item-month"`).
+- Week view needs no direct change — it `INCLUDE`s `day.tt`, so it inherits.
+- GATE: day/week/month still drag-to-reschedule; cards look identical to the
+  Focus Queue; Done writes the time log.
+
+## Phase 3 — Unify priority colour (one system: `pri-N`)
+- `todo_shared.css` `.todo-item-shared.priority-N` rules are the only place still
+  using `priority-N`. Replace them with the existing `pri-N` classes (already in
+  base-containers.css) so there is ONE priority colour scale everywhere. Keep the
+  `todo-item-shared` hooks only for geometry (drag, layout), not colour.
+- Remove the inline `background-color:#ffe6e6` on overdue month chips (use the
+  card's existing `opacity-60` / `--icon-bg` mechanism instead).
+- GATE: `grep -rn "priority-[0-9]" root/static/css` returns zero colour rules
+  (only the gcal priority `<select>` option values, which are data not colour).
+
+## Phase 4 — One Start/Done binding (collapse three paths)
+- Promote `startWorkTodoCard` / `doneWithLogTodoCard` / `closeLogTodoCard` in
+  `daily-plan-utils.js` to a single global delegated handler (they already call
+  `/todo/open_log` / `close_log` / `done_with_log`).
+- Add the gcal copy-to-AI + notes-modal behaviour into that one handler so the
+  calendar Start/Done behaves identically to the Focus Queue (time log + optional
+  clipboard copy).
+- Remove `startWorkGcal` / `doneWithNotesGcal` / `closeLogWithNotesGcal` from
+  `day.tt` (now dead) and point the gcal lane at the shared handler.
+- GATE: clicking Start on a calendar card opens a log entry (verified by the same
+  `_rescheduleAndReload` / reschedule the gcal lane used); Focus Queue + calendar
+  call the identical function.
+
+## Verification (no server needed for most of it)
+- Rule 23 TT smoke test for `todo_card.tt` (closed-by-default, no inline style
+  except data-driven, `pri-N` badge) — run for both the plain and drag-wrapper
+  cases.
+- `grep` unification checks (Phases 1/3) listed in each GATE.
+- Live check (after deploy / when server is up): open /todo, a project page, the
+  day/week/month views, and the Focus Queue; confirm badges, buttons, and drag
+  are identical. The time log opens on Start in every view.
+
+## Tracking
+Tracking todos are created under project 240 (this plan) — one per phase
+(0-4) plus a verification todo. rec 1942 (the original project-page inconsistency)
+is the parent of Phase 1's work.

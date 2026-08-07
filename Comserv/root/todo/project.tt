@@ -398,12 +398,12 @@
                         </div>
                     [% END %]
                     
-                    <!-- Associated Todos Section (now uses shared todo_row.tt) -->
+                    <!-- Associated Todos Section (now uses shared todo_card.tt) -->
                     [% IF project.todos && project.todos.size > 0 %]
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% project.todos.size %])</h6>
                         [% FOREACH todo IN project.todos %]
-                            [% INCLUDE 'todo/todo_row.tt' tc=todo %]
+                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
                         [% END %]
                     </div>
                     [% ELSE %]
@@ -617,12 +617,12 @@
                     </div>
                     [% END %]
 
-                    <!-- Associated Todos Section (now uses shared todo_row.tt) -->
+                    <!-- Associated Todos Section (now uses shared todo_card.tt) -->
                     [% IF subproject.todos && subproject.todos.size > 0 %]
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% subproject.todos.size %])</h6>
                         [% FOREACH todo IN subproject.todos %]
-                            [% INCLUDE 'todo/todo_row.tt' tc=todo %]
+                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
                         [% END %]
                     </div>
                     [% ELSE %]

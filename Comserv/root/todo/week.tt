@@ -27,7 +27,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/themes/themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
-<link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
+<link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css?v=20260806b">
 <script src="/static/js/todo_drag_drop.js"></script>
 
 [% PageVersion  = '/todo/week.tt, v 0.8 2026/02/09 Shanta Exp Shanta - Added overdue todos section (shows todos before week start)' %]

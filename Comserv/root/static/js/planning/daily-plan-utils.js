@@ -791,14 +791,25 @@
             resultEl.innerHTML = '';
             _aiTuneCall(targets[0], statusEl, resultEl, null);
         } else {
+            // Run models ONE AT A TIME (not in parallel). Each compare request
+            // drives a full local-model generation that pegs CPU; firing them
+            // concurrently only multiplies contention (Ollama serializes at
+            // -np 1 anyway) and saturates the box. Sequential keeps CPU bounded
+            // to a single generation and still shows the side-by-side result.
             var collected = [];
-            var pending = targets.length;
-            targets.forEach(function(t) {
+            var i = 0;
+            function nextOne() {
+                if (i >= targets.length) {
+                    _aiTuneRenderBatch(targets, collected, resultEl);
+                    return;
+                }
+                var t = targets[i++];
                 _aiTuneCall(t, statusEl, resultEl, function(target, d) {
                     collected.push(d);
-                    if (--pending === 0) _aiTuneRenderBatch(targets, collected, resultEl);
+                    nextOne();
                 });
-            });
+            }
+            nextOne();
         }
     }
 
