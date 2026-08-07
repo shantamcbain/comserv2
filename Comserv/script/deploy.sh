@@ -264,6 +264,24 @@ safe_pkill_f() {
     done
 }
 
+# Resolve a WRITABLE log path for the emergency host-Starman fallback.
+# A shared /tmp/host_starman_start.log left behind by a root run makes the
+# redirect fail with "Permission denied" BEFORE perl ever executes, silently
+# killing the last-resort fallback (production outage 2026-08-07). Namespacing
+# by UID keeps runs by different users from colliding; the app dir and
+# /dev/null are progressive fallbacks so this can never abort the recovery.
+resolve_starman_log() {
+    local app_dir="${1:-}"
+    local candidate="${TMPDIR:-/tmp}/host_starman_start.$(id -u).log"
+    if : >"$candidate" 2>/dev/null; then
+        echo "$candidate"; return 0
+    fi
+    if [ -n "$app_dir" ] && : >"$app_dir/host_starman_start.log" 2>/dev/null; then
+        echo "$app_dir/host_starman_start.log"; return 0
+    fi
+    echo "/dev/null"
+}
+
 # Sync host git checkout lib/ into the running prod container and restart so
 # Starman workers reload Perl modules (Docker image alone does not include git pull).
 sync_host_app_lib() {
@@ -607,11 +625,12 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                     export CATALYST_HOME="$HOST_APP_DIR"
                     export CATALYST_ENV=production
                     export COMSERV_LOG_DIR="$HOST_APP_DIR"
-                    if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_start.log 2>&1; then
+                    STARMAN_LOG=$(resolve_starman_log "$HOST_APP_DIR")
+                    if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >"$STARMAN_LOG" 2>&1; then
                         echo "✅ Manual Starman started successfully on port 5000."
                     else
                         echo "❌ Failed to start manual Starman. Log:"
-                        cat /tmp/host_starman_start.log || true
+                        cat "$STARMAN_LOG" || true
                     fi
                 else
                     echo "Could not find Catalyst PSGI file on host."
@@ -999,14 +1018,30 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
         echo "   Initiating automatic recovery procedure..."
         
         RESTART_OK=0
+
+        # The recovery wait MUST exceed the image's healthcheck start_period, or a
+        # perfectly good container is force-killed mid-boot and declared dead
+        # (outage 2026-08-07: 30s wait vs a 60s start_period produced three
+        # SIGKILL/exit-137 restarts, then container deletion). Read the real
+        # start_period from the image and add a margin.
+        RECOVERY_WAIT_S=$(docker inspect --format='{{.Config.Healthcheck.StartPeriod}}' "$CONTAINER" 2>/dev/null || echo "")
+        if [ -n "$RECOVERY_WAIT_S" ] && [ "$RECOVERY_WAIT_S" -gt 0 ] 2>/dev/null; then
+            # Docker reports StartPeriod in nanoseconds
+            RECOVERY_WAIT_S=$(( RECOVERY_WAIT_S / 1000000000 ))
+        else
+            RECOVERY_WAIT_S=60
+        fi
+        RECOVERY_WAIT_S=$(( RECOVERY_WAIT_S + 60 ))   # start_period + 60s margin
+        RECOVERY_POLLS=$(( RECOVERY_WAIT_S / 2 ))
+        echo "   [Recovery] Health wait per attempt: ${RECOVERY_WAIT_S}s (healthcheck start_period + 60s margin)"
+
         for ATTEMPT in 1 2 3; do
             echo "   [Recovery] Attempt $ATTEMPT of 3: restarting container $CONTAINER..."
             docker restart "$CONTAINER" >/dev/null 2>&1 || docker compose -f "$COMPOSE_FILE" restart "$CONTAINER" >/dev/null 2>&1 || true
             sleep 5
             
-            # Wait up to 30 seconds for container to become healthy
-            echo "   [Recovery] Waiting for container to become healthy..."
-            for SEC in $(seq 1 15); do
+            echo "   [Recovery] Waiting up to ${RECOVERY_WAIT_S}s for container to become healthy..."
+            for SEC in $(seq 1 $RECOVERY_POLLS); do
                 sleep 2
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
                 RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
@@ -1031,17 +1066,33 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
             # Get the image ID of the currently running unhealthy container
             CURRENT_IMAGE_ID=$(docker inspect --format='{{.Image}}' "$CONTAINER" 2>/dev/null || true)
             
-            # Find all available backup tags in sorted order (e.g. backup-1, backup-2...)
-            BACKUP_TAGS=$(docker images shantamcsbain/comserv-web-prod --format '{{.Tag}}' 2>/dev/null | grep -E '^backup-[0-9]+' | sort -V || true)
-            
-            # If no backup tags are found but backup-1 exists by inspect, seed it
+            # Find all available backup images, NEWEST FIRST.
+            # Two schemes exist on real hosts and BOTH must be searched (outage
+            # 2026-08-07: only the backup-N scheme was searched, while the host
+            # actually held bk-comserv2-web-prod:<timestamp> images, so fallback
+            # reported "no backups available" with three valid backups present):
+            #   a) shantamcsbain/comserv-web-prod:backup-N  (rotated by this script)
+            #   b) bk-comserv2-web-prod:<YYYYmmdd_HHMMSS>   (pre-deploy snapshots)
+            # Entries are fully-qualified "repo:tag" refs, not bare tags.
+            BACKUP_TAGS=$(docker images shantamcsbain/comserv-web-prod --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E ':backup-[0-9]+$' | sort -V || true)
+            BK_SNAPSHOTS=$(docker images bk-comserv2-web-prod --format '{{.CreatedAt}}|{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v ':<none>$' | sort -r | cut -d'|' -f2 || true)
+            BACKUP_TAGS=$(printf '%s\n%s\n' "$BACKUP_TAGS" "$BK_SNAPSHOTS" | grep -v '^$' || true)
+
+            # If nothing was found but the canonical backup-1 exists by inspect, seed it
             if [ -z "$BACKUP_TAGS" ] && docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
-                BACKUP_TAGS="backup-1"
+                BACKUP_TAGS="shantamcsbain/comserv-web-prod:backup-1"
+            fi
+
+            if [ -z "$BACKUP_TAGS" ]; then
+                echo "   [Fallback] No backup images found (searched shantamcsbain/comserv-web-prod:backup-N and bk-comserv2-web-prod:*)."
+            else
+                echo "   [Fallback] Backup candidates (newest first):"
+                echo "$BACKUP_TAGS" | sed 's/^/      /'
             fi
             
             ACTIVE_BACKUP=""
-            for B_TAG in $BACKUP_TAGS; do
-                B_IMAGE="shantamcsbain/comserv-web-prod:$B_TAG"
+            for B_IMAGE in $BACKUP_TAGS; do
+                B_TAG="$B_IMAGE"
                 B_ID=$(docker image inspect "$B_IMAGE" --format='{{.Id}}' 2>/dev/null || true)
                 
                 # If this backup's image ID is already the one that failed, skip it
@@ -1137,18 +1188,11 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                     ' "$FAIL_REASON"
                 fi
                 
-                # Stop any failed docker container first to free port 5000
-                docker stop "$CONTAINER" 2>/dev/null || true
-                docker rm -f "$CONTAINER" 2>/dev/null || true
-                
-                # Free ports
-                SUDO_CMD=""
-                if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
-                if command -v fuser &>/dev/null; then
-                    $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
-                fi
-                
-                # Find host application directory
+                # Find host application directory FIRST. The container must not be
+                # destroyed until we know a replacement can actually take over —
+                # on 2026-08-07 this block removed comserv2-web-prod and only THEN
+                # discovered the host fallback was unusable, leaving nothing serving
+                # port 5000 and no container left to inspect or restart.
                 HOST_APP_DIR=""
                 if [ -d "/opt/comserv/Comserv" ]; then
                     HOST_APP_DIR="/opt/comserv/Comserv"
@@ -1173,6 +1217,20 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                 
                 if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
                     echo "   [Emergency] Found host git repository at $HOST_APP_DIR"
+
+                    # Only NOW is it safe to tear the container down: we have a
+                    # fallback to hand over to. Stop (do not delete) so the failed
+                    # container remains available for diagnosis and for restart if
+                    # the handover fails.
+                    echo "   [Emergency] Stopping container to free port 5000 (NOT removing it)..."
+                    docker stop "$CONTAINER" 2>/dev/null || true
+
+                    SUDO_CMD=""
+                    if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
+                    if command -v fuser &>/dev/null; then
+                        $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                    fi
+
                     cd "$HOST_APP_DIR"
                     
                     if [ -f "script/comserv_server.psgi" ]; then
@@ -1190,7 +1248,8 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                     safe_pkill_f "comserv.*psgi"
                     safe_pkill_f "comserv_server"
                     
-                    if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_start.log 2>&1; then
+                    STARMAN_LOG=$(resolve_starman_log "$HOST_APP_DIR")
+                    if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >"$STARMAN_LOG" 2>&1; then
                         echo "   ✅ [Emergency] Successfully started manual starman server on host port 5000 to prevent interruption!"
                         if command -v mail >/dev/null 2>&1; then
                             echo -e "Emergency Fallback: Container died and failed 3 restarts & image rollback. Started host-level Starman on port 5000.\n\nServer : $HOSTNAME_VAL\nTime   : $(date)" \
@@ -1198,10 +1257,18 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                         fi
                     else
                         echo "   ❌ [Emergency] Failed to start manual starman on host. Log:"
-                        cat /tmp/host_starman_start.log || true
+                        cat "$STARMAN_LOG" || true
+                        echo "   [Emergency] Host fallback failed — restarting the container so SOMETHING serves port 5000."
+                        docker start "$CONTAINER" 2>/dev/null \
+                            || docker compose -f "$COMPOSE_FILE" up -d 2>/dev/null \
+                            || echo "   ❌ [Emergency] Could not bring the container back up. Manual intervention required."
                     fi
                 else
                     echo "   ❌ [Emergency] Could not find host Catalyst PSGI file on host."
+                    echo "   [Emergency] No fallback available — leaving the container in place and retrying it."
+                    docker start "$CONTAINER" 2>/dev/null \
+                        || docker compose -f "$COMPOSE_FILE" up -d 2>/dev/null \
+                        || echo "   ❌ [Emergency] Container could not be started. Manual intervention required."
                 fi
             fi
         fi
