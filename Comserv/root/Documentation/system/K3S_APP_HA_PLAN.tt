@@ -1,142 +1,261 @@
 [% META
-        title = "K3s 2-Node App HA  -  Kill the Manual OPNsense Cutover"
-   description = "Focused plan: run Comserv web-prod on a 2-node k3s cluster (.126 + .199) behind health-checked ingress, with the image registry on .199. Eliminates the manual OPNsense switch on .126 failure. DB HA deferred to a future step (currently .198 backup is stale)."
+        title = "Availability & Load Balancing Master Plan  -  Comserv2"
+   description = "THE single authoritative plan for Comserv2 availability, load balancing and container orchestration. Consolidates six fragmented docker/k3s/k8s/kubernetes plans into one reality-matched roadmap on the real bare-metal hosts (.126 / .199 / .20 / .198). Target: 99% site availability for all users, scaling up from today's single-container SPOF."
    roles = "admin,devops,developer"
    TemplateType = "Documentation"
-   category = "infrastructure,deployment,kubernetes,high-availability"
-   page_version = "0.01"
-   last_updated = "Tue Aug 04 2026"
+   category = "infrastructure,deployment,kubernetes,high-availability,load-balancing"
+   page_version = "1.00"
+   last_updated = "Fri Aug 07 2026"
    site_specific = "true"
    project_id = "202"
    project_code = "INFRA-HA"
 %]
 [%# ai-plan-sync created todo_ids: 1905,1906,1907,1908,1909,1910 under project_id=202 %]
 
-
 <nav style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.12); border: 1px solid var(--border-color);">
-  <a href="[% c.uri_for('/Documentation') %]" style="color: var(--link-color); text-decoration: none;">← Back to Documentation</a>
+  <a href="[% c.uri_for('/Documentation') %]" style="color: var(--link-color); text-decoration: none;">&larr; Back to Documentation</a>
   &nbsp;|&nbsp;
-  <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color); text-decoration: none;">📁 Tracked in project #202 (INFRA-HA)</a>
+  <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color); text-decoration: none;">&#128193; Tracked in project #202 (INFRA-HA)</a>
 </nav>
 
 <div class="container">
-    <h1 style="color: var(--text-color); font-family: var(--header-font);">K3s 2-Node App HA  -  Kill the Manual OPNsense Cutover</h1>
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Availability &amp; Load Balancing Master Plan</h1>
 
     <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-bottom: var(--spacing-medium);">
-        Version: 0.01 | Status: 📋 DRAFT FOR REVIEW | Scope: App-layer HA only. DB HA explicitly OUT OF SCOPE (future step).
+        Version: 1.00 | Status: &#128203; DRAFT FOR REVIEW | Scope: app HA + load balancing + DB HA. This document SUPERSEDES the fragmented plan set listed in &sect;10.
     </div>
 
-    <div style="background-color: var(--caution-bg, #fff3cd); border: 2px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px;">
-        <h3 style="margin-top: 0; color: #d84315;">⚠️ DRAFT  -  AWAITING APPROVAL</h3>
-        <p style="color: var(--text-color); margin: 5px 0;">No k3s install, no registry container, no OPNsense change occurs until this plan is approved. All remote-execution steps require explicit go-ahead with credentials handled by the user, not automated scripts.</p>
+    <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--caution-color); padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px;">
+        <h3 style="margin-top: 0; color: var(--warning-color);">&#9888;&#65039; DRAFT  -  AWAITING APPROVAL</h3>
+        <p style="color: var(--text-color); margin: 5px 0;">No k3s install, no registry container, no OPNsense change, and no database replication work occurs until this plan is approved. All remote-execution steps require explicit go-ahead; credentials are handled by the user, not automated scripts.</p>
     </div>
 
-    <h2>1. Problem Statement</h2>
-    <p>Today <strong>.126 (production1)</strong> is the only live Catalyst app. If it dies, failover to the standby container on <strong>.199 (workstation)</strong> is a <strong>manual OPNsense switch</strong>  -  a human must flip it. Two drivers for change:</p>
-    <ul>
-        <li><strong>Eliminate the manual cutover</strong>  -  auto-fail when .126 dies.</li>
-        <li><strong>Prove a real docker/k3s management system</strong>  -  replace the current "build on .199, push, manually switch" rig with orchestration that self-heals.</li>
-    </ul>
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#why" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">0. Why</a>
+                <a href="#goal" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">1. Goal</a>
+                <a href="#current" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">2. Current State</a>
+                <a href="#target" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3. Target</a>
+                <a href="#pushing" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">4. Deploy Flow</a>
+                <a href="#roadmap" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">5. Roadmap</a>
+                <a href="#shared-state" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">6. Shared State</a>
+                <a href="#maths" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">7. Availability Maths</a>
+                <a href="#spofs" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">8. Retained SPOFs</a>
+                <a href="#gates" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">9. Gates</a>
+                <a href="#consolidation" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">10. Consolidation</a>
+                <a href="#see-also" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">11. See Also</a>
+            </div>
+        </div>
+    </div>
 
-    <h2>2. Actual Current Topology (per 2026-08-04 inventory)</h2>
+    <!-- PROJECT TRACKING NAVIGATION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">Project Tracking</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);">This plan is tracked as project <strong>#202 (INFRA-HA)</strong>. Every phase in &sect;5 has a corresponding todo carrying that phase's gate.</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">&#128193; View Project #202 (INFRA-HA)</a> &mdash; all phases, status and gates</li>
+                    <li><a href="[% c.uri_for('/todo') %]?project_id=202" style="color: var(--link-color);">&#9989; View INFRA-HA Todo List</a> &mdash; phase todos 1905&ndash;1910</li>
+                    <li><a href="[% c.uri_for('/project') %]" style="color: var(--link-color);">&#128202; All Projects</a></li>
+                </ul>
+                <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                    <tr>
+                        <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Phase</th>
+                        <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Todo</th>
+                        <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Gate summary</th>
+                    </tr>
+                    <tr><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">A &mdash; Registry on .199</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1905" style="color: var(--link-color);">#1905</a></td><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Push from .199 pulls on .126</td></tr>
+                    <tr style="background-color: rgba(255,255,255,0.12);"><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">B &mdash; k3s install</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1906" style="color: var(--link-color);">#1906</a></td><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">2 nodes Ready; live container untouched</td></tr>
+                    <tr><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">C &mdash; Deployment manifest</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1907" style="color: var(--link-color);">#1907</a></td><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Both pods serve /health; no creds in layers</td></tr>
+                    <tr style="background-color: rgba(255,255,255,0.12);"><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">D &mdash; Cutover</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1908" style="color: var(--link-color);">#1908</a></td><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Ingress serves externally; rollback rehearsed</td></tr>
+                    <tr><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">E &mdash; Failover proof</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1909" style="color: var(--link-color);">#1909</a></td><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Drain .126, site stays up</td></tr>
+                    <tr style="background-color: rgba(255,255,255,0.12);"><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">F &mdash; DB HA (.198)</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1910" style="color: var(--link-color);">#1910</a></td><td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">.198 drift assessed; replica decision recorded</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <h2 id="why">0. Why this document exists</h2>
+    <p>Availability work was spread across <strong>six overlapping documents</strong> totalling roughly 530&nbsp;KB, most of which describe <em>hardware that is not in service</em>. That fragmentation was itself a reliability risk: it was not possible to answer "what are we actually doing?" without reading four contradictory roadmaps. This document is now the <strong>single source of truth</strong>. &sect;10 records exactly what was absorbed and what was retired, so nothing of value was silently dropped.</p>
+
+    <div style="background: rgba(255,255,255,0.08); border-left: 4px solid var(--link-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+        <p style="margin:0;"><strong>The single biggest source of confusion  -  now settled:</strong> the December 2025 plan set was written against a <strong>3-host Proxmox cluster</strong> (<code>proxmoxws</code> .11, <code>proxmox720</code> .12, <code>proxmoxt210</code> .3) and repeatedly names <strong>192.168.1.198</strong> as "the production database". <strong>Both statements are false today.</strong> Production runs on bare metal, and the primary database is <strong>192.168.1.20:3307</strong>. Following those docs would have migrated the wrong database on the wrong machines.</p>
+    </div>
+
+    <h2 id="goal">1. Goal</h2>
+    <p><strong>Deliver the site to all users 99% of the time</strong>, moving from a single fragile container to an upwardly scalable system, while making full use of hardware already owned.</p>
+    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);">99% availability = up to ~7h20m of downtime per month. That budget is consumed by <em>unplanned</em> outages; planned rolling deploys should cost zero once Phase D lands.</p>
+
+    <h2 id="current">2. Verified current state (probed 2026-08-07, not assumed)</h2>
     <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
-        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Host</th><th style="text-align:left; padding:6px;">Role</th><th style="text-align:left; padding:6px;">Docker?</th><th style="text-align:left; padding:6px;">HA relevance</th></tr>
-        <tr><td style="padding:6px;">.126 production1</td><td style="padding:6px;">Live Catalyst app (web-prod)</td><td style="padding:6px;">yes (Docker 29.x)</td><td style="padding:6px;"><strong>SPOF</strong>  -  failure needs manual cutover</td></tr>
-        <tr><td style="padding:6px;">.199 workstation</td><td style="padding:6px;">Builds + pushes image; runs same web-prod as dormant standby</td><td style="padding:6px;">yes (Docker 29.7.1)</td><td style="padding:6px;">Registry host + 2nd app node</td></tr>
-        <tr><td style="padding:6px;">.20</td><td style="padding:6px;">Primary DB (Ency MySQL)</td><td style="padding:6px;">no</td><td style="padding:6px;"><strong>SPOF</strong>  -  accepted for this step (future DB HA)</td></tr>
-        <tr><td style="padding:6px;">.198</td><td style="padding:6px;">Backup DB server</td><td style="padding:6px;">no docker (could add)</td><td style="padding:6px;">NOT kept current  -  drift unknown. Future DB-replica step, NOT this step.</td></tr>
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Host</th><th style="text-align:left; padding:6px;">Role today</th><th style="text-align:left; padding:6px;">Verified</th><th style="text-align:left; padding:6px;">HA relevance</th></tr>
+        <tr><td style="padding:6px;"><strong>.126</strong> production1</td><td style="padding:6px;">Live Catalyst app (<code>comserv2-web-prod</code>), nginx :80, app :5000</td><td style="padding:6px;">up; healthy</td><td style="padding:6px;"><strong>SPOF  -  the whole site</strong></td></tr>
+        <tr><td style="padding:6px;"><strong>.199</strong> workstation</td><td style="padding:6px;">Image build host; Ollama; dev workstation</td><td style="padding:6px;">up; Docker present</td><td style="padding:6px;">2nd app node + registry host</td></tr>
+        <tr><td style="padding:6px;"><strong>.20</strong> db-server-1</td><td style="padding:6px;"><strong>PRIMARY DB</strong>  -  MariaDB <code>ency</code>, port 3307, priority 1</td><td style="padding:6px;">port 3307 open</td><td style="padding:6px;"><strong>SPOF  -  hard outage if lost</strong></td></tr>
+        <tr><td style="padding:6px;"><strong>.198</strong></td><td style="padding:6px;">Backup DB server (MySQL/MariaDB on 3306)</td><td style="padding:6px;">up; 3306 open; <em>currency unverified</em></td><td style="padding:6px;">Least-used box  -  DB replica candidate</td></tr>
     </table>
-    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Doc drift note:</strong> Existing k3s docs (<code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code>, <code>DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</code>, <code>Phase0KubernetesReadinessPlan.tt</code>) describe a <em>3-host Proxmox cluster</em> (proxmoxws / proxmox720) and a MariaDB-on-k3s Galera migration. That does not match the bare-metal <code>.126/.199/.20/.198</code> reality above. Those docs are about <strong>DB HA</strong> and must be reconciled separately; this plan covers only <strong>app HA</strong> on the real hardware.</p>
+    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Standing constraint:</strong> <code>.20</code> is <strong>database-only</strong> by explicit decision  -  do not co-locate a registry, k3s node, or any other service on it. <strong>Unverified:</strong> .198 CPU/RAM/disk headroom and its Docker status could not be probed (different SSH credentials); Phase F.0 must establish these before committing it to a role.</p>
 
-    <h2>3. Target State</h2>
+    <h3>2b. What the 2026-08-07 outage proved</h3>
+    <p>A monitor-cron bug deleted the only production container and could not restore it; the site served an nginx default page for roughly 100 minutes. The script defects are fixed (commit <code>86e1dce6</code>, todo 1959), but the <strong>architectural</strong> lesson stands and is the whole justification for this plan: <strong>one container on one host means any single fault is a total outage.</strong> No amount of recovery-script hardening changes that.</p>
+
+    <h2 id="target">3. Target architecture</h2>
     <ul>
-        <li>k3s cluster: <strong>2 nodes</strong>  -  .126 (server+worker) and .199 (agent+worker). Control plane tolerates one node; app keeps serving if either dies.</li>
-        <li><strong>Image registry on .199</strong> (<code>registry:2</code> container, port 5000, HTTP/insecure). This is the build→deploy handoff, same as today's plan  -  k3s does NOT eliminate the push, it only automates the last mile.</li>
-        <li>Comserv web-prod deployed as a k3s <strong>Deployment</strong> (replicas=2) with a <strong>health-checked ingress/Service</strong>. .126 dies → kubelet reschedules; ingress stops routing to the dead pod. <strong>No OPNsense manual flip.</strong></li>
-        <li>Shared dependencies already present: <code>comserv2_redis_data</code>, <code>comserv2_sessions</code>, <code>comserv2_nfs_data</code> (sessions + uploads)  -  must be mounted into the pods (hostPath or NFS CSI), not container-local.</li>
+        <li><strong>k3s cluster, 2 nodes:</strong> .126 (server + worker) and .199 (agent + worker).</li>
+        <li><strong>Image registry on .199</strong> (<code>registry:2</code>, port 5000, insecure/HTTP on LAN). k3s does not remove the build&rarr;push step; it automates only the last mile.</li>
+        <li><strong>Deployment with replicas=2</strong> behind a health-checked Service/Ingress. A node or pod dying removes it from rotation automatically  -  <strong>no manual OPNsense flip</strong>.</li>
+        <li><strong>Load balancing:</strong> ingress spreads traffic across both pods, so the second node is <em>earning its keep</em> continuously rather than sitting dormant  -  this is the "maximum hardware use" requirement.</li>
+        <li><strong>Shared state must be external to the pod:</strong> <code>comserv2_sessions</code>, <code>comserv2_nfs_data</code>, redis. Two replicas with node-local sessions would log users out at random  -  see &sect;6.</li>
+        <li><strong>DB HA (Phase F):</strong> .198 promoted from stale backup to a real replica of .20, closing the last hard SPOF.</li>
     </ul>
 
-    <h2>4. Does k3s eliminate "pushing to production"?  -  No.</h2>
-    <p>The build→registry→deploy pipeline is unchanged. Only the last mile changes:</p>
+    <h2 id="pushing">4. Does k3s eliminate "pushing to production"?  -  No.</h2>
     <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
-        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Phase</th><th style="text-align:left; padding:6px;">Current</th><th style="text-align:left; padding:6px;">k3s</th></tr>
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Phase</th><th style="text-align:left; padding:6px;">Current</th><th style="text-align:left; padding:6px;">With k3s</th></tr>
         <tr><td style="padding:6px;">Build</td><td style="padding:6px;">.199</td><td style="padding:6px;">.199 (unchanged)</td></tr>
-        <tr><td style="padding:6px;">Push target</td><td style="padding:6px;">Docker Hub / LAN registry</td><td style="padding:6px;">LAN registry on .199 (unchanged)</td></tr>
-        <tr><td style="padding:6px;">Deploy to live</td><td style="padding:6px;">manual OPNsense → .199 container</td><td style="padding:6px;"><code>kubectl set image</code> → k3s rolls new tag onto both nodes</td></tr>
+        <tr><td style="padding:6px;">Push target</td><td style="padding:6px;">Docker Hub / LAN registry</td><td style="padding:6px;">LAN registry on .199</td></tr>
+        <tr><td style="padding:6px;">Deploy to live</td><td style="padding:6px;">manual OPNsense &rarr; .199 container</td><td style="padding:6px;"><code>kubectl set image</code> &rarr; rolling update across nodes</td></tr>
         <tr><td style="padding:6px;">Failover</td><td style="padding:6px;">human flips OPNsense</td><td style="padding:6px;">automatic (health check + reschedule)</td></tr>
+        <tr><td style="padding:6px;">Bad deploy</td><td style="padding:6px;">manual rollback / image retag</td><td style="padding:6px;"><code>kubectl rollout undo</code></td></tr>
     </table>
 
-    <h2>5. Implementation Phases (high level  -  each needs its own approved sub-step)</h2>
-    <h3>Phase A - Registry on .199 (prereq, already partly planned)</h3>
+    <h2 id="roadmap">5. Phased roadmap</h2>
+    <p>Each phase is a todo in project <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 (INFRA-HA)</a> and carries a GATE that must be demonstrated before the next phase starts.</p>
+
+    <h3>Phase A - Registry on .199</h3>
+    <p><strong>GATE:</strong> a test tag pushed from .199 pulls successfully on .126.</p>
     <ul>
-        <li>Stand up <code>registry:2</code> container on .199, port 5000, persistent volume.</li>
-        <li>Add <code>192.168.1.199:5000</code> (or <code>comserv-registry.lan</code>) to <code>insecure-registries</code> on BOTH .126 and .199 docker/k3s config.</li>
-        <li>Verify: <code>docker push</code> a test tag from .199, <code>docker pull</code> on .126.</li>
+        <li>Stand up <code>registry:2</code> on .199, port 5000, with a persistent volume.</li>
+        <li>Add <code>192.168.1.199:5000</code> to <code>insecure-registries</code> on BOTH .126 and .199.</li>
+        <li>Naming follows the system, not the feature: <code>comserv2_registry_data</code> for the volume.</li>
     </ul>
+
     <h3>Phase B - k3s install</h3>
+    <p><strong>GATE:</strong> <code>kubectl get nodes</code> shows both nodes Ready, and the existing compose container on .126 is still serving untouched.</p>
     <ul>
-        <li>Install k3s on .126 (server) and .199 (agent joined to .126).</li>
-        <li>Verify cluster: <code>kubectl get nodes</code> shows both Ready.</li>
-        <li><strong>Verify-before-execute:</strong> confirm .126 currently runs web-prod via compose; migration must not disrupt the live container until the Deployment is proven.</li>
+        <li>Install k3s server on .126; join .199 as an agent.</li>
+        <li><strong>Verify-before-execute:</strong> k3s must not disturb the live compose container until Phase D proves the Deployment.</li>
+        <li>Confirm k3s does not bind port 5000 (the app) or collide with the registry port on .199.</li>
     </ul>
+
     <h3>Phase C - App Deployment manifest</h3>
+    <p><strong>GATE:</strong> both pods Running and independently serving <code>/health</code>; no credential present in any image layer.</p>
     <ul>
-        <li>Write Deployment (replicas=2, image <code>&lt;registry&gt;/comserv-web-prod:&lt;sha&gt;</code>, pull policy IfNotPresent), Service (ClusterIP), and Ingress/LoadBalancer with health probe on <code>/</code> or a health route.</li>
-        <li>Mount shared volumes (redis/sessions/nfs) from existing docker volumes or NFS.</li>
-        <li>Pass DB creds via k8s Secret (sourced from existing <code>db_config.json</code>  -  do NOT bake into image; the IMGSEC work already excludes it from layers).</li>
+        <li>Deployment (replicas=2, image <code>&lt;registry&gt;/comserv-web-prod:&lt;sha&gt;</code>), Service (ClusterIP), Ingress with a health probe on <code>/health</code>.</li>
+        <li>Readiness probe must gate traffic; liveness probe must allow a <strong>60s+ start_period</strong>  -  the app genuinely needs ~90s to become healthy (measured 2026-08-07). Too short a probe recreates the exact kill-loop that caused the outage.</li>
+        <li>DB credentials via k8s Secret sourced from <code>db_config.json</code>  -  never baked into the image (IMGSEC).</li>
+        <li>Mount shared session/NFS/redis state (&sect;6).</li>
     </ul>
+
     <h3>Phase D - Cutover (zero-downtime intent)</h3>
+    <p><strong>GATE:</strong> external traffic served by the ingress with no user-visible change; rollback path rehearsed.</p>
     <ul>
-        <li>Bring Deployment up alongside (not replacing) the existing .126 compose container first; validate both serve.</li>
+        <li>Run the Deployment <em>alongside</em> the existing compose container; validate both serve identical responses.</li>
         <li>Switch the OPNsense / external entry to the k3s ingress.</li>
-        <li>Only after stable: retire the manual-switch compose standby on .199.</li>
+        <li>Retire the manual-switch compose standby only after a stable period.</li>
+        <li>Keep the compose path documented as an emergency escape hatch until Phase E passes.</li>
     </ul>
+
     <h3>Phase E - Failover proof</h3>
+    <p><strong>GATE:</strong> <code>kubectl drain</code> of .126 leaves the site fully serving from .199, demonstrated and recorded. This is the evidence that the manual cutover is dead.</p>
     <ul>
-        <li>Test: cordon/drain .126 → confirm ingress routes only to .199 pod, app stays up. This is the proof that replaces the manual cutover.</li>
+        <li>Drain .126 &rarr; confirm ingress routes only to the .199 pod; app stays up.</li>
+        <li>Repeat in the opposite direction (drain .199).</li>
+        <li>Pull the power/network on a node for an unplanned-failure test, not just a graceful drain.</li>
+        <li>Record measured recovery time; this is the first real input to the 99% budget.</li>
     </ul>
 
-    <h2>6. Known SPOFs retained (explicitly accepted this step)</h2>
+    <h3>Phase F - DB HA (.198 promoted to live replica)</h3>
+    <p><strong>GATE:</strong> .198 assessed against .20 for drift, and either promoted to a live replica (DB SPOF closed) or explicitly confirmed backup-only  -  decision recorded here.</p>
+    <p>Until this phase lands, <strong>the site cannot reach 99%</strong>: .20 is a single point of failure whose loss takes down both app nodes at once. App HA without DB HA caps real availability at the availability of one database server.</p>
     <ul>
-        <li><strong>DB .20</strong>  -  if it dies, neither app node serves. Accepted; DB HA is the future step.</li>
-        <li><strong>Registry on .199</strong>  -  if .199 dies, no new pushes/deploys (running pods keep serving). Acceptable; could add .198 later.</li>
-        <li><strong>k3s control plane on .126</strong>  -  single server node. For 2-node app HA this is acceptable; full HA control plane is future.</li>
+        <li><strong>F.0 Assess (probe, do not assume):</strong> .198 hardware headroom, Docker status, MariaDB/MySQL version parity with .20, and actual schema/row drift. Its SSH credentials differ from .126 and must be supplied by the user.</li>
+        <li><strong>F.1 Decide:</strong> MariaDB async replication (simpler, near-zero risk to .20) vs Galera synchronous cluster (stronger, heavier). <em>Recommendation: async replica first</em>  -  it closes most of the risk without endangering the working primary.</li>
+        <li><strong>F.2 Implement</strong> replication .20 &rarr; .198 with monitored lag.</li>
+        <li><strong>F.3 Failover procedure:</strong> documented and rehearsed promotion of .198. The app already supports prioritised DB failover via <code>db_config.json</code> priorities  -  wire .198 as priority 2 rather than inventing a new mechanism.</li>
     </ul>
 
-    <h2>7. Future Step  -  DB HA (tracked as Phase F todo)</h2>
-    <p>The existing <code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code> covers MariaDB Galera on .198. But reality check from 2026-08-04: <strong>.198 backup is NOT kept current  -  drift is unknown and may already be broken.</strong> Before any Galera/replica work, a standalone task must:</p>
+    <h2 id="shared-state">6. Shared state  -  the thing that breaks naive replica scaling</h2>
+    <p>Running two replicas is trivial; running two replicas <em>correctly</em> is not. Each item below is an outage or a support ticket if missed:</p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">State</th><th style="text-align:left; padding:6px;">Risk with 2 replicas</th><th style="text-align:left; padding:6px;">Resolution</th></tr>
+        <tr><td style="padding:6px;">Sessions (<code>comserv2_sessions</code>)</td><td style="padding:6px;">Node-local &rarr; users randomly logged out as they bounce between pods</td><td style="padding:6px;">Shared NFS volume or redis-backed sessions</td></tr>
+        <tr><td style="padding:6px;">Uploads (<code>comserv2_nfs_data</code>)</td><td style="padding:6px;">File uploaded to pod A is invisible on pod B</td><td style="padding:6px;">Existing NFS mount into both pods</td></tr>
+        <tr><td style="padding:6px;">Logs</td><td style="padding:6px;">Split across nodes; the 2026-08-07 diagnosis was crippled by lost container logs</td><td style="padding:6px;">Ship to the DB/system_log (already the audited path) rather than pod-local files</td></tr>
+        <tr><td style="padding:6px;">Cron / scheduled jobs</td><td style="padding:6px;"><strong>Double execution</strong>  -  two pods each firing the same job</td><td style="padding:6px;">k8s CronJob (single owner), never in-pod cron</td></tr>
+        <tr><td style="padding:6px;">Whisper / heavy tool volumes</td><td style="padding:6px;">Duplicated large caches on both nodes</td><td style="padding:6px;">Portable network tool-services, per existing standard</td></tr>
+    </table>
+
+    <h2 id="maths">7. Availability maths  -  what actually buys the 99%</h2>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Stage</th><th style="text-align:left; padding:6px;">Surviving faults</th><th style="text-align:left; padding:6px;">Still fatal</th></tr>
+        <tr><td style="padding:6px;">Today</td><td style="padding:6px;">none  -  container, host, or DB loss = outage</td><td style="padding:6px;">everything</td></tr>
+        <tr><td style="padding:6px;">After A-E</td><td style="padding:6px;">app crash, bad deploy, one app node down</td><td style="padding:6px;">DB .20, registry (deploys only), OPNsense</td></tr>
+        <tr><td style="padding:6px;">After F</td><td style="padding:6px;">+ database host loss</td><td style="padding:6px;">OPNsense / WAN entry, site-wide power</td></tr>
+    </table>
+    <p><strong>Honest conclusion:</strong> Phases A-E remove the <em>most frequent</em> causes of downtime (which is what actually bit us on 2026-08-07), but <strong>Phase F is required for a defensible 99% claim</strong>. The remaining single points after F  -  the OPNsense entry point and site power  -  should be acknowledged to clients rather than papered over.</p>
+
+    <h2 id="spofs">8. Explicitly retained SPOFs (accepted, with rationale)</h2>
     <ul>
-        <li>Assess .198 actual state vs .20 (schema + row drift).</li>
-        <li>Decide: repair .198 into a <strong>live replica</strong> (closes DB SPOF) vs. keep it file/sql backup only.</li>
-        <li>Only then reconcile with the existing Galera plan.</li>
+        <li><strong>Registry on .199</strong>  -  if .199 is lost, running pods keep serving; only new deploys stop. Acceptable.</li>
+        <li><strong>k3s control plane on .126</strong>  -  single server node. Workloads keep running if the control plane blips; a full HA control plane needs a third node and is out of scope.</li>
+        <li><strong>.199 is also the developer workstation</strong>  -  a genuine tension: production capacity shares a machine that gets rebooted for development. Revisit if it proves disruptive; a dedicated third node is the fix.</li>
+        <li><strong>OPNsense / WAN entry</strong>  -  unchanged by this plan.</li>
     </ul>
 
-    <h3>Phase F - Future: DB HA (.198 backup repair + live replica)</h3>
-    <p><strong>GATE:</strong> .198 assessed for drift and either promoted to a live replica (DB SPOF closed) or confirmed as file/sql backup only  -  decision recorded. This phase is intentionally deferred; app-HA (Phases A-E) ships first.</p>
+    <h2 id="gates">9. Gates / Definition of Done</h2>
     <ul>
-        <li>Assess .198 vs .20 (schema + row drift)  -  probe, do not assume.</li>
-        <li>Decide live replica vs backup-only; record the decision.</li>
-        <li>Reconcile with <code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code> (note: that doc describes Proxmox/Galera, not bare-metal .198  -  reconcile or retire).</li>
+        <li>[ ] Registry on .199 pushes from .199 and pulls on .126.</li>
+        <li>[ ] <code>kubectl get nodes</code> &rarr; 2 Ready.</li>
+        <li>[ ] Deployment replicas=2, both pods Running, sharing sessions/NFS/redis.</li>
+        <li>[ ] Probes tuned to the real ~90s startup; no restart kill-loop under load.</li>
+        <li>[ ] External entry hits the k3s ingress; app serves identically to before.</li>
+        <li>[ ] Drain .126 &rarr; site stays up on .199 (manual cutover eliminated).</li>
+        <li>[ ] Unplanned-failure test (hard node kill) passes, recovery time recorded.</li>
+        <li>[ ] No DB credential in image layers (IMGSEC verified).</li>
+        <li>[ ] .198 drift assessed; replica-vs-backup decision recorded.</li>
+        <li>[ ] Scheduled jobs run exactly once cluster-wide.</li>
     </ul>
+
+    <h2 id="consolidation">10. Consolidation record  -  what was absorbed, what was retired</h2>
+    <p>Nothing was deleted. Superseded documents are retained for history; their durable content is listed here so it is not lost.</p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Document</th><th style="text-align:left; padding:6px;">Disposition</th><th style="text-align:left; padding:6px;">What was kept</th></tr>
+        <tr><td style="padding:6px;"><code>K3S_APP_HA_PLAN.tt</code> (this file)</td><td style="padding:6px;"><strong>PROMOTED to master</strong></td><td style="padding:6px;">Whole 2-node bare-metal design; still the spine of &sect;3-&sect;5</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE" style="color: var(--link-color);">K3S_PRODUCTION_MIGRATION_GUIDE</a></td><td style="padding:6px;">SUPERSEDED (Dec 2025, Proxmox/Galera on .198)</td><td style="padding:6px;">Galera + replication mechanics and rollback steps &rarr; retargeted into Phase F</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" style="color: var(--link-color);">PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN</a></td><td style="padding:6px;">SUPERSEDED (Dec 2025, 3-host Proxmox)</td><td style="padding:6px;">Zero-downtime cutover discipline and rollback procedure &rarr; Phase D</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT" style="color: var(--link-color);">COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT</a></td><td style="padding:6px;">SUPERSEDED (Dec 2025, Proxmox VM layout)</td><td style="padding:6px;">Dual-DB sync strategy and priority-order thinking &rarr; Phase F.3</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="color: var(--link-color);">DOCKER_KUBERNETES_MIGRATION_STRATEGY</a></td><td style="padding:6px;">SUPERSEDED as a roadmap; useful as container reference</td><td style="padding:6px;">Container networking, healthcheck and DB-connectivity notes</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/Phase0KubernetesReadinessPlan" style="color: var(--link-color);">Phase0KubernetesReadinessPlan</a></td><td style="padding:6px;">PARTIALLY ABSORBED</td><td style="padding:6px;"><code>db_config.json</code> authority and secrets handling &rarr; Phase C</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/ImmutableImageDeployPlan" style="color: var(--link-color);">ImmutableImageDeployPlan</a></td><td style="padding:6px;">ACTIVE &mdash; complementary, not superseded</td><td style="padding:6px;">LAN registry, dirty-tree/version.json &mdash; prerequisite for Phase A</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/GatewayPlan" style="color: var(--link-color);">GatewayPlan</a></td><td style="padding:6px;">ACTIVE &mdash; complementary</td><td style="padding:6px;">OPNsense HAProxy + ACME termination &rarr; Phase D entry point</td></tr>
+        <tr><td style="padding:6px;"><a href="/Documentation/CREDENTIALS_AUDIT_AND_PLAN" style="color: var(--link-color);">CREDENTIALS_AUDIT_AND_PLAN</a> / IMGSEC (239)</td><td style="padding:6px;">ACTIVE &mdash; gates Phase C</td><td style="padding:6px;">No credentials in image layers</td></tr>
+    </table>
+    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Correction of record:</strong> every superseded document above refers to <strong>192.168.1.198</strong> as the production database and assumes a 3-host Proxmox cluster. Verified 2026-08-07: the primary database is <strong>192.168.1.20:3307</strong> (MariaDB <code>ency</code>, <code>db-server-1</code>, priority 1) and production is bare metal. Treat any surviving statement to the contrary in those files as obsolete.</p>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">11. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/ImmutableImageDeployPlan" style="color: var(--link-color);">Immutable Image Deploy Plan</a> &mdash; LAN registry, prerequisite for Phase A</li>
+                    <li><a href="/Documentation/GatewayPlan" style="color: var(--link-color);">Gateway Plan</a> &mdash; OPNsense HAProxy + ACME, Phase D entry point</li>
+                    <li><a href="/Documentation/CREDENTIALS_AUDIT_AND_PLAN" style="color: var(--link-color);">Credentials Audit &amp; Plan</a> &mdash; IMGSEC, gates Phase C</li>
+                    <li><a href="/Documentation/STANDARD" style="color: var(--link-color);">Documentation System Standard</a> &mdash; S1&ndash;S7 authoring rules</li>
+                    <li><a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">Project #202 (INFRA-HA)</a> &mdash; live phase tracking</li>
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a></li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
     <hr style="border-color: var(--border-color); margin: var(--spacing-large) 0;" />
-    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Doc currency:</strong> this plan is kept current as phases complete. Each phase todo in project <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 (INFRA-HA)</a> carries its gate; when a phase's deliverables land, the corresponding todo is closed here and this doc's section is marked done with the commit/evidence. Last reviewed: 2026-08-04.</p>
-
-    <h2>8. Gates / Definition of Done</h2>
-    <ul>
-        <li>[ ] Registry on .199 pushes + pulls from both nodes.</li>
-        <li>[ ] <code>kubectl get nodes</code> → 2 Ready.</li>
-        <li>[ ] Deployment replicas=2, both pods Running, share redis/sessions/nfs.</li>
-        <li>[ ] External entry hits k3s ingress; app serves identically to before.</li>
-        <li>[ ] Drain .126 → app stays up on .199 (manual cutover eliminated).</li>
-        <li>[ ] No DB credential in image layers (IMGSEC verified).</li>
-    </ul>
-
-    <h2>9. References</h2>
-    <ul>
-        <li><code>ImmutableImageDeployPlan.tt</code>  -  LAN registry + dirty-tree/version.json context (DockerDeploy.pm changes).</li>
-        <li><code>K3S_PRODUCTION_MIGRATION_GUIDE.tt</code>  -  DB-on-k3s Galera (future step; doc-reality drift noted).</li>
-        <li><code>DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</code>  -  broader strategy (references Proxmox cluster not matching bare-metal reality).</li>
-        <li><code>Phase0KubernetesReadinessPlan.tt</code>  -  K8s readiness (db_config.json authority).</li>
-    </ul>
+    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Doc currency:</strong> this plan is kept current as phases complete. Each phase todo in project <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 (INFRA-HA)</a> carries its gate; when a phase lands, its todo is closed and the section here is marked done with commit evidence. Last reviewed: 2026-08-07.</p>
 </div>
