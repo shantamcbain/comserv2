@@ -1,111 +1,281 @@
-# Comserv Authentication Evolution Plan
+[% META
+        title = "Authentication Evolution Plan  -  Comserv"
+   description = "Authoritative plan for Comserv authentication and credential architecture. Defines the session-compatibility contract templates depend on, and owns the credential-storage defect (per-table credentials in JSON files) that blocks automated container propagation. Tracked as project 243 (AUTH-EVO) under 201 SECURITY."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "security,authentication,credentials,architecture"
+   page_version = "2.00"
+   last_updated = "Fri Aug 07 2026"
+   site_specific = "false"
+   project_id = "243"
+   project_code = "AUTH-EVO"
+%]
+[% PageVersion = 'Documentation/AuthenticationEvolutionPlan.tt,v 2.00 2026/08/07 hermes-agent Exp shanta - Converted raw markdown to template-compliant .tt (RULE P3); linked project 243 (RULE P1); added AUTH-R1..R4 dependency register and routine re-audit (RULE P2)' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-**File:** `/Comserv/root/Documentation/authentication_evolution_plan.md`  
-**Version:** 1.0  
-**Last Updated:** January 2025  
-**Status:** ACTIVE - DO NOT CHANGE WITHOUT EXPLICIT PERMISSION
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Authentication Evolution Plan</h1>
 
-## Overview
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-08-07 |
+        Version: 2.00 |
+        Project: <a href="[% c.uri_for('/project/details') %]?project_id=243" style="color: var(--link-color);">#243 (AUTH-EVO)</a> |
+        Status: ACTIVE
+    </div>
 
-This document defines the authentication evolution strategy for Comserv to maintain session-to-session consistency and prevent AI from constantly reinventing the authentication approach.
+    <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
+        <strong style="color: var(--warning-color);">ACTIVE &mdash; DO NOT CHANGE WITHOUT EXPLICIT PERMISSION.</strong>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0 0 0;">This document exists to stop the authentication approach being reinvented every session. Any change to authentication strategy must update this document <em>and</em> get explicit approval. Other plans (notably <a href="/Documentation/K3S_APP_HA_PLAN" style="color: var(--link-color);">the Availability &amp; Load Balancing Master Plan</a>) may <strong>raise requirements</strong> here, but must not redesign authentication themselves.</p>
+    </div>
 
-## Current State
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">1. Overview</a>
+                <a href="#current-state" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">2. Current State</a>
+                <a href="#root-defect" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3. Root Defect</a>
+                <a href="#credential-sources" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">4. Credential Sources</a>
+                <a href="#phases" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">5. Evolution Phases</a>
+                <a href="#requirements" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">6. Requirements Raised</a>
+                <a href="#rules" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">7. Implementation Rules</a>
+                <a href="#project-tracking" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Project Tracking</a>
+                <a href="#see-also" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
 
-**Problem:** Authentication broke in menu system branch due to AI introducing Catalyst authentication framework while templates expect simple session-based auth.
+    <!-- 1. OVERVIEW -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This document defines the authentication and credential strategy for Comserv, to maintain session-to-session consistency and prevent the approach being reinvented. It covers two related concerns: <strong>how users authenticate</strong> (sessions, roles, templates) and <strong>where service credentials live</strong> (database, SSH, registry, API tokens).</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Scope boundary: this plan <em>owns</em> the authentication and credential architecture. Infrastructure plans consume it and may raise requirements against it (&sect;6), but must not implement authentication changes themselves.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-**Root Cause:** Templates (.tt files) are the application documentation and expect:
-- `c.session.username`
-- `c.session.roles` 
-- Simple session checks
+    <!-- 2. CURRENT STATE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="current-state" style="color: var(--text-color); font-family: var(--header-font);">2. Current State</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> authentication broke in the menu system branch when the Catalyst authentication framework was introduced while templates expected simple session-based auth.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Root cause:</strong> templates (<code>.tt</code> files) are the application documentation, and they expect:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>c.session.username</code></li>
+                <li><code>c.session.roles</code> (as an array)</li>
+                <li>Simple session checks</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This session contract is <strong>binding</strong>: any authentication change must continue to populate it, or templates break site-wide.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-Current code implements complex Catalyst framework with DBEncy model that templates don't support.
+    <!-- 3. ROOT DEFECT -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="root-defect" style="color: var(--text-color); font-family: var(--header-font);">3. The root credential defect</h2>
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--caution-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;">The credential problem was created <strong>at the very beginning of the process</strong>: the assumption that <strong>each table needed its own credential</strong>, and that those credentials belonged in JSON files.</p>
+            </div>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Consequences that are now blocking other work:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Secrets multiply per node and per rotation, so credential handling does not scale to multiple hosts.</li>
+                <li>Automated container propagation is impossible if a human must hand-place credential files on each node.</li>
+                <li>Observed 2026-08-07: <code>~/.comserv/secrets/dbi/</code> holds <strong>16 connection files</strong>, several stale (<code>backup_*</code>, <code>zerotier_*</code>, <code>sqlite_*</code>). These must be audited, not lifted wholesale into a new store.</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-## Evolution Phases
+    <!-- 4. CREDENTIAL SOURCES -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="credential-sources" style="color: var(--text-color); font-family: var(--header-font);">4. Credential sources as implemented today</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Verified 2026-08-07 by reading <code>lib/Comserv/Model/RemoteDB.pm</code> <code>_load_config()</code>. It tries sources in order and stops at the first that yields config:</p>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Order</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Source</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Mechanism</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Status in code</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">1</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Mounted secret files</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>_load_from_k8s_secrets()</code> scans <code>&lt;base&gt;/dbi/*.json</code> across six paths, including <code>~/.comserv/secrets</code> and <code>/var/run/secrets/comserv/</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Preferred</td>
+                </tr>
+                <tr style="background-color: rgba(255,255,255,0.12);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Environment variables</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>COMSERV_DB_&lt;CONN&gt;_&lt;FIELD&gt;</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Supported fallback</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>db_config.json</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>_find_db_config_file()</code>, six search paths</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>DEPRECATED</strong> &mdash; the code logs "MIGRATE TO K8S SECRETS"</td>
+                </tr>
+            </table>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The mechanism therefore already exists and already expresses a preference. The real problem is that <strong>all three are live at once</strong>, so nobody can say which source a given host is actually using. Deciding the end state is this project's work &mdash; not the infrastructure plan's.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-### Phase 1: Menu System Branch (CURRENT)
-**Goal:** Fix authentication to continue menu development  
-**Approach:** Hybrid compatibility layer  
-**Implementation:**
-- Keep Catalyst authentication framework in controller
-- Populate session variables for template compatibility
-- Document as "transition architecture"
+    <!-- 5. PHASES -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phases" style="color: var(--text-color); font-family: var(--header-font);">5. Evolution phases</h2>
 
-**Code Pattern:**
-```perl
-# In User.pm controller after successful $c->authenticate()
-$c->session->{username} = $user->username;
-$c->session->{user_id}  = $user->id;
-$c->session->{roles}    = $user->roles; # properly formatted array
-```
+            <h3 id="phase-1" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.1 Phase 1 &mdash; Menu system branch (CURRENT)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Goal:</strong> fix authentication so menu development can continue. <strong>Approach:</strong> hybrid compatibility layer.</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Keep the Catalyst authentication framework in the controller.</li>
+                <li>Populate session variables for template compatibility.</li>
+                <li>Document as "transition architecture".</li>
+            </ul>
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); border-radius: 4px; margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># In User.pm controller after successful $c-&gt;authenticate()
+$c-&gt;session-&gt;{username} = $user-&gt;username;
+$c-&gt;session-&gt;{user_id}  = $user-&gt;id;
+$c-&gt;session-&gt;{roles}    = $user-&gt;roles; # properly formatted array</code></pre>
+            </div>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Files to modify:</strong> <code>Comserv/lib/Comserv/Controller/User.pm</code> only. <strong>Templates:</strong> NO CHANGES.</p>
 
-**Files to modify:** `Comserv/lib/Comserv/Controller/User.pm` only  
-**Templates:** NO CHANGES - continue using session variables
+            <h3 id="phase-2" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.2 Phase 2 &mdash; Security branch (FUTURE)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Goal:</strong> complete modern authentication system, with full Catalyst auth and template migration. Scope: a dedicated branch.</p>
 
-### Phase 2: Security Branch (FUTURE)
-**Goal:** Complete modern authentication system  
-**Approach:** Full Catalyst auth with template migration  
-**Scope:** New branch dedicated to authentication improvements
+            <h3 id="phase-3" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.3 Phase 3 &mdash; Credential consolidation (NEW, 2026-08-07)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Added because infrastructure work is now blocked by the credential design. Retires the per-table credential assumption (&sect;3), settles the source-of-truth question (&sect;4), and extends the policy to non-DB credentials (SSH, registry, API tokens). Tracked as <a href="[% c.uri_for('/todo') %]?project_id=243" style="color: var(--link-color);">todos under project #243</a>.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-## Implementation Rules
+    <!-- 6. REQUIREMENTS RAISED -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="requirements" style="color: var(--text-color); font-family: var(--header-font);">6. Requirements raised by other plans</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Other plans state what they need from authentication and raise a todo here. They do <strong>not</strong> implement the change themselves. A requirement below may <strong>block</strong> the raising plan, and that is the correct outcome &mdash; better than two plans redesigning the same subsystem in different directions.</p>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Req</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Requirement</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Todo</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Blocks</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">AUTH-R1</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Credentials must reach a pod without hand-placing files on each node</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1965" style="color: var(--link-color);">#1965</a></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFRA-HA Phase C / G</td>
+                </tr>
+                <tr style="background-color: rgba(255,255,255,0.12);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">AUTH-R2</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Sessions valid across BOTH app replicas</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1966" style="color: var(--link-color);">#1966</a></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFRA-HA Phase D</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">AUTH-R3</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">One credential set per <em>connection</em>, not per table</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1967" style="color: var(--link-color);">#1967</a></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFRA-HA Phase G</td>
+                </tr>
+                <tr style="background-color: rgba(255,255,255,0.12);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">AUTH-R4</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Managed credentials for .198 and any new node</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/todo/details') %]?record_id=1968" style="color: var(--link-color);">#1968</a></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFRA-HA Phase F &mdash; <strong>already blocking</strong></td>
+                </tr>
+            </table>
+            <p style="color: var(--text-color); font-family: var(--body-font);">AUTH-R4 is not hypothetical: on 2026-08-07 the .198 replica assessment could not be performed because its SSH credentials differ from .126 and are held in no managed store.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-### For AI Sessions:
-1. **READ THIS DOCUMENT FIRST** before making any authentication changes
-2. **Phase 1 ONLY** - implement compatibility layer, DO NOT change templates
-3. **NO DBEncy references** - use existing working database models
-4. **ASK PERMISSION** before changing authentication approach
-5. **UPDATE THIS DOCUMENT** when making approved changes
+    <!-- 7. RULES -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="rules" style="color: var(--text-color); font-family: var(--header-font);">7. Implementation rules</h2>
+            <h3 id="rules-ai" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.1 For AI sessions</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>READ THIS DOCUMENT FIRST</strong> before making any authentication change.</li>
+                <li><strong>Phase 1 only</strong> &mdash; implement the compatibility layer; do NOT change templates.</li>
+                <li><strong>No DBEncy references</strong> &mdash; use the existing working database models.</li>
+                <li><strong>ASK PERMISSION</strong> before changing the authentication approach.</li>
+                <li><strong>UPDATE THIS DOCUMENT</strong> when making approved changes.</li>
+                <li><strong>Do not solve auth inside another plan.</strong> Raise a requirement here (&sect;6) instead.</li>
+            </ol>
+            <h3 id="rules-dev" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.2 For developers</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>The authentication approach is documented here; changes require updating this document.</li>
+                <li>Templates are documentation &mdash; changing them requires the Phase 2 branch.</li>
+                <li>Controllers must use existing database models, populate session variables, and keep template compatibility.</li>
+            </ul>
+            <h3 id="success" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.3 Phase 1 success criteria</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Login works with username/password</li>
+                <li>Session variables populated correctly</li>
+                <li>Templates display user info properly</li>
+                <li>Role-based access works</li>
+                <li>Logout clears session appropriately</li>
+                <li>Menu system development can continue</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-### For Developers:
-1. Authentication approach is documented here
-2. Changes require updating this document
-3. Templates are documentation - changing them requires Phase 2 branch
+    <!-- PROJECT TRACKING (RULE P1) -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" style="color: var(--text-color); font-family: var(--header-font);">Project Tracking</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Owning project: <a href="[% c.uri_for('/project/details') %]?project_id=243" style="color: var(--link-color);">#243 (AUTH-EVO) Authentication &amp; Credential Architecture</a>
+                &mdash; sub-project of <a href="[% c.uri_for('/project/details') %]?project_id=201" style="color: var(--link-color);">#201 SECURITY</a>,
+                sibling of <a href="[% c.uri_for('/project/details') %]?project_id=239" style="color: var(--link-color);">#239 IMGSEC</a> (credentials leaking into image layers).
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><a href="[% c.uri_for('/todo') %]?project_id=243" style="color: var(--link-color);">All AUTH-EVO todos</a></li>
+                <li>Consumed by <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 INFRA-HA</a> &mdash; see &sect;6 for what it needs and what it blocks</li>
+                <li>Routine re-audit: <a href="[% c.uri_for('/todo/details') %]?record_id=1970" style="color: var(--link-color);">#1970</a> (quarterly) &mdash; stops this plan going stale</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-## Current Implementation Requirements
+    <!-- SEE ALSO -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/K3S_APP_HA_PLAN" style="color: var(--link-color);">Availability &amp; Load Balancing Master Plan</a> &mdash; raises AUTH-R1&ndash;R4</li>
+                    <li><a href="/Documentation/Server_Room_IP_Registry" style="color: var(--link-color);">Server Room IP Registry</a> &mdash; host inventory (.198 credential gap)</li>
+                    <li><a href="/Documentation/DocumentationTtTemplate" style="color: var(--link-color);">Documentation TT Template</a> &mdash; RULE P1/P2/P3 authoring standard</li>
+                    <li><a href="/Documentation/CREDENTIALS_AUDIT_AND_PLAN" style="color: var(--link-color);">Credentials Audit and Plan</a></li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">&uarr; Back to Top</a></p>
+        </div>
+    </div>
 
-### Controller Must:
-- Use existing database models (not DBEncy)
-- Populate session variables after authentication
-- Maintain backward compatibility with templates
-- Handle login/logout/register endpoints
-
-### Templates Expect:
-- `c.session.username` for user identification
-- `c.session.roles` as array for role checking
-- Standard session-based patterns
-
-### Database:
-- Use existing user table structure
-- No DBEncy model references
-- Standard password hashing
-
-## Success Criteria Phase 1
-
-- [ ] Login works with username/password
-- [ ] Session variables populated correctly  
-- [ ] Templates display user info properly
-- [ ] Role-based access works
-- [ ] Logout clears session appropriately
-- [ ] Menu system development can continue
-
-## Evolution Guidelines Updates
-
-Add to `/Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.md`:
-
-```markdown
-## Authentication System
-
-Authentication approach is defined in `authentication_evolution_plan.md`.
-- Current phase: Phase 1 (compatibility layer)
-- DO NOT change authentication approach without reading the plan
-- DO NOT modify templates for authentication in current phase
-- ASK PERMISSION before changing documented authentication strategy
-```
-
-## Change Log
-
-- 2025-01-XX: Initial plan created to address session consistency issues
-- [Future changes go here]
-
----
-
-**IMPORTANT:** This document exists to prevent AI from constantly changing authentication approaches. Any changes to authentication strategy must update this document and get explicit approval.
+    <!-- CHANGE LOG -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Change log</strong></p>
+                <ul>
+                    <li>2025-01: Initial plan created to address session consistency issues.</li>
+                    <li>2026-08-07 (v2.00): Converted from raw markdown to a template-compliant <code>.tt</code> (RULE P3). Linked to project #243 (RULE P1) and added a quarterly re-audit todo (RULE P2). Added &sect;3 root credential defect, &sect;4 verified credential sources, &sect;6 AUTH-R1&ndash;R4 requirements register, and Phase 3. Removed two references to <code>authentication_evolution_plan.md</code>, a file verified not to exist.</li>
+                </ul>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

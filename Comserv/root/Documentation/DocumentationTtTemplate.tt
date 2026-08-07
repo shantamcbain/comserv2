@@ -4,12 +4,12 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "templates"
-   page_version = "0.07"
-   last_updated = "Tue Apr 22 2026"
+   page_version = "0.09"
+   last_updated = "Fri Aug 07 2026"
    site_specific = "false"
 %]
 # all links must be Documentation/DocumentationTemplate format
-[% PageVersion = 'Documentation/DocumentationTtTemplate.tt,v 0.08 2026/06/13 shanta Exp shanta - Theme opportunistic checklist ref' %]
+[% PageVersion = 'Documentation/DocumentationTtTemplate.tt,v 0.09 2026/08/07 hermes-agent Exp shanta - Added P1 plan-must-link-to-project, P2 routine-update todo, P3 .tt-only (no .md); added Project Tracking section' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -22,6 +22,39 @@
   title/description/page_version/last_updated fields here stay as-is.
 %]
 [%#
+  RULE P1 — A PLAN MUST BE LINKED TO A PROJECT (added v0.09).
+  Any document that is a PLAN (roadmap, migration, phased work, "we will build X")
+  MUST carry project_id + project_code in its META block and MUST render a
+  "Project Tracking" section linking the project and its todos.
+  A plan with no project is untrackable: the work is invisible to the planning
+  system, nothing can be assigned, and the doc silently goes stale.
+  - No suitable project? CREATE one — top-level, or a sub-project via
+    Project.parent_id (POST /api/project/create accepts parent_id).
+  - Phases are SUB-PROJECTS, not single todos. "Install k3s" is not one unit of
+    work. Each phase = sub-project + small todos that finish in one sitting.
+  - Do not invent numbers: GET /api/projects and /api/todos and use real ids.
+
+  RULE P2 — EVERY PLAN NEEDS A ROUTINE-UPDATE TODO (added v0.09).
+  Reference/inventory/registry docs go stale silently and then poison every plan
+  built on them. (Real case: Server_Room_IP_Registry.tt sat untouched for months
+  naming a host as the production DB that never was one — four migration plans
+  inherited the error.) Each such doc needs a RECURRING re-audit todo in its
+  owning project.
+  NOTE (verified 2026-08-07): Todo.pm has is_recurring + recurrence_rule, but the
+  /api/todo whitelist in Api.pm does NOT include them — the API silently drops
+  both. Set recurrence in the Todo UI, or extend @allowed.
+
+  RULE P3 — .tt ONLY, NOT .md (added v0.09).
+  AI-facing docs moved to .tt only. .md is no longer produced for AI reference,
+  because "Chat with AI" / HelpDesk serves documentation through the rendered
+  .tt route. A .md file is invisible to that path.
+  - New plan/reference doc → .tt with a META block. Do NOT create a companion .md.
+  - Converting a .md? Do not paste raw markdown into a .tt and stop — that is not
+    a template. It needs the META block and the container/row/col structure below,
+    or it renders unstyled and carries no metadata for the indexer.
+  - Remove references to .md files that no longer exist.
+%]
+[%#
   TWO THEME GOALS (do not conflate):
   A) Author a theme → static/config/theme_definitions.json (see /Documentation/CssThemes)
   B) Template compliance → this checklist (fix opportunistically when editing .tt files)
@@ -32,6 +65,8 @@
   2. Doc links: /Documentation/FILENAME (no subdirs, no .tt)
   3. has-bg-image: rgba(255,255,255,0.12) sections, 0.88 for small readable cards only
   4. Fix the file/section you touch; do not repo-wide sweep unless asked
+  5. PLANS ONLY: META has project_id + project_code, and a Project Tracking section exists (RULE P1)
+  6. PLANS/REFERENCE ONLY: a recurring re-audit todo exists in the owning project (RULE P2)
 %]
 
 <div class="container">
@@ -57,6 +92,7 @@
                 <a href="#advanced" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Advanced Usage</a>
                 <a href="#troubleshooting" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Troubleshooting</a>
                 <a href="#config-ref" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Configuration</a>
+                <a href="#project-tracking" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Project Tracking</a>
                 <a href="#see-also" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">See Also</a>
             </div>
         </div>
@@ -189,6 +225,40 @@ example_command --parameter value
                 </tr>
             </table>
 
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PROJECT TRACKING SECTION (RULE P1 — REQUIRED FOR PLAN DOCUMENTS) -->
+    <!-- Delete this whole block for non-plan reference pages. For a PLAN it is mandatory:
+         META must also carry project_id and project_code. Use REAL ids from
+         GET /api/projects and GET /api/todos — never invent numbers. -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" style="color: var(--text-color); font-family: var(--header-font);">Project Tracking</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Owning project:
+                <a href="/project/details?project_id=NNN" style="color: var(--link-color);">#NNN (PROJECT-CODE)</a>
+                &mdash; parent: <a href="/project/details?project_id=PPP" style="color: var(--link-color);">#PPP</a>.
+                Each phase below is a <strong>sub-project</strong>, not a single todo.
+            </p>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Phase / Sub-project</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Tracking item</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Gate / Done when</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Phase A &mdash; short name</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="/todo/details?record_id=NNNN" style="color: var(--link-color);">todo NNNN</a></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Demonstrable condition, not "looks done"</td>
+                </tr>
+                <tr style="background-color: rgba(255,255,255,0.12);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ROUTINE re-audit (RULE P2)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="/todo/details?record_id=NNNN" style="color: var(--link-color);">todo NNNN</a> (recurring)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Keeps this doc from going stale</td>
+                </tr>
+            </table>
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
         </div>
     </div>
