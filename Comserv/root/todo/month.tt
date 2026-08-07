@@ -32,7 +32,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/themes/themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
-<link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
+<link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css?v=20260806b">
 <script src="/static/js/todo_drag_drop.js"></script>
 
 <style>
@@ -585,33 +585,19 @@ function monthApplyFilters() {
                         <div class="overdue-section" style="border-top: 2px solid #ff4444; padding-top: 5px; margin-top: 5px;">
                             <div style="color: #ff4444; font-weight: bold; font-size: 0.8em; margin-bottom: 3px;">⚠️ Overdue</div>
                             [% FOREACH todo IN all_overdue_todos %]
-                                <div class="todo-item todo-item-month todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% todo.start_date || todo.due_date %]" title="[% todo.description %]" draggable="true" style="background-color: #ffe6e6;">
-                                    <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                        <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                        <input type="hidden" name="return_to" value="">
-                                        <button type="submit" style="background:none; border:none; padding:0; color:inherit; text-decoration:none; cursor:pointer; text-align:left; width:100%; overflow:hidden; text-overflow:ellipsis; font-size: 0.9em;">
-                                            <span class="drag-handle-month" title="Drag to reschedule">⋮⋮</span>
-                                            [% IF todo.time_of_day %]<span style="font-weight: bold;">[% todo.time_of_day.substr(0, 5) %]</span> [% END %]
-                                            <span class="todo-subject-shared">[% todo.subject %]</span>
-                                        </button>
-                                    </form>
-                                </div>
+                                [% SET tcard_wrap_mo = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ (todo.start_date || todo.due_date) _ "' data-is-recurring='0' draggable='true'" %]
+                                [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_is_overdue=1 tc_stale_days=999 tc_calendar=1
+                                    tc_drag_class='todo-item-month todo-item-shared'
+                                    tc_wrapper_extra=tcard_wrap_mo %]
                             [% END %]
                         </div>
                     [% END %]
                     [% IF cell.todos.size > 0 %]
                         [% FOREACH todo IN cell.todos %]
-                            <div class="todo-item todo-item-month todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% cell.date %]" title="[% todo.description %]" draggable="true">
-                                <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                    <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                    <input type="hidden" name="return_to" value="">
-                                    <button type="submit" style="background:none; border:none; padding:0; color:inherit; text-decoration:none; cursor:pointer; text-align:left; width:100%; overflow:hidden; text-overflow:ellipsis; font-size: 0.9em;">
-                                        <span class="drag-handle-month" title="Drag to reschedule">⋮⋮</span>
-                                        [% IF todo.time_of_day %]<span style="font-weight: bold;">[% todo.time_of_day.substr(0, 5) %]</span> [% END %]
-                                        <span class="todo-subject-shared">[% todo.subject %]</span>
-                                    </button>
-                                </form>
-                            </div>
+                            [% SET tcard_wrap_m = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ cell.date _ "' data-is-recurring='0' draggable='true'" %]
+                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_calendar=1
+                                tc_drag_class='todo-item-month todo-item-shared'
+                                tc_wrapper_extra=tcard_wrap_m %]
                         [% END %]
                     [% END %]
                 </div>

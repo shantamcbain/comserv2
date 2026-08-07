@@ -89,7 +89,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/themes/themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
-<link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
+<link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css?v=20260806b">
 <script src="/static/js/todo_drag_drop.js"></script>
 [% END %]
 
@@ -684,46 +684,6 @@ function markDoneCalendar(btn, recordId) {
     }).catch(function(e){ alert('Error: ' + e); });
 }
 
-function markDoneGcal(btn, recordId) {
-    doneWithNotesGcal(btn, recordId);
-}
-
-function doneWithNotesGcal(btn, recordId) {
-    _gcalNotesModal(
-        'Mark Done — What was accomplished?',
-        'Briefly describe what was done (optional)…',
-        function(notes) {
-            btn.disabled = true;
-            fetch('/todo/done_with_log', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ record_id: recordId, notes: notes })
-            }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d.ok) {
-                    var ev = btn.closest('.gcal-ev');
-                    if (ev) {
-                        ev.classList.add('is-done');
-                        var title = ev.querySelector('.gcal-ev-title');
-                        if (title && !title.textContent.trim().startsWith('✓')) {
-                            title.textContent = '✓ ' + title.textContent.trim();
-                        }
-                    }
-                    if (typeof _rescheduleAndReload === 'function') {
-                        _rescheduleAndReload();
-                    } else {
-                        fetch('/todo/reschedule', { method: 'POST', credentials: 'same-origin' })
-                            .finally(function() { window.location.reload(); });
-                    }
-                } else {
-                    btn.disabled = false;
-                    alert('Could not mark done: ' + (d.error || 'unknown'));
-                }
-            }).catch(function(e) { btn.disabled = false; alert('Error: ' + e); });
-        }
-    );
-}
-
 function _gcalNotesModal(title, placeholder, onConfirm, onCancel) {
     var modal = document.getElementById('gcal-notes-modal');
     var titleEl = document.getElementById('gcal-notes-modal-title');
@@ -773,96 +733,6 @@ function _gcalShowClipboardFallback(text) {
     }
     confirmBtn.addEventListener('click', close);
     cancelBtn.addEventListener('click', close);
-}
-
-function startWorkGcal(btn, recordId) {
-    btn.disabled = true;
-    var origText = btn.textContent.trim();
-    btn.textContent = '…';
-    fetch('/todo/open_log', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record_id: recordId })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.ok) {
-            btn.textContent = '⏸ Active';
-            btn.classList.add('gcal-ev-btn-active');
-            btn.title = 'Log is open — click to close log with notes (todo stays open)';
-            btn.onclick = function() { closeLogWithNotesGcal(btn, recordId); };
-            btn.disabled = false;
-            var ev = btn.closest('.gcal-ev');
-            if (ev) {
-                ev.style.outline = '2px solid #fd7e14';
-                var popup = ev.querySelector('.todo-popup .btn-start');
-                if (popup) {
-                    popup.textContent = '⏸ Active';
-                    popup.style.background = '#fd7e14';
-                    popup.style.borderColor = '#fd7e14';
-                    popup.title = 'Log is open — click to close log with notes (todo stays open)';
-                    popup.onclick = function() { closeLogWithNotesGcal(popup, recordId); };
-                }
-            }
-            if (!d.already_open) {
-                var subject = btn.getAttribute('data-subject') || '';
-                var desc    = btn.getAttribute('data-desc') || '';
-                var site    = btn.getAttribute('data-site') || '';
-                var project = btn.getAttribute('data-project') || '';
-                var clip = 'TODO: ' + subject + '\nSite: ' + site + '\nProject: ' + project + (desc ? '\n\n' + desc : '');
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(clip).catch(function() {
-                        _gcalShowClipboardFallback(clip);
-                    });
-                } else {
-                    _gcalShowClipboardFallback(clip);
-                }
-            }
-        } else {
-            btn.disabled = false;
-            btn.textContent = origText;
-            if (d.error && d.error.indexOf('already open') !== -1) {
-                btn.textContent = '⏸ Active';
-                btn.classList.add('gcal-ev-btn-active');
-                btn.title = 'Log is open — click to close log with notes (todo stays open)';
-                btn.onclick = function() { closeLogWithNotesGcal(btn, recordId); };
-            } else {
-                alert('Could not start: ' + (d.error || 'unknown error'));
-            }
-        }
-    }).catch(function(e) {
-        btn.disabled = false;
-        btn.textContent = origText;
-        alert('Error: ' + e);
-    });
-}
-
-function closeLogWithNotesGcal(btn, recordId) {
-    _gcalNotesModal(
-        'Close Log — What did you do?',
-        'Brief notes on what was accomplished (optional)…',
-        function(notes) {
-            btn.disabled = true;
-            fetch('/todo/close_log', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ record_id: recordId, notes: notes })
-            }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d.ok) {
-                    btn.textContent = '▶ Start';
-                    btn.classList.remove('gcal-ev-btn-active');
-                    btn.title = 'Start working on this todo — creates a log entry and copies details to clipboard';
-                    btn.onclick = function() { startWorkGcal(btn, recordId); };
-                    btn.disabled = false;
-                    var ev = btn.closest('.gcal-ev');
-                    if (ev) ev.style.outline = '';
-                } else {
-                    btn.disabled = false;
-                    alert('Could not close log: ' + (d.error || 'unknown'));
-                }
-            }).catch(function(e) { btn.disabled = false; alert('Error: ' + e); });
-        }
-    );
 }
 
 function closeLogTodoCard(btn, recordId) {
@@ -1673,59 +1543,10 @@ document.addEventListener('DOMContentLoaded', function() {
         </summary>
         <div class="priority-content">
             [% FOREACH todo IN overdue_todos %]
-                <div class="todo-item-day todo-item-shared overdue priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% todo.start_date || todo.due_date %]" draggable="true">
-                    <div style="display: flex; align-items: flex-start; gap: 5px;">
-                        <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
-                        <div style="flex: 1;">
-                            <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
-                            <div class="todo-details todo-details-shared">
-                                <span class="status-[% todo.status %]">Overdue</span>
-                                [% IF todo.project_id %]<span>📁 [% proj_name_map.${todo.project_id} || todo.project_id %]</span>[% END %]
-                                [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
-                                [% IF todo.time_of_day %]<span>Time: [% todo.time_of_day.substr(0, 5) %]</span>[% END %]
-                                <span>Priority: [% todo.priority %]</span>
-                            </div>
-                            <div class="todo-actions todo-actions-shared">
-                                <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                    <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                    <input type="hidden" name="return_to" value="">
-                                    <button type="submit" class="btn">Details</button>
-                                </form>
-                                <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;">
-                                    <button type="submit" class="btn">Edit</button>
-                                </form>
-                                <form action="/log/log_form" method="GET" style="display: inline;">
-                                    <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
-                                    <button type="submit" class="btn btn-log">Log</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Popup on hover -->
-                    <div class="todo-popup">
-                        <div class="popup-details">
-                            <div><strong>Subject:</strong> [% todo.subject %]</div>
-                        [% SET opd = todo.description | trim %][% IF opd %]
-                            <div class="popup-line-desc"><strong>Description:</strong> [% opd %]</div>
-                        [% END %]
-                            [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
-                            [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
-                            [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
-                            [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
-                            <div><strong>Priority:</strong> [% todo.priority %]</div>
-                            <div><strong>Status:</strong> 
-                                [% IF todo.status == 1 %]New
-                                [% ELSIF todo.status == 2 %]In Progress
-                                [% ELSIF active_todos.${todo.record_id} %]&#9654; Active Session
-                                [% ELSIF todo.status == 3 %]Completed
-                                [% ELSE %]Unknown[% END %]
-                            </div>
-                            [% IF todo.sitename %]<div><strong>Site:</strong> [% todo.sitename %]</div>[% END %]
-                            [% IF todo.developer %]<div><strong>Developer:</strong> [% todo.developer %]</div>[% END %]
-                        </div>
-                    </div>
-                </div>
+                [% SET tcard_wrap_ov = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ (todo.start_date || todo.due_date) _ "' data-is-recurring='0' draggable='true'" %]
+                [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_is_overdue=1 tc_stale_days=999 tc_calendar=1
+                    tc_drag_class='todo-item-day todo-item-shared'
+                    tc_wrapper_extra=tcard_wrap_ov %]
             [% END %]
         </div>
     </details>
@@ -1916,64 +1737,10 @@ document.addEventListener('DOMContentLoaded', function() {
                  data-date="[% date %]"
                  [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]"[% END %]
                  style="top:[% tpx %]px; height:[% tht %]px; left:0.3%; width:99.4%;">
-                <div class="gcal-ev-row">
-                    <span class="gcal-ev-time">[% tlbl %]</span>
-                    <span class="gcal-ev-title">[% IF tdone %]&#10003; [% END %][% IF isrec %]&#x1F501; [% END %][% IF ttype == 'appointment' %]&#x1F4CC; [% ELSIF ttype == 'meeting' %]&#x1F91D; [% ELSIF ttype == 'event' %]&#x1F382; [% ELSIF ttype == 'reminder' %]&#x1F514; [% END %][% todo.subject %]</span>
-                    [% IF ts %]<span class="gcal-ev-site">[% ts %]</span>[% END %]
-                    [% IF tdev %]<span class="gcal-ev-user">[% tdev %]</span>[% END %]
-                    <div class="gcal-ev-actions" draggable="false">
-                        <select class="gcal-priority-sel" draggable="false" data-record-id="[% todo.record_id %]" data-orig="[% tp %]" onchange="savePriority(this)">
-                            [% FOREACH pv IN [1,2,3,4,5,6,7,8,9] %]<option value="[% pv %]" [% IF pv == tp %]selected[% END %]>P[% pv %]</option>[% END %]
-                        </select>
-                        <a class="gcal-ev-btn" draggable="false" href="/todo/details?record_id=[% todo.record_id %]"
-                           title="View full todo details">View</a>
-                        <a class="gcal-ev-btn" draggable="false" href="/log/log_form?todo_record_id=[% todo.record_id %]"
-                           title="Manually add a time log entry for this todo">Log</a>
-                        [% UNLESS tdone %]
-                        [% SET _tis_inprog = active_todos.${todo.record_id} %]
-                        [% SET _tsubject = todo.subject | html %]
-                        [% SET _tdesc    = todo.description | html %]
-                        <button class="gcal-ev-btn[% IF _tis_inprog %] gcal-ev-btn-active[% END %]" draggable="false"
-                            onclick="[% IF _tis_inprog %]closeLogWithNotesGcal(this,[% todo.record_id %])[% ELSE %]startWorkGcal(this,[% todo.record_id %])[% END %]"
-                            title="[% IF _tis_inprog %]Log is open — click to close log with notes (todo stays open)[% ELSE %]Start working — creates a log entry and copies todo details to clipboard[% END %]"
-                            data-subject="[% _tsubject %]"
-                            data-desc="[% _tdesc %]"
-                            data-site="[% ts %]"
-                            data-project="[% tproj %]">
-                            [% IF _tis_inprog %]⏸ Active[% ELSE %]▶ Start[% END %]
-                        </button>
-                        <button class="gcal-ev-btn" draggable="false"
-                            onclick="doneWithNotesGcal(this,[% todo.record_id %])"
-                            title="Mark done — asks what was accomplished, closes open log (if any), marks todo complete">Done</button>
-                        [% END %]
-                    </div>
-                </div>
-                <div class="todo-popup">
-                    <div class="popup-details">
-                        <div><strong>Subject:</strong> [% todo.subject | html %]</div>
-                    [% SET pd = todo.description | trim %]
-                    [% IF pd %]<div class="popup-line-desc"><strong>Description:</strong> [% pd | html %]</div>[% END %]
-                        <div><strong>Time:</strong> [% tlbl %]</div>
-                        [% IF ts %]<div><strong>Site:</strong> [% ts %]</div>[% END %]
-                        [% IF tproj %]<div><strong>Project:</strong> [% tproj %]</div>[% END %]
-                        [% IF tdev %]<div><strong>Assigned:</strong> [% tdev %]</div>[% END %]
-                        [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %]</div>[% END %]
-                        [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
-                        <div><strong>Priority:</strong> P[% todo.priority || 9 %]</div>
-                        <div><strong>Status:</strong> [% tstat %]</div>
-                        [% IF test > 0 %]<div><strong>Est:</strong> [% test %] min</div>[% END %]
-                        [% IF isrec %]<div><strong>Recurring:</strong> [% todo.recurrence_rule || 'yes' %]</div>[% END %]
-                        [% IF ttype AND ttype != 'task' %]<div><strong>Type:</strong> [% ttype %]</div>[% END %]
-                    </div>
-                    <div class="popup-actions">
-                        <a class="popup-action-btn btn-view" href="/todo/details?record_id=[% todo.record_id %]">View</a>
-                        <a class="popup-action-btn btn-log" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
-                        [% UNLESS tdone %]
-                        <button class="popup-action-btn btn-start" onclick="startWorkGcal(this,[% todo.record_id %])">▶ Start</button>
-                        <button class="popup-action-btn btn-done" onclick="markDoneGcal(this,[% todo.record_id %]);this.closest('.todo-popup').style.display='none';">Done</button>
-                        [% END %]
-                    </div>
-                </div>
+                [% SET tcard_wrap_g = "data-todo-id='" _ todo.record_id _ "' data-todo-date='" _ date _ "' data-is-recurring='" _ isrec _ "' draggable='true'" %]
+                [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_calendar=1
+                    tc_drag_class='gcal-ev-card'
+                    tc_wrapper_extra=tcard_wrap_g %]
             </div>
         [% END %]
     </div>

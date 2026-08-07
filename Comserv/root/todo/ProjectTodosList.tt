@@ -13,7 +13,7 @@
     <summary class="project-todos-summary"><strong>📋 Todos for [% project.name %] ([% project.todos.size %])</strong></summary>
     <div class="project-todos-content">
         [% FOREACH todo IN project.todos %]
-            [% INCLUDE 'todo/todo_row.tt' tc=todo %]
+            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
         [% END %]
     </div>
 </details>

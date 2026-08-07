@@ -24,6 +24,16 @@
     tc_blocker_subject, tc_show_done, tc_done_fn, tc_meta_extra,
     tc_est_mins, tc_open
 
+  Calendar / drag integration (added for full cross-list unification):
+    tc_drag_class  — extra class(es) on the outer .todo-card div so the
+      calendar drag-and-drop bindings (todo_drag_drop.js selects
+      .todo-item-day / .todo-item-shared / .todo-item-month) keep matching
+      the card when it is rendered inside a calendar time-slot.
+    tc_wrapper_extra — raw attributes appended to the outer div (e.g.
+      data-todo-id / data-todo-date / data-is-recurring / draggable /
+      positioning style) so the existing reschedule-on-drop logic keeps
+      working. Kept separate from tc_wrapper_extra_data (its own slot).
+
   Outer-scope variables used automatically: is_admin, is_csc
   ============================================================ %]
 [% tc_done_fn  = tc_done_fn || 'quickClose' -%]
@@ -48,103 +58,81 @@
 [% END %]
 
 <div [% IF tc_wrapper_id %]id="[% tc_wrapper_id %]"[% END %]
-     [% tc_wrapper_extra_data %]
-     class="todo-card[% IF tci_is_done OR tc_is_blocked %] opacity-60[% END %]">
+     [% tc_wrapper_extra_data %][% IF tc_wrapper_extra %] [% tc_wrapper_extra %][% END %]
+     class="todo-card pri-[% tci_p %][% IF tc_drag_class %] [% tc_drag_class %][% END %][% IF tci_is_done OR tc_is_blocked %] opacity-60[% END %]">
   <details [% IF tc_open %]open[% END %] class="card">
-    [%# ── Closed summary row = badges + subject + standard action buttons ── %]
-    <summary class="d-flex align-items-center justify-content-between p-2">
-      <div class="d-flex align-items-center flex-grow-1 min-width-0" style="gap:4px;">
-
-        [%# Priority badge %]
-        <span class="badge pri-[% tci_p %]">P[% tci_p %]</span>
-
-        [%# Status badge %]
-        <span class="badge [% tci_st_cls %]">[% tci_st_label %]</span>
-
-        [%# Audit / occurrence / type / flag badges (compact, standard .badge) %]
-        [% IF tc_is_audit_root %]
-        <span class="badge badge-danger">AUDIT ROOT</span>
-        [% END %]
-
-        [% SET tci_occ = 0 %]
-        [% IF tc.occurrence_count && tc.occurrence_count > 1 %][% SET tci_occ = tc.occurrence_count %][% END %]
-        [% IF tci_occ > 1 %]
-        <span class="badge badge-danger" title="Recurred [% tci_occ %] times">↻ [% tci_occ %]×</span>
-        [% END %]
-
-        [% SET tci_type = tc.todo_type || 'task' %]
-        [% IF tci_type == 'appointment' %]
-        <span class="badge badge-primary" title="Appointment">📌</span>
-        [% ELSIF tci_type == 'meeting' %]
-        <span class="badge badge-primary" title="Meeting">🤝</span>
-        [% ELSIF tci_type == 'event' %]
-        <span class="badge badge-primary" title="Event">🎂</span>
-        [% ELSIF tci_type == 'reminder' %]
-        <span class="badge badge-warning" title="Reminder">🔔</span>
-        [% END %]
-
-        [% SET tci_subj_l = tc.subject.lower %]
-        [% IF tc.is_recurring OR tci_subj_l.match('lunch') OR tci_subj_l.match('break') OR tci_subj_l.match('standup') %]
-        <span class="badge badge-secondary" title="[% tc.recurrence_rule || 'recurring' %]">🔁</span>
-        [% END %]
-
-        [% IF tc_is_stale %]
-        <span class="badge badge-warning" title="No activity for [% tc_stale_days %] days">⏳ [% tc_stale_days %]d</span>
-        [% END %]
-        [% IF tc_is_blocking %]
-        <span class="badge badge-danger" title="Other tasks depend on this">🔒</span>
-        [% END %]
-        [% IF tc_is_cross_blocker && tc_is_blocking %]
-        <span class="badge badge-primary" title="Unblocks [% tc_blocking_count %] task(s)">🔗[% tc_blocking_count %]</span>
-        [% END %]
-        [% IF tc_is_blocked %]
-        <span class="badge badge-secondary" title="Waiting on: [% tc_blocker_subject %]">⏸</span>
-        [% END %]
-        [% IF tc_is_overdue %]
-        <span class="badge badge-danger">🔴 OVR</span>
-        [% ELSIF tc_due_today %]
-        <span class="badge badge-warning">⚡</span>
-        [% END %]
-        [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]
-        <span class="badge badge-primary">[% tc.sitename %]</span>
-        [% END %]
-
-        [%# Subject link %]
-        <a href="/todo/details?record_id=[% tc.record_id %]"
-           class="text-truncate font-weight-bold ml-1"
-           style="max-width:360px; color: var(--text-color); [% IF tci_is_done %]text-decoration:line-through;[% END %]"
-           title="[% tc.subject | html %]">
-          [% tc.subject || '(No subject)' %]
-        </a>
-      </div>
-
-      [%# Action buttons — same as todo_row.tt, always visible in the closed card %]
-      <div class="d-flex align-items-center flex-shrink-0" style="gap:4px;">
-        <a href="/todo/details?record_id=[% tc.record_id %]"
-           class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.75em;">View</a>
-
-        <a href="/log/log_form?todo_record_id=[% tc.record_id %]"
-           class="btn btn-sm btn-outline-info py-0 px-2" style="font-size:0.75em;">Log</a>
-
+    [%# ── Closed summary row ── %]
+    [% IF tc_calendar %]
+    [%# Calendar-compact: TITLE first, then PRIORITY. The status/"New" badge is
+        redundant when the card is fully visible, so it is omitted from the
+        header. Action buttons live in the hover popup (todo-card-popup),
+        which is not confined to the card window. %]
+    <summary class="d-flex align-items-center p-1 todo-card-summary-cal">
+      <a href="/todo/details?record_id=[% tc.record_id %]"
+         class="todo-card-subject flex-grow-1 min-width-0">[% tc.subject || '(No subject)' %]</a>
+      <span class="badge pri-[% tci_p %]">P[% tci_p %]</span>
+      [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename %]</span>[% END %]
+      [% IF tc_is_overdue %]<span class="badge badge-danger">OVR</span>[% END %]
+    </summary>
+    [%# Hover popup — not confined to the card — shows the action buttons %]
+    <div class="todo-popup todo-card-popup">
+      <div class="todo-popup-actions">
+        <a href="/todo/details?record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-primary">View</a>
+        <a href="/log/log_form?todo_record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-info">Log</a>
         [% IF tc_show_done && is_admin && !tci_is_done %]
           [% IF tci_is_active %]
-          <button data-start-btn="1" data-record-id="[% tc.record_id %]"
-                  class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size:0.75em;"
-                  title="Session active — click to close session">⏸ Active</button>
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" class="btn btn-sm btn-outline-warning">⏸ Active</button>
           [% ELSE %]
-          <button data-start-btn="1" data-record-id="[% tc.record_id %]"
-                  class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.75em;"
-                  title="Start working — creates a log entry">▶ Start</button>
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" class="btn btn-sm btn-outline-primary">▶ Start</button>
           [% END %]
-          <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="[% tci_is_active ? '1' : '0' %]"
-                  class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:0.75em;"
-                  title="[% tci_is_active ? 'Close log and mark todo done' : 'Mark done' %]">Done</button>
+          <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="[% tci_is_active ? '1' : '0' %]" class="btn btn-sm btn-outline-success">Done</button>
         [% ELSIF tc_show_done && is_admin %]
-          <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0"
-                  class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:0.75em;" title="Mark done">Done</button>
+          <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0" class="btn btn-sm btn-outline-success">Done</button>
+        [% END %]
+        [% IF tc.sitename %]<div class="todo-popup-meta">[% tc.sitename %][% IF tc.developer %] · [% tc.developer %][% END %]</div>[% END %]
+      </div>
+    </div>
+    [% ELSE %]
+    [%# Standard summary (Focus Queue / project pages): badges + subject + buttons %]
+    <summary class="d-flex align-items-center justify-content-between p-2">
+      <div class="d-flex align-items-center flex-grow-1 min-width-0 todo-card-badges">
+        <span class="badge pri-[% tci_p %]">P[% tci_p %]</span>
+        <span class="badge [% tci_st_cls %]">[% tci_st_label %]</span>
+        [% IF tc_is_audit_root %]<span class="badge badge-danger">AUDIT ROOT</span>[% END %]
+        [% SET tci_occ = 0 %][% IF tc.occurrence_count && tc.occurrence_count > 1 %][% SET tci_occ = tc.occurrence_count %][% END %]
+        [% IF tci_occ > 1 %]<span class="badge badge-danger" title="Recurred [% tci_occ %] times">↻ [% tci_occ %]×</span>[% END %]
+        [% SET tci_type = tc.todo_type || 'task' %]
+        [% IF tci_type == 'appointment' %]<span class="badge badge-primary" title="Appointment">📌</span>
+        [% ELSIF tci_type == 'meeting' %]<span class="badge badge-primary" title="Meeting">🤝</span>
+        [% ELSIF tci_type == 'event' %]<span class="badge badge-primary" title="Event">🎂</span>
+        [% ELSIF tci_type == 'reminder' %]<span class="badge badge-warning" title="Reminder">🔔</span>[% END %]
+        [% SET tci_subj_l = tc.subject.lower %]
+        [% IF tc.is_recurring OR tci_subj_l.match('lunch') OR tci_subj_l.match('break') OR tci_subj_l.match('standup') %]<span class="badge badge-secondary" title="[% tc.recurrence_rule || 'recurring' %]">🔁</span>[% END %]
+        [% IF tc_is_stale %]<span class="badge badge-warning" title="No activity for [% tc_stale_days %] days">⏳ [% tc_stale_days %]d</span>[% END %]
+        [% IF tc_is_blocking %]<span class="badge badge-danger" title="Other tasks depend on this">🔒</span>[% END %]
+        [% IF tc_is_cross_blocker && tc_is_blocking %]<span class="badge badge-primary" title="Unblocks [% tc_blocking_count %] task(s)">🔗[% tc_blocking_count %]</span>[% END %]
+        [% IF tc_is_blocked %]<span class="badge badge-secondary" title="Waiting on: [% tc_blocker_subject %]">⏸</span>[% END %]
+        [% IF tc_is_overdue %]<span class="badge badge-danger">🔴 OVR</span>
+        [% ELSIF tc_due_today %]<span class="badge badge-warning">⚡</span>[% END %]
+        [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename %]</span>[% END %]
+        <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-subject ml-1">[% tc.subject || '(No subject)' %]</a>
+      </div>
+      <div class="d-flex align-items-center flex-shrink-0 todo-card-actions">
+        <a href="/todo/details?record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-primary">View</a>
+        <a href="/log/log_form?todo_record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-info">Log</a>
+        [% IF tc_show_done && is_admin && !tci_is_done %]
+          [% IF tci_is_active %]
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" class="btn btn-sm btn-outline-warning" title="Session active — click to close session">⏸ Active</button>
+          [% ELSE %]
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" class="btn btn-sm btn-outline-primary" title="Start working — creates a log entry">▶ Start</button>
+          [% END %]
+          <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="[% tci_is_active ? '1' : '0' %]" class="btn btn-sm btn-outline-success" title="[% tci_is_active ? 'Close log and mark todo done' : 'Mark done' %]">Done</button>
+        [% ELSIF tc_show_done && is_admin %]
+          <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0" class="btn btn-sm btn-outline-success" title="Mark done">Done</button>
         [% END %]
       </div>
     </summary>
+    [% END %]
 
     [%# ── Open body: details-page equivalent ── %]
     <div class="card-body">
@@ -170,11 +158,11 @@
       </div>
 
       [% IF tc.description %]
-      <div class="mb-2"><small class="text-muted d-block">Description</small><div class="border rounded p-2 bg-light" style="white-space:pre-wrap;word-break:break-word;">[% tc.description %]</div></div>
+      <div class="mb-2"><small class="text-muted d-block">Description</small><div class="todo-card-pre border rounded p-2 bg-light">[% tc.description %]</div></div>
       [% END %]
 
       [% IF tc.comments %]
-      <div class="mb-2"><small class="text-muted d-block">Comments / Code context</small><div class="border rounded p-2 bg-light" style="white-space:pre-wrap;word-break:break-word;">[% tc.comments %]</div></div>
+      <div class="mb-2"><small class="text-muted d-block">Comments / Code context</small><div class="todo-card-pre border rounded p-2 bg-light">[% tc.comments %]</div></div>
       [% END %]
 
       <div class="mt-2 pt-2 border-top">
