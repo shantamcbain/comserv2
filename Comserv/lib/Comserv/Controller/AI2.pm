@@ -569,6 +569,44 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    # ── Focus-Tune agent: "what are my top 5 todos by function?" ──
+    # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
+    # UI button uses) so the question is answerable from Chat-with-AI too.
+    # Triggered by the 'focustune' agent_id OR a natural-language intent.
+    my $is_focus = (lc($agent_id) eq 'focustune')
+        || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
+            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i);
+    if ($is_focus) {
+        my $tune = $c->model('AI2::FocusTune');
+        my $now_epoch = time();
+        my ($top, $rbid) = $tune->gather_candidates($c, $now_epoch);
+        my @plan_docs = $tune->plan_docs($c);
+        my ($system, $user_prompt) = $tune->build_prompt($c, $top, \@plan_docs);
+
+        # Honor an explicit model from the dropdown; otherwise require one via
+        # the UI (no silent default). If none supplied, surface a clear error.
+        my $req_model = $model || '';
+        unless ($req_model) {
+            $c->res->body(encode_json({ success => 0, error => 'Select a model',
+                detail => 'The Focus-Tune agent needs an explicit model (no default). Pick one in the chat model dropdown.' }));
+            return;
+        }
+        my $can_select = 0;
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        $can_select = grep { $_ =~ /^(admin|developer|editor)$/i } @$roles ? 1 : 0;
+
+        my $raw = $tune->run_one($c, { name => $req_model }, $system, $user_prompt, $can_select);
+        my $parsed = $tune->parse_result($c, $raw, $top, $rbid, $now_epoch);
+        my $payload = {
+            %$parsed,
+            agent_id => 'focustune',
+            note => 'Top-5-by-function from the AI Focus-Tune brain (shared with /api/focus/top5). Advisory only — does not reorder or mutate todos.',
+        };
+        $c->res->body(encode_json($payload));
+        return;
+    }
+
     my $result = try {
         $c->model('AI2::Chat')->process($c,
             prompt          => $prompt,

@@ -73,9 +73,9 @@ my %ALLOWED_FLAGS = (
     # --no-ff (always create a merge commit), --no-commit (review then commit),
     # --abort (cancel a conflicted merge), --squash (optional single-commit merge).
     merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash) },
-    # Worktree is read/maintenance only from the app: list + prune. Never 'add'
-    # (worktrees are created out-of-band by the branch-server tooling).
-    worktree => { map { $_ => 1 } qw(list prune) },
+    # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
+    # allow add, remove (with --force to clear a dirty checkout), list, prune.
+    worktree => { map { $_ => 1 } qw(add remove list prune --force) },
 );
 
 sub new {
@@ -961,9 +961,9 @@ sub switch_branch {
 
 Return an arrayref of worktree entries for the repo:
   { path, branch, is_main, port }
-Port is derived from the known worktree layout (~/.zenflow/worktrees/<branch>/Comserv)
+Port is derived from the configured worktree layout (~/.comserv/worktrees/<branch>/Comserv)
 using the same port map the dashboard uses (BranchServerControl / _planning_tab.tt).
-Main repo (no .zenflow/worktrees in its path) is reported as is_main => 1.
+Main repo (no configured worktree path in its path) is reported as is_main => 1.
 
 =cut
 
@@ -1018,9 +1018,9 @@ sub _worktree_row {
 }
 
 # Cached worktree config loaded from root/config/worktrees.json. This is the
-# single source of truth for the worktree base dir + branch→port map, replacing
-# the old hardcoded .zenflow layout. Falls back to the static WORKTREE_PORTS hash
-# (below) if the JSON is missing.
+# single source of truth for the worktree base dir + branch->port map, replacing
+# the old hardcoded .zenflow layout. There is NO static fallback: a branch not in
+# the JSON has port 0. Deleted ports stay deleted so they can be reused.
 my $_wt_config;
 sub _worktree_config {
     return $_wt_config if $_wt_config;
@@ -1041,35 +1041,177 @@ sub _worktree_config {
 
 sub worktree_base_dir { return _worktree_config()->{base_dir}; }
 
-# Port map mirrored from root/admin/planning/_planning_tab.tt so the dashboard
-# can deep-link each worktree's running instance.
-my %WORKTREE_PORTS = (
-    'aichatsystem-ef4e'                    => 4010,
-    'schema-managment-system-7eb3'        => 4002,
-    'infrastructuremanagement-d133'        => 4003,
-    'workshops-7d21'                       => 4004,
-    'users-e5b8'                           => 4005,
-    'new-task-bb05'                        => 4006,
-    'unified-mail-system-site-managed-2c53' => 4007,
-    'membership-1304'                      => 4008,
-    'pointsystem-3230'                     => 4009,
-    'cssthemes-9195'                       => 4011,
-    'ency-53b0'                            => 4012,
-    'helpdesk-7217'                        => 4013,
-    'healthplanning-9db9'                  => 4014,
-    'productionserverhealth-82fb'          => 4015,
-    'security-764f'                        => 4016,
-    'documentation-9122'                   => 4017,
-    'api-bc05'                             => 4018,
-    'bmaster-f0fd'                         => 4019,
-    'aichatsystem-planning-system-int-f187' => 4020,
-    'inventory-system-104a'                => 4021,
-    '3dprinting-use-this-as-the-branc-41f3' => 4030,
-    'developer-time-logging-points-ba-542a' => 4022,
-    'page-management-system-implement-41a1' => 4023,
-    'docker-5c15'                          => 4024,
-    'planning-system-continue-from-pl-bdac' => 4001,
-);
+# NOTE: the old hardcoded WORKTREE_PORTS hash has been REMOVED. The single source
+# of truth for branch->port is root/config/worktrees.json. A deleted/non-JSON port
+# must NEVER be resurrected from a static map (user rule: removed ports stay removed
+# so they can be reused). If a branch is not in the JSON, its port is 0.
+
+=head2 next_free_port($c)
+
+Scan upward from the configured floor (port_start, default 4000) for the first
+port not already assigned to a branch in worktrees.json. Port 4000 itself is
+treated as occupied if anything is listening there; the caller's JSON is the
+authority for what is taken. Returns the first free integer > floor.
+
+=cut
+
+sub next_free_port {
+    my ($self_or_c) = @_;
+    my $cfg  = _worktree_config();
+    my $floor = $cfg->{port_start} // 4000;
+    $floor = 4000 if $floor !~ /^\d+$/ || $floor < 4000;
+    # Port 4000 is occupied by a live instance; never hand it out. The first
+    # usable port is one above the floor (your rule: first available AFTER 4000).
+    my $start = $floor < 4001 ? 4001 : $floor;
+    my %taken;
+    if ($cfg->{branches}) {
+        for my $b (keys %{ $cfg->{branches} }) {
+            my $p = $cfg->{branches}{$b}{port};
+            $taken{$p} = 1 if $p && $p =~ /^\d+$/;
+        }
+    }
+    my $p = $start;
+    $p++ while $taken{$p};   # first port >= start not already in the JSON
+    return $p;
+}
+
+=head2 create_worktree($c, $branch, \%opts)
+
+The isolation primitive. In one call:
+  1. create the branch from $opts{parent} (default 'main') if it does not exist,
+  2. git worktree add <base_dir>/<branch>/Comserv <branch>,
+  3. assign the next free port (next_free_port),
+  4. append { port, label, url } to root/config/worktrees.json,
+  5. return { success, branch, port, path, cmd }.
+
+The branch-servers list reads the JSON, so it refreshes automatically.
+Never renames or deletes an existing branch.
+
+=cut
+
+sub create_worktree {
+    my ($self, $c, $branch, $opts) = @_;
+    $opts //= {};
+    my $res = { success => 0, action => 'create_worktree', branch => $branch };
+
+    unless ($branch && $branch =~ /^[A-Za-z0-9._\/-]+$/) {
+        $res->{error} = 'A valid branch name is required.';
+        return $res;
+    }
+    my $cfg    = _worktree_config();
+    my $base   = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    my $wt_dir = "$base/$branch/Comserv";
+    my $parent = $opts->{parent} // 'main';
+
+    # 1) branch (create from parent if missing)
+    my $have = $self->_run($c, 'branch', '--list', '--no-color', $branch);
+    if (!$have->{success} || $have->{output} !~ /\b\Q$branch\E\b/) {
+        my $cr = $self->_run($c, 'branch', $branch, $parent);
+        unless ($cr->{success}) {
+            $res->{error} = "Failed to create branch '$branch' from '$parent': " . ($cr->{error} // $cr->{output});
+            return $res;
+        }
+    }
+
+    # 2) worktree add
+    if (-d $wt_dir) {
+        $res->{error} = "Worktree dir already exists: $wt_dir";
+        return $res;
+    }
+    my $ar = $self->_run($c, 'worktree', 'add', $wt_dir, $branch);
+    unless ($ar->{success}) {
+        $res->{error} = "git worktree add failed: " . ($ar->{error} // $ar->{output});
+        return $res;
+    }
+
+    # 3) port + 4) persist to JSON
+    my $port = $self->next_free_port($c);
+    my $label = $opts->{label} // $branch;
+    my $url   = $opts->{url}   // '/planning/daily';
+    $cfg->{branches} //= {};
+    $cfg->{branches}{$branch} = { port => $port, label => $label, url => $url };
+    unless (_save_worktree_config($self, $cfg)) {
+        $res->{error} = 'Failed to write worktrees.json';
+        return $res;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_worktree',
+        "Created worktree branch='$branch' parent='$parent' port=$port path=$wt_dir");
+
+    $res->{success} = 1;
+    $res->{port}    = $port;
+    $res->{path}    = $wt_dir;
+    # The Catalyst app lives one level deeper: the worktree checkout is the
+    # comserv2 repo, and the app dir is <wt_dir>/Comserv (where script/ lives).
+    my $app_dir = "$wt_dir/Comserv";
+    $res->{cmd}     = "cd $app_dir && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p $port -r";
+    return $res;
+}
+
+=head2 remove_worktree($c, $branch)
+
+Inverse of create_worktree (user rule 3): remove the worktree checkout, delete
+the branch from git, and drop the JSON entry so its port is freed for reuse.
+main is never touched.
+
+=cut
+
+sub remove_worktree {
+    my ($self, $c, $branch) = @_;
+    my $res = { success => 0, action => 'remove_worktree', branch => $branch };
+    return $res->{error} = 'Refusing to remove main.' if $branch eq 'main';
+
+    my $cfg    = _worktree_config();
+    my $base   = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    my $wt_dir = "$base/$branch/Comserv";
+
+    # remove the checkout
+    if (-d $wt_dir) {
+        my $rr = $self->_run($c, 'worktree', 'remove', $wt_dir, '--force');
+        unless ($rr->{success}) {
+            $res->{error} = "worktree remove failed: " . ($rr->{error} // $rr->{output});
+            return $res;
+        }
+    }
+    # delete the branch
+    my $br = $self->_run($c, 'branch', '-D', $branch);
+    unless ($br->{success}) {
+        $res->{error} = "branch delete failed: " . ($br->{error} // $br->{output});
+        # still try to drop the JSON entry below
+    }
+    # free the port
+    if ($cfg->{branches} && $cfg->{branches}{$branch}) {
+        delete $cfg->{branches}{$branch};
+        _save_worktree_config($self, $cfg);
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_worktree',
+        "Removed worktree branch='$branch' dir=$wt_dir");
+    $res->{success} = 1;
+    return $res;
+}
+
+# Write the in-memory worktree config back to root/config/worktrees.json and
+# clear the cache so the next read picks up the change. Returns 1 on success.
+sub _save_worktree_config {
+    my ($self, $cfg) = @_;
+    my $file = __FILE__;
+    $file =~ s{lib/Comserv/Util/Git\.pm$}{root/config/worktrees.json};
+    my $ok = eval {
+        open my $fh, '>', $file or die $!;
+        print $fh encode_json($cfg);
+        close $fh;
+        1;
+    };
+    if ($ok) { $_wt_config = $cfg; }
+    else {
+        my $err = $@;
+        if ($self && $self->can('logging')) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'wt_cfg',
+                "worktrees.json write failed: $err");
+        }
+    }
+    return $ok ? 1 : 0;
+}
 
 sub _worktree_port {
     my ($branch) = @_;
@@ -1077,7 +1219,7 @@ sub _worktree_port {
     if ($cfg->{branches} && $cfg->{branches}{$branch}) {
         return $cfg->{branches}{$branch}{port} // 0;
     }
-    return $WORKTREE_PORTS{$branch} // 0;
+    return 0;   # no static fallback — only the JSON knows ports
 }
 
 =head2 diff_against_main($c, $branch, $context)

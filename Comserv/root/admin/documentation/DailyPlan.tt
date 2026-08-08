@@ -654,15 +654,13 @@
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
-                    [% SET b_worktree = (b.name == 'main') ? '/home/shanta/PycharmProjects/comserv2/Comserv' : ('/home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv') %]
-                    [% SET b_cmd = 'cd ' _ b_worktree _ ' && perl script/comserv_server.pl -p ' _ b.port _ ' -r' %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
                         <td style="padding:5px 8px;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
                         </td>
                         <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
                         <td style="padding:5px 8px;max-width:340px;">
-                            <code id="cmd-[% b.port %]" style="font-size:0.8em;word-break:break-all;">[% b_cmd %]</code>
+                            <code id="cmd-[% b.port %]" style="font-size:0.8em;word-break:break-all;">[% b.cmd %]</code>
                             <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-[% b.port %]').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋',1500);"
                                 style="padding:1px 6px;border:1px solid var(--border-color);border-radius:3px;background:transparent;color:var(--text-muted-color);cursor:pointer;margin-left:4px;font-size:0.85em;">📋</button>
                         </td>

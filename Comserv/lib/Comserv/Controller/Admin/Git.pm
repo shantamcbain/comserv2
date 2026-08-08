@@ -1510,7 +1510,15 @@ sub branch_management :Path('/admin/branch_management') :Args(0) {
         if ($action eq 'create_branch') {
             my $branch_name = $c->req->param('branch_name');
             my $source_branch = $c->req->param('source_branch') || 'main';
-            $result = $self->create_branch($c, $branch_name, $source_branch);
+            # New Branch is one isolation action: create the git branch, add its
+            # worktree, allocate/register its port, and return the launch command.
+            $result = $self->git_service->create_worktree($c, $branch_name,
+                { parent => $source_branch, label => $branch_name, url => '/planning/daily' });
+            $self->logging->log_with_details($c, $result->{success} ? 'info' : 'error',
+                __FILE__, __LINE__, 'create_worktree',
+                "branch='" . ($branch_name // '') . "' parent='$source_branch' port="
+                . ($result->{port} // '?')
+                . ($result->{error} ? " error=$result->{error}" : ''));
         } elsif ($action eq 'delete_branch') {
             my $branch_name = $c->req->param('branch_name');
             $result = $self->delete_branch($c, $branch_name);
@@ -1753,6 +1761,70 @@ sub push_main :Path('/admin/git/push_main') :Args(0) {
         success => $res->{success} ? 1 : 0,
         output  => $res->{output},
         error   => $res->{error_msg},
+    }));
+}
+
+sub create_worktree :Path('/admin/git/create_worktree') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_worktrees');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $p       = $c->req->params;
+    my $branch  = $p->{branch}  // '';
+    my $parent  = $p->{parent}  // 'main';
+    my $label   = $p->{label}   // $branch;
+    my $url     = $p->{url}     // '/planning/daily';
+
+    unless ($branch) {
+        $c->response->body(encode_json({ success => 0, error => 'branch is required' }));
+        return;
+    }
+
+    my $res = $self->git_service->create_worktree($c, $branch,
+        { parent => $parent, label => $label, url => $url });
+
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'create_worktree', "branch='$branch' parent='$parent' port=" . ($res->{port} // '?') .
+        ($res->{error} ? " error=$res->{error}" : ''));
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        port    => $res->{port},
+        path    => $res->{path},
+        cmd     => $res->{cmd},
+        ($res->{error} ? (error => $res->{error}) : ()),
+    }));
+}
+
+sub remove_worktree :Path('/admin/git/remove_worktree') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_worktrees');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $p      = $c->req->params;
+    my $branch = $p->{branch} // '';
+    unless ($branch) {
+        $c->response->body(encode_json({ success => 0, error => 'branch is required' }));
+        return;
+    }
+
+    my $res = $self->git_service->remove_worktree($c, $branch);
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'remove_worktree', "branch='$branch'" . ($res->{error} ? " error=$res->{error}" : ''));
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        ($res->{error} ? (error => $res->{error}) : ()),
     }));
 }
 

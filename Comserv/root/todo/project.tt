@@ -149,10 +149,11 @@
         <label for="project_search" style="white-space:nowrap;margin:0;">🔍</label>
         <input type="text" id="project_search" placeholder="Search name / code / description…"
                class="form-control" style="width:260px;"
-               oninput="filterProjects(this.value)">
+               oninput="if(window.ComservProjectSearch) ComservProjectSearch.onSearch(this.value)">
         <span id="project_search_count" style="font-size:0.82em;color:var(--text-muted-color,#6c757d);white-space:nowrap;min-width:80px;"></span>
         <label for="project_filter" class="mr-2" style="white-space:nowrap;margin:0;">Project:</label>
-        <select id="project_filter" name="project_id" class="form-control" style="width:auto;">
+        <select id="project_filter" name="project_id" class="form-control" style="width:auto;"
+                onchange="if(window.ComservProjectSearch) ComservProjectSearch.onDropdown()">
                 <option value="">All Projects</option>
                 [% FOREACH project IN projects.sort('name') %]
                     <option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]>[% project.name %]</option>
@@ -161,13 +162,39 @@
                     [% END %]
                 [% END %]
             </select>
-        <label for="priority_filter" style="white-space:nowrap;margin:0;">Priority:</label>
-        <select id="priority_filter" name="priority" class="form-control" style="width:auto;">
+        <label for="priority_filter" class="white-space:nowrap;margin:0;" style="white-space:nowrap;margin:0;">Priority:</label>
+        <select id="priority_filter" name="priority" class="form-control" style="width:auto;"
+                onchange="if(window.ComservProjectSearch) ComservProjectSearch.onDropdown()">
             <option value="">All</option>
             <option value="1" [% IF priority_filter == '1' %]selected[% END %]>High</option>
             <option value="2" [% IF priority_filter == '2' %]selected[% END %]>Medium</option>
             <option value="3" [% IF priority_filter == '3' %]selected[% END %]>Low</option>
         </select>
+        [% IF is_csc_admin && sites.size %]
+        <div class="dropdown" style="position:relative;display:inline-block;">
+            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" id="siteFilterBtn"
+                    onclick="var m=document.getElementById('siteFilterMenu'); m.style.display = (m.style.display==='block'?'none':'block');">
+                Site[% IF selected_sitenames.size %]: [% selected_sitenames.size %] selected[% ELSE %]s: All[% END %]
+            </button>
+            <div id="siteFilterMenu" class="card p-2" style="display:none;position:absolute;z-index:1000;min-width:200px;max-height:320px;overflow:auto;background:#fff;">
+                <div class="mb-1">
+                    <a href="#" class="small" onclick="document.querySelectorAll('#siteFilterMenu input[type=checkbox]').forEach(function(cb){cb.checked=true;}); return false;">Select all</a>
+                    &nbsp;|&nbsp;
+                    <a href="#" class="small" onclick="document.querySelectorAll('#siteFilterMenu input[type=checkbox]').forEach(function(cb){cb.checked=false;}); return false;">Clear</a>
+                </div>
+                [% FOREACH site IN sites %]
+                    [% SET sname = site.name %]
+                    <div class="form-check">
+                        <label class="form-check-label small" style="white-space:nowrap;">
+                            <input type="checkbox" name="sitename" value="[% sname %]"
+                                   [% IF selected_sitenames.contains(sname) %]checked[% END %]>
+                                [% sname %]
+                        </label>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
         <button type="submit" class="btn btn-primary btn-sm">Apply</button>
         <button type="button" id="clearFilters" class="btn btn-outline-secondary btn-sm">Clear</button>
     </form>
@@ -184,7 +211,8 @@
         
         [% SET proj_search_text = project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '') %]
         <div class="collapsible-card" id="project-[% project.id %]"
-             data-search="[% proj_search_text.lower %]">
+             data-search="[% proj_search_text.lower %]"
+             data-priority="[% project.priority || 2 %]">
             <div class="card">
                 <!-- Card header with priority badge, project summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
@@ -456,7 +484,10 @@
         <!-- Skip this subproject if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != subproject.priority %]
         
-        <div class="collapsible-card mb-3" id="subproject-[% subproject.id %]">
+        [% SET sub_search_text = subproject.name _ ' ' _ (subproject.project_code || '') _ ' ' _ (subproject.description || '') _ ' ' _ (subproject.sitename || '') %]
+        <div class="collapsible-card mb-3" id="subproject-[% subproject.id %]"
+             data-search="[% sub_search_text.lower %]"
+             data-priority="[% subproject.priority || 2 %]">
             <div class="card">
                 <!-- Card header with priority badge, subproject summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('subproject-body-[% subproject.id %]')" aria-expanded="false">
@@ -696,92 +727,4 @@
 </div>
 [% END %]
 
-<!-- JavaScript for collapsible cards and filter handling -->
-<script>
-    // Function to toggle collapse state of project cards
-    function toggleCollapse(elementId) {
-        const element = document.getElementById(elementId);
-        const header = element.parentNode.querySelector('.card-header');
-        const icon = header.querySelector('.collapse-icon');
-        
-        if (element.classList.contains('show')) {
-            element.classList.remove('show');
-            header.setAttribute('aria-expanded', 'false');
-            icon.classList.remove('fa-chevron-up');
-            icon.classList.add('fa-chevron-down');
-        } else {
-            element.classList.add('show');
-            header.setAttribute('aria-expanded', 'true');
-            icon.classList.remove('fa-chevron-down');
-            icon.classList.add('fa-chevron-up');
-        }
-    }
-    
-    // Real-time project search / filter
-    function filterProjects(query) {
-        const q = query.trim().toLowerCase();
-        const cards = document.querySelectorAll('.collapsible-card[data-search]');
-        let visible = 0;
-        cards.forEach(function(card) {
-            const text = card.getAttribute('data-search') || '';
-            const match = !q || text.indexOf(q) !== -1;
-            card.style.display = match ? '' : 'none';
-            if (match) visible++;
-        });
-        const countEl = document.getElementById('project_search_count');
-        if (countEl) {
-            countEl.textContent = q ? ('Showing ' + visible + ' of ' + cards.length) : '';
-        }
-    }
-
-    // Clear filters button functionality
-    document.getElementById('clearFilters').addEventListener('click', function() {
-        document.getElementById('project_filter').value = '';
-        document.getElementById('priority_filter').value = '';
-        document.getElementById('projectFilterForm').submit();
-    });
-    
-    // Auto-expand project if it's the filtered project
-    document.addEventListener('DOMContentLoaded', function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const projectFilter = urlParams.get('project_id');
-        
-        if (projectFilter) {
-            // If filtering by a specific project, expand that project
-            const projectElement = document.getElementById('project-body-' + projectFilter);
-            if (projectElement) {
-                toggleCollapse('project-body-' + projectFilter);
-            } else {
-                // Check if it's a subproject
-                const subprojectElement = document.getElementById('subproject-body-' + projectFilter);
-                if (subprojectElement) {
-                    toggleCollapse('subproject-body-' + projectFilter);
-                    // Also expand its parent project
-                    const parentCard = subprojectElement.closest('.collapsible-card[id^="project-"]');
-                    if (parentCard) {
-                        const parentId = parentCard.id.replace('project-', '');
-                        const parentBody = document.getElementById('project-body-' + parentId);
-                        if (parentBody && !parentBody.classList.contains('show')) {
-                            toggleCollapse('project-body-' + parentId);
-                        }
-                    }
-                } else {
-                    // If it's nested deeper, find and expand all parent containers
-                    const allProjects = document.querySelectorAll('.collapsible-card');
-                    allProjects.forEach(function(projectCard) {
-                        const projectId = projectCard.id.replace('project-', '').replace('subproject-', '');
-                        const projectBody = document.getElementById('project-body-' + projectId);
-                        
-                        // Check if this project contains the filtered subproject
-                        if (projectBody) {
-                            const hasFilteredSubproject = projectBody.innerHTML.includes('name="project_id" value="' + projectFilter + '"');
-                            if (hasFilteredSubproject) {
-                                toggleCollapse('project-body-' + projectId);
-                            }
-                        }
-                    });
-                }
-            }
-        }
-    });
-</script>
+<!-- End project macros / tree -->

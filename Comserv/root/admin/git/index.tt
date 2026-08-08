@@ -24,6 +24,25 @@
         <div class="content-primary">
             <h1><i class="fas fa-code-branch"></i> Git Dashboard</h1>
 
+            <div class="admin-panel" data-create-worktree-panel="1">
+                <div class="admin-panel-header"><h3><i class="fas fa-plus"></i> New Branch + Worktree</h3></div>
+                <div class="admin-panel-body">
+                    <form data-create-worktree-form="1" class="git-inline">
+                        <label>Branch
+                            <input type="text" name="branch" required pattern="[A-Za-z0-9._/-]+"
+                                   placeholder="feature/name" class="form-control">
+                        </label>
+                        <label>Parent
+                            <input type="text" name="parent" value="main" class="form-control">
+                        </label>
+                        <button type="submit" class="admin-btn admin-btn-primary">
+                            <i class="fas fa-code-branch"></i> Create Branch + Worktree
+                        </button>
+                        <span data-create-worktree-status="1" class="section-info"></span>
+                    </form>
+                </div>
+            </div>
+
             [% IF debug_msg && c.session.debug_mode == 1 %]
                 <div class="admin-alert admin-alert-info">
                     <strong>Debug Information:</strong>

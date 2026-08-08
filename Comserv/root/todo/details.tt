@@ -225,48 +225,31 @@
 
     [% IF is_admin && !det_is_done %]
       <div class="btn-group" role="group" aria-label="Task actions">
-<script>
-document.addEventListener('click', function(e) {
-  if (e.target.closest('.btn-group')) {
-    console.log('[Diagnostic] Click detected on task button group', e.target);
-  }
-});
-</script>
+
       [% IF det_is_active %]
       <button type="button"
               class="btn btn-warning btn-sm"
-              hx-post="/todo/close_log"
-              hx-vals='{"record_id": "[% det_rid %]"}'
-              hx-confirm="Close current work session?"
-              hx-indicator="#work-indicator"
-              hx-on::after-request="console.log('[HTMX] close_log response:', event.detail); if (event.detail.successful) location.reload()"
-              hx-on::before-request="console.log('[HTMX] Starting close_log...')">
+              data-start-btn="1" data-record-id="[% det_rid %]"
+              title="Close the current work session">
           ⏸ Active
       </button>
       [% ELSE %]
       <button type="button"
               class="btn btn-primary btn-sm"
-              hx-post="/todo/open_log"
-              hx-vals='{"record_id": "[% det_rid %]"}'
-              hx-confirm="Start working on this task?"
-              hx-indicator="#work-indicator"
-              hx-on::after-request="console.log('[HTMX] open_log response:', event.detail); if (event.detail.successful) location.reload()"
-              hx-on::before-request="console.log('[HTMX] Starting open_log...')">
+              data-start-btn="1" data-record-id="[% det_rid %]"
+              title="Start working on this task">
           ▶ Start
       </button>
       [% END %]
 
       <button type="button"
               class="btn btn-success btn-sm"
-              hx-post="/todo/done_with_log"
-              hx-vals='{"record_id": "[% det_rid %]"}'
-              hx-confirm="Mark this task as Done?"
-              hx-indicator="#work-indicator"
-              hx-on::after-request="console.log('[HTMX] done_with_log response:', event.detail); if (event.detail.successful) location.reload()"
-              hx-on::before-request="console.log('[HTMX] Starting done_with_log...')">
+              data-done-btn="1" data-record-id="[% det_rid %]"
+              data-is-active="[% det_is_active ? '1' : '0' %]"
+              title="Mark this task as done">
           ✓ Done
       </button>
-      <span id="work-indicator" class="htmx-indicator" style="margin-left:8px;">⏳</span>
+
       </div>
     [% END %]
 </div>
@@ -317,41 +300,9 @@ document.addEventListener('click', function(e) {
     </div>
 </div>
 
-<script>
-(function() {
-    var el = document.getElementById('ai-task-conversations');
-    var taskId = el ? el.getAttribute('data-task-id') : null;
-    if (!taskId) return;
-    fetch('/ai/project_conversations?task_id=' + encodeURIComponent(taskId))
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (!d.success || !d.conversations || !d.conversations.length) {
-                el.innerHTML = '<p style="color:#888;font-size:0.9em;">No AI conversations for this task yet.</p>';
-                return;
-            }
-            var html = '<ul style="margin:0;padding-left:18px;">';
-            d.conversations.forEach(function(c) {
-                html += '<li><a href="/ai/conversation/' + c.id + '">' + (c.title || 'Untitled') + '</a>'
-                      + ' <span style="color:#888;font-size:0.85em;">(' + (c.model || 'unknown') + ' &mdash; ' + c.updated_at + ')</span></li>';
-            });
-            html += '</ul>';
-            el.innerHTML = html;
-        })
-        .catch(function() {
-            el.innerHTML = '<p style="color:#888;font-size:0.9em;">Could not load conversations.</p>';
-        });
-})();
-</script>
 
 <div class="return-nav" style="margin-top:16px">
     <a href="/todo" class="return-button">Return to List View</a>
     <a href="/todo/day" class="return-button">Return to Day View</a>
     <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
 </div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('[Diagnostic] Page loaded - HTMX status:', !!window.htmx);
-    if (window.htmx) htmx.process(document.body);
-  });
-</script>

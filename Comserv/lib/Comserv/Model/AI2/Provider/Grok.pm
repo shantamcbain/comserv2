@@ -40,18 +40,22 @@ sub _resolve_api_key {
     }
     return $ENV{GROK_API_KEY} if $ENV{GROK_API_KEY} && length $ENV{GROK_API_KEY};
 
-    my $user_id = $c->session->{user_id} or return undef;
-    my $roles   = $c->session->{roles} || [];
-    $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
-    my $is_admin = grep { $_ =~ /^(admin|developer)$/i } @$roles;
-    return undef unless $is_admin;   # key sync is admin-only (per v1)
-
+    # The Grok key is an APP-OWNED credential (shared across the app), not a
+    # per-user secret — so it must resolve for ANY authenticated session, not
+    # only admin/dev. The old admin-gate here is what made Grok work
+    # intermittently (only when the chat widget happened to run under an
+    # admin session). Prefer a service-wide active row; fall back to the
+    # row scoped to the current user_id when present.
     my $schema = eval { $c->model('DBEncy')->schema } or return undef;
     my $key_obj = $schema->resultset('UserApiKeys')->search(
-        { user_id => $user_id, service => 'grok', is_active => '1' }
-    )->first || $schema->resultset('UserApiKeys')->search(
         { service => 'grok', is_active => '1' }
     )->first;
+    $key_obj ||= do {
+        my $uid = $c->session->{user_id};
+        $uid ? $schema->resultset('UserApiKeys')->search(
+            { user_id => $uid, service => 'grok', is_active => '1' }
+        )->first : undef;
+    };
 
     return undef unless $key_obj && $key_obj->api_key_encrypted;
     return eval { $key_obj->get_api_key() } || undef;
