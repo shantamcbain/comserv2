@@ -1,8 +1,1 @@
-{
-  "base_dir": "/home/shanta/.comserv/worktrees",
-  "port_start": 4001,
-  "branches": {
-    "ai":                { "port": 4001, "label": "AIChat",          "url": "/planning/daily" },
-    "aichatsystem-ef4e": { "port": 4010, "label": "AIChatSystem",    "url": "/planning/daily" }
-  }
-}
+{"branches":{"InventoryAccounting":{"url":"/planning/daily","label":"InventoryAccounting","port":4001}},"port_start":4000,"base_dir":"/home/shanta/.comserv/worktrees"}

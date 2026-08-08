@@ -574,16 +574,18 @@
     /* ── Branch server operations ───────────────────────────────────────── */
 
     function smartOpenBranch(branch, port, targetUrl) {
+        // Open synchronously from the user's click.  A delayed window.open is
+        // treated as a popup by browsers and is blocked, which made an already
+        // running branch appear not to open.
+        var branchWindow = targetUrl ? window.open(targetUrl, '_blank') : null;
         fetch('/admin/branch_server_action', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=open&branch=' + encodeURIComponent(branch) + '&port=' + port
         }).catch(function() {});
-        var cmd = encodeURIComponent('cd /home/shanta/.zenflow/worktrees/' + branch + '/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p ' + port + ' -r');
-        window.open('/admin/system-shell-terminal?cmd=' + cmd, '_blank');
-        setTimeout(function() {
-            window.open(targetUrl, '_blank');
-        }, 8000);
+        // Keep the command-output terminal available without making it the
+        // only new tab.  The branch page is the primary Open action.
+        if (!branchWindow && targetUrl) window.location.href = targetUrl;
     }
 
     function showBranchStartModal(branch, port, targetUrl) {
@@ -1021,13 +1023,22 @@
             return;
         }
         // Branch server
-        var sob = e.target.closest('[data-smart-open]');
+        // Planning markup uses data-open-branch/data-url; accept the older
+        // data-smart-open/data-target-url contract too.
+        var selectedOpen = e.target.closest('[data-open-selected]');
+        if (selectedOpen) {
+            e.preventDefault();
+            var branchSelect = document.getElementById('bs-select');
+            if (branchSelect && branchSelect.value) window.open(branchSelect.value, '_blank');
+            return;
+        }
+        var sob = e.target.closest('[data-open-branch], [data-smart-open]');
         if (sob) {
             e.preventDefault();
             smartOpenBranch(
-                sob.getAttribute('data-branch'),
+                sob.getAttribute('data-open-branch') || sob.getAttribute('data-branch'),
                 sob.getAttribute('data-port'),
-                sob.getAttribute('data-target-url')
+                sob.getAttribute('data-url') || sob.getAttribute('data-target-url')
             );
             return;
         }

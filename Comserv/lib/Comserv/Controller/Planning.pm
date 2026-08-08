@@ -1729,7 +1729,7 @@ sub _build_worktree_list {
             port  => $b->{port} // 0,
             label => $b->{label} // $name,
             url   => $b->{url}   // '/planning/daily',
-            cmd   => "cd $base/$name/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
+            cmd  => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
         };
     }

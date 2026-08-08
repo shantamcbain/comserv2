@@ -20,6 +20,39 @@
     }
 
     ready(function () {
+        // Shared branch + worktree creation used by both the Git dashboard and
+        // the AI editor Git panel.  Both surfaces call the same admin endpoint.
+        var createForms = document.querySelectorAll('[data-create-worktree-form]');
+        for (var cf = 0; cf < createForms.length; cf++) {
+            createForms[cf].addEventListener('submit', function (e) {
+                e.preventDefault();
+                var formEl = this;
+                var statusEl = formEl.querySelector('[data-create-worktree-status]')
+                    || formEl.parentNode.querySelector('[data-create-worktree-status]');
+                var data = new URLSearchParams(new FormData(formEl));
+                var branch = data.get('branch') || '';
+                if (!branch) return;
+                if (statusEl) statusEl.textContent = 'Creating branch and worktree…';
+                fetch('/admin/git/create_worktree', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    credentials: 'same-origin',
+                    body: data.toString()
+                }).then(function (r) { return r.json(); })
+                  .then(function (result) {
+                      if (!result.success) throw new Error(result.error || 'Creation failed');
+                      if (statusEl) statusEl.textContent = 'Created ' + result.branch +
+                          ' on port ' + result.port + '\n' + (result.path || '');
+                      formEl.reset();
+                      var parent = formEl.querySelector('[name="parent"]');
+                      if (parent) parent.value = 'main';
+                  })
+                  .catch(function (err) {
+                      if (statusEl) statusEl.textContent = 'Git error: ' + err.message;
+                  });
+            });
+        }
+
         var form = document.querySelector('[data-git-file-form]');
 
         // "Select all" toggle (only present when the working tree has changes).

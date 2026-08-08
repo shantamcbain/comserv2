@@ -3437,7 +3437,7 @@ sub reschedule :Path('reschedule') :Args(0) {
 
     my @err_list = @{ $errors // [] };
     $c->response->body(JSON::encode_json({
-        ok            => JSON::true,
+        ok            => 1,
         count         => $count // 0,
         error_count   => scalar(@err_list),
         today         => $today // '',
@@ -3467,6 +3467,9 @@ sub open_log :Path('open_log') :Args(0) {
     my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
     my $data;
     eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    # HTMX submits hx-vals as form parameters, while API callers send JSON.
+    # Accept both request shapes for this shared work-log action.
+    $data ||= { $c->req->params };
     my $record_id = $data->{record_id} if $data;
     unless ($record_id) {
         $c->response->status(400);

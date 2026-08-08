@@ -175,6 +175,58 @@ sub select_best_model {
 }
 
 # -------------------------------------------------------------------
+# dispatch_chat — SINGLE place that turns (model name + messages) into a
+# provider response for the v2 AI system. Used by BOTH the chat widget
+# (Model::AI2::Chat::process) AND the AI Focus-Tune (Controller::Api
+# api_focus_top5), so Ollama / Grok / OpenRouter all route through one
+# code path and never bypass the provider layer (which is what made the
+# tune silently fail on non-Ollama models).
+# -------------------------------------------------------------------
+sub dispatch_chat {
+    my ($self, $c, $requested_model, $messages, %opts) = @_;
+
+    my $can_select = $opts{can_select} // 1;
+    my ($provider_name, $use_model) = $self->select_model($c,
+        requested_model => $requested_model, can_select => $can_select);
+
+    my $dispatch = {
+        ollama     => 'AI2::Provider::Ollama',
+        grok       => 'AI2::Provider::Grok',
+        openrouter => 'AI2::Provider::OpenRouter',
+        external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
+    };
+    my $prov_class = $dispatch->{$provider_name} || 'AI2::Provider::Ollama';
+    my $provider = try { $c->model($prov_class) } catch { undef };
+    return { success => 0, error => "No client available for provider $provider_name" }
+        unless $provider && $provider->can('chat');
+
+    # For Ollama, resolve the first reachable workstation address (LAN vs
+    # ZeroTier vs OLLAMA_HOST). Non-Ollama providers ignore host/port.
+    my ($host, $port);
+    if ($provider->can('resolve_host')) {
+        ($host, $port) = $provider->resolve_host($c);
+    }
+
+    my $resp = try {
+        $provider->chat($c,
+            messages => $messages,
+            model    => $use_model,
+            host     => $host,
+            port     => $port,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'router_dispatch_chat',
+            "Provider $provider_name threw: $_");
+        undef;
+    };
+
+    return { success => 0, error => "Provider $provider_name returned nothing" }
+        unless $resp && ref($resp) eq 'HASH';
+    $resp->{provider} = $provider_name;
+    return $resp;
+}
+
+# -------------------------------------------------------------------
 # get_available_models — merged view across all providers.
 #
 # Local Ollama tags + external (x.ai / OpenRouter) catalog. External models

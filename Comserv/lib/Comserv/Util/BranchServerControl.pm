@@ -3,6 +3,7 @@ package Comserv::Util::BranchServerControl;
 use strict;
 use warnings;
 use JSON qw(encode_json);
+use Comserv::Util::Git;
 
 our %DEFAULT_COMMANDS = (
     'main' => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 DISABLE_HEALTH_MONITOR=1 perl script/comserv_server.pl -p 3001 -r',
@@ -13,7 +14,10 @@ sub new { bless {}, shift }
 sub get_command {
     my ($self, $branch, $port) = @_;
     return $DEFAULT_COMMANDS{$branch}
-        || "cd /home/shanta/.zenflow/worktrees/$branch/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p $port -r";
+        || do {
+            my $base = Comserv::Util::Git->worktree_base_dir;
+            "cd $base/$branch/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p $port -r";
+        };
 }
 
 sub start {
