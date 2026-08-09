@@ -114,6 +114,20 @@
                                 <span class="section-info-warn"><i class="fas fa-download"></i> [% tracking.behind %] behind</span>
                                 [% END %]
                             [% END %]
+                        [% ELSIF tracking.base %]
+                            [# This branch has no GitHub upstream (local-merge workflow).
+                               Show its relationship to the integration base (main), so the
+                               user can see if the branch is stale before starting work. #]
+                            [% IF tracking.base_ahead == 0 && tracking.base_behind == 0 %]
+                                <span class="section-info"><i class="fas fa-check"></i> in sync with [% tracking.base | html %]</span>
+                            [% ELSE %]
+                                [% IF tracking.base_ahead > 0 %]
+                                <span class="section-info"><i class="fas fa-code-branch"></i> [% tracking.base_ahead %] unmerged on [% tracking.base | html %]</span>
+                                [% END %]
+                                [% IF tracking.base_behind > 0 %]
+                                <span class="section-info-warn"><i class="fas fa-arrow-down"></i> [% tracking.base_behind %] behind [% tracking.base | html %] — update before working</span>
+                                [% END %]
+                            [% END %]
                         [% ELSE %]
                             <span class="section-info-warn">no upstream</span>
                         [% END %]
@@ -206,6 +220,13 @@
                         <p>
                             <textarea name="message" placeholder="Commit / stash message"
                                       class="form-control" rows="2" data-git-message="1"></textarea>
+                        </p>
+                        <p>
+                            <label for="git-commit-ai-model">AI model for commit message:</label>
+                            <select id="git-commit-ai-model" class="form-control"
+                                    data-git-ai-model="1">
+                                <option value="">Use automatic model selection</option>
+                            </select>
                         </p>
                         <p>
                             <button type="button" class="admin-btn admin-btn-sm"

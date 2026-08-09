@@ -147,8 +147,9 @@ sub process {
         $args{model}, $can_select,
         agent_id => $args{agent_id},
     );
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'process',
-        "AI2 using provider=$provider_name model=$use_model");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+        "AI2 chat dispatch: user=$username provider=$provider_name model="
+        . ($use_model // '(router-default)') . " can_select=$can_select");
 
     # Dispatch to the correct self-contained v2 provider client.
     my $dispatch = {
@@ -161,6 +162,9 @@ sub process {
     my $provider = try { $c->model($prov_class) } catch { undef };
 
     unless ($provider && $provider->can('chat')) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "No client available for provider=$provider_name (class="
+            . ($prov_class // 'undef') . ")");
         return { success => 0, error => "No client available for provider $provider_name" };
     }
 
@@ -174,7 +178,7 @@ sub process {
     my $resp = try {
         $provider->chat($c,
             messages => $messages,
-            model    => $use_model,
+            model    => $self->_bare_model($use_model),
             host     => $ollama_host,
             port     => $ollama_port,
         );
@@ -185,6 +189,9 @@ sub process {
     };
 
     unless ($resp && $resp->{success}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "Provider $provider_name failed: " . ($resp->{error} // 'AI provider error')
+            . " (model=" . ($use_model // '?') . ", user=$username)");
         return { success => 0, error => $resp->{error} // 'AI provider error' };
     }
 

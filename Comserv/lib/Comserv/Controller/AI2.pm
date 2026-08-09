@@ -459,18 +459,22 @@ sub token_login :Local :Args(0) {
         return;
     }
 
-    my $body;
+    my $body = {};
     try {
-        my $raw = $c->req->can('content') ? $c->req->content : $c->request->body;
-        $raw = do { local $/; <$raw> } if ref($raw);
-        $body = decode_json($raw) if $raw && length($raw);
-    } catch {
-        $c->res->status(400);
-        $c->res->body(encode_json({ success => 0, error => 'Invalid JSON' }));
-        return;
-    };
+        if ($c->req->can('data') && ref($c->req->data) eq 'HASH') {
+            $body = $c->req->data;
+        } elsif (my $raw = $c->req->body) {
+            $body = decode_json($raw) if length($raw);
+        }
+    } catch { };
+    $body = {} unless ref($body) eq 'HASH';
 
-    my $token = $body->{token} || '';
+    # Accept the token from JSON body, form params, OR query string so the
+    # endpoint is testable without fighting Catalyst's POST-body buffering.
+    my $token = $body->{token}
+             || $c->req->param('token')
+             || $c->req->query_params->{token}
+             || '';
     unless ($token) {
         $c->res->status(400);
         $c->res->body(encode_json({ success => 0, error => 'token required' }));

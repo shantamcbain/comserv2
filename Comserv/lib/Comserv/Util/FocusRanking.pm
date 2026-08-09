@@ -42,6 +42,8 @@ use Comserv::Util::TodoRanking ();
 #       project_id  => 235,
 #   }
 #   %filter_ctx = {
+#       role_filtered  => 1,                 # non-CSC-admin visibility gate
+#       permitted_roles=> { editor=>1 },     # roles the viewer may see
 #       all_roles    => { general=>1, developer=>1, ... },  # every role the viewer can pick
 #       checked_roles=> { developer=>1 },                    # roles the viewer selected
 #       site_filtered=> 0|1,        # true when not all sites are selected
@@ -50,35 +52,38 @@ use Comserv::Util::TodoRanking ();
 #       checked_projects=> { 235=>1, 240=>1 },
 #   }
 #
-# Semantics (mirrors the JS):
-#   - 'general' cards always show.
-#   - a card role the viewer does NOT have in all_roles still shows (lenient).
-#   - a card role the viewer has shows only if it is in checked_roles.
-#   - site/project: shown when that dimension is not filtered, or the value is selected.
+# Semantics:
+#   - CSC administrators bypass role and SiteName restrictions.
+#   - Every other viewer must match an assigned role or the general category.
+#   - SiteName is then enforced before project filtering and sorting.
 # ----------------------------------------------------------------------------
 sub passes_filters {
     my ($t, $ctx) = @_;
     $t   //= {};
     $ctx //= {};
 
-    # Role
-    my $all_roles = $ctx->{all_roles} || {};
-    my %checked   = %{ $ctx->{checked_roles} || {} };
+    # Role is the first visibility gate. CSC admins bypass it.
     my $show_role = 1;
-    my @crs = split /,/, ($t->{role_cats} // 'general');
-    my $role_ok = 0;
-    for my $cr (@crs) {
-        $cr =~ s/^\s+|\s+$//g;
-        next if $cr eq '';
-        if ($cr eq 'general') { $role_ok = 1; last; }
-        if (!exists $all_roles->{$cr}) { $role_ok = 1; last; }   # lenient: unknown role shows
-        if ($checked{$cr}) { $role_ok = 1; last; }
+    if ($ctx->{is_csc_admin}) {
+        $show_role = 1;
+    } elsif ($ctx->{role_filtered}) {
+        my $permitted = $ctx->{permitted_roles} || {};
+        my @todo_roles = split /,/, ($t->{role_cats} // 'general');
+        $show_role = 0;
+        for my $role (@todo_roles) {
+            $role =~ s/^\s+|\s+$//g;
+            next unless length $role;
+            if ($role eq 'general' || $permitted->{$role}) {
+                $show_role = 1;
+                last;
+            }
+        }
     }
-    $show_role = $role_ok;
+    return 0 unless $show_role;
 
-    # Site
+    # SiteName is the second visibility gate.
     my $show_site = 1;
-    if ($ctx->{site_filtered}) {
+    if ($ctx->{site_filtered} && !$ctx->{is_csc_admin}) {
         my $cs = $ctx->{checked_sites} || {};
         $show_site = $cs->{ $t->{sitename} // '' } ? 1 : 0;
     }

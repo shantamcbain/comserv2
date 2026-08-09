@@ -32,41 +32,41 @@
     </ol>
 
     <h2>2. Current state (what exists, what's missing)</h2>
-    <table style="width:100%; border-collapse:collapse;">
-        <tr style="background-color: rgba(255,255,255,0.15);">
-            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Capability</th>
-            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Today</th>
-            <th style="text-align:left; padding:8px; border:1px solid var(--border-color);">Gap</th>
+    <table class="doc-table">
+        <tr class="doc-tr-alt">
+            <th class="doc-th">Capability</th>
+            <th class="doc-th">Today</th>
+            <th class="doc-th">Gap</th>
         </tr>
         <tr>
-            <td style="padding:8px; border:1px solid var(--border-color);">AI commit in worktree (gated)</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">✅ pre-commit hook covers it</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">—</td>
+            <td class="doc-td">AI commit in worktree (gated)</td>
+            <td class="doc-td">✅ pre-commit hook covers it</td>
+            <td class="doc-td">—</td>
         </tr>
         <tr>
-            <td style="padding:8px; border:1px solid var(--border-color);">Test in worktree</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">✅ test_gate.sh + per-branch port</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">not yet a required pre-merge step</td>
+            <td class="doc-td">Test in worktree</td>
+            <td class="doc-td">✅ test_gate.sh + per-branch port</td>
+            <td class="doc-td">not yet a required pre-merge step</td>
         </tr>
         <tr>
-            <td style="padding:8px; border:1px solid var(--border-color);">Main sees worktree branch</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">✅ shared .git — branch IS visible</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">no UI to pick/inspect it</td>
+            <td class="doc-td">Main sees worktree branch</td>
+            <td class="doc-td">✅ shared .git — branch IS visible</td>
+            <td class="doc-td">no UI to pick/inspect it</td>
         </tr>
         <tr>
-            <td style="padding:8px; border:1px solid var(--border-color);">Contextual diff review</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">partial (suggest_message reads diff)</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">no per-file view/edit/stage UI</td>
+            <td class="doc-td">Contextual diff review</td>
+            <td class="doc-td">partial (suggest_message reads diff)</td>
+            <td class="doc-td">no per-file view/edit/stage UI</td>
         </tr>
         <tr>
-            <td style="padding:8px; border:1px solid var(--border-color);">Merge worktree &rarr; main</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">❌ not in app</td>
-            <td style="padding:8px; border:1px solid var(--border-color);"><code>merge</code> not in Util::Git whitelist</td>
+            <td class="doc-td">Merge worktree &rarr; main</td>
+            <td class="doc-td">❌ not in app</td>
+            <td class="doc-td"><code>merge</code> not in Util::Git whitelist</td>
         </tr>
         <tr>
-            <td style="padding:8px; border:1px solid var(--border-color);">Push main &rarr; GitHub</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">✅ push exists (but deploy.sh pushes are currently disabled)</td>
-            <td style="padding:8px; border:1px solid var(--border-color);">wire as explicit human action</td>
+            <td class="doc-td">Push main &rarr; GitHub</td>
+            <td class="doc-td">✅ push exists (but deploy.sh pushes are currently disabled)</td>
+            <td class="doc-td">wire as explicit human action</td>
         </tr>
     </table>
 

@@ -925,6 +925,39 @@
     color: var(--text-muted-color);
 }
 
+/* ── Remaining open todos ─────────────────────────────────── */
+
+.RemainingTodosPanel {
+    margin-top: var(--spacing-medium);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 4px);
+    background: var(--bg-secondary);
+}
+
+.RemainingTodosSummary {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    padding: var(--spacing-small) var(--spacing-medium);
+    cursor: pointer;
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+.RemainingTodosCount {
+    color: var(--text-muted-color);
+    font-size: 0.85em;
+    font-weight: normal;
+}
+
+.RemainingTodosBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-small);
+    padding: var(--spacing-small) var(--spacing-medium) var(--spacing-medium);
+    border-top: 1px solid var(--border-color);
+}
+
 /* ── Helpdesk Panel ───────────────────────────────────────── */
 
 .HelpdeskSummary {

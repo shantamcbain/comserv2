@@ -13,6 +13,11 @@ use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
 use POSIX qw(strftime); # For timestamp formatting
 
 my $LOG_FH; # Global file handle for logging
+
+# Rate-limiting state for log-file open failures (see log_to_file). Prevents an
+# EMFILE storm from recursively re-logging itself thousands of times.
+my $_open_fail_last  = 0;
+my $_open_fail_count = 0;
 my $LOG_FILE; # Global log file path
 
 # When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
@@ -986,7 +991,24 @@ sub log_to_file {
     }
     
     unless (open $file, '>>', $file_path) {
-        _print_log("Failed to open file: $file_path - $!");
+        # Do NOT call _print_log() here. When the failure is EMFILE ("Too many
+        # open files") every request logs many lines, each of which re-enters
+        # this sub and fails again — the burst that filled ~2000 log lines with
+        # "Failed to open file" and starved the process of the fd needed to
+        # render error.tt. Rate-limit the complaint to STDERR only.
+        my $err = $!;
+        my $now = time;
+        if ($now - $_open_fail_last >= 60) {
+            my $skipped = $_open_fail_count;
+            $_open_fail_last  = $now;
+            $_open_fail_count = 0;
+            print STDERR "[LOGGING] Failed to open log file $file_path - $err"
+                       . ($skipped ? " (suppressed $skipped similar failures in the last 60s)" : "")
+                       . "\n";
+        }
+        else {
+            $_open_fail_count++;
+        }
         return;
     }
 

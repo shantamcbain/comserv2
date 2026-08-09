@@ -148,7 +148,14 @@ sub score_todo {
     }
     $h->{due_bonus} = $due_bonus;
 
-    $h->{ap_score} = ($status_tier * $w->('status_tier', 100))
+    # status_tier weight is deliberately fractional and < 1 (see note). Status is
+    # NOT a ranking signal: a new todo at P1 must be able to outrank an in-progress
+    # todo at P5. With weight < 1, a single priority step (1.0) always dominates the
+    # status term (0 or 1 * W), so status can never cross a priority boundary — it
+    # only breaks ties between two rows that are otherwise identical (same priority,
+    # due, staleness), where in-progress edges out new. Priority + due + staleness
+    # drive the real order.
+    $h->{ap_score} = ($status_tier * $w->('status_tier', 0.5))
                    + ($priority + $block_bonus + $cross_block_bonus + $due_bonus)
                    + $stale_penalty
                    + $demotion;

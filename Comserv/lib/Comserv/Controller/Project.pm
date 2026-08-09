@@ -634,13 +634,17 @@ sub fetch_projects_with_subprojects :Private {
             );
         }
         unless ($show_all || $is_csc_admin) {
-            $search_cond{sitename} = $SiteName;
+            # Qualify with 'me.' — the prefetch below LEFT JOINs project_dependencies
+            # (and depends_on_me), which ALSO has a sitename column, so a bare
+            # `sitename` in the WHERE is ambiguous and throws DBI error 1052.
+            $search_cond{'me.sitename'} = $SiteName;
         }
         # CSC admin SiteName multi-select: when a non-empty selection is passed,
         # restrict top-level projects to those whose sitename column matches.
         # (project_sites is empty in this DB, so the sitename COLUMN is authoritative.)
         if ($is_csc_admin && $site_filter && ref($site_filter) eq 'ARRAY' && @$site_filter) {
-            $search_cond{sitename} = { -in => $site_filter };
+            # Qualify with 'me.' for the same ambiguous-column reason as above.
+            $search_cond{'me.sitename'} = { -in => $site_filter };
         }
         @top_projects = $schema->resultset('Project')->search(
             \%search_cond,

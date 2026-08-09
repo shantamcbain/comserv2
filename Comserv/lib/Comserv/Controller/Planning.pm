@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AccessControl;
+use Comserv::Util::AdminAuth;
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoRanking;
 use Comserv::Util::FocusRanking;
@@ -42,6 +43,7 @@ sub daily :Path('/planning/daily') :Args {
     # CSC sees text-based planning tabs in addition to DB-driven sections.
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
+    my $is_csc_admin = Comserv::Util::AdminAuth->new->is_csc_admin($c);
 
     # Detect local/dev domain (.local, .zero, localhost) — shown branch servers panel
     my $req_host = $c->req->uri->host_port;
@@ -492,19 +494,17 @@ sub daily :Path('/planning/daily') :Args {
     # Active priorities (smart-scored)
     my @active_priorities;
     eval {
-        my $user_id  = $c->session->{user_id};
         my $roles    = $c->stash->{user_roles} || [];
-        my $can_see_all = $c->stash->{is_admin}
-            || grep { lc($_) =~ /^(developer|devops|editor)$/ } @$roles;
 
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
         my %ap_cond = (status => { -not_in => \@done_statuses });
-        if ($is_csc && $filter_site) {
+        if ($is_csc_admin && $filter_site) {
             $ap_cond{sitename} = $filter_site;
-        } elsif (!$is_csc) {
+        } elsif (!$is_csc_admin) {
             $ap_cond{sitename} = $sitename;
         }
-        $ap_cond{user_id} = $user_id unless $can_see_all;
+        # Do not reduce non-CSC users to only todos they personally created.
+        # Their role visibility is applied before project filtering and sorting.
 
         my %cross_blocker_projects;
         my %cross_blocker_names;
@@ -566,15 +566,6 @@ sub daily :Path('/planning/daily') :Args {
             next if ($h{todo_type} // '') =~ /^(appointment|meeting|event|reminder)$/i;
             next if ($h{is_recurring} // 0);
 
-            # Score via the shared ranking module (project 240 / TodoRanking.pm).
-            # This keeps the Focus Queue ordering identical to the main Todo list.
-            Comserv::Util::TodoRanking::score_todo(\%h, {
-                now_epoch              => $now_epoch,
-                cross_blocker_projects => \%cross_blocker_projects,
-                cross_blocker_names    => \%cross_blocker_names,
-                row_by_id              => \%row_by_id,
-            });
-
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
@@ -599,20 +590,42 @@ sub daily :Path('/planning/daily') :Args {
             # Mirrors the client applyAllFilters but runs server-side so any controller
             # (CSC planning, BMaster calendar, etc.) can reuse the same predicate.
             my %filter_ctx = (
+                role_filtered   => $is_csc_admin ? 0 : 1,
+                is_csc_admin    => $is_csc_admin ? 1 : 0,
+                permitted_roles => {
+                    map { lc($_) => 1 } grep { defined && length } @$roles
+                },
                 all_roles       => { map { $_ => 1 } @{ $c->stash->{user_roles} || [] } },
                 checked_roles   => { map { $_ => 1 } @{ $c->stash->{user_roles} || [] } },
-                site_filtered   => (defined $filter_site && length $filter_site) ? 1 : 0,
-                checked_sites   => { ($filter_site || '') => 1 },
+                site_filtered   => $is_csc_admin ? 0 : 1,
+                checked_sites   => {
+                    ($is_csc_admin ? ($filter_site || '') : $sitename) => 1
+                },
                 proj_filtered   => (defined $filter_project && length $filter_project) ? 1 : 0,
                 checked_projects=> { ($filter_project || '') => 1 },
             );
             next unless Comserv::Util::FocusRanking::passes_filters(\%h, \%filter_ctx);
 
+            # Score only after the SiteName/role gate. Visibility is decided
+            # before project filtering, ranking, and the Focus Queue limit.
+            Comserv::Util::TodoRanking::score_todo(\%h, {
+                now_epoch              => $now_epoch,
+                cross_blocker_projects => \%cross_blocker_projects,
+                cross_blocker_names    => \%cross_blocker_names,
+                row_by_id              => \%row_by_id,
+            });
+
             push @scored, \%h;
         }
 
         my @all_sorted = sort {
-            $a->{ap_score} <=> $b->{ap_score} || $a->{priority} <=> $b->{priority}
+            # A todo currently being worked (status 5) is the first item an
+            # admin needs to see, regardless of its numeric priority score.
+            my $a_active = (($a->{status} // '') eq '5') ? 1 : 0;
+            my $b_active = (($b->{status} // '') eq '5') ? 1 : 0;
+            $b_active <=> $a_active
+                || $a->{ap_score} <=> $b->{ap_score}
+                || $a->{priority} <=> $b->{priority}
         } @scored;
 
         if ($filter_project) {
@@ -626,13 +639,35 @@ sub daily :Path('/planning/daily') :Args {
         $c->stash->{focus_queue_limit}         = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_LIMIT;
 
         my $limit = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_LIMIT;
-        if ($focus_total > $limit) {
-            @active_priorities = @all_sorted[0 .. $limit - 1];
-            $c->stash->{active_priorities_backlog} = $focus_total - $limit;
-        } else {
-            @active_priorities = @all_sorted;
-            $c->stash->{active_priorities_backlog} = 0;
+        my $ip_cap = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_IN_PROGRESS_CAP;
+
+        # Build the Focus Queue so a flood of in-progress rows cannot bury the
+        # highest-priority OPEN todos (project 240 fix). The scorer already sorts
+        # every in-progress row above every open row, so a plain top-N slice would
+        # surface only in-progress items when the in-progress pool is large. Walk the
+        # score-sorted list, keeping at most $ip_cap in-progress rows, then fill the
+        # rest of the queue (up to $limit) with the next highest-priority open rows.
+        # When the in-progress pool is smaller than the cap, the open rows simply
+        # continue filling the queue in score order.
+        my (@ip_picked, @open_picked);
+        for my $row (@all_sorted) {
+            if ($row->{in_progress}) {
+                push @ip_picked, $row if scalar(@ip_picked) < $ip_cap;
+            } else {
+                push @open_picked, $row;
+            }
+            last if (scalar(@ip_picked) + scalar(@open_picked)) >= $limit;
         }
+        @active_priorities = (@ip_picked, @open_picked);
+        $c->stash->{active_priorities_backlog} = $focus_total - scalar(@active_priorities);
+
+        # Keep the complete eligible backlog available separately from the
+        # limited Focus Queue. It uses the same server-side filters and score
+        # ordering, but is never truncated to FOCUS_QUEUE_LIMIT.
+        my %focus_ids = map { $_->{record_id} => 1 } @active_priorities;
+        $c->stash->{remaining_open_todos} = [
+            grep { !$focus_ids{$_->{record_id}} } @all_sorted
+        ];
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;

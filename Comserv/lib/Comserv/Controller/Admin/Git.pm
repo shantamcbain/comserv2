@@ -535,54 +535,39 @@ Diff${\ ($truncated ? ' (truncated)' : '')}:
 $diff
 PROMPT
 
-    # Resolve an installed local model via the same Router the chat uses.
-    my $provider = try { $c->model('AI2::Provider::Ollama') } catch { undef };
-    unless ($provider && $provider->can('chat')) {
-        $c->response->body(encode_json({ success => 0, error => 'AI provider unavailable' }));
+    # An explicit model from the Git dashboard wins. The dropdown offers the
+    # FULL catalog (Ollama + Grok + OpenRouter); the selected value is
+    # "provider|model" (e.g. "openrouter|tencent/hy3"). If empty, the Router
+    # falls back to the app-wide default (openrouter|tencent/hy3) unless no
+    # external key is configured, in which case it uses local Ollama — so the
+    # behavior is consistent with the chat widget and editor.
+    my $requested_model = $c->req->param('model') || '';
+    $requested_model = '' if $requested_model =~ /[\x00\r\n]/;
+
+    # SINGLE dispatch brain — identical code path to the chat widget and the
+    # Focus-Tune agent (Model::AI2::Router::dispatch_chat). No bespoke Ollama
+    # branch here: local vs external is decided once, in the Router, so the Git
+    # dashboard can never diverge from the rest of the app.
+    my $router = try { $c->model('AI2::Router') } catch { undef };
+    unless ($router && $router->can('dispatch_chat')) {
+        $c->response->body(encode_json({ success => 0, error => 'AI router unavailable' }));
         return;
     }
 
-    my ($host, $port) = $provider->resolve_host($c);
-
-    # Prefer a model that is ALREADY resident in Ollama — a commit message only
-    # describes a diff (which already contains the code + your comments), so
-    # code-awareness buys little, and paying a cold ~9GB weight-load is the main
-    # cost. If something chat-capable is warm, use it; otherwise let the Router
-    # pick (which may trigger a load).
-    my $model;
-    my $running = try { $provider->running_models($c, $host, $port) } catch { [] };
-    my @warm_chat = grep {
-        $_ && $_ !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-    } @$running;
-
-    if (@warm_chat) {
-        $model = $warm_chat[0];
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
-            "Reusing already-loaded model '$model' (warm) for $scope");
-    }
-    else {
-        my $installed = try { $provider->list_models($c) } catch { [] };
-        (my $prov_name, $model) = $c->model('AI2::Router')->select_model($c,
-            installed_models => $installed,
-            agent_id         => 'coding',
-        );
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
-            "No warm model; Router selected '$model' (cold load likely) for $scope");
-    }
+    my $messages = [
+        { role => 'system', content => 'You are a precise git commit message generator.' },
+        { role => 'user',   content => $prompt },
+    ];
 
     my $resp = try {
-        $provider->chat($c,
-            model    => $model,
-            host     => $host,
-            port     => $port,
-            messages => [
-                { role => 'system', content => 'You are a precise git commit message generator.' },
-                { role => 'user',   content => $prompt },
-            ],
+        $router->dispatch_chat($c,
+            $requested_model,
+            $messages,
+            can_select => 1,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'suggest_commit_message', "AI call threw: $_");
+            'suggest_commit_message', "AI dispatch threw: $_");
         undef;
     };
 
@@ -594,18 +579,19 @@ PROMPT
         return;
     }
 
+    my $used_model = $resp->{model} // $requested_model // 'unknown';
     my $message = $resp->{response};
     $message =~ s/^\s+//; $message =~ s/\s+$//;
     # Strip any stray code fences the model may add despite instructions.
     $message =~ s/^```[a-zA-Z]*\n?//; $message =~ s/\n?```$//;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
-        "Suggested commit message (" . length($message) . " chars) via $model");
+        "Suggested commit message (" . length($message) . " chars) via $used_model");
 
     $c->response->body(encode_json({
         success => 1,
         message => $message,
-        model   => $resp->{model} // $model,
+        model   => $used_model,
     }));
 }
 
