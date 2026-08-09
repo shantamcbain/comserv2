@@ -295,6 +295,24 @@
                     [% END %]
                 </div>
                 [% END %]
+
+                [% IF remaining_open_todos && remaining_open_todos.size %]
+                <details class="RemainingTodosPanel">
+                    <summary class="RemainingTodosSummary">
+                        <span>📋 Remaining eligible todos</span>
+                        <span class="RemainingTodosCount">[% remaining_open_todos.size %]</span>
+                    </summary>
+                    <div class="RemainingTodosBody">
+                    [% FOREACH todo IN remaining_open_todos %]
+                        [% INCLUDE 'todo/todo_card.tt'
+                            tc           = todo
+                            tc_show_done = 1
+                            tc_done_fn   = 'quickClose'
+                        %]
+                    [% END %]
+                    </div>
+                </details>
+                [% END %]
             </div>
 
             

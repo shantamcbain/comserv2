@@ -1,0 +1,262 @@
+[% META
+        title = "Branch Sync & Conflict Assist Plan"
+   description = "Plan: bidirectional main<->worktree merge, multi-branch update, AI conflict resolution, and open-commit warning on branch creation"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "git"
+   project_id = "3"
+   project_code = "Project"
+   page_version = "0.01"
+   last_updated = "Sun Aug 09 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/BranchSyncConflictAssist.tt,v 0.01 2026/08/09 hermes-agent Exp shanta - Plan: bidirectional main<->worktree sync, multi-branch update, AI conflict assist, open-commit warning' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<div class="container">
+    <h1 class="doc-h1">Branch Sync &amp; Conflict Assist Plan</h1>
+
+    <div class="last-updated" class="doc-muted">
+        Last Updated: 2026-08-09 |
+        Version: 0.01 |
+        Author: Hermes (on request) |
+        Status: DRAFT for review — no code written yet
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#prerequisites" class="doc-navlink">Prerequisites</a>
+                <a href="#features" class="doc-navlink">Key Features</a>
+                <a href="#getting-started" class="doc-navlink">Getting Started</a>
+                <a href="#advanced" class="doc-navlink">Advanced Usage</a>
+                <a href="#troubleshooting" class="doc-navlink">Troubleshooting</a>
+                <a href="#config-ref" class="doc-navlink">Configuration</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">This plan enhances the in-app Git dashboard so branches stay current with <code>main</code>, multiple branches can be updated at once, merge conflicts get AI assistance, and branch creation warns when the source branch has unmerged commits. No code has been written yet — this document is for review before implementation.</p>
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES & KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-50">
+            <h2 id="prerequisites" class="doc-h2">2. Prerequisites</h2>
+            <ul class="doc-body">
+                <li>Comserv Git dashboard (<code>/admin/git</code>) running against a linked worktree.</li>
+                <li>Verified 2026-08-09: worktrees are <strong>linked</strong> git worktrees of the PyCharm repo; port 3001 = <code>main</code>, port 4001 = <code>InventoryAccounting</code> worktree (separate working dirs, no same-file edit collision).</li>
+                <li><code>get_tracking_info()</code> in <code>lib/Comserv/Util/Git.pm</code> already returns <code>base</code> / <code>base_ahead</code> / <code>base_behind</code> vs <code>main</code>.</li>
+                <li><code>Git.pm</code> already whitelists <code>merge</code> (flags <code>--no-ff --no-commit --abort --squash</code>) and <code>pull</code> (<code>--ff-only</code>).</li>
+                <li>DB verification must target the primary <code>192.168.1.20:3307</code> (ency), not the .198 replica.</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 id="features" class="doc-h2">3. Key Features</h2>
+            <ul class="doc-body">
+                <li><strong>Bidirectional merge</strong>: merge <code>main</code> into a branch (update) and merge a finished branch into <code>main</code>.</li>
+                <li><strong>Multi-branch update</strong>: select several branches, merge <code>main</code> into all in one action; one conflict does not block others.</li>
+                <li><strong>AI conflict assist</strong>: on conflict, read both sides, propose a resolution, stage (never auto-commit); gated behind a config flag.</li>
+                <li><strong>Open-commit warning</strong>: branch creation warns when the source has commits not in <code>main</code>, requiring explicit confirm.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- GETTING STARTED SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="getting-started" class="doc-h2">4. Getting Started (Implementation Steps)</h2>
+
+            <div class="doc-info">
+                <h3 class="doc-h3">Relationship to other plans</h3>
+                <p class="doc-body">This document is a sub-plan of the
+                    <a href="/Documentation/MASTER_PLAN" >Comserv2 Master Plan</a>
+                    (Git Subsystem Refactor, W1.2). It extends the merge-to-main workflow described in
+                    <a href="/Documentation/git_worktree_merge_plan" >git_worktree_merge_plan</a>
+                    (In-App Git: Worktree AI-Commit &rarr; Human Merge-to-Main) by adding: (a) a safe
+                    <em>main&rarr;branch</em> update path, (b) multi-branch updates, (c) AI-assisted conflict
+                    resolution, and (d) an open-commit warning on branch creation. It also builds on
+                    <a href="/Documentation/git_worktree_new_system_plan" >git_worktree_new_system_plan</a>
+                    (the isolated-creation backend) and the
+                    <a href="/Documentation/GitSubsystemRefactorPlan" >Git Subsystem Refactor Plan</a>.</p>
+            </div>
+
+            <h3 id="gs-step1" class="doc-h3">4.1 Step 1: Safe merge util</h3>
+            <p class="doc-body">Add <code>merge_base($c, $branch, $base, \%opts)</code> to <code>lib/Comserv/Util/Git.pm</code>:</p>
+            <ul class="doc-body">
+                <li>Validate <code>$base</code> against an allow-list (<code>main</code>, <code>master</code>, <code>Production</code>) — never free-form.</li>
+                <li>Run <code>git -C $repo merge --no-ff --no-commit $base</code> via <code>_run</code>.</li>
+                <li>If conflicts, detect via <code>git diff --name-only --diff-filter=U</code> and return <code>{ conflicted =&gt; [...], needs_resolution =&gt; 1 }</code> without committing.</li>
+                <li>On any failure, <code>git merge --abort</code> to keep the branch clean (non-destructive).</li>
+            </ul>
+
+            <h3 id="gs-step2" class="doc-h3">4.2 Step 2: Controller op + template button</h3>
+            <p class="doc-body">Add a <code>merge</code> op to the <code>Admin/Git.pm</code> action handler (mirror the existing <code>push</code>/<code>switch</code> structure). In <code>root/admin/git/index.tt</code>, show an "Update from main" button when <code>tracking.base_behind &gt; 0</code> (reuses the existing signal), posting <code>op=merge&amp;base=main</code>. Add a branch multi-select + "Update all from main" button.</p>
+
+            <h3 id="gs-step3" class="doc-h3">4.3 Step 3: AI conflict resolution + open-commit warning</h3>
+            <p class="doc-body">On <code>needs_resolution</code>, show a per-file "Resolve with AI" button. Backend sends both conflict sides to the AI helper, writes the proposed resolution to the worktree file, stages it (human reviews the diff and commits). Gate behind <code>git.ai_conflict_assist</code> (default off). For the warning, compute <code>git rev-list --left-right --count main...$source</code> inside <code>create_worktree()</code> and require confirm in <code>branch_management.tt</code>.</p>
+
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ADVANCED USAGE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="advanced" class="doc-h2">5. Advanced Usage</h2>
+
+            <h3 id="adv-feature1" class="doc-h3">5.1 Multi-branch update</h3>
+            <p class="doc-body"><code>merge_base_multi($c, \@branches, $base)</code> loops per branch and returns independent results. A conflict on one branch does not block the others. Useful for keeping several long-lived feature branches current with <code>main</code> before new AI work starts.</p>
+
+            <h3 id="adv-integration" class="doc-h3">5.2 Integration with other systems</h3>
+            <p class="doc-body">AI conflict resolution reuses the existing auxiliary-client / chat-completion path (<code>agent/auxiliary_client</code>), not a new provider. The config flag lives in <code>config.yaml</code> (non-secret behavioral setting), surfaced via <code>hermes_cli/config.py</code> <code>DEFAULT_CONFIG</code>.</p>
+
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" class="doc-h2">6. Troubleshooting</h2>
+
+            <div class="warning" class="doc-warning">
+                <h3 id="ts-issue1" class="doc-h3">Problem: merge leaves the branch dirty after a conflict</h3>
+                <p class="doc-body"><strong>Symptoms:</strong> A failed merge leaves conflict markers or a partial index.</p>
+                <p class="doc-body"><strong>Solution:</strong> <code>merge_base</code> must always call <code>git merge --abort</code> on failure before returning, so the branch is restored to its pre-merge state. Verify with <code>git status</code> showing no conflict markers.</p>
+            </div>
+
+            <div class="doc-info">
+                <h3 id="ts-issue2" class="doc-h3">Problem: "no upstream" still logged as ERROR</h3>
+                <p class="doc-body"><strong>Symptoms:</strong> Spurious error-audit todos from <code>git rev-parse @{u}</code> exit 128.</p>
+                <p class="doc-body"><strong>Solution:</strong> <code>Git.pm _run</code> demotes the "no upstream configured" case to <code>info</code> (already applied 2026-08-09). Ensure the fix is present before testing the dashboard.</p>
+            </div>
+
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CONFIGURATION REFERENCE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="config-ref" class="doc-h2">7. Configuration Reference</h2>
+
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Parameter</th>
+                    <th class="doc-th">Type</th>
+                    <th class="doc-th">Default</th>
+                    <th class="doc-th">Description</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">git.ai_conflict_assist</td>
+                    <td class="doc-td">boolean</td>
+                    <td class="doc-td">false</td>
+                    <td class="doc-td">Enables the AI "Resolve conflict" action. Off by default to avoid scope creep.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">merge base allow-list</td>
+                    <td class="doc-td">list</td>
+                    <td class="doc-td">main, master, Production</td>
+                    <td class="doc-td">Only these branches may be merged as a base; prevents free-form merge targets.</td>
+                </tr>
+            </table>
+
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PROJECT TRACKING SECTION (RULE P1) -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="/project/details?project_id=3" >#3 (Project)</a>.
+                Each phase below is a <strong>sub-project</strong>, not a single todo.
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase / Sub-project</th>
+                    <th class="doc-th">Tracking item</th>
+                    <th class="doc-th">Gate / Done when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase A &mdash; safe merge util + op</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2006" >todo 2006</a></td>
+                    <td class="doc-td">merge_base() merges main into a worktree branch cleanly; dashboard "Update from main" works on port 4001.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase B &mdash; multi-branch update</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2006" >todo 2006</a></td>
+                    <td class="doc-td">Select N branches, merge main into all; per-branch results; one conflict does not block others.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase C &mdash; AI conflict assist</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2006" >todo 2006</a></td>
+                    <td class="doc-td">Conflict surfaces "Resolve with AI"; proposal staged, never auto-committed; gated behind git.ai_conflict_assist.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase D &mdash; open-commit warning</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2006" >todo 2006</a></td>
+                    <td class="doc-td">create_worktree() warns when source has commits not in main; confirm required before proceeding.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
+                    <td class="doc-td">todo 2007 (recurring &mdash; set recurrence in Todo UI; API whitelist drops is_recurring)</td>
+                    <td class="doc-td">Keeps this plan from going stale as the Git subsystem evolves.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" doc-success">
+                <h2 class="doc-h2">8. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="/Documentation/MASTER_PLAN" >Comserv2 Master Plan</a> (parent plan; Git Subsystem Refactor W1.2)</li>
+                    <li><a href="/Documentation/git_worktree_merge_plan" >git_worktree_merge_plan</a> (In-App Git: Worktree AI-Commit &rarr; Human Merge-to-Main)</li>
+                    <li><a href="/Documentation/git_worktree_new_system_plan" >git_worktree_new_system_plan</a> (isolated worktree creation backend)</li>
+                    <li><a href="/Documentation/GitSubsystemRefactorPlan" >Git Subsystem Refactor Plan</a></li>
+                    <li><a href="/Documentation/Git" >Git</a></li>
+                    <li><a href="/admin/git" >Git Dashboard</a></li>
+                    <li><a href="/admin/branch_management" >Branch Management</a></li>
+                </ul>
+            </div>
+
+            <p class="doc-backtop"><a href="#toc" >&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

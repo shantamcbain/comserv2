@@ -141,6 +141,27 @@
         // "Suggest message with AI" — POST selected paths (if any) to the suggest
         // endpoint and drop the returned message into the commit/stash input.
         var suggestBtn = document.querySelector('[data-git-suggest]');
+        var aiModelSelect = document.querySelector('[data-git-ai-model]');
+        if (aiModelSelect && window.ComservChat && ComservChat.modelSelect) {
+            ComservChat.modelSelect.init({
+                selectEl: aiModelSelect,
+                context: 'code',
+                onReady: function () {
+                    // Full provider list is shown (Ollama + Grok + OpenRouter) so
+                    // the user can choose a model that won't stall the workstation.
+                    // Per explicit direction, all models are available everywhere;
+                    // per-page defaulting/visibility is a separate later choice.
+                    var automatic = document.createElement('option');
+                    automatic.value = '';
+                    automatic.textContent = 'Use automatic model selection';
+                    aiModelSelect.insertBefore(automatic, aiModelSelect.firstChild);
+                    aiModelSelect.value = '';
+                },
+                onError: function () {
+                    aiModelSelect.innerHTML = '<option value="">Automatic model selection</option>';
+                }
+            });
+        }
         if (suggestBtn) {
             suggestBtn.addEventListener('click', function () {
                 var url    = suggestBtn.getAttribute('data-git-suggest-url');
@@ -152,6 +173,9 @@
                 var boxes = selectedBoxes();
                 for (var k = 0; k < boxes.length; k++) {
                     body.append('paths', boxes[k].value);
+                }
+                if (aiModelSelect && aiModelSelect.value) {
+                    body.append('model', aiModelSelect.value);
                 }
 
                 suggestBtn.disabled = true;

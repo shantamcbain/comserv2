@@ -299,6 +299,22 @@ around 'finalize_error' => sub {
             $c->stash->{error_title} ||= 'Application Error';
             $c->stash->{error_msg}   ||= 'An unexpected error occurred.';
             $c->stash->{technical_details} ||= join(', ', @{$c->error // []});
+
+            # API/AJAX callers get JSON and never touch the TT view. Rendering
+            # error.tt requires opening a template file, which is exactly the
+            # resource that is unavailable under EMFILE ("Too many open files")
+            # — so the error page failed and produced a SECOND, more confusing
+            # error than the original. Serving a static string needs no fd.
+            my $wants_json = (($c->req->path // '') =~ m{^/?api/}i)
+                          || (($c->req->header('Accept') // '') =~ /application\/json/i)
+                          || (($c->req->header('X-Requested-With') // '') =~ /XMLHttpRequest/i);
+
+            if ($wants_json) {
+                $c->response->content_type('application/json; charset=utf-8');
+                $c->response->body('{"success":0,"error":"Internal Server Error"}');
+                return;
+            }
+
             $c->stash->{template} = 'error.tt';
 
             eval {

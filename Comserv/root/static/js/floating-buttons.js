@@ -13,9 +13,9 @@
         // Show/hide on scroll
         window.addEventListener('scroll', () => {
             if (window.scrollY > 300) {
-                btn.classList.add('visible');
+                btn.classList.add('show');
             } else {
-                btn.classList.remove('visible');
+                btn.classList.remove('show');
             }
         });
 

@@ -55,7 +55,7 @@ my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
 my %ALLOWED_FLAGS = (
     status   => { map { $_ => 1 } qw(--porcelain --short -s --no-color) },
     log      => { map { $_ => 1 } qw(--oneline --no-color --stat -n) },
-    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short) },
+    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet) },
     'rev-list'  => { map { $_ => 1 } qw(--left-right --count) },
     branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color --format) },
     diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified) },
@@ -380,7 +380,26 @@ sub _run {
     $result->{error}     = defined $err ? $err : '';
     $result->{success}   = ($code == 0) ? 1 : 0;
 
-    my $level = $result->{success} ? 'info' : 'error';
+    # Log level: a non-zero exit is usually an error, but some expected/graceful
+    # conditions legitimately exit non-zero and are handled by the caller:
+    #   * `rev-parse --abbrev-ref --symbolic-full-name @{u}` exits 128 with
+    #     "fatal: no upstream configured for branch '...'" when a branch simply
+    #     has no tracking branch. get_tracking_info() treats that as
+    #     upstream => undef (a normal dashboard state), so logging it as ERROR
+    #     just creates noise / false error-audit todos. Demote such known-benign
+    #     "no upstream" results to info so real failures still stand out.
+    #   * The same is true for `rev-list --left-right --count @{u}...HEAD`.
+    # Detect this structurally (the argv asks about @{u}) as well as by message
+    # text, because git's wording varies by version/locale and a text-only match
+    # silently stops working after a git upgrade.
+    my $combined   = ($result->{output} // '') . "\n" . ($result->{error} // '');
+    my $asks_upstream = grep { defined $_ && /\@\{u(pstream)?\}/ } @argv;
+    my $benign   = !$result->{success}
+                && ( $asks_upstream
+                  || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
+    my $level    = $result->{success} ? 'info'
+                 : $benign            ? 'info'
+                 :                      'error';
     $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_run',
         "git " . join(' ', @argv) . " -> exit=$code out=" . substr($result->{output}, 0, 500));
 
@@ -586,26 +605,79 @@ sub get_git_status {
 
 =head2 get_tracking_info($c)
 
-Ahead/behind vs upstream (does not fetch): { upstream, ahead, behind }.
+Ahead/behind vs the branch's integration base.
+
+This project does NOT use a GitHub-style push/pull workflow per branch.
+Worktrees are *linked* to the main (PyCharm) repo's .git, so a branch in a
+worktree IS the same ref as that branch in the PyCharm repo — the AI commits
+in the worktree, the user verifies and commits, then merges into `main`.
+
+We therefore compute the relationship in two layers:
+
+  1. GitHub upstream (@{u}) if it exists — the classic ahead/behind.
+  2. FALLBACK when there is no @{u} (the normal local-merge case): compare the
+     current branch against `main` using a local-only `rev-list --count` (no
+     fetch, no network — `main` is a local branch in the shared repo). This is
+     the signal the dashboard needs: "is my branch behind main?" so the branch
+     can be updated before new work starts.
+
+Returns { upstream, ahead, behind, base, base_ahead, base_behind } where the
+`base*` fields describe the relationship to `main` (or whatever integration
+base we pick) regardless of whether a GitHub upstream is configured.
 
 =cut
 
 sub get_tracking_info {
     my ($self, $c) = @_;
-    my $info = { upstream => undef, ahead => 0, behind => 0 };
+    my $info = {
+        upstream     => undef,
+        ahead        => 0,
+        behind       => 0,
+        base         => undef,   # integration base we fell back to (e.g. 'main')
+        base_ahead   => 0,       # commits in branch not in base
+        base_behind  => 0,       # commits in base not in branch (branch is stale)
+    };
 
+    # --- Layer 1: GitHub-style upstream if configured -------------------
     my $r = $self->_run($c, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}');
     my $upstream = $r->{output};
     chomp $upstream if defined $upstream;
-    return $info if !$r->{success} || !$upstream || $upstream =~ /fatal|no upstream/i;
-    $info->{upstream} = $upstream;
+    if ($r->{success} && $upstream && $upstream !~ /fatal|no upstream/i) {
+        $info->{upstream} = $upstream;
+        my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', '@{u}...HEAD');
+        my $counts = $cr->{output};
+        chomp $counts if defined $counts;
+        if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
+            $info->{behind} = $1;
+            $info->{ahead}  = $2;
+        }
+        return $info;
+    }
 
-    my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', '@{u}...HEAD');
+    # --- Layer 2: local-merge fallback vs integration base -----------------
+    # Pick a base branch: `main` if it exists, else `master`, else the repo's
+    # first existing local branch that is not the current branch.
+    my $current = $self->get_current_branch($c);
+    my $base;
+    for my $cand (qw(main master)) {
+        my $br = $self->_run($c, 'rev-parse', '--verify', '--quiet', $cand);
+        if ($br->{success} && length($br->{output} // '')) {
+            $base = $cand;
+            last;
+        }
+    }
+    return $info unless defined $base;          # no base to compare against
+    return $info if defined $current && $current eq $base;  # already on base
+
+    $info->{base} = $base;
+    my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$base...HEAD");
     my $counts = $cr->{output};
     chomp $counts if defined $counts;
     if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
-        $info->{behind} = $1;
-        $info->{ahead}  = $2;
+        # left  = commits only in $base (branch is BEHIND $base -> stale)
+        # right = commits only in HEAD (branch is AHEAD of $base -> unmerged work)
+        $info->{base_behind} = $1;
+        $info->{base_ahead}  = $2;
     }
     return $info;
 }

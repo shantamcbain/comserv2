@@ -78,6 +78,15 @@ sub-plan remains the authoritative spec for its own work.</p>
             <a class="menu-item" href="#index">Index</a>
         </div>
     </div>
+    <div class="submenu-section">
+        <span class="submenu-section-title">Git</span>
+        <div class="nav-row">
+            <a class="menu-item" href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">Git Refactor</a>
+            <a class="menu-item" href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">Worktree Create</a>
+            <a class="menu-item" href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">Merge-to-Main</a>
+            <a class="menu-item" href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">Branch Sync</a>
+        </div>
+    </div>
 </nav>
 
 <h2 id="principles">0. Guiding principles (apply to every wave)</h2>
@@ -157,6 +166,7 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li>Remaining: <strong>B</strong> (centralise path — largely delivered early by A3), <strong>D</strong> (chained auth base), <strong>E</strong> (read-only parsers + partials), <strong>F.5/F.8/F.9</strong> (software-card include, convert 6 legacy templates to <code>admin-*</code>, in-browser check), <strong>G.3/G.4/G.6</strong> (safe pull, branch switch, write-safety contract).</li>
     <li>Gate: D/E/F done before Deployment Workflow Plan reuses git_pull owner.</li>
 </ul>
+<p>Branch-sync extension: <a href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">/Documentation/BranchSyncConflictAssist</a> &mdash; adds bidirectional main&harr;worktree merge, multi-branch update, AI conflict assist, and an open-commit warning on branch creation (sub-plan of W1.2; tracking todo #2006 in project 3).</p>
 
 <h4 id="w1-3">W1.3 — Security Hardening Free Stack</h4>
 <p>Route: <a href="[% c.uri_for('/Documentation/security_hardening_free_stack') %]">/Documentation/security_hardening_free_stack</a> (tools installed)</p>
@@ -318,6 +328,9 @@ WAVE 5   Routing std, Deploy WF, Daily Plan, K8s/infra cluster,
         <tr><td style="border:1px solid var(--border-color);">3D Browse Gallery</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/3dBrowseGalleryPlan') %]">/Documentation/3dBrowseGalleryPlan</a></td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/plans/3d-browse-gallery') %]">/Documentation/plans/3d-browse-gallery</a></td></tr>
         <tr><td style="border:1px solid var(--border-color);">AI2 Migration</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/ai2_migration_plan') %]">/Documentation/ai2_migration_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
         <tr><td style="border:1px solid var(--border-color);">Git Subsystem Refactor</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">/Documentation/GitSubsystemRefactorPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
+        <tr><td style="border:1px solid var(--border-color);">Git Worktree — new isolated-creation backend</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">/Documentation/git_worktree_new_system_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
+        <tr><td style="border:1px solid var(--border-color);">Git Worktree — AI-commit → human merge-to-main</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">/Documentation/git_worktree_merge_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
+        <tr><td style="border:1px solid var(--border-color);">Branch Sync &amp; Conflict Assist (sub-plan of Git refactor)</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">/Documentation/BranchSyncConflictAssist</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
         <tr><td style="border:1px solid var(--border-color);">Security Hardening</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/security_hardening_free_stack') %]">/Documentation/security_hardening_free_stack</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
         <tr><td style="border:1px solid var(--border-color);">Voice Inspection</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/VoiceInspectionPlan') %]">/Documentation/VoiceInspectionPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
         <tr><td style="border:1px solid var(--border-color);">Herb Sign Generator</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/HerbSignGeneratorPlan') %]">/Documentation/HerbSignGeneratorPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>

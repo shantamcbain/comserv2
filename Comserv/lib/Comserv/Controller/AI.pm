@@ -232,6 +232,40 @@ sub index :Path :Args(0) {
     }
 
     # Set template variables
+    # Build a single, normalized, role-aware model catalog and stash it to the
+    # session (cached) so EVERY page — including the floating "Chat with AI"
+    # widget — can render the full provider list server-side without a per-use
+    # fetch. The widget reads window.ComservConfig.models (rendered in
+    # js_load.tt) instead of calling /ai2/providers on every open, which both
+    # removes the fragile fetch/render race AND saves CPU (fetched once per
+    # session, not per page load). Per your direction: ALL models are included
+    # (Ollama + Grok + OpenRouter) so the user can pick one that won't stall the
+    # workstation; per-page visibility is a separate, later choice.
+    my @_catalog;
+    for my $m (@$installed_models) {
+        my $name = ref($m) ? ($m->{name} || '') : ($m || '');
+        next unless $name;
+        push @_catalog, { value => "ollama|$name", label => $name, provider => 'ollama' };
+    }
+    for my $m (@external_models) {
+        my $name = $m->{name} || '';
+        next unless $name;
+        my $prov = $m->{provider} || 'external';
+        my $label = $m->{label} || $name;
+        push @_catalog, { value => "$prov|$name", label => $label, provider => $prov };
+    }
+    # Session-cache: build at most once per session (CPU saving).
+    unless ($c->session->{ai_model_catalog} && ref($c->session->{ai_model_catalog}) eq 'ARRAY' && @{$c->session->{ai_model_catalog}}) {
+        $c->session->{ai_model_catalog} = \@_catalog;
+    }
+    # Pre-serialized JSON string for direct emission into the page (no TT filter,
+    # which the template engine rejects). Built once per session.
+    unless ($c->session->{ai_model_catalog_json}) {
+        my $json = '[]';
+        eval { require JSON; $json = JSON->new->utf8->encode($c->session->{ai_model_catalog}); };
+        $c->session->{ai_model_catalog_json} = $json;
+    }
+    $c->stash(ai_model_catalog => $c->session->{ai_model_catalog});
     $c->stash(
         template => 'ai/index.tt',
         page_title => 'AI Assistant',
@@ -7484,54 +7518,85 @@ sub get_user_providers :Local :Args(0) {
             my $schema = $c->model('DBEncy')->schema;
             my %seen;
 
-            # User's own keys first
+            # Collect every active key this user may use: own keys first, then
+            # (for admins) any other active key in the system.
+            my @keys;
             my $own_keys = $schema->resultset('UserApiKeys')->search(
                 { user_id => $user_id, is_active => '1' },
                 { order_by => { -asc => 'service' } }
             );
-            foreach my $key ($own_keys->all) {
-                next if $seen{$key->service}++;
-                my $meta   = $key->get_metadata() || {};
-                my $models = $meta->{available_models} || [];
-
-                # Fallback to hardcoded Grok models if none stored in metadata
-                if (!@$models && $key->service eq 'grok') {
-                    $models = [
-                        { id => 'grok-4-fast-reasoning' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-3' },
-                        { id => 'grok-3-mini' },
-                    ];
-                }
-
-                # Filter image/video models for non-admins
-                my @filtered = grep {
-                    $is_admin || !$_->{id} || $_->{id} !~ /imagine|video/i
-                } @$models;
-
-                push @providers, {
-                    service  => $key->service,
-                    name     => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
-                    models   => \@filtered,
-                };
-            }
-
-            # Admins: fall back to any active key not owned by this user
+            push @keys, $own_keys->all;
             if ($is_admin) {
                 my $any_keys = $schema->resultset('UserApiKeys')->search(
                     { is_active => '1' },
                     { order_by => { -asc => 'service' } }
                 );
-                foreach my $key ($any_keys->all) {
-                    next if $seen{$key->service}++;
-                    my $meta   = $key->get_metadata() || {};
-                    my $models = $meta->{available_models} || [];
-                    push @providers, {
-                        service => $key->service,
-                        name    => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
-                        models  => $models,
+                push @keys, $any_keys->all;
+            }
+
+            # Cache provider-model clients so we hit the live API once per service.
+            my %live_client = (
+                openrouter => sub { Comserv::Model::AI2::Provider::OpenRouter->new->list_models($c) },
+                grok       => sub { Comserv::Model::AI2::Provider::Grok->new->list_models($c) },
+            );
+
+            foreach my $key (@keys) {
+                next if $seen{$key->service}++;
+                my $svc = $key->service;
+
+                # Prefer the LIVE provider API (the catalog endpoint returns the
+                # current model list), falling back to stale DB metadata only if
+                # the live call fails. This is the source-of-truth fix: the
+                # dropdown was previously driven entirely by metadata.available_models,
+                # which is empty/stale for keys whose catalog was never cached, so
+                # admins with a valid key saw NO external models at all.
+                my @models;
+                if (my $fetcher = $live_client{$svc}) {
+                    try {
+                        my $res = $fetcher->();
+                        if ($res && $res->{success} && @{ $res->{models} || [] }) {
+                            @models = map { { id => $_->{id} } } @{ $res->{models} };
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                                'get_user_providers',
+                                "Live $svc catalog: " . scalar(@models) . " models for $username");
+                        }
+                    } catch {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'get_user_providers', "Live $svc list_models failed: $_");
                     };
                 }
+
+                # Fallback: DB metadata (and hardcoded Grok defaults).
+                if (!@models) {
+                    my $meta   = $key->get_metadata() || {};
+                    my $stored = $meta->{available_models} || [];
+                    if (!@$stored && $svc eq 'grok') {
+                        $stored = [
+                            { id => 'grok-4-fast-reasoning' },
+                            { id => 'grok-4-fast-non-reasoning' },
+                            { id => 'grok-3' },
+                            { id => 'grok-3-mini' },
+                        ];
+                    }
+                    @models = @$stored;
+                    if (!@models) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                            'get_user_providers',
+                            "No live or stored models for $svc (user=$username); skipping provider");
+                        next;
+                    }
+                }
+
+                # Filter image/video models for non-admins
+                my @filtered = grep {
+                    $is_admin || !$_->{id} || $_->{id} !~ /imagine|video/i
+                } @models;
+
+                push @providers, {
+                    service  => $svc,
+                    name     => $svc eq 'grok' ? 'xAI (Grok)' : ucfirst($svc),
+                    models   => \@filtered,
+                };
             }
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,

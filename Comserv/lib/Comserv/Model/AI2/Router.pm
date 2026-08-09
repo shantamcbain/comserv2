@@ -40,8 +40,19 @@ sub _detect_provider {
     if ($requested_model =~ /^grok/i) {
         return ('grok', $requested_model);
     }
-    if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-)/i) {
+    # Namespaced models (provider/slug, e.g. "anthropic/claude-3-haiku",
+    # "openai/gpt-4o", "meta-llama/llama-3.1-8b-instruct", "tencent/hy3")
+    # come from OpenRouter and must go to the external provider. Local Ollama
+    # tags are bare names ("qwen2.5:72b", "phi4:14b") with NO slash — so a
+    # slash is a reliable external signal. Without this, every OpenRouter
+    # model except a few prefix matches (tencent, gpt, ...) was wrongly
+    # routed to Ollama and failed with "model not found".
+    if ($requested_model =~ m{/}) {
+        return ('external', $requested_model);
+    }
+    if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-|tencent)/i) {
         # External OpenAI-compatible / OpenRouter / x.AI model
+        # (tencent/hy3 etc. live on OpenRouter)
         return ('external', $requested_model);
     }
     # Anything else (e.g. "llama3.1:latest", "phi4") is a local Ollama tag
@@ -109,6 +120,45 @@ sub _is_chat_model {
     return $name !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
 }
 
+# The Router identifies external models as "provider|slug" (e.g.
+# "openrouter|tencent/hy3"). Providers want the BARE slug ("tencent/hy3"),
+# not the prefixed form — sending "openrouter|tencent/hy3" to OpenRouter's API
+# returns HTTP 400 "not a valid model ID". Strip the prefix once, here, so
+# every caller (dispatch_chat, Chat::process) hands the provider a clean id.
+sub _bare_model {
+    my ($self, $model) = @_;
+    return $model unless defined $model;
+    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    return $model;
+}
+
+# True when the given "provider|model" external default can actually be served:
+# an API key/secret resolves for that provider AND the model appears in its live
+# catalog. Avoids silently defaulting to a model that will 401/404 — in which
+# case we fall through to the local Ollama preference below.
+sub _external_default_available {
+    my ($self, $c, $external) = @_;
+    return 0 unless $external && $external =~ /^([^|]+)\|(.+)$/;
+    my ($svc, $model) = ($1, $2);
+
+    my $cls = { grok => 'AI2::Provider::Grok', openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
+    return 0 unless $cls;
+    my $prov = try { $c->model($cls) } catch { undef };
+    return 0 unless $prov && $prov->can('_resolve_api_key');
+
+    # Key must resolve (k8s secret / env / DBEncy UserApiKeys).
+    my $key = try { $prov->_resolve_api_key($c) } catch { undef };
+    return 0 unless $key;
+
+    # Model must exist in the live catalog (skip the network check if the
+    # provider lacks list_models, e.g. some thin wrappers — then trust the key).
+    return 1 unless $prov->can('list_models');
+    my $listed = try { $prov->list_models($c) } catch { undef };
+    return 1 unless $listed && $listed->{success} && $listed->{models};
+    my %ids = map { ($_->{id} // '') => 1 } @{$listed->{models}};
+    return $ids{$model} ? 1 : 0;
+}
+
 # -------------------------------------------------------------------
 # select_model — the core routing decision.
 #
@@ -129,6 +179,17 @@ sub select_model {
     if ($requested) {
         my ($prov, $model) = $self->_detect_provider($requested);
         return ($prov, $model);
+    }
+
+    # 1.5) App-wide DEFAULT: prefer the off-host OpenRouter model so automatic
+    # selection never stalls the workstation by cold-loading a ~9GB local
+    # Ollama weight. This is the SINGLE default used by every surface that
+    # reaches the Router (chat widget, Git drafting, editor, focus-tune) so
+    # behavior is consistent across the whole app. Only used when an external
+    # key is actually resolvable AND the model is reachable.
+    my $default_external = 'openrouter|tencent/hy3';
+    if ($self->_external_default_available($c, $default_external)) {
+        return ('external', $default_external);
     }
 
     # 2) Build a lookup of installed chat models (short name -> full name).
@@ -210,7 +271,7 @@ sub dispatch_chat {
     my $resp = try {
         $provider->chat($c,
             messages => $messages,
-            model    => $use_model,
+            model    => $self->_bare_model($use_model),
             host     => $host,
             port     => $port,
         );

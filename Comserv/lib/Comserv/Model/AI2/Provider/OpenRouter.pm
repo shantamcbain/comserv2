@@ -95,13 +95,23 @@ sub chat {
     my ($self, $c, %args) = @_;
 
     my $api_key = $self->_resolve_api_key($c, $args{api_key});
-    return { success => 0, error => 'No active openrouter API key found' } unless $api_key;
+    unless ($api_key) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
+            "No active openrouter API key found (user=" . ($c->session->{username} // 'Guest') . ")");
+        return { success => 0, error => 'No active openrouter API key found' };
+    }
 
     my $messages = $args{messages} || [];
     return { success => 0, error => 'No messages provided' }
         unless ref($messages) eq 'ARRAY' && @$messages;
 
-    my $model = $args{model} or return { success => 0, error => 'No model specified' };
+    my $model = $args{model};
+    $model =~ s/^[^|]+\|// if $model;   # drop any "provider|" prefix
+    unless ($model) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
+            "No model specified for OpenRouter chat (user=" . ($c->session->{username} // 'Guest') . ")");
+        return { success => 0, error => 'No model specified' };
+    }
     my $payload = {
         model       => $model,
         messages    => $messages,
@@ -118,13 +128,27 @@ sub chat {
 
     my $res = try { $ua->request($req) } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'openrouter_chat', "OpenRouter request failed: $_");
+            'openrouter_chat', "OpenRouter request threw: $_ (model=$model, user="
+            . ($c->session->{username} // 'Guest') . ")");
         return undef;
     };
-    return { success => 0, error => 'OpenRouter provider error' } unless $res && $res->is_success;
+    unless ($res && $res->is_success) {
+        my $status = $res ? $res->status_line : 'no response';
+        my $body   = $res ? substr($res->decoded_content // '', 0, 600) : '';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'openrouter_chat',
+            "OpenRouter HTTP failure: $status (model=$model, user="
+            . ($c->session->{username} // 'Guest') . ") body=$body");
+        return { success => 0, error => "OpenRouter provider error: $status" };
+    }
 
     my $data = try { decode_json($res->decoded_content) } catch { undef };
-    return { success => 0, error => 'Bad JSON from OpenRouter' } unless $data;
+    unless ($data) {
+        my $body = substr($res->decoded_content // '', 0, 600);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'openrouter_chat', "Bad JSON from OpenRouter (model=$model) body=$body");
+        return { success => 0, error => 'Bad JSON from OpenRouter' };
+    }
 
     my $text = '';
     if ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {

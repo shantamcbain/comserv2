@@ -457,9 +457,44 @@
 @media (max-width: 768px) {
     .files-grid { grid-template-columns: 1fr; gap: 12px; }
     .user-context { flex-direction: column; gap: 5px; }
-    .container-header h2 { font-size: 1.2em; }
+    .container-header { padding: 12px 15px; font-size: 0.9em; }
     .search-input-group { flex-direction: column; }
     .search-input, .search-category, .search-button { width: 100%; }
     .container-header { padding: 12px 15px; font-size: 0.9em; }
     .file-card { padding: 12px; }
 }
+
+/* ── Plan/doc utility classes (DocumentationTtTemplate + plan docs) ──
+ * Theme-compliant: every value consumes a canonical CSS variable so all
+ * themes apply. Authors copy these classes — NEVER write inline style=. */
+.doc-h1      { color: var(--text-color); font-family: var(--header-font); }
+.doc-h2      { color: var(--text-color); font-family: var(--header-font); margin-top: 0; }
+.doc-h3      { color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0; }
+.doc-body    { color: var(--text-color); font-family: var(--body-font); }
+.doc-muted   { color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); }
+.doc-strong  { color: var(--text-color); font-family: var(--body-font); }
+
+.doc-toc        { margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; }
+.doc-navlink    { color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block; }
+.doc-navrow     { display: flex; flex-wrap: wrap; gap: var(--spacing-small); }
+.doc-backtop    { display: block; text-align: right; margin-top: var(--spacing-small); }
+.doc-backtop a  { color: var(--link-color); font-size: var(--font-size-small); text-decoration: none; }
+
+.doc-codebox    { background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); border-radius: 4px; margin: var(--spacing-small) 0; }
+.doc-codebox pre,
+.doc-code       { background-color: #1e1f22; color: #9cdcfe; padding: 10px; border-radius: 4px; overflow: auto; font-family: monospace; margin: 0; }
+
+.doc-warning    { background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-small) 0; }
+.doc-warning h3 { color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0; }
+.doc-info       { background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color, #17a2b8); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-small) 0; }
+.doc-info h3    { color: var(--info-color, #17a2b8); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0; }
+.doc-success    { background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0; }
+.doc-success h3 { color: var(--success-color); font-family: var(--header-font); margin-top: 0; }
+
+.doc-table     { width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0; }
+.doc-th        { background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left; }
+.doc-td        { color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); }
+.doc-tr-alt    { background-color: rgba(255,255,255,0.12); }
+.doc-link      { color: var(--link-color); text-decoration: none; }
+.doc-link:hover { color: var(--link-hover-color); }
+.doc-footer    { margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small); }
