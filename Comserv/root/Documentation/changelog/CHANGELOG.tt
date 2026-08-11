@@ -31,6 +31,18 @@
     <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-10-ai2-providers-hashref-guard">2026-08-10-ai2-providers-hashref-guard</a></li>
 </ul>
 
+<h3>Fixed — ModelCatalog::_flatten "Not a HASH reference" (same root cause, cascaded to every page)</h3>
+<ul>
+    <li><strong>What was wrong:</strong> the <code>ai2/providers</code> 500 above was only the visible tip. <code>Comserv::Util::ModelCatalog-&gt;_flatten</code> (the flat catalog that <code>Root-&gt;auto</code> builds on <em>every</em> request and stashes for the widget, <code>/ai</code>, <code>ai/model_select.tt</code>, the editor and the git dashboard) dereferenced <code>$m-&gt;{name}</code> / <code>$m-&gt;{provider}</code> on each catalog element with only <code>next unless $m &amp;&amp; $m-&gt;{name} &amp;&amp; $m-&gt;{provider}</code> — no <code>ref($m) eq 'HASH'</code> check. A single non-hash element therefore threw <em>"Not a HASH reference at ModelCatalog.pm line 221"</em> inside <code>Root-&gt;auto</code>, 500-ing <strong>every page load</strong>, not just one endpoint. The live log shows this firing at 07:02 today (after the 06:49 two-layer guard landed), proving the earlier "all surfaces protected" claim was overstated — ModelCatalog was the unguarded path.</li>
+    <li><strong>Fix:</strong> guard added at the crash site:
+        <ul>
+            <li><code>Util/ModelCatalog.pm::_flatten</code> now does <code>next unless $m &amp;&amp; ref($m) eq 'HASH' &amp;&amp; $m-&gt;{name} &amp;&amp; $m-&gt;{provider}</code>, matching the guards already present in <code>Api.pm::_focus_external_models</code> and <code>Controller/AI.pm</code>. A malformed element is dropped, not fatal. The Router sanitizer still logs the offending shape so the provider can be fixed at the boundary.</li>
+        </ul>
+    </li>
+    <li><strong>Verified:</strong> <code>perl -c</code> clean on <code>Util/ModelCatalog.pm</code>. With this guard, every surface that reads the catalog is now protected by the same contract: non-hash elements are rejected at the source (<code>Router</code>), at the flatten step (<code>ModelCatalog</code>), and at each consumer loop.</li>
+    <li><strong>Files changed:</strong> <code>lib/Comserv/Util/ModelCatalog.pm</code> (guard) + this entry. The 2026-08-10-ai2-providers-hashref-guard.tt dated note overstated protection and has been corrected inline.</li>
+</ul>
+
 <h2>[2026-07-27] — Production1 stability: restart loop, disk, AI2 providers 500</h2>
 
 <h3>Fixed — Deploy system: production "restart loop" (commit 76135ef0)</h3>

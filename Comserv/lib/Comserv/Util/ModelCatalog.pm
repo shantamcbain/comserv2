@@ -218,7 +218,13 @@ sub _flatten {
     my ($class, $catalog) = @_;
     my @flat;
     for my $m (@$catalog) {
-        next unless $m && $m->{name} && $m->{provider};
+        # Defensive: the catalog is built from upstream provider JSON (Ollama
+        # /api/tags, OpenRouter /v1/models). If a provider returns a malformed
+        # entry (a bare string or array instead of a model object) it must NOT
+        # 500 every page load — Root->auto calls catalog() on each request.
+        # Skip and let the Router's own sanitizer log the offending element.
+        # Matches the guard used by Api.pm/_focus_external_models and AI.pm.
+        next unless $m && ref($m) eq 'HASH' && $m->{name} && $m->{provider};
         next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
         my $svc  = $m->{provider};
         my $name = $m->{name};
