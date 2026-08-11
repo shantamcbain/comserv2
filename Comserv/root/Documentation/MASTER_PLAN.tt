@@ -63,6 +63,7 @@ sub-plan remains the authoritative spec for its own work.</p>
             <a class="menu-item" href="#wave0">0 · Source-of-truth</a>
             <a class="menu-item" href="#wave1">1 · Defects</a>
             <a class="menu-item" href="#wave2">2 · Chat/AI</a>
+            <a class="menu-item" href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
             <a class="menu-item" href="#wave3">3 · 3D/Sign</a>
             <a class="menu-item" href="#wave4">4 · Inventory</a>
             <a class="menu-item" href="#wave5">5 · Polish</a>
@@ -327,6 +328,7 @@ WAVE 5   Routing std, Deploy WF, Daily Plan, K8s/infra cluster,
         <tr><td style="border:1px solid var(--border-color);">local-chat.js V2 refactor</td><td style="border:1px solid var(--border-color);">—</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/plans/local-chat-v2-refactor') %]">/Documentation/plans/local-chat-v2-refactor</a></td></tr>
         <tr><td style="border:1px solid var(--border-color);">3D Browse Gallery</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/3dBrowseGalleryPlan') %]">/Documentation/3dBrowseGalleryPlan</a></td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/plans/3d-browse-gallery') %]">/Documentation/plans/3d-browse-gallery</a></td></tr>
         <tr><td style="border:1px solid var(--border-color);">AI2 Migration</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/ai2_migration_plan') %]">/Documentation/ai2_migration_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
+        <tr><td style="border:1px solid var(--border-color);">AI Model Presentation &amp; Selection (AIMPS, proj 252)</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">/Documentation/AIModelPresentationPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
         <tr><td style="border:1px solid var(--border-color);">Git Subsystem Refactor</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">/Documentation/GitSubsystemRefactorPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
         <tr><td style="border:1px solid var(--border-color);">Git Worktree — new isolated-creation backend</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">/Documentation/git_worktree_new_system_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
         <tr><td style="border:1px solid var(--border-color);">Git Worktree — AI-commit → human merge-to-main</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">/Documentation/git_worktree_merge_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>

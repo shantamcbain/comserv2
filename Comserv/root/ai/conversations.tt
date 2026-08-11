@@ -868,8 +868,10 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 
-<script src="/static/js/ai-common.js"></script>
 <script>
+// ai-common.js (defines window.AIUtils) is already loaded by js_load.tt.
+// The former redundant inline load re-declared `const AIUtils` and threw a
+// SyntaxError that broke message rendering. Removed — do not re-add.
 function toggleMessageDebug(btn) {
     const messageDiv = btn.closest('.ai-conversations-message');
     const debugInfo = messageDiv.querySelector('.message-debug-info');

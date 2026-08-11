@@ -137,10 +137,11 @@ sub get_available_models {
                             external => 1,
                         };
                     }
-                } else {
-                    # Safe hardcoded fallbacks per provider (never crash on empty)
-                    push @models, $self->_default_models_for_service($service);
                 }
+                # NOTE: intentionally NO hardcoded fallback list. When a provider's
+                # live model sync returns nothing we show nothing for that provider
+                # rather than injecting a hardcoded model array (the user wants the
+                # dynamic list only).
             }
         };
         if ($@) {
@@ -171,36 +172,6 @@ sub _make_label {
     $label =~ s/-/ /g;
     $label = ucfirst($label);
     return "$label (" . ucfirst($service) . ")";
-}
-
-sub _default_models_for_service {
-    my ($self, $service) = @_;
-    $service = lc($service // '');
-
-    if ($service eq 'grok' || $service eq 'xai') {
-        return (
-            { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)', external => 1 },
-            { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)', external => 1 },
-            { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)', external => 1 },
-            { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)', external => 1 },
-        );
-    }
-
-    if ($service eq 'openai') {
-        return (
-            { name => 'gpt-4o', provider => 'openai', label => 'GPT-4o (OpenAI)', external => 1 },
-            { name => 'gpt-4o-mini', provider => 'openai', label => 'GPT-4o Mini (OpenAI)', external => 1 },
-        );
-    }
-
-    if ($service eq 'groq') {
-        return (
-            { name => 'llama3-70b-8192', provider => 'groq', label => 'Llama 3 70B (Groq)', external => 1 },
-            { name => 'mixtral-8x7b-32768', provider => 'groq', label => 'Mixtral 8x7B (Groq)', external => 1 },
-        );
-    }
-
-    return ();
 }
 
 =head2 get_external_models

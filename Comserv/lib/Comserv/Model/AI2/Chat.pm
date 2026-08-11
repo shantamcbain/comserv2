@@ -283,6 +283,21 @@ sub _can_select_model {
     return grep { $_ =~ /^(admin|developer|editor)$/i } @$roles ? 1 : 0;
 }
 
+# The Router identifies external models as "provider|slug" (e.g.
+# "openrouter|tencent/hy3"). Providers want the BARE slug ("tencent/hy3") —
+# sending the prefixed form to OpenRouter returns HTTP 400 "not a valid model
+# ID". This mirrors Router::_bare_model and MUST exist here too: process()
+# calls $self->_bare_model(...), and Chat.pm extends Catalyst::Model (it does
+# NOT inherit from Router), so without this the call dies with "Can't locate
+# object method _bare_model". The enclosing try{} swallowed that exception and
+# reported a misleading generic "OpenRouter provider error" instead.
+sub _bare_model {
+    my ($self, $model) = @_;
+    return $model unless defined $model;
+    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    return $model;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

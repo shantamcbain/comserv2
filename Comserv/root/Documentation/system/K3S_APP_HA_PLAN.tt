@@ -4,13 +4,15 @@
    roles = "admin,devops,developer"
    TemplateType = "Documentation"
    category = "infrastructure,deployment,kubernetes,high-availability,load-balancing"
-   page_version = "1.10"
-   last_updated = "Fri Aug 07 2026"
+   page_version = "1.12"
+   last_updated = "Mon Aug 10 2026"
    site_specific = "true"
    project_id = "202"
    project_code = "INFRA-HA"
 %]
 [%# ai-plan-sync created todo_ids: 1905,1906,1907,1908,1909,1910 under project_id=202 %]
+[%# 2026-08-10 v1.12: sections 3h/3i/6a/6b added; Store::Dummy session-store blocker raised as todo 2046 on project 243 AUTH-EVO; /tmp cross-request state as todo 2047 %]
+[%# 2026-08-10: Phase A decomposed into todos 2037-2044 under sub-project 244; A.0 resolved to .199 on disk evidence; registry port corrected 5000 -> 5001 (5000 occupied by comserv2-web-prod) %]
 [%# 2026-08-07: phases converted to SUB-PROJECTS of 202 (RULE P1): A=244 B=245 C=246 D=247 E=248 F=249 G=250 H=251 %]
 [%# Dependencies: project 243 AUTH-EVO (auth/credentials, parent 201 SECURITY); project 242 SRV-INV (server room inventory, parent 78) %]
 
@@ -43,9 +45,14 @@
                 <a href="#current" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">2. Current State</a>
                 <a href="#target" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3. Target</a>
                 <a href="#roles" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3d. Role Eval</a> &middot;
+                <a href="#registry-port" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3d-ii. Registry Port</a> &middot;
                 <a href="#quorum" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3e. Node Count</a> &middot;
                 <a href="#progression" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3f. Progression Ladder</a> &middot;
                 <a href="#external" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3g. External/ZeroTier</a> &middot;
+                <a href="#lb-reality" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3h. LB Reality</a> &middot;
+                <a href="#stickiness" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">3i. Stickiness</a> &middot;
+                <a href="#session-store" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">6a. Session BLOCKER</a> &middot;
+                <a href="#temp-files" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">6b. Temp Files</a> &middot;
                 <a href="#pushing" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">4. Deploy Flow</a>
                 <a href="#roadmap" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">5. Roadmap</a>
                 <a href="#shared-state" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">6. Shared State</a>
@@ -133,7 +140,7 @@
     <h3>3b. Component target</h3>
     <ul>
         <li><strong>k3s cluster, 2 nodes:</strong> .126 (server + worker) and .199 (agent + worker). Conformant K8s API from day one.</li>
-        <li><strong>Image registry on .199</strong> (<code>registry:2</code>, port 5000, insecure/HTTP on LAN) &mdash; the single source every node pulls from. This is what makes automatic propagation possible at all.</li>
+        <li><strong>Image registry on .199</strong> (<code>registry:2</code>, host port <strong>5001</strong> &mdash; see &sect;3d-ii, insecure/HTTP on LAN, addressed as <code>comserv-registry.lan:5001</code>) &mdash; the single source every node pulls from. This is what makes automatic propagation possible at all.</li>
         <li><strong>Deployment with replicas=2</strong> behind a health-checked Service/Ingress. A node or pod dying removes it from rotation automatically &mdash; <strong>no manual OPNsense flip</strong>.</li>
         <li><strong>Load balancing:</strong> ingress spreads traffic across both pods, so the second node <em>earns its keep</em> continuously rather than sitting dormant &mdash; the "maximum hardware use" requirement.</li>
         <li><strong>Shared state must be external to the pod:</strong> <code>comserv2_sessions</code>, <code>comserv2_nfs_data</code>, redis &mdash; see &sect;6.</li>
@@ -160,6 +167,27 @@
         <tr><td style="padding:6px;">.126 production1</td><td style="padding:6px;">2 core</td><td style="padding:6px;"><strong>0.06</strong> (idle)</td><td style="padding:6px;">24 GB avail / 26 GB</td><td style="padding:6px;"><strong>88% (3.5 GB free)</strong></td><td style="padding:6px;">Idle CPU but <strong>disk-critical</strong>; uptime 48 days</td></tr>
     </table>
     <p>This <strong>confirms the concern and refutes the earlier draft</strong>: the "most powerful" machine is the <em>busiest</em> one, while the "production" machine is nearly idle but almost out of disk. Neither is an obvious registry host &mdash; .199 for contention, .126 for 3.5 GB of headroom. A registry needs disk and availability, not GPU.</p>
+
+    <h3>3d-i. Re-measured 2026-08-10 &mdash; the load profiles have SWAPPED</h3>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Host</th><th style="text-align:left; padding:6px;">Load 08-07</th><th style="text-align:left; padding:6px;">Load 08-10</th><th style="text-align:left; padding:6px;">RAM avail 08-10</th><th style="text-align:left; padding:6px;">Disk free 08-07 &rarr; 08-10</th></tr>
+        <tr><td style="padding:6px;">.199 workstation</td><td style="padding:6px;"><strong>8.10</strong> / 8 cores (saturated)</td><td style="padding:6px;"><strong>1.80</strong> / 8 cores</td><td style="padding:6px;">22 GB / 31 GB</td><td style="padding:6px;">66 GB &rarr; <strong>80 GB</strong> (83% used)</td></tr>
+        <tr><td style="padding:6px;">.126 production1</td><td style="padding:6px;">0.06 / 2 cores (idle)</td><td style="padding:6px;"><strong>8.89</strong> / 2 cores (saturated)</td><td style="padding:6px;">23 GB / 26 GB</td><td style="padding:6px;">3.5 GB &rarr; <strong>3.2 GB</strong> (89% used)</td></tr>
+    </table>
+    <p><strong>The reading that survived re-measurement.</strong> CPU load on both hosts inverted within three days &mdash; .199's Ollama workload drained, .126 climbed to 8.89 on two cores. This is exactly why &sect;3d demands measurement under realistic load rather than a one-off snapshot: <em>a load figure is perishable evidence and must be re-taken per phase, not reused.</em> The figure that did <strong>not</strong> move is .126's disk, which went 3.5 GB &rarr; 3.2 GB free. That is the durable constraint.</p>
+    <p><strong>A.0 resolved on evidence: the registry goes on .199</strong> &mdash; 80 GB free versus 3.2 GB. .126 is disqualified on disk alone, independent of load. Note carefully that this reaches the same host the retracted draft assumed, but by a different and valid route: disk headroom, not "most powerful machine". The conclusion coinciding with the old assumption does not retroactively validate the old reasoning, and this decision must not be reused for the Phase B control-plane role &mdash; B.0 re-measures.</p>
+
+    <h3 id="registry-port">3d-ii. Registry port: 5000 is NOT available (verified 2026-08-10)</h3>
+    <div style="border-left: 4px solid var(--caution-color); padding: var(--spacing-small); margin: var(--spacing-medium) 0;">
+        <p style="margin:0;"><strong>Correction to &sect;3b and Phase A.</strong> Both state the registry listens on <strong>port 5000</strong>. That was written without checking the host. On .199, port 5000 is already published by the <code>comserv2-web-prod</code> container. Ports 3000, 4000, 8081, 8083 and 11434 are likewise occupied.</p>
+        <p style="margin: var(--spacing-small) 0 0 0;">The registry therefore publishes host port <strong>5001</strong> (container port remains 5000). Freeing 5000 would mean stopping a live application container, which the standing operational rule forbids.</p>
+    </div>
+    <p><strong>Canonical-name rule &mdash; the part that actually matters.</strong> A registry's port is not an implementation detail: it becomes part of <em>every image name</em>. A tag such as <code>192.168.1.199:5001/comserv-web-prod</code> hard-codes both host and port into compose files, k8s manifests, deploy scripts and every node's <code>insecure-registries</code> list. Moving or re-porting the registry then means a repo-wide rewrite.</p>
+    <ul>
+        <li>Register <strong><code>comserv-registry.lan:5001</code></strong> as the single canonical name (LAN DNS or hosts entry &rarr; 192.168.1.199) and use <strong>only</strong> that string in image tags and manifests. Never the bare IP.</li>
+        <li>The value in <code>insecure-registries</code> must match the image-name string <strong>byte for byte</strong> &mdash; an IP and a hostname are not interchangeable to the Docker daemon. Mixing them produces an HTTPS-to-HTTP pull failure that reads like a TLS bug and is not one.</li>
+        <li>Record the canonical URL in <code>Comserv/root/config/services.json</code> alongside the other service URLs, so relocating the registry is a one-line edit plus a DNS change.</li>
+    </ul>
     <p><strong>Therefore every phase carries its own role-evaluation todo</strong> (the <code>.0</code> todo of each sub-project) which must answer, with measurements taken under realistic load:</p>
     <ul>
         <li>Which host should hold this role, and <strong>on what evidence</strong> &mdash; not which is nominally strongest.</li>
@@ -195,6 +223,32 @@
         <li><strong>Small cloud instance</strong> as a third control-plane member purely for quorum &mdash; cheap, and solves the 2-node split-brain problem without new physical hardware.</li>
         <li><strong>Do nothing beyond rung 2</strong> &mdash; a legitimate outcome if measured availability meets the target.</li>
     </ul>
+    <p style="margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color);">&uarr; Back to Top</a></p>
+
+    <h2 id="lb-reality">3h. What Kubernetes load balancing actually does &mdash; and what it does not</h2>
+    <p>A direct answer to &ldquo;can the setup choose the best container to return the request, and does Kubernetes do true load balancing?&rdquo; The honest answer separates two things that are easily conflated.</p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Capability</th><th style="text-align:left; padding:6px;">Out of the box?</th><th style="text-align:left; padding:6px;">Detail</th></tr>
+        <tr><td style="padding:6px;">Spread requests across replicas</td><td style="padding:6px;"><strong>YES</strong></td><td style="padding:6px;">kube-proxy distributes connections across all Ready pods (random / round-robin). Over real traffic this spreads load evenly.</td></tr>
+        <tr><td style="padding:6px;">Never route to a broken pod</td><td style="padding:6px;"><strong>YES</strong></td><td style="padding:6px;">A pod failing its readiness probe is removed from the Service endpoint list immediately. <em>This is the property that answers the 2026-08-07 outage.</em></td></tr>
+        <tr><td style="padding:6px;">Refuse to overload a node at placement time</td><td style="padding:6px;"><strong>YES</strong></td><td style="padding:6px;">Resource requests/limits + anti-affinity (&sect;3c). Capacity-aware, but decided at schedule time, not per request.</td></tr>
+        <tr><td style="padding:6px;">Add pods when load rises</td><td style="padding:6px;"><strong>YES</strong> (HPA)</td><td style="padding:6px;">HorizontalPodAutoscaler scales on CPU/memory. Genuinely load-responsive, at scale-out timescale.</td></tr>
+        <tr><td style="padding:6px;">Pick the <em>least busy</em> pod per request</td><td style="padding:6px;"><strong>NO &mdash; opt-in</strong></td><td style="padding:6px;">Default is round-robin; it does not measure backend CPU or latency. Least-connection routing is one ingress config line (NGINX <code>least_conn</code>; Traefik does weighted round-robin).</td></tr>
+    </table>
+    <p><strong>So: yes, k3s/k8s load balance.</strong> The only thing not enabled by default is per-request least-connection selection, and that is a configuration choice at the ingress, not a missing capability or a reason to prefer another platform.</p>
+    <div style="border-left: 4px solid var(--link-color); padding: var(--spacing-small); margin: var(--spacing-medium) 0;">
+        <p style="margin:0;"><strong>Why this is deliberately NOT a Phase D decision.</strong> This plan is an <em>availability</em> plan. The 2026-08-07 outage was a container that did not exist for 100 minutes &mdash; not a container that was slow because a request landed on a busy node. Readiness probes plus <code>replicas=2</code> close that entire outage class. Least-request routing addresses a throughput problem the estate does not currently have, on two nodes serving a low-traffic internal application.</p>
+        <p style="margin: var(--spacing-small) 0 0 0;"><strong>Revisit trigger:</strong> if E.4 (testing under load, with the AI workload saturating a node) shows uneven latency between replicas, enable least-connection routing at the ingress then. Recording the trigger here prevents both premature tuning and quietly forgetting the option exists.</p>
+    </div>
+    <p><strong>Note on load measurements in this document.</strong> The host figures in &sect;3d/&sect;3d-i are <em>placement</em> evidence &mdash; a one-time human decision about where a role lives. They are not consulted per request and nothing re-reads them at runtime. A load average is a 1-minute-decayed figure; by the time it moves, thousands of requests have already been served. That is precisely why per-request routing uses connection counts rather than load average.</p>
+
+    <h2 id="stickiness">3i. If each call lands on a different container, what breaks?</h2>
+    <p>Round-robin means consecutive requests from one user reach <strong>different pods</strong>. That is inherent to distributing traffic at all, not a defect. It makes any state held <em>inside</em> a pod a correctness bug. Two possible responses, only one of which is correct here:</p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Approach</th><th style="text-align:left; padding:6px;">Verdict</th></tr>
+        <tr><td style="padding:6px;"><strong>Sticky sessions</strong> &mdash; pin a user to one pod</td><td style="padding:6px;"><strong>Rejected as the primary answer.</strong> The pin dies with the pod, so the user loses their session exactly during the failure this plan exists to survive. It also concentrates load on whichever pod holds the busy users, undermining balancing. Acceptable only as a temporary bridge.</td></tr>
+        <tr><td style="padding:6px;"><strong>Externalise the state</strong> &mdash; any pod can serve any request</td><td style="padding:6px;"><strong>Correct.</strong> Stateless pods are what make replicas, rolling updates and node failure survivable at once.</td></tr>
+    </table>
     <p style="margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color);">&uarr; Back to Top</a></p>
 
     <h2 id="pushing">4. Does k3s eliminate "pushing to production"?  -  No.</h2>
@@ -233,24 +287,25 @@
         </ol>
     </div>
 
-    <h3>Phase A - Registry on .199</h3>
-    <p><strong>GATE:</strong> a test tag pushed from .199 pulls successfully on .126.</p>
+    <h3>Phase A - Registry (host resolved to .199 on 2026-08-10 evidence)</h3>
+    <p><strong>GATE:</strong> a test tag pushed from the registry host pulls successfully on .126, with matching digests recorded. Gate todo <a href="[% c.uri_for('/todo/details') %]?record_id=1905" style="color: var(--link-color);">#1905</a>.</p>
     <ul>
-        <li>Stand up <code>registry:2</code> on .199, port 5000, with a persistent volume.</li>
-        <li>Add <code>192.168.1.199:5000</code> to <code>insecure-registries</code> on BOTH .126 and .199.</li>
-        <li>Naming follows the system, not the feature: <code>comserv2_registry_data</code> for the volume.</li>
+        <li>Stand up <code>registry:2</code> on .199, host port <strong>5001</strong> (see &sect;3d-ii &mdash; 5000 is taken by the live app container), with persistent volume <code>comserv2_registry_data</code>.</li>
+        <li>Add <code>comserv-registry.lan:5001</code> to <code>insecure-registries</code> on BOTH .126 and .199, and use that canonical name &mdash; never the bare IP &mdash; in every image tag.</li>
+        <li>Naming follows the system, not the feature: <code>comserv2_registry_data</code> for the volume, <code>comserv2-registry</code> for the container.</li>
     </ul>
-    <p><strong>Sub-project A todos:</strong></p>
-    <ul>
-        <li><strong>A.0 ROLE EVAL:</strong> which host hosts the registry? <strong>Do not default to .199.</strong> Measured 2026-08-07: .199 load 8.10/8 cores, 0 GB RAM free (AI models); .126 idle but only 3.5 GB disk free. Registry needs disk + availability, not GPU. Evaluate both, plus unidentified hosts (&sect;3g). Record evidence.</li>
-        <li><strong>A.1 DEPENDENCY:</strong> does the registry need auth (push credentials)? If yes &rarr; todo on auth plan.</li>
-        <li>A.2 Free disk on the chosen host if needed (.126 at 88% cannot host a registry as-is).</li>
-        <li>A.3 Stand up <code>registry:2</code> with persistent volume <code>comserv2_registry_data</code>.</li>
-        <li>A.4 Configure <code>insecure-registries</code> on all nodes.</li>
-        <li>A.5 Push/pull round-trip test; record the digest.</li>
-        <li>A.6 Decide registry retention/pruning policy (an unpruned registry will fill the disk and recreate the outage).</li>
-        <li><strong>A.7 FAILOVER:</strong> what happens to deploys when the registry host is down or saturated? Document the answer.</li>
-    </ul>
+    <p><strong>Sub-project A todos (created 2026-08-10 under <a href="[% c.uri_for('/project/details') %]?project_id=244" style="color: var(--link-color);">#244</a>):</strong></p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Todo</th><th style="text-align:left; padding:6px;">Work</th><th style="text-align:left; padding:6px;">State</th></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2037" style="color: var(--link-color);">#2037</a> A.0</td><td style="padding:6px;">ROLE EVAL &mdash; which host, on measured evidence</td><td style="padding:6px;"><strong>ANSWERED</strong> &mdash; .199 on disk headroom (&sect;3d-i)</td></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2038" style="color: var(--link-color);">#2038</a> A.1</td><td style="padding:6px;">DEPENDENCY &mdash; does the registry need auth?</td><td style="padding:6px;"><strong>NOT BLOCKED</strong> &mdash; LAN-only HTTP needs no credentials; revisit if ever exposed or automated (AUTH-R1)</td></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2039" style="color: var(--link-color);">#2039</a> A.2</td><td style="padding:6px;">Confirm disk headroom on the chosen host</td><td style="padding:6px;">80 GB free on .199; growth estimate still owed to A.6</td></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2040" style="color: var(--link-color);">#2040</a> A.3</td><td style="padding:6px;">Stand up <code>registry:2</code> + persistent volume</td><td style="padding:6px;">Ready to run; commands recorded, awaiting go-ahead</td></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2041" style="color: var(--link-color);">#2041</a> A.4</td><td style="padding:6px;"><code>insecure-registries</code> + canonical name on all nodes</td><td style="padding:6px;"><strong>NEEDS AUTHORIZATION</strong> &mdash; the .126 half restarts dockerd and therefore the live container</td></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2042" style="color: var(--link-color);">#2042</a> A.5</td><td style="padding:6px;">Push/pull round trip; record digest</td><td style="padding:6px;">The gate itself &mdash; use a tiny image, .126 has 3.2 GB free</td></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2043" style="color: var(--link-color);">#2043</a> A.6</td><td style="padding:6px;">Retention / pruning policy</td><td style="padding:6px;">Open &mdash; untagging frees nothing without garbage-collect</td></tr>
+        <tr><td style="padding:6px;"><a href="[% c.uri_for('/todo/details') %]?record_id=2044" style="color: var(--link-color);">#2044</a> A.7</td><td style="padding:6px;">FAILOVER &mdash; deploys when the registry host is down</td><td style="padding:6px;">Open &mdash; blast radius is wider than &sect;8 currently claims</td></tr>
+    </table>
     <p><strong>WHY NEXT:</strong> the registry makes one proven image <em>available</em> to every node, but nothing yet <em>places</em> it. A human still runs it host by host. That gap is what Phase B closes.</p>
 
     <h3>Phase B - k3s install</h3>
@@ -375,12 +430,47 @@
     <p>Running two replicas is trivial; running two replicas <em>correctly</em> is not. Each item below is an outage or a support ticket if missed:</p>
     <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
         <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">State</th><th style="text-align:left; padding:6px;">Risk with 2 replicas</th><th style="text-align:left; padding:6px;">Resolution</th></tr>
-        <tr><td style="padding:6px;">Sessions (<code>comserv2_sessions</code>)</td><td style="padding:6px;">Node-local &rarr; users randomly logged out as they bounce between pods</td><td style="padding:6px;">Shared NFS volume or redis-backed sessions</td></tr>
+        <tr><td style="padding:6px;">Sessions (<code>comserv2_sessions</code>)</td><td style="padding:6px;"><strong>WORSE THAN STATED &mdash; see &sect;6a.</strong> Not node-local but <em>process</em>-local: the store is <code>Store::Dummy</code>, a test store</td><td style="padding:6px;">Switch to the already-configured, already-installed <code>Store::DBIC</code> and pin the cookie name (&sect;6a, todo #2046)</td></tr>
         <tr><td style="padding:6px;">Uploads (<code>comserv2_nfs_data</code>)</td><td style="padding:6px;">File uploaded to pod A is invisible on pod B</td><td style="padding:6px;">Existing NFS mount into both pods</td></tr>
         <tr><td style="padding:6px;">Logs</td><td style="padding:6px;">Split across nodes; the 2026-08-07 diagnosis was crippled by lost container logs</td><td style="padding:6px;">Ship to the DB/system_log (already the audited path) rather than pod-local files</td></tr>
         <tr><td style="padding:6px;">Cron / scheduled jobs</td><td style="padding:6px;"><strong>Double execution</strong>  -  two pods each firing the same job</td><td style="padding:6px;">k8s CronJob (single owner), never in-pod cron</td></tr>
         <tr><td style="padding:6px;">Whisper / heavy tool volumes</td><td style="padding:6px;">Duplicated large caches on both nodes</td><td style="padding:6px;">Portable network tool-services, per existing standard</td></tr>
     </table>
+
+    <h3 id="session-store">6a. BLOCKER found 2026-08-10: the session store is a TEST store</h3>
+    <div style="border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+        <p style="margin:0;">Answering &ldquo;do we have to change how we store sessions?&rdquo; required reading the code, and the answer is <strong>yes, and more urgently than this plan assumed</strong>. <code>Comserv/lib/Comserv.pm</code> loads:</p>
+        <pre style="margin: var(--spacing-small) 0; padding: var(--spacing-small); background: rgba(0,0,0,0.25); overflow-x: auto;">Session
+Session::State::Cookie
+Session::Store::Dummy      # line 22</pre>
+        <p style="margin:0;"><code>Store::Dummy</code>'s own documentation reads: <em>&ldquo;Doesn't really store sessions - useful for tests.&rdquo;</em> It keeps session data in a per-process hash in memory.</p>
+    </div>
+    <p><strong>Sessions are therefore not merely node-local, they are process-local.</strong> This is worse than &sect;6's original &ldquo;node-local sessions&rdquo; wording. Consequences, in order of severity:</p>
+    <ul>
+        <li>With <code>replicas=2</code>, two pods would <strong>not share a login for a single user</strong> &mdash; every round-robin hop is a potential logout.</li>
+        <li>Sessions do not survive a container restart <em>today</em>, on the current single container. This is testable now and is not an HA-only problem.</li>
+        <li>Any multi-worker server model already risks inconsistency within one host.</li>
+    </ul>
+    <p><strong>The fix is already staged and never switched on.</strong> Directly beneath the plugin list, <code>Plugin::Session</code> is fully configured for a database store &mdash; <code>dbic_class =&gt; 'DBEncy::Session'</code>, <code>expires_column</code>, <code>id_column</code>, <code>data_column</code>. <code>Result/Session.pm</code> exists and maps the <code>sessions</code> table. <code>Catalyst::Plugin::Session::Store::DBIC</code> <strong>v0.14 is installed</strong> on the host. A comment at line 218 claims &ldquo;Session store is now properly configured in the plugin list above&rdquo; &mdash; that comment is false and should be removed with the fix.</p>
+    <p><strong>Second defect, same area: the cookie name is derived from the port.</strong></p>
+    <pre style="margin: var(--spacing-small) 0; padding: var(--spacing-small); background: rgba(0,0,0,0.25); overflow-x: auto;">$ENV{COMSERV_SESSION_COOKIE} || "comserv_session_$port"</pre>
+    <p>On .199 the prod container publishes 5000, dev 3000, staging 4000 &mdash; so those instances issue <strong>differently named cookies</strong>. Balanced replicas must agree on the cookie name or they cannot see each other's sessions even with a shared store. <code>COMSERV_SESSION_COOKIE</code> must be pinned explicitly in the Deployment rather than left to derive from the port. This is also why &ldquo;the container on workstation is the same as production&rdquo; is true of the <em>image</em> but not yet true of the <em>runtime</em>: same image, different cookie namespace, no shared session state.</p>
+    <p><strong>Ownership:</strong> this is evidence for AUTH-R2 on project <a href="[% c.uri_for('/project/details') %]?project_id=243" style="color: var(--link-color);">#243 (AUTH-EVO)</a>, per &sect;11 &mdash; this plan states the requirement and does not implement it. Tracked as todo <a href="[% c.uri_for('/todo/details') %]?record_id=2046" style="color: var(--link-color);">#2046</a>. Switching a session store logs every active user out, so it needs a scheduled window, not an opportunistic change.</p>
+
+    <h3 id="temp-files">6b. Temp files: pod-local <code>/tmp</code> used for cross-request state</h3>
+    <p>Answering the second half of &ldquo;do we have to change how we store temp files?&rdquo;. <strong>Uploads are already safe; scratch state is not.</strong></p>
+    <p><strong>Already correct &mdash; no change needed:</strong> user uploads go through <code>$c-&gt;path_to('root','uploads',...)</code> and the NFS mount (<code>NFS_HOST_PATH</code> &rarr; <code>/data/nfs</code>, present in both compose services). Mount the same NFS into both pods and a file uploaded via pod A is visible from pod B.</p>
+    <p><strong>The real exposure &mdash; <code>/tmp</code> holding state that a LATER request reads back.</strong> A file written to pod-local <code>/tmp</code> by one request is invisible to the next request if it lands on the other pod. Grep of the controllers found:</p>
+    <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+        <tr style="background: rgba(255,255,255,0.12);"><th style="text-align:left; padding:6px;">Path</th><th style="text-align:left; padding:6px;">Where</th><th style="text-align:left; padding:6px;">Risk under 2 replicas</th></tr>
+        <tr><td style="padding:6px;"><code>/tmp/whisper_job_${job_id}.status</code>, <code>_result.json</code></td><td style="padding:6px;">AI.pm ~12293&ndash;12332</td><td style="padding:6px;"><strong>HIGH</strong> &mdash; classic submit-then-poll. The poll hits the other pod, finds no status file, and the job appears lost.</td></tr>
+        <tr><td style="padding:6px;"><code>/tmp/comserv_chat_progress_${session_id}</code></td><td style="padding:6px;">AI.pm ~8200, 8233</td><td style="padding:6px;"><strong>HIGH</strong> &mdash; progress polling breaks the same way; keyed by session, read by a later request.</td></tr>
+        <tr><td style="padding:6px;"><code>/tmp/comserv_security_scan.{txt,json}</code></td><td style="padding:6px;">Admin.pm ~2828&ndash;3042</td><td style="padding:6px;"><strong>MEDIUM</strong> &mdash; scan writes on one pod, results page reads on the other; shows stale or missing output.</td></tr>
+        <tr><td style="padding:6px;"><code>/tmp/comserv_deploy_4000.pid</code></td><td style="padding:6px;">Planning.pm ~1702</td><td style="padding:6px;"><strong>MEDIUM</strong> &mdash; a PID file is meaningless across pods; two pods could each believe no deploy is running.</td></tr>
+        <tr><td style="padding:6px;"><code>File::Temp</code> with <code>UNLINK =&gt; 1</code></td><td style="padding:6px;">AI.pm ~646</td><td style="padding:6px;"><strong>NONE</strong> &mdash; written and consumed within a single request. Correct as-is; scratch inside one request is fine.</td></tr>
+    </table>
+    <p><strong>The rule that separates them:</strong> scratch data used and discarded <em>within one request</em> may stay in pod-local <code>/tmp</code>. Anything a <em>later</em> request must read back is shared state and must move to the database, the NFS mount, or redis. Job status and progress belong in the database &mdash; they are already keyed by <code>job_id</code>/<code>session_id</code>, so the change is a storage swap, not a redesign.</p>
+    <p>Tracked as todo <a href="[% c.uri_for('/todo/details') %]?record_id=2047" style="color: var(--link-color);">#2047</a>, blocking Phase C. Note this is <em>independent of the session store fix</em>: sharing sessions does not help a poll that looks for a file on the wrong pod's disk.</p>
 
     <h2 id="maths">7. Availability maths  -  what actually buys the 99%</h2>
     <table style="width:100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
@@ -393,7 +483,7 @@
 
     <h2 id="spofs">8. Explicitly retained SPOFs (accepted, with rationale)</h2>
     <ul>
-        <li><strong>Registry on .199</strong>  -  if .199 is lost, running pods keep serving; only new deploys stop. Acceptable.</li>
+        <li><strong>Registry on .199</strong>  -  if .199 is lost, running pods keep serving; only new deploys stop. Acceptable, but the wording above understates the blast radius and is corrected here: a pod <em>rescheduled</em> onto a node that has not cached the image cannot start while the registry is down. So a node failure <em>during</em> a registry outage is not self-healing &mdash; the two faults compound. Mitigation is the documented <code>docker save | ssh host docker load</code> escape hatch and a named second home for the role (todo <a href="[% c.uri_for('/todo/details') %]?record_id=2044" style="color: var(--link-color);">#2044</a>).</li>
         <li><strong>k3s control plane on .126</strong>  -  single server node. Workloads keep running if the control plane blips; a full HA control plane needs a third node and is out of scope.</li>
         <li><strong>.199 is also the developer workstation</strong>  -  a genuine tension: production capacity shares a machine that gets rebooted for development. Revisit if it proves disruptive; a dedicated third node is the fix.</li>
         <li><strong>OPNsense / WAN entry</strong>  -  unchanged by this plan.</li>
@@ -455,6 +545,8 @@
             <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">11. See Also</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="[% c.uri_for('/Documentation/2026-08-10-infra-ha-phase-a-registry-decomposition') %]" style="color: var(--link-color);">Changelog 2026-08-10 (a)</a> &mdash; Phase A decomposition, A.0 role eval, registry port correction</li>
+                    <li><a href="[% c.uri_for('/Documentation/2026-08-10-infra-ha-load-balancing-session-state') %]" style="color: var(--link-color);">Changelog 2026-08-10 (b)</a> &mdash; load balancing reality, Store::Dummy and /tmp state blockers</li>
                     <li><a href="/Documentation/ImmutableImageDeployPlan" style="color: var(--link-color);">Immutable Image Deploy Plan</a> &mdash; LAN registry, prerequisite for Phase A</li>
                     <li><a href="/Documentation/GatewayPlan" style="color: var(--link-color);">Gateway Plan</a> &mdash; OPNsense HAProxy + ACME, Phase D entry point</li>
                     <li><a href="/Documentation/CREDENTIALS_AUDIT_AND_PLAN" style="color: var(--link-color);">Credentials Audit &amp; Plan</a> &mdash; IMGSEC, gates Phase C</li>
@@ -468,5 +560,5 @@
     </div>
 
     <hr style="border-color: var(--border-color); margin: var(--spacing-large) 0;" />
-    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Doc currency:</strong> this plan is kept current as phases complete. Each phase todo in project <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 (INFRA-HA)</a> carries its gate; when a phase lands, its todo is closed and the section here is marked done with commit evidence. Last reviewed: 2026-08-07.</p>
+    <p style="color: var(--text-muted-color); font-size: var(--font-size-small);"><strong>Doc currency:</strong> this plan is kept current as phases complete. Each phase todo in project <a href="[% c.uri_for('/project/details') %]?project_id=202" style="color: var(--link-color);">#202 (INFRA-HA)</a> carries its gate; when a phase lands, its todo is closed and the section here is marked done with commit evidence. Last reviewed: 2026-08-10 &mdash; Phase A decomposed into todos 2037&ndash;2044, A.0 resolved, registry port corrected to 5001, &sect;8 blast radius corrected. v1.12 adds &sect;3h (what k8s load balancing does and does not do), &sect;3i (stickiness), &sect;6a (Store::Dummy blocker, todo #2046 on AUTH-EVO) and &sect;6b (cross-request /tmp state, todo #2047).</p>
 </div>

@@ -27,7 +27,11 @@
         pageDocFetched: false,
         currentAgent: null,
         agentsConfig: null,
-        selectedProvider: 'ollama',
+        // No hardcoded provider default. The server renders the correct default
+        // into #ai-provider (role- and cost-aware) and mountProviderSelect()
+        // adopts it. Hardcoding 'ollama' here caused every request to go local
+        // regardless of what the dropdown displayed.
+        selectedProvider: '',
         conversationMessages: [],
         username: 'You',
         activeModel: null,
@@ -710,7 +714,7 @@
               '<option value="auto">⚡ Auto</option>' +
             '</select>' +
             '<label for="ai-provider">Model:</label>' +
-            '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
+            '<span id="ai-provider-mount"></span>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
                 '<input type="checkbox" id="enable-web-search" style="vertical-align:middle;"> 🔍 Web' +
@@ -764,20 +768,35 @@
         chatPanel.appendChild(resizeHandle);
 
         // ── Provider / model dropdown ──────────────────────────────────────
-        // NOTE: the catalog fetch + dropdown rendering is delegated to the
-        // SHARED module (ai-chat/model-select.js) via loadUserProviders() ->
-        // ComservChat.modelSelect.init(), which rebuilds #ai-provider from
-        // scratch (Ollama + Grok + external). Do NOT also populate it here:
-        // a duplicate inline fetch races the shared module's rebuild and leaves
-        // the selector stuck with only the Grok/external groups (no Ollama
-        // models). loadUserProviders() is invoked from openChat()/initPageMode().
+        // The #ai-provider <select> is SERVER-RENDERED (ai/model_select.tt via
+        // js_load.tt) from the catalog in stash, so it already shows the full,
+        // role-correct model list with no JS fetch or render race. We simply MOVE
+        // that server-rendered node into the provider-selector bar. The legacy
+        // shared-module fetch (ai-chat/model-select.js) is no longer needed to
+        // build the list and is only kept as a fallback if the server node is
+        // absent.
+        (function mountProviderSelect() {
+            var mount = document.getElementById('ai-provider-mount');
+            var src   = document.getElementById('ai-provider-server-rendered');
+            var sel   = src ? src.querySelector('#ai-provider') : null;
+            if (mount && sel) {
+                mount.appendChild(sel);
+                if (src) src.parentNode && src.parentNode.removeChild(src);
+                // Adopt the server-chosen default as the active provider. Without
+                // this, state.selectedProvider stayed at its 'ollama' initial value
+                // while the dropdown displayed (say) a free OpenRouter model, so the
+                // request went to Ollama and the status line said Ollama — exactly
+                // the mismatch the server-rendered default was meant to remove.
+                if (sel.value) state.selectedProvider = sel.value;
+            }
+        })();
 
         // Pre-warm the Ollama model at page-load time so the first real
         // message doesn't hit a cold-start delay.  Re-warm every 25 min
         // (keep_alive is 2h so this ensures the model stays in VRAM).
         (function startPreload() {
             function _firePreload() {
-                    if ((state.selectedProvider || 'ollama').split('|')[0] !== 'ollama') return;
+                    if ((state.selectedProvider || '').split('|')[0] !== 'ollama') return;
                     const agentId = (state.pageContext && state.pageContext.agent_id) || '';
                     fetch('/ai/preload_model?provider=ollama&agent_id=' + encodeURIComponent(agentId), {
                         method: 'GET',
@@ -1494,14 +1513,11 @@
 
             state.selectedProvider = selectedVal;
             state.userModelOverride = true;   // user chose manually — disable auto-select
-            let modelDisplay;
-            if (isGrok) {
-                modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
-            } else {
-                const host = state.ollamaHost || '';
-                const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
-                modelDisplay = (isLocalHost ? 'Ollama (Local)' : 'Ollama (Remote)') + (parts[1] ? ': ' + parts[1] : '');
-            }
+            // Label from the SHARED helper: it derives the provider from the
+            // "provider|model" value itself. The old code assumed anything that
+            // was not Grok must be Ollama, so picking an OpenRouter model (e.g.
+            // openrouter|tencent/hy3) was mislabelled "Ollama (Local)".
+            let modelDisplay = describeModel(selectedVal, { host: state.ollamaHost });
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
             statusEl.textContent = '🔵 ' + modelDisplay + ' (manual)';
@@ -1751,10 +1767,17 @@
                         }
                     });
 
-                    // Sync our selectedProvider shadow.
+                    // Sync our selectedProvider shadow. NOTE: do NOT set
+                    // userModelOverride here — this runs for the *programmatic
+                    // default* selection (smallest local Ollama model), not a
+                    // deliberate user choice. Marking it as an override would
+                    // disable auto-tiering and force every question onto the
+                    // default model (previously hy3, a paid external model)
+                    // instead of letting autoSelectProvider route simple queries
+                    // to a small/free local model. Real user picks still set the
+                    // flag via the change-event listener below.
                     const curVal = providerSelect.value || '';
                     state.selectedProvider = curVal || state.selectedProvider;
-                    if (curVal && curVal !== 'ollama') state.userModelOverride = true;
                     // Web-search toggle: show it whenever the user HAS Grok
                     // access (toggle applies to Grok requests whether selected
                     // manually or reached via auto-routing) — not only when a
@@ -2189,7 +2212,10 @@
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
         // We only specify a model when the user manually chose one, or for Grok (where model matters).
-        let effectiveProvider = state.selectedProvider || 'ollama';
+        // Fall back to whatever the dropdown currently shows, NOT a hardcoded
+        // 'ollama' — the dropdown holds the server-rendered role/cost-aware default.
+        let effectiveProvider = state.selectedProvider ||
+            (document.getElementById('ai-provider') || {}).value || '';
         let autoTier = null;
         if (!state.userModelOverride) {
             autoTier = classifyQuery(prompt);
@@ -2865,17 +2891,18 @@
                     }
                 }
                 
-                // Update status with provider + model name + host
-                const providerParts2 = (state.selectedProvider || 'ollama').split('|');
-                const provName = data.provider || providerParts2[0];
+                // Update status with provider + model name + host.
+                // Use the SHARED describeModel() helper so the label always matches
+                // the provider that actually served the request. The previous code
+                // treated every non-Grok response as Ollama, which is why an
+                // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
+                const providerParts2 = (state.selectedProvider || '').split('|');
+                const provName = data.provider || providerParts2[0] || '';
                 const rawModel = data.model || providerParts2[1] || '';
-                let modelLabel;
-                if (provName === 'grok') {
-                    modelLabel = 'Grok (xAI)' + (rawModel ? ': ' + rawModel : '');
-                } else {
-                    const hostLabel = data.ollama_host ? ' @' + data.ollama_host : ' (Local)';
-                    modelLabel = 'Ollama' + hostLabel + (rawModel ? ': ' + rawModel : '');
-                }
+                const modelLabel = describeModel(
+                    provName + (rawModel ? '|' + rawModel : ''),
+                    { host: data.ollama_host || state.ollamaHost }
+                );
                 state.activeModel = modelLabel;
                 statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
@@ -3153,9 +3180,35 @@
         return 'medium';
     }
 
-    // Pick the best provider string for a given complexity tier
+    // Label a "provider|model" value. Delegates to the SHARED module so every
+    // surface labels identically; the inline fallback only runs if model-select.js
+    // failed to load.
+    function describeModel(value, opts) {
+        if (window.ComservChat && window.ComservChat.modelSelect &&
+            typeof window.ComservChat.modelSelect.describeModel === 'function') {
+            return window.ComservChat.modelSelect.describeModel(value, opts);
+        }
+        if (!value) return 'AI Assistant';
+        var p = String(value).split('|');
+        return (p[0] || 'AI') + (p[1] ? ': ' + p[1] : '');
+    }
+
+    // Pick the best provider string for a given complexity tier.
+    //
+    // IMPORTANT: auto-tiering only ever picks between LOCAL Ollama sizes (plus
+    // Grok for complex queries). It must therefore NOT run when the current
+    // selection is an external provider — modelTiers only ever contains
+    // 'ollama|...' entries, so returning a tier would silently drag an
+    // OpenRouter selection (e.g. a free NVIDIA model) back onto local Ollama.
+    // That is the "I picked a free model but got Ollama" bug.
     function autoSelectProvider(complexity) {
         const t = state.modelTiers;
+        const current = state.selectedProvider || '';
+        const currentSvc = current.split('|')[0];
+
+        // Respect any non-Ollama selection (server-rendered default included).
+        if (currentSvc && currentSvc !== 'ollama') return current;
+
         if (complexity === 'nav' || complexity === 'simple') {
             return t.small || t.medium || state.selectedProvider;
         }

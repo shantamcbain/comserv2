@@ -8,7 +8,9 @@ use JSON;
 use URI;
 use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
+
 use Comserv::Util::Logging;
+use Comserv::Util::ModelCatalog;
 use Comserv::Util::SystemInfo;
 use Comserv::Util::UserPreferences;
 
@@ -1088,10 +1090,34 @@ sub auto :Private {
             "Server info - DB Host: $db_host, Hostname: $display_hostname, IP: $display_ip");
 
         $self->_normalize_debug_msg($c);
-        
+
+        # ── CANONICAL AI MODEL CATALOG ────────────────────────────────────
+        # SINGLE SOURCE OF TRUTH: Comserv::Util::ModelCatalog owns the list for
+        # EVERY AI surface (floating widget, /ai/widget popup, /ai, /ai2, editor,
+        # git dashboard). It builds once per process from the v2 Router — the
+        # same source /ai2/providers uses — and caches with a TTL, so this adds
+        # no per-request provider round-trip. Stash both shapes: the decoded
+        # array for server-side .tt rendering (ai/model_select.tt, the reliable
+        # path) and the JSON string for window.ComservConfig.models.
+        $c->stash->{ai_model_catalog}      = Comserv::Util::ModelCatalog->catalog($c);
+        $c->stash->{ai_model_catalog_json} = Comserv::Util::ModelCatalog->catalog_json($c);
+
+        # Role + page context used by the .tt to SORT/order the dropdown.
+        my $roles = $c->session->{roles} || [];
+        $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
+        $c->stash->{ai_is_priv} = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles) ? 1 : 0;
+        $c->stash->{ai_chat_page} ||= $c->request->path;
+        # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
+        # and no load on the already-saturated workstation GPU); privileged users
+        # on a coding surface get the pinned coding model. Without this the
+        # browser just selects the first option alphabetically, which silently
+        # sent every guest to a local Ollama model.
+        $c->stash->{ai_default_model}
+            = Comserv::Util::ModelCatalog->default_for($c, page => 'chat');
+
         return 1; # Continue processing
     };
-    
+
     # Error handling for auto() method
     if ($@) {
         my $error = $@;

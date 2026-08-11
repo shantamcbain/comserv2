@@ -17,6 +17,20 @@
 <h2>[Unreleased]</h2>
 <p><em>Add bullets here while working; move to a dated section when shipped.</em></p>
 
+<h3>Fixed — AI2 system: /ai2/providers "Not a HASH reference" (malformed catalog element)</h3>
+<ul>
+    <li><strong>What was wrong:</strong> an unauthenticated request to <code>/ai2/providers</code> at the guest tier (free OpenRouter + Ollama only) returned the correct free list <em>but</em> also raised <em>"Not a HASH reference at Controller/AI2.pm line 76"</em>, generating an error-audit todo. The loop that groups the catalog by provider did <code>$m-&gt;{provider}</code> on every element; one element of <code>@$catalog</code> was not a hashref (an upstream provider JSON anomaly — Ollama <code>/api/tags</code> or OpenRouter <code>/v1/models</code> occasionally returns a non-object entry).</li>
+    <li><strong>Fix:</strong> two layers now reject non-hash elements instead of dying:
+        <ul>
+            <li><code>Controller/AI2.pm::providers</code> skips any non-hash element and logs <code>ai2_providers</code> with the offending shape.</li>
+            <li><code>Model/AI2/Router.pm::get_available_models</code> sanitizes the built catalog right before the role filter, dropping any non-hashref element and logging <code>get_available_models</code> with the element's shape (scalar/array/ref). This is the single source of truth, so the widget, <code>/ai</code>, <code>/ai2</code> and the git dashboard are all protected.</li>
+        </ul>
+    </li>
+    <li><strong>Root-cause capture:</strong> the warnings record the exact bad element on the next occurrence, so the offending provider/payload can be identified and fixed at the API boundary if it recurs.</li>
+    <li><strong>Verified:</strong> <code>perl -c</code> clean on both modules. The endpoint now degrades gracefully — a malformed entry is dropped, not fatal.</li>
+    <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-10-ai2-providers-hashref-guard">2026-08-10-ai2-providers-hashref-guard</a></li>
+</ul>
+
 <h2>[2026-07-27] — Production1 stability: restart loop, disk, AI2 providers 500</h2>
 
 <h3>Fixed — Deploy system: production "restart loop" (commit 76135ef0)</h3>

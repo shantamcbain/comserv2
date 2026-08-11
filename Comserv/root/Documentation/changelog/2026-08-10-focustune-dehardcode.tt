@@ -1,0 +1,68 @@
+[% PageVersion = 'Documentation/changelog/2026-08-10-focustune-dehardcode.tt,v 1.00 2026/08/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'AI Focus-Tune — De-hardcode top-N and finish removing phi4:14b' %]
+[% META description = 'FocusTune candidate/prompt/compare sizes are now named constants (50/25/20) instead of magic numbers; the remaining phi4:14b client fallback is replaced by the seeded catalog default' %]
+[% META author = 'shanta' %]
+[% META date = '2026-08-10' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>AI Focus-Tune — de-hardcode top-N + finish phi4:14b removal</h1>
+        <div class="changelog-meta">
+            <span class="date">August 10, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Bug fix / daily-plan AI Focus-Tune</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <p>
+            The daily-plan &ldquo;ask AI to check the accuracy of the top 20&rdquo; (AI
+            Focus-Tune) still had hardcoded literals: the candidate/prompt/comparison sizes
+            (<code>50</code> / <code>25</code> / <code>19</code>) were bare magic numbers in
+            <code>FocusTune.pm</code>, and <code>phi4:14b</code> remained as the client-side
+            fallback in <code>daily-plan-utils.js</code>. Both are now de-hardcoded.
+        </p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>What changed</h2>
+        <ul>
+            <li><code>FocusTune.pm</code> &mdash; added named constants
+                <code>CANDIDATE_CAP =&gt; 50</code>, <code>PROMPT_CAP =&gt; 25</code>,
+                <code>COMPARE_TOP =&gt; 20</code>. The candidate <code>splice</code>, the prompt
+                cap, and the coded-vs-AI &ldquo;top 20&rdquo; diff slices all use these instead
+                of <code>50</code> / <code>25</code> / <code>19</code>. One place to tune.</li>
+            <li><code>daily-plan-utils.js</code> &mdash; the three <code>phi4:14b</code> literals
+                are gone. The default is now seeded from
+                <code>window.ComservConfig.aiFocusDefault</code> (set by the daily page from the
+                shared catalog default) and falls back to the server&rsquo;s
+                <code>/api/focus/models</code> <code>default</code> field; only a last-resort
+                free-OpenRouter slug remains as an absolute safety net (never a localhost Ollama).</li>
+            <li><code>_today_work_tab.tt</code> &mdash; emits
+                <code>window.ComservConfig.aiFocusDefault</code> from
+                <code>ai_default_model</code> so the picker is seeded before any
+                <code>/api/focus/models</code> fetch.</li>
+        </ul>
+
+        <h2>Verified</h2>
+        <p>
+            <code>grep -c phi4:14b</code> on <code>daily-plan-utils.js</code> = 0.
+            <code>perl -c</code> on Router.pm / FocusTune.pm / ModelCatalog.pm and
+            <code>node --check</code> on daily-plan-utils.js all pass. The Role filter from the
+            prior change remains active at the Router level (guest widget still shows 19
+            free/Ollama models).
+        </p>
+
+        <h2>Files changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Model/AI2/FocusTune.pm</code> &mdash; named top-N constants</li>
+            <li><code>lib/Comserv/Model/AI2/Router.pm</code> &mdash; role filter at get_available_models (see model-role-filter changelog)</li>
+            <li><code>root/static/js/planning/daily-plan-utils.js</code> &mdash; seed default from catalog, remove phi4:14b</li>
+            <li><code>root/admin/planning/_today_work_tab.tt</code> &mdash; emit aiFocusDefault global</li>
+            <li><code>root/Documentation/changelog/2026-08-10-focustune-dehardcode.tt</code> &mdash; this entry</li>
+        </ul>
+    </section>
+</div>

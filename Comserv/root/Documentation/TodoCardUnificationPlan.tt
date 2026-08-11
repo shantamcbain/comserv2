@@ -112,6 +112,20 @@ usable inside a positioned time-slot while preserving drag. Changes, all inside
   `_rescheduleAndReload` / reschedule the gcal lane used); Focus Queue + calendar
   call the identical function.
 
+## Phase 4 addendum — project-page cards must carry `data-todo-id`
+The single delegated handler in `daily-plan-utils.js` finds the card to restyle via
+`btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') ||
+btn.closest('[data-todo-id]')`. The calendar views and the Focus Queue pass
+`tc_wrapper_extra="data-todo-id='...'"`, so Start/Done restyle the card inline
+(strikethrough + disabled buttons). The **project pages did not** — `ProjectTodosList.tt`
+and `project.tt` (main + sub-project Associated Todos) omitted `data-todo-id`, so the
+success restyle was skipped: the button flipped to "✓ Done" but the card kept showing
+"⏸ Active" with no strikethrough until a full page reload re-rendered from the DB.
+Fixed: all three project-page includes now pass
+`tc_wrapper_extra="data-todo-id='[%~ todo.record_id %]'"`, matching the calendar views.
+GATE: on /project/details and /project, clicking Done on a todo now strikes the card
+through and disables its buttons immediately, identical to the calendar/Focus Queue.
+
 ## Verification (no server needed for most of it)
 - Rule 23 TT smoke test for `todo_card.tt` (closed-by-default, no inline style
   except data-driven, `pri-N` badge) — run for both the plain and drag-wrapper

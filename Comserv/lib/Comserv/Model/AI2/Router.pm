@@ -394,6 +394,12 @@ sub get_available_models {
                         provider => $svc,
                         label    => ($m->{label} || $m->{id}) . " ($svc)",
                         local    => 0,
+                        # AIMPS-P1 (#253): keep real per-token pricing so the
+                        # catalog can sort/filter/display by cost. Free ":free"
+                        # models carry a pricing hash of zeros.
+                        pricing          => $m->{pricing}        || {},
+                        price_prompt     => $m->{price_prompt}     // 0,
+                        price_completion => $m->{price_completion} // 0,
                     };
                 }
                 next;
@@ -410,7 +416,80 @@ sub get_available_models {
         }
     }
 
+    # Sanitize: upstream provider JSON (Ollama /api/tags, OpenRouter /v1/models)
+    # can occasionally return a malformed entry (a bare string or array instead
+    # of a model object). Drop anything that isn't a hashref so the downstream
+    # grouping in /ai2/providers and ModelCatalog never hits "Not a HASH
+    # reference". Log the offending element tagged by provider so the source
+    # (and the exact bad payload) is visible in the error audit.
+    my @clean;
+    for my $m (@all) {
+        if (ref $m eq 'HASH') {
+            push @clean, $m;
+        } else {
+            # We can't read a provider off a non-hash element; infer a hint from
+            # the element shape so the log points at the likely culprit.
+            my $hint = defined $m
+                ? (ref $m ? ref($m) : "scalar '$m'")
+                : 'undef';
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'get_available_models',
+                "Dropping non-hash catalog element: $hint");
+        }
+    }
+    @all = @clean;
+
+    # ROLE FILTER — applied ONCE here, at the single source of truth, so every
+    # consumer (ModelCatalog, /ai2/providers, the widget, /ai, git dashboard)
+    # is role-filtered without each list re-implementing it. Tiers:
+    #   guest  : free OpenRouter + Ollama local only (no paid, no Grok)
+    #   member : free + cheap + mid (premium > $5 / 1M excluded, no Grok)
+    #   priv   : everything (admin / developer / editor)
+    @all = $self->_role_filter_models($c, \@all);
+
     return \@all;
+}
+
+# Keep only the models a role tier may see. Mirrors ModelCatalog's tiers so the
+# two paths (direct Router use and ModelCatalog caching) agree.
+sub _role_filter_models {
+    my ($self, $c, $all) = @_;
+    my $tier = $self->_role_tier($c);
+    return @$all if $tier eq 'priv';
+    my @out;
+    for my $m (@$all) {
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $svc  = $m->{provider} || '';
+        my $free = $m->{free} || ( ($m->{name} // '') =~ /:free$/ ? 1 : 0 );
+        my $local = $m->{local} || ( $svc eq 'ollama' ? 1 : 0 );
+        if ($tier eq 'guest') {
+            push @out, $m if $free || $local;
+        } else { # member
+            next if $svc eq 'grok';
+            my $pp = ($m->{price_prompt}     // 0) + 0;
+            my $pc = ($m->{price_completion} // 0) + 0;
+            my $max = ( $pp > $pc ) ? $pp : $pc;
+            next if $max > 5;   # premium excluded for members
+            push @out, $m;
+        }
+    }
+    return \@out;
+}
+
+sub _role_tier {
+    my ($self, $c) = @_;
+    my $roles = eval { $c->session->{roles} } || [];
+    $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
+    my $is_guest = 1;
+    my $is_priv  = 0;
+    for my $r (@$roles) {
+        next unless defined $r && length $r;
+        $is_guest = 0 if $r =~ /^(admin|developer|editor|member|user)$/i;
+        $is_priv  = 1 if $r =~ /^(admin|developer|editor)$/i;
+    }
+    return 'priv'  if $is_priv;
+    return 'guest' if $is_guest;
+    return 'member';
 }
 
 # -------------------------------------------------------------------

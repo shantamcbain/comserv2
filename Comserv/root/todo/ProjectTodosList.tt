@@ -13,7 +13,8 @@
     <summary class="project-todos-summary"><strong>📋 Todos for [% project.name %] ([% project.todos.size %])</strong></summary>
     <div class="project-todos-content">
         [% FOREACH todo IN project.todos %]
-            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
+            [% SET tcard_wrap_p = "data-todo-id='" _ todo.record_id _ "'" %]
+            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_wrapper_extra=tcard_wrap_p %]
         [% END %]
     </div>
 </details>

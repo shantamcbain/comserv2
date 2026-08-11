@@ -1,0 +1,296 @@
+[% META
+        title = "AI Model Presentation & Selection Plan"
+   description = "Cost-aware, role-aware and page-aware presentation of AI models across every Comserv AI surface, plus the standing v2-migration and documentation-sync obligations"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning"
+   page_version = "0.01"
+   last_updated = "Mon Aug 10 2026"
+   site_specific = "false"
+   project_id = "252"
+   project_code = "AIMPS"
+%]
+[% PageVersion = 'Documentation/AIModelPresentationPlan.tt,v 0.01 2026/08/10 hermes-agent Exp shanta - Initial plan: cost/role/page aware model selection + v2 & docs-sync standing rules' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+
+      <h1 class="doc-h1" id="top">AI Model Presentation &amp; Selection Plan</h1>
+
+      <p class="doc-intro">
+        How Comserv decides <em>which</em> AI models to show a given user on a given
+        page, what each one costs, and which one is pre-selected. Supersedes the
+        ad-hoc per-page JS model lists removed during the August 2026 chat-widget
+        regression fix.
+      </p>
+
+      <div class="doc-navlinks">
+        <a class="doc-navlink" href="/Documentation/MASTER_PLAN">&#8592; Master Plan</a>
+        <a class="doc-navlink" href="/Documentation/AI_Chat_System_Master_Audit">AI Chat System Master Audit</a>
+        <a class="doc-navlink" href="/Documentation/AIChatSystemUserGuide">AI Chat User Guide</a>
+        <a class="doc-navlink" href="/Documentation/AI_DEVELOPMENT_GUIDELINES">AI Development Guidelines</a>
+        <a class="doc-navlink" href="/Documentation/AI_DOCUMENTATION_GUIDELINES">AI Documentation Guidelines</a>
+      </div>
+
+      [%# On this page: horizontal section nav, same classes as the top application menu %]
+      <nav class="masterplan-nav" aria-label="Plan sections">
+        <div class="submenu-section">
+          <span class="submenu-section-title">Sections</span>
+          <div class="nav-row">
+            <a class="menu-item" href="#tracking">Tracking</a>
+            <a class="menu-item" href="#phases">Phases</a>
+            <a class="menu-item" href="#background">1 &middot; Background</a>
+            <a class="menu-item" href="#current">2 &middot; Current state</a>
+          </div>
+        </div>
+        <div class="submenu-section">
+          <span class="submenu-section-title">Phases</span>
+          <div class="nav-row">
+            <a class="menu-item" href="#p1">P1 &middot; Pricing</a>
+            <a class="menu-item" href="#p2">P2 &middot; Sort/Filter</a>
+            <a class="menu-item" href="#p3">P3 &middot; Shortlists</a>
+            <a class="menu-item" href="#p4">P4 &middot; Telemetry</a>
+            <a class="menu-item" href="#p5">P5 &middot; Standing rules</a>
+          </div>
+        </div>
+        <div class="submenu-section">
+          <span class="submenu-section-title">Reference</span>
+          <div class="nav-row">
+            <a class="menu-item" href="#questions">Open questions</a>
+            <a class="menu-item" href="[% c.uri_for('/project/details') %]?project_id=252">Project #252</a>
+            <a class="menu-item" href="[% c.uri_for('/todo') %]?project_id=252">Todos</a>
+          </div>
+        </div>
+      </nav>
+
+      <h2 class="doc-h2" id="tracking">Project Tracking</h2>
+      <table class="doc-table">
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Project</td><td>AI Model Presentation &amp; Selection (AIMPS)</td></tr>
+        <tr><td>Project ID</td><td><a href="[% c.uri_for('/project/details') %]?project_id=252">#252 (AIMPS)</a></td></tr>
+        <tr><td>Parent Project</td><td><a href="[% c.uri_for('/project/details') %]?project_id=114">#114 &mdash; AI Chat System Enhancement (AIC-ENH)</a></td></tr>
+        <tr><td>Grandparent</td><td><a href="[% c.uri_for('/project/details') %]?project_id=63">#63 &mdash; AI Integration</a></td></tr>
+        <tr><td>All todos</td><td><a href="[% c.uri_for('/todo') %]?project_id=252">Todos under project #252</a></td></tr>
+        <tr><td>Status</td><td>Active</td></tr>
+        <tr><td>Window</td><td>2026-08-10 &rarr; 2026-10-31</td></tr>
+      </table>
+
+      <h2 class="doc-h2" id="phases">Phase Sub-Projects</h2>
+      <table class="doc-table">
+        <tr><th>ID</th><th>Code</th><th>Phase</th><th>Todos</th></tr>
+        <tr><td><a href="[% c.uri_for('/project/details') %]?project_id=253">253</a></td><td>AIMPS-P1</td><td>Cost Metadata &amp; Pricing Feed</td><td><a href="[% c.uri_for('/todo') %]?project_id=253">2020&ndash;2022</a></td></tr>
+        <tr><td><a href="[% c.uri_for('/project/details') %]?project_id=254">254</a></td><td>AIMPS-P2</td><td>Cost-Aware Sorting, Filtering &amp; Price Display</td><td><a href="[% c.uri_for('/todo') %]?project_id=254">2023&ndash;2025</a></td></tr>
+        <tr><td><a href="[% c.uri_for('/project/details') %]?project_id=255">255</a></td><td>AIMPS-P3</td><td>Page &amp; Role Scoped Shortlists</td><td><a href="[% c.uri_for('/todo') %]?project_id=255">2026&ndash;2029, 2036</a></td></tr>
+        <tr><td><a href="[% c.uri_for('/project/details') %]?project_id=256">256</a></td><td>AIMPS-P4</td><td>Usage Telemetry &amp; Popularity Ranking</td><td><a href="[% c.uri_for('/todo') %]?project_id=256">2030&ndash;2032</a></td></tr>
+        <tr><td><a href="[% c.uri_for('/project/details') %]?project_id=257">257</a></td><td>AIMPS-P5</td><td>v2 Migration &amp; Documentation Sync (standing)</td><td><a href="[% c.uri_for('/todo') %]?project_id=257">2033&ndash;2035</a></td></tr>
+      </table>
+
+      <h2 class="doc-h2" id="background">1. Background &mdash; what went wrong</h2>
+      <p>
+        An attempt to reduce duplicated JavaScript and make every AI surface share
+        one code path broke the chat system. Two defects, both now fixed:
+      </p>
+      <ul class="doc-list">
+        <li><strong>Lowercase <code>Process</code> in Template Toolkit.</strong> All three
+            call sites used <code>[&#37; Process('ai/model_select.tt', ... ) &#37;]</code>. TT
+            directives are UPPERCASE; lowercase parses as an undefined variable and
+            renders nothing, so every model dropdown was empty.</li>
+        <li><strong>The detached popup bypassed the loader.</strong>
+            <code>/ai/widget</code> renders <code>widget.tt</code> through a bare
+            <code>Template-&gt;new</code> with no Catalyst context, so it never saw the
+            catalog stash or the cache-buster and served a frozen
+            <code>?v=1</code> with an empty widget.</li>
+      </ul>
+      <p class="doc-warning">
+        Lesson recorded: static analysis and <code>node --check</code> cannot catch
+        either failure. Only rendering the live page proves a fix.
+      </p>
+
+      <h2 class="doc-h2" id="current">2. Current state (delivered)</h2>
+      <ul class="doc-list">
+        <li><code>Comserv::Util::ModelCatalog</code> is the single source of truth for the
+            model list. Built once per process from the v2 Router, cached with a
+            600-second TTL, primed for free by <code>/ai2/providers</code>.</li>
+        <li><code>root/ai/model_select.tt</code> is the single server-rendered dropdown
+            partial used by the floating widget, the <code>/ai/widget</code> popup,
+            <code>/ai</code> and <code>/ai2</code>.</li>
+        <li>Non-chat model families (embeddings, rerankers, image/audio/video,
+            moderation) are filtered out: 414 catalog entries &rarr; 397 options.</li>
+        <li>Each entry carries cost flags: <code>free</code>, <code>local</code>,
+            <code>paid</code>. Free models sort first inside their provider group and
+            are labelled &ldquo;&mdash; free&rdquo;; Ollama models are labelled
+            &ldquo;&mdash; local&rdquo;.</li>
+        <li><code>default_for()</code> pre-selects a free OpenRouter model for guests and
+            ordinary members, and the pinned coding model for privileged users on a
+            coding surface.</li>
+        <li><strong>Phase 1 delivered (AIMPS-P1 / #253).</strong> OpenRouter's
+            <code>pricing</code> hash from <code>/api/v1/models</code> is no longer
+            discarded: <code>OpenRouter::list_models</code> keeps the raw
+            <code>pricing</code> object and adds <code>price_prompt</code> /
+            <code>price_completion</code> (USD per 1M tokens). The v2 Router carries both
+            through <code>get_available_models</code>, and <code>ModelCatalog::_flatten</code>
+            exposes them on every catalog entry alongside a threshold-derived
+            <code>price_tier</code> (<code>free</code> / <code>cheap</code> &le; $1 / 1M,
+            <code>mid</code> &le; $5 / 1M, <code>premium</code> &gt; $5 / 1M — ranked by the
+            dearer of prompt/completion). Tiers are threshold-driven, never a hardcoded
+            model list. See changelog
+            <a href="[% c.uri_for('/Documentation/changelog/2026-08-10-openrouter-pricing-feed') %]">2026-08-10 OpenRouter pricing feed</a>.
+            A same-day follow-up fixed <code>Controller::AI2::providers</code>, which was
+            stripping <code>price_*</code> / <code>pricing</code> out of the catalog before
+            priming <code>ModelCatalog</code> &mdash; that is why the dropdown initially
+            showed the provider but a blank fee (not a cache issue).</li>
+        <li><strong>Phase 2 price display delivered (AIMPS-P2 / #254).</strong> Paid
+            models now show their real per-token cost. The widget, <code>/ai</code>,
+            <code>/ai2</code> and the git dashboard render their dropdown via the shared
+            <code>ai-chat/model-select.js</code> module (it rebuilds the
+            <code>&lt;select&gt;</code> from <code>window.ComservConfig.models</code> on
+            <code>init()</code>, so the server-rendered <code>ai/model_select.tt</code> is
+            overwritten on those surfaces). That module now carries
+            <code>price_prompt</code>/<code>price_completion</code>/<code>pricing</code>
+            through <code>fromFlat()</code> and appends
+            <code>— $pp/$pc per 1M (tier)</code> (with <code>— free</code> /
+            <code>— local</code>) in <code>render()</code>; the provider is shown once via the
+            optgroup header (the doubled-provider bug is fixed). <code>/ai</code>,
+            <code>/ai2</code> and <code>/admin/git</code> now emit the
+            <code>ComservConfig.models</code> global so the fast path is used. The
+            server-rendered <code>ai/model_select.tt</code> also shows the price for any
+            surface that uses it directly. Remaining P2 work (premium-tier &ldquo;show
+            all&rdquo; toggle, tier-then-capability ordering) is still open.</li>
+      </ul>
+
+      <h3 class="doc-h3">Why free OpenRouter beats Ollama for guests</h3>
+      <p>
+        Ollama costs no money but it is <em>not</em> free: it consumes workstation
+        (192.168.1.199) GPU and VRAM, and that host is routinely saturated. Sending
+        anonymous guest traffic there degrades the machine we depend on for real
+        work while giving the guest the slowest possible answer. A free OpenRouter
+        model costs nothing, runs off-host, and responds faster. Local models stay
+        available in the list for anyone who explicitly wants privacy or offline
+        operation &mdash; they are simply no longer the silent default.
+      </p>
+
+      <h2 class="doc-h2" id="p1">3. Phase 1 &mdash; Cost metadata &amp; pricing feed</h2>
+      <p>
+        OpenRouter's <code>/api/v1/models</code> response already includes a
+        <code>pricing</code> object (per-token prompt and completion cost); our
+        provider currently discards it. Phase 1 keeps it and surfaces it on every
+        catalog entry so later phases can sort, filter and display by real cost.
+      </p>
+      <table class="doc-table">
+        <tr><th>Field</th><th>Meaning</th></tr>
+        <tr><td>price_prompt</td><td>USD per 1M input tokens</td></tr>
+        <tr><td>price_completion</td><td>USD per 1M output tokens</td></tr>
+        <tr><td>price_tier</td><td>free / cheap / mid / premium, derived from thresholds</td></tr>
+      </table>
+      <p class="doc-note">
+        Tiers must be threshold-driven, never a hardcoded list of model names &mdash;
+        the OpenRouter catalog changes weekly and any name list will rot.
+      </p>
+
+      <h2 class="doc-h2" id="p2">4. Phase 2 &mdash; Cost-aware sorting, filtering &amp; price display</h2>
+      <ul class="doc-list">
+        <li>Show the per-1M cost beside each paid model so the user sees the price
+            before choosing.</li>
+        <li>Hide the premium tier behind a &ldquo;show all models&rdquo; toggle. 387
+            OpenRouter entries in one dropdown is not a usable interface.</li>
+        <li>Replace alphabetical ordering with tier-then-capability ordering. The
+            current alphabetical sort is why the list opens on &ldquo;AI21:&nbsp;&hellip;&rdquo;.</li>
+      </ul>
+
+      <h2 class="doc-h2" id="p3">5. Phase 3 &mdash; Page and role scoped shortlists</h2>
+      <p>
+        The model shown should depend on what the user is actually doing. Editing a
+        Perl module and writing a herb monograph do not need the same shortlist.
+      </p>
+      <ul>
+        <li><strong>Role visibility delivered (AIMPS-P3 / #255).</strong> The shared catalog
+            (<code>Comserv::Util::ModelCatalog</code>) now role-filters at the single source of
+            truth, so a not-logged-in user no longer sees the full admin list. Tiers:
+            <strong>guest</strong> &rarr; free OpenRouter + Ollama local only (no paid, no Grok);
+            <strong>member</strong> (logged-in, non-privileged) &rarr; free + cheap + mid
+            (premium &gt; $5 / 1M excluded, no Grok); <strong>privileged</strong>
+            (admin/developer/editor) &rarr; everything. Verified live: an unauthenticated
+            request to the widget returns 19 models (5 Ollama + 14 free OpenRouter), 0 paid,
+            0 Grok &mdash; down from the full 414-model admin list. See changelog
+            <a href="[% c.uri_for('/Documentation/changelog/2026-08-10-model-role-filter') %]">2026-08-10 model role filter</a>.
+            Page-scoped shortlists (editor &rarr; coding models, herb/content &rarr; long-context)
+            are a follow-up still open.</li>
+      </ul>
+      <table class="doc-table">
+        <tr><th>Surface</th><th>Model class</th><th>Default</th></tr>
+        <tr><td>AI2 code editor</td><td>Coding models</td><td>openrouter|tencent/hy3 (privileged only)</td></tr>
+        <tr><td>Herb / content pages</td><td>General + long-context</td><td>Free OpenRouter</td></tr>
+        <tr><td>Planning / todo</td><td>General reasoning</td><td>Free OpenRouter</td></tr>
+        <tr><td>Git dashboard</td><td>Coding + summarisation</td><td>Per role</td></tr>
+        <tr><td>General chat (guest)</td><td>Free tier only</td><td>Free OpenRouter</td></tr>
+      </table>
+      <p class="doc-warning">
+        All of this logic lives in <code>Model::AI2::Router</code>. No per-page bespoke
+        AI logic &mdash; that fragmentation is exactly what caused the outage this plan
+        follows.
+      </p>
+      <p class="doc-note">
+        Related defect (todo&nbsp;#2036): the chat backend currently reports the generic
+        bucket name <code>external</code> instead of the concrete provider that served
+        the request, so the UI cannot distinguish OpenRouter from a future provider.
+        This is worked around client-side today and must be fixed in the Router.
+      </p>
+
+      <h2 class="doc-h2" id="p4">6. Phase 4 &mdash; Usage telemetry &amp; popularity ranking</h2>
+      <p>
+        Record the model that actually served each request &mdash; provider, surface,
+        role, latency, success or failure &mdash; then rank the dropdown by observed
+        usage and reliability rather than by guesswork. Includes a recurring monthly
+        re-audit of the catalog, pricing tiers and defaults.
+      </p>
+
+      <h2 class="doc-h2" id="p5">7. Phase 5 &mdash; Standing rules on every code touch</h2>
+      <p>These are not one-off tasks. They apply to every future change.</p>
+
+      <h3 class="doc-h3">Rule V2 &mdash; migrate as you touch</h3>
+      <p>
+        Any file touched on an AI surface must be moved onto the v2
+        Router / ModelCatalog pattern as part of that change. No new v1 code paths,
+        no new per-page model fetches, no new bespoke dispatch. Partial migration is
+        how the system ended up with two disagreeing catalog shapes.
+      </p>
+
+      <h3 class="doc-h3">Rule DOC &mdash; docs match code, in the same commit</h3>
+      <p>
+        Every code change updates the matching <code>/Documentation/*.tt</code> page and
+        appends to <code>/Documentation/CHANGELOG</code> in the <em>same</em> commit. A
+        change whose documentation still describes the previous behaviour is not
+        finished. Plans and docs must always describe the code as it currently is,
+        not as it was intended to be.
+      </p>
+      <p class="doc-note">
+        Enforcement: a pre-merge check flags any commit that modifies
+        <code>lib/</code> or <code>root/static/js</code> under an AI path without a
+        corresponding <code>.tt</code> documentation change.
+      </p>
+
+      <h2 class="doc-h2" id="questions">8. Open questions</h2>
+      <ul class="doc-list">
+        <li>Do members with their own API key bypass the premium filter entirely?</li>
+        <li>Should price display be absolute dollars or a relative indicator
+            (&#36;/&#36;&#36;/&#36;&#36;&#36;) for non-technical users?</li>
+        <li>Per-site or per-role monthly spend cap, and what happens on breach?</li>
+        <li>Should the free-tier preference order be configurable rather than a
+            constant in <code>ModelCatalog</code>?</li>
+      </ul>
+
+      <div class="doc-navlinks">
+        <a class="doc-navlink" href="/Documentation/MASTER_PLAN">&#8592; Master Plan</a>
+        <a class="doc-navlink" href="/Documentation/AI_Chat_System_Master_Audit">AI Chat System Master Audit</a>
+        <a class="doc-navlink" href="/Documentation/changelog/2026-08-10-ai-model-catalog-single-source">Changelog entry</a>
+        <a class="doc-navlink" href="[% c.uri_for('/project/details') %]?project_id=252">Project #252 (AIMPS)</a>
+        <a class="doc-navlink" href="#top">&#8593; Top</a>
+      </div>
+
+    </div>
+  </div>
+</div>
