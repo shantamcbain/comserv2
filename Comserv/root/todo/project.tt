@@ -431,7 +431,8 @@
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% project.todos.size %])</h6>
                         [% FOREACH todo IN project.todos %]
-                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
+                            [% SET tcard_wrap_p = "data-todo-id='" _ todo.record_id _ "'" %]
+                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_wrapper_extra=tcard_wrap_p %]
                         [% END %]
                     </div>
                     [% ELSE %]
@@ -653,7 +654,8 @@
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% subproject.todos.size %])</h6>
                         [% FOREACH todo IN subproject.todos %]
-                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
+                            [% SET tcard_wrap_p = "data-todo-id='" _ todo.record_id _ "'" %]
+                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_wrapper_extra=tcard_wrap_p %]
                         [% END %]
                     </div>
                     [% ELSE %]

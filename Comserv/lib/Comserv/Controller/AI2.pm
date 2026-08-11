@@ -10,6 +10,7 @@ use Comserv::Util::EditorFile;
 use DateTime;
 
 use Comserv::Util::Logging;
+use Comserv::Util::ModelCatalog;
 use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller' }
@@ -72,12 +73,32 @@ sub providers :Local :Args(0) {
     # Group v2 catalog (each: name, provider, label, local) into providers[].
     my %by_service;
     for my $m (@$catalog) {
+        # Defensive: the catalog is built from upstream provider JSON (Ollama
+        # /api/tags, OpenRouter /v1/models). If a provider returns a malformed
+        # entry (e.g. a bare string instead of an object), a single bad element
+        # must NOT 500 the entire /ai2/providers endpoint for every user. Skip
+        # it and log the offending element so the source can be fixed.
+        if (ref $m ne 'HASH') {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'ai2_providers', "Skipping non-hash catalog element: "
+                . (defined $m ? (ref $m ? ref($m) : "'$m'") : 'undef'));
+            next;
+        }
         my $svc = $m->{provider} || 'unknown';
         $by_service{$svc} ||= { service => $svc, models => [], name => ucfirst($svc) };
+        # v2 Router carries { name, provider, label, local, price_prompt,
+        # price_completion, pricing } for external models. Pass the pricing
+        # through so JS surfaces (and ModelCatalog->prime, called below) can
+        # show real per-token cost — otherwise the dropdown shows provider but
+        # a blank fee (AIMPS-P1/#253 regression).
         push @{ $by_service{$svc}{models} }, {
-            id         => $m->{name},
-            label      => $m->{label},
-            unreachable=> $m->{unreachable} ? 1 : 0,
+            id              => $m->{name},
+            label           => $m->{label},
+            unreachable     => $m->{unreachable} ? 1 : 0,
+            local           => $m->{local}     ? 1 : 0,
+            price_prompt    => $m->{price_prompt}     // 0,
+            price_completion=> $m->{price_completion} // 0,
+            pricing         => $m->{pricing}         || {},
         };
     }
 
@@ -93,6 +114,12 @@ sub providers :Local :Args(0) {
             };
         }
     }
+
+    # Prime the shared catalog cache from the catalog we just built, so every
+    # other surface (Root auto -> stash -> ai/model_select.tt) reuses it instead
+    # of hitting the provider APIs again. Single source of truth lives in
+    # Comserv::Util::ModelCatalog.
+    eval { Comserv::Util::ModelCatalog->prime($c, $catalog); };
 
     $c->res->content_type('application/json');
     $c->res->body(encode_json({

@@ -382,6 +382,10 @@ sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
     return unless $self->_require_login($c);
 
+    # Renders todo/project.tt (which includes todo_card.tt) — flag the shared
+    # Start/Done handler for js_load.tt so it loads daily-plan-utils.js once.
+    $c->stash(needs_todo_card_js => 1);
+
     # Log the start of the project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');
     
@@ -461,6 +465,10 @@ sub project :Path('project') :Args(0) {
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
     return unless $self->_require_login($c);
+
+    # Renders todo/projectdetails.tt (→ ProjectTodosList.tt → todo_card.tt) —
+    # flag the shared Start/Done handler for js_load.tt.
+    $c->stash(needs_todo_card_js => 1);
 
     # Logging: Start of the details action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');

@@ -652,7 +652,12 @@
            thinks, with EXPLICIT multi-model selection (no silent swap) ───────── */
 
     // Selected models: array of {name, host}. Defaults to the first available.
+    // _aiTuneDefault: the catalog default "provider|model" seeded from
+    // window.ComservConfig.aiFocusDefault (set by the daily page), falling back
+    // to the value returned by /api/focus/models. No hardcoded localhost Ollama.
     var _aiTuneSelected = [];
+    var _aiTuneDefault  = (window.ComservConfig && window.ComservConfig.aiFocusDefault)
+                          ? window.ComservConfig.aiFocusDefault : '';
 
     function _aiTuneModelList() {
         var sel = document.getElementById('ai-tune-model-pop');
@@ -780,9 +785,14 @@
     }
 
     function _aiTuneTargets() {
-        // Use explicit selection if any; else default to first available model.
+        // Use explicit selection if any; else the catalog default seeded from
+        // window.ComservConfig.aiFocusDefault (no hardcoded model anywhere).
         if (_aiTuneSelected.length) return _aiTuneSelected.slice();
-        return [ { name: 'phi4:14b', host: 'localhost' } ];
+        if (_aiTuneDefault) {
+            var dp = _aiTuneDefault.split('|');
+            return [ { name: dp[1] || dp[0], host: '' } ];
+        }
+        return [];
     }
 
     function aiTuneRun() {
@@ -827,15 +837,39 @@
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 var list = (d && d.models) || [];
-                if (!list.length) list = [ { name: 'phi4:14b', host: 'localhost' } ];
-                // Initialize selection from current _aiTuneSelected or first item.
-                if (!_aiTuneSelected.length && list.length) _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                // Capture the catalog default from the server (no client hardcode).
+                _aiTuneDefault = (d && d.default) ? d.default : (_aiTuneDefault || '');
+                if (!list.length) {
+                    var dv = _aiTuneDefault.split('|');
+                    list = [ { name: dv[1] || dv[0], host: 'localhost' } ];
+                }
+                // Initialize selection from current _aiTuneSelected or the server default.
+                if (!_aiTuneSelected.length) {
+                    if (_aiTuneDefault) {
+                        var pd = _aiTuneDefault.split('|');
+                        _aiTuneSelected = [ { name: pd[1] || pd[0], host: '' } ];
+                    } else if (list.length) {
+                        _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                    }
+                }
                 var html = '<div class="AITuneModelPopInner">';
                 list.forEach(function(m) {
                     var checked = _aiTuneSelected.some(function(s) { return s.name === m.name; }) ? 'checked' : '';
+                    var label = esc(m.name) + (m.provider && m.provider !== 'ollama' ? ' <small>(' + esc(m.provider) + ')</small>' : '');
+                    // Cost marker so the user sees what a choice costs (matches the chat dropdown).
+                    var pp = Number(m.price_prompt) || 0, pc = Number(m.price_completion) || 0;
+                    if (m.local) {
+                        label += ' — local';
+                    } else if (m.free || (m.provider === 'openrouter' && /(^|:)(free)$/i.test(m.name || ''))) {
+                        label += ' — free';
+                    } else if (pp > 0 || pc > 0 || m.price_tier) {
+                        var fmt = function(n) { return (Math.round(n * 100) / 100).toFixed(2); };
+                        var tier = m.price_tier || (pp === 0 && pc === 0 ? 'free' : 'paid');
+                        label += ' — $' + fmt(pp) + '/$' + fmt(pc) + ' per 1M (' + tier + ')';
+                    }
                     html += '<label class="AITuneModelOpt"><input type="checkbox" data-model="'
                         + esc(m.name) + '" data-host="' + esc(m.host || '') + '" ' + checked + '> '
-                        + esc(m.name) + (m.provider && m.provider !== 'ollama' ? ' <small>(' + esc(m.provider) + ')</small>' : '') + '</label>';
+                        + label + '</label>';
                 });
                 html += '<div class="AITuneModelPopFoot"><button class="ActionBarBtn ActionBarBtn--blue" data-action="ai-tune-models-done">Done</button></div>';
                 html += '</div>';
@@ -850,13 +884,20 @@
                         } else {
                             _aiTuneSelected = _aiTuneSelected.filter(function(s){ return s.name !== n; });
                         }
-                        if (!_aiTuneSelected.length) _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                        if (!_aiTuneSelected.length) {
+                            var dd = _aiTuneDefault.split('|');
+                            _aiTuneSelected = [ { name: dd[1] || dd[0] || list[0].name, host: '' } ];
+                        }
                         _aiTuneUpdateCount();
                     });
                 });
             })
             .catch(function() {
-                pop.innerHTML = '<div class="AITuneModelPopInner"><label class="AITuneModelOpt"><input type="checkbox" data-model="phi4:14b" data-host="localhost" checked> phi4:14b</label></div>';
+                var dv = (_aiTuneDefault || '').split('|');
+                var fb = dv[1] || dv[0];
+                if (!fb) { pop.innerHTML = '<div class="AITuneModelPopInner">Model list unavailable</div>'; pop.style.display = 'block'; return; }
+                pop.innerHTML = '<div class="AITuneModelPopInner"><label class="AITuneModelOpt"><input type="checkbox" data-model="'
+                    + esc(fb) + '" data-host="localhost" checked> ' + esc(fb) + '</label></div>';
                 pop.style.display = 'block';
             });
     }

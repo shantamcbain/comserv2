@@ -15,7 +15,13 @@
 [% END %]
 
 <div class="container">
-    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Chat System - Master Audit & Implementation Status</h1>
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Chat System - Master Audit &amp; Implementation Status</h1>
+    <p>
+        Related plan:
+        <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Presentation &amp; Selection (AIMPS, project 252)</a>
+        &mdash; cost-aware, role-aware and page-aware model shortlists, price display,
+        and the standing v2-migration / documentation-sync rules.
+    </p>
     <h2 style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-large); margin-top: 0;">Comprehensive Consolidation of AI Chat Documentation</h2>
     
     <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">

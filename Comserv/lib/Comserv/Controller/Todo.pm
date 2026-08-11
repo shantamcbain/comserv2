@@ -288,6 +288,15 @@ sub begin :Private {
 
     # If we get here, the user is authorized
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
+
+    # Flag pages that render todo_card.tt so js_load.tt loads the shared
+    # Start/Done delegated handler (daily-plan-utils.js) exactly once, instead
+    # of relying on a brittle per-URL match list. Any Todo route that renders a
+    # todo card sets this; the main /todo list + day/week/month were previously
+    # missing from js_load.tt and had dead Start/Done buttons.
+    if ($c->req->path =~ m{^todo(?:/$|/details|/day|/week|/month|/edit)}) {
+        $c->stash(needs_todo_card_js => 1);
+    }
 }
 
 # Main todo action with filtering capabilities

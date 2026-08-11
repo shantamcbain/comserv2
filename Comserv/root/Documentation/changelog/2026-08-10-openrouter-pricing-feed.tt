@@ -1,0 +1,109 @@
+[% PageVersion = 'Documentation/changelog/2026-08-10-openrouter-pricing-feed.tt,v 1.00 2026/08/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'OpenRouter Pricing Feed &mdash; Keep per-token cost from /api/v1/models' %]
+[% META description = 'Provider::OpenRouter::list_models now keeps the pricing hash instead of discarding it; cost flows through the Router into ModelCatalog as price_prompt, price_completion and a threshold-derived price_tier' %]
+[% META author = 'shanta' %]
+[% META date = '2026-08-10' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>OpenRouter Pricing Feed &mdash; Keep per-token cost</h1>
+        <div class="changelog-meta">
+            <span class="date">August 10, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Feature / AIMPS-P1 (#253)</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>
+            <code>Provider::OpenRouter::list_models</code> previously mapped each model to
+            only <code>{ id, label }</code> and threw away the <code>pricing</code> object
+            that OpenRouter returns from <code>/api/v1/models</code>. The real per-token
+            cost is now kept and carried all the way through to the shared model catalog,
+            so every AI surface can sort, filter and display by actual price. This
+            completes Phase 1 of
+            <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model
+            Presentation &amp; Selection</a> (project 252, sub-project 253).
+        </p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>What changed</h2>
+        <ul>
+            <li><strong><code>Provider::OpenRouter::list_models</code></strong> now keeps the
+                raw <code>pricing</code> hash and adds <code>price_prompt</code> and
+                <code>price_completion</code> as USD-per-1M-token numbers. OpenRouter reports
+                per-token prices as strings (<code>"0.000001"</code>); the new
+                <code>_per_million</code> helper converts them to per-1M USD and returns
+                <code>0</code> for anything missing or non-numeric.</li>
+            <li><strong><code>Model::AI2::Router::get_available_models</code></strong> carries
+                <code>pricing</code>, <code>price_prompt</code> and
+                <code>price_completion</code> on each OpenRouter model it emits (the
+                <code>:free</code> slugs carry a zero pricing hash).</li>
+            <li><strong><code>Model::Util::ModelCatalog::_flatten</code></strong> exposes
+                <code>price_prompt</code>, <code>price_completion</code> and a new
+                <code>price_tier</code> on every catalog entry. The tier is
+                <strong>threshold-derived</strong> (never a hardcoded model list, which
+                would rot as the catalog changes weekly):
+                <ul>
+                    <li><code>free</code> &mdash; zero per-token cost</li>
+                    <li><code>cheap</code> &mdash; dearer side &le; $1 / 1M tokens</li>
+                    <li><code>mid</code> &mdash; dearer side &le; $5 / 1M tokens</li>
+                    <li><code>premium</code> &mdash; dearer side &gt; $5 / 1M tokens</li>
+                </ul>
+                Tiers are ranked by the dearer of prompt/completion so a model is not
+                under-classified when only its output price is high.</li>
+        </ul>
+
+        <h2>Verified</h2>
+        <p>
+            All three modules pass <code>perl -c</code>. A standalone harness fed sample
+            OpenRouter pricing through the real <code>_flatten</code> /
+            <code>_price_tier</code> path and produced the expected tiers:
+            <code>:free</code> &rarr; <code>free</code>; Gemini 2.0 Flash ($0.1/$0.4 per 1M)
+            &rarr; <code>cheap</code>; GPT-4.1 ($2/$8), Claude 3.5 Sonnet ($3/$15) and
+            GPT-4o ($5/$15) &rarr; <code>premium</code>; Ollama &rarr; <code>local</code>
+            (tier <code>free</code>, no cash cost).
+        </p>
+
+        <h2>Follow-up (phases 2&ndash;5)</h2>
+        <p>
+            Phases 2&ndash;5 (cost-aware sorting/filtering/price display, page- and
+            role-scoped shortlists, usage telemetry, and the standing v2-migration /
+            documentation-sync rules) remain tracked in the
+            <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AIMPS plan</a>
+            (todos 2023&ndash;2035).
+        </p>
+
+        <h2>Follow-up fix (same day): <code>/ai2/providers</code> was stripping pricing</h2>
+        <p>
+            After P1 landed, the model dropdown still showed the provider (optgroup
+            header) but a <strong>blank fee</strong> on every option &mdash; not a browser
+            cache issue. Root cause: <code>Controller::AI2::providers</code> rebuilt each
+            catalog model as only <code>{ id, label, unreachable }</code> and dropped the
+            <code>price_*</code> / <code>pricing</code> fields before calling
+            <code>ModelCatalog->prime()</code>, so the shared cache was primed with
+            price-less entries and every surface that reads it rendered no cost.
+            Fixed by passing <code>price_prompt</code> / <code>price_completion</code> /
+            <code>pricing</code> / <code>local</code> through in the <code>providers</code>
+            endpoint. Verified live: <code>/ai2/providers</code> returned 399/414 priced
+            models and <code>/ai/widget</code> now renders
+            <code>AI21: Jamba Large 1.7 &mdash; $2.00/$8.00 per 1M (premium)</code>,
+            <code>Ollama &mdash; local</code>, <code>:free &mdash; free</code>, etc.
+        </p>
+
+        <h2>Files changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Model/AI2/Provider/OpenRouter.pm</code> &mdash; keep pricing, add <code>_per_million</code></li>
+            <li><code>lib/Comserv/Model/AI2/Router.pm</code> &mdash; carry pricing through <code>get_available_models</code></li>
+            <li><code>lib/Comserv/Util/ModelCatalog.pm</code> &mdash; expose <code>price_prompt</code> / <code>price_completion</code> / <code>price_tier</code></li>
+            <li><code>lib/Comserv/Controller/AI2.pm</code> &mdash; stop stripping pricing in <code>providers</code> (pass <code>price_*</code> / <code>pricing</code> / <code>local</code> through)</li>
+            <li><code>root/Documentation/AIModelPresentationPlan.tt</code> &mdash; mark P1 delivered</li>
+            <li><code>root/Documentation/changelog/2026-08-10-openrouter-pricing-feed.tt</code> &mdash; this entry</li>
+        </ul>
+    </section>
+</div>

@@ -7,6 +7,56 @@ use Digest::SHA qw(sha256_hex);
 use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::DocumentationConfig;
+use Comserv::Util::ModelCatalog;
+
+# Resolve the default model for the AI Focus-Tune picker from the SAME shared
+# catalog every other AI surface uses (ModelCatalog::default_for) — NEVER a
+# hardcoded slug. Returns "provider|model" (e.g. "openrouter|...:free"). If the
+# catalog is empty there is genuinely no dynamic default, so we return '' (the
+# caller must then fall back to a real listed model, not invent one).
+sub _focus_default_model {
+    my ($c) = @_;
+    my $def = eval { Comserv::Util::ModelCatalog->default_for($c, page => 'chat') };
+    return $def if $def && $def =~ /\|/;
+    my $cat = eval { Comserv::Util::ModelCatalog->catalog($c) } || [];
+    return $cat->[0]{value} if @$cat && $cat->[0]{value};
+    return '';
+}
+
+# Live external (Grok/xAI, OpenRouter, ...) model list for the AI Focus-Tune
+# picker. Pulled from Model::AI2::Router::get_available_models — the SAME source
+# the chat dropdown and ModelCatalog use — which performs a real list_models()
+# call against each provider's API. This is the dynamic list: it reflects what
+# the provider actually offers for the configured key, NOT a stale DB snapshot
+# in UserApiKeys.metadata.available_models. No hardcoded fallback is added.
+sub _focus_external_models {
+    my ($c) = @_;
+    my @out;
+    eval {
+        my $router = $c->model('AI2::Router');
+        my $all    = $router->get_available_models($c);
+        return unless $all && ref($all) eq 'ARRAY';
+        for my $m (@$all) {
+            next unless $m && ref($m) eq 'HASH';
+            my $prov = $m->{provider} // '';
+            next if $prov eq 'ollama';                 # Ollama handled separately
+            next if $m->{disabled} || $m->{needs_key}; # skip unconfigured stubs
+            my $name = $m->{name} // $m->{id} // '';
+            next unless $name;
+            push @out, {
+                name     => $name,
+                provider => $prov,
+                label    => $m->{label} // $name,
+            };
+        }
+    };
+    if ($@) {
+        Comserv::Util::Logging->instance->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, 'api_focus',
+            "Live external model list failed: $@");
+    }
+    return @out;
+}
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -1779,7 +1829,11 @@ sub api_focus_top5 :Path('focus/top5') :Args(0) {
 
     # Build the list of selectable models for the UI (same facade the chat
     # header dropdown uses). Surfaced in the response so the UI can label hosts.
-    my $default_model = 'phi4:14b';
+    # Default comes from the chat system's CURRENT model when available; if that
+    # is missing we fall back to the shared catalog default (ModelCatalog) rather
+    # than a hardcoded localhost Ollama slug.
+    my ($def_prov, $def_name) = split(/\|/, _focus_default_model($c), 2);
+    my $default_model = $def_name // '';
     my $cfg_host      = 'localhost';
     my $ai_facade     = eval { $c->model('AI') };
     if ($ai_facade) {
@@ -1792,18 +1846,19 @@ sub api_focus_top5 :Path('focus/top5') :Args(0) {
                 push @models, { name => $n, provider => 'ollama', host => $host } if $n;
             }
         }
-        my @ext = eval { $ai_facade->get_external_models($c) } or ();
+        my @ext = _focus_external_models($c);
         for my $m (@ext) {
             push @models, { name => $m->{name}, provider => $m->{provider} // 'external',
                             label => $m->{label} // ($m->{name} // ''), host => '' };
         }
     }
     # Default the target to the chat system's current model when none passed.
-    unless (@targets) {
+    # Only when it is a real (non-empty) model — never invent one.
+    unless (@targets || !$default_model) {
         push @targets, { name => $default_model, host => '' };
     }
     push @models, { name => $default_model, provider => 'ollama', host => $cfg_host }
-        unless $default_model eq ($models[0]{name} // '') && @models;
+        if $default_model && !($default_model eq ($models[0]{name} // '') && @models);
     my %seen; @models = grep { !$seen{ $_->{name} }++ } @models;
 
     # ── Delegate the AI work to Model::AI2::FocusTune (the SAME brain the
@@ -1857,19 +1912,64 @@ sub api_focus_models :Path('focus/models') :Args(0) {
                 push @models, { name => $n, provider => 'ollama', host => $host };
             }
         }
-        # External (Grok/xAI etc.) models.
-        my @ext = $ai->get_external_models($c);
+        # External (Grok/xAI, OpenRouter, ...) models — sourced from the SAME
+        # live catalog the chat dropdown uses (Model::AI2::Router::get_available_models),
+        # which does a real list_models() call against each provider's API. This
+        # is the dynamic list: it reflects what the provider actually offers for
+        # the configured key, not a stale DB snapshot. No hardcoded fallback.
+        my @ext = _focus_external_models($c);
         for my $m (@ext) {
             push @models, { name => $m->{name}, provider => $m->{provider} // 'external',
                             label => $m->{label} // ($m->{name} // '') };
         }
     };
     my %seen; @models = grep { !$seen{ $_->{name} }++ } @models;
-    # Always offer the chat's current default as a fallback so the picker is never empty.
-    unless (@models) {
-        push @models, { name => 'phi4:14b', provider => 'ollama', host => 'localhost' };
+    # Attach real per-token pricing (USD per 1M) from the live Router catalog so
+    # the picker can show cost like the chat dropdown does. Keyed by provider|name.
+    my %price_by_model;
+    my $price_src;
+    eval { $price_src = $c->model('AI2::Router')->get_available_models($c); };
+    $price_src = undef if $@;
+    if ($price_src && ref($price_src) eq 'ARRAY') {
+        for my $m (@$price_src) {
+            next unless $m && ref($m) eq 'HASH' && $m->{name};
+            my $svc  = $m->{provider} // '';
+            my $key  = "$svc|" . $m->{name};
+            $price_by_model{$key} = {
+                price_prompt     => ($m->{price_prompt}     // 0) + 0,
+                price_completion => ($m->{price_completion} // 0) + 0,
+                price_tier       => $m->{price_tier} // '',
+                free             => ($m->{free} || (($m->{name} // '') =~ /:free$/)) ? 1 : 0,
+                local            => ($svc eq 'ollama') ? 1 : 0,
+            };
+        }
     }
-    $c->res->body(encode_json({ success => 1, models => \@models }));
+    for my $m (@models) {
+        my $k = ($m->{provider} // '') . '|' . $m->{name};
+        if (my $p = $price_by_model{$k}) {
+            $m->{price_prompt}     = $p->{price_prompt};
+            $m->{price_completion} = $p->{price_completion};
+            $m->{price_tier}       = $p->{price_tier};
+            $m->{free}             = $p->{free};
+            $m->{local}            = $p->{local};
+        }
+    }
+    # The pre-selected default MUST be one of the dynamic models we just listed —
+    # never a hardcoded slug that isn't actually an option. Prefer the shared
+    # catalog default, but only if it is present in the live list; otherwise fall
+    # back to the first listed (dynamic) model. Surfaced as `default` so the JS
+    # picker pre-checks the right option instead of inventing one client-side.
+    my $default = '';
+    my $cat_def = _focus_default_model($c);
+    if ($cat_def && $cat_def =~ /\|/) {
+        my (undef, $cn) = split(/\|/, $cat_def, 2);
+        if (grep { $_->{name} eq $cn } @models) { $default = $cat_def; }
+    }
+    unless ($default) {
+        $default = (@models && $models[0]{provider})
+            ? ($models[0]{provider} . '|' . $models[0]{name}) : '';
+    }
+    $c->res->body(encode_json({ success => 1, models => \@models, default => $default }));
 }
 
 # Gather the plan-doc context for api_focus_top5: BOTH the on-disk planning

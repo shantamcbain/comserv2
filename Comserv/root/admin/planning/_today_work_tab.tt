@@ -2,6 +2,15 @@
     <div id="today-work" class="tab-content active">
         <div id="today-work-content">
 
+            <script>
+                // Seed the AI Focus-Tune default from the shared catalog default
+                // (free OpenRouter / coding default) so the picker never falls back
+                // to a hardcoded localhost Ollama slug (phi4:14b). daily-plan-utils.js
+                // reads window.ComservConfig.aiFocusDefault on load.
+                window.ComservConfig = window.ComservConfig || {};
+                window.ComservConfig.aiFocusDefault = '[% ai_default_model || '' %]';
+            </script>
+
             [%# ── Action bar (below tabs) ── %]
             <div class="ActionBar">
                 <a href="/todo/addtodo" class="ActionBarLink ActionBarLink--primary">+ Add Todo</a>
