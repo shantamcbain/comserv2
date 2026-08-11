@@ -797,13 +797,15 @@
 /* Model multi-select popover (one compact line trigger; popover is absolute) */
 .AITuneModelPop {
     position: absolute;
-    z-index: 50;
+    z-index: 10001;          /* above fixed tab/filter bars (z-index 10000) so it is never hidden behind them */
     margin-top: 4px;
     background: var(--bg-color);
     border: 1px solid #0d6efd;
     border-radius: 6px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.25);
-    max-width: 320px;
+    max-width: 340px;
+    max-height: 60vh;        /* keep it on-screen */
+    overflow-y: auto;        /* scroll when the model list is long, so top/bottom are reachable */
 }
 .AITuneModelPopInner { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
 .AITuneModelOpt { display: flex; align-items: center; gap: 6px; font-size: 0.85em; padding: 2px 0; cursor: pointer; }
@@ -1298,6 +1300,8 @@
     padding: 14px 18px;
     margin: 8px 0;
     position: relative;
+    max-height: 70vh;        /* keep long log entries on-screen */
+    overflow-y: auto;        /* scroll within the panel so top/bottom are reachable */
 }
 
 .log-panel.open {
