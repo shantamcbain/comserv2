@@ -42,8 +42,8 @@
                 sanitizes the assembled catalog immediately before the role filter, dropping any
                 non-hashref element and logging a <code>get_available_models</code> warning with
                 the element's shape. Because <code>get_available_models</code> is the single
-                source of truth, the chat widget, <code>/ai</code>, <code>/ai2</code> and the
-                git dashboard are all protected by this one guard.</li>
+                source of truth, the bad element is already gone before the chat widget,
+                <code>/ai</code>, <code>/ai2</code> and the git dashboard consume it.</li>
         </ul>
 
         <h2>Why defensive rather than a one-line type check</h2>
