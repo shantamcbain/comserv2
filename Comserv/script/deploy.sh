@@ -1375,7 +1375,11 @@ else
     fi
 
     echo "1. Pulling latest image..."
-    docker compose -f "$COMPOSE_FILE" pull
+    # Explicit image pull (not 'compose pull'): on a build:-enabled service
+    # 'compose pull' is a no-op and the later 'up' would rebuild from the stale
+    # host context instead of running the pushed image. Pull the exact digest.
+    docker pull "$IMAGE" || echo "⚠ Pull failed — will try compose pull fallback."
+    docker compose -f "$COMPOSE_FILE" pull 2>/dev/null || true
 fi
 
 VERSION_INFO=$(docker inspect --format='{{index .Config.Labels "app.version"}}' "$IMAGE" 2>/dev/null || true)
