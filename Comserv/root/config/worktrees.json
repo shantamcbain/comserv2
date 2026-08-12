@@ -1,1 +1,1 @@
-{"branches":{"InventoryAccounting":{"url":"/planning/daily","label":"InventoryAccounting","port":4001}},"port_start":4000,"base_dir":"/home/shanta/.comserv/worktrees"}
+{"port_start":4000,"base_dir":"/home/shanta/.comserv/worktrees","branches":{"3d":{"url":"/planning/daily","port":4003,"label":"3d"},"InventoryAccounting":{"url":"/planning/daily","port":4001,"label":"InventoryAccounting"},"DockerHA":{"port":4002,"url":"/planning/daily","label":"DockerHA"}}}

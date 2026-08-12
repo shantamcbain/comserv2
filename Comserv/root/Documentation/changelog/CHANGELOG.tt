@@ -31,6 +31,35 @@
     <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-10-ai2-providers-hashref-guard">2026-08-10-ai2-providers-hashref-guard</a></li>
 </ul>
 
+<h3>Fixed — Per-request CPU storm: static DB info re-read on every request + stacking chat polling loops</h3>
+<ul>
+    <li><strong>What was wrong:</strong> the workstation CPU spiked to ~99% (load 11.6, 20 starman workers CPU-spinning). Two coupled causes:
+        <ul>
+            <li><strong>Server:</strong> <code>Controller/Root.pm::auto</code> re-derived the static DB-connection info (DBEncy / DBForager <code>get_connection_info</code> &mdash; a fixed config hash) and re-ran <code>get_all_sites</code> (a full DB query + 17 log lines) on <em>every</em> request, even though the DB location is known and never changes per request.</li>
+            <li><strong>Client:</strong> <code>root/static/js/ai-chat/support.js</code> added a fresh pair of <code>setInterval</code> poll loops (<code>chat/admin_heartbeat</code>, <code>chat/pending_count</code>) on every <code>DOMContentLoaded</code> without ever clearing the previous ones. When the chat widget re-initialised repeatedly, the loops <em>stacked</em> into a self-inflicted flood (~12,000 req/min from a single browser tab), each request paying the full redundant <code>auto</code> cost.</li>
+        </ul>
+    </li>
+    <li><strong>Why multiple tabs are fine, stacking is not:</strong> separate tabs are separate clients/sessions and each legitimately runs one poll loop &mdash; that is correct. The bug was <em>one page accumulating many loops</em>. On a multi-domain production host the same stacking would multiply across re-inits and collapse the box quickly, so it had to be fixed at the source.</li>
+    <li><strong>Fix:</strong>
+        <ul>
+            <li><code>Controller/Root.pm</code> now caches the resolved DB-connection list + host per worker (5-minute TTL, following the existing <code>$_remotedb_status</code> precedent). Cache hits skip all model/DB work in <code>auto</code>; the data is identical for every domain a process serves, so this is correct on multi-domain prod.</li>
+            <li><code>support.js::_scheduleAdminNotifier()</code> is now idempotent: it clears any existing timers before (re)starting, so re-running the script can never stack additional loops. One poll loop per page, exactly as intended.</li>
+        </ul>
+    </li>
+    <li><strong>Verified:</strong> <code>perl -c</code> clean on Root.pm; <code>node --check</code> clean on support.js.</li>
+    <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-11-auto-db-info-cache-and-poll-guard">2026-08-11-auto-db-info-cache-and-poll-guard</a></li>
+</ul>
+
+<h3>Fixed — Deploy never pulled the freshly-pushed image (production stayed on stale build)</h3>
+<ul>
+    <li><strong>What was wrong:</strong> every <code>docker compose up -d --force-recreate</code> in <code>script/deploy.sh</code> (the main full/quick deploy at line 1494, and the monitor self-heal at line 883) ran <em>without</em> a preceding <code>docker compose pull</code>. So when a new image was pushed to Docker Hub, production1 recreated the container from the <strong>locally-cached <code>latest</code></strong> on the host &mdash; an old image &mdash; and never fetched the push. Confirmed by the running container banner still reporting <code>Git: main@c58120ed+local</code> / Build <code>2026-08-01 02:24 UTC</code> long after a push of a newer commit. This is why CSS (and every other fix) appeared &ldquo;not to reach production&rdquo; &mdash; the new build was never actually pulled.</li>
+    <li><strong>Fix:</strong> added <code>docker compose -f &quot;$COMPOSE_FILE&quot; pull web-prod</code> immediately before the recreate in both the main deploy and the monitor self-heal paths, and scoped the recreate to the <code>web-prod</code> service. The intentional rollback path (backup re-tag) is deliberately left as a local-image recreate &mdash; pulling there would defeat the rollback.</li>
+    <li><strong>Root cause of the &ldquo;random chance / inconsistent push&rdquo; feeling:</strong> a push updated Hub <code>latest</code>, but the deploy recreated from the host's stale cached <code>latest</code>; only if the host happened to have no cached <code>latest</code> did a fresh pull occur. Now every deploy is deterministic: pull-then-recreate.</li>
+    <li><strong>Verified:</strong> <code>bash -n script/deploy.sh</code> clean.</li>
+    <li><strong>Action required to land the current build:</strong> re-run Pull &amp; Deploy on production1 now &mdash; it will pull the just-pushed <code>a009a8c4</code> image (which serves correctly on the local <code>latest</code> container).</li>
+    <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-11-deploy-pull-before-recreate">2026-08-11-deploy-pull-before-recreate</a></li>
+</ul>
+
 <h3>Fixed — ModelCatalog::_flatten "Not a HASH reference" (same root cause, cascaded to every page)</h3>
 <ul>
     <li><strong>What was wrong:</strong> the <code>ai2/providers</code> 500 above was only the visible tip. <code>Comserv::Util::ModelCatalog-&gt;_flatten</code> (the flat catalog that <code>Root-&gt;auto</code> builds on <em>every</em> request and stashes for the widget, <code>/ai</code>, <code>ai/model_select.tt</code>, the editor and the git dashboard) dereferenced <code>$m-&gt;{name}</code> / <code>$m-&gt;{provider}</code> on each catalog element with only <code>next unless $m &amp;&amp; $m-&gt;{name} &amp;&amp; $m-&gt;{provider}</code> — no <code>ref($m) eq 'HASH'</code> check. A single non-hash element therefore threw <em>"Not a HASH reference at ModelCatalog.pm line 221"</em> inside <code>Root-&gt;auto</code>, 500-ing <strong>every page load</strong>, not just one endpoint. The live log shows this firing at 07:02 today (after the 06:49 two-layer guard landed), proving the earlier "all surfaces protected" claim was overstated — ModelCatalog was the unguarded path.</li>

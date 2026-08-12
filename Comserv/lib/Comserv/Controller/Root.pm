@@ -27,6 +27,19 @@ my $_remotedb_status       = undef;   # 'ok', 'missing', 'error', 'fallback'
 my $_remotedb_last_checked = 0;
 my $_REMOTEDB_TTL          = 300;     # seconds between re-checks
 
+# Cache the static database-connection info (DBEncy / DBForager hosts) gathered
+# for the debug display. This data comes from a fixed config hash
+# (get_connection_info -> storage connect_info) and NEVER changes per request —
+# yet auto re-reads and re-logs it on every single request. Under a client
+# polling storm (e.g. chat heartbeat endpoints) that redundant per-request work
+# is enough to peg the CPU. Cache it per worker, refresh every 5 minutes (and
+# never let a transient failure wedge the cache). Each Starman worker owns its
+# own copy; that's correct even on a multi-domain production host because the
+# DB topology is the same for every domain served by this process.
+my $_db_connections_cache   = undef;   # arrayref of { type, name, ip }
+my $_db_connections_checked = 0;
+my $_DB_CONN_TTL            = 300;     # seconds between re-reads
+
 # Cache the per-site enabled-modules result (SiteModule + HostingAccount addon
 # resolution) so the ~4-6 DB round-trips it costs don't run on EVERY request.
 # This is the single biggest per-request DB cost for anonymous visitors, and
@@ -860,8 +873,22 @@ sub auto :Private {
         $system_info->{hostname} = 'Unknown' if !$system_info->{hostname} || $system_info->{hostname} eq '';
         $system_info->{ip} = 'Unknown' if !$system_info->{ip} || $system_info->{ip} eq '';
         
-        # Populate database connections information for debug display
+        # Populate database connections information for debug display.
+        # This is STATIC config (DBEncy / DBForager connect_info) that never
+        # changes per request — yet it used to be re-read and re-logged on every
+        # single request, which under a client polling storm is enough to peg the
+        # CPU. Cache it per worker, refreshed every 5 minutes, following the same
+        # precedent as $_remotedb_status. Safe on a multi-domain production host
+        # because the DB topology is identical for every domain this process serves.
         my @db_connections;
+        my $now = time();
+        if (defined $_db_connections_cache
+            && ($now - $_db_connections_checked) <= $_DB_CONN_TTL) {
+            # Cache hit: reuse the frozen host + connection list, no model/DB work.
+            $db_host = $_db_connections_cache->[0];
+            @db_connections = @{ $_db_connections_cache->[1] };
+        } else {
+        my @db_connections_live;
         eval {
             # Try to get database connection info from active models
             if ($c->model('DBEncy')) {
@@ -892,7 +919,7 @@ sub auto :Private {
                             }
                         }
                         
-                        push @db_connections, {
+                        push @db_connections_live, {
                             type => 'DBEncy',
                             name => 'Ency',
                             ip => $host
@@ -940,7 +967,7 @@ sub auto :Private {
                             }
                         }
                         
-                        push @db_connections, {
+                        push @db_connections_live, {
                             type => 'DBForager',
                             name => 'Forager',
                             ip => $host
@@ -965,7 +992,16 @@ sub auto :Private {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
                 "Error in database connection extraction: $@");
         }
-        
+        # Freeze the resolved host + connection list for the next requests.
+        # Guard against a totally empty result so a transient failure doesn't
+        # wedge the cache (we simply skip caching and retry next request).
+        if (@db_connections_live || $db_host ne 'Unknown') {
+            $_db_connections_cache   = [ $db_host, \@db_connections_live ];
+            $_db_connections_checked = $now;
+        }
+        @db_connections = @db_connections_live;
+        } # end cache-aware gather
+
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
             "Database connections collected: " . scalar(@db_connections) . " entries");
         
