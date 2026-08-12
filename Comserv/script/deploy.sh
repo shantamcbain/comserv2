@@ -879,13 +879,13 @@ ensure_required_volumes() {
 if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
     ensure_required_volumes
     if ! docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
-        echo "MONITOR: container $CONTAINER absent — pulling latest then recreating..."
-        docker compose -f "$COMPOSE_FILE" pull web-prod 2>&1 | grep -v "^$" || true
-        docker compose -f "$COMPOSE_FILE" up -d --force-recreate web-prod 2>&1 | grep -v "^$" || true
+        echo "MONITOR: container $CONTAINER absent — pulling latest then recreating (--no-build)..."
+        docker pull "$IMAGE" 2>&1 | grep -v "^$" || true
+        docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
     elif [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then
         echo "MONITOR: container $CONTAINER present but not running — starting..."
         docker start "$CONTAINER" 2>&1 | grep -v "^$" || \
-            docker compose -f "$COMPOSE_FILE" up -d --force-recreate web-prod 2>&1 | grep -v "^$" || true
+            docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
     fi
 fi
 
@@ -1492,9 +1492,16 @@ if [ "${COMSERV_SECURITY_GATE:-0}" = "1" ]; then
 fi
 
 echo "3. Pulling latest image from Docker Hub before recreate (fix: push must reach prod)..."
-docker compose -f "$COMPOSE_FILE" pull web-prod || echo "⚠ Pull failed — recreating from existing local image."
-echo "3. Starting new container..."
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate web-prod
+# Explicit image pull (not 'compose pull web-prod') so we know the exact digest
+# landed, and --no-build on the up below prevents a local rebuild from the stale
+# build context (the old bug that pinned prod to the 8/4 image).
+if ! docker pull "$IMAGE"; then
+    echo "⚠ PULL FAILED — refusing to recreate from a stale local image. Abort."
+    exit 1
+fi
+echo "   Pulled: $(docker inspect -f '{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)"
+echo "3. Starting container from the PULLED image (--no-build)..."
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-build web-prod
 
 echo "3a. Syncing host lib into container..."
 sync_host_app_lib || true
