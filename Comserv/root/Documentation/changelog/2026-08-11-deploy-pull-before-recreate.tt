@@ -1,88 +1,96 @@
-[% PageVersion = 'Documentation/changelog/2026-08-11-deploy-pull-before-recreate.tt,v 1.00 2026/08/11 shanta Exp' %]
+[% PageVersion = 'Documentation/changelog/2026-08-11-deploy-pull-before-recreate.tt,v 1.01 2026/08/11 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-[% META title = 'Deploy now pulls the freshly-pushed image before recreate' %]
-[% META description = 'script/deploy.sh recreated the production container from the host-cached latest image instead of pulling the newly-pushed build, so pushes never reached production1. Added docker compose pull web-prod before every recreate in the deploy and monitor paths.' %]
+[% META title = 'Production never received a push — build: in prod compose made up rebuild instead of pull' %]
+[% META description = 'Root cause of "Pull & Deploy never updates production1": docker-compose.prod.yml web-prod had BOTH build: and image:, so docker compose up --force-recreate rebuilt from the host git context and ignored the pulled registry image, pinning prod to a stale 8/4 build. Removed build: (pull-only) and added explicit docker pull + --no-build to deploy.sh.' %]
 [% META author = 'shanta' %]
 [% META date = '2026-08-11' %]
 [% META roles = 'admin developer' %]
 
 <div class="changelog-entry">
     <header class="changelog-header">
-        <h1>Deploy now pulls the freshly-pushed image before recreate</h1>
+        <h1>Production never received a push (build: made <code>up</code> rebuild, not pull)</h1>
         <div class="changelog-meta">
             <span class="date">August 11, 2026</span>
             <span class="author">by shanta</span>
-            <span class="type">Bug Fix</span>
+            <span class="type">Bug Fix — Critical deploy path</span>
         </div>
     </header>
 
     <section class="changelog-summary">
         <p>
-            After pushing a new image to Docker Hub and running Pull &amp; Deploy on production1,
-            the running container still reported the <strong>old build</strong>
-            (<code>Git: main@c58120ed+local</code>, Build <code>2026-08-01 02:24 UTC</code>) —
-            CSS and other fixes never appeared in production. The cause: the deploy recreated the
-            container from the <strong>locally-cached <code>latest</code> image on the host</strong>
-            instead of pulling the freshly-pushed one.
+            After every Push + Pull &amp; Deploy, prod's banner stayed on
+            <code>Git: main@c58120ed+local</code> / Build <code>2026-08-01</code> /
+            image <code>9c7bb1e9d715</code> (8/4). CSS and all other fixes never reached
+            production1. The push itself was fine — the registry <code>:latest</code> carried
+            the new build. The deploy simply never ran it.
         </p>
     </section>
 
     <section class="changelog-details">
-        <h2>Root cause</h2>
+        <h2>Root cause (proven)</h2>
         <p>
-            Every <code>docker compose up -d --force-recreate</code> in
-            <code>script/deploy.sh</code> ran <em>without</em> a preceding
-            <code>docker compose pull</code>:
+            <code>docker-compose.prod.yml</code> (the file <code>deploy.sh</code> resolves
+            <code>COMPOSE_FILE</code> to on prod, line 95) defined <code>web-prod</code> with
+            <strong>both</strong> a <code>build:</code> block <em>and</em>
+            <code>image: shantamcsbain/comserv-web-prod:latest</code>. When a compose service
+            carries <code>build:</code>, <code>docker compose up -d --force-recreate</code>
+            <strong>rebuilds from the local build context and ignores the pulled registry
+            image</strong>. Prod's build context was its stale git checkout, so every deploy
+            re-baked the 8/4-era code and re-tagged it <code>:latest</code> — the pulled push
+            was discarded on the very next <code>up</code>.
         </p>
-        <ul>
-            <li>Main full/quick deploy — <code>deploy.sh:1494</code></li>
-            <li>Monitor self-heal (container absent / not running) — <code>deploy.sh:883</code></li>
-            <li>Rollback path — <code>deploy.sh:1159</code> (intentionally local-image; left unchanged)</li>
-        </ul>
         <p>
-            A push updated Hub's <code>latest</code>, but the deploy reused the host's stale cached
-            <code>latest</code>. Only when the host happened to have <em>no</em> cached
-            <code>latest</code> did a fresh pull occur — which is exactly why deploys felt like
-            &ldquo;random chance&rdquo; and production inconsistently received the build.
+            Proven with an isolated repro: a <code>build:</code>+<code>image:</code> service,
+            <code>docker pull</code> the new image, then <code>up --force-recreate</code>
+            <strong>rebuilds</strong> (old behavior). Adding <code>--no-build</code> makes
+            <code>up</code> run the <em>pulled</em> registry image
+            (<code>df71dc1fa4bf</code> = the 9-min-old Hub build) — confirmed identical
+            image IDs. The registry side was never the problem:
+            <code>docker pull shantamcsbain/comserv-web-prod:latest</code> returns
+            <code>sha256:90561894…</code> (built minutes earlier), "Image is up to date."
         </p>
 
         <h2>Fix</h2>
         <ul>
-            <li>Added <code>docker compose -f "$COMPOSE_FILE" pull web-prod</code> immediately
-                before the recreate in both the main deploy and the monitor self-heal paths.</li>
-            <li>Scoped the recreate to the <code>web-prod</code> service (was recreating the whole
-                project, including config-db / redis, unnecessarily).</li>
-            <li>Left the deliberate rollback path (<code>deploy.sh:1159</code>) as a local-image
-                recreate — pulling there would defeat the rollback to a known-good backup.</li>
+            <li><code>docker-compose.prod.yml</code> — removed the <code>build:</code> block
+                from <code>web-prod</code>. It is now pull-only (matches the already-correct
+                <code>script/docker-compose.server.yml</code>).</li>
+            <li><code>deploy.sh</code> (main deploy, ~1494) — replaced
+                <code>docker compose pull web-prod</code> with an explicit
+                <code>docker pull "$IMAGE"</code> that <strong>aborts if the pull fails</strong>
+                (no silent fallback to a stale local image), and added
+                <code>--no-build</code> to the <code>up --force-recreate</code>.</li>
+            <li><code>deploy.sh</code> (monitor self-heal, ~883) — same: explicit
+                <code>docker pull "$IMAGE"</code> + <code>--no-build</code> on both recreate
+                branches.</li>
+            <li>Rollback path (1159) deliberately left as a local-image recreate — pulling
+                there would defeat rollback to a known-good backup.</li>
         </ul>
 
         <h2>Verified</h2>
         <ul>
-            <li><code>bash -n script/deploy.sh</code> — syntax clean.</li>
-            <li>The local <code>comserv2-web-prod</code> container running the pushed
-                <code>a009a8c4</code> image serves <code>GET /</code> and <code>/health</code> with
-                HTTP 200, confirming the new build is good; the gap was purely that production never
-                pulled it.</li>
+            <li><code>bash -n script/deploy.sh</code> — clean.</li>
+            <li>No <code>build:</code> key remains under <code>web-prod</code> in
+                <code>docker-compose.prod.yml</code> (only the explanatory comment).</li>
+            <li>Isolated repro: <code>up --force-recreate --no-build</code> runs the pulled
+                registry image, not a local rebuild (image IDs match).</li>
         </ul>
 
         <h2>Action to land the current build</h2>
         <p>
-            Re-run <strong>Pull &amp; Deploy</strong> on production1 now. With the fix it will
-            <code>pull web-prod</code> (fetching <code>a009a8c4</code>) then recreate — so the
-            corrected CSS reaches production deterministically.
+            Re-run <strong>Pull &amp; Deploy</strong> on production1. With the fix, prod pulls
+            the freshly-pushed <code>:latest</code> (e.g. <code>sha256:90561894…</code>) and
+            recreates with <code>--no-build</code>, so the container will now report the new
+            commit/build and CSS + all pending fixes reach production deterministically.
         </p>
 
         <h2>Files changed</h2>
         <ul>
-            <li><code>script/deploy.sh</code> — pull-then-recreate in deploy + monitor paths</li>
+            <li><code>docker-compose.prod.yml</code> — <code>web-prod</code> now pull-only</li>
+            <li><code>script/deploy.sh</code> — explicit pull + <code>--no-build</code></li>
             <li><code>root/Documentation/changelog/2026-08-11-deploy-pull-before-recreate.tt</code> — this entry</li>
-            <li><code>root/Documentation/changelog/CHANGELOG.tt</code> — [Unreleased] bullet cross-linked here</li>
-        </ul>
-
-        <h2>Related</h2>
-        <ul>
-            <li><a href="[% c.uri_for('/Documentation/changelog/2026-08-11-auto-db-info-cache-and-poll-guard') %]">Per-request CPU storm — static DB info cached + polling loops idempotent</a></li>
+            <li><code>root/Documentation/changelog/CHANGELOG.tt</code> — [Unreleased] bullet</li>
         </ul>
     </section>
 </div>

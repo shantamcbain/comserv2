@@ -30,9 +30,10 @@ services:
       retries: 5
 
   web-prod:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # PULL-ONLY. No `build:` block: when build: is present, `docker compose up`
+    # rebuilds from the local context and ignores the pulled registry image,
+    # which pinned prod to a stale 8/4 build forever (Pull & Deploy never landed
+    # a push). Pull-only guarantees `up --force-recreate` runs the pushed image.
     image: shantamcsbain/comserv-web-prod:latest
     container_name: comserv2-web-prod
     restart: unless-stopped
