@@ -849,13 +849,59 @@ normalize_volumes() {
 # Call normalization on every deploy (safe - only logs, does not delete)
 normalize_volumes
 
+# ── Ensure required comserv2_* volumes exist (2026-08-11) ─────────────────────
+# The prod compose overlay references named volumes (comserv2_redis_data,
+# comserv2_sessions, comserv2_cache, comserv2_temp, comserv2_themes,
+# comserv2_whisper_venv, comserv2_cpan_cache, comserv2_config_db_data) that are
+# NOT declared in either compose file's top-level volumes section. If they are
+# missing, `docker compose up` aborts with "undefined volume" and the container
+# can never be (re)created — a silent recovery blocker. Create any missing ones
+# as empty local volumes (non-destructive; they are recreated empty on purpose).
+ensure_required_volumes() {
+    local REQUIRED=(comserv2_redis_data comserv2_sessions comserv2_cache comserv2_temp \
+                    comserv2_themes comserv2_whisper_venv comserv2_cpan_cache comserv2_config_db_data)
+    local missing=0
+    for v in "${REQUIRED[@]}"; do
+        if ! docker volume inspect "$v" >/dev/null 2>&1; then
+            echo "  Creating missing volume: $v"
+            docker volume create "$v" >/dev/null 2>&1 || true
+            missing=$((missing + 1))
+        fi
+    done
+    [ "$missing" -gt 0 ] && echo "  Created $missing missing volume(s)." || echo "  All required volumes present."
+}
+
+# ── Monitor self-heal (2026-08-11) ───────────────────────────────────────────
+# If the prod container is missing/stopped, recreate it from the EXISTING local
+# image so a transient failure does not become a permanent outage. Previously the
+# monitor only did lib-sync (which requires a running container) and then pruned,
+# so once the container vanished it could never return without a human deploy.
+if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
+    ensure_required_volumes
+    if ! docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
+        echo "MONITOR: container $CONTAINER absent — pulling latest then recreating..."
+        docker compose -f "$COMPOSE_FILE" pull web-prod 2>&1 | grep -v "^$" || true
+        docker compose -f "$COMPOSE_FILE" up -d --force-recreate web-prod 2>&1 | grep -v "^$" || true
+    elif [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then
+        echo "MONITOR: container $CONTAINER present but not running — starting..."
+        docker start "$CONTAINER" 2>&1 | grep -v "^$" || \
+            docker compose -f "$COMPOSE_FILE" up -d --force-recreate web-prod 2>&1 | grep -v "^$" || true
+    fi
+fi
+
 # ── Disk space report ────────────────────────────────────────────────────────
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk before: $DISK_BEFORE"
 
-# ── Routine cleanup (runs every cron tick, not just on deploy) ───────────────
+# ── Routine cleanup (runs every cron tick, not just on deploy) ────────────────
 echo "Running routine Docker cleanup..."
-docker container prune -f --filter "until=1h" 2>&1 | grep -v "^$" || true
+# GUARD (2026-08-11): never prune the production web container. A former
+# `docker container prune -f --filter "until=1h"` ran on every monitor tick and
+# DELETED the prod container whenever it was non-running >1h, causing the
+# recurring "site down, no container" outages. We now prune only stopped
+# containers that are explicitly marked safe-to-prune (label comserv.prune=safe)
+# and never the named prod container.
+docker container prune -f --filter "label=comserv.prune=safe" 2>&1 | grep -v "^$" || true
 # Prune ONLY dangling (untagged) images to protect tagged rollback/backup images
 docker image prune -f                          2>&1 | grep -v "^$" || true
 docker volume prune -f                         2>&1 | grep -v "^$" || true
@@ -1445,8 +1491,10 @@ if [ "${COMSERV_SECURITY_GATE:-0}" = "1" ]; then
     fi
 fi
 
+echo "3. Pulling latest image from Docker Hub before recreate (fix: push must reach prod)..."
+docker compose -f "$COMPOSE_FILE" pull web-prod || echo "⚠ Pull failed — recreating from existing local image."
 echo "3. Starting new container..."
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate web-prod
 
 echo "3a. Syncing host lib into container..."
 sync_host_app_lib || true

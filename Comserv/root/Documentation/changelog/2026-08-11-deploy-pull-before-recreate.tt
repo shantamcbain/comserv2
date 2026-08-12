@@ -1,0 +1,88 @@
+[% PageVersion = 'Documentation/changelog/2026-08-11-deploy-pull-before-recreate.tt,v 1.00 2026/08/11 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Deploy now pulls the freshly-pushed image before recreate' %]
+[% META description = 'script/deploy.sh recreated the production container from the host-cached latest image instead of pulling the newly-pushed build, so pushes never reached production1. Added docker compose pull web-prod before every recreate in the deploy and monitor paths.' %]
+[% META author = 'shanta' %]
+[% META date = '2026-08-11' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Deploy now pulls the freshly-pushed image before recreate</h1>
+        <div class="changelog-meta">
+            <span class="date">August 11, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Bug Fix</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <p>
+            After pushing a new image to Docker Hub and running Pull &amp; Deploy on production1,
+            the running container still reported the <strong>old build</strong>
+            (<code>Git: main@c58120ed+local</code>, Build <code>2026-08-01 02:24 UTC</code>) —
+            CSS and other fixes never appeared in production. The cause: the deploy recreated the
+            container from the <strong>locally-cached <code>latest</code> image on the host</strong>
+            instead of pulling the freshly-pushed one.
+        </p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>Root cause</h2>
+        <p>
+            Every <code>docker compose up -d --force-recreate</code> in
+            <code>script/deploy.sh</code> ran <em>without</em> a preceding
+            <code>docker compose pull</code>:
+        </p>
+        <ul>
+            <li>Main full/quick deploy — <code>deploy.sh:1494</code></li>
+            <li>Monitor self-heal (container absent / not running) — <code>deploy.sh:883</code></li>
+            <li>Rollback path — <code>deploy.sh:1159</code> (intentionally local-image; left unchanged)</li>
+        </ul>
+        <p>
+            A push updated Hub's <code>latest</code>, but the deploy reused the host's stale cached
+            <code>latest</code>. Only when the host happened to have <em>no</em> cached
+            <code>latest</code> did a fresh pull occur — which is exactly why deploys felt like
+            &ldquo;random chance&rdquo; and production inconsistently received the build.
+        </p>
+
+        <h2>Fix</h2>
+        <ul>
+            <li>Added <code>docker compose -f "$COMPOSE_FILE" pull web-prod</code> immediately
+                before the recreate in both the main deploy and the monitor self-heal paths.</li>
+            <li>Scoped the recreate to the <code>web-prod</code> service (was recreating the whole
+                project, including config-db / redis, unnecessarily).</li>
+            <li>Left the deliberate rollback path (<code>deploy.sh:1159</code>) as a local-image
+                recreate — pulling there would defeat the rollback to a known-good backup.</li>
+        </ul>
+
+        <h2>Verified</h2>
+        <ul>
+            <li><code>bash -n script/deploy.sh</code> — syntax clean.</li>
+            <li>The local <code>comserv2-web-prod</code> container running the pushed
+                <code>a009a8c4</code> image serves <code>GET /</code> and <code>/health</code> with
+                HTTP 200, confirming the new build is good; the gap was purely that production never
+                pulled it.</li>
+        </ul>
+
+        <h2>Action to land the current build</h2>
+        <p>
+            Re-run <strong>Pull &amp; Deploy</strong> on production1 now. With the fix it will
+            <code>pull web-prod</code> (fetching <code>a009a8c4</code>) then recreate — so the
+            corrected CSS reaches production deterministically.
+        </p>
+
+        <h2>Files changed</h2>
+        <ul>
+            <li><code>script/deploy.sh</code> — pull-then-recreate in deploy + monitor paths</li>
+            <li><code>root/Documentation/changelog/2026-08-11-deploy-pull-before-recreate.tt</code> — this entry</li>
+            <li><code>root/Documentation/changelog/CHANGELOG.tt</code> — [Unreleased] bullet cross-linked here</li>
+        </ul>
+
+        <h2>Related</h2>
+        <ul>
+            <li><a href="[% c.uri_for('/Documentation/changelog/2026-08-11-auto-db-info-cache-and-poll-guard') %]">Per-request CPU storm — static DB info cached + polling loops idempotent</a></li>
+        </ul>
+    </section>
+</div>

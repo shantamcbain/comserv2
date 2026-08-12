@@ -113,12 +113,29 @@
             .catch(function() {});
         }
 
+        var _adminPendingTimer = null;
+        var _adminHeartbeatTimer = null;
+        function _scheduleAdminNotifier() {
+            // Idempotent: clear any prior timers before (re)starting so that
+            // re-running this script — e.g. the chat widget re-initialising, or
+            // the module being loaded again — can NEVER stack additional
+            // setInterval loops on top of the existing ones. Without this guard a
+            // single page could accumulate thousands of heartbeat/poll loops
+            // (one per re-init) and flood /chat/admin_heartbeat and
+            // /chat/pending_count, pegging the server CPU. One poll loop per tab
+            // is correct; multiple tabs are fine because they are separate
+            // clients/sessions, not stacked loops in one page.
+            if (_adminPendingTimer)    { clearInterval(_adminPendingTimer);    _adminPendingTimer = null; }
+            if (_adminHeartbeatTimer)  { clearInterval(_adminHeartbeatTimer);  _adminHeartbeatTimer = null; }
+            _sendAdminHeartbeat();
+            setTimeout(_checkPendingSupport, 2000);   // one-shot initial poll (fire-and-forget, not tracked)
+            _adminPendingTimer   = setInterval(_checkPendingSupport, 30000);
+            _adminHeartbeatTimer = setInterval(_sendAdminHeartbeat, 20000);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             _requestAdminNotifPerm();
-            _sendAdminHeartbeat();
-            setTimeout(_checkPendingSupport, 2000);
-            setInterval(_checkPendingSupport, 30000);
-            setInterval(_sendAdminHeartbeat, 20000);
+            _scheduleAdminNotifier();
         });
     })();
 
