@@ -69,9 +69,9 @@
         which is not confined to the card window. %]
     <summary class="d-flex align-items-center p-1 todo-card-summary-cal">
       <a href="/todo/details?record_id=[% tc.record_id %]"
-         class="todo-card-subject flex-grow-1 min-width-0">[% tc.subject || '(No subject)' %]</a>
+         class="todo-card-subject flex-grow-1 min-width-0">[% tc.subject || '(No subject)' | html %]</a>
       <span class="badge pri-[% tci_p %]">P[% tci_p %]</span>
-      [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename %]</span>[% END %]
+      [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename | html %]</span>[% END %]
       [% IF tc_is_overdue %]<span class="badge badge-danger">OVR</span>[% END %]
     </summary>
     [%# Hover popup — not confined to the card — shows the action buttons %]
@@ -89,7 +89,7 @@
         [% ELSIF tc_show_done && is_admin %]
           <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0" class="btn btn-sm btn-outline-success">Done</button>
         [% END %]
-        [% IF tc.sitename %]<div class="todo-popup-meta">[% tc.sitename %][% IF tc.developer %] · [% tc.developer %][% END %]</div>[% END %]
+        [% IF tc.sitename %]<div class="todo-popup-meta">[% tc.sitename | html %][% IF tc.developer %] · [% tc.developer | html %][% END %]</div>[% END %]
       </div>
     </div>
     [% ELSE %]
@@ -114,8 +114,8 @@
         [% IF tc_is_blocked %]<span class="badge badge-secondary" title="Waiting on: [% tc_blocker_subject %]">⏸</span>[% END %]
         [% IF tc_is_overdue %]<span class="badge badge-danger">🔴 OVR</span>
         [% ELSIF tc_due_today %]<span class="badge badge-warning">⚡</span>[% END %]
-        [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename %]</span>[% END %]
-        <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-subject ml-1">[% tc.subject || '(No subject)' %]</a>
+        [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]<span class="badge badge-primary">[% tc.sitename | html %]</span>[% END %]
+        <a href="/todo/details?record_id=[% tc.record_id %]" class="todo-card-subject ml-1">[% tc.subject || '(No subject)' | html %]</a>
       </div>
       <div class="d-flex align-items-center flex-shrink-0 todo-card-actions">
         <a href="/todo/details?record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-primary">View</a>
@@ -144,7 +144,7 @@
         <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Due Date</small>[% tc.due_date %]</div>
         [% END %]
         [% IF tc.developer %]
-        <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Assigned To</small>[% tc.developer %]</div>
+        <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Assigned To</small>[% tc.developer | html %]</div>
         [% END %]
         [% IF tc.accumulative_time %]
         <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Accumulated Time</small>[% tc.accumulative_time %]</div>
@@ -153,16 +153,19 @@
         <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Parent Todo</small><a href="/todo/details?record_id=[% tc.parent_todo %]">#[% tc.parent_todo %]</a></div>
         [% END %]
         [% IF tc.sitename %]
-        <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Site</small>[% tc.sitename %]</div>
+        <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Site</small>[% tc.sitename | html %]</div>
+        [% END %]
+        [% IF tc.project %]
+        <div class="col-md-3 col-sm-6 mb-2"><small class="text-muted d-block">Project</small><a href="/project/details?project_id=[% tc.project.id %]">[% tc.project.name | html %]</a></div>
         [% END %]
       </div>
 
       [% IF tc.description %]
-      <div class="mb-2"><small class="text-muted d-block">Description</small><div class="todo-card-pre border rounded p-2 bg-light">[% tc.description %]</div></div>
+      <div class="mb-2"><small class="text-muted d-block">Description</small><div class="todo-card-pre border rounded p-2">[% tc.description | html %]</div></div>
       [% END %]
 
       [% IF tc.comments %]
-      <div class="mb-2"><small class="text-muted d-block">Comments / Code context</small><div class="todo-card-pre border rounded p-2 bg-light">[% tc.comments %]</div></div>
+      <div class="mb-2"><small class="text-muted d-block">Comments / Code context</small><div class="todo-card-pre border rounded p-2">[% tc.comments | html %]</div></div>
       [% END %]
 
       <div class="mt-2 pt-2 border-top">

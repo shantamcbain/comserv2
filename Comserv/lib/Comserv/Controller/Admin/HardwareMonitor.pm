@@ -5,6 +5,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::DiskStats;
+use Comserv::Util::HardwareAgent;
 use JSON ();
 use Scalar::Util qw(looks_like_number);
 use List::Util ();
@@ -36,6 +37,10 @@ my %CRIT_AT = (
     swap_used_pct => 85,  disk_used_pct => 90,
     ipmi_inlet_temp => 40,
 );
+
+# How long (seconds) before a missing monitoring heartbeat is treated as a
+# missed window. Cron fires every 5 min, so 600s (~2 missed cycles) trips it.
+our $MONITOR_TIMEOUT = 600;
 
 sub _metric_level {
     my ($name, $val) = @_;
@@ -280,9 +285,296 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
         filter_level    => $filter_level,
         filter_hours    => $filter_hours,
         db_error        => $db_error,
-        ingest_token    => ($ENV{HW_INGEST_TOKEN} // 'changeme'),
+        ingest_token    => $self->_expected_token,
         ingest_url      => _ingest_url($c),
     );
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MONITORING RE-ARCHITECTURE (2026-08-12)
+# The external script no longer touches the DB directly — it only curls this
+# `run` endpoint every 5 min. The APP owns the monitoring: it collects local
+# hardware metrics, verifies the CURRENT DB is live, runs a self test, and
+# records a heartbeat. Because the app already knows which DB is current
+# (SYSTEM_IDENTIFIER / Docker Swarm), the "which DB is current" blind spot that
+# plagued the standalone script is gone. Any failure here is logged critical via
+# log_with_details → error audit → [Error] todo + daily-priorities + admin email.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Resolve the shared monitoring token. The token MUST be byte-identical on every
+# cron host AND every app container, or healthy nodes get falsely reported down.
+# Single source of truth is the NFS-backed token file (same file every host and
+# container mounts), then a host-local copy, then the compose env var, then the
+# changeme placeholder. deploy.sh creates the NFS file once and copies the same
+# value into each server's /usr/local/etc/comserv copy + compose, so they always
+# agree. Reading the file here keeps the container's token in lock-step with the
+# cron host even if env is unset.
+sub _expected_token {
+    my ($self) = @_;
+    # The token MUST be byte-identical on every cron host AND every container, or
+    # healthy nodes get falsely reported down. Scan candidate sources in priority
+    # order; the NFS share is the single source of truth (every host + container
+    # mounts the same export, possibly at a different local path). If a pinned env
+    # token was set it still wins, then the NFS/host files, then changeme.
+    my @candidates = (
+        $ENV{HW_INGEST_TOKEN} // '',
+        '/data/nfs/comserv_secrets/hw_ingest_token',
+        '/mnt/nfs_data/comserv_secrets/hw_ingest_token',
+        '/usr/local/etc/comserv/hw_ingest_token',
+        "$ENV{COMSERV_HOST_NFS_PATH}/comserv_secrets/hw_ingest_token",
+    );
+    for my $path (@candidates) {
+        next unless defined $path && length $path;
+        my $t = $path;
+        if (-f $path) {
+            if (open(my $fh, '<', $path)) {
+                $t = <$fh>;
+                close $fh;
+            } else {
+                next;
+            }
+        }
+        next unless defined $t;
+        $t =~ s/\s+$//;
+        return $t if length $t && $t ne 'changeme';
+    }
+    return $ENV{HW_INGEST_TOKEN} // 'changeme';
+}
+
+sub run :Path('/admin/hardware_monitor/run') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Accept external (cron/script) calls without a browser session: the trigger
+    # script sends X-Ingest-Token. Same token as the ingest/report endpoints.
+    my $expected = $self->_expected_token;
+    my $provided  = $c->req->header('X-Ingest-Token')
+                 // $c->req->param('token')
+                 // '';
+    unless ($provided eq $expected) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
+        return;
+    }
+
+    # Canonical, deterministic node identity shared by `run` (writes heartbeat)
+    # and `watchdog` (queries it). get_system_identifier() appends a volatile
+    # runtime tag (" (Standalone)"/" (Docker)") and the listening port, which is
+    # detected non-deterministically per request in the dev server — so `run`
+    # and `watchdog` would compute DIFFERENT keys and the watchdog could never
+    # find its own heartbeat. Normalize both to the bare host identity.
+    my ($sys_id, $hostname) = $self->_node_identity($c);
+
+    my $dbh_ok   = 0;
+    my $self_test = 'ok';
+    my $err      = '';
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $dbh    = $schema->storage->dbh;
+
+        # 0. Probe the handle first. With mariadb_auto_reconnect => 1 (set in the
+        # model connect_info) a ping against a stale/dropped handle transparently
+        # re-establishes the connection. We temporarily DISABLE auto-reconnect for
+        # the probe so we can DETECT (and log) a stale handle rather than silently
+        # papering over it — visibility into how often the DB drops the connection
+        # matters for diagnosis. If the handle was dead we log a WARNING (not
+        # critical: auto-reconnect repairs it on the next statement) and then let
+        # the live 'SELECT 1' below reconnect it for real. If the DB is truly
+        # unreachable the probe returns false and we fall through to the critical
+        # failure path below.
+        my $driver_name = eval { $dbh->{Driver}->{Name} } // 'MariaDB';
+        my $reconnect_key = $driver_name eq 'mysql' ? 'mysql_auto_reconnect' : 'mariadb_auto_reconnect';
+        my $prev_reconnect = eval { $dbh->{$reconnect_key} };
+        eval { $dbh->{$reconnect_key} = 0 } if defined $prev_reconnect;
+        my $probe = eval { $dbh->ping };
+        eval { $dbh->{$reconnect_key} = $prev_reconnect } if defined $prev_reconnect;
+        if (!defined $probe || !$probe) {
+            # Handle was dead. Log it (warning) so the audit records the drop; the
+            # live query below will auto-reconnect. If it can't, we hit the critical
+            # failure path and log_with_details there.
+            eval {
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                    'hardware_monitor.run',
+                    "[MONITOR-RUN] node=$hostname db_handle_stale=1 (auto-reconnect will repair)");
+            };
+            die "db handle dead (ping failed)";
+        }
+
+        # 1. Verify the CURRENT DB is genuinely live with a trivial query.
+        my $live = $dbh->selectrow_array('SELECT 1');
+        $dbh_ok = ($live && $live == 1) ? 1 : 0;
+
+        # 2. Self test — exercise a real read the app depends on.
+        my $ping = $schema->resultset('SystemLog')->search({}, { rows => 1 })->count;
+        $self_test = 'ok';
+    };
+    if ($@) {
+        # Stringify: DBIx::Class throws a *blessed* exception object. Embedding the
+        # raw object in the log message / JSON body breaks JSON::XS (no TO_JSON) and
+        # trips the global error handler. Force a plain string here.
+        $err = "$@";
+        $err =~ s/\s+/ /g;
+        $dbh_ok = 0;
+        $self_test = 'failed';
+    }
+
+    # Record heartbeat + DB-liveness + self-test as hardware_metrics rows so the
+    # watchdog (and the dashboard) can see the last good cycle per node.
+    my $rs = eval { $c->model('DBEncy')->resultset('HardwareMetrics') };
+    if ($rs) {
+        my @rows = (
+            { name => 'monitor_heartbeat', value => time(), unit => 'epoch',
+              level => $dbh_ok ? 'info' : 'critical',
+              text  => "db_live=$dbh_ok self_test=$self_test" },
+            { name => 'db_live', value => $dbh_ok ? 1 : 0, unit => 'bool',
+              level => $dbh_ok ? 'info' : 'critical' },
+            { name => 'self_test', value => ($self_test eq 'ok' ? 1 : 0), unit => 'bool',
+              level => ($self_test eq 'ok') ? 'info' : 'critical' },
+        );
+        for my $r (@rows) {
+            eval { $rs->create({
+                timestamp          => \'NOW()',
+                system_identifier => $sys_id,
+                hostname          => $hostname,
+                metric_name       => $r->{name},
+                metric_value      => $r->{value},
+                metric_text       => $r->{text},
+                unit              => $r->{unit},
+                level             => $r->{level},
+            }) };
+        }
+        # Also refresh local hardware metrics (CPU/mem/disk) when DB is live.
+        if ($dbh_ok) {
+            eval { Comserv::Util::HardwareAgent->collect_and_store($c) };
+        }
+    }
+
+    # 3. Failure path — surface to the audit exactly like any in-app error.
+    unless ($dbh_ok && $self_test eq 'ok') {
+        $self->logging->log_with_details($c, 'critical', __FILE__, __LINE__,
+            'hardware_monitor.run',
+            "[MONITOR-RUN] node=$hostname db_live=$dbh_ok self_test=$self_test"
+            . ($err ? " err=$err" : ''));
+        $c->response->status(503);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({
+            ok => 0, db_live => $dbh_ok, self_test => $self_test, error => $err // '' }));
+        return;
+    }
+
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json({ ok => 1, node => $hostname, db_live => 1, self_test => 'ok' }));
+}
+
+# Watchdog: did THIS node's monitor run recently? Missed window = container/DB down.
+# Returns JSON { ok, last_run, age_sec, missed }. Designed to be polled (e.g. by
+# the external script or a dashboard) and to log a critical if the window lapsed.
+sub watchdog :Path('/admin/hardware_monitor/watchdog') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Token-guarded so an external poller (no browser session) can call it.
+    my $expected = $self->_expected_token;
+    my $provided  = $c->req->header('X-Ingest-Token')
+                 // $c->req->param('token')
+                 // '';
+    unless ($provided eq $expected) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
+        return;
+    }
+
+    my ($sys_id, $hostname) = $self->_node_identity($c);
+
+    # Match on system_identifier ONLY. `run` writes system_identifier as the
+    # canonical node key via _node_identity(); the separate `hostname` column is
+    # derived with sanitization that diverges between endpoints, so requiring an
+    # exact hostname match makes the watchdog unable to find its own heartbeat.
+    my ($last) = eval {
+        $c->model('DBEncy')->resultset('HardwareMetrics')->search(
+            { system_identifier => $sys_id, metric_name => 'monitor_heartbeat' },
+            { order_by => { -desc => 'timestamp' }, rows => 1 },
+        )->single;
+    };
+    my $now = time();
+    my $last_epoch = $last ? ($last->metric_value // 0) : 0;
+    my $age = $last_epoch ? ($now - $last_epoch) : (10**9);
+    my $missed = ($age > $MONITOR_TIMEOUT) ? 1 : 0;
+
+    if ($missed) {
+        $self->logging->log_with_details($c, 'critical', __FILE__, __LINE__,
+            'hardware_monitor.watchdog',
+            "[MONITOR-WATCHDOG] node=$hostname missed monitoring window (age=${age}s, timeout=$MONITOR_TIMEOUT)");
+    }
+
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json({
+        ok => ($missed ? 0 : 1), node => $hostname,
+        last_run => $last_epoch, age_sec => $age, timeout => $MONITOR_TIMEOUT, missed => $missed,
+    }));
+}
+
+# Canonical, deterministic node identity shared by `run` (writes the heartbeat)
+# and `watchdog` (queries it). get_system_identifier() appends a volatile runtime
+# tag (" (Standalone)"/" (Docker)") and the listening port, which is detected
+# non-deterministically per request in the dev server — so `run` and `watchdog`
+# would otherwise compute DIFFERENT keys and the watchdog could never find the
+# heartbeat row `run` wrote. We normalize both to the bare host identity here so
+# the two endpoints always agree.
+sub _node_identity {
+    my ($self, $c) = @_;
+
+    my $sys_id = Comserv::Util::Logging->get_system_identifier();
+    # Strip volatile " (Standalone)"/" (Docker)" runtime tag.
+    $sys_id =~ s/\s*\([^)]*\)//g;
+    # Strip trailing ":port" if present.
+    $sys_id =~ s/:\d+$//;
+    $sys_id =~ s/[^A-Za-z0-9._-]//g;
+
+    my $hostname = $ENV{HW_HOSTNAME_OVERRIDE} || $sys_id || `hostname -s 2>/dev/null` || 'unknown';
+    chomp $hostname;
+    $hostname =~ s/[^A-Za-z0-9._-]//g;
+
+    return ($sys_id, $hostname);
+}
+
+# External reporter: a watcher on node X reports it could NOT reach node Y's
+# container. That indicates node Y's container (or its host) is down. The app
+# logs it critical (→ audit + admin email) so the outage is visible centrally.
+sub report_down :Path('/admin/hardware_monitor/report_down') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $expected = $self->_expected_token;
+    my $provided  = $c->req->header('X-Ingest-Token')
+                 // $c->req->param('token')
+                 // '';
+    unless ($provided eq $expected) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
+        return;
+    }
+
+    my $node = $c->req->param('node') // '';
+    $node =~ s/[^A-Za-z0-9._:-]//g;
+    my $detail = $c->req->param('detail') // '';
+    $detail =~ s/[^[:print:]]//g;
+
+    unless ($node) {
+        $c->response->status(400);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'node required' }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'critical', __FILE__, __LINE__,
+        'hardware_monitor.report_down',
+        "[MONITOR-DOWN] node=$node unreachable from watcher "
+        . "host=" . (`hostname -s 2>/dev/null` // 'unknown') . " detail=$detail");
+
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json({ ok => 1, reported => $node }));
 }
 
 sub _ingest_url {
@@ -600,7 +892,7 @@ sub ingest :Path('/admin/hardware_monitor/ingest') :Args(0) {
         return;
     }
 
-    my $expected = $ENV{HW_INGEST_TOKEN} // 'changeme';
+    my $expected = $self->_expected_token;
     my $provided  = $c->req->header('X-Ingest-Token')
                  // $c->req->param('token')
                  // '';
@@ -683,6 +975,70 @@ sub ingest :Path('/admin/hardware_monitor/ingest') :Args(0) {
 
     $c->response->content_type('application/json');
     $c->response->body(JSON::encode_json({ ok => 1, count => $count, hostname => $hostname }));
+}
+
+# External (standalone) reporting channel for the hardware_monitor.pl cron script.
+# The standalone script cannot write system_log when its DB connect FAILS (no handle),
+# so it POSTs the failure here. This writes a critical log_with_details entry, which the
+# error audit picks up into a [Error] todo + daily-priorities, and the admin error email.
+# Reuses the same ingest token guard — no new secret.
+sub report_error :Path('/admin/hardware_monitor/report_error') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $expected = $self->_expected_token;
+    my $provided  = $c->req->header('X-Ingest-Token')
+                 // $c->req->param('token')
+                 // '';
+    unless ($provided eq $expected) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid token' }));
+        return;
+    }
+
+    my $body;
+    if (ref($c->req->body_data) eq 'HASH') {
+        $body = $c->req->body_data;
+    } else {
+        my $raw_json = '{}';
+        if (my $body_fh = $c->req->body) {
+            if (ref($body_fh) && $body_fh->can('getline')) {
+                local $/;
+                $raw_json = <$body_fh>;
+                $body_fh->seek(0, 0) if $body_fh->can('seek');
+            } elsif (!ref($body_fh)) {
+                $raw_json = $body_fh;
+            }
+        }
+        $body = eval { JSON::decode_json($raw_json) };
+    }
+    if ($@ || !ref $body) {
+        $c->response->status(400);
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid JSON' }));
+        return;
+    }
+
+    my $hostname = $body->{hostname} // $c->req->address // 'unknown';
+    $hostname =~ s/[^A-Za-z0-9._-]//g;
+    my $sys_id   = "$hostname:monitor";
+    my $reason   = $body->{reason} // 'unknown failure';
+    $reason      =~ s/[^\x20-\x7e]//g;  # strip control chars
+    my $detail   = $body->{detail} // '';
+    $detail      =~ s/[^\x20-\x7e]//g;
+
+    $self->logging->log_with_details($c, 'critical', __FILE__, __LINE__, 'hardware_monitor.pl',
+        "[MONITOR-FAIL] host=$hostname reason=$reason" . ($detail ? " detail=$detail" : ''));
+
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json({ ok => 1, logged => 1, hostname => $hostname }));
 }
 
 # Ingest test payloads (e.g. hostname=testhost) store metrics but must not email admins.

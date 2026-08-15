@@ -190,6 +190,23 @@ sub _normalize_debug_msg {
 # Auto method to set up common stash variables for all requests
 sub auto :Private {
     my ($self, $c) = @_;
+
+    # External monitoring trigger endpoints (hardware_monitor run/watchdog/
+    # report_down/report_error/ingest) are called by the cron script on proxmox720
+    # (and other nodes) WITHOUT a browser session, so they MUST skip the admin-role
+    # gate below. Per-endpoint token checks live in the controller. Placed FIRST so
+    # it runs before LAYER 0.
+    if ($c->req->path =~ m{^admin/hardware_monitor/(?:run|watchdog|report_down|report_error|ingest)(?:/|$)}) {
+        return 1;
+    }
+
+    # Logging-audit cron trigger (admin/logging_audit/run) is hit by the same
+    # external cron WITHOUT a browser session, so it must skip the admin-role gate
+    # (token check lives in the controller, mirrors hardware_monitor.run).
+    if ($c->req->path =~ m{^admin/logging_audit/run(?:/|$)}) {
+        return 1;
+    }
+
     # LAYER 0: Require admin role for sensitive paths
     if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|file/admin)}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
@@ -494,7 +511,6 @@ sub auto :Private {
         eval {
             my $cfg = $c->model('AI')->config;
             $c->stash->{show_code_editor_widget} = ($cfg && $cfg->_editor_enabled($c)) ? 1 : 0;
-            $c->stash->{show_code_editor_widget} = 1;  # TEMP: force floating 💻 Code button for AI2 testing
         };
         $c->stash->{show_code_editor_widget} //= 0;
 

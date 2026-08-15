@@ -1,0 +1,95 @@
+[% META
+        title = "V2 Migration Plan — migrate every .tt to the v2 standard (incl. Planning page in lockstep)"
+   description = "Top-level plan (proj #259 V2MIG) to migrate the whole app to the v2 standard: theme classes, js_load.tt data-* delegation, documentation-standard S1-S7. Phases are sub-projects. P4 fixes the Planning page IN LOCKSTEP with its migration."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "v2-migration,planning,standards,refactor"
+   page_version = "1.0"
+   last_updated = "Wed Aug 13 2026"
+   project_id = "259"
+   project_code = "V2MIG"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/V2MigrationPlan.tt,v 1.0 2026/08/13 hermes-agent Exp - V2MIG top-level plan; phases P1-P5 as sub-projects; P4 = Planning page in lockstep' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+
+<h1 class="doc-h1">V2 Migration Plan</h1>
+
+<div class="doc-muted last-updated">
+    Last Updated: 2026-08-13 | Version: 1.0 | Status: In-Process | Owning project:
+    <a href="/project/details?project_id=259" class="doc-link">#259 V2MIG</a>
+</div>
+
+<div class="doc-info">
+    <p class="doc-body"><strong>Why this exists as its own project:</strong> V2 migration touches <em>almost every</em> <code>.tt</code>
+    and a large number of other files. It must be tracked as a first-class plan, not folded into a sub-bullet of
+    another project. Per the <a href="/Documentation/PlanningLanguageStandard">Planning Language Standard</a>:
+    <strong>PROJECT = PLAN</strong>, <strong>PHASE = SUB-PROJECT</strong> (rows #260–264 with <code>parent_id = 259</code>),
+    <strong>STEP = TODO</strong>, <strong>GATE = done-when</strong>.</p>
+    <p class="doc-body"><strong>Direct lesson encoded here:</strong> the current dire state of the <strong>Planning page</strong> is
+    a symptom of v2 work NOT being done at the same time the page was improved. So <strong>P4</strong> makes the
+    Planning-page fix happen <em>in lockstep</em> with its v2 migration — they ship together, not page-first-then-migrate.</p>
+</div>
+
+<h2 id="deliverable" class="doc-h2">1. Deliverable (one line)</h2>
+<p class="doc-body">Every <code>.tt</code> in the app meets the v2 standard (theme classes only / no inline style,
+<code>js_load.tt</code> data-* delegation / no inline script, documentation-standard S1-S7 cross-links), with the
+Planning page migrated and fixed as part of the same work.</p>
+
+<h2 id="standard" class="doc-h2">2. What "v2" means per .tt (the gate)</h2>
+<ul class="doc-body">
+    <li>No inline <code>style="..."</code> and no hardcoded colours — use theme classes / <code>var(--*)</code> only.</li>
+    <li>No inline <code>&lt;script&gt;</code> in templates that use <code>js_load.tt</code>; JS wired through <code>js_load.tt</code> with <code>data-*</code> delegation.</li>
+    <li>Documentation pages follow S1–S7 (metadata in SQL, one reader, flat <code>/Documentation/&lt;path&gt;</code> routes, indexer-owned metadata).</li>
+    <li>Cross-plan changes raised on the owning plan, never absorbed.</li>
+</ul>
+
+<h2 id="phases" class="doc-h2">3. Phases (each is a sub-project of #259)</h2>
+<table class="doc-table">
+    <tr>
+        <th class="doc-th">Phase / Sub-project</th>
+        <th class="doc-th">Goal</th>
+        <th class="doc-th">Gate / Done when</th>
+    </tr>
+    <tr>
+        <td class="doc-td"><strong>V2MIG-P1</strong> — Baseline &amp; standards<br>(<a href="/project/details?project_id=260" class="doc-link">#260</a>)</td>
+        <td class="doc-td">Write the v2 standard + a CI/lint gate that fails non-compliant <code>.tt</code>.</td>
+        <td class="doc-td">Standard published; automated check exists and blocks a non-compliant <code>.tt</code>.</td>
+    </tr>
+    <tr class="doc-tr-alt">
+        <td class="doc-td"><strong>V2MIG-P2</strong> — Core/shared .tt<br>(<a href="/project/details?project_id=261" class="doc-link">#261</a>)</td>
+        <td class="doc-td">Migrate layout, nav, admin shell — highest blast radius, do first.</td>
+        <td class="doc-td">Shared shell renders theme-compliant with zero inline style.</td>
+    </tr>
+    <tr>
+        <td class="doc-td"><strong>V2MIG-P3</strong> — Feature .tt waves<br>(<a href="/project/details?project_id=262" class="doc-link">#262</a>)</td>
+        <td class="doc-td">Migrate feature <code>.tt</code> in dependency waves (the bulk touching almost every file).</td>
+        <td class="doc-td">Every feature <code>.tt</code> passes the P1 gate.</td>
+    </tr>
+    <tr class="doc-tr-alt">
+        <td class="doc-td"><strong>V2MIG-P4</strong> — Planning page IN LOCKSTEP<br>(<a href="/project/details?project_id=263" class="doc-link">#263</a>)</td>
+        <td class="doc-td">Fix the Planning page <em>together with</em> its v2 migration. This is the work that was skipped before and caused the current mess.</td>
+        <td class="doc-td">Planning page + its v2 migration ship in the same change; verified in-browser.</td>
+    </tr>
+    <tr>
+        <td class="doc-td"><strong>V2MIG-P5</strong> — Sync &amp; verify<br>(<a href="/project/details?project_id=264" class="doc-link">#264</a>)</td>
+        <td class="doc-td">Cross-link, documentation sync, full verification. Absorbs the former AIMPS-P5 "v2 Migration &amp; Documentation Sync" intent.</td>
+        <td class="doc-td">Docs synced; all <code>.tt</code> green on the P1 gate.</td>
+    </tr>
+</table>
+
+<h2 id="see-also" class="doc-h2">4. See also</h2>
+<ul class="doc-body">
+    <li><a href="/Documentation/MASTER_PLAN" class="doc-link">Master Plan</a> — V2MIG listed under the active projects (GROUP 2 / reconciled tracks).</li>
+    <li><a href="/Documentation/PlanningLanguageStandard" class="doc-link">Planning Language Standard</a> — vocabulary used here.</li>
+    <li><a href="/Documentation/DocumentationTtTemplate" class="doc-link">Documentation TT Template</a> — required page structure / theme classes.</li>
+    <li>AI/assistant reference: <a href="/Documentation/V2MigrationPlan_md" class="doc-link">V2MigrationPlan.md</a> (companion, for chat/AI consumption).</li>
+</ul>
+
+<div class="doc-footer">
+    <p>This plan is the readable view of project <a href="/project/details?project_id=259" class="doc-link">#259 V2MIG</a>. The DB (<code>/api/projects</code>) is the source of truth; steps live there as todos.</p>
+</div>
+
+</div>

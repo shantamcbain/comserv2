@@ -32,7 +32,7 @@ __PACKAGE__->add_columns(
     },
     metric_value => {
         data_type     => 'decimal',
-        size          => [12, 3],
+        size          => [15, 3],
         is_nullable   => 1,
     },
     metric_text => {

@@ -1,0 +1,140 @@
+[% META
+        title = "Api::api_focus_models namespace::autoclean Try::Tiny Fix - August 12, 2026"
+   description = "api_focus_models crashed with 'Can't call method catch on an undefined value' because bare use namespace::autoclean stripped Try::Tiny try/catch under Perl 5.40"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "changelog"
+   page_version = "0.01"
+   last_updated = "Wed Aug 12 2026"
+   site_specific = "false"
+%]
+
+<div class="container">
+    <h1 class="doc-h1">Api::api_focus_models Fix &mdash; namespace::autoclean + Try::Tiny &mdash; August 12, 2026</h1>
+
+    <div class="doc-muted last-updated">
+        Last Updated: 2026-08-12 |
+        Version: 0.01 |
+        Author: Hermes Agent |
+        Status: Fixed
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Issue</h2>
+            <p class="doc-body">
+                The error-audit system logged repeated <code>ERROR</code> entries from
+                <code>Comserv::Controller::Api->api_focus_models</code>:
+            </p>
+            <div class="doc-codebox">
+                <pre><code>[GLOBAL ERROR] Unhandled exception: Caught exception in
+Comserv::Controller::Api->api_focus_models "Can't call method "catch"
+on an undefined value at .../lib/Comserv/Controller/Api.pm line 1930."
+Path: api/focus/models  IP: 192.168.1.199  Referer: /planning/daily</code></pre>
+            </div>
+            <p class="doc-body">
+                The reported line number (1930) was from the 2026-08-10 code; that block has
+                since been refactored to <code>eval {...}</code> and is fine. The real live
+                defect is a genuine <code>try { } catch { }</code> block at lines 1003&ndash;1013
+                inside the local-auth user resolver (<code>_api_get_user_context</code>) that runs
+                before <code>api_focus_models</code>. The <code>192.168.1.199</code> IP is exactly
+                the local-network path that hits this code, so it crashed on every local request
+                to <code>/api/focus/models</code>.
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="root-cause" class="doc-h2">2. Root Cause</h2>
+            <p class="doc-body">
+                <code>lib/Comserv/Controller/Api.pm</code> declared:
+            </p>
+            <div class="doc-codebox">
+                <pre><code>use namespace::autoclean;</code></pre>
+            </div>
+            <p class="doc-body">
+                with no <code>-except</code> guard. Under Perl 5.40, <code>namespace::autoclean</code>
+                strips the <code>try</code>/<code>catch</code> keywords that <code>Try::Tiny</code>
+                injected at compile time. The <code>try { ... } catch { ... }</code> block then
+                degrades to <code>try{...}->catch(...)</code> on an undefined value &mdash; yielding
+                precisely the "Can't call method 'catch' on an undefined value" exception. This is
+                the same class of bug already fixed in <code>ThemeConfig.pm</code> and documented in
+                the project's Perl 5.40 notes.
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="solution" class="doc-h2">3. Solution</h2>
+            <p class="doc-body">
+                Added the <code>-except</code> clause so the Try::Tiny keywords survive cleanup,
+                matching the established pattern already used in <code>ThemeConfig.pm</code>:
+            </p>
+            <div class="doc-codebox">
+                <pre><code># before
+use namespace::autoclean;
+# after
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)</code></pre>
+            </div>
+            <p class="doc-body">
+                No other code in <code>Api.pm</code> needed changing &mdash; the single remaining
+                <code>try/catch</code> block is now correctly resolved at runtime.
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="scope" class="doc-h2">4. Scope Note</h2>
+            <div class="doc-warning">
+                <p class="doc-body">
+                    The same latent defect exists in other controllers that combine a bare
+                    <code>use namespace::autoclean;</code> with real <code>try { } catch { }</code>
+                    usage: <code>HostingSignup.pm</code> and <code>3d.pm</code> (genuine
+                    Try::Tiny blocks). A broader sweep (13 files match the text) was deferred
+                    pending user confirmation. Those two should get the same <code>-except</code>
+                    guard before their code paths are exercised on Perl 5.40.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">5. Files Modified</h2>
+            <ul class="doc-body">
+                <li><code>Comserv/lib/Comserv/Controller/Api.pm</code> &mdash; added
+                    <code>-except => [qw(try catch finally)]</code> to the
+                    <code>namespace::autoclean</code> import (line 3).</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="testing" class="doc-h2">6. Verification</h2>
+            <ul class="doc-body">
+                <li><code>perl -Mlib=lib -c lib/Comserv/Controller/Api.pm</code> &rarr; syntax OK.</li>
+                <li>Confirmed the only <code>try</code>/<code>catch</code> pair in the file is the
+                    local-auth block at 1003&ndash;1013, which now resolves via the <code>-except</code> guard.</li>
+                <li>Standing rule respected: the app was not started/stopped and
+                    <code>comserv_server.pl</code> was not modified. The fix is effective on the
+                    next code reload / deploy.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" class="doc-h2">7. See Also</h2>
+            <div class="doc-success">
+                <ul class="doc-body">
+                    <li><a href="/Documentation/changelog/2026-08-12-themeconfig-missing-dir-fix" class="doc-link">ThemeConfig set_site_theme ENOENT Fix</a> &mdash; sibling fix in the same audit window.</li>
+                    <li><a href="/Documentation/ThemeConfig" class="doc-link">Theme Configuration</a> &mdash; example of the same <code>-except</code> guard already applied.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

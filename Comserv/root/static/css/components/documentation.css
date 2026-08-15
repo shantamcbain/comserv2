@@ -15,7 +15,52 @@
     background: var(--background-color, #f8f9fa);
 }
 
-/* ── Page header ─────────────────────────────────────────────── */
+/* ── Shared doc page header (admin/documentation/_doc_header.tt) ──
+   Theme-compliant: every value consumes a canonical CSS variable so all
+   themes apply. Authors copy these classes — NEVER write inline style=. */
+.doc-page-header {
+    margin-bottom: var(--spacing-large, 30px);
+    padding: var(--spacing-medium, 20px);
+    background: var(--primary-color, #fff);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color, #ddd);
+    text-align: center;
+}
+
+.doc-page-header .doc-h1 {
+    margin: 0 0 10px 0;
+    font-size: 2em;
+}
+
+.doc-header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-medium, 16px);
+    font-size: var(--font-size-small, 0.9em);
+    color: var(--text-color, #555);
+    margin-bottom: var(--spacing-small, 10px);
+}
+
+.doc-header-item { white-space: nowrap; }
+
+.doc-header-label {
+    color: var(--text-muted-color, #666);
+    font-weight: bold;
+}
+
+.doc-header-value { color: var(--text-color, #333); }
+
+.doc-header-actions,
+.markdown-doc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-small, 10px);
+}
+
+/* ── Legacy .doc-header (kept for any pages still using it) ── */
 .doc-header {
     text-align: center;
     margin-bottom: 30px;
@@ -497,4 +542,26 @@
 .doc-tr-alt    { background-color: rgba(255,255,255,0.12); }
 .doc-link      { color: var(--link-color); text-decoration: none; }
 .doc-link:hover { color: var(--link-hover-color); }
+
+/* ── MASTER_PLAN coordinator doc ──
+ * Theme-compliant: canonical CSS variables ONLY. Typography, notices, tables
+ * and the section nav are expressed with the shared .doc-* classes already in
+ * this file. Only the SiteName-scoped context banner (no .doc-* equivalent) and
+ * the collapsible <details> disclosure marker live here. Inline style= and
+ * page <style> blocks are forbidden per DocumentationTtTemplate.tt. */
+.masterplan { color: var(--text-color); }
+
+/* SiteName-scoped context banner (CSC = coordinating; other sites scoped) */
+.mp-site-context { margin: 12px 0; padding: 8px 12px; border-radius: 4px; font-size: 0.92em; border-left: 4px solid var(--info-color); background: var(--secondary-color); }
+.mp-site-context-csc { border-left-color: var(--primary-color); }
+.mp-site-context-other { border-left-color: var(--warning-color); }
+.mp-back-link { margin: 10px 0 0; font-size: 0.9em; }
+
+/* Collapsible cards reuse the theme's .card/.card-header/.card-body; only the
+   disclosure marker (▸/▾) is styled so it matches the doc theme. */
+.masterplan details > summary.card-header { cursor: pointer; list-style: none; }
+.masterplan details > summary.card-header::-webkit-details-marker { display: none; }
+.masterplan details > summary.card-header::before { content: "\25B8 "; }
+.masterplan details[open] > summary.card-header::before { content: "\25BE "; }
+.masterplan .card > details[open] { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .doc-footer    { margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small); }

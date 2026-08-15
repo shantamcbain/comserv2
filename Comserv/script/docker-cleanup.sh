@@ -21,14 +21,26 @@ echo "Disk before: $(disk_before)"
 echo ""
 
 # ── 1. Stopped / dead / exited containers ────────────────────────────────────
-echo "1. Removing stopped containers..."
-STOPPED=$(docker ps -a --filter "status=exited" --filter "status=dead" --filter "status=created" --format "{{.Names}}" 2>/dev/null)
-if [ -n "$STOPPED" ]; then
-    echo "$STOPPED" | while read -r name; do echo "   Removing: $name"; done
-    docker container prune -f 2>/dev/null | grep -v "^$" || true
+# PROTECTION (2026-08-15): NEVER run a bare `docker container prune -f` — it
+# deletes ANY stopped container, including the production web container if it
+# ever briefly exits, which has caused recurring full-site outages. We only
+# remove stopped containers that are explicitly marked safe-to-prune
+# (label comserv.prune=safe). The production container and its legacy alias are
+# always skipped.
+echo "1. Removing only safe-to-prune stopped containers..."
+PROD_NAMES="comserv2-web-prod comserv-web-prod"
+if docker container prune -f --filter "label=comserv.prune=safe" 2>/dev/null | grep -q .; then
+    echo "   (safe prune ran)"
 else
     echo "   None found."
 fi
+# Belt-and-suspenders: if anything named like prod shows up stopped, warn loudly.
+for p in $PROD_NAMES; do
+    if docker inspect "$p" >/dev/null 2>&1 && [ "$(docker inspect -f '{{.State.Running}}' "$p" 2>/dev/null)" != "true" ]; then
+        echo "   ⚠️  WARNING: production container '$p' is NOT running. Do NOT remove it."
+        echo "      It must be restarted or recreated, never pruned. Investigate before cleanup."
+    fi
+done
 
 # ── 2. Dangling images (untagged build leftovers) ────────────────────────────
 echo ""
