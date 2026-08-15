@@ -18,6 +18,21 @@
     </section>
 
     <section class="recent-enhancements">
+        <h2>Resilience Note &mdash; Missing Config Directory</h2>
+        <div class="enhancement-highlight">
+            <strong>2026-08-12</strong>: All JSON writers (<code>set_site_theme</code>,
+            <code>create_theme</code>, <code>save_theme</code>, <code>set_site_favicon</code>,
+            <code>set_domain_favicon</code>) now call an internal
+            <code>_ensure_parent_dir</code> guard that <code>mkdir -p</code>s
+            <code>static/config/</code> before writing. Previously, <code>write_file</code>
+            raised <code>ENOENT</code> when that directory was absent on a deployment
+            (e.g. the production container), which surfaced as a repeated
+            <code>set_site_theme</code> error on every MCoop page load. See
+            <a href="/Documentation/changelog/2026-08-12-themeconfig-missing-dir-fix">ThemeConfig set_site_theme ENOENT Fix</a>.
+        </div>
+    </section>
+
+    <section class="recent-enhancements">
         <h2>Recent Enhancements</h2>
         <div class="enhancement-highlight">
             <strong>Interactive Theme Editor</strong>: The theme system now includes a comprehensive interactive CSS editor with real-time preview capabilities. See the <a href="/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt">CSS Theme System Enhancements - January 2025</a> changelog for complete details on new features including:

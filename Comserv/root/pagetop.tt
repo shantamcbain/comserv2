@@ -8,8 +8,8 @@
 [% SET is_admin = c.stash.is_admin || roles.grep('admin').size > 0 ? 1 : 0 %]
 [% SET is_helpdesk_staff = is_admin || roles.grep('helpdesk').size > 0 ? 1 : 0 %]
 
-<!-- Add Font Awesome for the paint brush icon -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- Font Awesome (served locally — no external CDN dependency) -->
+<link rel="stylesheet" href="/static/css/fontawesome/all.min.css">
 
 <!-- Theme-aware stylesheet -->
 <style>

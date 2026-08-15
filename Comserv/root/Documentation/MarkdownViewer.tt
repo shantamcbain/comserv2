@@ -20,64 +20,38 @@
 [% END %]
 
 <div class="markdown-viewer">
-    <div class="markdown-header">
-        <h1>[% page_title %]</h1>
-        
-        <div class="user-context">
-            <div class="site-info">
-                <span class="label">Current Site:</span>
-                <span class="value">[% site_name %]</span>
-            </div>
-            <div class="role-info">
-                <span class="label">User Role:</span>
-                <span class="value">[% user_role %]</span>
-            </div>
-        </div>
-        
-        <div class="document-info">
-            <div class="last-updated">
-                <span class="label">Last Updated:</span>
-                <span class="value">[% last_updated %]</span>
-            </div>
-            
-            <div class="actions">
-                <a href="[% c.uri_for('/Documentation') %]" class="action-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                    Documentation Home
-                </a>
-                
-                [% IF user_role == 'admin' || user_role == 'developer' || user_role == 'editor' %]
-                <a href="[% c.uri_for('/Documentation/suggest_edit', page_name) %]" class="action-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 20h9"></path>
-                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                    </svg>
-                    Suggest Edit
-                </a>
-                [% END %]
-                
-                <button id="expand-all-button" class="action-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="7 13 12 18 17 13"></polyline>
-                        <polyline points="7 6 12 11 17 6"></polyline>
-                    </svg>
-                    Expand All
-                </button>
+    [%# Shared, META-driven page header (title + site/role/updated/project links +
+        Documentation Home / Suggest Edit). Mirrors the .tt template header so
+        every doc page renders identically. Data comes from the Documentation
+        controller stash (META block + request context).
+        See admin/documentation/_doc_header.tt. %]
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = page_title
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
 
-                <button id="print-button" class="action-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                        <rect x="6" y="14" width="12" height="8"></rect>
-                    </svg>
-                    Print
-                </button>
-            </div>
+        <div class="markdown-doc-actions">
+            <button id="expand-all-button" class="action-link">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="7 13 12 18 17 13"></polyline>
+                    <polyline points="7 6 12 11 17 6"></polyline>
+                </svg>
+                Expand All
+            </button>
+
+            <button id="print-button" class="action-link">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Print
+            </button>
         </div>
-    </div>
     
     <div class="markdown-content">
         <!-- Display the markdown content with basic formatting -->

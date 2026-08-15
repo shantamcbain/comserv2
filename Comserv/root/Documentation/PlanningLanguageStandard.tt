@@ -1,0 +1,186 @@
+[% META
+        title = "Planning Language Standard — one vocabulary for projects and plans"
+   description = "The controlled vocabulary every Comserv2 plan uses: PROJECT = PLAN, PHASE = sub-project, STEP = todo, GATE = done-when. Retires 'Wave' and per-plan step numbering so all plans speak the same language."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning,standards,documentation"
+   page_version = "1.0"
+   last_updated = "Wed Aug 13 2026"
+   project_id = "138"
+   project_code = "PLANNING"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/PlanningLanguageStandard.tt,v 1.0 2026/08/13 hermes-agent Exp - Single planning vocabulary: project=plan, phase=sub-project, step=todo, gate=done-when' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+
+<h1 class="doc-h1">Planning Language Standard</h1>
+
+<div class="doc-muted last-updated">
+    Last Updated: 2026-08-13 | Version: 1.0 | Status: RATIFIED | Owning project: <a href="/project/details?project_id=138" class="doc-link">#138 PLANNING</a>
+</div>
+
+<!-- WHY -->
+<div class="row">
+    <div class="col-100">
+        <h2 id="why" class="doc-h2">1. Why this standard exists</h2>
+        <p class="doc-body">
+            We have one source of truth — the <strong>projects</strong> table in the database. The
+            <code>.tt</code> / <code>.md</code> plan documents are only human/AI-readable <em>views</em> of those
+            rows. Historically we invented a second taxonomy on top of "project" — we called plans "waves",
+            numbered them W0.1/W1.2, and every plan picked its own word for a step (P1, Q4, 1A, Step 0). That
+            made it impossible to tell what level you were looking at.
+        </p>
+        <p class="doc-body">
+            This standard collapses to <strong>one hierarchy with one word per level</strong>. After it,
+            "project" and "plan" mean the same thing, and the master plan is simply <em>the list of projects
+            for a site, in dependency order</em>.
+        </p>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<!-- THE HIERARCHY -->
+<div class="row">
+    <div class="col-100">
+        <h2 id="hierarchy" class="doc-h2">2. The hierarchy (one word per level)</h2>
+        <table class="doc-table">
+            <tr>
+                <th class="doc-th">Term</th>
+                <th class="doc-th">What it IS</th>
+                <th class="doc-th">Where it lives</th>
+                <th class="doc-th">Wrong words to stop using</th>
+            </tr>
+            <tr>
+                <td class="doc-td"><strong>PROJECT</strong><br>(= PLAN)</td>
+                <td class="doc-td">The single planning unit and source of truth. A row in <code>projects</code>. The plan <em>document</em> with the same name is just its view.</td>
+                <td class="doc-td"><code>projects</code> table (DB). Doc at <code>/Documentation/&lt;Name&gt;</code>.</td>
+                <td class="doc-td">"wave", "initiative", "track", "the plan vs the project"</td>
+            </tr>
+            <tr class="doc-tr-alt">
+                <td class="doc-td"><strong>MASTER PLAN</strong></td>
+                <td class="doc-td">One coordinator doc <em>per SiteName</em>. Lists that site's top-level projects in dependency order and links each to its plan. It does not invent waves.</td>
+                <td class="doc-td"><code>/Documentation/MASTER_PLAN</code> (scoped by SiteName)</td>
+                <td class="doc-td">"the roadmap", "the coordinator wave"</td>
+            </tr>
+            <tr>
+                <td class="doc-td"><strong>PHASE</strong><br>(= SUB-PROJECT)</td>
+                <td class="doc-td">A major slice of a project. A <code>projects</code> row with <code>parent_id</code> set to the parent project.</td>
+                <td class="doc-td"><code>projects.parent_id</code> (DB)</td>
+                <td class="doc-td">"W0.1", "sub-plan", "sub-project" used as if distinct from "phase"</td>
+            </tr>
+            <tr class="doc-tr-alt">
+                <td class="doc-td"><strong>STEP</strong><br>(= TODO)</td>
+                <td class="doc-td">A leaf work item. A row in <code>todos</code> whose project is the phase's project.</td>
+                <td class="doc-td"><code>todos</code> table (DB)</td>
+                <td class="doc-td">"P1/P2 finding", "Q1/Q6", "1A/1B", "Step 0" used as phase names</td>
+            </tr>
+            <tr>
+                <td class="doc-td"><strong>GATE</strong></td>
+                <td class="doc-td">The <em>done-when</em> condition on a phase. Checked (and demonstrated) before the next phase starts. Lives on the phase's project/todo.</td>
+                <td class="doc-td"><code>todos</code> / phase project description (DB)</td>
+                <td class="doc-td">"blocker", "prerequisite" used loosely without a verifiable condition</td>
+            </tr>
+        </table>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<!-- RETIRED WORDS -->
+<div class="row">
+    <div class="col-100">
+        <h2 id="retired" class="doc-h2">3. Retired words (do not use as structure)</h2>
+        <div class="doc-warning">
+            <p class="doc-body">These words mean different things in different docs. Stop using them as
+            <em>structural</em> labels. Findings inside a plan (e.g. an audit "P1 High") are fine — they are
+            findings, not plan levels.</p>
+        </div>
+        <ul class="doc-body">
+            <li><strong>Wave</strong> — replace with: order the real <em>projects</em> by dependency. If you must group for readability, call it a "dependency group of projects" and label each entry by its <em>project code</em>, not "Wave N".</li>
+            <li><strong>W0.1 / W1.2</strong> (master-plan numbering) — replace with the project code (e.g. <a href="/project/details?project_id=138" class="doc-link">#138 PLANNING</a>).</li>
+            <li><strong>P1/P2, Q1/Q6, 1A/1B, "Step 0"</strong> — standardize on <strong>PHASE</strong> (sub-project) + <strong>STEP</strong> (todo). Finer numbering inside a phase is just steps.</li>
+            <li><strong>"sub-plan" as a separate identity</strong> — it is a <strong>PHASE</strong> / sub-project. Link it by project code.</li>
+        </ul>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<!-- SKELETON -->
+<div class="row">
+    <div class="col-100">
+        <h2 id="skeleton" class="doc-h2">4. Required plan-doc skeleton (same for every plan)</h2>
+        <p class="doc-body">Every plan document — top-level or phase — uses this shape. The META block must carry
+            <code>project_id</code> and <code>project_code</code> (real values from <code>GET /api/projects</code>; never invent).</p>
+        <ol class="doc-body">
+            <li><strong>Header line:</strong> <code>Project code · Parent project (or "Master Plan" if top-level) · Site · Status · Audit date</code></li>
+            <li><strong>One-line deliverable:</strong> what this project delivers.</li>
+            <li><strong>Phases</strong> (each = a sub-project): id, goal, gate, link to the sub-project's plan. Listed in dependency order.</li>
+            <li><strong>Steps</strong> live in the DB as todos; the doc <em>summarizes</em> them, it does not re-track them.</li>
+            <li><strong>Cross-links:</strong> to the parent (master plan) and to each child plan (by <code>/Documentation/&lt;Name&gt;</code>).</li>
+        </ol>
+        <div class="doc-codebox">
+<pre><code># &lt;Project Name&gt; Plan
+
+**Project code:** XXX-YYY   **Parent project:** #NNN (or "Master Plan")   **Site:** CSC
+**Status:** In-Process   **Audit date:** YYYY-MM-DD
+
+## Deliverable (one line)
+What this project ships.
+
+## Phases (each is a sub-project)
+- **Phase A — &lt;name&gt;** (proj #AAA): goal. GATE: &lt;demonstrable done-when&gt;.
+- **Phase B — &lt;name&gt;** (proj #BBB): goal. GATE: &lt;demonstrable done-when&gt;. (starts after A's gate)
+
+## See also
+- Parent: [Master Plan](/Documentation/MASTER_PLAN)
+- Child: [Sub-plan](/Documentation/&lt;ChildName&gt;)
+</code></pre>
+        </div>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<!-- MASTER PLAN RULE -->
+<div class="row">
+    <div class="col-100">
+        <h2 id="master" class="doc-h2">5. What the master plan is (per site)</h2>
+        <p class="doc-body">
+            The master plan is <strong>the list of that site's top-level projects, in dependency order</strong>.
+            Each entry is a PROJECT (with its code). Dependency arrows point between real projects. There is no
+            separate "wave" layer — if projects share a dependency, group them under a labelled
+            "dependency group" but keep every card labelled by project code.
+        </p>
+        <p class="doc-body">
+            The AI reads the DB (<code>/api/projects</code>, <code>/api/todos</code>) as the source of truth and
+            renders the master plan as the shared visualization for humans and AI. The plan docs and the master
+            plan are two views of the same <code>projects</code>/<code>todos</code> rows.
+        </p>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<!-- SEE ALSO -->
+<div class="row">
+    <div class="col-100">
+        <div id="see-also" class="doc-success">
+            <h2 class="doc-h3">6. See Also</h2>
+            <ul class="doc-body">
+                <li><a href="/Documentation/MASTER_PLAN" class="doc-link">Master Plan (per SiteName)</a> — must follow this standard</li>
+                <li><a href="/Documentation/DocumentationTtTemplate" class="doc-link">Documentation TT Template</a> — required page structure / theme classes</li>
+                <li><a href="/project/details?project_id=138" class="doc-link">#138 PLANNING</a> — owning project for the planning-system plans</li>
+            </ul>
+        </div>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <div class="doc-footer">
+            <p>This standard is part of the Comserv planning system. All new and revised plan docs must conform to it.</p>
+        </div>
+    </div>
+</div>
+
+</div>

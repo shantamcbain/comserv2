@@ -448,6 +448,30 @@ sub deploy {
             $self->_error("Aborting: registry login failed before pull on $target.");
             die "docker login failed";
         };
+        # CRITICAL FIX (2026-08-11): _backup_container commits the old container to
+        # a backup image + visible stopped backup container, but leaves the LIVE
+        # $container_name running. Without removing it first, `compose up
+        # --force-recreate` hits "name already in use" and NEVER creates the new
+        # container — yet the health check then passes against the OLD container and
+        # the deploy falsely reports SUCCESS. Stop + rm the live container now so
+        # `up` can create the pulled image. Rollback uses the committed backup image,
+        # so this is safe.
+        if ($self->_container_exists($container_name, $is_remote, $ssh_prefix)) {
+            # DEFENSE (2026-08-15): never remove the live prod container unless a
+            # rollback backup image exists. Without the backup, a failed recreate
+            # would leave prod permanently down with no restore path. $backup is
+            # the committed image ref computed earlier in deploy(); when present
+            # this rm is safe (rollback retags it). When absent, skip the rm so the
+            # container keeps running instead of being destroyed with no fallback.
+            my $backup_exists = ($backup && $backup ne '');
+            if ($backup_exists) {
+                $self->_log("  Removing live $container_name before recreate (backup image $backup retained for rollback)...");
+                my $rm_cmd = "$ssh_prefix \\\"docker stop $container_name 2>/dev/null; docker rm -f $container_name 2>/dev/null\\\"";
+                $self->_stream_command($rm_cmd);
+            } else {
+                $self->_log("  SKIPPING rm of live $container_name: no rollback backup image present. Container left running to avoid unrecoverable outage.");
+            }
+        }
         $self->_log("Step 5: Pulling image on $target and starting $service...");
         my $remote_cmd = sprintf(
             'cd %s && ( docker compose %s pull %s 2>&1 ) && ( docker compose %s up -d --force-recreate %s 2>&1 )',

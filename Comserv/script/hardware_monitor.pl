@@ -2,339 +2,117 @@
 use strict;
 use warnings;
 
-use POSIX         qw(strftime);
-use DBI           ();
-use Sys::Hostname qw(hostname);
-use Scalar::Util  qw(looks_like_number);
+# ─────────────────────────────────────────────────────────────────────────────
+# hardware_monitor.pl — THIN TRIGGER (monitoring re-architecture, 2026-08-12)
+#
+# This script no longer connects to the database or collects metrics. The APP
+# owns all of that (see Comserv::Controller::Admin::HardwareMonitor, `run`
+# endpoint): it knows which DB is current, collects local hardware metrics,
+# verifies DB liveness, runs a self test, records a heartbeat, and — on failure —
+# writes a CRITICAL system_log entry via log_with_details so the error audit
+# creates a [Error] todo + daily-priorities entry + admin email.
+#
+# This script only CURls the `run` endpoint on each candidate node. The first
+# node that answers 200 wins. If NO node answers, that itself means the
+# containers are down / the world can't see the app — and the only signal we can
+# emit is this script's OWN stderr → root's cron mail (design A). We never
+# touch the DB directly, so we can't write a system_log row when the app is dark.
+# ─────────────────────────────────────────────────────────────────────────────
 
-my $json_decode;
-BEGIN {
-    if (eval { require JSON::XS; 1 }) {
-        $json_decode = sub { JSON::XS::decode_json($_[0]) };
-    } else {
-        require JSON::PP;
-        $json_decode = sub { JSON::PP::decode_json($_[0]) };
-    }
-}
+use POSIX qw(strftime);
 
-# ---------------------------------------------------------------------------
-# Thresholds — determine the level stored in hardware_metrics.level
-# The application's HealthLogger reads system_log for warn/error/critical
-# and sends email alerts. This script only writes to hardware_metrics.
-# ---------------------------------------------------------------------------
-my %WARN_AT = (
-    cpu_load_pct  => 70,  mem_used_pct  => 80,
-    swap_used_pct => 60,  disk_used_pct => 80,
-    ipmi_inlet_temp => 35,
+sub _ts { strftime('%Y-%m-%d %H:%M:%S', localtime) }
+
+# Candidate nodes, in priority order. Override via env (comma-separated URLs).
+# IMPORTANT: these are REACHABLE node addresses, NOT localhost. The script runs
+# on a separate host (proxmox720) and curls the app containers directly — the app
+# has no concept of "localhost" on this host. The deploy pipeline writes the
+# correct HW_MONITOR_NODES for each server; these fallbacks are only used if the
+# env is unset. production1 -> 192.168.1.126:5000, workstation -> 192.168.1.199:5000.
+# (No 127.0.0.1 — it would target this script host's own loopback, which is wrong.)
+my @NODES = split /,/, ($ENV{HW_MONITOR_NODES}
+    || 'http://192.168.1.126:5000/admin/hardware_monitor/run,'
+    .  'http://192.168.1.199:5000/admin/hardware_monitor/run,'
+    .  'http://192.168.1.198:5000/admin/hardware_monitor/run');
+
+# The shared token. Every cron host and every container MUST use the IDENTICAL
+# key, otherwise healthy nodes are falsely reported down. deploy.sh provisions it
+# once on the NFS share (.../comserv_secrets/hw_ingest_token) — the same export
+# every host mounts (workstation:/data/nfs, proxmox720:/mnt/nfs_data, etc.) plus
+# a host-local copy. We scan candidate paths; if none yield a key we do NOT fall
+# back to a guess — we exit 2 so the failure surfaces (cron mail + the script's
+# own error reporting) instead of silently using a wrong key that would 403.
+my @TOKEN_CANDIDATES = (
+    $ENV{HW_INGEST_TOKEN} // '',
+    '/usr/local/etc/comserv/hw_ingest_token',
+    '/data/nfs/comserv_secrets/hw_ingest_token',
+    '/mnt/nfs_data/comserv_secrets/hw_ingest_token',
 );
-my %CRIT_AT = (
-    cpu_load_pct  => 90,  mem_used_pct  => 92,
-    swap_used_pct => 85,  disk_used_pct => 90,
-    ipmi_inlet_temp => 40,
-);
-
-sub _level {
-    my ($name, $val) = @_;
-    return 'info' unless defined $val && looks_like_number($val);
-    if ($name =~ /_temp$/) {
-        return 'critical' if $val >= 80;
-        return 'warn'     if $val >= 65;
-        return 'info';
+my $token = '';
+for my $c (@TOKEN_CANDIDATES) {
+    next unless defined $c && length $c;
+    my $t = $c;
+    if (-f $c) {
+        chomp($t = `cat '$c' 2>/dev/null`);
     }
-    return 'critical' if exists $CRIT_AT{$name} && $val >= $CRIT_AT{$name};
-    return 'warn'     if exists $WARN_AT{$name} && $val >= $WARN_AT{$name};
-    return 'info';
+    $t =~ s/^\s+|\s+$//g;
+    if (length $t && $t ne 'changeme') { $token = $t; last; }
 }
 
-sub _ts { strftime('%Y-%m-%d %H:%M:%S', gmtime) }
-
-# ---------------------------------------------------------------------------
-# DB — reads same secrets files as the application
-# ---------------------------------------------------------------------------
-sub _connect {
-    my $secrets_dir = $ENV{COMSERV_SECRETS_DIR}
-        || "$ENV{HOME}/.comserv/secrets/dbi";
-
-    my $driver = 'mysql';
-    my %timeout_attr = (mysql_connect_timeout => 5);
-    if (eval { require DBD::MariaDB; 1 }) {
-        $driver = 'MariaDB';
-        %timeout_attr = (mariadb_connect_timeout => 5);
-    }
-
-    for my $name (qw(production_server zerotier_ency backup_ency local_ency)) {
-        my $file = "$secrets_dir/$name.json";
-        next unless -f $file;
-        open my $fh, '<', $file or next;
-        my $raw = do { local $/; <$fh> };
-        close $fh;
-        my $cfg = eval { $json_decode->($raw) } or next;
-        my $c;
-        if (ref($cfg) eq 'ARRAY') {
-            $c = $cfg->[0];
-        } elsif (ref($cfg) eq 'HASH') {
-            $c = exists $cfg->{host} ? $cfg : (values %$cfg)[0];
-        }
-        next unless ref($c) eq 'HASH' && $c->{host} && $c->{database};
-        next if $c->{host} =~ /^YOUR_/ || $c->{username} =~ /^YOUR_/;
-        my $dsn = "DBI:$driver:database=$c->{database};host=$c->{host};port=" . ($c->{port}||3306);
-        my $dbh = eval {
-            DBI->connect($dsn, $c->{username}, $c->{password},
-                { RaiseError => 1, PrintError => 0, AutoCommit => 1, %timeout_attr })
-        };
-        return $dbh if $dbh;
-    }
-    die "No database connection available\n";
+my $curl = `which curl 2>/dev/null`; chomp $curl;
+unless ($curl && -x $curl) {
+    print STDERR _ts() . " [hardware_monitor] FATAL: curl not found; cannot trigger app monitoring\n";
+    exit 2;
 }
 
-# ---------------------------------------------------------------------------
-# Metric collectors — return list of { name, value, text, unit }
-# ---------------------------------------------------------------------------
-my $IS_FREEBSD = ($^O eq 'freebsd');
-
-sub _cpu {
-    my ($l1, $l5, $l15, $cpus);
-    if ($IS_FREEBSD) {
-        my $avg = `sysctl -n vm.loadavg 2>/dev/null`; chomp $avg;
-        ($l1, $l5, $l15) = ($avg =~ /\{\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
-        $cpus = `sysctl -n hw.ncpu 2>/dev/null`; chomp $cpus; $cpus ||= 1;
-    } else {
-        open my $fh, '<', '/proc/loadavg' or return ();
-        ($l1, $l5, $l15) = split /\s+/, <$fh>; close $fh;
-        if (open my $cf, '<', '/proc/cpuinfo') {
-            $cpus = scalar grep { /^processor\s*:/ } <$cf>; close $cf;
-        }
-    }
-    $cpus ||= 1;
-    return () unless defined $l1;
-    my $pct = sprintf('%.1f', ($l1 / $cpus) * 100);
-    return (
-        { name => 'cpu_load_1m',  value => $l1,  unit => 'load' },
-        { name => 'cpu_load_5m',  value => $l5,  unit => 'load' },
-        { name => 'cpu_load_15m', value => $l15, unit => 'load' },
-        { name => 'cpu_load_pct', value => $pct, unit => '%'    },
-    );
+unless (length $token && $token ne 'changeme') {
+    print STDERR _ts() . " [hardware_monitor] FATAL: no shared monitoring token (looked in /usr/local/etc/comserv/hw_ingest_token, /data/nfs/comserv_secrets/hw_ingest_token, /mnt/nfs_data/comserv_secrets/hw_ingest_token, or \$HW_INGEST_TOKEN). Deploy must run once to provision it. Cannot authenticate to app nodes.\n";
+    exit 2;
 }
 
-sub _mem {
-    if ($IS_FREEBSD) {
-        my $total_bytes = `sysctl -n hw.physmem 2>/dev/null`; chomp $total_bytes;
-        my $page_size   = `sysctl -n hw.pagesize 2>/dev/null`; chomp $page_size;
-        my $free_pages  = `sysctl -n vm.stats.vm.v_free_count 2>/dev/null`; chomp $free_pages;
-        my $inact_pages = `sysctl -n vm.stats.vm.v_inactive_count 2>/dev/null`; chomp $inact_pages;
-        return () unless $total_bytes && $page_size;
-        $page_size  ||= 4096; $free_pages ||= 0; $inact_pages ||= 0;
-        my $avail_bytes = ($free_pages + $inact_pages) * $page_size;
-        my $used_pct = sprintf('%.1f', (($total_bytes - $avail_bytes) / $total_bytes) * 100);
-        return (
-            { name => 'mem_total_mb', value => int($total_bytes/1024/1024), unit => 'MB' },
-            { name => 'mem_used_pct', value => $used_pct, unit => '%' },
-        );
+my ($ok_node, $http);
+for my $url (@NODES) {
+    $url =~ s/^\s+|\s+$//g;
+    next unless $url;
+    # Single-line command: the original split the args across multiple lines via
+    # string concatenation, which under /bin/sh (dash, what cron uses) turns each
+    # line into a separate shell command and fails with "Illegal option -H".
+    my $cmd = "$curl -s -o /dev/null -w '%{http_code}' -X POST"
+            . " -H 'Content-Type: application/json'"
+            . " -H 'X-Ingest-Token: $token'"
+            . " --connect-timeout 10 --max-time 45 '$url' 2>/dev/null";
+    my $out = `$cmd`;
+    chomp $out;
+    if ($out eq '200') {
+        $ok_node = $url;
+        $http    = $out;
+        last;
     }
-    my %m;
-    open my $fh, '<', '/proc/meminfo' or return ();
-    while (<$fh>) { $m{$1} = $2 if /^(\w+):\s+(\d+)/ }
-    close $fh;
-    my $total = $m{MemTotal} || 1;
-    my $avail = $m{MemAvailable} || $m{MemFree} || 0;
-    my $used_pct  = sprintf('%.1f', (($total - $avail) / $total) * 100);
-    my $st = $m{SwapTotal} || 0;
-    my $swap_pct  = $st > 0
-        ? sprintf('%.1f', (($st - ($m{SwapFree}||0)) / $st) * 100) : 0;
-    return (
-        { name => 'mem_total_mb',  value => int($total/1024), unit => 'MB' },
-        { name => 'mem_used_pct',  value => $used_pct,        unit => '%'  },
-        { name => 'swap_used_pct', value => $swap_pct,        unit => '%'  },
-    );
+    $http = $out;   # last attempted code, for diagnostics
 }
 
-sub _uptime {
-    if ($IS_FREEBSD) {
-        my $boot = `sysctl -n kern.boottime 2>/dev/null`; chomp $boot;
-        my ($sec) = ($boot =~ /sec\s*=\s*(\d+)/);
-        return () unless $sec;
-        return ({ name => 'uptime_seconds', value => int(time() - $sec), unit => 'seconds' });
+if ($ok_node) {
+    print _ts() . " [hardware_monitor] monitoring triggered via $ok_node (HTTP $http)\n";
+
+    # Also trigger the logging-coverage audit on the same node (mirrors run): the
+    # app scan (system_log grouping + code grep for silent error swallowing) writes
+    # findings to the logging_audit table. Reuses the same token + node that just
+    # answered, so it only fires when the app is actually up.
+    (my $audit_url = $ok_node) =~ s{/admin/hardware_monitor/run\z}{/admin/logging_audit/run};
+    if ($audit_url ne $ok_node) {
+        my $acmd = "$curl -s -o /dev/null -w '%{http_code}' -X POST"
+                 . " -H 'Content-Type: application/json'"
+                 . " -H 'X-Ingest-Token: $token'"
+                 . " --connect-timeout 10 --max-time 45 '$audit_url' 2>/dev/null";
+        my $acode = `$acmd`; chomp $acode;
+        print _ts() . " [hardware_monitor] logging audit triggered via $audit_url (HTTP $acode)\n";
     }
-    open my $fh, '<', '/proc/uptime' or return ();
-    my ($secs) = split /\s+/, <$fh>; close $fh;
-    return ({ name => 'uptime_seconds', value => int($secs), unit => 'seconds' });
+    exit 0;
 }
 
-sub _disk {
-    my @out;
-    my $cmd = $^O eq 'freebsd'
-        ? 'df -k 2>/dev/null'
-        : 'df -Pk 2>/dev/null';
-    open my $fh, '-|', $cmd or return ();
-    while (<$fh>) {
-        next if /^Filesystem/;
-        chomp;
-        my ($dev, $total_k, $used_k, $avail_k, $pct_str, $mount) = split /\s+/, $_, 6;
-        next unless defined $mount;
-        next if $dev  =~ /^(tmpfs|devtmpfs|udev|overlay|shm|squashfs|none|loop)/;
-        next if $mount =~ m{^(/sys|/proc|/dev/pts|/run/|/snap/)};
-        (my $pct = $pct_str) =~ s/%//;
-        next unless looks_like_number($pct);
-        (my $safe = $mount) =~ s{/}{_}g;
-        $safe = 'root' unless $safe;
-        my $total_mb = $total_k > 0 ? int($total_k / 1024) : undef;
-        my $free_mb  = $avail_k > 0 ? int($avail_k / 1024) : 0;
-        push @out,
-            { name => "disk_used_pct$safe",  value => $pct+0,     unit => '%',  text => $dev },
-            { name => "disk_total_mb$safe",   value => $total_mb,  unit => 'MB', text => $dev },
-            { name => "disk_free_mb$safe",    value => $free_mb,   unit => 'MB', text => $dev };
-    }
-    close $fh;
-    return @out;
-}
-
-sub _temp {
-    my @out;
-    if ($IS_FREEBSD) {
-        for my $line (`sysctl -a 2>/dev/null`) {
-            if ($line =~ /^dev\.cpu\.(\d+)\.temperature:\s*([\d.]+)C/) {
-                push @out, { name => "cpu${1}_temp", value => $2+0, unit => 'C' };
-            }
-        }
-        return @out;
-    }
-    my $zone = 0;
-    for my $path (glob('/sys/class/thermal/thermal_zone*/temp')) {
-        open my $fh, '<', $path or next;
-        my $raw = <$fh>; close $fh; chomp $raw;
-        next unless looks_like_number($raw) && $raw > 0;
-        my $c = sprintf('%.1f', $raw / 1000);
-        (my $type_path = $path) =~ s/temp$/type/;
-        my $label = "cpu${zone}_temp";
-        if (open my $tf, '<', $type_path) { my $t = <$tf>; chomp $t; $label = lc($t) . '_temp'; close $tf; }
-        push @out, { name => $label, value => $c+0, unit => 'C' };
-        $zone++;
-    }
-    unless (@out) {
-        my $cpu_num = 0;
-        for my $hwmon (sort glob('/sys/class/hwmon/hwmon*')) {
-            my $name_file = "$hwmon/name";
-            next unless -f $name_file;
-            open my $nf, '<', $name_file or next;
-            my $name = <$nf>; close $nf; chomp $name;
-            next unless $name eq 'coretemp';
-            my $max_raw = 0;
-            for my $input_file (glob("$hwmon/temp*_input")) {
-                open my $tf, '<', $input_file or next;
-                my $raw = <$tf>; close $tf; chomp $raw;
-                next unless looks_like_number($raw) && $raw > 0;
-                $max_raw = $raw if $raw > $max_raw;
-            }
-            next unless $max_raw > 0;
-            my $c = sprintf('%.1f', $max_raw / 1000);
-            push @out, { name => "cpu${cpu_num}_max_temp", value => $c+0, unit => 'C' };
-            $cpu_num++;
-        }
-    }
-    return @out;
-}
-
-sub _ipmi {
-    my @out;
-    my $ipmitool = `which ipmitool 2>/dev/null`; chomp $ipmitool;
-    return () unless $ipmitool && -x $ipmitool;
-
-    for my $line (`ipmitool sdr type "Power Supply" 2>/dev/null`) {
-        chomp $line; next unless $line =~ /\S/;
-        my ($name, undef, $status, $entity, $desc) = split /\s*\|\s*/, $line, 5;
-        next unless defined $status;
-        ($name = lc($name // '')) =~ s/\s+/_/g;
-        $status  =~ s/^\s+|\s+$//g if $status;
-        $entity  =~ s/^\s+|\s+$//g if $entity;
-        $desc    =~ s/^\s+|\s+$//g if $desc;
-        my $label;
-        if ($entity && $entity =~ /^(\d+)\.(\d+)$/) {
-            $label = "ipmi_ps${2}_${name}";
-        } else {
-            $label = "ipmi_psu_$name";
-        }
-        push @out, { name => $label, text => ($desc || $status), unit => undef };
-    }
-    my $ps_num = 1;
-    for my $line (`ipmitool sdr type "Current" 2>/dev/null`) {
-        chomp $line; next unless $line =~ /\S/;
-        my ($name, undef, $status, $entity, undef) = split /\s*\|\s*/, $line, 5;
-        next unless defined $status && $status =~ /ok/i;
-        my ($amps) = ($line =~ /([\d.]+)\s*Amps/i);
-        next unless defined $amps;
-        push @out, { name => "ipmi_ps${ps_num}_current", value => $amps+0, unit => 'A' };
-        $ps_num++;
-    }
-
-    for my $sensor_name ("System Level", "Pwr Consumption", "Total Power") {
-        my @lines = `ipmitool sensor get "$sensor_name" 2>/dev/null`;
-        next unless @lines;
-        for my $line (@lines) {
-            if ($line =~ /Sensor Reading\s*:\s*([\d.]+)/) {
-                push @out, { name => 'ipmi_power_consumption', value => $1+0, unit => 'Watts' };
-                last;
-            }
-        }
-        last if grep { $_->{name} eq 'ipmi_power_consumption' } @out;
-    }
-    for my $sensor_name ("Inlet Temp", "Ambient Temp", "System Inlet Temp") {
-        my @lines = `ipmitool sensor get "$sensor_name" 2>/dev/null`;
-        next unless @lines;
-        for my $line (@lines) {
-            if ($line =~ /Sensor Reading\s*:\s*([\d.]+)/) {
-                push @out, { name => 'ipmi_inlet_temp', value => $1+0, unit => 'C' };
-                last;
-            }
-        }
-        last if grep { $_->{name} eq 'ipmi_inlet_temp' } @out;
-    }
-    for my $line (`ipmitool sdr type "Temperature" 2>/dev/null`) {
-        chomp $line;
-        my ($sname, undef, $status, undef, undef) = split /\s*\|\s*/, $line, 5;
-        next unless defined $status && $status =~ /ok/i;
-        next unless $sname;
-        $sname =~ s/^\s+|\s+$//g;
-        next if $sname =~ /inlet|ambient/i;
-        my ($val) = ($line =~ /([\d.]+)\s*degrees/i);
-        next unless defined $val;
-        (my $label = lc($sname)) =~ s/\s+/_/g;
-        $label = "ipmi_${label}_temp";
-        push @out, { name => $label, value => $val+0, unit => 'C' };
-    }
-    return @out;
-}
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-my $host = hostname() || 'unknown';
-my $sys  = "$host:monitor";
-
-my $dbh = eval { _connect() };
-die "Cannot connect to DB: $@\n" unless $dbh;
-
-my $sth_hw = $dbh->prepare(
-    'INSERT INTO hardware_metrics
-     (timestamp,system_identifier,hostname,metric_name,metric_value,metric_text,unit,level)
-     VALUES (NOW(),?,?,?,?,?,?,?)'
-);
-
-my $sth_log = $dbh->prepare(
-    'INSERT INTO system_log
-     (timestamp,level,subroutine,message,sitename,system_identifier)
-     VALUES (NOW(),?,?,?,?,?)'
-);
-
-for my $m (_cpu(), _mem(), _uptime(), _disk(), _temp(), _ipmi()) {
-    my $lv = _level($m->{name}, $m->{value});
-    $sth_hw->execute($sys, $host,
-        $m->{name}, $m->{value}, $m->{text}, $m->{unit}, $lv);
-
-    if ($lv eq 'warn' || $lv eq 'critical' || $lv eq 'error') {
-        my $val_str = defined $m->{value} ? "$m->{value}" . ($m->{unit} ? " $m->{unit}" : '') : ($m->{text}//'');
-        my $msg = "[HARDWARE][$host] $m->{name} = $val_str ($lv)";
-        eval { $sth_log->execute($lv, 'hardware_monitor.pl', $msg, 'CSC', $sys) };
-    }
-}
-
-$dbh->disconnect();
+# No node answered → containers down / app unreachable. This is the OUTAGE signal.
+# Per design A: the ONLY channel available when the app is dark is this script's
+# stderr → root@proxmox720 cron mail. The app cannot record it (no DB/auth).
+print STDERR _ts() . " [hardware_monitor] CRITICAL: no application node reachable — app/monitoring DOWN. "
+                   . "Tried: " . join(', ', @NODES) . " (last HTTP: " . ($http // 'none') . ")\n";
+exit 1;

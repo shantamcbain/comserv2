@@ -185,7 +185,7 @@
         <td>[% record.get_column('scheduled_end') %]</td></tr>
     [% END %]
     <tr><th align="left">Project ID</th>
-        <td>[% record.get_column('project_id') || '—' %]</td></tr>
+        <td>[% IF record.project %]<a href="/project/details?project_id=[% record.project.id %]">[% record.project.name | html %]</a>[% ELSE %][% record.get_column('project_id') || '—' %][% END %]</td></tr>
     <tr><th align="left">Group</th>
         <td>[% record.get_column('group_of_poster') | html %]</td></tr>
     <tr><th align="left">Posted By</th>

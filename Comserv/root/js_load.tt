@@ -313,17 +313,6 @@
 </button>
 [% END %]
 
-[%# Chat with AI button - lower right (hidden inside the AI2 editor popup/window) %]
-[% IF c.session.user_id && !c.request.uri.match('/ai2/') %]
-<a href="#"
-   onclick="if(window.openChat) window.openChat(); return false;"
-   class="btn btn-success btn-sm"
-   style="position:fixed; bottom:24px; right:24px; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.3); border-radius:20px;"
-   title="Chat with AI">
-    💬 Chat with AI
-</a>
-[% END %]
-
 [%# ---------------------------------------------------------------------------
    SERVER-RENDERED AI model <select> for the floating "Chat with AI" widget.
    Rendered here (every page) from the catalog in stash so the widget never has

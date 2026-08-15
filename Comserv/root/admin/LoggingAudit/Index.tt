@@ -1,0 +1,83 @@
+[% META
+   title = "Logging Audit"
+   description = "Logging-coverage audit: system_log scan + silent-error-swallow code scan"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-08-15"
+%]
+
+<style>
+.la-table       { width:100%; border-collapse:collapse; }
+.la-table th    { text-align:left; padding:6px 8px; border-bottom:2px solid var(--border-color, #ccc); }
+.la-table td    { padding:6px 8px; border-bottom:1px solid var(--border-color, #eee); vertical-align:top; }
+.sev-critical   { color:var(--danger-color, #c00); font-weight:bold; }
+.sev-warning    { color:var(--warning-color, #b80); font-weight:bold; }
+.sev-info       { color:var(--info-color, #06c); }
+.la-code        { font-family:monospace; font-size:0.85em; color:var(--text-muted-color, #666); }
+.la-empty       { padding:20px; text-align:center; color:var(--text-muted-color, #888); }
+</style>
+
+<div class="app-container">
+    <div class="page-header page-header-actions">
+        <h1>Logging Audit</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <form method="post" action="[% trigger_url %]" style="display:inline;">
+                <button type="submit" class="btn btn-primary">&#128270; Run scan now</button>
+            </form>
+            <a href="[% c.uri_for('/admin/hardware_monitor') %]" class="btn btn-secondary">&#128268; Hardware Monitor</a>
+        </div>
+    </div>
+
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.status_msg %]
+        <div class="alert alert-success">[% c.flash.status_msg | html %]</div>
+    [% END %]
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+
+    <p class="muted">
+        Latest scan run: <strong>[% latest_run | html %]</strong> &mdash;
+        findings from the most recent cron or manual scan. The cron runs
+        <code>/admin/logging_audit/run</code> (token-guarded, like the hardware monitor).
+    </p>
+
+    [% IF findings.size %]
+        <table class="la-table">
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Scan</th>
+                    <th>Target / Area</th>
+                    <th>Finding</th>
+                    <th>Detail</th>
+                    <th>File : Line</th>
+                    <th>Recommendation</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH f IN findings %]
+                    <tr>
+                        <td class="sev-[% f.severity %]">[% f.severity | upper %]</td>
+                        <td>[% f.scan_type | html %]</td>
+                        <td>[% f.target | html %]</td>
+                        <td>[% f.finding | html %]</td>
+                        <td>[% f.detail | html %]</td>
+                        <td class="la-code">[% IF f.file_path %][% f.file_path | html %][% IF f.line_no %]:[% f.line_no %][% END %][% END %]</td>
+                        <td>[% f.recommendation | html %]</td>
+                    </tr>
+                [% END %]
+            </tbody>
+        </table>
+    [% ELSE %]
+        <div class="la-empty">
+            No findings yet. Run <code>script/hardware_monitor.pl</code> (or click
+            &ldquo;Run scan now&rdquo;) to populate. Ensure the <code>logging_audit</code>
+            table has been deployed via schema-compare.
+        </div>
+    [% END %]
+</div>

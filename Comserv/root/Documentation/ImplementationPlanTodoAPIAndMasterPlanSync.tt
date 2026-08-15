@@ -20,6 +20,7 @@
         <p><strong>Problem</strong>: Text-based DailyPlan.tt and PriorityTodo.md require manual updates and AI assistance to stay current.</p>
         <p><strong>Solution</strong>: Migrate to application-driven workflow with REST API and database-driven Master Plan that auto-syncs.</p>
         <p><strong>Benefit</strong>: Reduces overhead, keeps Master Plan in sync automatically, enables IDE agents to create tasks directly without manual intervention.</p>
+        <p><strong>Coordinator:</strong> this implementation plan is a PHASE of the <strong>Planning System project</strong> (#138 PLANNING — see <a href="/project/details?project_id=138">#138</a>) and follows the <a href="/Documentation/PlanningLanguageStandard">Planning Language Standard</a> (PROJECT = PLAN, PHASE = sub-project, STEP = todo, GATE = done-when). Note: the "DB-driven Master Plan" described here is a separate concept from the coordinator doc at <a href="/Documentation/MASTER_PLAN">/Documentation/MASTER_PLAN</a>.</p>
     </div>
 
     <hr style="margin: 30px 0;" />

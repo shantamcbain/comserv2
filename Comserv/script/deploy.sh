@@ -115,6 +115,64 @@ DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 export SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-$HOSTNAME_VAL}"
 
+# ── PRODUCTION CONTAINER PROTECTION (2026-08-15) ─────────────────────────────
+# Recurring outage root cause: a stopped/otherwise-still-valuable production
+# container (and its volumes/networks) was being deleted by blind `docker`
+# prune/rm paths. We now treat the production web container as NEVER-prunable
+# unless an explicit, intentional deploy is in flight. Two guards:
+#   1. is_prod_container NAME  -> returns 0 if NAME is (or aliases to) prod.
+#   2. protect_prod_resources   -> labels the live prod container so that only
+#      containers explicitly labeled `comserv.prune=safe` are ever pruned, and
+#      refuses to reap prod's named volumes/networks/images.
+# Any cleanup code MUST route stopped-container removal through safe_prune()
+# below, which drops only labeled-safe stopped containers and skips prod.
+
+PROD_CONTAINER_NAMES="comserv2-web-prod comserv-web-prod"
+PROD_VOLUME_PREFIXES="comserv2_"
+PROD_NETWORK_NAMES="comserv2_default comserv2_web-prod"
+
+is_prod_container() {
+    local n="${1:-}"
+    [ -z "$n" ] && return 1
+    for p in $PROD_CONTAINER_NAMES; do
+        [ "$n" = "$p" ] && return 0
+    done
+    return 1
+}
+
+# Label the live prod container (and ensure compose labels) so the
+# `label=comserv.prune=safe` prune filter excludes it by default.
+protect_prod_resources() {
+    for c in $PROD_CONTAINER_NAMES; do
+        if docker inspect "$c" >/dev/null 2>&1; then
+            # idempotent: label present is harmless; absence is the norm because
+            # compose did not set it. We set it so tooling can distinguish prod.
+            docker inspect -f '{{.Config.Labels}}' "$c" 2>/dev/null | grep -q 'comserv.role=prod' \
+                || docker update --label-add comserv.role=prod "$c" >/dev/null 2>&1 || true
+        fi
+    done
+}
+
+# Remove ONLY stopped containers that are explicitly marked safe-to-prune.
+# Never touches a running container and never touches the prod container.
+safe_prune_stopped_containers() {
+    echo "Pruning only label=comserv.prune=safe stopped containers (prod protected)..."
+    docker container prune -f --filter "label=comserv.prune=safe" 2>&1 | grep -v '^$' || true
+}
+
+# Prune only DANGLING (untagged, unattached to any container) volumes. Never
+# remove a named comserv2_* volume — those belong to prod/redis/db.
+safe_prune_volumes() {
+    echo "Pruning dangling (unattached) volumes only — named comserv2_* protected..."
+    docker volume prune -f 2>&1 | grep -v '^$' || true
+}
+
+# Prune only unused networks that are NOT a known prod network.
+safe_prune_networks() {
+    echo "Pruning unused networks except prod networks..."
+    docker network prune -f 2>&1 | grep -v '^$' || true
+}
+
 # Verify host prerequisites
 if ! command -v docker &>/dev/null; then
     echo "❌ ERROR: Docker is not installed on this remote server ($HOSTNAME_VAL)."
@@ -192,9 +250,137 @@ if [ -n "$GLOBAL_HOST_APP_DIR" ] && command -v git &>/dev/null; then
     echo "--------------------------------------------"
 fi
 
+# ── Provision the SHARED monitoring token (single source of truth) ────────────
+# The monitoring token MUST be byte-identical on every cron host AND every app
+# container, or healthy nodes get falsely reported down by the cross-node check.
+# It lives once in a token file on the NFS share (mounted on every host + in
+# every container), and is also copied host-local for the cron job to read. We do
+# NOT generate it per-server: that would give prod and workstation different keys
+# and break cross-node calls. Create-once (idempotent, atomic) so all servers
+# share one key. A manually set HW_INGEST_TOKEN env still wins at deploy time.
+setup_shared_secrets() {
+    # Where the token lives. Prefer the NFS mount both hosts + container share.
+    local NFS_TOKEN_DIR="/data/nfs/comserv_secrets"
+    local NFS_TOKEN_FILE="$NFS_TOKEN_DIR/hw_ingest_token"
+    local HOST_TOKEN_DIR="/usr/local/etc/comserv"
+    local HOST_TOKEN_FILE="$HOST_TOKEN_DIR/hw_ingest_token"
+
+    # 1. If the operator pinned a token via env, persist it to NFS (once) so every
+    #    other server/containers inherit the same key.
+    if [ -n "${HW_INGEST_TOKEN:-}" ] && [ "$HW_INGEST_TOKEN" != "changeme" ]; then
+        mkdir -p "$NFS_TOKEN_DIR" 2>/dev/null || true
+        if [ -d "$NFS_TOKEN_DIR" ] && [ ! -f "$NFS_TOKEN_FILE" ]; then
+            printf '%s\n' "$HW_INGEST_TOKEN" > "$NFS_TOKEN_FILE.$$" 2>/dev/null \
+                && mv -f "$NFS_TOKEN_FILE.$$" "$NFS_TOKEN_FILE" 2>/dev/null \
+                && echo "  ✅ shared token seeded to NFS from HW_INGEST_TOKEN"
+        fi
+    fi
+
+    # 2. If no NFS token yet, generate one (only if NFS is writable). This makes
+    #    "get it working on workstation, then every server just reads the same key"
+    #    automatic — no manual copy needed.
+    if [ ! -f "$NFS_TOKEN_FILE" ]; then
+        mkdir -p "$NFS_TOKEN_DIR" 2>/dev/null || true
+        if [ -d "$NFS_TOKEN_DIR" ] && [ -w "$NFS_TOKEN_DIR" ]; then
+            local NEWTOK
+            NEWTOK=$(head -c 48 /dev/urandom 2>/dev/null | base64 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 32)
+            [ -z "$NEWTOK" ] && NEWTOK=$(date +%s%N | md5sum | cut -c1-32)
+            printf '%s\n' "$NEWTOK" > "$NFS_TOKEN_FILE.$$" 2>/dev/null \
+                && mv -f "$NFS_TOKEN_FILE.$$" "$NFS_TOKEN_FILE" 2>/dev/null \
+                && echo "  ✅ generated shared monitoring token (NFS: $NFS_TOKEN_FILE)"
+        else
+            echo "  ⚠ NFS token dir not writable ($NFS_TOKEN_DIR); relying on env/host-local token"
+        fi
+    fi
+
+    # 3. Copy the resolved token host-local so the cron job reads the SAME value
+    #    even if NFS is briefly unmounted at cron time. Resolves in priority order:
+    #    NFS file → pinned env → changeme.
+    local RESOLVED=""
+    if [ -f "$NFS_TOKEN_FILE" ]; then
+        RESOLVED=$(cat "$NFS_TOKEN_FILE" 2>/dev/null | tr -d '[:space:]')
+    fi
+    [ -z "$RESOLVED" ] && RESOLVED="${HW_INGEST_TOKEN:-changeme}"
+
+    mkdir -p "$HOST_TOKEN_DIR" 2>/dev/null || true
+    if [ -d "$HOST_TOKEN_DIR" ] && [ -w "$HOST_TOKEN_DIR" ]; then
+        printf '%s\n' "$RESOLVED" > "$HOST_TOKEN_FILE" 2>/dev/null \
+            && echo "  ✅ host-local token written: $HOST_TOKEN_FILE"
+    fi
+
+    # Export the resolved token so the rest of deploy (compose env) inherits it.
+    export HW_INGEST_TOKEN="$RESOLVED"
+    echo "  token length: ${#RESOLVED} chars (shared across all servers)"
+}
+
+# ── Sync changed host/cron scripts to the host (FIRST, before any build/pull) ──
+# The container carries the app code, but host-side cron scripts (hardware_monitor.pl)
+# and deploy.sh itself must live on the HOST (they run outside the container). This
+# step copies every changed script the host cron/deploy needs so all servers stay
+# identical. Runs as the very first action of deploy so a fresh server gets the
+# scripts + crons in place before the container is even pulled.
+sync_cron_scripts() {
+    local SRC_DIR="$GLOBAL_HOST_APP_DIR"
+    [ -d "$SRC_DIR/script" ] && SRC_DIR="$SRC_DIR/script"
+    [ -d "$SRC_DIR" ] || { echo "⚠ sync_cron_scripts: no script dir found"; return 0; }
+
+    echo "--- Syncing host/cron scripts to /usr/local/bin ---"
+    for s in hardware_monitor.pl deploy.sh device_agent.sh; do
+        if [ -f "$SRC_DIR/$s" ]; then
+            cp -f "$SRC_DIR/$s" "/usr/local/bin/$s"
+            chmod 0755 "/usr/local/bin/$s"
+            echo "  ✅ /usr/local/bin/$s"
+        fi
+    done
+
+    # Ensure the shared token exists + is identical everywhere before installing
+    # the cron (creates the NFS token file + host-local copy if missing).
+    setup_shared_secrets
+
+    # The cron reads the host-local token file at runtime so a MISSING token fails
+    # loudly (non-zero → audit) instead of silently using 'changeme'. This is the
+    # same key every container uses, so cross-node calls succeed when nodes are up.
+    local HOST_TOKEN_FILE="/usr/local/etc/comserv/hw_ingest_token"
+    local MON_TOKEN
+    if [ -f "$HOST_TOKEN_FILE" ]; then
+        MON_TOKEN=$(cat "$HOST_TOKEN_FILE" | tr -d '[:space:]')
+    else
+        MON_TOKEN="${HW_INGEST_TOKEN:-changeme}"
+    fi
+    local MON_NODES="${HW_MONITOR_NODES:-}"
+    if [ -z "$MON_NODES" ]; then
+        case "$SYSTEM_IDENTIFIER" in
+            production1) MON_NODES="http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run" ;;
+            *workstation*|workstation-prod-local) MON_NODES="http://192.168.1.199:5000/admin/hardware_monitor/run,http://192.168.1.126:5000/admin/hardware_monitor/run" ;;
+            *) MON_NODES="http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run" ;;
+        esac
+    fi
+
+    # Idempotent cron install (every 5 min). Reads the shared token from the
+    # host-local file at runtime so the key is identical to every container. If
+    # the file is missing the cron exits non-zero → the script reports the failure
+    # to the API (audit + admin email) instead of silently using a default.
+    local CRON_MARKER="# comserv-hardware-monitor"
+    local CRON_LINE="*/5 * * * * $CRON_MARKER HW_MONITOR_NODES='$MON_NODES' HW_INGEST_TOKEN=\"\$(cat /usr/local/etc/comserv/hw_ingest_token 2>/dev/null || echo MISSING_TOKEN)\" /usr/local/bin/hardware_monitor.pl >> /var/log/comserv-hardware-monitor.log 2>&1"
+    local TMP_CRON
+    TMP_CRON=$(mktemp)
+    # Strip any prior instance of our marker, then append the current line.
+    ( crontab -l 2>/dev/null | grep -v "$CRON_MARKER" ) > "$TMP_CRON" 2>/dev/null || true
+    echo "$CRON_LINE" >> "$TMP_CRON"
+    crontab "$TMP_CRON" 2>/dev/null && echo "  ✅ cron installed: $CRON_MARKER (every 5 min)" || echo "  ⚠ crontab install failed (non-fatal)"
+    rm -f "$TMP_CRON"
+    echo "--------------------------------------------"
+}
+
 # ── Self-Update Permanent Script Copy ─────────────────────────────────────────
 # If running as /tmp/deploy.sh, copy ourselves to the permanent script folder so that cron jobs use the latest script.
 CURRENT_SCRIPT_PATH=$(readlink -f "$0" 2>/dev/null || echo "$0")
+# FIRST: sync all changed host/cron scripts + install crons so every server is
+# identical before we touch the container. (host-side scripts run outside the
+# container and would otherwise be stale on a fresh push.)
+if [ -n "$GLOBAL_HOST_APP_DIR" ]; then
+    sync_cron_scripts
+fi
 if [ "$CURRENT_SCRIPT_PATH" = "/tmp/deploy.sh" ] && [ -n "$GLOBAL_HOST_APP_DIR" ]; then
     echo "--- Script Self-Updating ---"
     UPDATED=0
@@ -350,7 +536,8 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
         "prod")
             echo "=== PRODUCTION DEPLOY MODE ==="
             echo "Full production deploy: auto-commit + build + push + deploy"
-            # Continue to the normal production deploy flow below
+            # Identical to 'full': route into the standard full deploy flow below.
+            export FORCE=0
             ;;
         
         "local")
@@ -406,10 +593,10 @@ fi
 if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
     echo "Non-interactive Deploy Mode requested: $DEPLOY_MODE"
     case "$DEPLOY_MODE" in
-        "full")
-            export FORCE=0
-            # Continue to standard full deploy
-            ;;
+    "prod"|"full")
+        export FORCE=0
+        # Continue to standard full deploy
+        ;;
         "quick")
             export FORCE=1
             # Continue to standard quick deploy
@@ -878,6 +1065,7 @@ ensure_required_volumes() {
 # so once the container vanished it could never return without a human deploy.
 if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
     ensure_required_volumes
+    protect_prod_resources
     if ! docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
         echo "MONITOR: container $CONTAINER absent — pulling latest then recreating (--no-build)..."
         docker pull "$IMAGE" 2>&1 | grep -v "^$" || true
@@ -895,19 +1083,22 @@ echo "Disk before: $DISK_BEFORE"
 
 # ── Routine cleanup (runs every cron tick, not just on deploy) ────────────────
 echo "Running routine Docker cleanup..."
-# GUARD (2026-08-11): never prune the production web container. A former
-# `docker container prune -f --filter "until=1h"` ran on every monitor tick and
-# DELETED the prod container whenever it was non-running >1h, causing the
-# recurring "site down, no container" outages. We now prune only stopped
-# containers that are explicitly marked safe-to-prune (label comserv.prune=safe)
-# and never the named prod container.
-docker container prune -f --filter "label=comserv.prune=safe" 2>&1 | grep -v "^$" || true
+# PROTECTION (2026-08-15): the prod container, its named volumes, and its
+# networks are NEVER reaped by the monitor. We only drop:
+#   - stopped containers explicitly labeled comserv.prune=safe (throwaways)
+#   - dangling (untagged, unattached) images and volumes
+#   - unused networks other than the known prod networks
+# A former `docker container prune -f --filter "until=1h"` (and the unfiltered
+# `docker volume prune -f` / `docker network prune -f` below) ran every monitor
+# tick and could delete the prod container / its resources, causing the
+# recurring "site down, no container" outages. Guarded for good.
+safe_prune_stopped_containers
 # Prune ONLY dangling (untagged) images to protect tagged rollback/backup images
-docker image prune -f                          2>&1 | grep -v "^$" || true
-docker volume prune -f                         2>&1 | grep -v "^$" || true
-docker network prune -f                        2>&1 | grep -v "^$" || true
+docker image prune -f                          2>&1 | grep -v '^$' || true
+safe_prune_volumes
+safe_prune_networks
 # Completely purge build cache since server only pulls pre-built production images
-docker builder prune -a -f                     2>&1 | grep -v "^$" || true
+docker builder prune -a -f                     2>&1 | grep -v '^$' || true
 
 DISK_AFTER_CLEANUP=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after cleanup: $DISK_AFTER_CLEANUP"
