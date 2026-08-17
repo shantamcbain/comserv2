@@ -1097,6 +1097,30 @@ in any worktree (e.g. a local-only branch with no worktree).
 
 sub worktree_checkout_path_for_branch {
     my ($self, $c, $branch) = @_;
+
+    # Primary strategy: scan the worktree base directory and check each
+    # checkout's ACTUAL current branch with `git branch --show-current`. This
+    # is robust even when `git worktree list --porcelain` has stale/corrupt
+    # metadata (e.g. a worktree whose directory was renamed but whose git
+    # bookkeeping still points at the old name — git-dev's porcelain entry
+    # drops its `worktree <path>` line, so list_worktrees records it with no
+    # path). Scanning the dirs directly always finds the real checkout.
+    my $cfg  = eval { _worktree_config() } // { base_dir => "$ENV{HOME}/.comserv/worktrees" };
+    my $base = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    if ($base && -d $base) {
+        opendir(my $dh, $base) or return undef;
+        my @entries = grep { -e "$base/$_/Comserv/.git" } readdir($dh);
+        closedir($dh);
+        for my $name (@entries) {
+            my $dir = "$base/$name/Comserv";
+            my $b   = $self->_run($c, 'branch', '--show-current',
+                { repo => $dir })->{output};
+            chomp $b if defined $b;
+            return $dir if defined $b && length $b && $b eq $branch;
+        }
+    }
+
+    # Fallback: trust list_worktrees (works for well-formed worktree metadata).
     my $wts = $self->list_worktrees($c) or return undef;
     for my $wt (@$wts) {
         next unless $wt->{branch} && $wt->{branch} eq $branch;
