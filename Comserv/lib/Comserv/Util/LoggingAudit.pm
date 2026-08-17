@@ -3,6 +3,7 @@ package Comserv::Util::LoggingAudit;
 use strict;
 use warnings;
 use File::Spec;
+use DBI ();
 use Comserv::Util::Logging;
 
 # Logging-coverage audit. Mirrors the hardware_monitor pattern: a token-guarded
@@ -33,7 +34,50 @@ sub generate_run_id {
 # Scan window (days) for the log grouping.
 sub LOG_SCAN_DAYS { 7 }
 
-# Entry point. Returns a summary hash { run_id, log => {...}, code => {...} }.
+# Robust error logger. Builds the full message from a pre-captured scalar BEFORE
+# any nested eval runs, so a successful log_with_details() call (which internally
+# uses eval and resets $@) can never erase the detail. Falls back to the plain
+# catalyst logger if log_with_details itself dies, and never emits an empty
+# message. This is the permanent fix for the "log scan failed: " (empty-detail)
+# todo that kept re-opening: the true cause is always preserved verbatim in the
+# message AND in $summary->{...}{error}.
+sub _safe_log_error {
+    my ($self, $c, $area, $raw_err) = @_;
+    my $msg = "$raw_err";
+    $msg =~ s/\s+/ /g;
+    $msg = '(no detail captured)' if $msg eq '';
+    my $full = "$area failed: $msg";
+    eval {
+        Comserv::Util::Logging->instance->log_with_details(
+            $c, 'error', __FILE__, __LINE__, "logging_audit.$area", $full
+        );
+        1;
+    } or do {
+        my $inner = $@ || 'logger error';
+        $c->log->error("$full [logger-fallback: $inner]") if $c->can('log');
+    };
+    return $msg;
+}
+
+# Run a DBI selectall_arrayref against the Ency handle with a one-shot reconnect
+# + retry. The log-scan issues long GROUP BY queries over a multi-million-row
+# system_log table; if the shared handle drops (idle timeout / server kill) mid
+# query we must reconnect and retry ONCE rather than surface a "Lost connection"
+# error. Mirrors the reconnect guard already used by the code-scan inserts.
+sub _run_query {
+    my ($self, $schema, $sql, $bind) = @_;
+    my $rows = eval { $schema->storage->dbh->selectall_arrayref($sql, { Slice => {} }, @$bind) };
+    return $rows if defined $rows;
+    # Handle dropped mid-query: reconnect and retry once.
+    eval {
+        $schema->storage->disconnect;
+        $schema->storage->dbh;
+        $rows = $schema->storage->dbh->selectall_arrayref($sql, { Slice => {} }, @$bind);
+    };
+    return $rows;
+}
+
+# Entry point. Returns a summary hash { run_id, log => {...}, code => {} }.
 sub run_scan {
     my ($self, $c, %opts) = @_;
 
@@ -55,20 +99,20 @@ sub run_scan {
     eval {
         my $days = LOG_SCAN_DAYS;
 
-        my $by_level = $schema->storage->dbh->selectall_arrayref(
+        my $by_level = $self->_run_query($schema,
             "SELECT level, COUNT(*) AS cnt FROM system_log
              WHERE timestamp >= NOW() - INTERVAL ? DAY
              GROUP BY level ORDER BY cnt DESC",
-            { Slice => {} }, $days
+            [ $days ]
         );
         $summary->{log}{by_level} = $by_level // [];
 
-        my $by_area = $schema->storage->dbh->selectall_arrayref(
+        my $by_area = $self->_run_query($schema,
             "SELECT subroutine, level, COUNT(*) AS cnt FROM system_log
              WHERE timestamp >= NOW() - INTERVAL ? DAY
              GROUP BY subroutine, level
              ORDER BY cnt DESC LIMIT 25",
-            { Slice => {} }, $days
+            [ $days ]
         );
         $summary->{log}{by_area} = $by_area // [];
 
@@ -92,13 +136,10 @@ sub run_scan {
     };
     my $log_err = $@;
     if ($log_err) {
-        $summary->{log}{error} = "$log_err";
-        # Best-effort alert. Capture $log_err BEFORE the inner eval: a successful
-        # log_with_details() call resets $@ to "", which would otherwise clobber
-        # the real error and emit an empty "log scan failed: " message (the bug
-        # that keeps re-opening this todo with no detail).
-        eval { Comserv::Util::Logging->instance->log_with_details($c, 'error', __FILE__, __LINE__,
-            'logging_audit.log_scan', "log scan failed: $log_err"); };
+        # DBI can report via $DBI::errstr instead of $@ when RaiseError is off.
+        $log_err ||= $DBI::errstr if defined $DBI::errstr;
+        my $detail = $self->_safe_log_error($c, 'log_scan', $log_err);
+        $summary->{log}{error} = $detail;
     }
 
     # ---- 2) CODE SCAN ------------------------------------------------------
@@ -111,7 +152,7 @@ sub run_scan {
             $summary->{code}{error} = "code_scan skipped: lib dir not found [$lib_dir]";
             return;
         }
-        my @sites = $self->_find_silent_swallow($lib_dir);
+        my @sites = @{ $self->_find_silent_swallow($lib_dir) // [] };
         $summary->{code}{sites} = \@sites;
 
         for my $s (@sites) {
@@ -149,17 +190,18 @@ sub run_scan {
     };
     my $code_err = $@;
     if ($code_err) {
-        $summary->{code}{error} = "$code_err" unless defined $summary->{code}{error};
-        # Same $@-clobber fix as the log scan: capture before the inner eval.
-        eval { Comserv::Util::Logging->instance->log_with_details($c, 'error', __FILE__, __LINE__,
-            'logging_audit.code_scan', "code scan failed: $code_err"); };
+        $code_err ||= $DBI::errstr if defined $DBI::errstr;
+        my $detail = $self->_safe_log_error($c, 'code_scan', $code_err);
+        $summary->{code}{error} = $detail unless defined $summary->{code}{error};
     }
 
     # ---- Summary log (audit trail of the audit) ----------------------------
     my $log_n = scalar(@{ $summary->{code}{sites} // [] });
     eval { Comserv::Util::Logging->instance->log_with_details($c, 'info', __FILE__, __LINE__,
         'logging_audit.run',
-        "[LOG-AUDIT] run=$run_id code_sites=$log_n log_error=" . ($summary->{log}{error}//'none')); };
+        "[LOG-AUDIT] run=$run_id code_sites=$log_n"
+        . " log_error=" . ($summary->{log}{error} // 'none')
+        . " code_error=" . ($summary->{code}{error} // 'none')); };
 
     return $summary;
 }
