@@ -55,11 +55,18 @@ tr.level-critical    { background:#f8d7da; font-weight:bold; }
                 <div class="data-container">
                     <p><strong>NFS Log Directory:</strong> [% nfs_dir | html %]</p>
                     <p><strong>Alert Level (Email Notification):</strong> <span class="badge">[% email_threshold | html %]</span></p>
+                    <p><strong>system_log table size:</strong> <span class="badge badge-info"><span class="system-log-rows-value">[% system_log_rows | html %]</span> rows</span>
+                        <span id="system_log_dedupe_status">[% IF dedupe_running %]<span class="badge badge-warning">dedupe in progress</span>[% END %]</span>
+                    </p>
                     <div class="form-actions">
                         <a href="[% c.uri_for('/admin/logging/settings') %]" class="btn btn-secondary">Change Settings</a>
                         <form method="post" action="[% c.uri_for('/admin/logging/rotate') %]" class="form-inline">
                             <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to rotate the log file manually?')">Rotate Log Now</button>
                         </form>
+                        <form method="post" action="[% c.uri_for('/admin/logging/dedupe') %]" class="form-inline" data-dedupe-trigger>
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Collapse duplicate system_log rows? Redundant entries are removed, keeping an occurrence count + first/last-seen per unique (level, area, message, day). The work runs in the background.')">Deduplicate system_log</button>
+                        </form>
+                        <span id="system_log_dedupe_running" data-running="[% dedupe_running ? '1' : '0' %]"></span>
                     </div>
                 </div>
             </div>
@@ -99,7 +106,7 @@ tr.level-critical    { background:#f8d7da; font-weight:bold; }
             [% END %]
 
             <div class="content-section">
-                <h3>Database Logs — showing last 100 of [% total_count | html %] total records</h3>
+                <h3>Database Logs — showing [% db_logs.size %] of [% total_count | html %] total records</h3>
                 [% IF db_error %]<div class="error"><strong>DB Error:</strong> [% db_error | html %]</div>[% END %]
 
                 <div class="data-container">
@@ -153,6 +160,7 @@ tr.level-critical    { background:#f8d7da; font-weight:bold; }
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th class="nowrap">Count</th>
                                 <th>Timestamp</th>
                                 <th>Instance</th>
                                 <th>Site</th>
@@ -166,6 +174,7 @@ tr.level-critical    { background:#f8d7da; font-weight:bold; }
                             [% IF db_logs.size > 0 %]
                                 [% FOR log IN db_logs %]
                                     <tr class="level-[% log.level | lower %]">
+                                        <td class="nowrap" title="Number of times this exact message has occurred (occurrence_count)">[% log.occurrence_count | html %]</td>
                                         <td class="nowrap">[% log.timestamp | html %]</td>
                                         <td><small>[% log.system_identifier | html %]</small></td>
                                         <td>[% log.sitename | html %]</td>
@@ -177,7 +186,7 @@ tr.level-critical    { background:#f8d7da; font-weight:bold; }
                                 [% END %]
                             [% ELSE %]
                                 <tr>
-                                    <td colspan="7" class="empty-state">No logs found matching criteria.</td>
+                                    <td colspan="8" class="empty-state">No logs found matching criteria.</td>
                                 </tr>
                             [% END %]
                         </tbody>
