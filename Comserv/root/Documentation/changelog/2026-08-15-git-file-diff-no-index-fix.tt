@@ -1,0 +1,119 @@
+[% META
+   title = "Git file_diff — refused '--no-index' flag fixed (root-cause of empty/Refused diff popup)"
+   description = "2026-08-15 (follow-up to the shared diff widget): the per-file Diff popup failed with 'Diff failed: Refused: flag --no-index is not allowed for git diff'. Root cause: Util::Git's per-subcommand flag allow-list for 'diff' omitted --no-index, so the guarded _run refushed the command before git ran. Added --no-index to the allow-list (read-only comparison, safe) — fixes BOTH /admin/git/file_diff and /ai2/file_diff, which share the same _run. Also added a log_with_details on the file_diff failure path so future diff errors are tracked."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "git,ai-systems,changelog,bugfix"
+   page_version = "1.00"
+   last_updated = "Sat Aug 15 2026"
+   site_specific = "false"
+   project_id = "238"
+   project_code = "GITWT-NEW"
+%]
+
+<div class="container">
+
+    <h1 class="doc-h1">Git Dashboard Diff &rarr; AI2 editor: path-format + --no-index fixes</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-15 | Version: 1.00 | Author: hermes | Status: Fixed (linked to project #238 GITWT-NEW, todo #1991)
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#root" class="doc-navlink">Root cause</a>
+                <a href="#fix" class="doc-navlink">Fix</a>
+                <a href="#files" class="doc-navlink">Files</a>
+                <a href="#verify" class="doc-navlink">Verification</a>
+                <a href="#related" class="doc-navlink">Related</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="summary" class="doc-h2">1. Summary</h2>
+            <p class="doc-body">Three coordinated fixes to the Git Dashboard per-file Diff flow. (1) The backend read-only diff endpoint refused its own <code>--no-index</code> flag for new/untracked files (allow-list gap in Util::Git). (2) The inline diff panel showed nothing, so the Diff button was re-routed to open the file in the AI2 editor (<code>/ai2/editing_widget_popup?file=&lt;path&gt;</code>), which is itself a widget consumer and auto-shows that file's diff on open. (3) <strong>The real "no file / empty diff" cause:</strong> <code>git status</code> runs from the repo root so it returns <strong>repo-relative</strong> paths (<code>Comserv/root/...</code>), but the AI2 editor and <code>/ai2/file_diff</code> expect <strong>app-relative</strong> paths (<code>root/...</code>). The dashboard was handing the editor <code>Comserv/root/...</code>, which <code>EditorFile</code> could not resolve (Not found) and the diff mapped to a non-existent path. The dashboard now strips the leading <code>Comserv/</code> segment before opening the editor.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="root" class="doc-h2">2. Root cause</h2>
+            <ul class="doc-body">
+                <li><strong>Path-format mismatch (the "no file / empty diff" cause).</strong> <code>Comserv::Util::Git::_run</code> runs <code>git -C $repo</code> where <code>$repo</code> is the <em>repo root</em> (<code>comserv2/</code>, the parent of <code>Comserv/</code>). So <code>git status --porcelain</code> returns paths relative to the repo root, i.e. <code>Comserv/root/admin/git/index.tt</code> (with the <code>Comserv/</code> prefix). But the AI2 editor's <code>EditorFile-&gt;read_file</code> and <code>/ai2/file_diff</code> resolve paths relative to the <em>app root</em> (<code>Comserv/</code>), so they need <code>root/admin/git/index.tt</code> (no <code>Comserv/</code>). The dashboard was passing the repo-relative <code>Comserv/root/...</code> straight to the editor, so the file load returned Not found and the diff mapped to a non-existent file. This is why the editor opened but showed nothing.</li>
+                <li><strong>--no-index flag refusal (only affected new/untracked files).</strong> For untracked files both <code>file_diff</code> endpoints call <code>git diff --no-index /dev/null &lt;file&gt;</code>, but <code>Util::Git::_run</code>'s per-subcommand flag allow-list for <code>diff</code> omitted <code>--no-index</code>, so it was refused before git ran. Tracked files (<code>git diff HEAD</code>) were unaffected by this part.</li>
+                <li><strong>Note on an earlier wrong turn:</strong> a first attempt "fixed" <code>file_diff</code> by removing <code>_ai2_repo_rel_path</code>; that mapping is actually correct for app-relative input and was reverted. The genuine fix is the dashboard stripping the <code>Comserv/</code> prefix so the editor receives app-relative paths.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="fix" class="doc-h2">3. Fix</h2>
+            <ul class="doc-body">
+                <li><code>lib/Comserv/Util/Git.pm</code> — added <code>--no-index</code> to the <code>diff</code> flag allow-list. This is a read-only comparison flag (no repo mutation), so it is safe to permit. One change fixes <strong>both</strong> endpoints because they share <code>_run</code>.</li>
+                <li><code>lib/Comserv/Controller/Admin/Git.pm</code> — added a <code>log_with_details(..., 'warn', 'file_diff', ...)</code> on the diff-failure branch so future diff failures (refusals, git errors, empty output) are recorded in the audit log instead of being silent. <strong>Logging answer:</strong> yes — the app uses <code>Comserv::Util::Logging-&gt;log_with_details</code> everywhere (per .ai-policy.md); the <code>file_diff</code> path simply never logged its failures until now.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">4. Files changed</h2>
+            <ul class="doc-body">
+                <li><code>lib/Comserv/Util/Git.pm</code> — <code>%ALLOWED_FLAGS</code> for <code>diff</code> now includes <code>--no-index</code>.</li>
+                <li><code>lib/Comserv/Controller/Admin/Git.pm</code> — <code>file_diff</code> logs failures via <code>log_with_details</code>.</li>
+                <li><code>root/static/js/git-dashboard.js</code> — the working-tree <em>Diff</em> button now opens <code>/ai2/editing_widget_popup?file=&lt;path&gt;</code> (a separate window) instead of rendering into the inline <code>#git-file-diff</code> panel. Before opening, it strips the leading <code>Comserv/</code> from the repo-relative git-status path so the editor receives an app-relative path (<code>root/...</code>).</li>
+                <li><code>root/ai2/editor/editing_widget_popup.tt</code> — exposes <code>window.AI2_FILE_TO_LOAD</code> when opened with <code>?file=</code>.</li>
+                <li><code>root/static/js/ai2editor/file-diff.js</code> — on open with a <code>?file=</code> target, auto-fetches <code>GET /ai2/file_diff</code> and renders it through <code>ComservGitDiff</code> (no extra click).</li>
+                <li><code>lib/Comserv/Controller/AI2.pm</code> — <code>file_diff</code> reverted to using <code>_ai2_repo_rel_path</code> (correct for app-relative input). No change needed there once the dashboard supplies app-relative paths. <code>use File::Spec</code> added (previously missing import).</li>
+                <li>No separate per-surface diff renderer created — the editor remains the sole widget consumer for this flow.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verify" class="doc-h2">5. Verification</h2>
+            <ul class="doc-body">
+                <li><code>perl -Ilib -c lib/Comserv/Util/Git.pm</code> — syntax OK.</li>
+                <li><code>perl -Ilib -c lib/Comserv/Controller/Admin/Git.pm</code> — syntax OK.</li>
+                <li><code>perl -Ilib -c lib/Comserv/Controller/AI2.pm</code> — syntax OK (shares the fix via <code>_run</code>).</li>
+                <li>Both endpoints auto-reload on the running <code>:3001</code> process (no server restart, per ops rule). Re-test by clicking Diff on an <strong>untracked/new</strong> file — it should now show the full new content as additions, and on a modified file show the vs-HEAD diff.</li>
+                <li>If a diff still fails, the audit log now carries a <code>file_diff</code> warn entry with the path, is_new flag, git error, and exit code — check the log for the exact cause.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="related" class="doc-h2">6. Related</h2>
+            <ul class="doc-body">
+                <li><a href="/Documentation/changelog/2026-08-15-git-diff-viewer-shared-widget" class="doc-link">2026-08-15 — shared diff widget built</a> (the widget this popup now uses).</li>
+                <li><a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a> &sect;3.5 (project #238).</li>
+                <li><a href="/project/details?project_id=238" class="doc-link">Project #238 (GITWT-NEW)</a>, <a href="/todo/details?record_id=1991" class="doc-link">todo #1991</a>.</li>
+                <li><a href="/Documentation/MASTER_PLAN" class="doc-link">MASTER_PLAN.tt</a>.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Owning project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>. Bug fix to the read-only diff endpoint; widget unchanged. Cross-linked from MASTER_PLAN.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+
+</div>

@@ -146,21 +146,56 @@
     // --- Attach/Detach is a VIEW TOGGLE of one chat, not two chats. ---
     //   attached:  sidebar shown in editor (uses real estate)
     //   detached:  sidebar hidden (real estate released), chat in own window
+    function sidebarAttached() { return !_detached; }
+
+    // --- Single view-state: considers BOTH close (collapse) and detach ----
+    //   attached + open :  sidebar visible in editor (uses real estate)
+    //   attached + closed: sidebar hidden, floating 💬 to reopen
+    //   detached         : sidebar hidden (real estate released), chat in own window
     let _detached = false;
+    let _closed = false;
+
     function sidebarAttached() { return !_detached; }
 
     function applyViewState() {
-        const sidebar = document.getElementById('ai-chat-sidebar');
-        const btn = document.getElementById('ai-chat-detach');
-        if (sidebar) sidebar.style.display = _detached ? 'none' : 'flex';
-        if (btn) btn.textContent = _detached ? '⊞ Attach' : '⤢ Detach';
-        // Keep the log in sync with whichever view is now active.
-        if (_detached) {
-            const w = window._aiChatWin;
-            if (w && !w.closed) renderChatLog(w.document.getElementById('chat-messages'));
-        } else {
-            renderChatLog(document.getElementById('chat-messages'));
+        try {
+            const sidebar = document.getElementById('ai-chat-sidebar');
+            const btn = document.getElementById('ai-chat-detach');
+            const reopen = document.getElementById('ai-chat-reopen');
+            // Hidden if closed OR detached; otherwise shown (flex child of .main,
+            // so the editor expands to fill the freed space — pinned to edges).
+            if (sidebar) sidebar.style.display = (_closed || _detached) ? 'none' : 'flex';
+            if (reopen) reopen.style.display = _closed ? 'block' : 'none';
+            if (btn) btn.textContent = _detached ? '⊞ Attach' : '⤢ Detach';
+            if (window.AI2EditorCore && typeof window.AI2EditorCore.resizeEditor === 'function') {
+                window.AI2EditorCore.resizeEditor();
+            }
+            // Keep the log in sync with whichever view is now active.
+            if (_detached) {
+                const w = window._aiChatWin;
+                if (w && !w.closed) renderChatLog(w.document.getElementById('chat-messages'));
+            } else {
+                renderChatLog(document.getElementById('chat-messages'));
+            }
+        } catch (e) {
+            console.error('[AI2EditorChat] applyViewState error', e);
         }
+    }
+
+    // --- Close / reopen the chat sidebar (collapse to free editor space). ---
+    // Distinct from detach: closing keeps the chat attached but hidden, with a
+    // floating 💬 button to bring it back. Detach moves it to a separate window.
+    function initClose() {
+        const closeBtn = document.getElementById('ai-chat-close');
+        const reopenBtn = document.getElementById('ai-chat-reopen');
+        if (closeBtn) closeBtn.addEventListener('click', function () {
+            _closed = true;
+            applyViewState();
+        });
+        if (reopenBtn) reopenBtn.addEventListener('click', function () {
+            _closed = false;
+            applyViewState();
+        });
     }
 
     function initDetach() {
@@ -169,105 +204,105 @@
         if (!btn || !sidebar) return;
 
         btn.addEventListener('click', function () {
-            if (!_detached) {
-                // --- Detach: release editor real estate, open chat window ---
-                _detached = true;
-                if (!window._aiChatWin || window._aiChatWin.closed) {
-                    openDetachedWindow();
+            try {
+                if (!_detached) {
+                    // --- Detach: release editor real estate, open chat window ---
+                    _detached = true;
+                    if (!window._aiChatWin || window._aiChatWin.closed) {
+                        openDetachedWindow();
+                    } else {
+                        window._aiChatWin.focus();
+                    }
+                    applyViewState();
                 } else {
-                    window._aiChatWin.focus();
+                    // --- Re-attach: bring chat back into the editor sidebar ---
+                    _detached = false;
+                    if (window._aiChatWin && !window._aiChatWin.closed) {
+                        window._aiChatWin.close();
+                        window._aiChatWin = null;
+                    }
+                    applyViewState();
                 }
-                applyViewState();
-            } else {
-                // --- Re-attach: bring chat back into the editor sidebar ---
+            } catch (e) {
+                console.error('[AI2EditorChat] detach toggle error', e);
                 _detached = false;
-                if (window._aiChatWin && !window._aiChatWin.closed) {
-                    window._aiChatWin.close();
-                    window._aiChatWin = null;
-                }
                 applyViewState();
             }
         });
-
-        // If the editor (opener) is closed while chat is detached, the
-        // orphaned window closes itself instead of dangling.
-        setInterval(function () {
-            if (_detached && window._aiChatWin && !window._aiChatWin.closed) {
-                // window.opener is null once the editor is gone
-                if (!window.opener || window.opener.closed) {
-                    window._aiChatWin.close();
-                    window._aiChatWin = null;
-                }
-            }
-        }, 1000);
     }
 
     function openDetachedWindow() {
-        const w = window.open('', 'AI2ChatDetach',
-            'width=420,height=700,left=' + (screen.width - 440) + ',top=40,resizable=yes');
-        if (!w) { _detached = false; applyViewState(); return; }
-        window._aiChatWin = w;
-        w.document.write(
-            '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-            '<title>AI Chat — editor</title>' +
-            '<style>body{margin:0;font-family:system-ui,sans-serif;background:#1e1f22;color:#ddd;height:100vh;display:flex;flex-direction:column;}' +
-            '#chat-messages{flex:1;overflow:auto;padding:8px;font-size:0.9em;}' +
-            '#chat-input{flex:1;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;}' +
-            '#send{background:#0e639c;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;}' +
-            '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;}' +
-            'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
-            '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
-            '</head><body>' +
-            '<h3>AI Chat (Hy3) — detached <button id="attach">⊞ Attach</button></h3>' +
-            '<div id="chat-messages"></div>' +
-            '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
-            '<button id="send">Send</button></div>' +
-            '</body></html>'
-        );
-        w.document.close();
-        renderChatLog(w.document.getElementById('chat-messages'));
-
-        const dInput = w.document.getElementById('chat-input');
-        const dSend = w.document.getElementById('send');
-        const dMsgs = w.document.getElementById('chat-messages');
-        const target = {
-            messages: dMsgs,
-            input: dInput,
-            sendBtn: dSend,
-            status: function () { /* detached window has no status bar */ }
-        };
-        function fire() {
-            const v = dInput.value;
-            dInput.value = '';
-            sendPrompt(v, target);
+        let w = null;
+        try {
+            w = window.open('', 'AI2ChatDetach',
+                'width=420,height=700,left=' + (screen.width - 440) + ',top=40,resizable=yes');
+        } catch (e) {
+            console.error('[AI2EditorChat] window.open blocked', e);
+            _detached = false; applyViewState(); return;
         }
-        dSend.addEventListener('click', fire);
-        dInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') fire(); });
+        if (!w) { _detached = false; applyViewState(); return; }
+        try {
+            window._aiChatWin = w;
+            w.document.write(
+                '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+                '<title>AI Chat — editor</title>' +
+                '<style>body{margin:0;font-family:system-ui,sans-serif;background:#1e1f22;color:#ddd;height:100vh;display:flex;flex-direction:column;}' +
+                '#chat-messages{flex:1;overflow:auto;padding:8px;font-size:0.9em;}' +
+                '#chat-input{flex:1;padding:6px;border:1px solid #555;border-radius:3px;background:#1e1f22;color:#ddd;}' +
+                '#send{background:#0e639c;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;}' +
+                '.bar{display:flex;gap:6px;padding:6px;border-top:1px solid #555;}' +
+                'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
+                '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
+                '</head><body>' +
+                '<h3>AI Chat (Hy3) — detached <button id="attach">⊞ Attach</button></h3>' +
+                '<div id="chat-messages"></div>' +
+                '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
+                '<button id="send">Send</button></div>' +
+                '</body></html>'
+            );
+            w.document.close();
+            renderChatLog(w.document.getElementById('chat-messages'));
 
-        // "Attach" inside the detached window re-attaches into the editor.
-        const attachBtn = w.document.getElementById('attach');
-        if (attachBtn) attachBtn.addEventListener('click', function () {
-            if (window.opener && !window.opener.closed && window.opener._aiReattach) {
-                window.opener._aiReattach();
-            } else {
-                // opener gone — nothing to attach to; just close.
-                window.close();
+            const dInput = w.document.getElementById('chat-input');
+            const dSend = w.document.getElementById('send');
+            const dMsgs = w.document.getElementById('chat-messages');
+            const target = {
+                messages: dMsgs,
+                input: dInput,
+                sendBtn: dSend,
+                status: function () { /* detached window has no status bar */ }
+            };
+            function fire() {
+                const v = dInput.value;
+                dInput.value = '';
+                sendPrompt(v, target);
             }
-        });
+            dSend.addEventListener('click', fire);
+            dInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') fire(); });
 
-        // Closing the detached window re-attaches into the editor automatically.
-        w.addEventListener('beforeunload', function () {
-            window._aiChatWin = null;
-            if (_detached) { _detached = false; applyViewState(); }
-        });
+            // "Attach" inside the detached window re-attaches into the editor.
+            const attachBtn = w.document.getElementById('attach');
+            if (attachBtn) attachBtn.addEventListener('click', function () {
+                try {
+                    if (window.opener && !window.opener.closed && window.opener._aiReattach) {
+                        window.opener._aiReattach();
+                    } else {
+                        window.close();
+                    }
+                } catch (err) { window.close(); }
+            });
 
-        // Watch the editor (opener); if it closes, this orphan closes too.
-        const watch = setInterval(function () {
-            if (!window.opener || window.opener.closed) {
-                clearInterval(watch);
-                window.close();
-            }
-        }, 1000);
+            // Closing the detached window re-attaches into the editor automatically.
+            w.addEventListener('beforeunload', function () {
+                try {
+                    window._aiChatWin = null;
+                    if (_detached) { _detached = false; applyViewState(); }
+                } catch (err) { /* non-fatal */ }
+            });
+        } catch (e) {
+            console.error('[AI2EditorChat] openDetachedWindow error', e);
+            _detached = false; applyViewState();
+        }
     }
 
     // Called from the detached window's "Attach" button.
@@ -519,7 +554,9 @@
 
         initResize();
         initDetach();
+        initClose();
         applyViewState();   // ensure correct initial view (attached by default)
+        applyClosedState();
 
         // Populate the editor's #model-select from the SHARED model-selection
         // module (same catalog + hy3 default the general widget uses).

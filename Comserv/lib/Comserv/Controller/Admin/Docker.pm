@@ -184,7 +184,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         # We trigger the main deploy script on workstation (which will then push to prod if needed).
         my $workstation_host = 'workstation.local';  # or 192.168.1.199
         # Use standardized compose files + volume normalization via main deploy.sh
-        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' DEPLOY_MODE=prod script/deploy.sh 2>&1";
+        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' PROD_TARGET_HOST=192.168.1.126 script/deploy.sh --prod 2>&1";
         my $ssh_cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@$workstation_host \"$cmd\"";
         my $remote_output = `$ssh_cmd`;
         my $exit_code = $? >> 8;
@@ -332,19 +332,21 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             push @lines, "[${\scalar localtime}] Volume consistency check passed (all comserv2_* volumes present).";
         }
 
-        # === Build new image ===
-        push @lines, "[${\scalar localtime}] === Building new image (web-prod) ===";
-        my $build_out = `cd '$repo_path/Comserv' && docker compose $compose_args build web-prod --no-cache 2>&1`;
-        push @lines, $build_out;
+        # === Delegate to the SINGLE canonical pipeline (deploy.sh --prod) ===
+        # The dashboard button must produce the IDENTICAL result as every other
+        # entry point: clean build -> push -> pull exact digest -> run --no-build
+        # -> health -> post. We no longer run raw `docker compose build/up` here,
+        # which previously diverged from the node-deploy path.
+        # Deploy ALWAYS runs from the WORKSTATION (single execution point), never
+        # from the container being replaced. SSH to the workstation to run the
+        # single canonical pipeline there; it builds/pushes then SSHes to prod.
+        push @lines, "[${\scalar localtime}] === Delegating canonical deploy to WORKSTATION (shanta\@192.168.1.199) ===";
+        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' PROD_TARGET_HOST=192.168.1.126 script/deploy.sh --prod 2>&1";
+        my $ws_ssh = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
+        my $canon_out = `$ws_ssh`;
+        push @lines, $canon_out;
         if ($? >> 8) { $success = 0; }
-
-        # === Start new container ===
-        push @lines, "[${\scalar localtime}] === Starting new container ===";
-        my $up_out = `cd '$repo_path/Comserv' && docker compose $compose_args up -d web-prod 2>&1`;
-        push @lines, $up_out;
-        if ($? >> 8) { $success = 0; }
-
-        push @lines, "[${\scalar localtime}] Local deploy sequence complete.";
+        push @lines, "[${\scalar localtime}] Canonical deploy sequence complete.";
     }
 
     my $elapsed = time() - $t0;
@@ -491,39 +493,37 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger, target=$target) ===\n";
         $log->flush();
 
-        # Wrap both ->new and deploy in eval so any error is logged
-        my $deployer;
-        eval {
-            $deployer = Comserv::Util::DockerDeploy->new(
-                log_fh   => $log,
-                logging  => $self->logging,
-                trigger  => $trigger,
-                target   => $target,
-                no_cache => $no_cache,
-            );
-        };
-        if ($@) {
-            print $log "[".scalar(localtime)."] Failed to create DockerDeploy: $@\n";
-            $log->flush();
-            close($log);
-            unlink($pid_file);
-            exit(1);
+        # Delegate to the SINGLE canonical pipeline (deploy.sh --deploy-to-node).
+        # This is the one engine with: pre-SSH script self-sync, identical
+        # build->push->pull->run sequence, always-rm-old-container before up,
+        # and die-on-failure (no false SUCCESS). The dashboard buttons must NOT
+        # use the divergent Perl DockerDeploy engine (it hit a name conflict and
+        # lied about success). So we call deploy.sh here.
+        # Locate deploy.sh relative to THIS module (app root = 4 dirs up from
+        # lib/Comserv/Controller/Admin/Docker.pm). This works on BOTH the
+        # workstation and the prod server, where the hardcoded workstation
+        # path does not exist (which is why 'nothing happened' on prod).
+        my $repo_path = __FILE__;
+        $repo_path =~ s{/lib/Comserv/Controller/Admin/Docker\.pm$}{};
+        $repo_path =~ s{/lib/Comserv/?$}{};
+        $repo_path =~ s{/Comserv/?$}{};
+        if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
+            $repo_path = "/opt/comserv/Comserv";
         }
-
-        eval {
-            my $ok = $deployer->deploy_to_target_safe;
-            print $log "[".scalar(localtime)."] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
-            $log->flush();
-            if ($ok) {
-                $deployer->_log("=== DEPLOY COMPLETE ===");
-            } else {
-                $deployer->_log("=== DEPLOY FAILED (see errors above) ===");
-            }
-        };
-        if ($@) {
-            print $log "[".scalar(localtime)."] CRASH in deploy: $@\n";
-            $log->flush();
-        }
+        # Deploy ALWAYS runs from the WORKSTATION. SSH there to run the single
+        # canonical pipeline; it builds/pushes then SSHes to the target node.
+        my $node = ($target eq "production1") ? "192.168.1.126"
+                 : ($target eq "production2") ? "192.168.1.127"
+                 : $target;
+        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node 2>&1";
+        my $cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
+        print $log "[".scalar(localtime)."] Delegating to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh --deploy-to-node $node ...\n";
+        $log->flush();
+        my $out = `$cmd`;
+        my $rc = $? >> 8;
+        print $log $out;
+        print $log "[".scalar(localtime)."] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+        $log->flush();
         close($log);
         unlink($pid_file);
         exit(0);
@@ -1070,20 +1070,34 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
             exit(1);
         }
 
-        eval {
-            my $ok = $deployer->deploy_to_target_safe();
-            print $log "[" . scalar(localtime) . "] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
-            $log->flush();
-            if ($ok) {
-                print $log "[" . scalar(localtime) . "] === REBUILD SUCCESS ===\n";
-            } else {
-                print $log "[" . scalar(localtime) . "] === REBUILD FAILED (see errors above) ===\n";
-            }
-        };
-        if ($@) {
-            print $log "[" . scalar(localtime) . "] CRASH in deploy: $@\n";
-            $log->flush();
+        # Delegate to the SINGLE canonical pipeline (deploy.sh --deploy-to-node)
+        # instead of the divergent Perl DockerDeploy engine. One engine, pre-SSH
+        # self-sync, always-rm-old container before up, die-on-failure.
+        # Locate deploy.sh relative to THIS module (app root = 4 dirs up from
+        # lib/Comserv/Controller/Admin/Docker.pm). This works on BOTH the
+        # workstation and the prod server, where the hardcoded workstation
+        # path does not exist (which is why 'nothing happened' on prod).
+        my $repo_path = __FILE__;
+        $repo_path =~ s{/lib/Comserv/Controller/Admin/Docker\.pm$}{};
+        $repo_path =~ s{/lib/Comserv/?$}{};
+        $repo_path =~ s{/Comserv/?$}{};
+        if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
+            $repo_path = "/opt/comserv/Comserv";
         }
+        # Deploy ALWAYS runs from the WORKSTATION. SSH there to run the single
+        # canonical pipeline; it builds/pushes then SSHes to the target node.
+        my $node = ($deploy_target eq "production1") ? "192.168.1.126"
+                 : ($deploy_target eq "production2") ? "192.168.1.127"
+                 : $deploy_target;
+        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild' script/deploy.sh --deploy-to-node $node 2>&1";
+        my $cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
+        print $log "[" . scalar(localtime) . "] Delegating Rebuild to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh --deploy-to-node $node ...\n";
+        $log->flush();
+        my $out = `$cmd`;
+        my $rc = $? >> 8;
+        print $log $out;
+        print $log "[" . scalar(localtime) . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+        $log->flush();
         close($log);
         unlink($pid_file);
         exit(0);

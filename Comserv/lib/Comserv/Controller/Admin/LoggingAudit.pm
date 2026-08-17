@@ -114,7 +114,7 @@ sub index :Path('/admin/logging_audit') :Args(0) {
         if ($latest_run) {
             my $rs = $schema->resultset('LoggingAudit')->search(
                 { scan_run_id => $latest_run },
-                { order_by   => { -desc => 'severity' }, -asc => 'file_path' }
+                { order_by   => [ { -desc => 'severity' }, { -asc => 'file_path' } ] }
             );
             while (my $f = $rs->next) {
                 push @$findings, {
