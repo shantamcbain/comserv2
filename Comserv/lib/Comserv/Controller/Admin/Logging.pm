@@ -180,8 +180,28 @@ sub index :Path('/admin/logging') :Args(0) {
                                || $a->{metric_name} cmp $b->{metric_name} } @hardware_latest;
     };
 
-    # Get available levels for filter
+    # Available levels for filter
     my @levels = sort { $Comserv::Util::Logging::LEVEL_PRIORITY{$a} <=> $Comserv::Util::Logging::LEVEL_PRIORITY{$b} } keys %Comserv::Util::Logging::LEVEL_PRIORITY;
+
+    # Live system_log size (instant estimate from information_schema) so the
+    # Deduplicate button's effect is directly observable. Independent of any
+    # active filter (total_count above is filter-aware and may be a real COUNT).
+    my $system_log_rows = eval {
+        my ($n) = $c->model('DBEncy')->storage->dbh->selectrow_array(
+            "SELECT TABLE_ROWS FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'");
+        $n // 0;
+    } // 0;
+
+    # Is a dedupe run currently in progress? (PID file written by the dedupe action)
+    my $dedupe_running = 0;
+    my $pid_file = '/tmp/system_log_dedupe.pid';
+    if (-e $pid_file) {
+        my $pid = '';
+        if (open(my $pfh, '<', $pid_file)) { local $/; $pid = <$pfh>; close $pfh; }
+        chomp $pid;
+        $dedupe_running = ($pid && kill(0, $pid)) ? 1 : 0;
+    }
 
     $c->stash(
         current_log => {
@@ -202,6 +222,8 @@ sub index :Path('/admin/logging') :Args(0) {
         search_text     => $search_text,
         email_threshold => $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD,
         nfs_dir         => $ENV{COMSERV_NFS_LOG_DIR} || 'Not Set',
+        system_log_rows => $system_log_rows,
+        dedupe_running  => $dedupe_running,
         template        => 'admin/Logging/AdminLoggingIndex.tt'
     );
 }
@@ -252,6 +274,87 @@ sub rotate :Path('/admin/logging/rotate') :Args(0) {
     }
     
     $c->res->redirect($c->uri_for($self->action_for('index')));
+}
+
+sub dedupe :Path('/admin/logging/dedupe') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $home   = $c->config->{home};
+    my $script = File::Spec->catfile($home, 'script', 'backfill_system_log_dedupe.pl');
+    unless (-f $script) {
+        $c->flash->{error_msg} = "Backfill script not found at $script";
+        return $c->res->redirect($c->uri_for($self->action_for('index')));
+    }
+
+    # Guard against launching concurrent runs.
+    my $pid_file = '/tmp/system_log_dedupe.pid';
+    if (-e $pid_file) {
+        my $old = '';
+        if (open(my $pfh, '<', $pid_file)) {
+            local $/;
+            $old = <$pfh>;
+            close $pfh;
+        }
+        chomp $old;
+        if ($old && kill(0, $old)) {
+            $c->flash->{warn_msg} =
+                "A deduplication run is already in progress (PID $old). Check /tmp/system_log_dedupe.log.";
+            return $c->res->redirect($c->uri_for($self->action_for('index')));
+        }
+    }
+
+    # Snapshot current size for the flash message (instant row-count estimate).
+    my $before = eval {
+        my ($n) = $c->model('DBEncy')->storage->dbh->selectrow_array(
+            "SELECT TABLE_ROWS FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'");
+        $n // 0;
+    } // 0;
+
+    # Launch in the background so the HTTP request returns immediately; the
+    # script does the heavy GROUP BY + chunked DELETE off-request.
+    my $log = '/tmp/system_log_dedupe.log';
+    system("nohup perl '$script' --apply > '$log' 2>&1 & echo \$! > '$pid_file'");
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dedupe',
+        "Triggered system_log dedupe (was ~$before rows) via $script --apply");
+
+    $c->flash->{success_msg} =
+        "Deduplication started (system_log had ~$before rows). It runs in the "
+      . "background; progress is written to $log. Refresh this page to confirm "
+      . "the row count dropped (the Total Records count updates when it finishes).";
+
+    return $c->res->redirect($c->uri_for($self->action_for('index')));
+}
+
+# Lightweight JSON status for live dedupe progress (polled by logging-dedupe.js).
+# Returns the current system_log row estimate + whether a run is in progress, so
+# the page can tick the count down in real time instead of only on refresh.
+sub dedupe_status :Path('/admin/logging/dedupe_status') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $rows = eval {
+        my ($n) = $c->model('DBEncy')->storage->dbh->selectrow_array(
+            "SELECT TABLE_ROWS FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'");
+        $n // 0;
+    } // 0;
+
+    my $running = 0;
+    my $pid_file = '/tmp/system_log_dedupe.pid';
+    if (-e $pid_file) {
+        my $pid = '';
+        if (open(my $pfh, '<', $pid_file)) { local $/; $pid = <$pfh>; close $pfh; }
+        chomp $pid;
+        $running = ($pid && kill(0, $pid)) ? 1 : 0;
+    }
+
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json({
+        system_log_rows => $rows + 0,
+        dedupe_running  => $running ? \1 : \0,
+    }));
+    return;
 }
 
 sub settings :Path('/admin/logging/settings') :Args(0) {

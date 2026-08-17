@@ -68,6 +68,13 @@ services:
       - comserv2_cache:/tmp/comserv/cache
       - comserv2_temp:/tmp/comserv/temp
       - comserv2_themes:/opt/comserv/root/themes
+      # The two MUTABLE subdirs of the static tree must be writable + persistent
+      # so theme_definitions.json and generated theme CSS survive redeploys
+      # without a host bind (which shadows the baked assets / makes them :ro).
+      # Both stay INSIDE root/static, so no code-path change is needed. Seed once
+      # from the image-baked root/static/config/theme_definitions.json at deploy.
+      - comserv2_theme_config:/opt/comserv/root/static/config
+      - comserv2_theme_css:/opt/comserv/root/static/css/themes
       - comserv2_whisper_venv:/opt/comserv/whisper_venv
       - comserv2_cpan_cache:/root/.cpan
       # Static assets (CSS/JS/images) are baked into the image at build time

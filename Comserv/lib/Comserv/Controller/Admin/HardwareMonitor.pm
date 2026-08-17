@@ -405,8 +405,30 @@ sub run :Path('/admin/hardware_monitor/run') :Args(0) {
         my $live = $dbh->selectrow_array('SELECT 1');
         $dbh_ok = ($live && $live == 1) ? 1 : 0;
 
-        # 2. Self test — exercise a real read the app depends on.
-        my $ping = $schema->resultset('SystemLog')->search({}, { rows => 1 })->count;
+        # 2. Self test — exercise a real read the app depends on. A mid-session
+        #    connection drop (transient network blip between the SELECT 1 above
+        #    and this query) raises "Lost connection ... during query"; mariadb
+        #    auto-reconnect only repairs the NEXT statement, not the one in
+        #    flight. Force a fresh handle and retry the self-test exactly once so
+        #    a sub-second blip self-heals within the same monitor cycle instead
+        #    of raising CRITICAL and opening a spurious todo. (Pattern mirrors
+        #    Comserv::Util::LoggingAudit code-scan reconnect.)
+        my $self_test_ok = eval {
+            $schema->resultset('SystemLog')->search({}, { rows => 1 })->count;
+            1;
+        };
+        unless ($self_test_ok) {
+            my $first_err = "$@";
+            eval { $schema->storage->disconnect };
+            my $dbh2 = eval { $schema->storage->dbh };
+            if ($dbh2) {
+                $self_test_ok = eval {
+                    $schema->resultset('SystemLog')->search({}, { rows => 1 })->count;
+                    1;
+                };
+            }
+            die $first_err unless $self_test_ok;   # retry failed -> outer eval logs real cause
+        }
         $self_test = 'ok';
     };
     if ($@) {

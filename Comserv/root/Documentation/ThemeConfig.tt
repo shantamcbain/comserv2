@@ -18,6 +18,13 @@
     </section>
 
     <section class="recent-enhancements">
+        <h2>Storage &amp; Production (2026-08-17)</h2>
+        <div class="enhancement-highlight">
+            Theme state now lives in two paths <strong>inside</strong> <code>root/static</code> (<code>static/config/theme_definitions.json</code> and <code>static/css/themes/*.css</code>), backed by persistent volume overlays (<code>comserv2_theme_config</code>, <code>comserv2_theme_css</code>). The old read-only host bind (<code>./root/static:/opt/comserv/root/static:ro</code>) that caused the <code>Permission denied</code> / <code>No such file or directory</code> writes was removed. For the full admin guide, see <a href="[% c.uri_for('/Documentation/CssThemes') %]">/Documentation/CssThemes</a> (Storage &amp; Production + Roadmap sections).
+        </div>
+    </section>
+
+    <section class="recent-enhancements">
         <h2>Resilience Note &mdash; Missing Config Directory</h2>
         <div class="enhancement-highlight">
             <strong>2026-08-12</strong>: All JSON writers (<code>set_site_theme</code>,

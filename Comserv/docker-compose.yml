@@ -230,5 +230,9 @@ volumes:
     driver: local
   comserv2_themes:
     driver: local
+  comserv2_theme_config:
+    driver: local
+  comserv2_theme_css:
+    driver: local
   comserv2_cache:
     driver: local
