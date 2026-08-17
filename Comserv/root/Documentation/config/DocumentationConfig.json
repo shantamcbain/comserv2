@@ -241,7 +241,7 @@
       "2025-01-27-backup-system-documentation" : {
          "title" : "Backup System Documentation - January 27, 2025",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-01-27-backup-system-documentation.tt",
+         "path" : "Documentation/changelog#2025-01-27-backup-system-documentation",
          "site" : "all",
          "category" : "admin_guides",
          "description" : null,
@@ -267,7 +267,7 @@
       },
       "2024-08-ve7tit-controller-fixes" : {
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2024-08-ve7tit-controller-fixes.tt",
+         "path" : "Documentation/changelog#2024-08-ve7tit-controller-fixes",
          "category" : "admin_guides",
          "site" : "all",
          "title" : "2024 08 Ve7tit Controller Fixes",
@@ -398,7 +398,7 @@
          "format" : "template",
          "description" : null,
          "site" : "all",
-         "path" : "Documentation/changelog/2025-05-25-git-pull-routing-fix.tt",
+         "path" : "Documentation/changelog#2025-05-25-git-pull-routing-fix",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "Git Pull Routing Fix"
@@ -547,7 +547,7 @@
          ],
          "description" : null,
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-01-15-enhanced-todo-navigation.tt",
+         "path" : "Documentation/changelog#2025-01-15-enhanced-todo-navigation",
          "category" : "admin_guides",
          "site" : "all",
          "title" : "Enhanced Todo Navigation Implementation"
@@ -629,7 +629,7 @@
          ],
          "description" : null,
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-07-30-todo-time-field-fix.tt",
+         "path" : "Documentation/changelog#2025-07-30-todo-time-field-fix",
          "site" : "all",
          "category" : "admin_guides",
          "title" : "Todo Time Field Fix - 2025-07-30"
@@ -849,7 +849,7 @@
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "category" : "admin_guides",
          "site" : "all",
-         "path" : "Documentation/changelog/2024-05-documentation-system-fixes.tt",
+         "path" : "Documentation/changelog#2024-05-documentation-system-fixes",
          "description" : null,
          "format" : "template",
          "roles" : [
@@ -1080,7 +1080,7 @@
       "2025-05-25-file-location-standardization" : {
          "title" : "File Location Standardization",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-05-25-file-location-standardization.tt",
+         "path" : "Documentation/changelog#2025-05-25-file-location-standardization",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "description" : null,
@@ -1095,7 +1095,7 @@
          "title" : "Proxmox Authentication Changes - July 2024",
          "site" : "all",
          "category" : "admin",
-         "path" : "Documentation/changelog/2024-07-proxmox-authentication-changes.md",
+         "path" : "Documentation/changelog#2024-07-proxmox-authentication-changes",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "description" : "Removed the login requirement from the Proxmox functionality in the Comserv application. The Proxmox integration now uses API token authentication exclusively, eliminating the need for users to log in to access Proxmox VM management features.",
          "roles" : [
@@ -1309,7 +1309,7 @@
          "format" : "template"
       },
       "2025-05-26-mail-system-docs" : {
-         "path" : "Documentation/changelog/2025-05-26-mail-system-docs.tt",
+         "path" : "Documentation/changelog#2025-05-26-mail-system-docs",
          "site" : "all",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
@@ -1735,7 +1735,7 @@
       "2025-01-15-git-divergent-branches-fix" : {
          "title" : "Git Divergent Branches Fix - Production Deployment Solution",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt",
+         "path" : "Documentation/changelog#2025-01-15-git-divergent-branches-fix",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "description" : null,
@@ -1756,7 +1756,7 @@
          "description" : null,
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-05-12-fix-documentation-controller-logging.tt",
+         "path" : "Documentation/changelog#2025-05-12-fix-documentation-controller-logging",
          "category" : "admin_guides",
          "title" : "2025 05 12 Fix Documentation Controller Logging"
       },
@@ -2415,7 +2415,7 @@
          "format" : "template",
          "description" : null,
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-01-15-fix-project-selection-todo-filtering.tt",
+         "path" : "Documentation/changelog#2025-01-15-fix-project-selection-todo-filtering",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "Fix for Project Selection in Todo Filtering"
@@ -3191,7 +3191,7 @@
       "2025-07-01-cloudflare-application-id-and-rbac" : {
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-07-01-cloudflare-application-id-and-rbac.tt",
+         "path" : "Documentation/changelog#2025-07-01-cloudflare-application-id-and-rbac",
          "site" : "all",
          "title" : "2025 07 01 Cloudflare Application Id And Rbac",
          "format" : "template",
@@ -3251,7 +3251,7 @@
          "format" : "template",
          "description" : null,
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-17-menu-links-implementation.tt",
+         "path" : "Documentation/changelog#2025-01-17-menu-links-implementation",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "2025 01 17 Menu Links Implementation"
@@ -3995,7 +3995,7 @@
          "description" : null,
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-15_documentation_system_completion.tt",
+         "path" : "Documentation/changelog#2025-01-15_documentation_system_completion",
          "category" : "admin_guides",
          "title" : "Documentation System Completion - 2025-01-15"
       },
@@ -4116,7 +4116,7 @@
          "title" : "Template System Fixes - Double Header Resolution",
          "category" : "admin_guides",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-27-template-system-fixes.tt",
+         "path" : "Documentation/changelog#2025-01-27-template-system-fixes",
          "last_scanned" : "Tue Jun  9 07:48:24 2026"
       },
       "DATABASE_CONFIG_DOCKER_KUBERNETES" : {
@@ -4317,7 +4317,7 @@
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
          "category" : "admin",
-         "path" : "Documentation/changelog/2025-05-20-template-error-fix-and-docs-organization.md"
+         "path" : "Documentation/changelog#2025-05-20-template-error-fix-and-docs-organization"
       },
       "Daily_Plans-2026-01-03" : {
          "roles" : [
@@ -4762,7 +4762,7 @@
          "format" : "template",
          "title" : "HelpDesk Ticket Lifecycle",
          "site" : "all",
-         "path" : "Documentation/changelog/2026-04-28-helpdesk-ticket-lifecycle.tt",
+         "path" : "Documentation/changelog#2026-04-28-helpdesk-ticket-lifecycle",
          "category" : "changelog",
          "last_scanned" : "Tue Jun  9 07:48:24 2026"
       },
@@ -4820,7 +4820,7 @@
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "category" : "admin_guides",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-05-26-changelog-system.tt"
+         "path" : "Documentation/changelog#2025-05-26-changelog-system"
       },
       "theme_system_normalization" : {
          "site" : "all",
@@ -4905,7 +4905,7 @@
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "category" : "admin_guides",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-21-major-system-enhancements.tt",
+         "path" : "Documentation/changelog#2025-01-21-major-system-enhancements",
          "title" : "Major System Enhancements - January 2025",
          "format" : "template",
          "roles" : [
@@ -4931,7 +4931,7 @@
       "2025-04-13-mcoop-url-case-fix-details" : {
          "title" : "2025 04 13 Mcoop Url Case Fix Details",
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-04-13-mcoop-url-case-fix-details.tt",
+         "path" : "Documentation/changelog#2025-04-13-mcoop-url-case-fix-details",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "description" : null,
@@ -4965,7 +4965,7 @@
          ],
          "format" : "template",
          "title" : "Mailing List System Implementation - Phase 1",
-         "path" : "Documentation/changelog/2025-01-15-mailing-list-system-implementation.tt",
+         "path" : "Documentation/changelog#2025-01-15-mailing-list-system-implementation",
          "category" : "admin_guides",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026"
@@ -5205,7 +5205,7 @@
       "2026-04-28-beekeeping-hive-inspection" : {
          "title" : "Beekeeping: Hive Inspection System",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2026-04-28-beekeeping-hive-inspection.tt",
+         "path" : "Documentation/changelog#2026-04-28-beekeeping-hive-inspection",
          "site" : "all",
          "category" : "changelog",
          "description" : null,
@@ -5244,7 +5244,7 @@
       "2025-04-pagetop-template-error-fix" : {
          "category" : "admin_guides",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-04-pagetop-template-error-fix.tt",
+         "path" : "Documentation/changelog#2025-04-pagetop-template-error-fix",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "2025 04 Pagetop Template Error Fix",
          "roles" : [
@@ -5438,7 +5438,7 @@
          "title" : "3D Printing System",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "category" : "changelog",
-         "path" : "Documentation/changelog/2026-04-28-3d-printing-system.tt",
+         "path" : "Documentation/changelog#2026-04-28-3d-printing-system",
          "site" : "all"
       },
       "daily_audit_log" : {
@@ -5688,7 +5688,7 @@
       "2025-01-15-tt-file-compliance-fix" : {
          "title" : "2025 01 15 Tt File Compliance Fix",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-15-tt-file-compliance-fix.tt",
+         "path" : "Documentation/changelog#2025-01-15-tt-file-compliance-fix",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "description" : null,
@@ -5744,7 +5744,7 @@
       },
       "2025-01-15-log-controller-fix" : {
          "title" : "Log Controller Fix - January 2025",
-         "path" : "Documentation/changelog/2025-01-15-log-controller-fix.tt",
+         "path" : "Documentation/changelog#2025-01-15-log-controller-fix",
          "category" : "admin_guides",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
@@ -6103,7 +6103,7 @@
          "description" : null,
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-20-todo-system-documentation.tt",
+         "path" : "Documentation/changelog#2025-01-20-todo-system-documentation",
          "category" : "admin_guides",
          "title" : "Todo System Documentation Creation"
       },
@@ -6248,7 +6248,7 @@
       "2025-01-15-mailing-list-phase1" : {
          "title" : "Mailing List System - Phase 1 Implementation",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-01-15-mailing-list-phase1.tt",
+         "path" : "Documentation/changelog#2025-01-15-mailing-list-phase1",
          "site" : "all",
          "category" : "admin_guides",
          "description" : null,
@@ -6303,7 +6303,7 @@
       },
       "2025-01-27-fix-debug-display-enhance-data-type-normalization" : {
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-01-27-fix-debug-display-enhance-data-type-normalization.tt",
+         "path" : "Documentation/changelog#2025-01-27-fix-debug-display-enhance-data-type-normalization",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "2025 01 27 Fix Debug Display Enhance Data Type Normalization",
@@ -6445,7 +6445,7 @@
          "format" : "template",
          "title" : "CSS Theme System Enhancements - January 2025",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt",
+         "path" : "Documentation/changelog#2025-01-19-css-theme-system-enhancements",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026"
       },
@@ -6454,7 +6454,7 @@
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
          "category" : "changelog",
-         "path" : "Documentation/changelog/2025-10-15-documentation-access-fixes.tt",
+         "path" : "Documentation/changelog#2025-10-15-documentation-access-fixes",
          "description" : "Fixes for documentation access control and display issues",
          "format" : "template",
          "roles" : [
@@ -7191,7 +7191,7 @@
          "description" : null,
          "site" : "all",
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-01-15-todo-edit-functionality.tt",
+         "path" : "Documentation/changelog#2025-01-15-todo-edit-functionality",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "Todo Edit Functionality Implementation"
       },
@@ -7626,7 +7626,7 @@
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "category" : "admin_guides",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-07-07-navigation-system-consolidation.tt",
+         "path" : "Documentation/changelog#2025-07-07-navigation-system-consolidation",
          "title" : "Navigation System Consolidation - 2025-07-07"
       },
       "session_2025-10-14" : {
@@ -7755,7 +7755,7 @@
          "title" : "2025 01 Get Site Theme Fix",
          "site" : "all",
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-01-get-site-theme-fix.tt",
+         "path" : "Documentation/changelog#2025-01-get-site-theme-fix",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "description" : null,
          "roles" : [
@@ -7860,7 +7860,7 @@
       },
       "2025-01-20-admin-authentication-refactor" : {
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-20-admin-authentication-refactor.tt",
+         "path" : "Documentation/changelog#2025-01-20-admin-authentication-refactor",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "Admin Authentication System Refactor - January 2025",
@@ -7964,7 +7964,7 @@
          ],
          "title" : "Todo Filtering and Views Implementation",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-01-15-todo-filtering-and-views.tt",
+         "path" : "Documentation/changelog#2025-01-15-todo-filtering-and-views",
          "site" : "all",
          "category" : "admin_guides"
       },
@@ -8543,7 +8543,7 @@
          "title" : "Todo Priority System &amp; Enhancements",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
-         "path" : "Documentation/changelog/2026-04-28-todo-priority-system.tt",
+         "path" : "Documentation/changelog#2026-04-28-todo-priority-system",
          "category" : "changelog",
          "description" : null,
          "format" : "template",
@@ -8648,7 +8648,7 @@
       },
       "2025-05-25-git-pull-debug-msg-fix" : {
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-05-25-git-pull-debug-msg-fix.tt",
+         "path" : "Documentation/changelog#2025-05-25-git-pull-debug-msg-fix",
          "category" : "admin_guides",
          "site" : "all",
          "title" : "Git Pull Debug Message Fix",
@@ -9165,7 +9165,7 @@
       "2025-01-27-fix-schema-compare-containers" : {
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-01-27-fix-schema-compare-containers.tt",
+         "path" : "Documentation/changelog#2025-01-27-fix-schema-compare-containers",
          "category" : "admin_guides",
          "title" : "2025 01 27 Fix Schema Compare Containers",
          "format" : "template",
@@ -9578,7 +9578,7 @@
          ],
          "format" : "template",
          "title" : "Log Controller Fix and Todo Documentation Update",
-         "path" : "Documentation/changelog/2025-01-15-log-controller-fix-and-todo-documentation.tt",
+         "path" : "Documentation/changelog#2025-01-15-log-controller-fix-and-todo-documentation",
          "category" : "admin_guides",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026"
@@ -9599,7 +9599,7 @@
       "2025-04-08-documentation-display-fix-details" : {
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
-         "path" : "Documentation/changelog/2025-04-08-documentation-display-fix-details.tt",
+         "path" : "Documentation/changelog#2025-04-08-documentation-display-fix-details",
          "category" : "admin_guides",
          "title" : "2025 04 08 Documentation Display Fix Details",
          "format" : "template",
@@ -9665,7 +9665,7 @@
       "2026-04-28-planning-system-daily-plan" : {
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "site" : "all",
-         "path" : "Documentation/changelog/2026-04-28-planning-system-daily-plan.tt",
+         "path" : "Documentation/changelog#2026-04-28-planning-system-daily-plan",
          "category" : "changelog",
          "title" : "Planning System: Daily Plan Enhancements",
          "format" : "template",
@@ -10116,7 +10116,7 @@
          ],
          "title" : "Software Upgrade Manager Implementation",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-01-15-software-upgrade-manager.tt",
+         "path" : "Documentation/changelog#2025-01-15-software-upgrade-manager",
          "site" : "all",
          "category" : "admin_guides"
       },
@@ -10135,7 +10135,7 @@
       },
       "2025-01-20-collapsible-changelog-enhancement" : {
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-01-20-collapsible-changelog-enhancement.tt",
+         "path" : "Documentation/changelog#2025-01-20-collapsible-changelog-enhancement",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "Enhanced Changelog Display with Collapsible Sections",
@@ -10716,7 +10716,7 @@
       },
       "2025-09-09-ve7tit-theme-fix" : {
          "title" : "Ve7tit Theme Fix - September 9, 2025",
-         "path" : "Documentation/changelog/2025-09-09-ve7tit-theme-fix.tt",
+         "path" : "Documentation/changelog#2025-09-09-ve7tit-theme-fix",
          "site" : "all",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
@@ -10806,7 +10806,7 @@
          ],
          "description" : "Changelog entry for the transition from Markdown (.md) to Template Toolkit (.tt) files",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2025-10-01-documentation-migration-to-tt.tt",
+         "path" : "Documentation/changelog#2025-10-01-documentation-migration-to-tt",
          "site" : "all",
          "category" : "changelog",
          "title" : "Documentation Migration to Template Toolkit (.tt) Files"
@@ -10868,7 +10868,7 @@
       },
       "2026-04-28-inventory-shop-hosting-membership" : {
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
-         "path" : "Documentation/changelog/2026-04-28-inventory-shop-hosting-membership.tt",
+         "path" : "Documentation/changelog#2026-04-28-inventory-shop-hosting-membership",
          "category" : "changelog",
          "site" : "all",
          "title" : "Inventory, Shop, Hosting, Membership &amp; Point System",
@@ -10974,7 +10974,7 @@
          "last_scanned" : "Sat May  9 07:30:56 2026"
       },
       "2025-06-15-api-credentials-documentation-fix" : {
-         "path" : "Documentation/changelog/2025-06-15-api-credentials-documentation-fix.tt",
+         "path" : "Documentation/changelog#2025-06-15-api-credentials-documentation-fix",
          "site" : "all",
          "category" : "admin_guides",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
@@ -11259,7 +11259,7 @@
       },
       "2025-01-27-fix-schema-compare-table-mapping" : {
          "category" : "admin_guides",
-         "path" : "Documentation/changelog/2025-01-27-fix-schema-compare-table-mapping.tt",
+         "path" : "Documentation/changelog#2025-01-27-fix-schema-compare-table-mapping",
          "site" : "all",
          "last_scanned" : "Tue Jun  9 07:48:24 2026",
          "title" : "2025 01 27 Fix Schema Compare Table Mapping",
