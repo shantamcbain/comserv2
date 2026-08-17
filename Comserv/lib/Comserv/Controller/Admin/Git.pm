@@ -372,6 +372,12 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         # Switch to a branch that exists in the local branch list. Name validated
         # against that list — never interpolated or free-form.
         my $target = $c->req->param('branch') // '';
+        # 'git' is a reserved word (collides with the git command) and is excluded
+        # from get_local_branches, but reject it explicitly so the message is clear.
+        if ($target eq 'git') {
+            $msg = "The branch name 'git' is reserved and cannot be switched to.";
+        }
+        else {
         my %known  = map { $_ => 1 } @{ $self->get_local_branches($c) };
         if (!$known{$target}) {
             $msg = "Unknown local branch: '$target'.";
@@ -385,6 +391,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             $ok  = $r->{success};
             $msg = $r->{success} ? ($r->{success_msg} || "Switched to '$target'.")
                                  : ($r->{error_msg}   || "Switch to '$target' failed.");
+        }
         }
     }
     elsif ($op eq 'delbranch') {
@@ -1824,6 +1831,176 @@ Human-driven push of main to origin (restores the deliberate GitHub push that
 deploy.sh currently leaves disabled). Admin-only.
 
 =cut
+
+=head2 merge
+
+POST /admin/git/merge (admin-gated git_merge)
+General merge dispatcher for the dashboard Merge card. Params C<source> and
+C<target> (one branch each). The server is the single source of truth for
+direction safety:
+
+  * Rejects source eq target.
+  * main -> branch (source=main, target=branch):
+      switch_branch(target), then merge_branch('main'). No test gate
+      (we are updating a worktree, not main).
+  * branch -> main (source=branch, target=main):
+      - Guard: get_current_branch must eq source (the branch must be the
+        active/checked-out one, mirroring PyCharm). Else error.
+      - run_test_gate(source); block on failure.
+      - switch to main (idempotent), then merge_branch(source).
+  * On conflict -> { conflict=>1, output=>... } so the UI can offer Abort.
+  * Returns { success, target, direction, conflict, error, output }.
+
+All git goes through git_service (_run whitelist). Logged via log_with_details.
+
+=cut
+
+sub merge :Path('/admin/git/merge') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $source = $c->req->param('source') // '';
+    my $target = $c->req->param('target') // '';
+
+    unless ($source && $target) {
+        $c->response->body(encode_json({ success => 0, error => 'Both source and target are required.' }));
+        return;
+    }
+    if ($source eq $target) {
+        $c->response->body(encode_json({ success => 0, error => 'Cannot merge a branch into itself.' }));
+        return;
+    }
+
+    # The literal 'git' branch is reserved (collides with the command). The UI
+    # should never offer it, but reject defensively — same guard as op=switch.
+    if ($source eq 'git' || $target eq 'git') {
+        $c->response->body(encode_json({ success => 0, error => "Branch 'git' is reserved and cannot be merged." }));
+        return;
+    }
+
+    my $direction;
+    my $res;
+
+    if ($source eq 'main' && $target ne 'main') {
+        # main -> branch: pull main's current state down into the target branch.
+        $direction = 'main->branch';
+        my $sw = $self->git_service->switch_branch($c, $target);
+        unless ($sw->{success}) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+                "switch to '$target' failed: " . ($sw->{error_msg} // ''));
+            $c->response->body(encode_json({
+                success => 0, error => "Could not switch to '$target': " . ($sw->{error_msg} // ''),
+                output  => $sw->{output} // '',
+            }));
+            return;
+        }
+        $res = $self->git_service->merge_branch($c, 'main');
+        $res->{output} = ($sw->{output} // '') . "\n" . ($res->{output} // '');
+    }
+    elsif ($source ne 'main' && $target eq 'main') {
+        # branch -> main: only when the source branch is the active checkout.
+        $direction = 'branch->main';
+        my $current = $self->get_current_branch($c);
+        unless ($current eq $source) {
+            $c->response->body(encode_json({
+                success => 0,
+                error   => "Switch to '$source' first (it must be the active branch to merge into main).",
+            }));
+            return;
+        }
+        # Test gate: block branch->main unless the worktree tests are green.
+        my $gate = $self->git_service->run_test_gate($c, $source);
+        unless ($gate->{success}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+                "test gate FAILED for '$source' — merge blocked");
+            $c->response->body(encode_json({
+                success => 0,
+                error   => "Test gate FAILED for '$source' — merge blocked. Fix tests in the worktree first.",
+                detail  => $gate->{output},
+            }));
+            return;
+        }
+        my $sw = $self->git_service->switch_branch($c, 'main');
+        unless ($sw->{success}) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+                "switch to main failed: " . ($sw->{error_msg} // ''));
+            $c->response->body(encode_json({
+                success => 0, error => "Could not switch to main: " . ($sw->{error_msg} // ''),
+                output  => $sw->{output} // '',
+            }));
+            return;
+        }
+        $res = $self->git_service->merge_branch($c, $source);
+        $res->{output} = ($sw->{output} // '') . "\n" . ($res->{output} // '');
+    }
+    else {
+        $c->response->body(encode_json({
+            success => 0,
+            error   => "Unsupported merge direction: source='$source', target='$target'.",
+        }));
+        return;
+    }
+
+    if ($res->{conflict}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge conflict: direction=$direction source=$source target=$target");
+        $c->response->body(encode_json({
+            success  => 0,
+            conflict => 1,
+            target   => $target,
+            direction => $direction,
+            error    => "Merge conflict. Resolve in the worktree, then retry (or abort).",
+            output   => $res->{output},
+        }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'git_merge', "direction=$direction source=$source target=$target success=" . ($res->{success} // 0));
+
+    $c->response->body(encode_json({
+        success   => $res->{success} ? 1 : 0,
+        target    => $target,
+        direction => $direction,
+        conflict  => 0,
+        error     => $res->{error_msg},
+        output    => $res->{output},
+    }));
+}
+
+=head2 merge_abort
+
+POST /admin/git/merge/abort (admin-gated git_merge)
+Cancel a conflicted in-progress merge. Wraps git_service->merge_abort
+(git merge --abort, flag already whitelisted in _run). Returns
+{ success, output, error }.
+
+=cut
+
+sub merge_abort :Path('/admin/git/merge/abort') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $res = $self->git_service->merge_abort($c);
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'git_merge_abort', "success=" . ($res->{success} // 0));
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        output  => $res->{output},
+        error   => $res->{error_msg},
+    }));
+}
 
 sub push_main :Path('/admin/git/push_main') :Args(0) {
     my ($self, $c) = @_;

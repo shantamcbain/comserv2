@@ -9,6 +9,12 @@
 %]
 [% PageVersion = 'admin/git/index.tt,v 0.02 2026/07/31 shanta Exp shanta ' %]
 
+[%# Absolute-URL building for branch links (RELATIVE-URL TRAP: a relative path
+    resolves against the current page origin, so the Open button would reopen
+    the SAME server instead of the branch's own port). Build the full URL. #]
+[% SET scheme = c.req.uri.scheme %]
+[% SET host = c.req.uri.host %]
+
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -309,7 +315,11 @@
                                 <td class="git-dev-actions">
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
                                             data-open-branch="[% b.name | html %]" data-port="[% b.port %]"
-                                            data-url="[% b.url | html %]" data-cmd="[% b.cmd | html %]">Open</button>
+                                            data-url="[% scheme %]://[% host %]:[% b.port %][% b.url | html %]"
+                                            data-cmd="[% b.cmd | html %]">Open</button>
+                                    <button type="button" class="admin-btn admin-btn-sm"
+                                            data-hermes-branch="[% b.name | html %]"
+                                            data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</button>
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
                                             data-branch-action="stop" data-branch="[% b.name | html %]" data-port="[% b.port %]">Stop</button>
                                     <button type="button" class="admin-btn admin-btn-sm"
@@ -340,6 +350,58 @@
                 </div>
             </div>
             [% END %]
+
+            [%# ===== Merge (main <-> branch, one at a time) =====
+                Driven by git-dashboard.js via data-attr delegation. Two directions:
+                merge main into the selected branch (always allowed), or merge the
+                selected branch into main (only when it is the active/checked-out
+                branch, mirroring PyCharm). Conflicts reveal the Abort button. %]
+            <details class="git-collapse git-merge-card">
+                <summary>Merge <span class="git-count">(main &harr; branch, one at a time)</span></summary>
+                <div class="git-collapse-body">
+                    <div class="git-inline git-merge-controls">
+                        <label>Branch
+                            <select name="merge_branch" class="form-control git-select"
+                                    id="git-merge-branch" data-git-merge-select="1"
+                                    title="Branch to merge with main">
+                                [% FOREACH b IN branch_details %]
+                                [% IF b.name != 'git' %]
+                                <option value="[% b.name | html %]"[% IF b.is_current %] selected[% END %]>[% b.name | html %][% IF b.is_current %] (active)[% END %]</option>
+                                [% END %]
+                                [% END %]
+                            </select>
+                        </label>
+                    </div>
+
+                    <p class="git-merge-hint">
+                        <i class="fas fa-info-circle"></i>
+                        Active branch: <code class="code-inline" data-git-current-branch="1">[% current_branch | html %]</code>
+                    </p>
+
+                    <div class="git-actions">
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                data-git-merge="1" data-merge-direction="main-to-branch"
+                                data-merge-url="[% c.uri_for('/admin/git/merge') %]">
+                            <i class="fas fa-arrow-down"></i> Merge main &rarr; this branch
+                        </button>
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                data-git-merge="1" data-merge-direction="branch-to-main"
+                                data-merge-url="[% c.uri_for('/admin/git/merge') %]"
+                                data-git-merge-disabled-unless-current="1">
+                            <i class="fas fa-arrow-up"></i> Merge this branch &rarr; main
+                        </button>
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
+                                data-git-merge-abort="1"
+                                data-merge-abort-url="[% c.uri_for('/admin/git/merge/abort') %]"
+                                style="display:none;">
+                            <i class="fas fa-ban"></i> Abort merge
+                        </button>
+                    </div>
+
+                    <div data-git-merge-status="1" class="git-merge-status"></div>
+                    <pre data-git-merge-output="1" class="git-merge-output" style="display:none;"></pre>
+                </div>
+            </details>
 
             [%# ==================== Branches (collapsed) ==================== %]
             <details class="git-collapse">

@@ -475,6 +475,10 @@ sub get_local_branches {
         $line =~ s/^\s+|\s+$//g;
         $line =~ s/\x1b\[[0-9;]*m//g;
         next if !$line || $line =~ /^\(.*\)$/;
+        # 'git' is a reserved word (it collides with the git command itself) and
+        # can never be checked out or merged — skip it everywhere so it can't be
+        # offered in the UI or validated as a real branch.
+        next if $line eq 'git';
         push @branches, $line;
     }
     return \@branches;
@@ -1134,6 +1138,10 @@ sub build_worktree_list {
         label => 'MAIN',
         url   => '/planning/daily',
         cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
+        # Hermes CLI for THIS checkout. Running from the worktree git-root makes Hermes
+        # auto-load the branch .hermes.md (which pulls in the global rules + domain
+        # expertise). -w = worktree-safe mode (parallel agents, no git conflicts).
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat -w',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
@@ -1147,6 +1155,8 @@ sub build_worktree_list {
             url   => $b->{url}   // '/planning/daily',
             cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
+            # Branch Hermes: cwd = the worktree's own git root so its .hermes.md loads.
+            hermes_cmd => "cd $base/$name/Comserv && hermes chat -w",
         };
     }
     return \@list;
@@ -1367,7 +1377,15 @@ sub merge_branch {
         $result->{error_msg} = "Branch name is required.";
         return $result;
     }
-    if ($branch eq 'main' || $branch eq 'master' || $branch eq 'Production') {
+    # Guard: refuse to merge a protected branch *into itself* (merging main INTO a
+    # worktree branch — the "pull main down" direction — is the normal, intended
+    # operation and must NOT be blocked). Previously this refused any merge that
+    # named main as the source, which broke the main->branch "update this branch"
+    # direction entirely. Now we only refuse main->main / master->master.
+    my $current = $self->get_current_branch($c);
+    if (($branch eq 'main'   && $current eq 'main')
+     || ($branch eq 'master' && $current eq 'master')
+     || ($branch eq 'Production' && $current eq 'Production')) {
         $result->{error_msg} = "Refusing to merge a protected branch into itself.";
         return $result;
     }
@@ -1384,6 +1402,34 @@ sub merge_branch {
             $result->{conflict} = 1;
         }
         $result->{error_msg} = "Merge of '$branch' failed (see output).";
+    }
+    return $result;
+}
+
+=head2 merge_abort($c)
+
+Cancel a conflicted in-progress merge via C<git merge --abort> (flag already
+whitelisted in C<_run>). Returns { success, output }. If there is nothing to
+abort, git exits cleanly and we report success with the (empty) output rather
+than raising a false error.
+
+=cut
+
+sub merge_abort {
+    my ($self, $c) = @_;
+    my $result = { success => 0, output => '', action => 'merge_abort' };
+
+    my $r = $self->_run($c, 'merge', '--abort');
+    $result->{output} = $r->{output};
+    # git merge --abort exits 0 when it aborts, and also exits 0 (no-op) when
+    # there is no merge in progress in modern git. Treat either as success so
+    # the UI's Abort button always resolves a conflicted state cleanly.
+    if ($r->{success}) {
+        $result->{success}     = 1;
+        $result->{success_msg} = "Merge aborted.";
+    }
+    else {
+        $result->{error_msg} = "Merge abort failed (see output).";
     }
     return $result;
 }
