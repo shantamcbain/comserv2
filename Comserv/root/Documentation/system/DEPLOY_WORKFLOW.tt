@@ -80,6 +80,31 @@ identity pulled from <code>version.json</code>:</p>
 </ul>
 <p>This single check is what catches the "old server" problem before customers hit it.</p>
 
+<h2 id="current_state">Current operational state (2026-08-15 fixes)</h2>
+<p>All deploy paths now flow through one canonical engine — <code>Comserv/script/deploy.sh::canonical_deploy</code> —
+invoked by the dashboard <em>Rebuild</em> / <em>Pull &amp; Deploy</em> buttons (via <code>lib/Comserv/Controller/Admin/Docker.pm</code>
+&rarr; <code>deploy.sh --deploy-to-node 192.168.1.126</code>). The sequence is: <strong>build on the workstation &rarr; push to
+Docker Hub &rarr; rename live container to a <code>bk-</code> backup &rarr; pull the exact digest on production1 &rarr;
+<code>compose up -d --no-build --force-recreate</code> &rarr; health gate (rollback on failure)</strong>. Key invariants now enforced:</p>
+<ul>
+    <li><strong>Never build on production1.</strong> <code>canonical_deploy</code> runs <code>docker compose build</code>/<code>push</code> only when
+        <code>TARGET_HOST == local</code>. Remote targets skip straight to pull+run; the workstation already built and pushed. (Production1 has no source tree to build from.)</li>
+    <li><strong>Compose is merged.</strong> The script invokes <code>docker compose -f docker-compose.yml -f docker-compose.prod.yml</code>
+        so the <code>comserv2_*</code> volume declarations in the base file are available — running <code>-f docker-compose.prod.yml</code>
+        alone aborts with <code>undefined volume comserv2_cache</code>.</li>
+    <li><strong>SSH to production1 is authenticated.</strong> <code>load_ssh_password()</code> exports <code>SSHPASS</code> from
+        <code>~/.comserv/secrets/ssh_credentials.json</code> before the remote <code>sshpass -e</code> hop, so the pull step can reach 192.168.1.126.</li>
+    <li><strong>Static assets come from the image.</strong> <code>docker-compose.prod.yml</code> does NOT bind a host <code>/root/static</code>
+        over the container; CSS/JS serve from the baked <code>/opt/comserv/root/static</code> tree. A stale container with the old
+        empty-bind still shows no CSS until it is recreated from the fixed image.</li>
+    <li><strong>No auto-commit.</strong> The script no longer git-commits; all code ships inside the image.</li>
+</ul>
+<p><strong>Single-click path that works today:</strong> from the workstation <code>/admin/docker-containers</code> page, use the
+<em>Rebuild</em> control (mode <code>pull-deploy</code> or Full Rebuild). It builds on the workstation, pushes, then pulls+recreates
+on production1. The first full build (no cache) can take 20–40 min — the dashboard poll timeout is 60 min, and progress streams to
+<code>/tmp/comserv_deploy.log</code> on the workstation even if the UI poll is briefly slow.</p>
+<p><em>See <a href="/Documentation/changelog">Changelog (2026-08-15: Dashboard pull/deploy to prod now works end-to-end)</a> for the full root-cause list.</em></p>
+
 <h2 id="trouble">Troubleshooting</h2>
 <table class="diagnostic-table">
     <tbody>
@@ -87,15 +112,23 @@ identity pulled from <code>version.json</code>:</p>
             <td>Pull &amp; Deploy did not update the image. Re-run Step 3; check the deploy log for
                 <code>pull</code> errors or a health-check failure that triggered rollback.</td></tr>
         <tr><td><strong>Container "unhealthy" after deploy</strong></td>
-            <td>New code failed the health check → auto-rolled back to the previous image. Read the container
+            <td>New code failed the health check &rarr; auto-rolled back to the previous image. Read the container
                 logs (<code>docker logs comserv2-web-prod</code>) for the boot error. Fix, then redeploy.</td></tr>
         <tr><td><strong>"Built but nothing changed"</strong></td>
             <td>Stale Docker layer. No Cache is default-on now; if you unchecked it, re-run with it checked.</td></tr>
         <tr><td><strong>Cannot deploy from inside production1</strong></td>
             <td>Expected. Production1 is a container; Docker management is blocked there. Always drive deploys
                 from the workstation UI.</td></tr>
-    </tbody>
-</table>
+        <tr><td><strong><code>undefined volume comserv2_cache: invalid compose project</code></strong></td>
+            <td>The deploy ran <code>docker compose -f docker-compose.prod.yml</code> without the base file. Fixed in
+                <code>deploy.sh</code> via <code>COMPOSE_ARGS</code> merge; if you run compose manually on prod, always include
+                <code>-f docker-compose.yml</code> too.</td></tr>
+        <tr><td><strong>Production site has no CSS / unstyled</strong></td>
+            <td>The running container is stale (old empty <code>/root/static</code> bind). Pull + recreate from the fixed image
+                (Step 3 / Rebuild) so the baked <code>root/static/css</code> tree is used. Do not bind a host <code>/root/static</code>.</td></tr>
+        <tr><td><strong>Deploy aborts with <code>command not found</code> / <code>... not found. Aborting.</code></strong></td>
+            <td>Stale <code>deploy.sh</code> on the server. Ensure <code>/opt/comserv/Comserv/script/deploy.sh</code> (and
+                <code>/opt/comserv/Comserv/deploy.sh</code>) is the current copy; the dashboard self-updates it on each run.</td></tr>
 
 <h2 id="future">Reserved / Future</h2>
 <p>The code retains an internal path that triggers a deploy from inside a production container (it SSHes back to

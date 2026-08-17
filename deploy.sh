@@ -156,17 +156,6 @@ for cand in \
     fi
 done
 # Final fallback (matches prior behaviour) if nothing matched.
-[ -f "$REPO_DP/docker-compose.yml" ] && BASE_CAND="$REPO_DP/docker-compose.yml"
-[ -f "$SCRIPT_DIR_DP/docker-compose.yml" ] && BASE_CAND="$SCRIPT_DIR_DP/docker-compose.yml"
-[ -f "/opt/comserv/Comserv/docker-compose.yml" ] && BASE_CAND="/opt/comserv/Comserv/docker-compose.yml"
-BASE_CAND="${BASE_CAND:-}"
-# COMPOSE_ARGS: merge base (volume defs) + chosen compose file so standalone
-# `docker compose -f <prod>` does not abort on "undefined volume".
-if [ -n "$BASE_CAND" ] && [ "$BASE_CAND" != "$COMPOSE_FILE" ]; then
-    COMPOSE_ARGS="-f $BASE_CAND -f $COMPOSE_FILE"
-else
-    COMPOSE_ARGS="-f $COMPOSE_FILE"
-fi
 [ -z "$COMPOSE_FILE" ] && COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
 # Standard container name is "comserv2-web-prod" (matches comserv2-config-db,
@@ -566,7 +555,7 @@ sync_host_app_lib() {
 
     echo "   Restarting $CONTAINER to load updated Perl modules..."
     docker restart "$CONTAINER" >/dev/null 2>&1 \
-        || docker compose $COMPOSE_ARGS restart web-prod >/dev/null 2>&1 \
+        || docker compose -f "$COMPOSE_FILE" restart web-prod >/dev/null 2>&1 \
         || true
 
     local attempt=0
@@ -594,11 +583,9 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             # Route through the SINGLE canonical pipeline so every entry point
             # produces the identical result (build -> push -> pull -> run --no-build).
             # "prod" mode means production — default the target to prod1
-            # (192.168.1.126). This must BUILD+PUSH on the workstation first,
-            # then pull+run on prod (never build on prod itself). Route through
-            # canonical_deploy_to_nodes so the build happens locally and the
-            # remote node only pulls the pushed digest.
-            canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
+            # (192.168.1.126) rather than "local", which would deploy to the
+            # workstation and never touch the live server.
+            canonical_deploy "${PROD_TARGET_HOST:-192.168.1.126}"
             exit $?
             ;;
 
@@ -636,14 +623,14 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             
             # Just pull and deploy - skip all build/push logic
             echo "Pulling latest image from Docker Hub..."
-            docker compose $COMPOSE_ARGS pull || echo "Pull failed!"
+            docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
             
             echo "Stopping old container..."
             docker stop "$CONTAINER" 2>/dev/null || true
             docker rm -f "$CONTAINER" 2>/dev/null || true
             
             echo "Starting new container..."
-            docker compose $COMPOSE_ARGS up -d --force-recreate
+            docker compose -f "$COMPOSE_FILE" up -d --force-recreate
             
             echo "✅ Deploy-only complete"
             exit 0
@@ -732,36 +719,28 @@ canonical_deploy() {
     echo "═══════════════════════════════════════════════════════════════════"
 
     # ── 1. clean build (local working tree) ──
-    # Only build when deploying to the LOCAL host. For a remote target the
-    # build+pull already happened on the workstation (via canonical_deploy_to_nodes
-    # or the --prod path), so the remote node must ONLY pull+run the pushed
-    # digest — never build from a (non-existent) source tree on prod.
-    if [ "$TARGET_HOST" = "local" ]; then
-        echo "--- [1/6] CLEAN BUILD (local) ---"
-        if ! docker compose $COMPOSE_ARGS build --pull "$SVC"; then
-            echo "❌ Build failed — aborting. Running container untouched."
-            return 1
-        fi
-        local LOCAL_ID
-        LOCAL_ID=$(docker inspect --format='{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)
-        echo "✅ Built $IMAGE (id ${LOCAL_ID:-unknown})"
-
-        # ── 2. clean push (one :latest; image is the unit) ──
-        echo "--- [2/6] CLEAN PUSH ---"
-        if ! docker compose $COMPOSE_ARGS push "$SVC"; then
-            echo "❌ Push failed — aborting."
-            return 1
-        fi
-        echo "✅ Pushed $IMAGE"
-    else
-        echo "--- [1-2/6] SKIP BUILD/PUSH (remote target=$TARGET_HOST) ---"
-        echo "    Image was built+pushed on the workstation; this node only pulls+runs."
+    echo "--- [1/6] CLEAN BUILD ---"
+    # Always build from a clean context; --pull refreshes base images.
+    if ! docker compose -f "$COMPOSE_FILE" build --pull "$SVC"; then
+        echo "❌ Build failed — aborting. Running container untouched."
+        return 1
     fi
+    local LOCAL_ID
+    LOCAL_ID=$(docker inspect --format='{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)
+    echo "✅ Built $IMAGE (id ${LOCAL_ID:-unknown})"
+
+    # ── 2. clean push (one :latest; image is the unit) ──
+    echo "--- [2/6] CLEAN PUSH ---"
+    if ! docker compose -f "$COMPOSE_FILE" push "$SVC"; then
+        echo "❌ Push failed — aborting."
+        return 1
+    fi
+    echo "✅ Pushed $IMAGE"
 
     # ── 3+4. clean pull + run --no-build on the target (local or remote) ──
     echo "--- [3/6] CLEAN PULL + [4/6] RUN (--no-build) ---"
     local RUN_CMD
-    RUN_CMD="cd /opt/comserv/Comserv && docker compose $COMPOSE_ARGS pull $SVC && docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $SVC"
+    RUN_CMD="cd /opt/comserv/Comserv && docker compose -f $COMPOSE_FILE pull $SVC && docker compose -f $COMPOSE_FILE up -d --force-recreate --no-build $SVC"
     if [ -n "$REMOTE_SSH" ]; then
         # Pre-create standardized volumes on the remote (idempotent, never rm).
         $REMOTE_SSH "bash -s" <<'EOF' || true
@@ -782,7 +761,7 @@ EOF
             docker stop "\$BK" 2>/dev/null || true
         fi
 EOF
-        if ! $REMOTE_SSH "cd /opt/comserv/Comserv && docker compose $COMPOSE_ARGS pull $SVC && docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $SVC"; then
+        if ! $REMOTE_SSH "cd /opt/comserv/Comserv && docker compose -f $COMPOSE_FILE pull $SVC && docker compose -f $COMPOSE_FILE up -d --force-recreate --no-build $SVC"; then
             echo "❌ Remote pull/run failed — check container logs on $TARGET_HOST."
             return 1
         fi
@@ -869,7 +848,7 @@ if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
             ;;
         "pull_only")
             echo "Pulling latest image from Docker Hub..."
-            docker compose $COMPOSE_ARGS pull || echo "Pull failed!"
+            docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
             exit 0
             ;;
         "stop_all")
@@ -877,7 +856,7 @@ if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
             echo "1. Stopping container $CONTAINER..."
             docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
             docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
-            docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true
+            docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
             
             echo "2. Force-killing host-level Starman/Plackup processes..."
             safe_pkill_f "starman"
@@ -1007,14 +986,14 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                 ;;
             3)
                 echo "Pulling latest image from Docker Hub..."
-                docker compose $COMPOSE_ARGS pull || echo "Pull failed!"
+                docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
                 ;;
             4)
                 echo "Stopping all services..."
                 echo "1. Stopping container $CONTAINER..."
                 docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
                 docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
-                docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true
+                docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
                 
                 echo "2. Force-killing host-level Starman/Plackup processes..."
                 safe_pkill_f "starman"
@@ -1335,11 +1314,11 @@ if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
     if ! docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
         echo "MONITOR: container $CONTAINER absent — pulling latest then recreating (--no-build)..."
         docker pull "$IMAGE" 2>&1 | grep -v "^$" || true
-        docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
+        docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
     elif [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then
         echo "MONITOR: container $CONTAINER present but not running — starting..."
         docker start "$CONTAINER" 2>&1 | grep -v "^$" || \
-            docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
+            docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
     fi
 fi
 
@@ -1540,7 +1519,7 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
 
         for ATTEMPT in 1 2 3; do
             echo "   [Recovery] Attempt $ATTEMPT of 3: restarting container $CONTAINER..."
-            docker restart "$CONTAINER" >/dev/null 2>&1 || docker compose $COMPOSE_ARGS restart "$CONTAINER" >/dev/null 2>&1 || true
+            docker restart "$CONTAINER" >/dev/null 2>&1 || docker compose -f "$COMPOSE_FILE" restart "$CONTAINER" >/dev/null 2>&1 || true
             sleep 5
             
             echo "   [Recovery] Waiting up to ${RECOVERY_WAIT_S}s for container to become healthy..."
@@ -1614,7 +1593,7 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                 docker tag "$B_IMAGE" shantamcsbain/comserv-web-prod:latest
                 
                 echo "   [Fallback] Launching container with rolled-back image..."
-                docker compose $COMPOSE_ARGS up -d --force-recreate
+                docker compose -f "$COMPOSE_FILE" up -d --force-recreate
                 
                 echo "   [Fallback] Checking health of the backup container $B_TAG (up to 60s)..."
                 B_HEALTHY=0
@@ -1763,14 +1742,14 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                         cat "$STARMAN_LOG" || true
                         echo "   [Emergency] Host fallback failed — restarting the container so SOMETHING serves port 5000."
                         docker start "$CONTAINER" 2>/dev/null \
-                            || docker compose $COMPOSE_ARGS up -d 2>/dev/null \
+                            || docker compose -f "$COMPOSE_FILE" up -d 2>/dev/null \
                             || echo "   ❌ [Emergency] Could not bring the container back up. Manual intervention required."
                     fi
                 else
                     echo "   ❌ [Emergency] Could not find host Catalyst PSGI file on host."
                     echo "   [Emergency] No fallback available — leaving the container in place and retrying it."
                     docker start "$CONTAINER" 2>/dev/null \
-                        || docker compose $COMPOSE_ARGS up -d 2>/dev/null \
+                        || docker compose -f "$COMPOSE_FILE" up -d 2>/dev/null \
                         || echo "   ❌ [Emergency] Container could not be started. Manual intervention required."
                 fi
             fi
@@ -1836,7 +1815,7 @@ else
     # 'compose pull' is a no-op and the later 'up' would rebuild from the stale
     # host context instead of running the pushed image. Pull the exact digest.
     docker pull "$IMAGE" || echo "⚠ Pull failed — will try compose pull fallback."
-    docker compose $COMPOSE_ARGS pull 2>/dev/null || true
+    docker compose -f "$COMPOSE_FILE" pull 2>/dev/null || true
 fi
 
 VERSION_INFO=$(docker inspect --format='{{index .Config.Labels "app.version"}}' "$IMAGE" 2>/dev/null || true)
@@ -1848,7 +1827,7 @@ echo "   Version: $VERSION_INFO"
 echo "2. Stopping and removing old container..."
 docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
 docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
-docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true
+docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "2b. Checking for host processes occupying port 5000/3000 outside Docker..."
 # Stop host port 5000/3000 processes to prevent "port already in use" binding errors in Docker
@@ -1962,7 +1941,7 @@ if ! docker pull "$IMAGE"; then
 fi
 echo "   Pulled: $(docker inspect -f '{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)"
 echo "3. Starting container from the PULLED image (--no-build)..."
-docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-build web-prod
 
 echo "3a. Syncing host lib into container..."
 sync_host_app_lib || true
@@ -2093,7 +2072,7 @@ else
         docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest
         
         echo "   [Fallback] Launching container with rolled-back image..."
-        COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose $COMPOSE_ARGS up -d --force-recreate
+        COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
         
         echo "   [Fallback] Checking health of the backup container (up to 60s)..."
         FALLBACK_ATTEMPT=0
