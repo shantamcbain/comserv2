@@ -4,8 +4,8 @@
    roles = "admin"
    TemplateType = "Application"
    category = "Admin"
-   page_version = "0.01"
-   last_updated = "2026-08-15"
+   page_version = "0.02"
+   last_updated = "2026-08-16"
 %]
 
 <style>
@@ -17,13 +17,14 @@
 .sev-info       { color:var(--info-color, #06c); }
 .la-code        { font-family:monospace; font-size:0.85em; color:var(--text-muted-color, #666); }
 .la-empty       { padding:20px; text-align:center; color:var(--text-muted-color, #888); }
+.la-volume      { margin:0 0 20px; padding:12px 0; }
 </style>
 
 <div class="app-container">
     <div class="page-header page-header-actions">
         <h1>Logging Audit</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <form method="post" action="[% trigger_url %]" style="display:inline;">
+            <form method="post" action="[% trigger_url %]" style="display:inline;" data-busy-on-submit>
                 <button type="submit" class="btn btn-primary">&#128270; Run scan now</button>
             </form>
             <a href="[% c.uri_for('/admin/hardware_monitor') %]" class="btn btn-secondary">&#128268; Hardware Monitor</a>
@@ -45,6 +46,49 @@
         findings from the most recent cron or manual scan. The cron runs
         <code>/admin/logging_audit/run</code> (token-guarded, like the hardware monitor).
     </p>
+
+    [%# System Log Volume summary — surface per-level counts so admins are aware
+        of warn/error/critical volume. Problem levels (error/critical) are flagged. %]
+    [% SET level_rows = [];
+       SET problem_levels = [];
+       FOR f IN findings;
+           IF f.finding == 'level_count';
+               SET cnt = f.detail.split('count=').last;
+               level_rows.push({ level => f.target, count => cnt });
+               IF f.target == 'error' OR f.target == 'critical';
+                   IF cnt AND cnt != 0; problem_levels.push(f.target _ '=' _ cnt); END;
+               END;
+           END;
+       END;
+    %]
+    [% IF level_rows.size %]
+    <div class="la-volume"[% IF problem_levels.size %] style="border-left:4px solid var(--danger-color, #c00); padding-left:12px;"[% END %]>
+        <h3 style="margin:0 0 8px;">System Log Volume (last 7 days)</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:.85em;">Click a level to drill down into the actual log entries.</p>
+        <table class="data-table" style="width:auto;">
+            <thead><tr><th>Level</th><th>Count</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            [% FOREACH lr IN level_rows %]
+                [% SET drill = c.uri_for('/admin/logging', { filter_level => lr.level }) %]
+                <tr class="sev-[% lr.level %]" style="cursor:pointer;">
+                    <td><a href="[% drill %]" style="color:inherit;font-weight:bold;">[% lr.level | upper %] &rarr;</a></td>
+                    <td><a href="[% drill %]" style="color:inherit;">[% lr.count %]</a></td>
+                    <td>[% IF lr.level == 'critical' OR lr.level == 'error' %]<span class="sev-critical">ATTENTION</span>[% ELSE %]informational[% END %]</td>
+                    <td><a href="[% drill %]" class="btn btn-sm btn-secondary">View</a></td>
+                </tr>
+            [% END %]
+            </tbody>
+        </table>
+        [% IF problem_levels.size %]
+        <p class="sev-critical" style="margin-top:8px;">
+            &#9888; Elevated [% problem_levels.join(', ') %] &mdash; review the
+            <a href="[% c.uri_for('/admin/logging') %]">system log</a> for failure paths.
+        </p>
+        [% ELSE %]
+        <p class="muted" style="margin-top:8px;">No error/critical volume in the window &mdash; levels shown are informational.</p>
+        [% END %]
+    </div>
+    [% END %]
 
     [% IF findings.size %]
         <table class="la-table">

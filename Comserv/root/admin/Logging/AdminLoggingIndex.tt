@@ -134,6 +134,21 @@ tr.level-critical    { background:#f8d7da; font-weight:bold; }
                     </form>
                 </div>
 
+                [%# Drill-down breakdown: "number of each" area/subroutine for the active filter. %]
+                [% IF level_area_counts AND level_area_counts.size %]
+                <div class="la-area-breakdown" style="margin:12px 0;">
+                    <h4 style="margin:0 0 6px;">Breakdown by area (number of each)</h4>
+                    <table class="data-table" style="width:auto;">
+                        <thead><tr><th>Area / Subroutine</th><th>Count</th></tr></thead>
+                        <tbody>
+                        [% FOREACH ac IN level_area_counts %]
+                            <tr><td>[% ac.area | html %]</td><td>[% ac.count %]</td></tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% END %]
+
                 <div class="table-container log-table-scroll">
                     <table class="data-table">
                         <thead>
