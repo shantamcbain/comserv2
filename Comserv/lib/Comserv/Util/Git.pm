@@ -304,13 +304,23 @@ sub _run {
 
     my $result = { success => 0, exit_code => -1, output => '', error => '', data => {} };
 
-    my $tinfo = $self->resolve_target($c, $opts{target});
+    my $tinfo;
+    if ($opts{repo}) {
+        # Explicit repository path override (local mode). Used when the caller
+        # needs git to run inside a specific checkout (e.g. a branch worktree)
+        # rather than the resolved default repo. Bypasses resolve_target but
+        # still goes through the same argv whitelist below.
+        $tinfo = { mode => 'local', repo => $opts{repo}, host => '', user => '', port => 22, label => 'explicit' };
+    }
+    else {
+        $tinfo = $self->resolve_target($c, $opts{target});
+    }
 
     # If the caller didn't pass an explicit target, honor the one bound for this
     # request (set once by the controller from the dashboard's target selector).
     # This lets the whole subsystem route to a remote host with a single line of
     # controller code rather than threading target through every public method.
-    unless ($opts{target}) {
+    unless ($opts{target} || $opts{repo}) {
         my $req_target = $c->stash->{git_target}
                       // ($c->req ? $c->req->param('target') : undef);
         $tinfo = $self->resolve_target($c, $req_target) if defined $req_target;
@@ -1071,6 +1081,28 @@ sub list_worktrees {
     }
     push @rows, _worktree_row($path, $branch) if defined $path;
     return \@rows;
+}
+
+=head2 worktree_checkout_path_for_branch($c, $branch)
+
+Resolve the on-disk checkout path where $branch is currently checked out, so
+git operations can run directly in that tree instead of trying to check the
+branch out elsewhere (which fails for worktree branches — a branch already
+checked out in another worktree cannot be checked out in the main repo).
+
+Returns the path string, or undef if the branch is not currently checked out
+in any worktree (e.g. a local-only branch with no worktree).
+
+=cut
+
+sub worktree_checkout_path_for_branch {
+    my ($self, $c, $branch) = @_;
+    my $wts = $self->list_worktrees($c) or return undef;
+    for my $wt (@$wts) {
+        next unless $wt->{branch} && $wt->{branch} eq $branch;
+        return $wt->{path} if $wt->{path} && -d $wt->{path};
+    }
+    return undef;
 }
 
 sub _worktree_row {
