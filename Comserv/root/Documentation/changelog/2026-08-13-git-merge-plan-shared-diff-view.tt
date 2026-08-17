@@ -37,7 +37,7 @@
             <h2 id="summary" class="doc-h2">1. Summary</h2>
             <p class="doc-body">Updated <a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a> from v0.1 → v0.2 to capture two decisions the user made about the git page / review UI:</p>
             <ul class="doc-body">
-                <li><strong>One shared diff view.</strong> Created and modified files on the Git Dashboard must each link to a diff view, but there is exactly ONE diff-view component — seeded in the AI2 editor — and every surface (<code>/admin/git</code> working-tree rows, merge review, commit-message preview) links to or embeds it. No per-surface diff fork to maintain.</li>
+                <li><strong>One shared diff view.</strong> Created and modified files on the Git Dashboard must each link to a diff view, but there is exactly ONE diff-view component, and every surface (<code>/admin/git</code> working-tree rows, merge review, commit-message preview) links to or embeds it. No per-surface diff fork to maintain. <strong>Correction (2026-08-15):</strong> the original wording here claimed this was "seeded in the AI2 editor <code>git-review.js</code>" — that file never existed. What shipped instead were two bespoke inline renderers: <code>git-dashboard.js</code> (working-tree <code>#git-file-diff</code> panel via <code>GET /admin/git/file_diff</code>) and <code>ai2editor/file-diff.js</code> (<code>#git-diff-pane</code> via <code>GET /ai2/file_diff</code>). On 2026-08-15 the decision was actually implemented: a real canonical widget <code>root/static/js/git-diff-viewer.js</code> (namespace <code>ComservGitDiff</code>) was built and both renderers were refactored to route through it. See <a href="/Documentation/changelog/2026-08-15-git-diff-viewer-shared-widget" class="doc-link">2026-08-15 — shared diff widget built</a>.</li>
                 <li><strong>View, edit, approve before AI commits to main.</strong> The AI may commit only inside its worktree. Entry into <code>main</code> requires a human to open the shared diff view, optionally edit files, and record an explicit audit approval that covers the current diff. Merge/push to main are blocked without it.</li>
             </ul>
             <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
@@ -51,7 +51,7 @@
                 <tr><th class="doc-th">Topic</th><th class="doc-th">Decision</th><th class="doc-th">Plan section</th></tr>
                 <tr>
                     <td class="doc-td">Diff viewer architecture</td>
-                    <td class="doc-td">Single shared component (AI2 editor <code>git-review.js</code> + <code>review-diff</code> pane), reused by all surfaces. One page + one code path to maintain.</td>
+                    <td class="doc-td">Single shared component, reused by all surfaces. One page + one code path to maintain. <em>Implemented 2026-08-15 as <code>root/static/js/git-diff-viewer.js</code> (namespace <code>ComservGitDiff</code>); both the dashboard and AI2 editor renderers route through it. See the 2026-08-15 entry.</em></td>
                     <td class="doc-td">§3.5</td>
                 </tr>
                 <tr>

@@ -58,7 +58,7 @@ sub run_scan {
         my $by_level = $schema->storage->dbh->selectall_arrayref(
             "SELECT level, COUNT(*) AS cnt FROM system_log
              WHERE timestamp >= NOW() - INTERVAL ? DAY
-             GROUP BY level ORDER BY COUNT(*) DESC",
+             GROUP BY level ORDER BY cnt DESC",
             { Slice => {} }, $days
         );
         $summary->{log}{by_level} = $by_level // [];
@@ -82,7 +82,7 @@ sub run_scan {
                               : ($row->{level} =~ /warn/i)          ? 'warning'
                               : 'info',
                 target      => $row->{level} // 'unknown',
-                finding     => 'error_count',
+                finding     => 'level_count',
                 detail      => "level=" . ($row->{level} // '?') . " count=$cnt",
                 recommendation => $row->{level} =~ /critical|error/i
                     ? 'Review area for missing/insufficient log_with_details on failure paths'
@@ -90,11 +90,15 @@ sub run_scan {
             });
         }
     };
-    if ($@) {
-        $summary->{log}{error} = "$@";
-        # Best-effort alert; must NOT overwrite the captured error above.
+    my $log_err = $@;
+    if ($log_err) {
+        $summary->{log}{error} = "$log_err";
+        # Best-effort alert. Capture $log_err BEFORE the inner eval: a successful
+        # log_with_details() call resets $@ to "", which would otherwise clobber
+        # the real error and emit an empty "log scan failed: " message (the bug
+        # that keeps re-opening this todo with no detail).
         eval { Comserv::Util::Logging->instance->log_with_details($c, 'error', __FILE__, __LINE__,
-            'logging_audit.log_scan', "log scan failed: $@"); };
+            'logging_audit.log_scan', "log scan failed: $log_err"); };
     }
 
     # ---- 2) CODE SCAN ------------------------------------------------------
@@ -143,10 +147,12 @@ sub run_scan {
             }
         }
     };
-    if ($@) {
-        $summary->{code}{error} = "$@" unless defined $summary->{code}{error};
+    my $code_err = $@;
+    if ($code_err) {
+        $summary->{code}{error} = "$code_err" unless defined $summary->{code}{error};
+        # Same $@-clobber fix as the log scan: capture before the inner eval.
         eval { Comserv::Util::Logging->instance->log_with_details($c, 'error', __FILE__, __LINE__,
-            'logging_audit.code_scan', "code scan failed: $@"); };
+            'logging_audit.code_scan', "code scan failed: $code_err"); };
     }
 
     # ---- Summary log (audit trail of the audit) ----------------------------

@@ -623,7 +623,9 @@
 [% END %]
 
 <!-- Start displaying projects -->
+<div id="project-tree">
 [% display_project_tree(projects) %]
+</div>
 
 <!-- Button to add a new project -->
 [% IF c.session.username %]
