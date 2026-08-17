@@ -386,8 +386,7 @@
                         </button>
                         <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
                                 data-git-merge="1" data-merge-direction="branch-to-main"
-                                data-merge-url="[% c.uri_for('/admin/git/merge') %]"
-                                data-git-merge-disabled-unless-current="1">
+                                data-merge-url="[% c.uri_for('/admin/git/merge') %]">
                             <i class="fas fa-arrow-up"></i> Merge this branch &rarr; main
                         </button>
                         <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"

@@ -1886,34 +1886,46 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     my $direction;
     my $res;
 
+    # Both directions run INSIDE the branch's own worktree checkout:
+    #   * A worktree branch is already checked out in its own worktree, so it
+    #     cannot be checked out (switch_branch) in the main repo — git refuses
+    #     ("already used by worktree"). The worktree checkout is already on the
+    #     branch, so we run the merge there directly.
+    #   * run_test_gate runs script/test_gate.sh in that same worktree, so the
+    #     gate decision and the merge happen in the SAME tree (authoritative).
+    my $wt_path = $self->git_service->worktree_checkout_path_for_branch($c, $target);
+
     if ($source eq 'main' && $target ne 'main') {
         # main -> branch: pull main's current state down into the target branch.
+        # The branch is already checked out in its worktree, so we just merge
+        # origin/main into it there. No test gate (we are updating a worktree,
+        # not main).
         $direction = 'main->branch';
-        my $sw = $self->git_service->switch_branch($c, $target);
-        unless ($sw->{success}) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
-                "switch to '$target' failed: " . ($sw->{error_msg} // ''));
-            $c->response->body(encode_json({
-                success => 0, error => "Could not switch to '$target': " . ($sw->{error_msg} // ''),
-                output  => $sw->{output} // '',
-            }));
-            return;
-        }
-        $res = $self->git_service->merge_branch($c, 'main');
-        $res->{output} = ($sw->{output} // '') . "\n" . ($res->{output} // '');
-    }
-    elsif ($source ne 'main' && $target eq 'main') {
-        # branch -> main: only when the source branch is the active checkout.
-        $direction = 'branch->main';
-        my $current = $self->get_current_branch($c);
-        unless ($current eq $source) {
+        unless (defined $wt_path) {
             $c->response->body(encode_json({
                 success => 0,
-                error   => "Switch to '$source' first (it must be the active branch to merge into main).",
+                error   => "Branch '$target' is not checked out in any worktree; cannot merge main into it from the dashboard.",
             }));
             return;
         }
-        # Test gate: block branch->main unless the worktree tests are green.
+        # Make sure the worktree has the latest main before merging.
+        my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
+        my $up = $self->git_service->_run($c, 'merge', '--no-ff', 'origin/main',
+            { repo => $wt_path });
+        $res = {
+            success   => $up->{success} ? 1 : 0,
+            output    => ($fetch->{output} // '') . "\n" . ($up->{output} // ''),
+            error_msg => $up->{success} ? undef : ($up->{error} || 'merge failed'),
+            conflict  => ($up->{output} // '') =~ /CONFLICT|Automatic merge failed/ ? 1 : 0,
+        };
+    }
+    elsif ($source ne 'main' && $target eq 'main') {
+        # branch -> main: merge the worktree branch's work into the main repo.
+        #   - Gate: run the worktree test suite (authoritative for this branch).
+        #   - Then merge the branch ref into the main repo (which is on 'main').
+        #     We merge the branch by NAME, which is visible from the main repo
+        #     (refs/heads/<branch>), so no worktree checkout is needed here.
+        $direction = 'branch->main';
         my $gate = $self->git_service->run_test_gate($c, $source);
         unless ($gate->{success}) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
@@ -1925,18 +1937,20 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
-        my $sw = $self->git_service->switch_branch($c, 'main');
-        unless ($sw->{success}) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
-                "switch to main failed: " . ($sw->{error_msg} // ''));
-            $c->response->body(encode_json({
-                success => 0, error => "Could not switch to main: " . ($sw->{error_msg} // ''),
-                output  => $sw->{output} // '',
-            }));
-            return;
+        # If the branch has its own worktree, first bring it up to latest main
+        # so the worktree stays consistent (optional, best-effort).
+        if (defined $wt_path) {
+            $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
+            $self->git_service->_run($c, 'merge', '--no-ff', 'origin/main',
+                { repo => $wt_path });
         }
-        $res = $self->git_service->merge_branch($c, $source);
-        $res->{output} = ($sw->{output} // '') . "\n" . ($res->{output} // '');
+        my $mr = $self->git_service->merge_branch($c, $source);
+        $res = {
+            success   => $mr->{success} ? 1 : 0,
+            output    => $mr->{output} // '',
+            error_msg => $mr->{error_msg},
+            conflict  => $mr->{conflict} ? 1 : 0,
+        };
     }
     else {
         $c->response->body(encode_json({

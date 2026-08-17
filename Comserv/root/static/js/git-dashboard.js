@@ -251,34 +251,13 @@
         // --- "Merge" card: merge main into a selected branch, or the selected
         // branch into main. POSTs to /admin/git/merge (source/target) and renders
         // a status badge + output <pre>. On conflict, reveals the Abort button
-        // (POST /admin/git/merge/abort). The branch->main direction is disabled
-        // unless the selected branch is the currently-active one (PyCharm parity).
+        // (POST /admin/git/merge/abort). Both directions run inside the branch's
+        // own worktree checkout (main->branch) or by branch-name ref (branch->main),
+        // so neither requires switching the active branch.
         var mergeSelect = document.querySelector('[data-git-merge-select]');
         var mergeStatus = document.querySelector('[data-git-merge-status]');
         var mergeOutput = document.querySelector('[data-git-merge-output]');
         var mergeAbortBtn = document.querySelector('[data-git-merge-abort]');
-
-        function refreshMergeCardState() {
-            if (!mergeSelect) { return; }
-            var selBranch = mergeSelect.value || '';
-            var activeBranch = (mergeStatus && mergeStatus.getAttribute('data-active-branch'))
-                || (mergeSelect.form && mergeSelect.form.querySelector('[data-git-current-branch]')
-                    ? mergeSelect.form.querySelector('[data-git-current-branch]').textContent
-                    : '');
-            var btns = document.querySelectorAll('[data-git-merge][data-git-merge-disabled-unless-current]');
-            for (var i = 0; i < btns.length; i++) {
-                var disabled = (selBranch !== activeBranch);
-                btns[i].disabled = disabled;
-                btns[i].title = disabled
-                    ? "Switch to '" + selBranch + "' first (it must be the active branch to merge into main)"
-                    : '';
-            }
-        }
-
-        if (mergeSelect) {
-            mergeSelect.addEventListener('change', refreshMergeCardState);
-            refreshMergeCardState();
-        }
 
         function showMergeResult(success, conflict, title, output) {
             if (!mergeStatus) { return; }
