@@ -5,6 +5,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 
 use Try::Tiny;
 use JSON;
+use File::Spec;
 use File::Path qw(make_path);
 use Comserv::Util::EditorFile;
 use DateTime;
@@ -261,6 +262,237 @@ sub save_file :Local :Args(0) {
         $c->res->status($status);
         $c->res->body(encode_json($result));
     }
+}
+
+# -------------------------------------------------------------------
+# Git diff for the AI2 editor
+#
+# Lets the code editor show the working-tree diff (vs HEAD) of the file
+# currently open/modified, and a parsed change-set so the file tree can be
+# badged (M / U). Reuses Comserv::Util::Git so it inherits the same repo
+# resolution and argv whitelisting. Auth mirrors the rest of AI2: a logged-in
+# user with an editor/admin/developer role.
+# -------------------------------------------------------------------
+
+sub _ai2_require_editor_role {
+    my ($self, $c) = @_;
+    return 1 if $c->session->{username}
+        && grep { $_ =~ /^(admin|developer|editor)$/i }
+               (ref($c->session->{roles}) ? @{$c->session->{roles}}
+                : split(/\s*,\s*/, $c->session->{roles} || ''));
+    $c->res->status(403);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 0, error => 'Editor access required' }));
+    return 0;
+}
+
+# Map an app-relative editor path (rooted at the Catalyst app dir) to the
+# path git sees (rooted at the repo root, typically one level up). We do this
+# by resolving both to absolute paths and stripping the repo-root prefix, so
+# it is correct regardless of which subdir the file lives in.
+# Map an app-relative editor path (rooted at the Catalyst app dir) to the
+# path git sees. CRITICAL: the git repo root is resolved by the SAME
+# Util::Git->repo_path() that the git _run uses (config git_repo_path /
+# $ENV{COMSERV_GIT_REPO} / path_to('..')). In some deployments the repo root
+# IS the app dir (Comserv/), not one level up -- so we must strip that actual
+# repo root, never a hardcoded path_to('..'). Absolute paths are also accepted.
+# Map an app-relative editor path (rooted at the Catalyst app dir) to the
+# path git sees. The diff is run with `git -C $repo` (Util::Git->_run), and
+# $repo may point at a subdir of the real repository (e.g. Comserv/ while the
+# actual .git lives one level up at comserv2/). git interprets a relative diff
+# path against the REPO TOPLEVEL, not against $repo, so we must strip the true
+# toplevel prefix -- resolved live via `git rev-parse --show-toplevel` (with a
+# repo_path() fallback). Absolute paths are also accepted.
+# Map an app-relative editor path (as the frontend sends it) to the path
+# git expects. We deliberately do NOT hardcode any app/repo directory: everything
+# is derived from the running process and from git itself, so this works under
+# any deployment (Zenflow-style workflow, Docker, monorepo, app-dir repo, etc.).
+#
+#   * The app directory is wherever THIS code runs (Catalyst path_to(''), made
+#     absolute via Cwd) -- never a literal string.
+#   * git is run from repo_path() (Util::Git->_run already does `git -C <repo>`).
+#   * git tells us how to express a path relative to the repo root via
+#     `git rev-parse --show-prefix` (e.g. "Comserv/" when the app dir is a
+#     subdir of the repo, or "" when the app dir IS the repo). So the
+#     toplevel-relative path = show-prefix + app-relative path. No string math
+#     on "Comserv"/"comserv2" that could double up.
+sub _ai2_repo_rel_path {
+    my ($self, $c, $rel_path) = @_;
+    require Cwd;
+    require File::Spec;
+    my $app_dir = Cwd::abs_path($c->path_to('')->stringify) || $c->path_to('')->absolute->stringify;
+    $app_dir = File::Spec->canonpath($app_dir);
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+
+    # The directory git actually runs in (Util::Git->_run does `git -C <repo>`).
+    my $repo_root = $git->repo_path($c);
+    $repo_root = $c->path_to('..')->absolute->stringify unless $repo_root;
+    $repo_root = File::Spec->canonpath(Cwd::abs_path($repo_root) || $repo_root);
+
+    # The path git wants is relative to $repo_root. Compute it as the relative
+    # path from $repo_root down to the app dir (e.g. "Comserv/"), joined with the
+    # app-relative file path. This is deployment-agnostic: it does not depend on
+    # git's current working directory or any hardcoded string, so it works for a
+    # Zenflow/Docker/monorepo layout as well as an app-dir repo.
+    my $prefix = '';
+    eval {
+        my $rel = File::Spec->abs2rel($app_dir, $repo_root);
+        $rel =~ s#\\#/#g;
+        if (length $rel && $rel ne '.') {
+            $prefix = $rel;
+            $prefix .= '/' unless $prefix =~ m#/$#;
+        }
+    };
+
+    # Normalise the incoming path: forward slashes, drop a leading slash/Comserv/.
+    my $p = $rel_path;
+    $p =~ s#\\#/#g;
+    $p =~ s#^/+##;
+    $p =~ s#^Comserv/##;
+
+    my $repo_rel = $prefix . $p;
+    $repo_rel =~ s#^/+##;
+    return $repo_rel;
+}
+
+# GET /ai2/git_status
+# Returns parsed working-tree status so the editor can badge changed files.
+sub git_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+    my $st  = $git->get_git_status($c);
+
+    $c->res->body(encode_json({
+        success          => 1,
+        has_changes      => $st->{has_changes} ? 1 : 0,
+        staged_files     => $st->{staged_files}    // [],
+        modified_files   => $st->{modified_files}  // [],
+        untracked_files  => $st->{untracked_files} // [],
+    }));
+}
+
+# GET /ai2/file_diff?path=<app-relative editor path>
+# Returns the unified diff of that file vs HEAD. For untracked (new) files we
+# diff against /dev/null so the full new content shows as additions.
+sub file_diff :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $rel_path = $c->req->param('path') || '';
+    unless (length $rel_path) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'path required' }));
+        return;
+    }
+
+    my $repo_rel = $self->_ai2_repo_rel_path($c, $rel_path);
+    unless (defined $repo_rel) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid path' }));
+        return;
+    }
+
+    my $git  = Comserv::Util::Git->new(logging => $self->logging);
+
+    # Resolve the REAL on-disk location of the file WITHOUT any hardcoded path.
+    # $rel_path is the app-relative path the frontend sends; the app dir is the
+    # directory THIS code runs in (runtime-derived, never a literal). Joining the
+    # two gives the real file for the --no-index (new-file) branch. We do NOT
+    # reuse $repo_rel here -- that one is relative to the git repo root (used for
+    # the ls-files/diff pathspecs below), not to the app dir.
+    require Cwd;
+    my $app_dir = Cwd::abs_path($c->path_to('')->stringify) || $c->path_to('')->absolute->stringify;
+    my $abs = File::Spec->canonpath(File::Spec->catfile($app_dir, $rel_path));
+
+    # "New" means git does not track it (untracked) — not merely "not found
+    # under the configured repo path". Use ls-files so the tracked-vs-new
+    # decision matches what git diff will actually show.
+    my $tracked = $git->_run($c, 'ls-files', '--error-unmatch', '--', $repo_rel);
+    my $is_new = ($tracked && $tracked->{success}) ? 0 : 1;
+
+    # git diff exits 1 when there ARE differences (expected, not an error), so
+    # we treat "exit != 0 but produced output" as success. For untracked (new)
+    # files diff against /dev/null so the full new content shows as additions.
+    my $r = $is_new
+        ? $git->_run($c, 'diff', '--no-index', '/dev/null', $abs)
+        : $git->_run($c, 'diff', 'HEAD', '--', $repo_rel);
+
+    if (!$r->{success} && !length($r->{output} // '')) {
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => $r->{error} || 'diff failed' }));
+        return;
+    }
+
+    $c->res->body(encode_json({
+        success  => 1,
+        path     => $rel_path,
+        is_new   => $is_new ? 1 : 0,
+        diff     => $r->{output} // '',
+    }));
+}
+
+# GET /ai2/file_tree
+# Returns the full project file tree (rooted at the app dir, $c->path_to(''))
+# as a nested structure so the editor Project panel can render every file,
+# with changed files surfaced at the top by the frontend (via /ai2/git_status).
+# Editor/admin/developer role, same guard as the rest of AI2. No shell, no
+# chdir — pure readdir recursion, path-confined to the project root.
+sub file_tree :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $root = $c->path_to('')->absolute->stringify;
+
+    # Directories that are never part of the editable source tree.
+    my %SKIP_DIR = map { $_ => 1 } qw(
+        .git node_modules blib .hermes logs tmp
+        static/vendor static/js/vendor vendor
+    );
+
+    my @tree;
+
+    my $walk;
+    $walk = sub {
+        my ($abs_dir, $rel_dir, $into) = @_;
+        opendir(my $dh, $abs_dir) or return;
+        my @entries = grep { $_ ne '.' && $_ ne '..' } readdir($dh);
+        closedir($dh);
+
+        my (@dirs, @files);
+        for my $name (sort @entries) {
+            my $abs = File::Spec->catfile($abs_dir, $name);
+            my $rel = length($rel_dir) ? "$rel_dir/$name" : $name;
+            if (-d $abs) {
+                next if $SKIP_DIR{$name} || $SKIP_DIR{$rel};
+                push @dirs, { type => 'dir', name => $name, path => $rel, children => [] };
+            } elsif (-f $abs) {
+                # Skip backup files, swap, and editor temp artifacts.
+                next if $name =~ /\.(bak|swp|tmp)$/;
+                push @files, { type => 'file', name => $name, path => $rel };
+            }
+        }
+        # Dirs first (so the tree reads like a real explorer), then files.
+        for my $d (@dirs) {
+            my $child_abs = File::Spec->catfile($abs_dir, $d->{name});
+            $walk->($child_abs, $d->{path}, $d->{children});
+            push @$into, $d;
+        }
+        push @$into, @files;
+    };
+
+    $walk->($root, '', \@tree);
+
+    $c->res->body(encode_json({
+        success => 1,
+        root    => $root,
+        tree    => \@tree,
+    }));
 }
 
 # -------------------------------------------------------------------

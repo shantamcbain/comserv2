@@ -115,6 +115,21 @@ sub index :Path('/admin/logging') :Args(0) {
             $total_count //= 0;
         }
         @db_logs = $fetch_logs->($schema, undef);  # try with all result-class columns
+
+        # Grouped breakdown ("number of each") by subroutine/area for the active
+        # filter, so a drill-down from the Logging Audit volume summary shows
+        # not just the rows but how many of each error type/area exist.
+        my @area_counts;
+        if (%$search_params) {
+            my $rows = $schema->storage->dbh->selectall_arrayref(
+                "SELECT subroutine, COUNT(*) AS cnt FROM system_log
+                 WHERE " . join(' AND ', map { "$_ = ?" } keys %$search_params) . "
+                 GROUP BY subroutine ORDER BY cnt DESC LIMIT 25",
+                { Slice => {} }, values %$search_params
+            );
+            @area_counts = map { { area => $_->{subroutine} // 'unknown', count => $_->{cnt} } } @$rows;
+        }
+        $c->stash(level_area_counts => \@area_counts);
     };
     if ($@) {
         # Retry selecting only the base columns (system_identifier not yet in DB)

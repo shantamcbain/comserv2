@@ -31,6 +31,8 @@
 
         if (wasOpen) {
             if (container) container.style.display = 'none';
+            // The editor reclaims the space automatically (flex layout).
+            document.dispatchEvent(new CustomEvent('ai2:panel-close'));
             return;
         }
 
@@ -42,6 +44,49 @@
         } catch (e) { /* CustomEvent unsupported — non-fatal */ }
     }
 
+    // NOTE: the left panel is a flex child of .main, so opening/closing it
+    // reclaims editor space automatically — no manual margin pushing needed.
+
+    // Make the left sidebar panel container resizable from its right edge.
+    function wireResize() {
+        var container = document.getElementById('sidebar-panels');
+        if (!container) return;
+        if (container.querySelector('.sidebar-resize-handle')) return;
+
+        var handle = document.createElement('div');
+        handle.className = 'sidebar-resize-handle';
+        handle.style.cssText = 'position:absolute;top:0;right:-3px;width:6px;height:100%;' +
+            'cursor:col-resize;z-index:20;background:transparent;';
+        handle.title = 'Drag to resize panel';
+        container.appendChild(handle);
+
+        var dragging = false;
+        handle.addEventListener('mousedown', function (e) {
+            dragging = true;
+            e.preventDefault();
+            document.body.style.userSelect = 'none';
+            if (container) container.style.transition = 'none';
+        });
+        document.addEventListener('mousemove', function (e) {
+            if (!dragging) return;
+            var sidebar = document.getElementById('sidebar-icons');
+            var baseX = sidebar ? sidebar.getBoundingClientRect().right : 56;
+            var w = Math.max(160, Math.min(e.clientX - baseX, 600));
+            container.style.width = w + 'px';
+        });
+        document.addEventListener('mouseup', function () {
+            if (!dragging) return;
+            dragging = false;
+            document.body.style.userSelect = '';
+            // Re-layout the editor now the panel has a new width (flex handles
+            // the editor reclaim automatically; just tell Ace to resize).
+            if (window.AI2EditorCore && typeof window.AI2EditorCore.resizeEditor === 'function') {
+                window.AI2EditorCore.resizeEditor();
+            }
+            document.dispatchEvent(new CustomEvent('ai2:panel-resize'));
+        });
+    }
+
     function wire() {
         var icons = document.querySelectorAll('.sidebar-icon');
         for (var i = 0; i < icons.length; i++) {
@@ -51,6 +96,7 @@
                 ic.addEventListener('click', function () { togglePanel(name); });
             })(icons[i]);
         }
+        wireResize();
     }
 
     if (document.readyState === 'loading') {

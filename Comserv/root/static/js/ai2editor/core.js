@@ -123,7 +123,100 @@
         }
     }
 
-    // Editor registry (for swappable editors)
+    /**
+     * openFile — load a file into the active Ace editor on demand (used by the
+     * Project panel file tree). Mirrors the popup's inline on-open load: gets
+     * the content, sets the Ace value, resets dirty/save state, and updates the
+     * tab label + status. Safe to call before Ace is ready (polls briefly).
+     *
+     * Returns a Promise that resolves to the loaded { path, content } or rejects.
+     */
+    let _openTries = 0;
+    function openFile(path) {
+        return new Promise((resolve, reject) => {
+            _openTries = 0;
+            function tryLoad() {
+                if (!(window.ace && ace.edit)) {
+                    if (_openTries < 20) { _openTries++; setTimeout(tryLoad, 200); }
+                    else reject(new Error('Ace not available'));
+                    return;
+                }
+                loadFileContent(path).then(function (data) {
+                    if (!data || data.content === undefined) {
+                        reject(new Error('empty or missing content'));
+                        return;
+                    }
+                    const editor = ace.edit('ace-editor');
+                    editor.setValue(data.content, -1);
+                    editor.clearSelection();
+                    editor.session.startNewLine = null;
+                    if (typeof editor.session.$resetUndo === 'function') {
+                        editor.session.$resetUndo();
+                    }
+                    const fileName = path.split('/').pop();
+                    const tabLabel = document.getElementById('file-tab-label');
+                    if (tabLabel) tabLabel.textContent = fileName;
+                    const statusEl = document.getElementById('file-status');
+                    if (statusEl) {
+                        statusEl.textContent = 'Loaded';
+                        statusEl.style.color = '#888';
+                    }
+                    const saveBtn = document.getElementById('save-btn');
+                    if (saveBtn) {
+                        saveBtn.style.display = 'none';
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save';
+                    }
+                    window.AI2_FILE_TO_LOAD = path;
+                    // Let the chat sidebar know which file is active.
+                    if (window.AI2EditorPopup && typeof window.AI2EditorPopup.setActiveFile === 'function') {
+                        window.AI2EditorPopup.setActiveFile(path);
+                    }
+                    if (window.AI2Chat && typeof window.AI2Chat.setActiveFile === 'function') {
+                        window.AI2Chat.setActiveFile(path);
+                    }
+                    console.log(`[${NS}] opened file: ${path}`);
+                    // The editor area may have just been revealed / resized
+                    // (e.g. Project panel opened) — ask Ace to recompute its
+                    // layout so the content fills the newly-sized area.
+                    resizeEditor();
+                    resolve({ path: path, content: data.content });
+                }).catch(function (err) {
+                    console.error(`[${NS}] openFile error:`, err);
+                    reject(err);
+                });
+            }
+            tryLoad();
+        });
+    }
+
+    /**
+     * resizeEditor — force the Ace editor to recompute its layout. Needed when
+     * its container is shown / resized (e.g. the Project panel opens, the
+     * window resizes) because Ace only auto-sizes on its own init. Safe no-op
+     * if Ace isn't ready yet.
+     */
+    function resizeEditor() {
+        try {
+            if (typeof ace !== 'undefined' && ace.edit) {
+                var el = document.getElementById('ace-editor');
+                // Only resize if an Ace instance already exists on the
+                // container (Ace adds the 'ace_editor' class). This avoids
+                // creating a stray empty editor when the panel is opened
+                // before any file is loaded.
+                if (el && el.classList.contains('ace_editor')) {
+                    var ed = ace.edit('ace-editor');
+                    if (ed && typeof ed.resize === 'function') ed.resize();
+                }
+            }
+        } catch (e) { /* non-fatal */ }
+    }
+
+    // Keep the editor laid out correctly whenever its container changes size.
+    window.addEventListener('resize', resizeEditor);
+    document.addEventListener('ai2:panel-open', resizeEditor);
+    document.addEventListener('ai2:panel-close', resizeEditor);
+    document.addEventListener('ai2:panel-resize', resizeEditor);
     const editors = {
         ace: EditorAdapter,
         // richtext: RichTextAdapter,   // TODO: add later
@@ -151,6 +244,8 @@
         EditorAdapter,
         loadFileContent,
         getFileMtime,
+        openFile,
+        resizeEditor,
         registerEditor,
         getAvailableEditors,
         createEditor,

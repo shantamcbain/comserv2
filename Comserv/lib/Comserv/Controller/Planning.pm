@@ -1293,6 +1293,16 @@ sub daily_impl :Private {
     eval {
         my %row_by_id = map { $_->record_id => { $_->get_columns } } @_focus_all;
         my $now_epoch = time();
+        # Classify a todo as a scheduled break/meal event and rank it by time-of-day.
+        # Morning Break (10:00) -> 1, Lunch (12:00) -> 2, Afternoon Break (15:00) -> 3.
+        my $break_rank = sub {
+            my ($subj) = @_;
+            return 0 unless defined $subj;
+            return 1 if $subj =~ /morning\s*break/i;
+            return 2 if $subj =~ /\blunch\b/i;
+            return 3 if $subj =~ /afternoon\s*break/i;
+            return 0;
+        };
         my @scored;
         for my $t (@_focus_all) {
             my $h = $row_by_id{ $t->record_id };
@@ -1301,9 +1311,32 @@ sub daily_impl :Private {
             # project_name / blocking_names / etc. set by score_todo) to the template,
             # exactly like Controller/Todo.pm. Passing the bare DBIx row left those
             # fields undef and (with the is_recurring skip) could empty the queue.
-            push @scored, { todo => $h, score => $h->{ap_score}, pri => $h->{priority} };
+            my $subj      = $h->{subject} // '';
+            my $is_break  = ($break_rank->($subj) ? 1 : 0);
+            my $tod       = $h->{time_of_day} // '';
+            my $time_min  = 9 * 60;   # default when no time set (matches _reschedule_time_min)
+            $time_min = $1 * 60 + $2 if $tod =~ /^(\d{1,2}):(\d{2})/;
+            push @scored, {
+                todo        => $h,
+                score       => $h->{ap_score},
+                pri         => $h->{priority},
+                in_progress => $h->{in_progress} ? 1 : 0,
+                is_break    => $is_break,
+                break_rank  => $break_rank->($subj),
+                time_min    => $time_min,
+            };
         }
-        @scored = sort { $b->{score} <=> $a->{score} } @scored;
+        # Three-tier ordering for the priorities list:
+        #   tier 0 (top):   in-progress / active todos
+        #   tier 1:         scheduled break/meal events, by time-of-day (Morning -> Lunch -> Afternoon)
+        #   tier 2:         remaining open todos, by ap_score (desc)
+        @scored = sort {
+            my $ta = $a->{in_progress} ? 0 : ($a->{is_break} ? 1 : 2);
+            my $tb = $b->{in_progress} ? 0 : ($b->{is_break} ? 1 : 2);
+            $ta <=> $tb
+              || ($ta == 1 ? ($a->{break_rank} <=> $b->{break_rank})
+                           : ($b->{score} <=> $a->{score}))
+        } @scored;
         @active_priorities = map { $_->{todo} } @scored[0..($#scored > 19 ? 19 : $#scored)];
 
         # Remaining (eligible but not in top 20) — also pass the decorated hash.
@@ -2109,34 +2142,12 @@ sub deploy :Path('deploy') :Args(0) {
 # Build the worktree registry list for the planning tab from
 # root/config/worktrees.json (via Comserv::Util::Git). Returns
 # [ { name, port, label, url, cmd }, ... ] with main first.
+# Delegates to Comserv::Util::Git->build_worktree_list — the single canonical
+# builder shared with the Git dashboard's "Develop Servers" card, so the two
+# surfaces can never drift apart.
 sub _build_worktree_list {
     my ($c) = @_;
-    my @list;
-    my $base = eval { Comserv::Util::Git->worktree_base_dir } // "$ENV{HOME}/.comserv/worktrees";
-    my $cfg  = eval { Comserv::Util::Git::_worktree_config() } // { branches => {} };
-
-    # main (primary checkout, port 3001)
-    push @list, {
-        name => 'main',
-        port => 3001,
-        label => 'MAIN',
-        url  => '/planning/daily',
-        cmd  => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
-    };
-
-    my $branches = $cfg->{branches} // {};
-    for my $name (sort keys %$branches) {
-        my $b = $branches->{$name};
-        push @list, {
-            name  => $name,
-            port  => $b->{port} // 0,
-            label => $b->{label} // $name,
-            url   => $b->{url}   // '/planning/daily',
-            cmd  => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
-                   . ($b->{port} // 0) . ' -r',
-        };
-    }
-    return \@list;
+    return Comserv::Util::Git->build_worktree_list;
 }
 
 __PACKAGE__->meta->make_immutable;
