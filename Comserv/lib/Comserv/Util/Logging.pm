@@ -595,17 +595,44 @@ sub log_with_details {
             eval {
                 my $dbh = $c->model('DBEncy')->storage->dbh;
                 $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
-                $c->model('DBEncy')->resultset('SystemLog')->create({
-                    timestamp         => $timestamp,
-                    level             => $level,
-                    file              => $file,
-                    line              => $line,
-                    subroutine        => ($subroutine // 'unknown'),
-                    message           => $message,
-                    sitename          => $sitename,
-                    username          => $username,
-                    system_identifier => $system_id,
-                });
+                # Coalesce repeat events: identical (level, subroutine, message) on
+                # the same calendar day collapse into ONE row via occurrence_count,
+                # preserving history as a count + first/last_seen. This stops
+                # system_log growing unbounded on recurring monitoring noise
+                # (e.g. the health-eval loop re-logging the same warnings every
+                # cycle) while keeping the signal and the 7-day audit window.
+                # The initial UPDATE is bounded to today via the timestamp index so
+                # it never full-scans the table.
+                my $sub = $subroutine // 'unknown';
+                my $day = substr($timestamp, 0, 10);   # YYYY-MM-DD
+                my $affected = $dbh->do(
+                    "UPDATE system_log
+                        SET occurrence_count = occurrence_count + 1,
+                            last_seen = ?
+                      WHERE level = ?
+                        AND subroutine = ?
+                        AND message = ?
+                        AND timestamp >= ?
+                        AND DATE(timestamp) = ?",
+                    undef,
+                    $timestamp, $level, $sub, $message, "$day 00:00:00", $day
+                );
+                if (!defined $affected || $affected == 0) {
+                    $c->model('DBEncy')->resultset('SystemLog')->create({
+                        timestamp         => $timestamp,
+                        level             => $level,
+                        file              => $file,
+                        line              => $line,
+                        subroutine        => $sub,
+                        message           => $message,
+                        sitename          => $sitename,
+                        username          => $username,
+                        system_identifier => $system_id,
+                        occurrence_count  => 1,
+                        first_seen        => $timestamp,
+                        last_seen         => $timestamp,
+                    });
+                }
             };
             if ($@) {
                 $_db_log_failed_at = time();
