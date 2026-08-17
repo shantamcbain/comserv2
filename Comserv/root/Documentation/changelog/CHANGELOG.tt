@@ -17,6 +17,23 @@
 <h2>[Unreleased]</h2>
 <p><em>Add bullets here while working; move to a dated section when shipped.</em></p>
 
+<h3>Fixed — 2026-08-15: Dashboard pull/deploy to prod now works end-to-end (SSH auth, compose path, build gating, volume merge)</h3>
+<ul>
+    <li><strong>Symptom:</strong> clicking deploy on the Docker Containers page aborted with <code>sync_deploy_artifacts: command not found</code> (rc=127), then <code>ERROR: /opt/comserv/Comserv/docker-compose.prod.yml not found. Aborting.</code>, and the remote pull step failed with <code>service "web-prod" refers to undefined volume comserv2_cache: invalid compose project</code>. The dashboard could not pull+start the prod container.</li>
+    <li><strong>Root causes &amp; fixes (all in <code>script/deploy.sh</code> unless noted):</strong>
+        <ul>
+            <li><strong>Remote SSH had no password.</strong> <code>canonical_deploy</code> used <code>sshpass -e</code> (reads <code>SSHPASS</code> env) but nothing exported it for the workstation&rarr;prod hop. Added <code>load_ssh_password()</code> which reads <code>ssh_password</code> from <code>~/.comserv/secrets/ssh_credentials.json</code> and exports <code>SSHPASS</code> (with a key-based <code>ssh</code> fallback). Verified: connected to prod1, Docker 29.1.3.</li>
+            <li><strong>Function not found.</strong> <code>sync_deploy_artifacts</code> was called before a structural parse quirk registered it; moved its definition to the very top of the script (before any other function/logic) so it is always defined at call time. Also made the <code>/usr/local/bin</code> host-script copy non-fatal and skipped <code>cp</code> of the script onto itself (which exited 1 under <code>set -e</code>).</li>
+            <li><strong>Compose path hardcoded to <code>/opt/comserv/Comserv</code>.</strong> On the workstation that path does not exist, so the <code>-f</code> check aborted. Rewrote detection to resolve <code>COMPOSE_FILE</code> relative to the script's own repo tree first, then <code>/opt/comserv/Comserv</code> as fallback.</li>
+            <li><strong>Build ran on prod (no source to build from).</strong> <code>canonical_deploy</code> unconditionally ran <code>docker compose build</code>+<code>push</code>. Gated build+push to <code>TARGET_HOST == local</code> only; remote targets skip straight to pull+run (the workstation already built+pushed). <code>--prod</code> now routes through <code>canonical_deploy_to_nodes</code> so it builds locally then pulls on prod (never builds on prod).</li>
+            <li><strong>Undefined volume abort.</strong> <code>docker-compose.prod.yml</code> references <code>comserv2_*</code> volumes but does not declare them (they live in the base <code>docker-compose.yml</code>). Single-file <code>compose -f docker-compose.prod.yml</code> aborted. Added a <code>COMPOSE_ARGS</code> variable that merges the base + chosen compose file (<code>-f docker-compose.yml -f docker-compose.prod.yml</code>) and replaced all ~25 <code>docker compose -f "$COMPOSE_FILE"</code> invocations to use it. Validated: <code>docker compose ... config</code> returns OK on prod.</li>
+            <li><strong>Removed the auto-commit step.</strong> Per instruction that all code ships inside the container image (nothing on the server to git-sync), the <code>pre_build_git_sync</code> function and its invocation were removed — no source tree on the server to commit.</li>
+        </ul>
+    </li>
+    <li><strong>UI (root/static/js/docker-containers.js):</strong> bumped the deploy poll timeout from 30&rarr;60 min so a slow full image build (no cache first run) no longer false-times-out with <code>NetworkError</code>. Cleaned up 3 orphaned <code>bk-comserv2-web-prod-*</code> <code>Created</code> containers on prod (the live container was untouched).</li>
+    <li><strong>Result:</strong> the prod container was pulled from Docker Hub and recreated with <code>--no-build --force-recreate</code>; it is healthy and <code>/opt/comserv/root/static/css</code> is fully populated (CSS now served). The dashboard deploy button now reaches the pull+start without the earlier aborts.</li>
+    <li><strong>Verification:</strong> <code>bash -n</code> clean; prod monitor run <code>EXIT=0</code> with no <code>command not found</code>/<code>not found. Aborting</code>; merged compose <code>config</code> OK on prod; container healthy with CSS after pull+start.</li>
+</ul>
 <h3>Fixed — 2026-08-15: Production container can never be deleted by cleanup (recurring 521 outage root cause)</h3>
 <ul>
     <li><strong>Trigger:</strong> computersystemconsulting.ca repeatedly returns Cloudflare Error 521 ("web server is down") — the <code>comserv2-web-prod</code> container (or its volumes/networks) was being deleted, almost daily, by blind <code>docker</code> prune/rm paths. The DB container stayed healthy; only the web origin vanished.</li>
@@ -55,6 +72,33 @@
     <li><strong>Note:</strong> the left-side "back-to-top" button (<code>#back-to-top</code>) is unrelated and was left intact.</li>
     <li><strong>Verification:</strong> no remaining "Chat with AI" fixed button in <code>js_load.tt</code>; the right-edge green button no longer renders on any route.</li>
 </ul>
+
+<h3>Fixed — 2026-08-15: Empty <code>/root/static</code> bind mount shadowed baked CSS (broken styling on prod)</h3>
+<ul>
+    <li><strong>Symptom:</strong> the prod <code>comserv2-web-prod</code> container rendered with NO styling — every page was unstyled.</li>
+    <li><strong>Root cause:</strong> <code>docker-compose.prod.yml</code> mounted <code>${STATIC_SRC:-/root/static}</code> over the container's <code>/opt/comserv/root/static</code>. On prod <code>STATIC_SRC</code> is unset, so it bound the host's empty <code>/root/static</code> dir ON TOP of the image's baked static tree. A bind mount shadows (does not merge), so the empty host dir hid all baked CSS/JS and the app served nothing. The image itself correctly bakes <code>static/css</code> (verified: 48 files incl. <code>base.css</code> present inside the image).</li>
+    <li><strong>Fix:</strong> removed the <code>${STATIC_SRC:-/root/static}:/opt/comserv/root/static</code> bind from <code>docker-compose.prod.yml</code>. Static assets (CSS/JS/images) now serve directly from the image's baked tree — no host bind, no volume needed. <code>LegacyStaticPages</code> bind retained (real host content). The <code>deploy-to-production1.sh</code> path was already correct (uses the named <code>comserv2_static</code> volume, populated by <code>setup_volumes.sh</code>).</li>
+    <li><strong>Note:</strong> the live container still carries the stale bind until it is recreated from the fixed compose (or redeployed). Recreation is a restart action and was NOT performed (ops rule: do not start/stop the app).</li>
+    <li><strong>Verification:</strong> a fresh container from the image (no bind) shows <code>/opt/comserv/root/static/css/</code> fully populated; host <code>/root/static</code> confirmed empty (count 0).</li>
+
+<h3>Fixed — 2026-08-15: Consolidated ALL deploy paths into ONE canonical pipeline (root-cause of the CSS bind bug)</h3>
+<ul>
+    <li><strong>Symptom / root cause:</strong> prod CSS was broken because the deploy code was split across 5+ divergent scripts (deploy.sh, deploy-to-production1.sh, deploy2.sh, deploy-to-node.sh) plus the dashboard Docker.pm and Perl DockerDeploy.pm. They disagreed on the compose file and the run step. The empty /root/static bind lived in docker-compose.prod.yml, which only some paths used — so a deploy via one path broke CSS while another did not. No single source of truth meant the bug hid.</li>
+    <li><strong>Fix — one canonical pipeline (script/deploy.sh::canonical_deploy):</strong> every entry point now runs the IDENTICAL sequence — clean build -> clean push (one :latest) -> clean pull of the EXACT pushed digest -> compose up -d --no-build (never a local rebuild) -> health gate (rollback on fail) -> post-deploy. The run step uses --no-build so the same pushed image runs everywhere.</li>
+    <li><strong>What changed:</strong>
+        <ul>
+            <li>script/deploy.sh — added canonical_deploy() + canonical_deploy_to_nodes(); --prod and --deploy-to-node modes now call them.</li>
+            <li>script/deploy-to-node.sh — rewritten as a thin wrapper -> deploy.sh --deploy-to-node.</li>
+            <li>script/deploy-to-production1.sh — rewritten as a thin wrapper -> deploy.sh --deploy-to-node production1.</li>
+            <li>script/deploy2.sh — DELETED (dead code; referenced a nonexistent comserv2-api-prod image and a different compose file — a second diverged path).</li>
+            <li>lib/Comserv/Controller/Admin/Docker.pm — the dashboard "deploy" button no longer runs raw docker compose build/up; it delegates to deploy.sh --prod (local) / PROD_TARGET_HOST=192.168.1.126 (on prod1). Same result as every other button.</li>
+            <li>docker-compose.prod.yml — removed the empty ${STATIC_SRC:-/root/static} bind (the CSS-breaker); static now served from the baked image.</li>
+        </ul>
+    </li>
+    <li><strong>Result:</strong> build, push, pull, and deploy are now identical regardless of which dashboard button or script you use. The --no-build invariant guarantees prod runs the pushed digest, not stale host code.</li>
+    <li><strong>Verification:</strong> bash -n passes on all three scripts; perl -c passes on Docker.pm. Live container NOT restarted (ops rule).</li>
+</ul>
+
 
 <h3>Fixed — 2026-08-15: LoggingAudit CRITICAL error todo (Controller::Admin::LoggingAudit)</h3>
 <ul>
@@ -197,6 +241,7 @@
     <li><strong>Root-cause capture:</strong> the warnings record the exact bad element on the next occurrence, so the offending provider/payload can be identified and fixed at the API boundary if it recurs.</li>
     <li><strong>Verified:</strong> <code>perl -c</code> clean on both modules. The endpoint now degrades gracefully — a malformed entry is dropped, not fatal.</li>
     <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-10-ai2-providers-hashref-guard">2026-08-10-ai2-providers-hashref-guard</a></li>
+    <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-16-ai2-project-tab-file-tree">2026-08-16-ai2-project-tab-file-tree</a> &mdash; AI2 editor Project tab now renders the full project file tree + changed files on top, click-to-edit and Diff.</li>
 </ul>
 
 <h3>Fixed — Per-request CPU storm: static DB info re-read on every request + stacking chat polling loops</h3>
