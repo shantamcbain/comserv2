@@ -1,0 +1,214 @@
+
+
+
+
+
+
+
+
+
+<div class="quick-nav">
+    <a href="" class="admin-btn admin-btn-secondary admin-btn-sm">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+</div>
+
+<div class="app-container">
+    <div class="content-container">
+        <div class="content-primary">
+            <h1><i class="fas fa-code-branch"></i> Git Dashboard</h1>
+
+            <div class="admin-panel" data-create-worktree-panel="1">
+                <div class="admin-panel-header"><h3><i class="fas fa-plus"></i> New Branch + Worktree</h3></div>
+                <div class="admin-panel-body">
+                    <form data-create-worktree-form="1" class="git-inline">
+                        <label>Branch
+                            <input type="text" name="branch" required pattern="[A-Za-z0-9._/-]+"
+                                   placeholder="feature/name" class="form-control">
+                        </label>
+                        <label>Parent
+                            <input type="text" name="parent" value="main" class="form-control">
+                        </label>
+                        <button type="submit" class="admin-btn admin-btn-primary">
+                            <i class="fas fa-code-branch"></i> Create Branch + Worktree
+                        </button>
+                        <span data-create-worktree-status="1" class="section-info"></span>
+                    </form>
+                </div>
+            </div>
+
+            
+
+            
+            
+
+            
+            <div class="git-strip">
+
+                
+                <div class="git-card git-card--fit">
+                    <h4>Host</h4>
+                    <div class="git-inline">
+                        <select name="target" class="form-control git-select" id="git-target-select"
+                                title="Run git on this host">
+                            
+                        </select>
+                    </div>
+                    <div class="git-branch-meta" id="git-target-path">local: <code class="code-inline"></code></div>
+                </div>
+
+                
+                <div class="git-card git-card--grow">
+                    <h4>Repository</h4>
+                    <div class="git-inline">
+                        
+                        <form method="post" action=""
+                              class="inline-form" data-git-switch-form="1">
+                            <input type="hidden" name="op" value="switch">
+                            <input type="hidden" name="confirm" value="1">
+                            <select name="branch" class="form-control git-select"
+                                    data-git-switch-select="1" title="Switch branch">
+                                
+                            </select>
+                        </form>
+
+                        
+                            <span class="section-info-warn">no upstream</span>
+                        
+                    </div>
+                    
+                </div>
+
+                
+                <div class="git-card git-card--fit">
+                    <h4>Remote</h4>
+                    <div class="git-inline">
+                        <form method="post" action="" class="inline-form">
+                            <input type="hidden" name="confirm" value="1">
+                            <button type="submit" class="admin-btn admin-btn-sm admin-btn-primary">
+                                <i class="fas fa-download"></i> Pull
+                            </button>
+                        </form>
+                        <form method="post" action="" class="inline-form">
+                            <input type="hidden" name="confirm" value="1">
+                            <button type="submit" class="admin-btn admin-btn-sm">
+                                <i class="fas fa-shield-alt"></i> Safe Pull
+                            </button>
+                        </form>
+                        <form method="post" action="" class="inline-form"
+                              data-git-confirm="Push  commit(s) on '' to origin?">
+                            <input type="hidden" name="op" value="push">
+                            <input type="hidden" name="confirm" value="1">
+                            
+                            <label class="checkbox-label"><input type="checkbox" name="set_upstream" value="1"> upstream</label>
+                            
+                            <button type="submit" class="admin-btn admin-btn-sm"
+                                    >
+                                <i class="fas fa-upload"></i> Push
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+
+            
+            <div class="admin-panel git-worktree">
+                <div class="admin-panel-header"><h3>Working Tree</h3></div>
+                <div class="admin-panel-body">
+                    
+                        <p><i class="fas fa-check"></i> Working tree clean.</p>
+                    
+                </div>
+            </div>
+
+            
+            
+            <details class="git-collapse git-dev-servers">
+                <summary>Develop Servers <span class="git-count">()</span></summary>
+                <div class="git-collapse-body">
+                    <table class="data-table git-dev-server-table">
+                        <thead>
+                            <tr>
+                                <th>Branch</th>
+                                <th>Port</th>
+                                <th>Start Command</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+
+            
+
+            
+            <details class="git-collapse git-merge-card">
+                <summary>Merge <span class="git-count">(main &harr; branch, one at a time)</span></summary>
+                <div class="git-collapse-body">
+                    <div class="git-inline git-merge-controls">
+                        <label>Branch
+                            <select name="merge_branch" class="form-control git-select"
+                                    id="git-merge-branch" data-git-merge-select="1"
+                                    title="Branch to merge with main">
+                                
+                            </select>
+                        </label>
+                    </div>
+
+                    <p class="git-merge-hint">
+                        <i class="fas fa-info-circle"></i>
+                        Active branch: <code class="code-inline" data-git-current-branch="1"></code>
+                    </p>
+
+                    <div class="git-actions">
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                data-git-merge="1" data-merge-direction="main-to-branch"
+                                data-merge-url="">
+                            <i class="fas fa-arrow-down"></i> Merge main &rarr; this branch
+                        </button>
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                data-git-merge="1" data-merge-direction="branch-to-main"
+                                data-merge-url="">
+                            <i class="fas fa-arrow-up"></i> Merge this branch &rarr; main
+                        </button>
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
+                                data-git-merge-abort="1"
+                                data-merge-abort-url=""
+                                style="display:none;">
+                            <i class="fas fa-ban"></i> Abort merge
+                        </button>
+                    </div>
+
+                    <div data-git-merge-status="1" class="git-merge-status"></div>
+                    <pre data-git-merge-output="1" class="git-merge-output" style="display:none;"></pre>
+                </div>
+            </details>
+
+            
+            <details class="git-collapse">
+                <summary>Branches <span class="git-count">()</span></summary>
+                <div class="git-collapse-body">
+                    <div class="git-branch-grid">
+                        
+                    </div>
+                </div>
+            </details>
+
+            
+            <details class="git-collapse">
+                <summary>Recent Commits <span class="git-count">()</span></summary>
+                <div class="git-collapse-body">
+                    <p>No commits found.</p>
+                </div>
+            </details>
+
+            
+            
+
+        </div>
+    </div>
+</div>
