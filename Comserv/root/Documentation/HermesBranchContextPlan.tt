@@ -1,0 +1,219 @@
+[% META
+   title = "Hermes Branch Context — per-branch AI guidance + in-app Hermes launch"
+   description = "Give every git worktree its own branch-specific Hermes context (.hermes.md that re-includes the global rules then adds domain expertise, e.g. InventoryAccounting = SQL-Ledger/Postgres <-> MySQL inventory integration; 3d = printing_3d consuming inventory/feeding accounting; DockerHA = K3s/HA; ai = v2 AI; BMaster = beekeeping). Add a 'Hermes' button to the Git dashboard that copies the branch's hermes chat -w launch command. Cover the one-install/no-per-branch-restart model and automate seeding for new branches."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "git,ai-systems,hermes,development-plan"
+   page_version = "0.1"
+   last_updated = "Sun Aug 17 18:00:00 UTC 2026"
+   project_id   = "238"
+   project_code = "GITWT-NEW"
+   site_specific = "false"
+%]
+
+<div class="container">
+    <h1 class="doc-h1">Hermes Branch Context — per-branch AI guidance + in-app Hermes launch</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-17 |
+        Version: 0.1 |
+        Status: In-Process |
+        Tracked in project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#mechanism" class="doc-navlink">The key mechanism</a>
+                <a href="#getting-started" class="doc-navlink">What exists today</a>
+                <a href="#button" class="doc-navlink">Hermes launch button</a>
+                <a href="#automate" class="doc-navlink">Automation for new branches</a>
+                <a href="#install" class="doc-navlink">One install / restart model</a>
+                <a href="#verification" class="doc-navlink">Verification</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">Each git worktree is its own git root, so Hermes (which loads <code>.hermes.md</code> by walking parents up to the git root and stopping there) does NOT inherit the repo-root global rules when run inside a worktree. This plan makes every branch carry its own context: a <code>.hermes.md</code> that (a) re-includes the global rules and (b) adds domain expertise (SQL-Ledger accounting, 3D printing, HA, AI v2, beekeeping), plus an in-app "Hermes" button on the Git dashboard that copies the correct <code>hermes chat -w</code> launch command for that branch.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- MECHANISM SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="mechanism" class="doc-h2">2. The key mechanism (why the design is shaped this way)</h2>
+            <ul class="doc-body">
+                <li><strong>Worktree = own git root.</strong> <code>git -C ~/.comserv/worktrees/InventoryAccounting/Comserv rev-parse --show-toplevel</code> returns the worktree dir, NOT the repo root. Hermes' parent walk stops at that root.</li>
+                <li><strong>Consequence:</strong> a session in a worktree would silently LOSE the global <code>/home/shanta/PycharmProjects/comserv2/.hermes.md</code> (writing styles, naming, API rules, schema-compare, etc.).</li>
+                <li><strong>Fix:</strong> each branch <code>.hermes.md</code> opens by READING and HONORING the global file, then adds branch domain expertise. Global rules stay edited in ONE place (no drift).</li>
+                <li><strong>Branch <code>.hermes.md</code> path:</strong> <code>~/.comserv/worktrees/&lt;branch&gt;/Comserv/.hermes.md</code> (one level deeper than the checkout, matching where the app lives).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- GETTING STARTED SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="getting-started" class="doc-h2">3. What exists today (implemented)</h2>
+
+            <h3 id="gs-dot" class="doc-h3">3.1 Branch <code>.hermes.md</code> files written</h3>
+            <ul class="doc-body">
+                <li><strong>InventoryAccounting</strong> — inventory (MySQL/Ency 192.168.1.20:3307) &#8644; accounting (SQL-Ledger/PostgreSQL). The posting contract is the integration boundary; confirm which DB before any query; accounting-correctness-first; verify on primary Ency.</li>
+                <li><strong>3d</strong> — <code>printing_3d*</code> subsystem: consumes inventory, feeds accounting via the Inventory branch's posting contract; heavy tools = Docker services.</li>
+                <li><strong>DockerHA</strong> — K3s/HA + immutable image; ONE canonical deploy pipeline; container-not-shell; match-real-hosts.</li>
+                <li><strong>ai</strong> — v2 AI chat + agents: extend thin AI2 layer, Ollama backend, Router-authoritative model catalog, V2 JS modules.</li>
+                <li><strong>aichatsystem-ef4e</strong> — legacy AIChat feature-spec branch; reconciles code&#8644;spec, distinct from v2 <code>ai</code>.</li>
+                <li><strong>git</strong> — builds the worktree system itself: worktrees.json source of truth, port contract, ALLOWED_FLAGS gating, launch form, local-merge, relative-URL trap, UI-route acceptance gate.</li>
+                <li><strong>BMaster</strong> — beekeeping teaching + running a beekeeping operation. PENDING: no BMaster worktree exists yet (only remote <code>origin/BMaster</code>); file authored when the worktree is created.</li>
+            </ul>
+
+            <h3 id="gs-cmd" class="doc-h3">3.2 Launch command (what the branch context does)</h3>
+            <div class="doc-codebox">
+                <pre><code>
+# cd into the worktree's OWN git root so its .hermes.md loads:
+cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat -w
+# -w = worktree mode (parallel agents, no git conflicts)
+                </code></pre>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- HERMES BUTTON SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="button" class="doc-h2">4. Hermes launch button on the Git dashboard</h2>
+            <p class="doc-body">Mirrors the existing server "Open" button in the Develop Servers card (<code>root/admin/git/index.tt</code>). Implemented in the same change as the domain files:</p>
+            <ul class="doc-body">
+                <li><code>Util/Git.pm -&gt; build_worktree_list</code> now emits <code>hermes_cmd</code> for <code>main</code> and every branch: <code>cd &lt;worktree-git-root&gt; &amp;&amp; hermes chat -w</code>.</li>
+                <li><code>root/admin/git/index.tt</code> gains a "Hermes" button per row (next to Open/Stop/Restart) with <code>data-hermes-branch</code> + <code>data-hermes-cmd</code>. Also fixed the Open button to build the absolute <code>scheme://host:port/path</code> URL (RELATIVE-URL TRAP rule).</li>
+                <li><code>root/static/js/git-dashboard.js</code> copies <code>hermes_cmd</code> to the clipboard and shows it in the dev console for manual copy.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- AUTOMATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="automate" class="doc-h2">5. Automation for NEW branches (outstanding)</h2>
+            <p class="doc-body">Today the <code>.hermes.md</code> files are authored by hand. The remaining work is to make <code>Util::Git-&gt;create_worktree</code> seed each new worktree's <code>.hermes.md</code> = global-pointer header + a per-branch domain block pulled from a small checked-in domain store (one block per branch). The same action should document/launch isolated Hermes (<code>hermes chat -w -p &lt;branch&gt;</code>) from the worktree dir, so "open a branch &#8594; get its context + isolated Hermes" is one action. Author the BMaster beekeeping block at the same time (todo #2144).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ONE INSTALL SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="install" class="doc-h2">6. One Hermes install / no per-branch restart</h2>
+            <ul class="doc-body">
+                <li><strong>Single install:</strong> <code>/home/shanta/.local/bin/hermes</code> exec's one venv at <code>/home/shanta/.hermes/hermes-agent/venv/bin/hermes</code>. Every surface (CLI in any branch, dashboard, desktop, gateway, spawned agents) runs that ONE binary. Config/skills/memory shared under <code>~/.hermes/</code> (<code>HERMES_HOME</code> unset).</li>
+                <li><strong>Unlike Comserv:</strong> Comserv runs a separate long-lived server per branch on its own port (restart each). Hermes CLI is a short-lived process — after <code>hermes update</code>, the next <code>hermes chat -w</code> already runs new code.</li>
+                <li><strong>Restart only the persistent daemons</strong> after an update: <code>hermes dashboard</code>, <code>hermes desktop</code>, <code>hermes gateway</code>, and any long-lived tmux agents. Branches are just cwds — nothing to restart.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- VERIFICATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verification" class="doc-h2">7. Verification</h2>
+            <ul class="doc-body">
+                <li><code>perl -c lib/Comserv/Util/Git.pm</code> passes with <code>PERL5LIB=lib</code> (DONE).</li>
+                <li>Each worktree <code>.hermes.md</code> exists and opens by re-including the global rules (DONE for the 6 existing worktrees).</li>
+                <li>On the live Git dashboard (<code>/admin/git</code>), click "Hermes" on a worktree row &#8594; clipboard contains <code>cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat -w</code> and the dev console shows it.</li>
+                <li>Running that command in the worktree loads the branch <code>.hermes.md</code> (and through it the global rules) — confirm by asking Hermes "what branch am I on / what are my domain constraints".</li>
+                <li><code>hermes update</code> then a fresh <code>hermes chat -w</code> in the worktree uses new code with no branch restart.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PROJECT TRACKING SECTION (RULE P1) -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>
+                &mdash; parent: <a href="/project/details?project_id=114" class="doc-link">#114</a>.
+                Each phase below is a <strong>sub-project</strong>, not a single todo.
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase / Sub-project</th>
+                    <th class="doc-th">Tracking item</th>
+                    <th class="doc-th">Gate / Done when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Author domain .hermes.md for active worktrees</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2142" class="doc-link">todo 2142</a></td>
+                    <td class="doc-td">6 existing worktrees done; BMaster when worktree exists</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">"Hermes" launch button on Git dashboard</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2143" class="doc-link">todo 2143</a></td>
+                    <td class="doc-td">Button copies hermes_cmd; perl -c OK</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Automate seeding for NEW branches</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2144" class="doc-link">todo 2144</a></td>
+                    <td class="doc-td">create_worktree seeds .hermes.md + launches isolated Hermes</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Write this planning plan doc</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2145" class="doc-link">todo 2145</a></td>
+                    <td class="doc-td">This .tt, MASTER_PLAN + sibling links, changelog</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=2146" class="doc-link">todo 2146</a> (recurring)</td>
+                    <td class="doc-td">Set recurrence in Todo UI (API drops is_recurring); keeps doc+files in sync</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">8. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="/Documentation/git_worktree_new_system_plan" class="doc-link">Git Worktree — new isolated-creation backend</a> (sibling plan, #238)</li>
+                    <li><a href="/Documentation/git_worktree_merge_plan" class="doc-link">Git Worktree — AI-commit to human merge-to-main</a> (sibling plan, #238)</li>
+                    <li><a href="/Documentation/BranchSyncConflictAssist" class="doc-link">Branch Sync &amp; Conflict Assist</a> (sibling sub-plan)</li>
+                    <li><a href="/Documentation/MASTER_PLAN" class="doc-link">MASTER_PLAN</a> — index of all plans</li>
+                    <li><a href="/Documentation/changelog/2026-08-17-hermes-branch-context" class="doc-link">Changelog 2026-08-17 — Hermes Branch Context</a></li>
+                    <li><a href="/admin/git" class="doc-link">Git Dashboard</a> — the "Hermes" button lives here</li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Tracking project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a> — one Todo per phase; progress and time logged there.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
