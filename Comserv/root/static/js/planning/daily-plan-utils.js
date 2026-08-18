@@ -11,35 +11,51 @@
 (function() {
     'use strict';
 
-    /* ── Tab switching ──────────────────────────────────────────────────── */
+    /* ── Tab switching ────────────────────────────────────────────────────
 
-    function switchTab(evt, tabName) {
-        var i, tabcontent, tabbuttons;
-        tabcontent = document.getElementsByClassName('tab-content');
+       Two paths must keep the visible tab in sync with the URL hash:
+       1. A click on a .tab-button  -> switchTab() pushes the hash AND shows it.
+       2. Browser Back/Forward      -> the hash changes WITHOUT a click, so a
+          popstate/hashchange listener must re-show the tab. Without it the
+          hash reverts but no tab gets .active and the page goes blank
+          ("go back and nothing shows").
+
+       _activateTab(name) does the pure show/hide. switchTab() calls it then
+       pushState()s. The popstate/hashchange listeners call it WITHOUT pushing
+       (so navigating history never spawns duplicate entries). */
+
+    function _activateTab(name) {
+        var tabEl = document.getElementById(name);
+        if (!tabEl) return false;
+        var i;
+        var tabcontent = document.getElementsByClassName('tab-content');
         for (i = 0; i < tabcontent.length; i++) {
             tabcontent[i].classList.remove('active');
         }
-        tabbuttons = document.getElementsByClassName('tab-button');
+        var tabbuttons = document.getElementsByClassName('tab-button');
         for (i = 0; i < tabbuttons.length; i++) {
             tabbuttons[i].classList.remove('active');
         }
-        var tabEl = document.getElementById(tabName);
-        if (!tabEl) return;
         tabEl.classList.add('active');
-        // evt.currentTarget is the element the listener is bound to. When switchTab is
-        // invoked from the document-level click delegation (currentTarget === document)
-        // or with a null event, document/classList is undefined — guard before use.
-        var activeBtn = (evt && evt.currentTarget && evt.currentTarget.classList)
-            ? evt.currentTarget
-            : (evt && evt.target && evt.target.closest ? evt.target.closest('.tab-button') : null);
-        if (activeBtn) activeBtn.classList.add('active');
+        // Highlight the matching button(s) by data-tab (robust to currentTarget
+        // quirks when this is called from a non-click path).
+        var btns = document.querySelectorAll('.tab-button[data-tab="' + name + '"]');
+        for (i = 0; i < btns.length; i++) {
+            btns[i].classList.add('active');
+        }
+        return true;
+    }
+
+    function switchTab(evt, tabName) {
+        if (!_activateTab(tabName)) return;
         if (history.pushState) {
             history.pushState(null, null, '#' + tabName);
         } else {
             location.hash = '#' + tabName;
         }
         // Lazy-load tab content if not already fetched
-        if (tabEl.hasAttribute('data-lazy') && !tabEl.classList.contains('lazy-loaded')) {
+        var tabEl = document.getElementById(tabName);
+        if (tabEl && tabEl.hasAttribute('data-lazy') && !tabEl.classList.contains('lazy-loaded')) {
             lazyLoadTab(tabEl);
         }
     }
@@ -174,8 +190,13 @@
         var feedback = document.getElementById('dl-feedback');
         if (startBtn) startBtn.disabled = true;
         if (endBtn)   endBtn.disabled   = true;
-        feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
-        feedback.style.color = '';
+        // NOTE: the rebuilt DailyPlan.tt index does NOT carry the dl-feedback /
+        // dl-start-btn / dl-end-btn ids (those lived on the old monolith). Guard
+        // every use so a missing node can never throw before the fetch fires.
+        if (feedback) {
+            feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
+            feedback.style.color = '';
+        }
 
         fetch('/planning/daily_log', {
             method: 'POST',
@@ -191,21 +212,27 @@
             var plainMsg = msg.replace(/<[^>]+>/g, '');
             if (d.success) {
                 alert(plainMsg);
-                feedback.innerHTML = msg;
-                feedback.style.color = '#2a7a2a';
+                if (feedback) {
+                    feedback.innerHTML = msg;
+                    feedback.style.color = '#2a7a2a';
+                }
                 window.location.reload();
             } else {
                 alert(plainMsg);
-                feedback.innerHTML = msg;
-                feedback.style.color = '#9b0000';
+                if (feedback) {
+                    feedback.innerHTML = msg;
+                    feedback.style.color = '#9b0000';
+                }
             }
         })
         .catch(function(e) {
             if (startBtn) startBtn.disabled = false;
             if (endBtn)   endBtn.disabled   = false;
             alert('Request failed: ' + e);
-            feedback.textContent = 'Request failed';
-            feedback.style.color = '#9b0000';
+            if (feedback) {
+                feedback.textContent = 'Request failed';
+                feedback.style.color = '#9b0000';
+            }
         });
     }
 
@@ -1121,7 +1148,38 @@
             if (panel) { panel.style.display = 'block'; panel.scrollIntoView({ behavior: 'smooth' }); }
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
+        // Master Plan tab is server-rendered inline (not an iframe). Its doc
+        // links would otherwise navigate the whole browser away from
+        // /planning/daily and lose the tab bar. Open them in a new tab so the
+        // daily index stays put. (The Calendar tab is an iframe and handles
+        // its own breakout via the embed script in day.tt.)
+        var mp = document.getElementById('master-plan');
+        if (mp) {
+            var mpLinks = mp.querySelectorAll('a[href]');
+            for (var i = 0; i < mpLinks.length; i++) {
+                var href = mpLinks[i].getAttribute('href') || '';
+                // Leave in-page anchors and external doc routes alone; only
+                // force real navigations to a new tab.
+                if (href.indexOf('#') !== 0 && href.indexOf('javascript:') !== 0) {
+                    mpLinks[i].setAttribute('target', '_blank');
+                    mpLinks[i].setAttribute('rel', 'noopener');
+                }
+            }
+        }
     });
+
+    // Browser Back/Forward changes the URL hash WITHOUT a click. Re-sync the
+    // visible tab to the hash so navigating history never leaves every tab
+    // hidden (the "go back and nothing shows" bug). Called WITHOUT pushState
+    // so we don't spawn a second history entry.
+    function _syncTabFromHash() {
+        var hash = window.location.hash.replace(/^#/, '');
+        if (hash && document.getElementById(hash)) {
+            _activateTab(hash);
+        }
+    }
+    window.addEventListener('popstate', _syncTabFromHash);
+    window.addEventListener('hashchange', _syncTabFromHash);
 
     /* ── Expose start/done handlers for inline onclick callers (e.g. todo_row.tt
        on the project-details page, which calls startWorkTodoCard via onclick).

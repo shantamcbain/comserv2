@@ -1,0 +1,110 @@
+[% META
+   title = "Hardware Monitor & Watchdog Plan"
+   description = "Root-cause + fix for the hardware_monitor watchdog false CRITICAL (todo #2065), and the rollout of that fix to the production containers."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "infrastructure,monitoring"
+   page_version = "1.0"
+   last_updated = "Thu Aug 13 2026 (v1.0 — watchdog false-CRITICAL fix + :3001 cron)"
+   project_id = 258
+   project_code = "HWMON"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/HardwareMonitorPlan.tt,v 1.0 2026/08/13 Shanta Exp - watchdog false-CRITICAL fix + prod rollout plan' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container masterplan">
+
+<h1 id="top">Hardware Monitor &amp; Watchdog Plan</h1>
+
+<div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+    Project: <a href="[% c.uri_for('/admin/project') %]/258">Hardware Monitor &amp; Watchdog (HWMON, #258)</a>
+    &nbsp;|&nbsp; Parent: <a href="[% c.uri_for('/admin/project') %]/1">Catalyst2 application (#1)</a>
+    &nbsp;|&nbsp; Status: IN-PROCESS
+</div>
+
+<p>This plan records the root-cause analysis and fix for the
+<strong>hardware_monitor watchdog false CRITICAL</strong> (error todo #2065:
+<code>node=workstationStandalone missed monitoring window (age=1000000000s, timeout=600)</code>),
+and the remaining work to roll the fix out to the production containers.</p>
+
+<div class="notice">
+    <strong>Key finding:</strong> <code>age=1000000000s</code> is a hard-coded <em>sentinel</em> in the watchdog
+    (HardwareMonitor.pm), not a real 1-billion-second gap. It means &ldquo;no <code>monitor_heartbeat</code> row
+    was found for this node,&rdquo; so the watchdog had no <code>last_run</code> to compute an age from. The
+    underlying cause was that the heartbeat row was <em>never being written</em>.
+</div>
+
+<h2 id="root-cause">1. Root cause (3 distinct bugs)</h2>
+<ol>
+    <li><strong>Schema overflow.</strong> <code>HardwareMetrics.metric_value</code> was declared
+        <code>decimal(12,3)</code> (max 999,999,999). The <code>monitor_heartbeat</code> row stores
+        <code>time()</code> (epoch seconds, ~1.75e9), which overflowed the column. The <code>INSERT</code>
+        failed silently inside an <code>eval</code> in <code>run</code>, so no heartbeat row was ever written.</li>
+    <li><strong>Node-identity mismatch.</strong> <code>run</code> and <code>watchdog</code> derived the node key
+        via <code>get_system_identifier()</code>, which appends a volatile runtime tag
+        (<code> (Standalone)</code>/<code> (Docker)</code>) and the listening port non-deterministically per
+        request. The two endpoints computed <em>different</em> keys, and the watchdog also filtered on a
+        separately-sanitized <code>hostname</code> column &mdash; so it could never match the row <code>run</code> wrote.</li>
+    <li><strong>Live DB target.</strong> The dev server resolves <code>DBEncy</code> to the <strong>PRIMARY Ency
+        at 192.168.1.20:3307</strong> (not localhost:3306). The <code>decimal(15,3)</code> widening had to be
+        deployed there, not on a dev-only database.</li>
+</ol>
+
+<h2 id="fix">2. Fix applied (verified on :3001, 2026-08-13)</h2>
+<ul>
+    <li>Widened <code>HardwareMetrics.metric_value</code> to <code>decimal(15,3)</code> in the source-of-truth
+        Result class (<code>Model/Schema/Ency/Result/HardwareMetrics.pm</code>) and deployed the column change to
+        the PRIMARY Ency (192.168.1.20:3307) via DBIC &mdash; never hand DDL. Verified a 1.7e9 epoch value now
+        stores cleanly.</li>
+    <li>Added a shared <code>_node_identity()</code> helper (HardwareMonitor.pm) that strips the volatile runtime
+        tag and trailing <code>:port</code>, giving both <code>run</code> (writes) and <code>watchdog</code>
+        (queries) one deterministic key (<code>workstation</code>). The watchdog now matches on
+        <code>system_identifier</code> alone.</li>
+    <li>Fixed the host cron: replaced two broken lines (one pointed at a non-existent
+        <code>/usr/local/bin/hardware_monitor.pl</code> with <code>MISSING_TOKEN</code>; the other used
+        script-default nodes with no token) with one correct marked line that triggers
+        <code>http://127.0.0.1:3001/admin/hardware_monitor/run</code> first and reads the token from the NFS
+        share. Also fixed <code>script/hardware_monitor.pl</code> itself: its multi-line backtick <code>curl</code>
+        broke under <code>/bin/sh</code> (dash, what cron uses) &mdash; rewrote as a single-line command &mdash; and
+        moved the log to <code>/tmp/comserv-hardware-monitor.log</code> (the previous
+        <code>/var/log/...</code> path was root-owned and unwritable by the cron user, so the job silently did
+        nothing).</li>
+</ul>
+<p><strong>Verified:</strong> <code>POST /admin/hardware_monitor/run</code> on :3001 &rarr; HTTP 200 and writes a
+<code>monitor_heartbeat</code> row to 192.168.1.20:3307; <code>/admin/hardware_monitor/watchdog</code> &rarr;
+<code>ok:1, missed:0, age_sec:&lt;real seconds&gt;, last_run:&lt;epoch&gt;</code> instead of
+<code>age=1000000000s</code>. The cron command runs clean under <code>dash</code> (exit 0).</p>
+
+<h2 id="remaining">3. Remaining work (rollout to prod)</h2>
+<ul>
+    <li><strong>Stability watch (local).</strong> Confirm the audit error count stops climbing on :3001 for
+        24&ndash;48h now that the cron reliably triggers <code>run</code>. Close audit todo #2065 once the
+        watchdog stays green.</li>
+    <li><strong>Rebuild prod container.</strong> <code>comserv2-web-prod</code> on :5000 is behind this code and
+        returns 302 on <code>run</code>/<code>watchdog</code> (no token bypass). Rebuild it from current code so
+        the bypass + <code>decimal(15,3)</code> deploy there. (Per standing rule: no container rebuild without
+        explicit approval.)</li>
+    <li><strong>Prod nodes in cron.</strong> After rebuild, the cron line's <code>:199:5000</code> /
+        <code>:126:5000</code> nodes will start returning 200; verify <code>monitor_heartbeat</code> rows for
+        those nodes appear on the primary Ency.</li>
+    <li><strong>Mirror to other fleet hosts.</strong> Apply the same schema widen + cron pattern to
+        proxmox720 / production1 per the established &ldquo;prove local first, then mirror&rdquo; workflow.</li>
+</ul>
+
+<h2 id="links">4. Related</h2>
+<ul>
+    <li>Master plan: <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">/Documentation/MASTER_PLAN</a></li>
+    <li>Project: <a href="[% c.uri_for('/admin/project') %]/258">Hardware Monitor &amp; Watchdog (HWMON, #258)</a></li>
+    <li>Parent project: <a href="[% c.uri_for('/admin/project') %]/1">Catalyst2 application (#1)</a></li>
+    <li>Next-steps todo: <a href="[% c.uri_for('/admin/todo') %]/2074">#2074 Hardware Monitor next steps</a></li>
+    <li>Code: <code>lib/Comserv/Controller/Admin/HardwareMonitor.pm</code>,
+        <code>lib/Comserv/Model/Schema/Ency/Result/HardwareMetrics.pm</code>,
+        <code>script/hardware_monitor.pl</code></li>
+    <li>Changelog: <a href="[% c.uri_for('/Documentation/changelog/CHANGELOG') %]">/Documentation/changelog/CHANGELOG</a>
+        (entry under [Unreleased])</li>
+</ul>
+
+<a class="back-to-top" href="#top" style="color: var(--link-color, #007bff);">↑ Back to top</a>
+
+</div>

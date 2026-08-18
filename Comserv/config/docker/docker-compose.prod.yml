@@ -38,7 +38,14 @@ services:
       # Code is read-only in production
       - ./lib:/opt/comserv/lib:ro
       - ./script:/opt/comserv/script:ro
-      - ./root/static:/opt/comserv/root/static:ro
+      # Static assets (CSS/JS/images) are baked into the image at build time.
+      # Do NOT bind-mount a host dir over /opt/comserv/root/static: the prod
+      # host dir is empty and shadows the baked assets (breaks ALL CSS) and the
+      # :ro bind makes the app unable to create root/static/config (theme writes
+      # fail with "Permission denied"). The only writable parts of the static
+      # tree are the theme-definition JSON + generated theme CSS — those get a
+      # PERSISTENT overlay volume below, so theme changes survive redeploys and
+      # stay INSIDE root/static (no code-path change needed).
       - ./root/Documentation:/opt/comserv/root/Documentation:ro
       - ./config:/opt/comserv/config:ro
       - ./t:/opt/comserv/t:ro
@@ -49,6 +56,11 @@ services:
       - comserv-prod-logs:/opt/comserv/root/log
       - comserv-prod-sessions:/opt/comserv/root/session
       - comserv-prod-backups:/opt/comserv/backups
+      # Writable theme state (persisted, INSIDE root/static, not host-bound)
+      # Seed once from the image-baked root/static/config/theme_definitions.json
+      # at deploy so the live site-theme mapping is not lost.
+      - comserv-prod-theme-config:/opt/comserv/root/static/config
+      - comserv-prod-theme-css:/opt/comserv/root/static/css/themes
       # NFS root mount for workshop files (shared storage)
       - workshop-files-nfs:/data/nfs:rw
     healthcheck:
@@ -100,6 +112,10 @@ volumes:
   comserv-prod-sessions:
     driver: local
   comserv-prod-backups:
+    driver: local
+  comserv-prod-theme-config:
+    driver: local
+  comserv-prod-theme-css:
     driver: local
   workshop-files-nfs:
     driver: local

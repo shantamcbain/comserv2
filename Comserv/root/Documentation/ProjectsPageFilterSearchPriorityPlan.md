@@ -1,11 +1,14 @@
 # Projects Page — Filter, Search & Priority Plan
 
-**Project code:** PROJ-UI (id 235)
-**Parent project:** 138 PLANNING
+**Project code:** PROJ-UI (proj #235)
+**Parent project:** #138 PLANNING (this is a PHASE of the Planning System project)
 **Site:** CSC
 **Status:** In-Process
 **Audit date:** 2026-08-02
-**Sibling plan:** PLAN-QUEUE (234) — `/Documentation/PlanningQueueRoleVisibilityPlan`
+**Standard:** follows [Planning Language Standard](/Documentation/PlanningLanguageStandard) — PHASE = sub-project, STEP = todo, GATE = done-when
+**Coordinator:** [Comserv2 Master Plan](/Documentation/MASTER_PLAN) — Project #138 PLANNING
+**Sibling phase:** PLAN-QUEUE (234) — `/Documentation/PlanningQueueRoleVisibilityPlan`
+**Deliverable (one line):** make the Projects page's `priority` column real in the DB and wire filter + search + priority so they actually apply.
 
 Page under audit: `/project/project` — `lib/Comserv/Controller/Project.pm:266`,
 template `root/todo/project.tt`.

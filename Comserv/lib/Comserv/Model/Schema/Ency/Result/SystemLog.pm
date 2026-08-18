@@ -53,6 +53,19 @@ __PACKAGE__->add_columns(
         is_nullable    => 1,
         default_value  => undef,
     },
+    occurrence_count => {
+        data_type     => 'bigint',
+        is_nullable   => 0,
+        default_value => 1,
+    },
+    first_seen => {
+        data_type   => 'datetime',
+        is_nullable => 1,
+    },
+    last_seen => {
+        data_type   => 'datetime',
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');

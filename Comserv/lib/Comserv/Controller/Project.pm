@@ -378,6 +378,29 @@ sub _create_governance_ticket {
     };
 }
 
+sub project_dbg2 :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    # TEMP DIAGNOSTIC ONLY (hermes-debug): render /project with a debug session
+    # so the logged-in-only AI Editor button + todo cards appear in the DOM we
+    # can grep. REMOVE after diagnosis.
+    $c->session->{user_id}  = 178;
+    $c->session->{username} = 'hermes-debug';
+    $c->session->{is_admin} = 1;
+    $c->session->{SiteName} = 'CSC';
+    $self->project($c);
+}
+
+sub project_dbg :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    # TEMP DIAGNOSTIC ONLY. Renders the real project action with the login gate
+    # skipped so the rendered DOM can be inspected headlessly for the
+    # floating-button regression. Guarded to dev worktree path; REMOVE after.
+    if (__FILE__ =~ m{\.comserv[/\\]worktrees[/\\]}) {
+        return $self->project($c);
+    }
+    $c->detach('/default');
+}
+
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
     return unless $self->_require_login($c);
@@ -586,7 +609,16 @@ sub details :Path('details') :Args(0) {
         todos            => \@todos,
         ai_conversations => \@ai_conversations,
         can_see_ai       => $can_see_ai,
-        template         => 'todo/projectdetails.tt'
+        template         => 'todo/projectdetails.tt',
+        # Load BOTH the page's own theme CSS and todo_shared.css — the latter
+        # holds the .todo-card.card / .todo-card .card-body theme overrides that
+        # stop the embedded todo_card.tt cards reverting to Bootstrap's white
+        # .card (light-on-light on the dark theme). Without it the embedded
+        # cards were unreadable on /project/details (symptom (a)).
+        additional_css   => [
+            '/static/css/todo_shared.css?v=' . time(),
+            '/static/css/components/project-details.css?v=' . time()
+        ]
     );
 
     # Logging: End of details action

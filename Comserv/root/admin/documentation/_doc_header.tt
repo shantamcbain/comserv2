@@ -1,0 +1,49 @@
+[%# ─────────────────────────────────────────────────────────────────────────
+  Shared documentation page header.
+
+  Renders the consistent doc-page header used by BOTH the .md viewer
+  (Documentation/MarkdownViewer.tt) and the .tt plan/template docs
+  (DocumentationTtTemplate.tt). Data-driven — it reads from the stash, which
+  the Documentation controller populates from the file's META block + request
+  context. Nothing here is hardcoded except the labels.
+
+  Stash inputs (all optional; missing ones are simply omitted):
+    page_title       – page heading (META title)
+    site_name        – current site (request context)
+    user_role        – current user role (request context)
+    last_updated     – Last Updated timestamp (file mtime / META last_updated)
+    page_name        – the /Documentation/<page_name> slug (for Suggest Edit)
+    doc_project_id    – owning project id (META project_id, or stash override)
+    doc_project_code  – owning project code (META project_code, or stash override)
+
+  Theme compliance: uses only .doc-* classes from
+  static/css/components/documentation.css — NO inline style=, NO hardcoded hex.
+  ───────────────────────────────────────────────────────────────────────── %]
+
+<div class="doc-page-header">
+    <h1 class="doc-h1">[% page_title | html %]</h1>
+
+    <div class="doc-header-meta">
+        [% IF site_name %]
+            <span class="doc-header-item"><span class="doc-header-label">Current Site:</span> <span class="doc-header-value">[% site_name | html %]</span></span>
+        [% END %]
+        [% IF user_role %]
+            <span class="doc-header-item"><span class="doc-header-label">User Role:</span> <span class="doc-header-value">[% user_role | html %]</span></span>
+        [% END %]
+        [% IF last_updated %]
+            <span class="doc-header-item"><span class="doc-header-label">Last Updated:</span> <span class="doc-header-value">[% last_updated | html %]</span></span>
+        [% END %]
+        [% IF doc_project_id %]
+            <span class="doc-header-item"><span class="doc-header-label">Project:</span>
+                <a href="/project/details?project_id=[% doc_project_id | html %]" class="doc-link">[% IF doc_project_code %]#[% doc_project_id | html %] ([% doc_project_code | html %])[% ELSE %]#[% doc_project_id | html %][% END %]</a>
+            </span>
+        [% END %]
+    </div>
+
+    <div class="doc-header-actions">
+        <a href="[% c.uri_for('/Documentation') %]" class="doc-navlink">Documentation Home</a>
+        [% IF user_role == 'admin' || user_role == 'developer' || user_role == 'editor' %]
+            <a href="[% c.uri_for('/Documentation/suggest_edit', page_name) %]" class="doc-navlink">Suggest Edit</a>
+        [% END %]
+    </div>
+</div>

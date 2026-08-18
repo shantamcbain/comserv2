@@ -146,3 +146,85 @@
     gap: 0.35rem;
     margin-top: 0.5rem;
 }
+
+/* Develop Servers card (zenflow worktree registry) — overlay on the theme table. */
+.git-dev-servers { margin-bottom: 0.75rem; }
+.git-dev-server-table th,
+.git-dev-server-table td { padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.git-dev-server-table tr.git-dev-current {
+    background: var(--primary-color-subtle, rgba(40,200,120,0.08));
+}
+.git-dev-cmd {
+    font-size: 0.78rem;
+    color: var(--muted-color, #777);
+    cursor: text;
+    user-select: all;
+    word-break: break-all;
+}
+.git-dev-actions { white-space: nowrap; }
+.git-dev-actions .admin-btn { margin-right: 0.25rem; }
+
+/* Develop Servers live console modal (Open button streams the server log). */
+.git-dev-console-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+}
+.git-dev-console {
+    background: var(--bg-color, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px;
+    width: min(640px, 92vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+}
+.git-dev-console-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color, #ddd);
+    font-weight: bold;
+    color: var(--text-color, #222);
+}
+.git-dev-console-close {
+    background: transparent;
+    border: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-muted-color, #777);
+}
+.git-dev-console-cmd {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted-color, #777);
+    padding: 8px 16px 0;
+    word-break: break-all;
+}
+.git-dev-console-log {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 10px 12px;
+    margin: 8px 16px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    overflow: auto;
+    flex: 1;
+    max-height: 50vh;
+    white-space: pre-wrap;
+}
+.git-dev-console-footer {
+    display: flex;
+    gap: 0.5rem;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-color, #ddd);
+}

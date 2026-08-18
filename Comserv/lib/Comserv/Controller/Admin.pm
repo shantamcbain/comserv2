@@ -7821,6 +7821,42 @@ sub branch_server_action :Path('/admin/branch_server_action') :Args(0) {
     }
 }
 
+# Read-only stream of a branch server's startup log (/tmp/branch-<branch>.log),
+# written by Comserv::Util::BranchServerControl->start. This is the "console" the
+# Git dashboard's Develop Servers card shows when you hit Open, so you can watch the
+# server boot and read any command-line errors (the planning tab's modal expected this
+# endpoint but it was never wired). Only /tmp/branch-*.log is readable — any other
+# path is refused, so this cannot be used to read arbitrary files.
+sub branch_server_log :Path('/admin/branch_server_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('text/plain; charset=utf-8');
+
+    my $file = $c->req->param('file') || '';
+    my $branch = $c->req->param('branch') || '';
+
+    # Resolve to /tmp/branch-<branch>.log. Prefer the branch param; if a full file
+    # path was supplied, only honor it when it matches the locked pattern.
+    my $path;
+    if ($branch =~ m{^[A-Za-z0-9._/-]+$} && $branch !~ m{\.\./} && $branch !~ m{^/}) {
+        $path = "/tmp/branch-$branch.log";
+    }
+    elsif ($file =~ m{^/tmp/branch-[A-Za-z0-9._-]+\.log$}) {
+        $path = $file;
+    }
+    else {
+        $c->response->body('(log unavailable)');
+        return;
+    }
+
+    if (-f $path) {
+        my $raw = do { local $/; open my $fh, '<', $path or die $!; <$fh> };
+        $c->response->body($raw // '');
+    }
+    else {
+        $c->response->body('(server not started yet — no log)');
+    }
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

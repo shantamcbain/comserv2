@@ -2,8 +2,8 @@
    description = 'Complete guide for site admins on how to choose, modify and create CSS themes from within the browser.'
    roles = 'admin'
    category = 'themes,css,admin-guide,how-to'
-   page_version = '1.1'
-   last_updated = '2026/03/04'
+   page_version = '1.2'
+   last_updated = '2026/08/17'
 %]
 
 <div class="container">
@@ -16,6 +16,8 @@
         <a href="#choose-theme"  class="ms-2">Choose a Theme</a> |
         <a href="#modify-theme"  class="ms-2">Modify a Theme</a> |
         <a href="#create-theme"  class="ms-2">Create a Theme</a> |
+        <a href="#storage"       class="ms-2">Storage &amp; Production</a> |
+        <a href="#roadmap"       class="ms-2">Roadmap</a> |
         <a href="#variables-ref" class="ms-2">CSS Variable Reference</a> |
         <a href="#faq"           class="ms-2">FAQ</a>
     </nav>
@@ -157,6 +159,49 @@
         </ol>
     </section>
 
+    <!-- Storage & Production -->
+    <section id="storage" class="mb-5">
+        <h2>Storage &amp; Production Deployment</h2>
+        <p>Theme state lives in two places, both <strong>inside</strong> the <code>root/static</code> tree so the code paths never change and the app can write without elevated privileges:</p>
+        <table class="table table-bordered table-sm">
+            <thead class="table-light">
+                <tr><th>Path (inside container)</th><th>Contents</th><th>Backing</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>/opt/comserv/root/static/config/</code></td><td><code>theme_definitions.json</code> (themes + <code>site_themes</code> mapping)</td><td>persistent volume overlay <code>comserv2_theme_config</code></td></tr>
+                <tr><td><code>/opt/comserv/root/static/css/themes/</code></td><td>compiled <code>&lt;theme&gt;.css</code> files</td><td>persistent volume overlay <code>comserv2_theme_css</code></td></tr>
+            </tbody>
+        </table>
+
+        <h4>Why a volume overlay (and not a host bind)</h4>
+        <p>The rest of <code>root/static</code> (CSS/JS/images) is <strong>baked into the image</strong> at build time and served directly. A previous production setup bind-mounted the host directory <code>./root/static</code> over the container path as read-only (<code>:ro</code>). That caused two failures:</p>
+        <ul>
+            <li><code>_ensure_parent_dir</code> could not <code>mkdir /opt/comserv/root/static/config</code> → <code>Permission denied</code>.</li>
+            <li><code>set_site_theme</code> could not <code>write_file .../theme_definitions.json</code> → <code>No such file or directory</code>.</li>
+        </ul>
+        <p>The fix (2026-08-17) removes the read-only host bind entirely and instead overlays two small <strong>persistent named volumes</strong> on just the two <em>mutable</em> subdirs (<code>root/static/config</code> and <code>root/static/css/themes</code>). This keeps theme writes writable + durable across redeploys, leaves the bulk of the static tree image-baked (so the CSS-shadow bug cannot return), and needs no code change.</p>
+
+        <div class="alert alert-info">
+            <strong>Deploy note:</strong> a fresh named volume starts empty. On first <code>docker compose up -d --force-recreate --no-build</code>, seed the JSON once from the image-baked copy so the live site-theme mapping is not lost:
+            <pre class="bg-light p-2 rounded"><code>docker cp /opt/comserv/Comserv/root/static/config/theme_definitions.json \
+  comserv2-web-prod:/opt/comserv/root/static/config/theme_definitions.json</code></pre>
+            The generated theme CSS regenerates on the next theme save. Volumes are preserved on later redeploys (canonical deploy never uses <code>-v</code>).
+        </div>
+
+        <h4>Dev vs Production isolation</h4>
+        <p>Each server is its own container with its own filesystem, so theme state is already isolated. The standalone dev server (<code>:3001</code>) writes to its own repo <code>root/static/config</code>; the production container (<code>:5000</code>) writes to its own volume overlay. A developer who tweaks a background colour on dev does <strong>not</strong> affect production — provided dev-only tweaks are not committed (the repo <code>theme_definitions.json</code> is baked into the image on deploy).</p>
+    </section>
+
+    <!-- Roadmap -->
+    <section id="roadmap" class="mb-5">
+        <h2>Roadmap</h2>
+        <p>Two enhancements are tracked under the <a href="/project/details?project_id=77">Theme Management System</a> project (#77):</p>
+        <ul>
+            <li><strong>DB-backed themes.</strong> Migrate all theme definitions and compiled CSS out of the JSON file / static tree and into the database (e.g. <code>themes</code> / <code>site_themes</code> tables). This makes theme state survive any volume loss, share instantly across nodes with no volume backend, and removes the file-write path entirely. (See <a href="/project/details?project_id=77">#77</a>.)</li>
+            <li><strong>More built-in themes from professional sources.</strong> Add several new theme choices to the mix, sourced from professional theme designers / palette systems (e.g. accessible high-contrast, dark-with-AMOLED, seasonal, and brand-matched variants), each delivered as a first-class theme key usable from Step 1.</li>
+        </ul>
+    </section>
+
     <!-- Variable Reference -->
     <section id="variables-ref" class="mb-5">
         <h2>CSS Variable Reference</h2>
@@ -248,7 +293,12 @@
 
     <hr>
     <p class="text-muted small">
-        Theme Management is at <a href="[% c.uri_for('/admin/theme') %]">/admin/theme</a> &nbsp;|&nbsp;
-        Version 1.0 — 2026-03-04
+        <strong>Related:</strong>
+        <a href="[% c.uri_for('/Documentation/ThemeConfig') %]">Theme Configuration</a> &nbsp;|&nbsp;
+        <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan</a> (Theme Management System #77) &nbsp;|&nbsp;
+        Theme Management is at <a href="[% c.uri_for('/admin/theme') %]">/admin/theme</a>
+    </p>
+    <p class="text-muted small">
+        Version 1.2 — 2026-08-17
     </p>
 </div>

@@ -1,331 +1,101 @@
-[% META 
-   title = "Daily Plan - Weekly Priority View"
-   description = "Weekly priority tasks organized by day with collapsible daily sections. Current day open, others collapsed."
-   roles = "admin,developer,devops"
+[% META
+   title = "Daily Planning"
+   description = "Daily planning hub: action bar (Start Day / End Day / Logs) and tabs for Priorities, Master Plan, and Calendar."
+   roles = "admin,developer,devops,editor,user,normal"
    TemplateType = "Application"
-   category = "planning,priorities,daily-tasks"
-   page_version = "1.10"
-   last_updated = "Tue Jan 28 16:43:00 UTC 2026"
-   site_specific = "false"
+   category = "planning"
+   page_version = "4.0"
+   last_updated = "2026-08-13"
 %]
-[% PageVersion = 'admin/documentation/DailyPlan.tt, v 2.0 2026/03/20 SiteName-aware: CSC-only tabs conditionally shown; DB plan list in PLANNING tab for all sites.' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
 [% SET is_csc = is_csc || (c.stash.SiteName == 'CSC') || (c.session.SiteName == 'CSC') %]
-[% SET plan_sitename = plan_sitename || c.stash.SiteName || c.session.SiteName || 'CSC' %]
 
 <link rel="stylesheet" href="/static/css/planning/daily-plan.css">
 
-[% 
-    display_date_str = selected_date;
-    
-    days = [
-        { date = '2026-01-21', display = 'Wednesday, January 21, 2026' },
-        { date = '2026-01-22', display = 'Thursday, January 22, 2026' },
-        { date = '2026-01-23', display = 'Friday, January 23, 2026' },
-        { date = '2026-01-24', display = 'Saturday, January 24, 2026' },
-        { date = '2026-01-25', display = 'Sunday, January 25, 2026' },
-        { date = '2026-01-26', display = 'Monday, January 26, 2026' },
-        { date = '2026-01-27', display = 'Tuesday, January 27, 2026' },
-    ];
-%]
+<div class="daily-index">
 
-<div class="container">
-    <!-- Sticky Header with Navigation -->
     <div class="daily-plan-header">
-        <h1>[DAILY PLAN] [% display_date %]</h1>
-        <div class="header-nav">
-            <div class="header-nav-links">
-                <span><strong>Today:</strong> [% current_display %]</span>
-                <span>|</span>
-                <a href="/Documentation/DailyPlan/[% current_date_str %]">[Jump to Today]</a>
-                <a href="/todo" >Master Plans</a>
-                <a href="/Documentation">All Docs</a>
-                <a href="/todo">Todo System</a>
-            </div>
-            <div class="header-date-nav">
-                <button class="dl-btn dl-btn-start" id="dl-start-btn" data-action="start-day"
-                        title="Audit system errors, check HelpDesk tickets, create daily log">🌅 Start Day</button>
-                <button class="dl-btn dl-btn-end" id="dl-end-btn" data-action="end-day">🌙 End Day</button>
-                [% IF is_admin && (SiteName == 'CSC' || c.session.SiteName == 'CSC') %]
-                <button class="dl-btn dl-btn-deploy" id="dl-deploy-btn"
-                        title="git pull + docker restart — opens deploy log popup">🐳 Deploy</button>
-                [% END %]
-                <span id="dl-feedback"></span>
-                [% IF stale_log_count %]
-                &nbsp;<a href="/log?status=open" class="stale-log-badge" title="View unclosed logs from previous days">⚠️ [% stale_log_count %] unclosed log(s)</a>
-                [% END %]
-                &nbsp;|&nbsp;
-                <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
-                | Viewing [% display_date %] |
-                <a href="/planning/daily/[% next_date %]" class="next-day-link">Next Day →</a>
-            </div>
+        <h1>[PLANNING] <a href="/planning/daily/[% selected_date %]">[% display_date %]</a></h1>
+        <div class="header-date-nav">
+            <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
+            | Viewing [% display_date %] |
+            <a href="/planning/daily/[% next_date %]" class="next-day-link">Next Day →</a>
+            &nbsp;|&nbsp;
+            <a href="/planning/daily/[% current_date_str %]">Today</a>
         </div>
     </div>
 
-    <!-- Daily Log Entry Panel (shown when day is active) -->
-    [% IF open_log_entry %]
-    <div id="log-panel" class="log-panel">
-      <div class="log-panel-flex">
-        <div class="log-panel-main">
-          <div class="log-panel-title">🌅 Today's Log Entry</div>
-          <div class="log-panel-detail"><strong>Started:</strong> [% open_log_entry.start_date %] [% open_log_entry.start_time %]</div>
-          <div><strong>Title:</strong>
-            <input id="log-title-edit" type="text" value="[% open_log_entry.abstract | html %]" class="log-panel-field">
-          </div>
-          <div><strong>Notes:</strong>
-            <textarea id="log-desc-edit" rows="3" class="log-panel-textarea">[% open_log_entry.details | html %]</textarea>
-          </div>
-        </div>
-        <div class="log-panel-actions">
-          <button data-save-log="[% open_log_entry.record_id %]" class="log-panel-btn log-panel-btn-primary">
-            💾 Save Notes
-          </button>
-          <button data-action="end-day" class="log-panel-btn log-panel-btn-secondary">
-            🌙 Close Day
-          </button>
-          <button data-action="dismiss-log-panel" class="log-panel-btn log-panel-btn-ghost">
-            ✖ Dismiss
-          </button>
-        </div>
-      </div>
-      <div id="log-save-status" class="log-panel-status"></div>
-    </div>
-    [% END %]
-
-    <!-- Tab Navigation -->
-    <div class="tab-navigation">
-        <button class="tab-button active" data-tab="today-work">
-            DAILY PRIORITIES
-        </button>
-        <button class="tab-button" data-tab="daily-schedule">
-            🕐 DAILY SCHEDULE
-        </button>
-        <button class="tab-button" data-tab="weekly-view">
-            📅 THIS WEEK
-        </button>
-        <button class="tab-button" data-tab="month-view">
-            MONTH VIEW
-        </button>
-        <button class="tab-button" data-tab="planning">
-            PLANNING
-        </button>
-        <button class="tab-button" data-tab="gantt-view">
-            📊 GANTT
-        </button>
-        <button class="tab-button" data-tab="resources-view">
-            RESOURCES & CONTEXT
-        </button>
-        [% IF is_csc %]
-        <button class="tab-button" data-tab="project-planning">
-            DAILY PLAN GUIDE
-        </button>
-        [% END %]
-    </div>
-
-    <!-- TAB 1: TODAY'S WORK (extracted) -->
-    [% INCLUDE 'admin/planning/_today_work_tab.tt' %]
-
-    <!-- TAB: PLANNING (extracted) -->
-    [% INCLUDE 'admin/planning/_planning_tab.tt' %]
-
-    <div id="daily-schedule" class="tab-content" data-lazy="daily-schedule" data-lazy-date="[% selected_date %]">
-        <div class="tab-loading">
-            <span class="spinner"></span> Loading daily schedule…
+    [%# ── ACTION CARD (above the tab bar) ──
+        Start Day / End Day / Logs / Triage / Reschedule controls. The same controls
+        also exist inside the Priorities tab (in _today_work_tab.tt), but DailyPlan.tt
+        passes hide_action_bar = 1 to that include so only THIS card shows — no duplicate. %]
+    <div class="daily-action-card">
+        <div class="daily-action-card-title">Day Controls</div>
+        <div class="ActionBar">
+            <a href="/todo/addtodo" class="ActionBarLink ActionBarLink--primary">+ Add Todo</a>
+            <a href="/todo" class="ActionBarLink">All Todos</a>
+            <a href="/log" class="ActionBarLink">Logs</a>
+            <button class="ActionBarBtn ActionBarBtn--teal" data-action="start-day" title="Start your day — audits application errors, checks HelpDesk, creates daily log">🌅 Start Day</button>
+            [%# 'Open Logs' alert only appears when a log is still open/unclosed, so the
+                user is told a log needs attention. Distinct from the permanent 'Logs'
+                link above, which always lets them check what is still open today. %]
+            [% IF open_log_entry %]
+            <a href="#log-panel" class="ActionBarLink ActionBarLink--green" data-action="toggle-log-panel" title="Today's log is still open — a log was started but not closed">🌅 Open Logs</a>
+            [% END %]
+            <button class="ActionBarBtn ActionBarBtn--orange" data-action="end-day" title="End your day — closes today's open log entry">🌙 End Day</button>
+            <span id="dl-feedback" class="ActionBarFeedback" aria-live="polite"></span>
+            [% IF is_admin %]
+            <button class="ActionBarBtn ActionBarBtn--orange" data-action="triage-stale" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
+            <button class="ActionBarBtn ActionBarBtn--purple" data-action="reschedule" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+            [% END %]
         </div>
     </div>
 
-    <!-- TAB 2: WEEKLY VIEW -->
-    <div id="weekly-view" class="tab-content" data-lazy="weekly-view" data-lazy-date="[% selected_date %]">
-        <div class="tab-loading">
-            <span class="spinner"></span> Loading weekly view…
-        </div>
+    [%# ── TAB BAR ──
+        Tab content is server-side INCLUDEd into the SAME document (never an AJAX
+        ?tab= full-page fetch, which re-injected layout.tt and duplicated the
+        floating buttons inside the tab). The embedded pages keep their own
+        internal chrome inside their tab <div>, but the parent's floating buttons
+        remain at body level and stay reachable. %]
+    <div class="tab-navigation" role="tablist">
+        <button class="tab-button active" data-tab="priorities" role="tab" aria-selected="true">🎯 Daily Priorities</button>
+        <button class="tab-button" data-tab="master-plan" role="tab" aria-selected="false">🗺️ Master Plan</button>
+        <button class="tab-button" data-tab="calendar" role="tab" aria-selected="false">📅 Calendar</button>
     </div>
 
-    <!-- TAB 4: DAILY PLAN GUIDE -->
-    <div id="daily-plan-guide" class="tab-content">
-        <h2>Instructions for Admin Working on The Daily Plan</h2>
-        [%  INCLUDE 'admin/documentation/DailyAuditGuide.tt' %]
-        <div class="info-box">
-            <h3>How to Update This Daily Plan</h3>
-            <ol>
-                <li><strong>Read First:</strong> Always read the entire DailyPlan.tt file before making changes. Understand the tab structure and container relationships.</li>
-                <li><strong>Preserve Floating Header:</strong> The sticky header with navigation must remain at the top. Do not remove or modify the floating position.</li>
-                <li><strong>Preserve Tab Structure:</strong> Never remove existing tabs without explicit user permission. You may add new tabs, but do not delete TODAY'S WORK, RESOURCES & CONTEXT, or COMPLETED tabs.</li>
-                <li><strong>Update Within Containers:</strong> Edit task content within task-list containers, not the containers themselves. Preserve checkbox structure and task items.</li>
-                <li><strong>Link to Master Docs:</strong> Reference PriorityTodos.tt at /admin/documentation/PriorityTodos - never duplicate the full table into daily plans.</li>
-                <li><strong>Track Progress:</strong> Update checkbox status as tasks complete. Move items to COMPLETED tab when done.</li>
-                <li><strong>Conditional Planning:</strong> If a critical blocker succeeds, update the next day's plan to show unblocked work.</li>
-                <li><strong>Log Changes:</strong> After edits, execute updateprompt.pl --phase after with files modified and changes made.</li>
-            </ol>
-        </div>
+    <div id="priorities" class="tab-content active" role="tabpanel">
+        [% INCLUDE 'admin/planning/_today_work_tab.tt' hide_action_bar = 1 %]
     </div>
 
-    <!-- TAB 3: RESOURCES & CONTEXT -->
-    <div id="resources-view" class="tab-content">
-        <h3>[RESOURCES & SUPPORTING CONTEXT] — [% plan_sitename %]</h3>
-
-        [% IF is_csc %]
-        <!-- Planning Quick Links (CSC only) — DB-driven state -->
-        <div class="planning-quick-links">
-            <h3 class="link-title">📋 Planning System — Current State</h3>
-            <p>All planning is now DB-driven. Tasks tracked in the <strong>Planning System</strong> project (todos 502–516). Text-based planning content below is CSC-only and being phased out.</p>
-            <div class="planning-link-bar">
-                <a href="/project/details?project_id=138">Planning System Project</a>
-                <a href="/todo?project_id=186">Phase 1 Todos</a>
-                <a href="/todo?project_id=187">Phase 2 Todos</a>
-                <a href="/todo">Master Plan Todos</a>
-                <a href="/todo">All Todos</a>
-            </div>
-        </div>
-        [% END %]<!-- end is_csc resources -->
-
-    </div>
-
-    <!-- TAB: MONTH VIEW -->
-    <div id="month-view" class="tab-content" data-lazy="month-view" data-lazy-date="[% selected_date %]">
-        <div class="tab-loading">
-            <span class="spinner"></span> Loading month view…
-        </div>
-    </div>
-
-    <div id="gantt-view" class="tab-content">
-        <div class="gantt-header">
-            <h2>📊 Project Timeline — [% IF is_csc && !filter_site %]All Sites[% ELSE %][% plan_sitename %][% END %]</h2>
-            <div class="gantt-legend">
-                <span><span class="gantt-legend-dot" style="background:#17a2b8;"></span>In-Process</span>
-                <span><span class="gantt-legend-dot" style="background: var(--success-color, #28a745);"></span>Completed</span>
-                <span><span class="gantt-legend-dot" style="background: var(--secondary-color, #6c757d);"></span>Pending</span>
-                <span><span class="gantt-legend-dot" style="background: var(--danger-color, #dc3545);"></span>On Hold</span>
-            </div>
-        </div>
-
-        [% IF planning_projects && planning_projects.size %]
-        <div id="gantt-container" class="gantt-container">
-            <div id="gantt-chart" class="gantt-chart"></div>
-        </div>
-
-        [% IF planning_projects && planning_projects.size > 0 %]
-        <script id="gantt-data" type="application/json">[% FOREACH p IN planning_projects %]{"id":[% p.id %],"name":"[% p.name | html %]","sitename":"[% p.sitename | html %]","status":"[% p.status | html %]","start_date":[% p.start_date ? ('"' _ p.start_date _ '"') : 'null' %],"end_date":[% p.end_date ? ('"' _ p.end_date _ '"') : 'null' %]}[% UNLESS loop.last %],[% END %][% END %]</script>
-
-        <p class="gantt-meta">
-            Blue line = today. Projects without dates are placed at current position.
-            Window: 3 months back → 9 months forward.
-            <a href="/project/addproject">Add dates to a project</a> to improve accuracy.
+    <div id="master-plan" class="tab-content" role="tabpanel">
+        [%# Interim bridge (todo #2107): in-tab MASTER_PLAN links do full-page
+            navigation that destroys the tab's JS state. Until that is fixed,
+            give a single "open in its own tab" escape hatch so plans/docs are
+            navigable. This anchor targets _blank and is outside the SPA
+            router, so it cannot break the parent tab's navigation. %]
+        <p style="margin:6px 0 10px;padding:8px 12px;border-left:4px solid var(--primary-color);background:var(--bg-secondary,#f8f9fa);border-radius:4px;">
+            <a href="/Documentation/MASTER_PLAN" target="_blank" rel="noopener" style="color:var(--primary-color);font-weight:600;text-decoration:none;">↗ Open Master Plan in a new tab</a>
+            <span style="color:var(--text-muted-color);font-size:0.9em;"> — full plan + documentation navigation (in-tab links are being fixed in todo #2107)</span>
         </p>
-
-        [% ELSE %]
-        <div class="gantt-empty">
-            <p>No projects found. Add projects at <a href="/project/addproject">/project/addproject</a>.</p>
-        </div>
-        [% END %]
-        [% END %]
+        [% INCLUDE 'Documentation/MASTER_PLAN.tt' %]
     </div>
 
-<!-- Deploy Control Center Modal HTML -->
-<div id="deploy-modal" class="deploy-modal-overlay" style="display:none;">
-    <div class="deploy-center-modal">
-        
-        <!-- Header -->
-        <div class="deploy-center-header">
-            <h3>
-                <span>🚀 Deploy Control Center</span>
-            </h3>
-            <button data-action="close-deploy-center" class="deploy-close-btn">&times;</button>
+    <div id="calendar" class="tab-content" role="tabpanel">
+        [%# Calendar tab: Day view is rendered INLINE (horizontal gcal grid,
+            proven working). Day/Week/Month switching is done with plain links
+            to the standalone /todo/day|week|month routes (which render
+            horizontally and reliably) carrying the date. This avoids the
+            fragile inline multi-view include experiment. %]
+        <div class="cal-view-subnav" style="display:flex;gap:8px;margin:10px 0 4px;">
+            <a class="cal-view-link" href="/todo/day/[% selected_date %]" style="padding:6px 14px;border:1px solid var(--border-color);border-radius:6px;text-decoration:none;color:var(--text-color);font-weight:600;">Day</a>
+            <a class="cal-view-link" href="/todo/week/[% selected_date %]" style="padding:6px 14px;border:1px solid var(--border-color);border-radius:6px;text-decoration:none;color:var(--text-color);font-weight:600;">Week</a>
+            <a class="cal-view-link" href="/todo/month/[% selected_date %]" style="padding:6px 14px;border:1px solid var(--border-color);border-radius:6px;text-decoration:none;color:var(--text-color);font-weight:600;">Month</a>
         </div>
-
-        <!-- Description -->
-        <p class="deploy-center-desc">
-            Select a deployment method. <strong>Docker Hub Production</strong> is the primary choice, which builds the image, pushes it to Docker Hub, and triggers a pull on the production server.
-        </p>
-
-        <!-- Form Options -->
-        <div class="deploy-options">
-            <!-- Option 1: Hub Production -->
-            <label class="deploy-option-label">
-                <input type="radio" name="deploy_method" value="production" checked data-action="toggle-deploy-form" class="deploy-option-radio">
-                <div>
-                    <strong class="deploy-option-name primary">Docker Hub Production Deploy (Primary)</strong>
-                    <span class="deploy-option-desc">Builds production image, pushes to Docker Hub, and SSH-triggers pull on the server ubuntu@192.168.1.126.</span>
-                </div>
-            </label>
-
-            <!-- Option 2: Local Workstation -->
-            <label class="deploy-option-label">
-                <input type="radio" name="deploy_method" value="local" data-action="toggle-deploy-form" class="deploy-option-radio">
-                <div>
-                    <strong class="deploy-option-name">Local Workstation Deploy</strong>
-                    <span class="deploy-option-desc">Performs a git pull and rebuilds/recreates the local workstation containers.</span>
-                </div>
-            </label>
-        </div>
-
-        <!-- Production Deploy Settings -->
-        <div id="production-deploy-settings" class="deploy-settings">
-            <div class="deploy-settings-grid">
-                <div>
-                    <label class="deploy-field-label">SSH Target:</label>
-                    <input type="text" id="deploy-ssh-target" value="ubuntu@192.168.1.126" class="deploy-input">
-                </div>
-                <div>
-                    <label class="deploy-field-label">SSH Password:</label>
-                    <input type="password" id="deploy-ssh-password" placeholder="Saved password will be used" class="deploy-input">
-                </div>
-            </div>
-            <div>
-                <label class="deploy-field-label">Deployment Mode / Action:</label>
-                <select id="deploy-mode-select" class="deploy-select">
-                    <option value="full" selected>🚀 FULL DEPLOY (Build/push local, remote pull, force stop, restart container)</option>
-                    <option value="quick">⚡ QUICK DEPLOY (Skip build/push, restart existing container on server)</option>
-                    <option value="pull_only">📥 DOWNLOAD CONTAINER ONLY (Pull latest image from Hub)</option>
-                    <option value="stop_all">🛑 STOP ALL SERVICES (Stop container, force-kill manual Starman)</option>
-                    <option value="git_pull">🐙 GIT UPDATE (Run git pull on production host)</option>
-                    <option value="manual_server">⚠️ EMERGENCY MANUAL SERVER (Start host Starman on port 5000)</option>
-                </select>
-            </div>
-            <div class="deploy-hint">
-                Saved credentials in <code>~/.comserv/secrets/ssh_credentials.json</code> will be loaded automatically if present.
-            </div>
-        </div>
-
-        <!-- Progress Log -->
-        <div id="deploy-progress-container" class="deploy-progress" style="display:none;">
-            <div class="deploy-progress-header">
-                <strong>Console Log Output:</strong>
-                <span id="deploy-status-spinner" class="deploy-spinner">
-                    <span class="deploy-spinner-dot"></span>
-                    Deploying...
-                </span>
-            </div>
-            <pre id="deploy-output-box" class="deploy-output"></pre>
-        </div>
-
-        <!-- Footer Actions -->
-        <div class="deploy-actions">
-            <button data-action="close-deploy-center" id="deploy-cancel-btn" class="deploy-btn-secondary">Cancel</button>
-            <button data-action="start-deploy-center" id="deploy-start-btn" class="deploy-btn-primary">Start Deploy</button>
-        </div>
-
+        [% INCLUDE 'todo/day.tt' include_mode = 1 %]
     </div>
+
+    <p class="daily-index-legacy">
+        Need the old all-in-one view? It is preserved for reference at
+        <a href="/planning/daily-legacy">/planning/daily-legacy</a>.
+    </p>
+
 </div>
-
-<!-- @keyframes spin moved to daily-plan.css -->
-
-<!-- Smart Open Modal for branch servers -->
-<div id="branch-start-modal" class="deploy-modal-overlay" style="display:none;">
-    <div class="branch-modal">
-        <div class="branch-modal-header">
-            <span id="branch-modal-title">Starting server…</span>
-            <button data-action="close-branch-modal" class="deploy-close-btn">&times;</button>
-        </div>
-        <div class="branch-modal-body">
-            <div class="branch-modal-cmd" id="branch-modal-cmd"></div>
-            <pre id="branch-modal-log" class="branch-modal-log"></pre>
-        </div>
-        <div class="branch-modal-footer">
-            <button data-action="close-branch-modal" class="deploy-btn-secondary">Close</button>
-        </div>
-    </div>
-</div>
-

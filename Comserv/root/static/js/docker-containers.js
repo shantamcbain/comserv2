@@ -103,7 +103,7 @@
             setStatus('check', 'Deploying ' + target + ' (' + elapsed + ')');
         }, 1000);
 
-        var maxDuration = 30 * 60 * 1000; // 30 minutes max
+        var maxDuration = 60 * 60 * 1000; // 60 minutes max (full image build+push+pull can exceed 30m)
 
         rebuildPollingTimer = setInterval(function() {
             // Timeout check

@@ -124,6 +124,8 @@
         </div>
     </div>
 
+    <p class="notice"><strong>Coordinator:</strong> this feature doc is the readable view of the <strong>Planning System project</strong> (#138 PLANNING — see <a href="/project/details?project_id=138">#138</a>). It follows the <a href="/Documentation/PlanningLanguageStandard">Planning Language Standard</a>: PROJECT = PLAN, PHASE = sub-project (234/235/236/240), STEP = todo, GATE = done-when. Its phases are listed in the <a href="/Documentation/MASTER_PLAN">Comserv2 Master Plan</a> under Project #138 PLANNING.</p>
+
     <div class="row">
         <div class="col-12">
             <nav id="toc" class="navigation-menu">
@@ -244,7 +246,7 @@
                 </tbody>
             </table>
             <p style="font-size:0.85em;color: var(--text-muted-color, #666);margin-top:6px;">
-                <strong>Implementation note:</strong> CSC text-based plan tabs (DAILY PLAN GUIDE, ZENCODER PROMPT, MASTER PLAN COORDINATION)
+                <strong>Implementation note:</strong> CSC text-based plan tabs (MASTER PLAN, ZENCODER PROMPT, MASTER PLAN COORDINATION)
                 are conditionally shown only when <code>is_csc = 1</code> in the session.
                 All other SiteNames see only DB-driven tabs (DAILY PRIORITIES, DAILY SCHEDULE, THIS WEEK, MONTH VIEW, PLANNING, GANTT, RESOURCES).
             </p>

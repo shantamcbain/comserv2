@@ -1,11 +1,15 @@
 # Todo List Page Ranking & Display Tuning Plan
 
-- **Project:** 240 TODOLIST-UI (sub-project of 138 PLANNING)
+- **Project code:** TODOLIST-UI ([proj #240](/project/details?project_id=240))
+- project_id = "240"
+- project_code = "TODOLIST-UI"
+- **Parent project:** #138 PLANNING (this is a PHASE of the Planning System project)
+- **Standard:** follows [Planning Language Standard](/Documentation/PlanningLanguageStandard) — PHASE = sub-project, STEP = todo, GATE = done-when
+- **Coordinator:** [Comserv2 Master Plan](/Documentation/MASTER_PLAN) — Project #138 PLANNING
 - **Created:** 2026-08-05
-- **Purpose:** Make the main Todo list page rank and display work the way the daily
-  triage does, so the user sees the important items (PROJ-UI Ph1, PLAN-QUEUE Ph1, the
-  ACC sign-off gates) at the top instead of stale p1 noise (dead Ollama stubs, SUPERSEDED
-  rows, routine daily-plan entries).
+- **Deliverable (one line):** Make the main Todo list page rank and display the way the daily triage does,
+  so important items (PROJ-UI phase 1, PLAN-QUEUE phase 1, the ACC sign-off gates) float to the top instead of
+  stale p1 noise (dead Ollama stubs, SUPERSEDED rows, routine daily-plan entries).
 
 ## Diagnosis (why the page currently diverges from triage)
 
@@ -278,6 +282,41 @@ Wired in `daily-plan-utils.js` (button IDs `ai-tune-btn` / `ai-tune-model` /
   under "🎯 Today's Focus Queue"** (not 3 lines in the top action bar, and not far from
   the queue). Shows `🤖 AI: Tune [model ▾] ⚖ Compare` on one row. The result panel
   renders below it, adjacent to the queue, so the diff is visible at a glance.
+
+## Phase 7 — API surfaces the same project name + link as the web page (2026-08-15)
+The web detail page (Ph detail-view fix) now shows the attached project <em>name</em> as a
+clickable link, but `GET /api/todos` (the surface AI agents use to "see the app as a logged-in
+user") returned only the raw numeric `project_id` — so an agent could not name or jump to the
+project without a second lookup.
+- **Fix:** `Comserv/lib/Comserv/Controller/Api.pm` `_todo_to_hash` now resolves the same
+  `belongs_to(project)` relationship and adds two fields per todo:
+  - `project_name` — the project name (`null` when none attached)
+  - `project_link` — `/project/details?project_id=<id>` (`null` when none)
+  `project_id` is retained for backward compatibility.
+- Now an agent authenticated as a logged-in user sees the identical project name + destination
+  link the browser shows — they can never disagree, because both read the same relationship.
+- **Verified:** `perl -e 'use Comserv::Controller::Api'` compiles cleanly; change is confined
+  to the serializer and auto-reloads on the running `:3001` process. (Live JSON not captured
+  this session — auth-gated curl probe required consent.)
+
+## Phase 8 — `/project/details` embedded cards still light-on-light + v2 inline-script removal (2026-08-15)
+The card theme fix from Phase 7 (todo_card.tt → `todo_shared.css` overrides) was not actually
+applied on `/project/details` because the controller's `details` action loaded only
+`project-details.css` and never `todo_shared.css`. Without that include the embedded
+`todo_card.tt` cards fell back to Bootstrap's white `.card` → light-on-light on the dark theme.
+- **Fix (Controller/Project.pm `details`):** `additional_css` now loads **both**
+  `todo_shared.css` and `project-details.css`. `project-details.css` was already theme-safe and
+  is untouched — the only gap was the missing `todo_shared.css` include (the grid page and the
+  day/week/month views already load it; this route did not).
+- **v2 JS:** removed the inline `<script>` (AI-conversations fetch) from `root/todo/projectdetails.tt`;
+  moved it to `root/static/js/project/project-conversations.js`, delegated on `[data-project-id]`,
+  loaded via `root/js_load.tt` on `/project/` routes (no inline `<script>` in any js_load.tt template).
+- **Project link:** the in-card Project link (`todo_card.tt` `tc.project` →
+  `/project/details?project_id=<id>`) was already present and is visible again now that the card
+  body is readable. No new link styling required.
+- **Verified (static):** `projectdetails.tt` parses via TT (stub) with 0 real `<script>`/`<style>`;
+  `node --check` passes on the new JS; grep of the three loaded CSS files for broad
+  `a`/`button`/`*` color selectors → none. Live admin render pending (auth-gated).
 
 ## Working discipline — time logs are mandatory per todo
 User rule (2026-08-05): every todo we work on must get a time log. Procedure:

@@ -1,17 +1,19 @@
 <!-- TAB 1: TODAY'S WORK (Default) -->
-    <div id="today-work" class="tab-content active">
+    <div id="today-work">
         <div id="today-work-content">
 
-            <script>
-                // Seed the AI Focus-Tune default from the shared catalog default
-                // (free OpenRouter / coding default) so the picker never falls back
-                // to a hardcoded localhost Ollama slug (phi4:14b). daily-plan-utils.js
-                // reads window.ComservConfig.aiFocusDefault on load.
-                window.ComservConfig = window.ComservConfig || {};
-                window.ComservConfig.aiFocusDefault = '[% ai_default_model || '' %]';
-            </script>
+            [%# Seed the AI Focus-Tune default WITHOUT inline JS. daily-plan-utils.js reads
+                window.ComservConfig.aiFocusDefault on load. Inline <script> blocks are
+                forbidden (root/js_load.tt) and were breaking tab switching on this page. %]
+            <script type="application/json" id="ai-focus-default" [% IF ai_default_model %]data-default="[% ai_default_model | html %]"[% END %]></script>
 
-            [%# ── Action bar (below tabs) ── %]
+            [%# ── Action bar (below tabs) ──
+                Canonical Start Day / End Day / Triage / Reschedule bar. Rendered on
+                DailyPriorities and DailyPlan.legacy (which INCLUDE this file without a
+                flag). On /planning/daily the same controls already live in the
+                top-level .daily-action-card above the tab bar, so DailyPlan.tt passes
+                hide_action_bar = 1 to suppress this duplicate. %]
+            [% IF hide_action_bar != 1 %]
             <div class="ActionBar">
                 <a href="/todo/addtodo" class="ActionBarLink ActionBarLink--primary">+ Add Todo</a>
                 <a href="/todo" class="ActionBarLink">All Todos</a>
@@ -24,8 +26,10 @@
                 [% END %]
                 <button class="ActionBarBtn ActionBarBtn--orange" data-action="triage-stale" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                 <button class="ActionBarBtn ActionBarBtn--purple" data-action="reschedule" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+                <span id="dl-feedback" class="ActionBarFeedback" aria-live="polite"></span>
                 [% END %]
             </div>
+            [% END %]
 
             [%# ── Cross-project dependency summary (always visible, collapsible) ── %]
             <details class="mb-8">
@@ -244,7 +248,7 @@
                         class="SortBtn">Project</button>
                     <button data-action="sort-due" id="sort-due"
                         class="SortBtn">Due</button>
-                    <a href="#planning" data-action="clear-filters"
+                    <a href="/planning/daily" data-action="clear-filters"
                         class="ClearFiltersLink">✕ Clear</a>
                 </div>
 
@@ -298,7 +302,7 @@
                 <div class="EmptyState">
                     <p>No active todos found[% IF filter_project || filter_site %] for the selected filter[% ELSE %] for your role and site[% END %].</p>
                     [% IF filter_project || filter_site %]
-                    <a href="/planning/daily#planning">✕ Clear filters</a>
+                    <a href="/planning/daily">✕ Clear filters</a>
                     [% ELSE %]
                     <a href="/todo/addtodo">+ Create your first todo</a>
                     [% END %]

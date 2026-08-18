@@ -175,6 +175,28 @@
     color: var(--text-color, #333);
 }
 
+/* ── Theme-compliance: the open card body used Bootstrap's .card (hardcoded
+   white background) and .todo-card-pre used a hardcoded `bg-light` gray. On a
+   dark theme those produce light text on a light background → unreadable.
+   Force the card + its pre blocks to follow the theme tokens instead of
+   Bootstrap's hardcoded colors. ── */
+.todo-card.card,
+.todo-card details.card {
+    background-color: var(--card-bg, var(--bg-secondary, transparent));
+    border-color: var(--border-color, #ddd);
+    color: var(--text-color, #333);
+}
+.todo-card .card-body {
+    background-color: var(--card-bg, var(--bg-secondary, transparent));
+    color: var(--text-color, #333);
+}
+.todo-card-pre {
+    background-color: var(--bg-secondary, #f8f9fa);
+    color: var(--text-color, #333);
+    border-color: var(--border-color, #ddd);
+}
+.todo-card .text-muted { color: var(--text-muted-color, #666) !important; }
+
 /* Todo Details Section */
 .todo-details-shared {
     display: flex;

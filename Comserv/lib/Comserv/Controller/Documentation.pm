@@ -820,6 +820,8 @@ sub view :Path('/Documentation') :Args(1) {
                     page_title => $metadata->{title} || $self->_format_title($page),
                     markdown_content => $content,
                     last_updated => $last_updated,
+                    project_id => $metadata->{project_id} || '',
+                    project_code => $metadata->{project_code} || '',
                     user_role => $user_role,
                     site_name => $site_name,
                     template => 'Documentation/MarkdownViewer.tt'
@@ -842,6 +844,9 @@ sub view :Path('/Documentation') :Args(1) {
                 my $stash_data = {
                     page_name => $page,
                     page_title => $metadata->{title} || $self->_format_title($page),
+                    last_updated => $metadata->{last_updated} || '',
+                    project_id => $metadata->{project_id} || '',
+                    project_code => $metadata->{project_code} || '',
                     user_role => $user_role,
                     site_name => $site_name,
                     template => $path
@@ -958,6 +963,8 @@ sub view :Path('/Documentation') :Args(1) {
             page_title => $self->_format_title($page),
             markdown_content => $content,
             last_updated => $last_updated,
+            project_id => '',
+            project_code => '',
             user_role => $user_role,
             site_name => $site_name,
             template => 'Documentation/MarkdownViewer.tt'

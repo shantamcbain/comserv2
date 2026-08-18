@@ -4,6 +4,108 @@ set -e
 # Ensure standard system bin paths are included in PATH (critical for non-interactive SSH)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
+# ── Sync changed host/cron scripts to the host (FIRST, before any build/pull) ──
+# The container carries the app code, but host-side cron scripts (hardware_monitor.pl)
+# and deploy.sh itself must live on the HOST (they run outside the container). This
+# step copies every changed script the host cron/deploy needs so all servers stay
+# identical. Runs as the very first action of deploy so a fresh server gets the
+# sync_deploy_artifacts() — SYNC THE CANONICAL DEPLOY ARTIFACT SET INTO THE
+# BUILD-SOURCE CHECKOUT BEFORE ANY BUILD.
+#
+# Root-cause of repeated "fix not in the rebuild" bugs: the build reads from a
+# server-side git checkout (e.g. /opt/comserv/Comserv), but edits were made on a
+# different machine/tree and never landed there. The script MUST close that gap
+# itself, unconditionally — not only when launched as /tmp/deploy.sh.
+#
+# It copies every file in the canonical deploy set from the SOURCE tree
+# (GLOBAL_HOST_APP_DIR, i.e. wherever this script actually lives) into the
+# BUILD-SOURCE checkout, and removes files that were deleted upstream
+# (e.g. deploy2.sh). This guarantees the next build contains the exact same
+# code that was edited — no manual commit/sync step required.
+#
+# NOTE: deploy.sh runs from the container image / the workstation build tree;
+# there is no server-side source tree to auto-commit, so a build always uses
+# the exact code that was edited here.
+sync_deploy_artifacts() {
+    # SRC_ROOT = the repo tree THIS script actually lives in (walk up from
+    # $CURRENT_SCRIPT_PATH to the dir that contains script/deploy.sh). This is
+    # the tree with the EDITED code -- NOT necessarily GLOBAL_HOST_APP_DIR.
+    # BUILD_ROOT = the checkout the build reads from (GLOBAL_HOST_APP_DIR).
+    # We copy SRC -> BUILD so an edited file is always on the server before SSH/build.
+    local SRC_ROOT=""
+    local p
+    p="$(dirname "$CURRENT_SCRIPT_PATH")"
+    while [ -n "$p" ] && [ "$p" != "/" ]; do
+        if [ -f "$p/script/deploy.sh" ]; then SRC_ROOT="$p"; break; fi
+        p="$(dirname "$p")"
+    done
+    [ -n "$SRC_ROOT" ] || SRC_ROOT="$GLOBAL_HOST_APP_DIR"
+    local BUILD_ROOT="$GLOBAL_HOST_APP_DIR"
+    [ -n "$BUILD_ROOT" ] || { echo "⚠ sync_deploy_artifacts: no build root"; return 0; }
+    [ -d "$SRC_ROOT" ] || { echo "⚠ sync_deploy_artifacts: source $SRC_ROOT missing"; return 0; }
+
+    echo "--- Syncing deploy artifacts: $SRC_ROOT -> $BUILD_ROOT ---"
+
+    # Canonical deploy artifact set (relative paths from repo root). Add new
+    # deploy/source files here so they are ALWAYS synced before a build.
+    local REL_FILES=(
+        "script/deploy.sh"
+        "script/deploy-to-node.sh"
+        "script/deploy-to-production1.sh"
+        "lib/Comserv/Controller/Admin/Docker.pm"
+        "docker-compose.prod.yml"
+    )
+    # Files that MUST NOT exist in the build source (deleted upstream).
+    local REL_DELETED=(
+        "script/deploy2.sh"
+    )
+
+    local copied=0
+    for rel in "${REL_FILES[@]}"; do
+        if [ -f "$SRC_ROOT/$rel" ]; then
+            # Only copy if content differs (avoid needless churn / mtime bumps).
+            if [ -f "$BUILD_ROOT/$rel" ] && cmp -s "$SRC_ROOT/$rel" "$BUILD_ROOT/$rel"; then
+                : # identical — skip
+            else
+                mkdir -p "$(dirname "$BUILD_ROOT/$rel")" 2>/dev/null || true
+                cp -f "$SRC_ROOT/$rel" "$BUILD_ROOT/$rel"
+                chmod 0755 "$BUILD_ROOT/$rel" 2>/dev/null || chmod 0644 "$BUILD_ROOT/$rel" 2>/dev/null || true
+                echo "  ✅ synced $rel"
+                copied=$((copied+1))
+            fi
+        else
+            echo "  ⚠ source missing: $rel (skipped)"
+        fi
+    done
+
+    for rel in "${REL_DELETED[@]}"; do
+        if [ -e "$BUILD_ROOT/$rel" ]; then
+            rm -f "$BUILD_ROOT/$rel" && echo "  🗑 removed stale $rel"
+        fi
+    done
+
+    # Also keep /usr/local/bin host-side scripts current (cron/monitor run outside container).
+    local SRC_DIR="$SRC_ROOT"
+    [ -d "$SRC_DIR/script" ] && SRC_DIR="$SRC_DIR/script"
+    for s in hardware_monitor.pl device_agent.sh; do
+        if [ -f "$SRC_DIR/$s" ]; then
+            # Non-fatal: on prod the cron runs as a user that may not own
+            # /usr/local/bin. A failed host-script refresh must not abort the
+            # whole deploy/monitor run.
+            if cp -f "$SRC_DIR/$s" "/usr/local/bin/$s" 2>/dev/null; then
+                chmod 0755 "/usr/local/bin/$s" 2>/dev/null || true
+                echo "  ✅ /usr/local/bin/$s"
+            else
+                echo "  ⚠ could not update /usr/local/bin/$s (no write permission) — skipped"
+            fi
+        fi
+    done
+
+    echo "  synced $copied changed deploy artifact(s) into build source."
+    echo "--------------------------------------------"
+}
+
+
 # ── New top-level mode handling (must be first) ──────────────────────────────
 # Supported modes:
 #   --prod / DEPLOY_MODE=prod           : Full production deploy (build + push + deploy)
@@ -28,79 +130,44 @@ if [ -n "$DEPLOY_MODE_DETECTED" ]; then
     export DEPLOY_MODE="$DEPLOY_MODE_DETECTED"
 fi
 
-# Auto-commit and push before deploy (Auto Deploy Step 0a).
-# Developers may edit code without manually committing; deploy must never ship
-# un-pushed changes. Production servers only git pull — they never auto-commit.
-pre_build_git_sync() {
-    local SCRIPT_DIR REPO_ROOT BRANCH DEPLOYER AT_UTC MSG unpushed
-
-    if [ "${COMSERV_SKIP_PRE_BUILD_GIT_SYNC:-0}" = "1" ]; then
-        echo "Skipping pre-build git sync (COMSERV_SKIP_PRE_BUILD_GIT_SYNC=1)"
-        return 0
-    fi
-
-    SCRIPT_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
-    REPO_ROOT="${COMSERV_GIT_REPO_ROOT:-}"
-    if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/.git" ]; then
-        REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
-    fi
-
-    if [ ! -d "$REPO_ROOT/.git" ]; then
-        echo "❌ pre_build_git_sync: no git repository at $REPO_ROOT" >&2
-        return 1
-    fi
-    if ! command -v git &>/dev/null; then
-        echo "❌ pre_build_git_sync: git not found" >&2
-        return 1
-    fi
-
-    echo "--- Pre-build: Commit and push local changes ---"
-    echo "Repository: $REPO_ROOT"
-
-    cd "$REPO_ROOT"
-    git fetch origin 2>/dev/null || true
-    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-    if [ -n "$(git status --porcelain)" ]; then
-        DEPLOYER="${COMSERV_DEPLOY_USER:-$(whoami)}"
-        AT_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        MSG="Auto-commit before production deploy ($AT_UTC by $DEPLOYER)"
-        echo "Uncommitted changes detected — staging and committing..."
-        git add -A
-        if ! git commit -m "$MSG"; then
-            echo "❌ git commit failed — deploy aborted" >&2
-            return 1
-        fi
-        echo "✅ Committed: $MSG"
-    else
-        echo "✓ Working tree clean (no new commit needed)"
-    fi
-
-    # NOTE: Push step intentionally removed.
-    # Commits (if any) are left local. Push must be done manually from PyCharm later.
-    # This allows the deploy to proceed immediately even with unpushed commits.
-    echo "⚠️  Skipping remote push (push disabled in deploy.sh — will be fixed later)"
-    echo "Deploy will build from commit: $(git rev-parse --short HEAD) ($(git log -1 --pretty=%s))"
-    echo "--------------------------------------------"
-    return 0
-}
-
-if [ "${1:-}" = "--pre-build-git-sync" ] || [ "${DEPLOY_MODE:-}" = "pre_build_git_sync" ]; then
-    pre_build_git_sync
-    exit $?
-fi
-
+# No pre-build git commit/push: all application code ships inside the container
+# image, and production runs from the image — there is no source tree on the
+# server to keep in sync. The dashboard build/push step produces the image;
+# deploy.sh only pulls and runs it.
 EMAIL="csc@computersystemconsulting.ca"
-# Detect correct compose file location (either root or script directory)
-if [ -f "/opt/comserv/Comserv/docker-compose.prod.yml" ]; then
-    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
-elif [ -f "/opt/comserv/Comserv/docker-compose.server.yml" ]; then
-    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
-elif [ -f "/opt/comserv/Comserv/script/docker-compose.server.yml" ]; then
-    COMPOSE_FILE="/opt/comserv/Comserv/script/docker-compose.server.yml"
+# Detect correct compose file location. Resolve relative to THIS script's own
+# repo tree first (the script lives in <repo>/script/deploy.sh), so it works
+# whether run on the workstation (/home/.../comserv2/Comserv) or on prod
+# (/opt/comserv/Comserv). Previously this hard-coded /opt/comserv/Comserv,
+# which does not exist on the workstation and aborted the deploy there.
+SCRIPT_DIR_DP="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+REPO_DP="$(cd "$SCRIPT_DIR_DP/.." 2>/dev/null && pwd)"
+COMPOSE_FILE=""
+for cand in \
+    "$REPO_DP/docker-compose.prod.yml" \
+    "$SCRIPT_DIR_DP/docker-compose.prod.yml" \
+    "/opt/comserv/Comserv/docker-compose.prod.yml" \
+    "/opt/comserv/Comserv/docker-compose.server.yml" \
+    "/opt/comserv/Comserv/script/docker-compose.server.yml" \
+    "docker-compose.prod.yml" ; do
+    if [ -f "$cand" ]; then
+        COMPOSE_FILE="$cand"
+        break
+    fi
+done
+# Final fallback (matches prior behaviour) if nothing matched.
+[ -f "$REPO_DP/docker-compose.yml" ] && BASE_CAND="$REPO_DP/docker-compose.yml"
+[ -f "$SCRIPT_DIR_DP/docker-compose.yml" ] && BASE_CAND="$SCRIPT_DIR_DP/docker-compose.yml"
+[ -f "/opt/comserv/Comserv/docker-compose.yml" ] && BASE_CAND="/opt/comserv/Comserv/docker-compose.yml"
+BASE_CAND="${BASE_CAND:-}"
+# COMPOSE_ARGS: merge base (volume defs) + chosen compose file so standalone
+# `docker compose -f <prod>` does not abort on "undefined volume".
+if [ -n "$BASE_CAND" ] && [ "$BASE_CAND" != "$COMPOSE_FILE" ]; then
+    COMPOSE_ARGS="-f $BASE_CAND -f $COMPOSE_FILE"
 else
-    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
+    COMPOSE_ARGS="-f $COMPOSE_FILE"
 fi
+[ -z "$COMPOSE_FILE" ] && COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
 # Standard container name is "comserv2-web-prod" (matches comserv2-config-db,
 # comserv2-redis, etc.). A legacy container may still exist under the old name
@@ -114,6 +181,64 @@ fi
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 export SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-$HOSTNAME_VAL}"
+
+# ── PRODUCTION CONTAINER PROTECTION (2026-08-15) ─────────────────────────────
+# Recurring outage root cause: a stopped/otherwise-still-valuable production
+# container (and its volumes/networks) was being deleted by blind `docker`
+# prune/rm paths. We now treat the production web container as NEVER-prunable
+# unless an explicit, intentional deploy is in flight. Two guards:
+#   1. is_prod_container NAME  -> returns 0 if NAME is (or aliases to) prod.
+#   2. protect_prod_resources   -> labels the live prod container so that only
+#      containers explicitly labeled `comserv.prune=safe` are ever pruned, and
+#      refuses to reap prod's named volumes/networks/images.
+# Any cleanup code MUST route stopped-container removal through safe_prune()
+# below, which drops only labeled-safe stopped containers and skips prod.
+
+PROD_CONTAINER_NAMES="comserv2-web-prod comserv-web-prod"
+PROD_VOLUME_PREFIXES="comserv2_"
+PROD_NETWORK_NAMES="comserv2_default comserv2_web-prod"
+
+is_prod_container() {
+    local n="${1:-}"
+    [ -z "$n" ] && return 1
+    for p in $PROD_CONTAINER_NAMES; do
+        [ "$n" = "$p" ] && return 0
+    done
+    return 1
+}
+
+# Label the live prod container (and ensure compose labels) so the
+# `label=comserv.prune=safe` prune filter excludes it by default.
+protect_prod_resources() {
+    for c in $PROD_CONTAINER_NAMES; do
+        if docker inspect "$c" >/dev/null 2>&1; then
+            # idempotent: label present is harmless; absence is the norm because
+            # compose did not set it. We set it so tooling can distinguish prod.
+            docker inspect -f '{{.Config.Labels}}' "$c" 2>/dev/null | grep -q 'comserv.role=prod' \
+                || docker update --label-add comserv.role=prod "$c" >/dev/null 2>&1 || true
+        fi
+    done
+}
+
+# Remove ONLY stopped containers that are explicitly marked safe-to-prune.
+# Never touches a running container and never touches the prod container.
+safe_prune_stopped_containers() {
+    echo "Pruning only label=comserv.prune=safe stopped containers (prod protected)..."
+    docker container prune -f --filter "label=comserv.prune=safe" 2>&1 | grep -v '^$' || true
+}
+
+# Prune only DANGLING (untagged, unattached to any container) volumes. Never
+# remove a named comserv2_* volume — those belong to prod/redis/db.
+safe_prune_volumes() {
+    echo "Pruning dangling (unattached) volumes only — named comserv2_* protected..."
+    docker volume prune -f 2>&1 | grep -v '^$' || true
+}
+
+# Prune only unused networks that are NOT a known prod network.
+safe_prune_networks() {
+    echo "Pruning unused networks except prod networks..."
+    docker network prune -f 2>&1 | grep -v '^$' || true
+}
 
 # Verify host prerequisites
 if ! command -v docker &>/dev/null; then
@@ -170,6 +295,19 @@ elif [ -d "/home/shanta/PycharmProjects/comserv2" ]; then
     GLOBAL_HOST_APP_DIR="/home/shanta/PycharmProjects/comserv2"
 fi
 
+# Resolve THIS script's real path FIRST so sync_deploy_artifacts can copy the
+# edited source tree onto the server before any git pull / SSH / build.
+CURRENT_SCRIPT_PATH=$(readlink -f "$0" 2>/dev/null || echo "$0")
+
+# ── SYNC CHANGED DEPLOY/SCRIPT FILES TO THE SERVER (BEFORE SSH / BUILD) ──
+# The script must copy any changed files from the tree it runs in (which holds
+# the edited code) into the build-source checkout on the server, so the deploy
+# builds/runs the LATEST code -- not stale files. This runs unconditionally,
+# before SSH opens and before any container is built/pulled.
+if [ -n "$GLOBAL_HOST_APP_DIR" ]; then
+    sync_deploy_artifacts
+fi
+
 # Run an early git pull to ensure we have the absolute latest code immediately.
 # This guarantees that if the container fails and we have to restart Starman on the host,
 # it is already running the current software from this synchronized state.
@@ -192,37 +330,140 @@ if [ -n "$GLOBAL_HOST_APP_DIR" ] && command -v git &>/dev/null; then
     echo "--------------------------------------------"
 fi
 
-# ── Self-Update Permanent Script Copy ─────────────────────────────────────────
-# If running as /tmp/deploy.sh, copy ourselves to the permanent script folder so that cron jobs use the latest script.
+# ── Provision the SHARED monitoring token (single source of truth) ────────────
+# The monitoring token MUST be byte-identical on every cron host AND every app
+# container, or healthy nodes get falsely reported down by the cross-node check.
+# It lives once in a token file on the NFS share (mounted on every host + in
+# every container), and is also copied host-local for the cron job to read. We do
+# NOT generate it per-server: that would give prod and workstation different keys
+# and break cross-node calls. Create-once (idempotent, atomic) so all servers
+# share one key. A manually set HW_INGEST_TOKEN env still wins at deploy time.
+setup_shared_secrets() {
+    # Where the token lives. Prefer the NFS mount both hosts + container share.
+    local NFS_TOKEN_DIR="/data/nfs/comserv_secrets"
+    local NFS_TOKEN_FILE="$NFS_TOKEN_DIR/hw_ingest_token"
+    local HOST_TOKEN_DIR="/usr/local/etc/comserv"
+    local HOST_TOKEN_FILE="$HOST_TOKEN_DIR/hw_ingest_token"
+
+    # 1. If the operator pinned a token via env, persist it to NFS (once) so every
+    #    other server/containers inherit the same key.
+    if [ -n "${HW_INGEST_TOKEN:-}" ] && [ "$HW_INGEST_TOKEN" != "changeme" ]; then
+        mkdir -p "$NFS_TOKEN_DIR" 2>/dev/null || true
+        if [ -d "$NFS_TOKEN_DIR" ] && [ ! -f "$NFS_TOKEN_FILE" ]; then
+            printf '%s\n' "$HW_INGEST_TOKEN" > "$NFS_TOKEN_FILE.$$" 2>/dev/null \
+                && mv -f "$NFS_TOKEN_FILE.$$" "$NFS_TOKEN_FILE" 2>/dev/null \
+                && echo "  ✅ shared token seeded to NFS from HW_INGEST_TOKEN"
+        fi
+    fi
+
+    # 2. If no NFS token yet, generate one (only if NFS is writable). This makes
+    #    "get it working on workstation, then every server just reads the same key"
+    #    automatic — no manual copy needed.
+    if [ ! -f "$NFS_TOKEN_FILE" ]; then
+        mkdir -p "$NFS_TOKEN_DIR" 2>/dev/null || true
+        if [ -d "$NFS_TOKEN_DIR" ] && [ -w "$NFS_TOKEN_DIR" ]; then
+            local NEWTOK
+            NEWTOK=$(head -c 48 /dev/urandom 2>/dev/null | base64 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 32)
+            [ -z "$NEWTOK" ] && NEWTOK=$(date +%s%N | md5sum | cut -c1-32)
+            printf '%s\n' "$NEWTOK" > "$NFS_TOKEN_FILE.$$" 2>/dev/null \
+                && mv -f "$NFS_TOKEN_FILE.$$" "$NFS_TOKEN_FILE" 2>/dev/null \
+                && echo "  ✅ generated shared monitoring token (NFS: $NFS_TOKEN_FILE)"
+        else
+            echo "  ⚠ NFS token dir not writable ($NFS_TOKEN_DIR); relying on env/host-local token"
+        fi
+    fi
+
+    # 3. Copy the resolved token host-local so the cron job reads the SAME value
+    #    even if NFS is briefly unmounted at cron time. Resolves in priority order:
+    #    NFS file → pinned env → changeme.
+    local RESOLVED=""
+    if [ -f "$NFS_TOKEN_FILE" ]; then
+        RESOLVED=$(cat "$NFS_TOKEN_FILE" 2>/dev/null | tr -d '[:space:]')
+    fi
+    [ -z "$RESOLVED" ] && RESOLVED="${HW_INGEST_TOKEN:-changeme}"
+
+    mkdir -p "$HOST_TOKEN_DIR" 2>/dev/null || true
+    if [ -d "$HOST_TOKEN_DIR" ] && [ -w "$HOST_TOKEN_DIR" ]; then
+        printf '%s\n' "$RESOLVED" > "$HOST_TOKEN_FILE" 2>/dev/null \
+            && echo "  ✅ host-local token written: $HOST_TOKEN_FILE"
+    fi
+
+    # Export the resolved token so the rest of deploy (compose env) inherits it.
+    export HW_INGEST_TOKEN="$RESOLVED"
+    echo "  token length: ${#RESOLVED} chars (shared across all servers)"
+}
+
+
+# setup_shared_secrets + cron install (kept from prior sync_cron_scripts).
+setup_shared_secrets_standalone() {
+    # Ensure the shared token exists + is identical everywhere before installing
+    # the cron (creates the NFS token file + host-local copy if missing).
+    setup_shared_secrets
+
+    local HOST_TOKEN_FILE="/usr/local/etc/comserv/hw_ingest_token"
+    local MON_TOKEN
+    if [ -f "$HOST_TOKEN_FILE" ]; then
+        MON_TOKEN=$(cat "$HOST_TOKEN_FILE" | tr -d '[:space:]')
+    else
+        MON_TOKEN="${HW_INGEST_TOKEN:-changeme}"
+    fi
+    local MON_NODES="${HW_MONITOR_NODES:-}"
+    if [ -z "$MON_NODES" ]; then
+        case "$SYSTEM_IDENTIFIER" in
+            production1) MON_NODES="http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run" ;;
+            *workstation*|workstation-prod-local) MON_NODES="http://192.168.1.199:5000/admin/hardware_monitor/run,http://192.168.1.126:5000/admin/hardware_monitor/run" ;;
+            *) MON_NODES="http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run" ;;
+        esac
+    fi
+
+    local CRON_MARKER="# comserv-hardware-monitor"
+    local CRON_LINE="*/5 * * * * $CRON_MARKER HW_MONITOR_NODES='$MON_NODES' HW_INGEST_TOKEN=\"\$(cat /usr/local/etc/comserv/hw_ingest_token 2>/dev/null || echo MISSING_TOKEN)\" /usr/local/bin/hardware_monitor.pl >> /var/log/comserv-hardware-monitor.log 2>&1"
+    local TMP_CRON
+    TMP_CRON=$(mktemp)
+    ( crontab -l 2>/dev/null | grep -v "$CRON_MARKER" ) > "$TMP_CRON" 2>/dev/null || true
+    echo "$CRON_LINE" >> "$TMP_CRON"
+    crontab "$TMP_CRON" 2>/dev/null && echo "  ✅ cron installed: $CRON_MARKER (every 5 min)" || echo "  ⚠ crontab install failed (non-fatal)"
+    rm -f "$TMP_CRON"
+    echo "--------------------------------------------"
+}
+
+# ── Self-Update + Artifact Sync (runs on EVERY invocation, unconditionally) ──
+# The script MUST keep the build-source checkout identical to the code that was
+# edited, so a rebuild can never ship stale/missing files. This was the root
+# cause of repeated "my fix wasn't in the rebuild" bugs: edits lived in one tree
+# but the build read another. We close that gap here, for every entry point —
+# not only when launched as /tmp/deploy.sh.
 CURRENT_SCRIPT_PATH=$(readlink -f "$0" 2>/dev/null || echo "$0")
-if [ "$CURRENT_SCRIPT_PATH" = "/tmp/deploy.sh" ] && [ -n "$GLOBAL_HOST_APP_DIR" ]; then
+
+if [ -n "$GLOBAL_HOST_APP_DIR" ]; then
+    # 1. Sync the full canonical deploy artifact set into the build-source checkout
+    #    (deploy.sh, deploy-to-node.sh, deploy-to-production1.sh, Docker.pm,
+    #    docker-compose.prod.yml) and remove deleted files (deploy2.sh).
+    sync_deploy_artifacts
+    # 2. Install/refresh host cron + shared token (host-side, runs outside container).
+    setup_shared_secrets_standalone
+
+    # 3. Self-update: copy THIS script into every build-source location so the
+    #    server always runs the latest deploy.sh (no /tmp gate — always runs).
     echo "--- Script Self-Updating ---"
     UPDATED=0
-    
-    # 1. Update in Catalyst home directly (for cron/SSH /opt/comserv/Comserv/deploy.sh)
-    if [ -f "$GLOBAL_HOST_APP_DIR/deploy.sh" ] || [ "$GLOBAL_HOST_APP_DIR" = "/opt/comserv/Comserv" ]; then
-        echo "Copying /tmp/deploy.sh -> $GLOBAL_HOST_APP_DIR/deploy.sh"
-        cp -f "$CURRENT_SCRIPT_PATH" "$GLOBAL_HOST_APP_DIR/deploy.sh"
-        chmod +x "$GLOBAL_HOST_APP_DIR/deploy.sh"
-        UPDATED=1
-    fi
-    
-    # 2. Update nested Comserv/script/deploy.sh (workstation style)
-    if [ -d "$GLOBAL_HOST_APP_DIR/Comserv/script" ]; then
-        echo "Copying /tmp/deploy.sh -> $GLOBAL_HOST_APP_DIR/Comserv/script/deploy.sh"
-        cp -f "$CURRENT_SCRIPT_PATH" "$GLOBAL_HOST_APP_DIR/Comserv/script/deploy.sh"
-        chmod +x "$GLOBAL_HOST_APP_DIR/Comserv/script/deploy.sh"
-        UPDATED=1
-    fi
-    
-    # 3. Update script/deploy.sh (standard server layout)
-    if [ -d "$GLOBAL_HOST_APP_DIR/script" ]; then
-        echo "Copying /tmp/deploy.sh -> $GLOBAL_HOST_APP_DIR/script/deploy.sh"
-        cp -f "$CURRENT_SCRIPT_PATH" "$GLOBAL_HOST_APP_DIR/script/deploy.sh"
-        chmod +x "$GLOBAL_HOST_APP_DIR/script/deploy.sh"
-        UPDATED=1
-    fi
-    
+    for tgt in "$GLOBAL_HOST_APP_DIR/deploy.sh" \
+                "$GLOBAL_HOST_APP_DIR/Comserv/script/deploy.sh" \
+                "$GLOBAL_HOST_APP_DIR/script/deploy.sh"; do
+        if [ -d "$(dirname "$tgt")" ]; then
+            # Skip if the target is the script currently running (cp onto itself
+            # exits 1, which would abort the whole run under set -e).
+            if [ "$tgt" = "$CURRENT_SCRIPT_PATH" ]; then
+                echo "  ✅ $tgt (already current)"
+                UPDATED=1
+                continue
+            fi
+            cp -f "$CURRENT_SCRIPT_PATH" "$tgt"
+            chmod +x "$tgt"
+            echo "  ✅ $tgt"
+            UPDATED=1
+        fi
+    done
     if [ $UPDATED -eq 1 ]; then
         echo "✅ Permanent script copy updated successfully."
     else
@@ -325,7 +566,7 @@ sync_host_app_lib() {
 
     echo "   Restarting $CONTAINER to load updated Perl modules..."
     docker restart "$CONTAINER" >/dev/null 2>&1 \
-        || docker compose -f "$COMPOSE_FILE" restart web-prod >/dev/null 2>&1 \
+        || docker compose $COMPOSE_ARGS restart web-prod >/dev/null 2>&1 \
         || true
 
     local attempt=0
@@ -349,13 +590,30 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
     case "$DEPLOY_MODE" in
         "prod")
             echo "=== PRODUCTION DEPLOY MODE ==="
-            echo "Full production deploy: auto-commit + build + push + deploy"
-            # Continue to the normal production deploy flow below
+            echo "Full production deploy: clean build + push + pull + deploy"
+            # Route through the SINGLE canonical pipeline so every entry point
+            # produces the identical result (build -> push -> pull -> run --no-build).
+            # "prod" mode means production — default the target to prod1
+            # (192.168.1.126). This must BUILD+PUSH on the workstation first,
+            # then pull+run on prod (never build on prod itself). Route through
+            # canonical_deploy_to_nodes so the build happens locally and the
+            # remote node only pulls the pushed digest.
+            canonical_deploy_to_nodes "${PROD_TARGET_HOST:-192.168.1.126}"
+            exit $?
             ;;
-        
+
+        "deploy-to-node")
+            # Multi-host deploy: build+push once, then canonical_deploy to each node.
+            # Kept here so `deploy.sh --deploy-to-node 192.168.1.126` works too.
+            shift
+            canonical_deploy_to_nodes "$@"
+            exit $?
+            ;;
+
         "local")
             echo "=== LOCAL TESTING MODE ==="
             echo "Building image locally for testing (no push to registry)"
+
             
             # Build the production image locally
             if [ -f "docker-compose.prod.yml" ]; then
@@ -378,14 +636,14 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             
             # Just pull and deploy - skip all build/push logic
             echo "Pulling latest image from Docker Hub..."
-            docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
+            docker compose $COMPOSE_ARGS pull || echo "Pull failed!"
             
             echo "Stopping old container..."
             docker stop "$CONTAINER" 2>/dev/null || true
             docker rm -f "$CONTAINER" 2>/dev/null || true
             
             echo "Starting new container..."
-            docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+            docker compose $COMPOSE_ARGS up -d --force-recreate
             
             echo "✅ Deploy-only complete"
             exit 0
@@ -402,21 +660,216 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
     esac
 fi
 
+# ════════════════════════════════════════════════════════════════════════════
+# canonical_deploy() — SINGLE SOURCE OF TRUTH for the deploy pipeline.
+#
+# EVERY entry point (deploy.sh CLI, deploy-to-node.sh, deploy-to-production1.sh,
+# and the dashboard Docker.pm buttons) MUST route through this function so the
+# result is IDENTICAL regardless of which "button" is pressed:
+#
+#    1. clean build   (from working tree, no stale context)
+#    2. clean push    (one :latest to the registry — image is the unit)
+#    3. clean pull    (pull the EXACT pushed digest on the target)
+#    4. run --no-build (compose runs the pulled digest; no local rebuild)
+#    5. health gate    (curl /health; rollback on failure)
+#    6. post-deploy     (force DB menu + clear caches)
+#
+# Key invariant: the RUN step uses `compose up -d --no-build` so it can NEVER
+# rebuild stale host code — it always executes the digest that was just pushed.
+# All paths also use the SAME compose file ($COMPOSE_FILE), which is the one
+# with the corrected static mount (no empty host /root/static shadowing CSS).
+#
+# Args: (target_host) (optional). Default: local build+push+run on this host.
+#       For remote, the function SSHes the same steps so the sequence is uniform.
+# ════════════════════════════════════════════════════════════════════════════
+# Load the production SSH password and export it so `sshpass -e` has a password
+# on EVERY hop. The password set by the Catalyst caller (Docker.pm) lives in the
+# web server's environment and does NOT survive an SSH command hop (the remote
+# command runs with the remote user's own environment). So we (re)establish it
+# inside the script itself from the shared credentials file. Without this, every
+# remote deploy dies at the first `sshpass -e` with "missing password".
+load_ssh_password() {
+    if [ -n "${SSHPASS:-}" ]; then
+        return 0   # already provided (e.g. interactive export or caller passed it)
+    fi
+    local CREDS="$HOME/.comserv/secrets/ssh_credentials.json"
+    [ -f "$CREDS" ] || CREDS="/home/shanta/.comserv/secrets/ssh_credentials.json"
+    if [ -f "$CREDS" ]; then
+        local pw
+        pw=$(perl -MJSON::PP -e 'my $f=$ARGV[0]; open my $h,"<",$f or exit; local $/; my $d=decode_json(<$h>); print $d->{ssh_password}//"";' "$CREDS" 2>/dev/null)
+        if [ -n "$pw" ]; then
+            export SSHPASS="$pw"
+            return 0
+        fi
+    fi
+    echo "⚠ load_ssh_password: no SSHPASS in env and no ssh_password in $CREDS" >&2
+    return 1
+}
+
+canonical_deploy() {
+    local TARGET_HOST="${1:-local}"
+    local SVC="web-prod"
+    local REMOTE_SSH=""
+    local DO_LOCAL_BUILD=1
+
+    if [ "$TARGET_HOST" != "local" ]; then
+        load_ssh_password || echo "⚠ SSH password not loaded — remote SSH may fail"
+        # Prefer sshpass -e (SSHPASS env); if no password is available, fall
+        # back to the keyfile-based ssh so key auth still works. Build the
+        # command as a function so both branches are used consistently.
+        if [ -n "${SSHPASS:-}" ]; then
+            REMOTE_SSH="sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@${TARGET_HOST}"
+        else
+            REMOTE_SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i ${SSH_KEYFILE:-$HOME/.ssh/id_ed25519} ubuntu@${TARGET_HOST}"
+        fi
+        # When deploying to a remote we build+push locally first, then the
+        # remote only pulls+runs (never rebuilds). Local build stays on this host.
+    fi
+
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo " CANONICAL DEPLOY — target=$TARGET_HOST  compose=$COMPOSE_FILE"
+    echo " sequence: build -> push -> pull -> run(--no-build) -> health -> post"
+    echo "═══════════════════════════════════════════════════════════════════"
+
+    # ── 1. clean build (local working tree) ──
+    # Only build when deploying to the LOCAL host. For a remote target the
+    # build+pull already happened on the workstation (via canonical_deploy_to_nodes
+    # or the --prod path), so the remote node must ONLY pull+run the pushed
+    # digest — never build from a (non-existent) source tree on prod.
+    if [ "$TARGET_HOST" = "local" ]; then
+        echo "--- [1/6] CLEAN BUILD (local) ---"
+        if ! docker compose $COMPOSE_ARGS build --pull "$SVC"; then
+            echo "❌ Build failed — aborting. Running container untouched."
+            return 1
+        fi
+        local LOCAL_ID
+        LOCAL_ID=$(docker inspect --format='{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)
+        echo "✅ Built $IMAGE (id ${LOCAL_ID:-unknown})"
+
+        # ── 2. clean push (one :latest; image is the unit) ──
+        echo "--- [2/6] CLEAN PUSH ---"
+        if ! docker compose $COMPOSE_ARGS push "$SVC"; then
+            echo "❌ Push failed — aborting."
+            return 1
+        fi
+        echo "✅ Pushed $IMAGE"
+    else
+        echo "--- [1-2/6] SKIP BUILD/PUSH (remote target=$TARGET_HOST) ---"
+        echo "    Image was built+pushed on the workstation; this node only pulls+runs."
+    fi
+
+    # ── 3+4. clean pull + run --no-build on the target (local or remote) ──
+    echo "--- [3/6] CLEAN PULL + [4/6] RUN (--no-build) ---"
+    local RUN_CMD
+    RUN_CMD="cd /opt/comserv/Comserv && docker compose $COMPOSE_ARGS pull $SVC && docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $SVC"
+    if [ -n "$REMOTE_SSH" ]; then
+        # Pre-create standardized volumes on the remote (idempotent, never rm).
+        $REMOTE_SSH "bash -s" <<'EOF' || true
+        for v in comserv2_cache comserv2_logs comserv2_nfs_data comserv2_sessions \
+                 comserv2_temp comserv2_themes comserv2_whisper_venv comserv2_cpan_cache; do
+            docker volume create "$v" >/dev/null 2>&1 || true
+        done
+EOF
+        # Stop+rename current container for rollback BEFORE pull/run.
+        # Use a single stable timestamp so the rename and the later stop refer
+        # to exactly the same backup name (two $(date) calls could differ).
+        local REMOTE_TS
+        REMOTE_TS=$(date +%Y%m%d-%H%M%S)
+        $REMOTE_SSH "bash -s" <<EOF || true
+        BK="bk-${CONTAINER}-${REMOTE_TS}"
+        if docker ps -q -f name=${CONTAINER} | grep -q .; then
+            docker rename ${CONTAINER} "\$BK" 2>/dev/null || true
+            docker stop "\$BK" 2>/dev/null || true
+        fi
+EOF
+        if ! $REMOTE_SSH "cd /opt/comserv/Comserv && docker compose $COMPOSE_ARGS pull $SVC && docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $SVC"; then
+            echo "❌ Remote pull/run failed — check container logs on $TARGET_HOST."
+            return 1
+        fi
+    else
+        if ! bash -c "$RUN_CMD"; then
+            echo "❌ Local pull/run failed."
+            return 1
+        fi
+    fi
+    echo "✅ $CONTAINER running the freshly-pulled digest (no local rebuild)"
+
+    # ── 5. health gate ──
+    echo "--- [5/6] HEALTH GATE ---"
+    local HEALTHY=0
+    local i
+    for i in $(seq 1 30); do
+        local OK=0
+        if [ -n "$REMOTE_SSH" ]; then
+            $REMOTE_SSH "curl -fs http://localhost:5000/health" >/dev/null 2>&1 && OK=1
+        else
+            curl -fs http://localhost:5000/health >/dev/null 2>&1 && OK=1
+        fi
+        if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
+        echo "  health attempt $i failed, waiting 5s..."
+        sleep 5
+    done
+    if [ "$HEALTHY" != "1" ]; then
+        echo "❌ HEALTH FAILED after 30 attempts."
+        if [ -n "$REMOTE_SSH" ]; then
+            $REMOTE_SSH "bash -s" <<EOF || true
+            docker stop $CONTAINER 2>/dev/null || true
+            docker rm -f $CONTAINER 2>/dev/null || true
+            BK="bk-$CONTAINER-$REMOTE_TS"
+            if docker ps -aq -f name="\$BK" | grep -q .; then
+                docker start "\$BK" 2>/dev/null || true
+                docker rename "\$BK" $CONTAINER 2>/dev/null || true
+            fi
+EOF
+        fi
+        return 1
+    fi
+
+    # ── 6. post-deploy ──
+    echo "--- [6/6] POST-DEPLOY ---"
+    local POST_CMD="perl -pi -e 's/USE_DB_MENU.*/USE_DB_MENU=1/' /opt/comserv/comserv.conf 2>/dev/null; rm -rf /tmp/comserv/cache/* /cache/* 2>/dev/null; echo done"
+    if [ -n "$REMOTE_SSH" ]; then
+        $REMOTE_SSH "docker exec $CONTAINER bash -c '$POST_CMD'" 2>/dev/null || true
+    else
+        docker exec "$CONTAINER" bash -c "$POST_CMD" 2>/dev/null || true
+    fi
+    echo "✅ Canonical deploy complete: $CONTAINER healthy on $TARGET_HOST"
+    return 0
+}
+
+# canonical_deploy_to_nodes() — build+push ONCE, then run the SAME
+# canonical_deploy to each target host. Guarantees the exact pushed digest runs
+# everywhere (no per-host rebuilds). Usage: canonical_deploy_to_nodes host1 host2
+canonical_deploy_to_nodes() {
+    local HOSTS=("$@")
+    [ ${#HOSTS[@]} -eq 0 ] && HOSTS=("production1")
+    # Build+push once locally (canonical_deploy with local target does both).
+    echo "=== Building + pushing once (image is the unit) ==="
+    canonical_deploy "local" || { echo "❌ build+push failed"; return 1; }
+    # Now pull+run the SAME digest on every node (never rebuild).
+    for H in "${HOSTS[@]}"; do
+        echo "=== Deploying identical image to $H ==="
+        canonical_deploy "$H" || echo "⚠ deploy to $H failed (continuing)"
+    done
+    echo "✅ Multi-node deploy complete"
+    return 0
+}
+
 # ── Non-interactive Deploy Mode (legacy modes) ─────────────────────────────────
 if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
     echo "Non-interactive Deploy Mode requested: $DEPLOY_MODE"
     case "$DEPLOY_MODE" in
-        "full")
-            export FORCE=0
-            # Continue to standard full deploy
-            ;;
+    "prod"|"full")
+        export FORCE=0
+        # Continue to standard full deploy
+        ;;
         "quick")
             export FORCE=1
             # Continue to standard quick deploy
             ;;
         "pull_only")
             echo "Pulling latest image from Docker Hub..."
-            docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
+            docker compose $COMPOSE_ARGS pull || echo "Pull failed!"
             exit 0
             ;;
         "stop_all")
@@ -424,7 +877,7 @@ if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
             echo "1. Stopping container $CONTAINER..."
             docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
             docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
-            docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+            docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true
             
             echo "2. Force-killing host-level Starman/Plackup processes..."
             safe_pkill_f "starman"
@@ -554,14 +1007,14 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                 ;;
             3)
                 echo "Pulling latest image from Docker Hub..."
-                docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
+                docker compose $COMPOSE_ARGS pull || echo "Pull failed!"
                 ;;
             4)
                 echo "Stopping all services..."
                 echo "1. Stopping container $CONTAINER..."
                 docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
                 docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
-                docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+                docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true
                 
                 echo "2. Force-killing host-level Starman/Plackup processes..."
                 safe_pkill_f "starman"
@@ -849,19 +1302,69 @@ normalize_volumes() {
 # Call normalization on every deploy (safe - only logs, does not delete)
 normalize_volumes
 
+# ── Ensure required comserv2_* volumes exist (2026-08-11) ─────────────────────
+# The prod compose overlay references named volumes (comserv2_redis_data,
+# comserv2_sessions, comserv2_cache, comserv2_temp, comserv2_themes,
+# comserv2_whisper_venv, comserv2_cpan_cache, comserv2_config_db_data) that are
+# NOT declared in either compose file's top-level volumes section. If they are
+# missing, `docker compose up` aborts with "undefined volume" and the container
+# can never be (re)created — a silent recovery blocker. Create any missing ones
+# as empty local volumes (non-destructive; they are recreated empty on purpose).
+ensure_required_volumes() {
+    local REQUIRED=(comserv2_redis_data comserv2_sessions comserv2_cache comserv2_temp \
+                    comserv2_themes comserv2_whisper_venv comserv2_cpan_cache comserv2_config_db_data)
+    local missing=0
+    for v in "${REQUIRED[@]}"; do
+        if ! docker volume inspect "$v" >/dev/null 2>&1; then
+            echo "  Creating missing volume: $v"
+            docker volume create "$v" >/dev/null 2>&1 || true
+            missing=$((missing + 1))
+        fi
+    done
+    [ "$missing" -gt 0 ] && echo "  Created $missing missing volume(s)." || echo "  All required volumes present."
+}
+
+# ── Monitor self-heal (2026-08-11) ───────────────────────────────────────────
+# If the prod container is missing/stopped, recreate it from the EXISTING local
+# image so a transient failure does not become a permanent outage. Previously the
+# monitor only did lib-sync (which requires a running container) and then pruned,
+# so once the container vanished it could never return without a human deploy.
+if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
+    ensure_required_volumes
+    protect_prod_resources
+    if ! docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
+        echo "MONITOR: container $CONTAINER absent — pulling latest then recreating (--no-build)..."
+        docker pull "$IMAGE" 2>&1 | grep -v "^$" || true
+        docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
+    elif [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then
+        echo "MONITOR: container $CONTAINER present but not running — starting..."
+        docker start "$CONTAINER" 2>&1 | grep -v "^$" || \
+            docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
+    fi
+fi
+
 # ── Disk space report ────────────────────────────────────────────────────────
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk before: $DISK_BEFORE"
 
-# ── Routine cleanup (runs every cron tick, not just on deploy) ───────────────
+# ── Routine cleanup (runs every cron tick, not just on deploy) ────────────────
 echo "Running routine Docker cleanup..."
-docker container prune -f --filter "until=1h" 2>&1 | grep -v "^$" || true
+# PROTECTION (2026-08-15): the prod container, its named volumes, and its
+# networks are NEVER reaped by the monitor. We only drop:
+#   - stopped containers explicitly labeled comserv.prune=safe (throwaways)
+#   - dangling (untagged, unattached) images and volumes
+#   - unused networks other than the known prod networks
+# A former `docker container prune -f --filter "until=1h"` (and the unfiltered
+# `docker volume prune -f` / `docker network prune -f` below) ran every monitor
+# tick and could delete the prod container / its resources, causing the
+# recurring "site down, no container" outages. Guarded for good.
+safe_prune_stopped_containers
 # Prune ONLY dangling (untagged) images to protect tagged rollback/backup images
-docker image prune -f                          2>&1 | grep -v "^$" || true
-docker volume prune -f                         2>&1 | grep -v "^$" || true
-docker network prune -f                        2>&1 | grep -v "^$" || true
+docker image prune -f                          2>&1 | grep -v '^$' || true
+safe_prune_volumes
+safe_prune_networks
 # Completely purge build cache since server only pulls pre-built production images
-docker builder prune -a -f                     2>&1 | grep -v "^$" || true
+docker builder prune -a -f                     2>&1 | grep -v '^$' || true
 
 DISK_AFTER_CLEANUP=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after cleanup: $DISK_AFTER_CLEANUP"
@@ -1037,7 +1540,7 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
 
         for ATTEMPT in 1 2 3; do
             echo "   [Recovery] Attempt $ATTEMPT of 3: restarting container $CONTAINER..."
-            docker restart "$CONTAINER" >/dev/null 2>&1 || docker compose -f "$COMPOSE_FILE" restart "$CONTAINER" >/dev/null 2>&1 || true
+            docker restart "$CONTAINER" >/dev/null 2>&1 || docker compose $COMPOSE_ARGS restart "$CONTAINER" >/dev/null 2>&1 || true
             sleep 5
             
             echo "   [Recovery] Waiting up to ${RECOVERY_WAIT_S}s for container to become healthy..."
@@ -1111,7 +1614,7 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                 docker tag "$B_IMAGE" shantamcsbain/comserv-web-prod:latest
                 
                 echo "   [Fallback] Launching container with rolled-back image..."
-                docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+                docker compose $COMPOSE_ARGS up -d --force-recreate
                 
                 echo "   [Fallback] Checking health of the backup container $B_TAG (up to 60s)..."
                 B_HEALTHY=0
@@ -1260,14 +1763,14 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                         cat "$STARMAN_LOG" || true
                         echo "   [Emergency] Host fallback failed — restarting the container so SOMETHING serves port 5000."
                         docker start "$CONTAINER" 2>/dev/null \
-                            || docker compose -f "$COMPOSE_FILE" up -d 2>/dev/null \
+                            || docker compose $COMPOSE_ARGS up -d 2>/dev/null \
                             || echo "   ❌ [Emergency] Could not bring the container back up. Manual intervention required."
                     fi
                 else
                     echo "   ❌ [Emergency] Could not find host Catalyst PSGI file on host."
                     echo "   [Emergency] No fallback available — leaving the container in place and retrying it."
                     docker start "$CONTAINER" 2>/dev/null \
-                        || docker compose -f "$COMPOSE_FILE" up -d 2>/dev/null \
+                        || docker compose $COMPOSE_ARGS up -d 2>/dev/null \
                         || echo "   ❌ [Emergency] Container could not be started. Manual intervention required."
                 fi
             fi
@@ -1329,7 +1832,11 @@ else
     fi
 
     echo "1. Pulling latest image..."
-    docker compose -f "$COMPOSE_FILE" pull
+    # Explicit image pull (not 'compose pull'): on a build:-enabled service
+    # 'compose pull' is a no-op and the later 'up' would rebuild from the stale
+    # host context instead of running the pushed image. Pull the exact digest.
+    docker pull "$IMAGE" || echo "⚠ Pull failed — will try compose pull fallback."
+    docker compose $COMPOSE_ARGS pull 2>/dev/null || true
 fi
 
 VERSION_INFO=$(docker inspect --format='{{index .Config.Labels "app.version"}}' "$IMAGE" 2>/dev/null || true)
@@ -1341,7 +1848,7 @@ echo "   Version: $VERSION_INFO"
 echo "2. Stopping and removing old container..."
 docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
 docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
-docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+docker compose $COMPOSE_ARGS down --remove-orphans 2>/dev/null || true
 
 echo "2b. Checking for host processes occupying port 5000/3000 outside Docker..."
 # Stop host port 5000/3000 processes to prevent "port already in use" binding errors in Docker
@@ -1445,8 +1952,17 @@ if [ "${COMSERV_SECURITY_GATE:-0}" = "1" ]; then
     fi
 fi
 
-echo "3. Starting new container..."
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+echo "3. Pulling latest image from Docker Hub before recreate (fix: push must reach prod)..."
+# Explicit image pull (not 'compose pull web-prod') so we know the exact digest
+# landed, and --no-build on the up below prevents a local rebuild from the stale
+# build context (the old bug that pinned prod to the 8/4 image).
+if ! docker pull "$IMAGE"; then
+    echo "⚠ PULL FAILED — refusing to recreate from a stale local image. Abort."
+    exit 1
+fi
+echo "   Pulled: $(docker inspect -f '{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)"
+echo "3. Starting container from the PULLED image (--no-build)..."
+docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod
 
 echo "3a. Syncing host lib into container..."
 sync_host_app_lib || true
@@ -1577,7 +2093,7 @@ else
         docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest
         
         echo "   [Fallback] Launching container with rolled-back image..."
-        COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+        COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose $COMPOSE_ARGS up -d --force-recreate
         
         echo "   [Fallback] Checking health of the backup container (up to 60s)..."
         FALLBACK_ATTEMPT=0
