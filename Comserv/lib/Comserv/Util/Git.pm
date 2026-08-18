@@ -47,7 +47,7 @@ Logging uses the standard helper; all public methods therefore take C<$c>.
 
 # Allowed git subcommands. Anything else is refused by _run.
 my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
-    status log rev-parse rev-list branch diff fetch pull push
+    status log rev-parse rev-list branch diff fetch pull push ls-files
     add commit stash checkout show restore rm merge worktree
 );
 
@@ -55,13 +55,14 @@ my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
 my %ALLOWED_FLAGS = (
     status   => { map { $_ => 1 } qw(--porcelain --short -s --no-color) },
     log      => { map { $_ => 1 } qw(--oneline --no-color --stat -n) },
-    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet) },
+    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet --show-prefix --show-toplevel) },
     'rev-list'  => { map { $_ => 1 } qw(--left-right --count) },
     branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color --format) },
-    diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified) },
+    diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified --no-index) },
     fetch    => { map { $_ => 1 } qw(--prune) },
     pull     => { map { $_ => 1 } qw(--ff-only) },
     push     => { map { $_ => 1 } qw(--set-upstream -u --delete) },
+    'ls-files' => { map { $_ => 1 } qw(--error-unmatch --others --exclude-standard) },
     add      => {},
     commit   => { map { $_ => 1 } qw(-m --amend) },
     stash    => { map { $_ => 1 } qw(push pop drop list -m) },
@@ -1112,6 +1113,44 @@ sub _worktree_config {
 }
 
 sub worktree_base_dir { return _worktree_config()->{base_dir}; }
+
+# Build the worktree/develop-server registry for UI surfaces (the planning tab's
+# "Branch Servers" panel, the Git dashboard's "Develop Servers" card, etc.). This is
+# the SINGLE canonical builder — the planning tab and the Git dashboard must both call
+# it so they can never drift apart. Returns [ { name, port, label, url, cmd }, ... ]
+# with `main` first (port 3001), then every branch from root/config/worktrees.json
+# sorted by name. `cmd` is the one launch form used everywhere:
+#   cd <base_dir>/<branch>/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p <port> -r
+# BranchServerControl (per-branch start/stop/restart) consumes the same path/port, so
+# the list, the launch command, and the running server all agree.
+sub build_worktree_list {
+    my ($self) = @_;
+    my @list;
+
+    my $base = eval { worktree_base_dir() } // "$ENV{HOME}/.comserv/worktrees";
+    push @list, {
+        name  => 'main',
+        port  => 3001,
+        label => 'MAIN',
+        url   => '/planning/daily',
+        cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
+    };
+
+    my $cfg = eval { _worktree_config() } // { branches => {} };
+    my $branches = $cfg->{branches} // {};
+    for my $name (sort keys %$branches) {
+        my $b = $branches->{$name} // {};
+        push @list, {
+            name  => $name,
+            port  => $b->{port} // 0,
+            label => $b->{label} // $name,
+            url   => $b->{url}   // '/planning/daily',
+            cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
+                   . ($b->{port} // 0) . ' -r',
+        };
+    }
+    return \@list;
+}
 
 # NOTE: the old hardcoded WORKTREE_PORTS hash has been REMOVED. The single source
 # of truth for branch->port is root/config/worktrees.json. A deleted/non-JSON port

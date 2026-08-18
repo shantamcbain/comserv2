@@ -17,6 +17,246 @@
 <h2>[Unreleased]</h2>
 <p><em>Add bullets here while working; move to a dated section when shipped.</em></p>
 
+<h3>Fixed — 2026-08-17: logging_audit code_scan crash (Not a HASH reference) + db-logs Count column</h3>
+<ul>
+    <li><strong>Trigger 1 (ERROR todo):</strong> <code>logging_audit.code_scan failed: Not a HASH reference at Comserv/Util/LoggingAudit.pm line 144</code> from <code>/admin/logging_audit/run</code> (bot UA <code>curl/8.5.0</code>). The scheduled code-scan never produced findings.</li>
+    <li><strong>Root cause 1:</strong> <code>_find_silent_swallow()</code> returns an <em>arrayref</em> (<code>return \@sites;</code> / <code>return [];</code>), but the caller did <code>my @sites = $self-&gt;_find_silent_swallow($lib_dir);</code>. Assigning a single arrayref into an array put that arrayref as the <em>only</em> element of <code>@sites</code>, so the <code>for my $s (@sites)</code> loop set <code>$s</code> to the arrayref and <code>$s-&gt;{file}</code> threw <em>Not a HASH reference</em>.</li>
+    <li><strong>Fix 1:</strong> <code>lib/Comserv/Util/LoggingAudit.pm</code> — dereference the return: <code>my @sites = @{ $self-&gt;_find_silent_swallow($lib_dir) // [] };</code>. The loop now iterates real hashrefs (<code>file</code>/<code>line</code>/<code>subroutine</code>) and the code-scan finding rows persist correctly. <code>perl -c</code> passes; standalone server auto-reloads.</li>
+    <li><strong>Trigger 2 (UI request):</strong> the <code>Database Logs</code> heading said &ldquo;showing last 100&rdquo; while the actual row count varied, and there was no per-row count field — the row count was inconsistent/unverifiable.</li>
+    <li><strong>Fix 2:</strong> <code>root/admin/Logging/AdminLoggingIndex.tt</code> —
+        <ul>
+            <li>Heading now shows the real displayed count: <code>Database Logs — showing [db_logs.size] of [total_count] total records</code> (the controller caps the list at <code>rows =&gt; 100</code>; <code>total_count</code> is the filter-aware table count).</li>
+            <li>Replaced the placeholder sequential &ldquo;#&rdquo; column with a real <strong>Count</strong> column rendering <code>system_log.occurrence_count</code> — the number of times that exact message has fired (collapsed per unique level+area+message+day by the dedupe process, which keeps first/last-seen + a count). Rows predating dedupe default to 1; run <em>Deduplicate system_log</em> to populate higher counts.</li>
+            <li>No backend change: <code>occurrence_count</code> is already defined in <code>SystemLog.pm</code> (line 56) and the controller fetches all columns. Empty-state colspan bumped 7&rarr;8.</li>
+        </ul>
+    </li>
+    <li><strong>Verification:</strong> Template Toolkit compiles cleanly (<code>TT OK</code>); <code>perl -c LoggingAudit.pm</code> clean. No restart needed (template + <code>.pm</code> auto-reload on the standalone server).</li>
+</ul>
+
+<h3>Fixed — 2026-08-17: Theme writes failed on prod (read-only host bind) + theme roadmap tracked</h3>
+<ul>
+    <li><strong>Symptom:</strong> saving a site theme on production raised <code>_ensure_parent_dir ... Permission denied</code> (could not <code>mkdir /opt/comserv/root/static/config</code>) and <code>set_site_theme ... No such file or directory</code> (could not <code>write_file theme_definitions.json</code>). The live <code>/admin/theme</code> write path was dead on the prod container.</li>
+    <li><strong>Root cause:</strong> the prod compose read-only bind-mounted the (empty) host <code>./root/static</code> over the image-baked <code>/opt/comserv/root/static</code>. A bind mount is read-only at the OS level, so even when the directory existed the app could not create <code>config/</code> or write the JSON. (This is a separate defect from the earlier empty-bind CSS-shadow bug — that one hid CSS; this one blocked writes — both came from the same <code>:ro</code> bind.)</li>
+    <li><strong>Fix (compose):</strong> removed the <code>${STATIC_SRC:-/root/static}:/opt/comserv/root/static:ro</code> bind from <code>docker-compose.prod.yml</code>. Theme state now lives in two paths <strong>inside</strong> <code>root/static</code> (<code>config/theme_definitions.json</code>, <code>css/themes/&lt;theme&gt;.css</code>) backed by two small <strong>persistent named-volume overlays</strong> (<code>comserv2_theme_config</code>, <code>comserv2_theme_css</code>) declared in <code>docker-compose.yml</code> and added to all three compose files (canonical <code>docker-compose.prod.yml</code>, base <code>docker-compose.yml</code>, and the stale duplicate <code>config/docker/docker-compose.prod.yml</code>). The bulk static tree stays image-baked, so the CSS-shadow bug cannot return; only the two mutable subdirs are volume-backed. No code change required.</li>
+    <li><strong>Deploy note (seed step):</strong> a fresh named volume starts empty. On the first <code>docker compose up -d --force-recreate --no-build</code> after this change, seed the JSON once: <code>docker cp /opt/comserv/Comserv/root/static/config/theme_definitions.json comserv2-web-prod:/opt/comserv/root/static/config/theme_definitions.json</code>. Generated CSS regenerates on the next theme save. Volumes survive later redeploys (canonical deploy never uses <code>-v</code>).</li>
+    <li><strong>Dev vs prod isolation:</strong> the standalone dev server (<code>:3001</code>) writes to its own repo <code>root/static</code>; prod (<code>:5000</code>) writes to its own volume overlay — a dev background tweak does not change prod, as long as dev-only edits are not committed (the repo JSON is baked into the image).</li>
+    <li><strong>Docs:</strong> <code>/Documentation/CssThemes</code> (v1.2) gained a <em>Storage &amp; Production Deployment</em> section (paths, why overlay-not-bind, the two failures, seed step, dev/prod isolation) and a <em>Roadmap</em> section; <code>/Documentation/ThemeConfig</code> gained a matching storage note; <code>/Documentation/MASTER_PLAN</code> links the admin guide + the Theme Management System project (#77). All changelog updates go to this single file (per the 2026-06 policy) — no new per-date changelog files.</li>
+    <li><strong>Theme roadmap (todos #2133 / #2134, project #77 Theme Management System):</strong> (1) migrate theme definitions + compiled CSS from the JSON/static files into the database (survives volume loss, shares instantly across nodes, removes the file-write path); (2) add several new built-in theme choices sourced from professional theme designers / palette systems (accessible high-contrast, dark/AMOLED, seasonal, brand-matched) — each a first-class key usable from Step 1.</li>
+    <li><strong>Verification:</strong> all three compose files parse (<code>docker compose config</code> clean after merge); volume overlay paths verified present in every file. The running container still carries the old bind until recreated (ops rule: no start/stop) — recreate + run the seed <code>docker cp</code> to land the fix.</li>
+</ul>
+
+<h3>Fixed — 2026-08-15: Dashboard pull/deploy to prod now works end-to-end (SSH auth, compose path, build gating, volume merge)</h3>
+<ul>
+    <li><strong>Symptom:</strong> clicking deploy on the Docker Containers page aborted with <code>sync_deploy_artifacts: command not found</code> (rc=127), then <code>ERROR: /opt/comserv/Comserv/docker-compose.prod.yml not found. Aborting.</code>, and the remote pull step failed with <code>service "web-prod" refers to undefined volume comserv2_cache: invalid compose project</code>. The dashboard could not pull+start the prod container.</li>
+    <li><strong>Root causes &amp; fixes (all in <code>script/deploy.sh</code> unless noted):</strong>
+        <ul>
+            <li><strong>Remote SSH had no password.</strong> <code>canonical_deploy</code> used <code>sshpass -e</code> (reads <code>SSHPASS</code> env) but nothing exported it for the workstation&rarr;prod hop. Added <code>load_ssh_password()</code> which reads <code>ssh_password</code> from <code>~/.comserv/secrets/ssh_credentials.json</code> and exports <code>SSHPASS</code> (with a key-based <code>ssh</code> fallback). Verified: connected to prod1, Docker 29.1.3.</li>
+            <li><strong>Function not found.</strong> <code>sync_deploy_artifacts</code> was called before a structural parse quirk registered it; moved its definition to the very top of the script (before any other function/logic) so it is always defined at call time. Also made the <code>/usr/local/bin</code> host-script copy non-fatal and skipped <code>cp</code> of the script onto itself (which exited 1 under <code>set -e</code>).</li>
+            <li><strong>Compose path hardcoded to <code>/opt/comserv/Comserv</code>.</strong> On the workstation that path does not exist, so the <code>-f</code> check aborted. Rewrote detection to resolve <code>COMPOSE_FILE</code> relative to the script's own repo tree first, then <code>/opt/comserv/Comserv</code> as fallback.</li>
+            <li><strong>Build ran on prod (no source to build from).</strong> <code>canonical_deploy</code> unconditionally ran <code>docker compose build</code>+<code>push</code>. Gated build+push to <code>TARGET_HOST == local</code> only; remote targets skip straight to pull+run (the workstation already built+pushed). <code>--prod</code> now routes through <code>canonical_deploy_to_nodes</code> so it builds locally then pulls on prod (never builds on prod).</li>
+            <li><strong>Undefined volume abort.</strong> <code>docker-compose.prod.yml</code> references <code>comserv2_*</code> volumes but does not declare them (they live in the base <code>docker-compose.yml</code>). Single-file <code>compose -f docker-compose.prod.yml</code> aborted. Added a <code>COMPOSE_ARGS</code> variable that merges the base + chosen compose file (<code>-f docker-compose.yml -f docker-compose.prod.yml</code>) and replaced all ~25 <code>docker compose -f "$COMPOSE_FILE"</code> invocations to use it. Validated: <code>docker compose ... config</code> returns OK on prod.</li>
+            <li><strong>Removed the auto-commit step.</strong> Per instruction that all code ships inside the container image (nothing on the server to git-sync), the <code>pre_build_git_sync</code> function and its invocation were removed — no source tree on the server to commit.</li>
+        </ul>
+    </li>
+    <li><strong>UI (root/static/js/docker-containers.js):</strong> bumped the deploy poll timeout from 30&rarr;60 min so a slow full image build (no cache first run) no longer false-times-out with <code>NetworkError</code>. Cleaned up 3 orphaned <code>bk-comserv2-web-prod-*</code> <code>Created</code> containers on prod (the live container was untouched).</li>
+    <li><strong>Result:</strong> the prod container was pulled from Docker Hub and recreated with <code>--no-build --force-recreate</code>; it is healthy and <code>/opt/comserv/root/static/css</code> is fully populated (CSS now served). The dashboard deploy button now reaches the pull+start without the earlier aborts.</li>
+    <li><strong>Verification:</strong> <code>bash -n</code> clean; prod monitor run <code>EXIT=0</code> with no <code>command not found</code>/<code>not found. Aborting</code>; merged compose <code>config</code> OK on prod; container healthy with CSS after pull+start.</li>
+</ul>
+<h3>Fixed — 2026-08-15: Production container can never be deleted by cleanup (recurring 521 outage root cause)</h3>
+<ul>
+    <li><strong>Trigger:</strong> computersystemconsulting.ca repeatedly returns Cloudflare Error 521 ("web server is down") — the <code>comserv2-web-prod</code> container (or its volumes/networks) was being deleted, almost daily, by blind <code>docker</code> prune/rm paths. The DB container stayed healthy; only the web origin vanished.</li>
+    <li><strong>Root cause — three unguarded deletion paths:</strong>
+        <ul>
+            <li><code>script/docker-cleanup.sh</code> ran a bare <code>docker container prune -f</code> (line 28) — deletes <em>any</em> stopped container, including prod if it ever briefly exits.</li>
+            <li><code>script/deploy.sh</code> monitor routine cleanup ran unfiltered <code>docker volume prune -f</code> / <code>docker network prune -f</code> every cron tick — could reap prod's named resources if detached.</li>
+            <li>Legacy <code>deploy.sh</code> <code>docker container prune -f --filter "until=1h"</code> (already guarded 2026-08-11) — kept as the safe label filter.</li>
+        </ul>
+    </li>
+    <li><strong>Fix (<code>script/deploy.sh</code>):</strong> added a PRODUCTION CONTAINER PROTECTION block — <code>is_prod_container()</code>, <code>protect_prod_resources()</code> (labels the live prod container <code>comserv.role=prod</code>), and safe-prune helpers <code>safe_prune_stopped_containers()</code> / <code>safe_prune_volumes()</code> / <code>safe_prune_networks()</code>. Monitor self-heal now calls <code>protect_prod_resources</code>; routine cleanup only prunes stopped containers labeled <code>comserv.prune=safe</code>, dangling volumes, and unused (non-prod) networks. Prod's named volumes/networks are never reaped.</li>
+    <li><strong>Fix (<code>script/docker-cleanup.sh</code>):</strong> replaced the bare <code>docker container prune -f</code> with the same <code>label=comserv.prune=safe</code> filter and a loud warning if a prod-named container is found stopped (never removed).</li>
+    <li><strong>Fix (<code>lib/Comserv/Util/DockerDeploy.pm</code>):</strong> the intentional deploy-time <code>docker rm -f</code> of the live prod container now only runs when a rollback backup image exists; otherwise it is skipped so a failed recreate cannot leave prod permanently down with no restore.</li>
+    <li><strong>Net effect:</strong> the production web container, its <code>comserv2_*</code> volumes, and its networks are now NEVER removed by any cleanup path — only an explicit, backup-backed deploy recreates them.</li>
+    <li><strong>Verification:</strong> <code>bash -n</code> clean on both scripts; <code>perl -c</code> clean on DockerDeploy.pm.</li>
+</ul>
+
+<h3>Added — 2026-08-15: Logging Audit feature (project #265 LOG-AUDIT)</h3>
+<ul>
+    <li><strong>What:</strong> in-app logging-coverage audit that enforces the error-audit trail policy (.ai-policy.md §7 / ai-editor-workflow hardblock). Detects (a) system_log error hotspots (grouped by level/area, last 7 days) and (b) code blocks in <code>lib/</code> that swallow errors (eval/catch with die/throw but no <code>log_with_details</code>).</li>
+    <li><strong>Trigger:</strong> <code>script/hardware_monitor.pl</code> now also POSTs to <code>/admin/logging_audit/run</code> on the node that answered (same token, same node) — no separate cron needed.</li>
+    <li><strong>Endpoints:</strong> <code>/admin/logging_audit/run</code> (token-guarded, cron; added to Root.pm auto-bypass), <code>/admin/logging_audit/trigger</code> (manual, admin-gated), <code>/admin/logging_audit</code> (results page with "Run scan now" button).</li>
+    <li><strong>Storage:</strong> new <code>logging_audit</code> table — Result class <code>lib/Comserv/Model/Schema/Ency/Result/LoggingAudit.pm</code> is the source of truth; <strong>deploy via schema-compare</strong> (NOT yet deployed).</li>
+    <li><strong>Scan logic:</strong> <code>lib/Comserv/Util/LoggingAudit.pm</code> — reports only, never edits code; findings stored per scan run; summary logged via log_with_details.</li>
+    <li><strong>UI:</strong> added "Logging Audit" link to admin top menu (admintopmenu.tt) and admin map (admin_map.tt); results page <code>root/admin/LoggingAudit/Index.tt</code>.</li>
+    <li><strong>Plan doc:</strong> <code>root/Documentation/LOG-AUDIT-PLAN.tt</code> (project #265, parent #258 HWMON).</li>
+    <li><strong>Outstanding:</strong> schema-compare deploy of <code>logging_audit</code> table still required before the scan can persist findings.</li>
+</ul>
+
+<h3>Removed — 2026-08-15: Green floating "Chat with AI" button on every page (RECURRENCE — fix #2 today)</h3>
+<ul>
+    <li><strong>Recurrence tracking:</strong> this is the <strong>2nd time today (2026-08-15)</strong> this exact problem has been fixed. The redundant green "💬 Chat with AI" button keeps re-appearing on the right edge of every page and has to be removed again. Count so far today: <strong>2</strong>.</li>
+    <li><strong>Symptom:</strong> a green <code>btn-success</code> button labeled "💬 Chat with AI" was fixed to the lower-right corner (<code>position:fixed; bottom:24px; right:24px; z-index:9999</code>) of <em>every</em> page via <code>root/js_load.tt</code>. It only made sense on pages where the chat widget was present; elsewhere it opened a chat window / did nothing useful and cluttered the layout. (First occurrence today's fix was not separately logged — this entry now serves as the running record.)</li>
+    <li><strong>Fix:</strong> removed the server-rendered block in <code>root/js_load.tt</code> (the <code>[% IF c.session.user_id && !c.request.uri.match('/ai2/') %]</code> "Chat with AI" anchor). The chat widget itself is still available through the dedicated AI pages; this was purely the redundant global button.</li>
+    <li><strong>Root-cause watch:</strong> if this button re-appears a 3rd time, the source is being re-added by another edit to <code>root/js_load.tt</code> (or a stale deploy reverting it) — check <code>git log</code> / deploy drift before re-fixing.</li>
+    <li><strong>Note:</strong> the left-side "back-to-top" button (<code>#back-to-top</code>) is unrelated and was left intact.</li>
+    <li><strong>Verification:</strong> no remaining "Chat with AI" fixed button in <code>js_load.tt</code>; the right-edge green button no longer renders on any route.</li>
+</ul>
+
+<h3>Fixed — 2026-08-15: Empty <code>/root/static</code> bind mount shadowed baked CSS (broken styling on prod)</h3>
+<ul>
+    <li><strong>Symptom:</strong> the prod <code>comserv2-web-prod</code> container rendered with NO styling — every page was unstyled.</li>
+    <li><strong>Root cause:</strong> <code>docker-compose.prod.yml</code> mounted <code>${STATIC_SRC:-/root/static}</code> over the container's <code>/opt/comserv/root/static</code>. On prod <code>STATIC_SRC</code> is unset, so it bound the host's empty <code>/root/static</code> dir ON TOP of the image's baked static tree. A bind mount shadows (does not merge), so the empty host dir hid all baked CSS/JS and the app served nothing. The image itself correctly bakes <code>static/css</code> (verified: 48 files incl. <code>base.css</code> present inside the image).</li>
+    <li><strong>Fix:</strong> removed the <code>${STATIC_SRC:-/root/static}:/opt/comserv/root/static</code> bind from <code>docker-compose.prod.yml</code>. Static assets (CSS/JS/images) now serve directly from the image's baked tree — no host bind, no volume needed. <code>LegacyStaticPages</code> bind retained (real host content). The <code>deploy-to-production1.sh</code> path was already correct (uses the named <code>comserv2_static</code> volume, populated by <code>setup_volumes.sh</code>).</li>
+    <li><strong>Note:</strong> the live container still carries the stale bind until it is recreated from the fixed compose (or redeployed). Recreation is a restart action and was NOT performed (ops rule: do not start/stop the app).</li>
+    <li><strong>Verification:</strong> a fresh container from the image (no bind) shows <code>/opt/comserv/root/static/css/</code> fully populated; host <code>/root/static</code> confirmed empty (count 0).</li>
+
+<h3>Fixed — 2026-08-15: Consolidated ALL deploy paths into ONE canonical pipeline (root-cause of the CSS bind bug)</h3>
+<ul>
+    <li><strong>Symptom / root cause:</strong> prod CSS was broken because the deploy code was split across 5+ divergent scripts (deploy.sh, deploy-to-production1.sh, deploy2.sh, deploy-to-node.sh) plus the dashboard Docker.pm and Perl DockerDeploy.pm. They disagreed on the compose file and the run step. The empty /root/static bind lived in docker-compose.prod.yml, which only some paths used — so a deploy via one path broke CSS while another did not. No single source of truth meant the bug hid.</li>
+    <li><strong>Fix — one canonical pipeline (script/deploy.sh::canonical_deploy):</strong> every entry point now runs the IDENTICAL sequence — clean build -> clean push (one :latest) -> clean pull of the EXACT pushed digest -> compose up -d --no-build (never a local rebuild) -> health gate (rollback on fail) -> post-deploy. The run step uses --no-build so the same pushed image runs everywhere.</li>
+    <li><strong>What changed:</strong>
+        <ul>
+            <li>script/deploy.sh — added canonical_deploy() + canonical_deploy_to_nodes(); --prod and --deploy-to-node modes now call them.</li>
+            <li>script/deploy-to-node.sh — rewritten as a thin wrapper -> deploy.sh --deploy-to-node.</li>
+            <li>script/deploy-to-production1.sh — rewritten as a thin wrapper -> deploy.sh --deploy-to-node production1.</li>
+            <li>script/deploy2.sh — DELETED (dead code; referenced a nonexistent comserv2-api-prod image and a different compose file — a second diverged path).</li>
+            <li>lib/Comserv/Controller/Admin/Docker.pm — the dashboard "deploy" button no longer runs raw docker compose build/up; it delegates to deploy.sh --prod (local) / PROD_TARGET_HOST=192.168.1.126 (on prod1). Same result as every other button.</li>
+            <li>docker-compose.prod.yml — removed the empty ${STATIC_SRC:-/root/static} bind (the CSS-breaker); static now served from the baked image.</li>
+        </ul>
+    </li>
+    <li><strong>Result:</strong> build, push, pull, and deploy are now identical regardless of which dashboard button or script you use. The --no-build invariant guarantees prod runs the pushed digest, not stale host code.</li>
+    <li><strong>Verification:</strong> bash -n passes on all three scripts; perl -c passes on Docker.pm. Live container NOT restarted (ops rule).</li>
+</ul>
+
+
+<h3>Fixed — 2026-08-15: LoggingAudit CRITICAL error todo (Controller::Admin::LoggingAudit)</h3>
+<ul>
+    <li><strong>Trigger:</strong> system error todo <code>logging_audit.run</code> — <code>Can't locate object method "new" via package "Comserv::Util::LoggingAudit"</code> at LoggingAudit.pm:62.</li>
+    <li><strong>Root cause:</strong> the controller called <code>Comserv::Util::LoggingAudit-&gt;new-&gt;run_scan($c)</code> (lines 62 &amp; 87) but never <code>use</code>d the class. Perl only autoloads Catalyst Controller/Model/View namespaces — arbitrary <code>Util::*</code> packages must be explicitly loaded, so the class was never compiled and <code>new</code> was undefined.</li>
+    <li><strong>Fix:</strong> added <code>use Comserv::Util::LoggingAudit;</code> alongside the existing <code>use Comserv::Util::Logging;</code> at the top of the controller. The Util module (with <code>new</code> + <code>run_scan</code>) and the <code>logging_audit</code> Result class already exist.</li>
+    <li><strong>Verification:</strong> <code>perl -c</code> on the controller passes; grepped that no other caller of <code>LoggingAudit</code> relies on implicit autoload.</li>
+</ul>
+
+<h3>Fixed — 2026-08-15: Todo card theme-compliance + Project field (todo_card.tt)</h3>
+<ul>
+    <li><strong>Trigger:</strong> the open todo card body was unreadable on the dark theme — text showed as light-on-light.</li>
+    <li><strong>Root cause:</strong> the open body used Bootstrap's <code>.card</code> (hardcoded white background) and <code>.todo-card-pre</code> used a hardcoded <code>bg-light</code> gray. On a dark theme <code>var(--text-color)</code> becomes light → light text on light background. The card also omitted the attached Project entirely (it showed Site but not Project).</li>
+    <li><strong>Fix (root/static/css/todo_shared.css):</strong> added <code>.todo-card.card</code> / <code>.todo-card .card-body</code> / <code>.todo-card-pre</code> / <code>.todo-card .text-muted</code> rules that override Bootstrap's hardcoded colors with theme tokens (<code>--card-bg</code>, <code>--bg-secondary</code>, <code>--text-color</code>, <code>--text-muted-color</code>, <code>--border-color</code>). No inline style, no hardcoded hex.</li>
+    <li><strong>Fix (root/todo/todo_card.tt):</strong> removed the <code>bg-light</code> class from both <code>.todo-card-pre</code> blocks; added a <strong>Project</strong> field to the open-body grid that renders the project name as a clickable link to <code>/project/details?project_id=&lt;id&gt;</code> (uses the existing <code>Todo-&gt;belongs_to(project)</code> relationship, same pattern as todo/day.tt's conversation links).</li>
+    <li><strong>Verification:</strong> rendered <code>todo/todo_card.tt</code> through Template Toolkit with a stubbed <code>tc</code> carrying a project — "Project" field + <code>/project/details?project_id=2</code> link + project name all present, <code>bg-light</code> gone, template parses. Both files auto-reload on the running <code>:3001</code> process (no restart).</li>
+</ul>
+
+<h3>Fixed — 2026-08-15: Project page <code>todo_card.tt</code> override (root/todo/project.tt + project-cards.css)</h3>
+<ul>
+    <li><strong>Trigger:</strong> the todo cards on a project page were still unreadable even after the todo_card.tt fix — because <code>root/todo/project.tt</code> carried a ~95-line inline <code>&lt;style&gt;</code> block that hard-coded <code>.card { background-color: rgba(255,255,255,0.88) }</code> and a white <code>.form-control</code>, plus a <code>!important</code> <code>.bg-light</code>. Inline styles win over the external <code>todo_shared.css</code>, so the card reverted to light-on-light on the dark theme. This also violates the AI-policy rule banning inline <code>&lt;style&gt;</code>/<code>&lt;script&gt;</code> in templates.</li>
+    <li><strong>Fix (root/todo/project.tt):</strong> deleted the entire inline <code>&lt;style&gt;</code> block. The page already loads its sanctioned external stylesheet via the controller's <code>additional_css =&gt; ['/static/css/components/project-cards.css']</code> stash, so no styling was lost.</li>
+    <li><strong>Fix (root/static/css/components/project-cards.css):</strong> made the base <code>.card</code>/<code>.card-header</code>/<code>.card-body</code>/<code>.card-footer</code> theme-aware — replaced hardcoded <code>rgba(0,0,0,0.03)</code> / <code>#dee2e6</code> with <code>var(--border-color)</code>, <code>var(--bg-secondary)</code>, <code>var(--card-bg)</code>, <code>var(--text-color)</code> (Bootstrap fallbacks preserved). Changed <code>.bg-light</code> from a hardcoded <code>#f8f9fa !important</code> gray to <code>var(--bg-secondary, #f8f9fa) !important</code> so the "Project ID" bar and comments box follow the dark theme. Now <code>todo_card.tt</code> (and the whole project page) render consistently on light and dark themes.</li>
+    <li><strong>Verification:</strong> <code>project.tt</code> parses (TT smoke test); inline <code>&lt;style&gt;</code> count = 0; no <code>rgba(255,255,255</code> remaining in the template. Remaining hex values in <code>project-cards.css</code> are all inside <code>var(--token, fallback)</code> fallbacks, not primary colors.</li>
+</ul>
+
+<h3>Fixed — 2026-08-15: <code>/project/details</code> (projectdetails.tt) wrong-colour text + missing project link</h3>
+<ul>
+    <li><strong>Trigger:</strong> on <code>/project/details?project_id=240</code> the text was still the wrong colour after a hard reload and the project link in the embedded todo card was not visible.</li>
+    <li><strong>Root cause:</strong> the controller's <code>details</code> action renders <code>root/todo/projectdetails.tt</code>, which carried its OWN ~250-line inline <code>&lt;style&gt;</code> block hard-coding <code>.project-details { background-color: rgba(255,255,255,0.9) }</code> (near-opaque white). That white box wrapped the details table AND the embedded todo cards (via ProjectTodosList.tt → todo_card.tt). My transparent theme card/body backgrounds showed the white box behind them, so light <code>--text-color</code> landed on white = unreadable, and the card's project link blended in. Same inline-<code>&lt;style&gt;</code> policy violation as the project.tt case.</li>
+    <li><strong>Fix:</strong> extracted the inline block to <code>root/static/css/components/project-details.css</code> and made it theme-aware — <code>.project-details</code> now uses <code>var(--card-bg, var(--bg-secondary, #fff))</code> + <code>var(--text-color)</code>; the details table <code>th/td</code> and the "Total Accumulated Time" <code>h3</code> explicitly set <code>var(--text-color)</code>. Removed the inline <code>&lt;style&gt;</code> from <code>projectdetails.tt</code> and wired the external file via <code>additional_css =&gt; ['/static/css/components/project-details.css?v=' . time()]</code> in the controller's <code>details</code> action (timestamp forces reload).</li>
+    <li><strong>Verification:</strong> <code>projectdetails.tt</code> parses; no real <code>&lt;style&gt;</code> element remains (only a comment mentioning it); no <code>rgba(255,255,255</code> in the template. Rendered <code>todo_card.tt</code> with <code>tc.project={id:240,name:"Real Project 240"}</code> → <code>/project/details?project_id=240</code> link + project name both present, no <code>bg-light</code>.</li>
+    </ul>
+
+    <h3>Fixed — 2026-08-15: /project/details embedded todo cards still light-on-light (missing todo_shared.css) + v2 inline-script removal</h3>
+    <ul>
+        <li><strong>Trigger (symptom a):</strong> on <code>/project/details?project_id=240</code> the embedded todo cards were still unreadable (light text on light background) even after the prior todo_card.tt / project.tt / projectdetails.tt CSS fixes.</li>
+        <li><strong>Root cause:</strong> the controller's <code>details</code> action loaded ONLY <code>project-details.css</code> via <code>additional_css</code> — it did not load <code>todo_shared.css</code>. todo_shared.css holds the <code>.todo-card.card</code> / <code>.todo-card .card-body</code> / <code>.todo-card-pre</code> overrides forcing the embedded todo_card.tt cards to the theme tokens. Without it, the cards fell back to Bootstrap's hardcoded white <code>.card</code> under the dark theme's light <code>--text-color</code> → light-on-light. (The grid page <code>project</code> loads project-cards.css; day/week/month load todo_shared.css inline — but <code>/project/details</code> loaded neither, so the override that fixes this page was never included.)</li>
+        <li><strong>Fix (lib/Comserv/Controller/Project.pm, details action):</strong> the <code>additional_css</code> stash now loads both <code>/static/css/todo_shared.css</code> and <code>/static/css/components/project-details.css</code> (timestamped to force reload). project-details.css itself was already theme-safe (no broad <code>.card</code>/<code>a</code>/<code>button</code>/<code>*</code> selector overriding the cards) and is left unchanged — the gap was purely the missing todo_shared.css include.</li>
+        <li><strong>v2 JS compliance (root/todo/projectdetails.tt):</strong> removed the raw inline <code>&lt;script&gt;</code> block (the /ai/project_conversations fetch). The fetch is now delegated in <code>root/static/js/project/project-conversations.js</code> (binds to the existing <code>[data-project-id]</code> container, HTML-escapes titles), loaded via <code>root/js_load.tt</code> on <code>/project/</code> routes (defer, versioned). No inline <code>&lt;script&gt;</code> remains in any template that includes js_load.tt.</li>
+        <li><strong>Project link:</strong> the in-card Project link (todo_card.tt lines 158-160, <code>tc.project</code> → <code>/project/details?project_id=id</code>) was already present and is now visible again because the card body is readable. A "Back to Projects" button and a "Return to Projects List" link already exist on the page; no new link styling was required.</li>
+        <li><strong>Verification:</strong> projectdetails.tt parses through Template Toolkit (stub project) — real <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code> count = 0 (only a comment mentions them), <code>data-project-id="240"</code> present. <code>node --check</code> passes on the new JS. Grep of todo_shared.css / project-details.css / project-cards.css for broad hardcoded-color selectors (<code>a</code>/<code>button</code>/<code>*</code>) → none; all are scoped (e.g. <code>.project-actions button</code>). Live admin render not captured this session (auth-gated) — verify cards + Project link in a browser when an admin session is available.</li>
+    </ul>
+
+<h3>Fixed — 2026-08-15: Todo detail page Project ID → clickable Project link (root/todo/details.tt)</h3>
+<ul>
+    <li><strong>Trigger:</strong> on <code>/todo/details?record_id=&lt;id&gt;</code> the "Project ID" row showed only the raw numeric <code>project_id</code> as plain text — no way to jump to the attached project.</li>
+    <li><strong>Fix (root/todo/details.tt, lines ~187-188):</strong> the <code>&lt;td&gt;</code> now checks the Todo row's existing <code>belongs_to(project)</code> relationship. When <code>record.project</code> resolves, it renders the project name as a clickable link to <code>/project/details?project_id=&lt;id&gt;</code> (<code>[% record.project.name | html %]</code> label, <code>/project/details?project_id=[% record.project.id %]</code> href) — same pattern as <code>todo/day.tt</code>'s conversation→project links and <code>todo_card.tt</code>'s Project field. Falls back to the raw <code>get_column('project_id') || '—'</code> text when no project is attached. Kept the <code>&lt;th&gt;Project ID&lt;/th&gt;</code> label unchanged. No hardcoded hex / inline <code>style=</code> — uses the site's default <code>a</code> styling.</li>
+    <li><strong>Verification:</strong> Extracted the new block into an isolated TT snippet and rendered with a stubbed <code>record.project={id:2,name:"ToDo system"}</code> → output <code>&lt;td&gt;&lt;a href="/project/details?project_id=2"&gt;ToDo system&lt;/a&gt;&lt;/td&gt;</code>, no syntax error. The full-file <code>perl -e Template process</code> aborts only on a Catalyst-only <code>js</code> filter (registered in the app, not a syntax fault in this edit); the link string <code>/project/details?project_id=</code> is confirmed present in <code>details.tt</code>. Remaining raw <code>get_column('project_id')</code> references in the file are the project-filter include (line 98) and the no-project fallback (line 188) — neither is an unlinked display of the value outside the fallback.</li>
+    <li><strong>Live check:</strong> blocked this session — the read-only <code>curl</code> reachability probe to the running <code>:3001</code> app required consent and was not authorised, so I could not confirm the rendered link in a live admin session. The edit is limited to the one display row and auto-reloads on the running process; verify in a browser with a project-attached todo when an admin session is available.</li>
+</ul>
+
+<h3>Fixed — 2026-08-15: API todo serializer now exposes project name + link (Comserv::Controller::Api::_todo_to_hash)</h3>
+<ul>
+    <li><strong>Trigger:</strong> the web detail page now shows the project <em>name</em> as a link, but the API (<code>GET /api/todos</code>) only returned the raw numeric <code>project_id</code> — so an AI-agent caller could not render the same human-readable project or jump to it without a second lookup.</li>
+    <li><strong>Fix (lib/Comserv/Controller/Api.pm, <code>_todo_to_hash</code>, ~line 1499):</strong> resolve the same existing <code>belongs_to(project)</code> relationship the web page uses and add two fields to every serialized todo: <code>project_name</code> (<code>$todo-&gt;project-&gt;name</code>, or <code>undef</code> when none) and <code>project_link</code> (<code>/project/details?project_id=&lt;id&gt;</code>, or <code>undef</code>). Now an agent authenticated as a logged-in user sees the identical project name + destination link the browser shows. <code>project_id</code> is retained for backward compatibility.</li>
+    <li><strong>Purpose:</strong> the API is the surface AI agents use to "see the application as a logged-in user"; surfacing <code>project_name</code>/<code>project_link</code> lets an agent name and navigate to the attached project without extra calls.</li>
+    <li><strong>Verification:</strong> <code>perl -e 'use Comserv::Controller::Api'</code> compiles cleanly (no syntax error). The change is confined to the serializer; it auto-reloads on the running <code>:3001</code> process. Live JSON output not captured this session (auth-gated curl probe required consent).</li>
+</ul>
+
+<h3>Docs — added Planning System cluster (proj #138 PLANNING) to the Master Plan</h3>
+<ul>
+    <li><strong>What:</strong> the planning-system plans were not listed anywhere in <code>Documentation/MASTER_PLAN.tt</code>. Added them in every needed place:
+        <ul>
+            <li><strong>Nav:</strong> new "Planning" submenu (Planning System, Focus Queue Visibility, Projects Filter/Search, Ownership/Billing, Todo Card Unify, Todo List Ranking).</li>
+            <li><strong>Dependency map:</strong> a new block showing the #138 cluster fanning out to its sub-plans (PLAN-QUEUE 234, PROJ-UI 235, PROJ-OWN 236, TODOLIST-UI 240) and to the Implementation Plan (Todo API + DB-driven Master Plan sync) and DailyPlanSystem feature doc.</li>
+            <li><strong>Roadmap:</strong> new <code>W5.8 — Planning System cluster</code> card under WAVE 5, with links to all docs + the #138 project.</li>
+            <li><strong>Sequencing glance:</strong> added the cluster to the WAVE 5 line.</li>
+            <li><strong>Index table:</strong> added rows for the Planning System feature doc, the Implementation Plan, and the 5 sub-plans.</li>
+        </ul>
+    </li>
+    <li><strong>Bidirectional links:</strong> added a "Coordinator → Master Plan (W5.8)" cross-link to each planning doc (<code>DailyPlanSystem.tt</code>, <code>ImplementationPlanTodoAPIAndMasterPlanSync.tt</code>, <code>PlanningQueueRoleVisibilityPlan.md</code>, <code>ProjectsPageFilterSearchPriorityPlan.md</code>, <code>ProjectOwnershipBillingPlan.md</code>, <code>TodoCardUnificationPlan.tt</code>, <code>TodoListPageDisplayTuningPlan.md</code>).</li>
+    <li><strong>Files:</strong> <code>root/Documentation/MASTER_PLAN.tt</code> + the 7 planning docs above. No code changed; docs-only.</li>
+</ul>
+
+<h3>Docs — Planning Language Standard + vocabulary normalization across master plan & planning docs</h3>
+<ul>
+    <li><strong>New doc:</strong> <code>root/Documentation/PlanningLanguageStandard.tt</code> — the controlled vocabulary for all plan docs. One word per level: <strong>PROJECT = PLAN</strong> (a <code>projects</code> DB row; the doc is its view), <strong>PHASE = SUB-PROJECT</strong> (<code>parent_id</code>), <strong>STEP = TODO</strong> (<code>todos</code> row), <strong>GATE = done-when</strong>. Retires "Wave", "W0.1/W1.2", "P1/Q4/1A" as structure; defines one required plan-doc skeleton. Owning project #138 PLANNING.</li>
+    <li><strong>MASTER_PLAN.tt:</strong> added a "Vocabulary (read this first)" notice; relabelled the planning card from "W5.8 — Planning System cluster" to "Project #138 PLANNING — Planning System (sub-projects: 234/235/236/240)" using phase/project language; added the standard to the Planning nav.</li>
+    <li><strong>7 planning docs</strong> refactored to the standard header: 5-field header (Project code · Parent project · Site · Status · Audit date) + a one-line Deliverable + a "follows Planning Language Standard" line + coordinator link to Project #138. Replaced "sub-plan"/"W5.8" wording with "PHASE / sub-project". Docs: <code>DailyPlanSystem.tt</code>, <code>ImplementationPlanTodoAPIAndMasterPlanSync.tt</code>, <code>PlanningQueueRoleVisibilityPlan.md</code>, <code>ProjectsPageFilterSearchPriorityPlan.md</code>, <code>ProjectOwnershipBillingPlan.md</code>, <code>TodoCardUnificationPlan.tt</code>, <code>TodoListPageDisplayTuningPlan.md</code>.</li>
+    <li><strong>Files:</strong> 1 new + 8 modified under <code>root/Documentation/</code>. Docs-only; no code/SQL changed.</li>
+</ul>
+
+<h3>Docs — reconciled Master Plan against the DB projects table (237 projects)</h3>
+<ul>
+    <li><strong>Finding:</strong> the master plan previously indexed only a hand-picked ~54 of the <strong>237</strong> project rows in the primary Ency (<code>projects</code> on 192.168.1.20:3307). Important active projects were missing or buried — notably <strong>INFRA-HA (#202)</strong> (only a bullet in the infra-cluster list), <strong>SECURITY (#201)</strong>/<strong>AUTH-EVO (#243)</strong>/<strong>IMGSEC (#239)</strong>, <strong>THEME-AUDIT (#221)</strong>, <strong>AIMPS (#252, incl. v2-migration sync)</strong>, <strong>PointSystem (#193)</strong>, <strong>3DPRINT (#206)</strong>, <strong>Marketplace (#210)</strong>, <strong>GITWT-NEW (#238)</strong>, <strong>PROD-HEALTH (#200)</strong>.</li>
+    <li><strong>Renamed "Waves" → "Projects by dependency"</strong> everywhere (nav title, GROUP 0–5 headers, glossary note, glance pre, decision note). The internal W0.1/W1.2 item labels stay as project-style codes.</li>
+    <li><strong>Added GROUP 6 card</strong> listing the missing important active projects (with phase sub-project ids), a coverage note (237 total, curated subset, DB = source of truth), and a "still intentionally excluded" note for ~180 legacy/duplicate rows.</li>
+    <li><strong>Index table</strong> gained 9 rows for the promoted projects; <strong>glance pre</strong> gained a GROUP 6 line.</li>
+    <li><strong>Files:</strong> <code>root/Documentation/MASTER_PLAN.tt</code> only. Docs-only; read-only DB SELECT, no writes.</li>
+</ul>
+
+<h3>Docs — V2 Migration promoted to its own top-level project (#259 V2MIG)</h3>
+<ul>
+    <li><strong>DB:</strong> created project <code>V2MIG</code> (#259, top-level) + 5 phase sub-projects on the primary Ency (192.168.1.20:3307): V2MIG-P1 (#260) baseline/standards gate, V2MIG-P2 (#261) core/shared .tt, V2MIG-P3 (#262) feature .tt waves, <strong>V2MIG-P4 (#263) Planning page fixed IN LOCKSTEP with its v2 migration</strong> (root cause of the current planning-page rot), V2MIG-P5 (#264) sync &amp; verify (absorbs former AIMPS-P5 #257).</li>
+    <li><strong>Docs:</strong> new <code>root/Documentation/V2MigrationPlan.tt</code> (human in-app view) + <code>root/Documentation/V2MigrationPlan.md</code> (AI/assistant reference, per the user's note that .md is for chat/AI benefit). Added a <code>.gitignore</code> negation so the companion .md is version-controlled (blanket <code>*.md</code> would otherwise ignore it).</li>
+    <li><strong>MASTER_PLAN.tt:</strong> added a prominent V2 MIGRATION card (after GROUP 6), index rows for #259 (both .tt and .md), and a V2 MIG line in the glance pre. Noted AIMPS-P5 (#257) is now superseded by V2MIG-P5 (left in place, not deleted).</li>
+    <li><strong>Why:</strong> V2 migration touches almost every .tt and many other files; it must be a first-class plan. The planning-page fix now ships as a phase of V2, not separately — directly addressing the user's diagnosis.</li>
+</ul>
+
+<h3>Fixed — hardware_monitor watchdog false CRITICAL: node "missed monitoring window (age=1000000000s)"</h3>
+<ul>
+    <li><strong>What was wrong:</strong> the <code>hardware_monitor.watchdog</code> endpoint (Controller/Admin/HardwareMonitor.pm) reported every node as permanently "missed" with the sentinel <code>age=1000000000s</code>. Root causes (all on the path used by <code>run</code> &rarr; <code>watchdog</code> against the PRIMARY Ency at <code>192.168.1.20:3307</code>):
+        <ul>
+            <li><strong>Schema overflow:</strong> <code>HardwareMetrics.metric_value</code> was declared <code>decimal(12,3)</code> (max 999,999,999). The <code>monitor_heartbeat</code> row stores <code>time()</code> (epoch seconds, ~1.75e9), which overflowed the column. The <code>INSERT</code> failed silently inside an <code>eval</code> in <code>run</code>, so no heartbeat row was ever written &mdash; the watchdog then had no <code>last_run</code> to compute an age from and fell back to the <code>10**9</code> sentinel.</li>
+            <li><strong>Node-identity mismatch:</strong> <code>run</code> and <code>watchdog</code> derived the node key via <code>get_system_identifier()</code>, which appends a volatile runtime tag (<code> (Standalone)</code>/<code> (Docker)</code>) and the listening port non-deterministically per request. The two endpoints computed <em>different</em> keys (e.g. <code>workstation (Standalone):3001</code> vs <code>workstation (Standalone)</code>) and the watchdog also filtered on a separately-sanitized <code>hostname</code> column &mdash; so it could never match the row <code>run</code> wrote.</li>
+        </ul>
+    </li>
+    <li><strong>Fix:</strong>
+        <ul>
+            <li>Widened <code>HardwareMetrics.metric_value</code> to <code>decimal(15,3)</code> in the source-of-truth Result class (<code>Model/Schema/Ency/Result/HardwareMetrics.pm</code>) and deployed the column change to the PRIMARY Ency (192.168.1.20:3307) via DBIC &mdash; never hand DDL. Verified a 1.7e9 epoch value now stores cleanly.</li>
+            <li>Added a shared <code>_node_identity()</code> helper that strips the volatile runtime tag and trailing <code>:port</code>, giving both <code>run</code> (writes) and <code>watchdog</code> (queries) one deterministic key (<code>workstation</code>). The watchdog now matches on <code>system_identifier</code> alone (the canonical key <code>run</code> stores).</li>
+        </ul>
+    </li>
+    <li><strong>Verified:</strong> on the <code>:3001</code> dev server, <code>POST /admin/hardware_monitor/run</code> returns 200 and writes a <code>monitor_heartbeat</code> row to 192.168.1.20:3307; <code>/admin/hardware_monitor/watchdog</code> now returns <code>ok:1, missed:0, age_sec:&lt;real seconds&gt;, last_run:&lt;epoch&gt;</code> instead of <code>age=1000000000s</code>.</li>
+    <li><strong>Note:</strong> the prod container (<code>:5000</code> / comserv2-web-prod on this host) is behind this code and still returns 302 on these endpoints until rebuilt; the host cron currently targets <code>:5000/:126/:198</code> and does not trigger <code>:3001</code>. Mirror this fix to prod (rebuild + cron node list + token) once local errors stop, per the established "prove local first, then mirror" workflow. Also fixed the host cron itself: the previous entry logged to root-owned <code>/var/log/comserv-hardware-monitor.log</code> (unwritable by the cron user, so the job silently did nothing) and <code>script/hardware_monitor.pl</code>'s multi-line backtick <code>curl</code> broke under <code>/bin/sh</code> (dash) — rewritten as a single line, log moved to <code>/tmp</code>.</li>
+</ul>
+
+<ul>
+    <li><strong>What was wrong:</strong> <code>/api/focus/models</code> threw a global exception <em>"Can't call method 'catch' on an undefined value at Controller/Api.pm"</em> on every local-network request (e.g. <code>192.168.1.199</code> → referer <code>/planning/daily</code>). Under Perl 5.40, <code>use namespace::autoclean;</code> (no <code>-except</code>) strips the <code>try</code>/<code>catch</code> keywords Try::Tiny injected at compile time, so the genuine <code>try { } catch { }</code> block in the local-auth user resolver (lines 1003&ndash;1013, which runs before <code>api_focus_models</code>) degraded to <code>try{...}->catch(...)</code> on an undefined value.</li>
+    <li><strong>Fix:</strong> added the standard guard to <code>lib/Comserv/Controller/Api.pm</code> line 3:
+        <ul>
+            <li><code>use namespace::autoclean -except =&gt; [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)</code> &mdash; matches the existing pattern in <code>ThemeConfig.pm</code>.</li>
+        </ul>
+    </li>
+    <li><strong>Verified:</strong> <code>perl -Mlib=lib -c lib/Comserv/Controller/Api.pm</code> &rarr; syntax OK; the only <code>try</code>/<code>catch</code> pair in the file now resolves at runtime.</li>
+    <li><strong>Scope note:</strong> the same latent defect (bare <code>use namespace::autoclean;</code> + real <code>try/catch</code>) exists in <code>Controller/HostingSignup.pm</code> and <code>Controller/3d.pm</code>; they need the same <code>-except</code> guard before their paths run on 5.40.</li>
+    <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-12-api-focus-models-namespace-autoclean-fix">2026-08-12-api-focus-models-namespace-autoclean-fix</a></li>
+</ul>
+
 <h3>Fixed — AI2 system: /ai2/providers "Not a HASH reference" (malformed catalog element)</h3>
 <ul>
     <li><strong>What was wrong:</strong> an unauthenticated request to <code>/ai2/providers</code> at the guest tier (free OpenRouter + Ollama only) returned the correct free list <em>but</em> also raised <em>"Not a HASH reference at Controller/AI2.pm line 76"</em>, generating an error-audit todo. The loop that groups the catalog by provider did <code>$m-&gt;{provider}</code> on every element; one element of <code>@$catalog</code> was not a hashref (an upstream provider JSON anomaly — Ollama <code>/api/tags</code> or OpenRouter <code>/v1/models</code> occasionally returns a non-object entry).</li>
@@ -29,6 +269,35 @@
     <li><strong>Root-cause capture:</strong> the warnings record the exact bad element on the next occurrence, so the offending provider/payload can be identified and fixed at the API boundary if it recurs.</li>
     <li><strong>Verified:</strong> <code>perl -c</code> clean on both modules. The endpoint now degrades gracefully — a malformed entry is dropped, not fatal.</li>
     <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-10-ai2-providers-hashref-guard">2026-08-10-ai2-providers-hashref-guard</a></li>
+    <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-16-ai2-project-tab-file-tree">2026-08-16-ai2-project-tab-file-tree</a> &mdash; AI2 editor Project tab now renders the full project file tree + changed files on top, click-to-edit and Diff.</li>
+</ul>
+
+<h3>Fixed — Per-request CPU storm: static DB info re-read on every request + stacking chat polling loops</h3>
+<ul>
+    <li><strong>What was wrong:</strong> the workstation CPU spiked to ~99% (load 11.6, 20 starman workers CPU-spinning). Two coupled causes:
+        <ul>
+            <li><strong>Server:</strong> <code>Controller/Root.pm::auto</code> re-derived the static DB-connection info (DBEncy / DBForager <code>get_connection_info</code> &mdash; a fixed config hash) and re-ran <code>get_all_sites</code> (a full DB query + 17 log lines) on <em>every</em> request, even though the DB location is known and never changes per request.</li>
+            <li><strong>Client:</strong> <code>root/static/js/ai-chat/support.js</code> added a fresh pair of <code>setInterval</code> poll loops (<code>chat/admin_heartbeat</code>, <code>chat/pending_count</code>) on every <code>DOMContentLoaded</code> without ever clearing the previous ones. When the chat widget re-initialised repeatedly, the loops <em>stacked</em> into a self-inflicted flood (~12,000 req/min from a single browser tab), each request paying the full redundant <code>auto</code> cost.</li>
+        </ul>
+    </li>
+    <li><strong>Why multiple tabs are fine, stacking is not:</strong> separate tabs are separate clients/sessions and each legitimately runs one poll loop &mdash; that is correct. The bug was <em>one page accumulating many loops</em>. On a multi-domain production host the same stacking would multiply across re-inits and collapse the box quickly, so it had to be fixed at the source.</li>
+    <li><strong>Fix:</strong>
+        <ul>
+            <li><code>Controller/Root.pm</code> now caches the resolved DB-connection list + host per worker (5-minute TTL, following the existing <code>$_remotedb_status</code> precedent). Cache hits skip all model/DB work in <code>auto</code>; the data is identical for every domain a process serves, so this is correct on multi-domain prod.</li>
+            <li><code>support.js::_scheduleAdminNotifier()</code> is now idempotent: it clears any existing timers before (re)starting, so re-running the script can never stack additional loops. One poll loop per page, exactly as intended.</li>
+        </ul>
+    </li>
+    <li><strong>Verified:</strong> <code>perl -c</code> clean on Root.pm; <code>node --check</code> clean on support.js.</li>
+    <li><strong>See also:</strong> <a href="/Documentation/changelog/2026-08-11-auto-db-info-cache-and-poll-guard">2026-08-11-auto-db-info-cache-and-poll-guard</a></li>
+</ul>
+
+<h3>Fixed — Pull &amp; Deploy never swapped the container (name conflict + false SUCCESS)</h3>
+<ul>
+    <li><strong>What was wrong:</strong> the UI rebuild/deploy orchestrator (<code>rebuild:pull-deploy</code> &rarr; <code>Comserv::Util::DockerDeploy-&gt;deploy_to_target_safe</code> &rarr; <code>deploy()</code>, which runs on the workstation app and SSHes to prod) backed up the old container (commit image + stopped backup container) but <strong>never stopped/removed the live <code>comserv2-web-prod</code></strong>. <code>compose up --force-recreate</code> then hit <code>Conflict: name already in use by 281ad37ece65</code> and never created the new container; the health check passed against the OLD container and reported SUCCESS. That is why prod stayed frozen on <code>9c7bb1e9d715</code> (8/4) through every attempt. (Git is not part of this; the real pipeline uses the LAN registry <code>comserv-registry.lan:5000</code>, not the deploy.sh shell scripts.)</li>
+    <li><strong>Fix:</strong> in <code>DockerDeploy.pm</code> <code>deploy()</code>, remote pull-deploy branch now <code>docker stop &amp;&amp; docker rm -f</code> the live <code>$container_name</code> <em>before</em> <code>compose up</code>. The committed backup image + visible stopped backup container remain for rollback, so <code>up --force-recreate</code> can create the pulled container, and the health check now verifies the NEW container (real failure &rarr; rollback, no false SUCCESS).</li>
+    <li><strong>Verified:</strong> <code>perl -c lib/Comserv/Util/DockerDeploy.pm</code> OK; <code>_container_exists</code> present (line 67). Fix takes effect when the workstation app reloads the <code>.pm</code> — no container rebuild/push needed for this fix.</li>
+    <li><strong>To land:</strong> after the <code>.pm</code> reloads, trigger PULL &amp; DEPLOY on production1. Log should show "Removing live comserv2-web-prod before recreate" then a clean <code>up</code> with no Conflict; banner image/build date changes to the pushed build.</li>
+    <li><strong>Note:</strong> earlier shell-script edits (deploy.sh/deploy-to-node.sh) were aimed at the wrong path and are not the fix; <code>build:</code> stays in docker-compose.prod.yml (build step needs it).</li>
 </ul>
 
 <h3>Fixed — ModelCatalog::_flatten "Not a HASH reference" (same root cause, cascaded to every page)</h3>
@@ -193,5 +462,44 @@
 <p>These fixes address several issues that were causing errors in the application logs. No database changes or configuration changes are required. Simply deploy the updated code to your server.</p>
 
 <p>If you encounter any issues after deploying these fixes, please check the application logs for any new error messages and report them to the development team.</p>
+
+<h2>2026-08-13 — /planning/daily rebuilt as a clean index (replaced the broken monolith)</h2>
+
+<p><strong>Decision:</strong> After multiple failed attempts to patch the floating buttons
+(AI Editor / Back-to-Top / Chat) on the old <code>/planning/daily</code> monolith, the page
+was rebuilt from scratch per the owner's direction. The old monolith trapped the global
+<code>position:fixed</code> floating buttons inside its nested tab content (full-page
+<code>?tab=</code> fetches were injected via <code>innerHTML</code>), making the buttons
+unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
+
+<p><strong>New structure:</strong></p>
+<ul>
+    <li><code>/planning/daily</code> is now a <strong>clean index page</strong> (<code>admin/planning/DailyPlan.tt</code>) with three <strong>hard-coded links</strong>: <strong>Daily Priorities</strong>, <strong>Master Plan</strong>, <strong>Calendar</strong>. It is a normal page, so the global floating buttons (Back-to-Top / AI Editor / Chat from <code>layout.tt</code>/<code>js_load.tt</code>) render correctly — the nested full-page injection that broke them is gone.</li>
+    <li><strong>Daily Priorities</strong> → new route <code>/planning/daily-priorities/&lt;date&gt;</code> (<code>Planning.pm sub daily_priorities</code>) renders <code>admin/planning/DailyPriorities.tt</code>, which INCLUDEs the existing <code>_today_work_tab.tt</code> (Start Day / End Day / Triage / Reschedule / Today's Log action bar, focus queue, remaining-todos). Verified: action bar + focus queue render.</li>
+    <li><strong>Calendar</strong> → links to <code>/todo/day/&lt;date&gt;</code>, the existing gcal <strong>day calendar</strong> view (the real day-grid, not a todo list).</li>
+    <li><strong>Master Plan</strong> → links to <code>/Documentation/MASTER_PLAN</code> (unchanged, working).</li>
+    <li><strong>Old monolith preserved</strong> as <code>admin/planning/DailyPlan.legacy.tt</code>, served read-only at <code>/planning/daily-legacy</code> (new <code>legacy_daily</code> action → refactored <code>daily_impl</code> private method). Kept for reference; does NOT carry live data when opened standalone and is intended to be re-integrated later as a tab on the main page.</li>
+</ul>
+
+<p><strong>Verified:</strong></p>
+<ul>
+    <li><code>perl -Ilib -c lib/Comserv/Controller/Planning.pm</code> &rarr; syntax OK.</li>
+    <li>Rendered <code>DailyPlan.tt</code> (index) and <code>DailyPriorities.tt</code> through the app's Template Toolkit: index emits all three hard-coded links; Daily Priorities emits the action bar (Start Day / End Day / Triage / Reschedule / Today's Log) and focus-queue section.</li>
+    <li>Routes present: <code>daily</code> (<code>/planning/daily</code>), <code>daily_priorities</code> (<code>/planning/daily-priorities</code>), <code>legacy_daily</code> (<code>/planning/daily-legacy</code>); <code>daily_log</code> untouched.</li>
+</ul>
+
+<p><strong>Files touched:</strong></p>
+<ul>
+    <li><code>lib/Comserv/Controller/Planning.pm</code> — <code>daily</code> now renders the clean index; added <code>daily_priorities</code> + <code>legacy_daily</code> + private <code>daily_impl</code>.</li>
+    <li><code>root/admin/planning/DailyPlan.tt</code> — rewritten as the clean index (was the monolith; old version moved to <code>DailyPlan.legacy.tt</code>).</li>
+    <li><code>root/admin/planning/DailyPriorities.tt</code> — new focused Daily Priorities page.</li>
+    <li><code>root/static/css/planning/daily-plan.css</code> — added <code>.daily-index*</code> card styles (theme-token driven, no fixed geometry).</li>
+</ul>
+
+<p><strong>Next steps (add one feature at a time):</strong> re-introduce the week / month / gantt / resources views as their own routes or lazy-loaded fragments; eventually re-surface the legacy monolith as a tab on the main index.</p>
+
+<h2>2026-08-13 — Removed duplicate action bar on /planning/daily; added End Day + Open Logs</h2>
+
+<p><code>/planning/daily</code> rendered two identical action bars: a top-level "Day Controls" card above the tab bar and a second one inside the Daily Priorities tab. The second (in-tab) bar was the duplicate and is now hidden on this page via <code>hide_action_bar = 1</code> on the <code>_today_work_tab.tt</code> include; the top card stays as the only action bar. <strong>End Day</strong> and <strong>Open Logs</strong> were added to that card and are now always visible (previously Start Day / Open Logs / End Day were mutually exclusive based on log state). No other buttons changed. The shared inner bar still shows on DailyPriorities and DailyPlan.legacy. See <a href="/Documentation/changelog/2026-08-13-daily-plan-remove-duplicate-action-card">the full note</a>.</p>
 
 

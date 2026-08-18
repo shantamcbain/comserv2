@@ -109,15 +109,27 @@
 <script src="/static/js/HealthMonitor.js" defer></script>
 [% END %]
 
-<!-- Admin Dashboard JS -->
+<!-- Hardware Monitor JS (charts + auto-refresh; V2 external module) -->
+[% IF c.request.uri.match('/admin/hardware_monitor') %]
+<script src="/static/js/hardware-monitor.js?v=[% cv %]" defer></script>
+[% END %]
 [% IF c.request.uri.match('/admin') %]
 <script src="/static/js/admin-dashboard.js?v=[% cv %]" defer></script>
+[% END %]
+
+<!-- Logging: live system_log row-count ticker during dedupe -->
+[% IF c.request.uri.match('/admin/logging') %]
+<script src="/static/js/logging-dedupe.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Schema Compare JS -->
 [% IF c.request.uri.match('/admin/schema_compare') %]
 <script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
 [% END %]
+
+<!-- Shared "operation in progress" overlay — auto-binds to any
+     form[data-busy-on-submit]; safe to load globally (no-ops without the attr). -->
+<script src="/static/js/common/scan-progress.js?v=[% cv %]" defer></script>
 
 <!-- Git Dashboard JS -->
 <!-- Loaded AFTER the shared ai-chat module block (below) on purpose:
@@ -159,6 +171,10 @@
      git-dashboard.js calls ComservChat.modelSelect.init() from its
      DOMContentLoaded handler. With `defer`, scripts run in document order. -->
 [% IF c.request.uri.match('/admin/git') %]
+<!-- Canonical shared diff widget (git_worktree_merge_plan §3.5). Loads BEFORE
+     git-dashboard.js so ComservGitDiff exists when bindFileDiff() runs. -->
+<script src="/static/js/git-diff-viewer.js?v=[% cv %]" defer></script>
+<link rel="stylesheet" href="/static/css/components/git-diff-viewer.css?v=[% cv %]">
 <script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
 <script>
     // Give the git dashboard the same canonical catalog (with price_* / tier)
@@ -171,12 +187,18 @@
 
 [% IF c.request.uri.match('/ai2/editing_widget_popup') %]
 <script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
+<!-- Canonical shared diff widget — must precede file-diff.js so
+     ComservGitDiff exists when the AI2 "Changed Files / Diff" action runs. -->
+<script src="/static/js/git-diff-viewer.js?v=[% cv %]" defer></script>
+<link rel="stylesheet" href="/static/css/components/git-diff-viewer.css?v=[% cv %]">
 <script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/sidebar-toggle.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/git-review.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/file-diff.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/project-tree.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/chat.js?v=[% cv %]" defer></script>
 [% END %]
 
@@ -311,17 +333,6 @@
         title="Open AI2 Code Editor (v2) — edits the current page source">
     ✏️ AI Editor
 </button>
-[% END %]
-
-[%# Chat with AI button - lower right (hidden inside the AI2 editor popup/window) %]
-[% IF c.session.user_id && !c.request.uri.match('/ai2/') %]
-<a href="#"
-   onclick="if(window.openChat) window.openChat(); return false;"
-   class="btn btn-success btn-sm"
-   style="position:fixed; bottom:24px; right:24px; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.3); border-radius:20px;"
-   title="Chat with AI">
-    💬 Chat with AI
-</a>
 [% END %]
 
 [%# ---------------------------------------------------------------------------

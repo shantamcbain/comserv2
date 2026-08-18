@@ -7,6 +7,8 @@
    page_version = "0.10"
    last_updated = "Sun Aug 09 2026"
    site_specific = "false"
+   project_id = "47"
+   project_code = "Doc"
 %]
 [% PageVersion = 'Documentation/DocumentationTtTemplate.tt,v 0.10 2026/08/09 hermes-agent Exp shanta - Self-compliant: no inline CSS; class-based theme styling; RULE reminder added' %]
 [% IF c.session.debug_mode == 1 %]
@@ -65,14 +67,18 @@
     here — add shared classes to documentation.css instead. #%]
 
 <div class="container">
-    <h1 class="doc-h1">Documentation Page Title</h1>
-
-    <div class="doc-muted last-updated">
-        Last Updated: 2025-10-15 |
-        Version: 0.02 |
-        Author: [Author Name] |
-        Status: [Status]
-    </div>
+    [%# Shared, META-driven page header (title + site/role/updated/project links +
+        Documentation Home / Suggest Edit). Mirrors the .md viewer header so every
+        doc page renders identically. Data comes from the Documentation controller
+        stash (META block + request context). See admin/documentation/_doc_header.tt. %]
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Documentation Page Title'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
 
     <!-- TABLE OF CONTENTS SECTION -->
     <div id="toc" class="row doc-toc">

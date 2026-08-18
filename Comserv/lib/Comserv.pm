@@ -8,6 +8,21 @@ use FindBin '$Bin';
 use Comserv::Util::Logging;
 use Comserv::Util::ConfigDatabaseInit;
 
+# ── Timezone fix (2026-08-14) ─────────────────────────────────────────────
+# The web container runs with TZ=UTC (see docker-compose.yml), but the owner
+# operates in America/Los_Angeles (PDT). DateTime->now therefore returned the
+# server's UTC "today" (one day ahead in the evening), which made calendar
+# "today" highlighting land on the wrong day. Pin the process timezone to the
+# owner's local zone so all "today" computations match the user's wall clock.
+# Overridable via $ENV{TZ} (already-respected by DateTime) so containers can
+# still set their own. POSIX::tzset makes the change live for the process.
+BEGIN {
+    unless ($ENV{TZ}) {
+        $ENV{TZ} = 'America/Los_Angeles';
+        eval { require POSIX; POSIX::tzset(); };
+    }
+}
+
 # Initialize the logging system
 BEGIN {
     Comserv::Util::Logging->init();

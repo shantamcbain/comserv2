@@ -99,6 +99,16 @@ sub _extract_md_metadata {
     # Default roles for admin category
     $meta->{roles} = 'admin,developer';
 
+    # Parse project linkage (RULE P1 — a plan must be linked to a project) so the
+    # shared doc header can render a "Project: #id (CODE)" link. These appear as
+    # plain "project_id = \"NNN\"" / "project_code = \"CODE\"" lines in .md docs.
+    if ($content =~ /project_id\s*=\s*["']?(\d+)["']?/i) {
+        $meta->{project_id} = $1;
+    }
+    if ($content =~ /project_code\s*=\s*["']?([A-Za-z0-9_-]+)["']?/i) {
+        $meta->{project_code} = $1;
+    }
+
     return $meta;
 }
 

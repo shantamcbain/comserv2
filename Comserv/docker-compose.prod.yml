@@ -68,11 +68,20 @@ services:
       - comserv2_cache:/tmp/comserv/cache
       - comserv2_temp:/tmp/comserv/temp
       - comserv2_themes:/opt/comserv/root/themes
+      # The two MUTABLE subdirs of the static tree must be writable + persistent
+      # so theme_definitions.json and generated theme CSS survive redeploys
+      # without a host bind (which shadows the baked assets / makes them :ro).
+      # Both stay INSIDE root/static, so no code-path change is needed. Seed once
+      # from the image-baked root/static/config/theme_definitions.json at deploy.
+      - comserv2_theme_config:/opt/comserv/root/static/config
+      - comserv2_theme_css:/opt/comserv/root/static/css/themes
       - comserv2_whisper_venv:/opt/comserv/whisper_venv
       - comserv2_cpan_cache:/root/.cpan
-      # Legacy bind mounts — use STATIC_SRC/LEGACY_STATIC_SRC env vars to
-      # override source path (for workstation use the repo's root/ dirs)
-      - ${STATIC_SRC:-/root/static}:/opt/comserv/root/static
+      # Static assets (CSS/JS/images) are baked into the image at build time
+      # under /opt/comserv/root/static. Do NOT bind-mount a host dir over them:
+      # the prod host /root/static is empty and shadows the baked assets, which
+      # breaks ALL CSS. The image's static tree serves directly.
+      # (Workstation dev can re-enable via STATIC_SRC if live-editing is needed.)
       - ${LEGACY_STATIC_SRC:-/root/LegacyStaticPages}:/opt/comserv/root/LegacyStaticPages
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]

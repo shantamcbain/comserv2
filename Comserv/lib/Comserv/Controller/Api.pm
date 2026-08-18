@@ -1,6 +1,6 @@
 package Comserv::Controller::Api;
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use JSON::MaybeXS;
 use DateTime;
 use Digest::SHA qw(sha256_hex);
@@ -1498,12 +1498,22 @@ sub api_project_update :Path('project/update') :Args(0) {
 
 sub _todo_to_hash {
     my ($self, $todo) = @_;
-    
+
+    # Resolve the attached project via the existing belongs_to(project)
+    # relationship so API/AI-agent callers see the SAME project name + link
+    # the web detail page renders (record.project.name ->
+    # /project/details?project_id=<id>), instead of only a raw project_id.
+    my $project = $todo->project;
+    my $project_name = $project ? $project->name : undef;
+    my $project_link = $project ? "/project/details?project_id=" . $project->id : undef;
+
     return {
         id => $todo->id,
         subject => $todo->subject,
         description => $todo->description,
         project_id => $todo->project_id,
+        project_name => $project_name,
+        project_link => $project_link,
         start_date => $todo->start_date,
         due_date => $todo->due_date,
         priority => $todo->priority,

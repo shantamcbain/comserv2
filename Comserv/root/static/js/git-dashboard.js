@@ -129,6 +129,103 @@
             appendTarget(postForms[p]);
         }
 
+        // --- "Develop Servers" card: Open / Stop / Restart for zenflow worktree
+        // branches. BOUND BEFORE the `if (!form) return` guard below, because the
+        // working-tree form is absent when the tree is clean — otherwise these
+        // buttons would never get wired and clicking would do nothing. Open opens the
+        // branch in a new window (like the old planning-tab button) AND shows a live
+        // console you can copy the command from; Stop/Restart POST to
+        // /admin/branch_server_action and surface the JSON result.
+
+        // Live console modal elements (resolved once).
+        var devConsole    = document.getElementById('git-dev-console');
+        var devTitle      = document.getElementById('git-dev-console-title');
+        var devCmd        = document.getElementById('git-dev-console-cmd');
+        var devLog        = document.getElementById('git-dev-console-log');
+        var devOpenLink   = document.getElementById('git-dev-console-open');
+        var devPollTimer  = null;
+
+        function closeDevConsole() {
+            if (devConsole) { devConsole.style.display = 'none'; }
+            if (devPollTimer) { clearInterval(devPollTimer); devPollTimer = null; }
+        }
+
+        function showDevConsole(branch, port, url, cmd) {
+            if (!devConsole) { return; }
+            devTitle.textContent = 'Starting ' + branch + ' on port ' + port + '…';
+            devCmd.textContent = cmd || '';
+            devLog.textContent = '(waiting for output…)';
+            devLog.scrollTop = 0;
+            if (devOpenLink && url) { devOpenLink.href = url; devOpenLink.style.display = ''; }
+            else if (devOpenLink) { devOpenLink.style.display = 'none'; }
+            devConsole.style.display = 'flex';
+
+            if (devPollTimer) { clearInterval(devPollTimer); }
+            devPollTimer = setInterval(function () {
+                fetch('/admin/branch_server_log?branch=' + encodeURIComponent(branch), {
+                    credentials: 'same-origin'
+                }).then(function (r) { return r.text(); })
+                  .then(function (text) {
+                      if (devLog) {
+                          devLog.textContent = text || '(no output yet)';
+                          devLog.scrollTop = devLog.scrollHeight;
+                      }
+                  })
+                  .catch(function () {});
+            }, 1500);
+        }
+
+        // Close buttons inside the console.
+        var devCloseBtns = document.querySelectorAll('[data-git-dev-console-close]');
+        for (var dc = 0; dc < devCloseBtns.length; dc++) {
+            devCloseBtns[dc].addEventListener('click', closeDevConsole);
+        }
+
+        function branchServerAction(action, branch, port, btn) {
+            if (!branch || !port) return;
+            if (btn) { btn.disabled = true; var prev = btn.textContent; }
+            var body = new URLSearchParams();
+            body.set('action', action);
+            body.set('branch', branch);
+            body.set('port', port);
+            fetch('/admin/branch_server_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); })
+              .then(function (res) {
+                  if (!res || res.ok == 0) {
+                      throw new Error((res && res.error) || (action + ' failed'));
+                  }
+              })
+              .catch(function (err) { window.alert(action + ' ' + branch + ': ' + err.message); })
+              .finally(function () { if (btn) { btn.disabled = false; btn.textContent = prev; } });
+        }
+
+        var devServerButtons = document.querySelectorAll('.git-dev-actions button');
+        for (var ds = 0; ds < devServerButtons.length; ds++) {
+            devServerButtons[ds].addEventListener('click', function () {
+                var el = this;
+                var openBranch = el.getAttribute('data-open-branch');
+                if (openBranch) {
+                    var url = el.getAttribute('data-url') || '';
+                    var cmd = el.getAttribute('data-cmd') || '';
+                    // Old behaviour first: open the branch in a new browser window.
+                    if (url) { window.open(url, '_blank'); }
+                    // Then show the console so you can watch boot / copy the command.
+                    showDevConsole(openBranch, el.getAttribute('data-port'), url, cmd);
+                    branchServerAction('open', openBranch, el.getAttribute('data-port'), el);
+                    return;
+                }
+                var action = el.getAttribute('data-branch-action');
+                if (action) {
+                    branchServerAction(action, el.getAttribute('data-branch'),
+                        el.getAttribute('data-port'), el);
+                }
+            });
+        }
+
         if (!form) { return; }
 
         var opField        = form.querySelector('[data-git-op-field]');
@@ -216,6 +313,30 @@
             }
             return false;
         }
+
+        // --- Per-file "Diff" buttons: open the file in the AI2 editor (which
+        // shows its own diff via ai2editor/file-diff.js), instead of the inline
+        // panel. The AI2 editor accepts ?file=<repo-relative path> and loads it.
+        // (git_worktree_merge_plan §3.5 — the editor is one of the widget's
+        // consumer surfaces; we route the user there rather than re-render.)
+        function bindFileDiff() {
+            var diffBtns = document.querySelectorAll('[data-git-view-diff]');
+            for (var i = 0; i < diffBtns.length; i++) {
+                diffBtns[i].addEventListener('click', function () {
+                    var path = this.getAttribute('data-git-view-diff');
+                    if (!path) return;
+                    // git status is repo-relative (e.g. "Comserv/root/..."), but
+                    // the AI2 editor + /ai2/file_diff expect app-relative paths
+                    // (e.g. "root/..."), so strip the leading app-dir segment.
+                    path = path.replace(/^Comserv\//, '');
+                    var url = '/ai2/editing_widget_popup?file=' + encodeURIComponent(path);
+                    window.open(url, 'AI2Editor',
+                        'width=1250,height=820,resizable=yes,scrollbars=yes,' +
+                        'menubar=no,toolbar=no,status=no,noopener,noreferrer');
+                });
+            }
+        }
+        bindFileDiff();
 
         var actionButtons = form.querySelectorAll('[data-git-action]');
         for (var b = 0; b < actionButtons.length; b++) {

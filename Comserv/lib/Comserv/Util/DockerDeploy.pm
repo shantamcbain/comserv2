@@ -244,322 +244,49 @@ sub deploy {
     my ($self) = @_;
     my $repo   = $self->{repo};
     my $target = $self->{target};
-    my $mode   = $self->{mode};
-    my $image_tag = $self->{image_tag} || 'latest';
 
-    # IMGDEP (2026-08-04): single source of truth for the image repository ref.
-    # Defaults to the LAN-local registry; the caller may override (e.g. to pass
-    # the real LAN host). This is the name compose builds AND tags AND pushes.
-    my $repo_ref = $self->{image_repo};
+    # ─────────────────────────────────────────────────────────────────────────
+    # SINGLE DEPLOY ENGINE: delegate to script/deploy.sh (canonical_deploy).
+    # This guarantees EVERY caller (dashboard buttons, Planning.pm staging
+    # worker, cron) runs the IDENTICAL pipeline: pre-SSH self-sync of changed
+    # scripts -> build -> push -> pull exact digest -> compose up --no-build
+    # --force-recreate (old container renamed first, so NO name conflict) ->
+    # health gate with rollback -> real success/failure. No divergent Perl
+    # build/pull/recreate logic remains. Debuggable: deploy.sh writes a
+    # structured log and returns a non-zero exit on any failure.
+    # ─────────────────────────────────────────────────────────────────────────
+    my $log_fh = $self->{log_fh};
+    my $log_line = sub { my ($msg) = @_; $self->_log($msg); };
 
-    $self->_log("=== DEPLOY STARTED (target=$target, trigger=$self->{trigger}, mode=$mode, repo=$repo_ref) ===");
+    # Map this object target -> deploy.sh target/host.
+    my $node = $target;
+    if ($target eq 'production1')        { $node = '192.168.1.126'; }
+    elsif ($target eq 'production2')      { $node = '192.168.1.127'; }
+    elsif ($target eq 'staging-4000' || $target eq 'local-staging') { $node = 'local'; }
+    elsif ($target eq 'workstation')      { $node = 'local'; }
+    elsif ($target eq 'local-test' || $target eq 'web-dev')         { $node = 'local'; }
+    else                                 { $node = '192.168.1.126'; }
 
-    # 0. Map target to service/container/port/ssh details
-    my ($service, $container_name, $port, $compose_files, $ssh_prefix, $is_remote);
-    if ($target eq 'staging-4000' || $target eq 'local-staging') {
-        $service        = 'web-staging';
-        $container_name = 'comserv-web-staging';
-        $port           = 4000;
-        $compose_files  = '-f docker-compose.yml';
-        $is_remote      = 0;
-    } elsif ($target eq 'web-dev') {
-        $service        = 'web-dev';
-        $container_name = 'comserv-web-dev';
-        $port           = 3000;
-        $compose_files  = '-f docker-compose.yml';
-        $is_remote      = 0;
-    } elsif ($target eq 'workstation') {
-        # Workstation: identical to production but runs locally
-        $service        = 'web-prod';
-        $container_name = 'comserv2-web-prod';
-        $port           = 5000;
-        $compose_files  = '-f docker-compose.yml -f docker-compose.prod.yml';
-        $is_remote      = 0;
-        # Use repo root/static directory instead of /root/static (root-owned, may be empty)
-        $ENV{STATIC_SRC}       = "$repo/root/static";
-        # LegacyStaticPages is not in the repo — use default /root/LegacyStaticPages
-    } elsif ($target eq 'local-test') {
-        # Build & test only — build the prod image, quick verify, no deploy
-        $service        = 'web-prod';
-        $container_name = 'comserv2-web-prod';
-        $port           = 5000;
-        $compose_files  = '-f docker-compose.yml -f docker-compose.prod.yml';
-        $is_remote      = 0;
-        # Use repo static dir for verification
-        $ENV{STATIC_SRC}       = "$repo/root/static";
-    } else {
-        $service        = 'web-prod';
-        $container_name = 'comserv2-web-prod';
-        $port           = 5000;
-        $is_remote      = 1;
-        my $ssh_host    = $target eq 'production1' ? '192.168.1.126'
-                        : $target eq 'production2' ? '192.168.1.127'
-                        : 'localhost';
-        my $ssh_pass    = $ENV{SSHPASS} || '';
-        # Resolve SSH user from credentials file, falling back to ubuntu
-        my $ssh_user    = 'ubuntu';
-        my $cred_file   = $ENV{HOME} . '/.comserv/secrets/ssh_credentials.json';
-        if (-f $cred_file) {
-            open(my $cfh, '<', $cred_file) or warn "Can't open $cred_file: $!";
-            my $json_str = do { local $/; <$cfh> };
-            close $cfh;
-            my $creds = decode_json($json_str);
-            if ($creds->{$target} && $creds->{$target}->{ssh_user}) {
-                $ssh_user = $creds->{$target}->{ssh_user};
-            }
-        }
-        $self->{ssh_user} = $ssh_user;
-        $ssh_prefix     = $ssh_pass
-                    ? "sshpass -e ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host"
-                    : "ssh -o StrictHostKeyChecking=no $ssh_user\@$ssh_host";
-        # SCP prefix for transferring compose files
-        my $scp_prefix  = $ssh_pass
-            ? "sshpass -e scp -o StrictHostKeyChecking=no"
-            : "scp -o StrictHostKeyChecking=no";
-        # Sync compose files to remote BEFORE using them
-        $compose_files  = $self->_sync_compose_to_remote($repo, $scp_prefix, $ssh_host);
-    }
+    $log_line->("=== DEPLOY STARTED (target=$target -> node=$node, trigger=$self->{trigger}) ===");
+    $log_line->("Delegating to single engine: script/deploy.sh --deploy-to-node $node");
 
-    # ── PUSH ONLY mode ──
-    # Just push the existing image without rebuilding
-    if ($mode eq 'push-only') {
-        $self->_log("Step 2: Pushing $repo_ref to registry (no rebuild)...");
-        my $rc = $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
-        if ($rc != 0) {
-            $self->_log("✗ Push failed (exit=$rc).");
-            $self->_save_deploy_log($container_name, $target);
-            return 0;
-        }
-        $self->_log("=== PUSH ONLY COMPLETE (target=$target) ===");
-        $self->_log("The running $container_name is untouched. Use 'Pull & Deploy' on the production server to deploy this image.");
-        $self->_save_deploy_log($container_name, $target);
-        return 1;
-    }
+    my $cmd = "cd '$repo' && TRIGGER_SOURCE='$self->{trigger}' script/deploy.sh --deploy-to-node $node 2>&1";
+    my $out = `$cmd`;
+    my $rc  = $? >> 8;
+    if ($log_fh) { print $log_fh $out; $log_fh->flush(); }
+    $self->_log($out) if !$log_fh;
 
-    # ── VOLUME CREATION (always runs for all modes) ──
-    # 1. Create all required volumes — local for dev, remote for production
-    #    Always runs so that pull-deploy mode works on hosts with no volumes yet.
-    $self->_log("Step 1: Ensuring all required volumes exist...");
-    if ($is_remote) {
-        $self->ensure_all_required_volumes_remote($ssh_prefix);
-    } else {
-        $self->ensure_all_required_volumes($repo);
-    }
-
-    # ── BUILD & PUSH phase (steps 2-3) ──
-    # Runs in full and build-push modes. Skipped in pull-deploy mode.
-    if ($mode ne 'pull-deploy') {
-        # 2. Build (local) then push if remote
-        my $git_hash = `cd $repo && git rev-parse --short HEAD 2>/dev/null` || 'unknown';
-        chomp $git_hash;
-
-        # NOTE: builds run from the WORKING TREE, not from git. The git hash is
-        # used only as a tag + in version.json (where a dirty tree is flagged
-        # with +local). We do NOT refuse dirty-tree builds — compose builds
-        # whatever is on disk, and refusing would block building uncommitted
-        # fixes. Traceability of "which build is live" is handled at pull-deploy
-        # time, not by blocking the build here.
-
-        # Regenerate version.json so the in-app footer (pagetop.tt via Root.pm)
-        # reports the REAL build. Previously this was a stale committed file
-        # (frozen at 2026-06-26/91c59fc5), so every image lied about its build —
-        # making build/push/pull verification impossible from the browser.
-        eval {
-            my $branch = `cd $repo && git rev-parse --abbrev-ref HEAD 2>/dev/null` || 'unknown';
-            chomp $branch;
-            my $dirty = `cd $repo && git status --porcelain 2>/dev/null` ? '+local' : '';
-            my $build_utc = do {
-                my @t = gmtime(time);
-                sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
-            };
-            my $host = `hostname -f 2>/dev/null` || `hostname` || 'unknown';
-            chomp $host;
-            if (open my $vf, '>', "$repo/version.json") {
-                printf $vf '{"branch":"%s","commit":"%s%s","build_date":"%s","build_host":"%s"}',
-                    $branch, $git_hash, $dirty, $build_utc, $host;
-                close $vf;
-                $self->_log("  version.json regenerated: $branch\@$git_hash$dirty $build_utc");
-            } else {
-                $self->_error("  WARNING: could not write version.json: $!");
-            }
-        };
-
-        $self->_log("Step 2: Building $service container (commit=$git_hash, repo=$repo_ref)" . ($self->{no_cache} ? ' [--no-cache]' : '') . "...");
-        my $no_cache_flag = $self->{no_cache} ? ' --no-cache' : '';
-        my $build_rc = $self->_stream_command("cd $repo && docker compose $compose_files build --progress plain$no_cache_flag $service 2>&1");
-        if ($build_rc != 0) {
-            $self->_log("✗ Build failed (exit=$build_rc) — aborting. Running container $container_name is untouched.");
-            $self->_save_deploy_log($container_name, $target);
-            return 0;
-        }
-        # Tag with git hash for traceability (single source of truth = image_repo)
-        system("docker tag $repo_ref:latest $repo_ref:$git_hash 2>/dev/null");
-        $self->_log("Step 2b: Build finished (commit=$git_hash).");
-        $self->{_git_hash} = $git_hash;
-
-        if ($is_remote) {
-            $self->_docker_login($is_remote, $ssh_prefix) or do {
-                $self->_error("Aborting: registry login failed before push.");
-                $self->_save_deploy_log($container_name, $target);
-                return 0;
-            };
-            $self->_log("Step 3: Pushing $repo_ref to registry...");
-            $self->_stream_command("cd $repo && docker compose $compose_files push $service 2>&1");
-            $self->_log("Step 3b: Push finished.");
-        }
-
-        # In build-push mode, stop here — don't touch the running container
-        if ($mode eq 'build-push') {
-            $self->_log("=== BUILD & PUSH COMPLETE (target=$target, image=$git_hash) ===");
-            $self->_log("The running $container_name is untouched. Use 'Pull & Deploy' on the production server to deploy this image.");
-            $self->_save_deploy_log($container_name, $target);
-            return 1;
-        }
-    }
-
-    # ── PULL & DEPLOY phase (steps 3-6) ──
-    # Runs in full and pull-deploy modes.
-    # In pull-deploy mode we do NOT build locally — we rely on the image already
-    # being on Docker Hub (pushed by a prior build-push run).
-
-    # 3. Backup old container (handles "no container" gracefully)
-    $self->_log("Step 4: Backing up old $container_name...");
-    $self->{_svc_port} = $port;   # used by _backup_container for the visible backup container's port mapping
-    $self->{_svc_container} = $container_name;  # used by rollback to rename the failed container
-    my $backup  = $self->_backup_container($container_name, $is_remote, $ssh_prefix);
-
-    # ── eval wrap: exception safety from here through health check ──
-    # $backup is a committed IMAGE ref (bk-<name>:<ts>) or undef if no container
-    # existed. The old container still runs under its real name until compose
-    # --force-recreate replaces it in place. On failure, rollback retags the
-    # backup image and compose-recreates from it (honoring undef gracefully).
-    my $healthy = 0;
-    my $deploy_ok = eval {
-        # 4. Rotate backup images — keep 5 locally, but only 3 on remote
-        #    (production1) targets to conserve disk space there.
-    $self->_prune_backups($container_name, ($is_remote ? 3 : 5), $is_remote, $ssh_prefix);
-
-    # 4.5 (Backups are images now — no bk- containers to stop. compose
-    #      --force-recreate below replaces the old container in place.)
-
-    # 5. Start new container on remote (pull then up) or local (up only)
-    if ($is_remote) {
-        $self->_docker_login($is_remote, $ssh_prefix) or do {
-            $self->_error("Aborting: registry login failed before pull on $target.");
-            die "docker login failed";
-        };
-        $self->_log("Step 5: Pulling image on $target and starting $service...");
-        my $remote_cmd = sprintf(
-            'cd %s && ( docker compose %s pull %s 2>&1 ) && ( docker compose %s up -d --force-recreate %s 2>&1 )',
-            $self->{_remote_compose_dir}, $compose_files, $service,
-            $compose_files, $service
-        );
-        $self->_stream_command("$ssh_prefix \"$remote_cmd\"");
-    } else {
-        $self->_docker_login($is_remote, $ssh_prefix) or do {
-            $self->_error("Aborting: registry login failed before local pull.");
-            die "docker login failed";
-        };
-        $self->_log("Step 5: Starting $service on localhost...");
-        $self->_stream_command("cd $repo && docker compose $compose_files up -d --force-recreate $service 2>&1");
-    }
-
-    # 5.5 Rename compose-created container to expected name
-    # Docker Compose names containers as <project>_<service>_<index> (e.g.
-    # comserv-deploy_web-prod_1), but our health-check, rollback, and
-    # diagnostics code expects the canonical name ($container_name).
-    {
-        my $compose_ps = $is_remote
-            ? `$ssh_prefix \"cd $self->{_remote_compose_dir} && docker compose $compose_files ps --format '{{.Names}}' 2>/dev/null | head -1\"`
-            : `cd $repo && docker compose $compose_files ps --format '{{.Names}}' 2>/dev/null | head -1`;
-        chomp $compose_ps;
-        if ($compose_ps && $compose_ps ne $container_name) {
-            $self->_rename_container($compose_ps, $container_name, $is_remote, $ssh_prefix, 0);
-        } elsif ($compose_ps) {
-            $self->_log("  Container name already matches $container_name");
-        } else {
-            $self->_log("  WARNING: Could not determine compose container name – continuing with assumed name $container_name");
-        }
-    }
-
-    # 6. Health-check loop (up to 90 seconds)
-    $self->_log("Step 6: Waiting for $container_name to become healthy...");
-    $healthy = 0;
-    for my $i (1..45) {
-        my $health;
-        if ($is_remote) {
-            $health = `$ssh_prefix "docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'"`;
-        } else {
-            $health = `docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'`;
-        }
-        chomp $health;
-        $health =~ s/^\s+|\s+$//g;
-        $self->_log("  [$i/45] health=$health");
-        if ($health =~ /healthy/i) { $healthy = 1; last; }
-        # Fallback: try direct HTTP to the port (covers missing Docker HEALTHCHECK)
-        if ($is_remote) {
-            my $http_ok = system("$ssh_prefix \"curl -sf --max-time 3 http://localhost:$port/ >/dev/null 2>&1\"") == 0;
-            if ($http_ok) { $healthy = 1; last; }
-        } else {
-            my $http_ok = system("curl -sf --max-time 3 http://localhost:$port/ >/dev/null 2>&1") == 0;
-            if ($http_ok) { $healthy = 1; last; }
-        }
-        # Check if container is actually running (not exited)
-        if ($i % 10 == 0) {
-            my $state;
-            if ($is_remote) {
-                $state = `$ssh_prefix "docker inspect --format='{{.State.Status}}' $container_name 2>/dev/null || echo 'unknown'"`;
-            } else {
-                $state = `docker inspect --format='{{.State.Status}}' $container_name 2>/dev/null || echo 'unknown'`;
-            }
-            chomp $state;
-            $state =~ s/^\s+|\s+$//g;
-            $self->_log("  State check: container status=$state");
-            if ($state ne 'running' && $state ne 'starting' && $state ne 'unknown') {
-                $self->_log("  ✗ Container is not running (status=$state) — aborting health check.");
-                last;
-            }
-        }
-        sleep 2;
-    }
-    };  # end eval
-    if ($@) {
-        $self->_log("CRITICAL: Runtime error during deploy phase: $@");
-        # Restore from backup image if we had one (retag → compose recreate).
-        if ($backup) {
-            $self->_log("Emergency rollback: restoring backup image $backup...");
-            my $ok = $self->_restore_backup_image($backup, $service, $compose_files, $repo, $is_remote, $ssh_prefix);
-            $self->_log($ok ? "  Rollback succeeded." : "  ROLLBACK_FAILED");
-        } else {
-            $self->_log("No backup image to restore (fresh deploy).");
-        }
-        $self->_log("=== DEPLOY FAILED (target=$target) - emergency rollback ===");
-        $self->_save_deploy_log($container_name, $target);
-        return 0;
-    }
-
-    if ($healthy) {
-        $self->_log("✅ New $container_name is healthy" . ($backup ? " – backup image $backup retained." : " (fresh deploy, no backup)."));
+    if ($rc == 0) {
         $self->_log("=== DEPLOY COMPLETE (target=$target) ===");
-        $self->_save_deploy_log($container_name, $target);
+        $self->_save_deploy_log('comserv2-web-prod', $target);
         return 1;
     } else {
-        $self->_log("✗ New $container_name failed health check – rolling back.");
-        if ($backup) {
-            my $ok = $self->_restore_backup_image($backup, $service, $compose_files, $repo, $is_remote, $ssh_prefix);
-            if ($ok) {
-                $self->_error("Deploy FAILED on $target – rolled back to backup image $backup.");
-            } else {
-                $self->_error("Deploy FAILED on $target – ROLLBACK from $backup also failed. Check container logs.");
-            }
-        } else {
-            $self->_error("Deploy FAILED on $target – no backup image to roll back to. Check container logs.");
-        }
-        $self->_log("=== DEPLOY FAILED (target=$target) ===");
-        $self->_save_deploy_log($container_name, $target);
+        $self->_error("DEPLOY FAILED (target=$target, rc=$rc). Container unchanged / rolled back. Check deploy.sh log.");
+        $self->_save_deploy_log('comserv2-web-prod', $target);
         return 0;
     }
 }
+
 
 # Backward-compatible wrappers
 sub deploy_to_target_safe { my $self = shift; $self->deploy; }

@@ -4,42 +4,22 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,coordination"
-   page_version = "1.2"
-   last_updated = "Sat Aug 01 2026 (v1.3)"
+   page_version = "1.4"
+   last_updated = "Sat Aug 15 2026 (v1.4 — META project link + TOC nav + new-tab bridge)"
    site_specific = "false"
+   project_id = "138"
+   project_code = "PLANNING"
 %]
 [% PageVersion = 'Documentation/MASTER_PLAN.tt,v 1.2 2026/08/01 shanta Exp - Horizontal themed nav (top-menu classes), dense layout' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<style>
-/* Scoped density + themed nav for this doc (layout only; colours come from theme vars / top-menu classes) */
-.masterplan { color: var(--text-color); }
-.masterplan h1 { margin: 0 0 6px; }
-.masterplan h2 { margin: 16px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--border-color); }
-.masterplan h3 { margin: 12px 0 4px; }
-.masterplan h4 { margin: 10px 0 3px; color: var(--text-color); }
-.masterplan p  { margin: 5px 0; }
-.masterplan ul, .masterplan ol { margin: 5px 0 5px 20px; padding: 0; }
-.masterplan li { margin: 2px 0; }
-.masterplan pre.masterplan-pre { font-size: 0.8em; line-height: 1.3; margin: 6px 0; padding: 8px; background: var(--table-header-bg, #f5f5f5); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); overflow-x: auto; }
-.masterplan table.data-table td, .masterplan table.data-table th { padding: 4px 8px; }
-.masterplan .notice { margin: 10px 0; padding: 8px 12px; border-left: 4px solid var(--info-color, #17a2b8); background: var(--info-bg, #d1ecf1); border-radius: 4px; }
-/* Navigation reuses the real top-menu classes so it is theme-identical */
-.masterplan-nav { margin: 12px 0; background: var(--bg-secondary, #f8f9fa); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 8px; }
-.masterplan-nav .submenu-section { border-top: 1px solid var(--border-color); padding-top: 4px; margin-top: 4px; }
-.masterplan-nav .submenu-section:first-child { border-top: none; padding-top: 0; margin-top: 0; }
-.masterplan-nav .nav-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0; }
-.masterplan-nav .menu-item { font-size: 0.88em; padding: 4px 10px; }
-.masterplan .back-to-top { margin-top: 16px; display: inline-block; }
-</style>
-
 <div class="container masterplan">
 
 <h1 id="top">Comserv2 — Master Plan (coordinator)</h1>
 
-<div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+<div class="last-updated doc-muted">
     Created: 2026-08-01 &nbsp;|&nbsp; Version: 1.2 &nbsp;|&nbsp; Status: COORDINATOR
 </div>
 
@@ -55,42 +35,111 @@ sub-plan remains the authoritative spec for its own work.</p>
     routes in the index below.
 </div>
 
-<!-- On this page: horizontal nav built from the SAME classes as the top application menu -->
-<nav class="masterplan-nav" aria-label="Master plan sections">
-    <div class="submenu-section">
-        <span class="submenu-section-title">Waves</span>
-        <div class="nav-row">
-            <a class="menu-item" href="#wave0">0 · Source-of-truth</a>
-            <a class="menu-item" href="#wave1">1 · Defects</a>
-            <a class="menu-item" href="#wave2">2 · Chat/AI</a>
-            <a class="menu-item" href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
-            <a class="menu-item" href="#wave3">3 · 3D/Sign</a>
-            <a class="menu-item" href="#wave4">4 · Inventory</a>
-            <a class="menu-item" href="#wave5">5 · Polish</a>
-        </div>
-    </div>
-    <div class="submenu-section">
-        <span class="submenu-section-title">Reference</span>
-        <div class="nav-row">
-            <a class="menu-item" href="#principles">Principles</a>
-            <a class="menu-item" href="#deps">Deps</a>
-            <a class="menu-item" href="#glance">Glance</a>
-            <a class="menu-item" href="#decisions">Decisions</a>
-            <a class="menu-item" href="#index">Index</a>
-        </div>
-    </div>
-    <div class="submenu-section">
-        <span class="submenu-section-title">Git</span>
-        <div class="nav-row">
-            <a class="menu-item" href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">Git Refactor</a>
-            <a class="menu-item" href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">Worktree Create</a>
-            <a class="menu-item" href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">Merge-to-Main</a>
-            <a class="menu-item" href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">Branch Sync</a>
-        </div>
-    </div>
-</nav>
+<div class="doc-info">
+    <strong>Vocabulary (read this first):</strong> this master plan follows the
+    <a href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]\">Planning Language Standard</a>.
+    One word per level, no synonyms:
+    <strong>PROJECT = PLAN</strong> (a <code>projects</code> DB row; the doc is just its view) ·
+    <strong>PHASE = SUB-PROJECT</strong> (a <code>projects</code> row with <code>parent_id</code>) ·
+    <strong>STEP = TODO</strong> (a <code>todos</code> row) ·
+    <strong>GATE = done-when</strong> (verified before the next phase).
+    The "Groups" below are only <em>dependency-ordered groupings of real projects</em> — every card is labelled by its
+    <strong>project code</strong>, never by a group number. The DB (<code>/api/projects</code>, <code>/api/todos</code>)
+    is the source of truth; this page and the plan docs are two views of the same rows.
+</div>
 
-<h2 id="principles">0. Guiding principles (apply to every wave)</h2>
+[%# ── TOC / Quick Navigation (DocumentationTtTemplate compliant) ──
+    In-tab navigation is broken inside the planning tab (todo #2107: MASTER_PLAN
+    links do a full-page nav that destroys the tab's JS state). Until that is
+    fixed, give a single "open in its own browser tab" bridge (target=_blank, so
+    it cannot break the parent tab) AND a standard in-page TOC for when the doc
+    is opened standalone. Both use canonical theme classes / var(--*) only. %]
+<div id="toc" class="row doc-toc">
+    <div class="col-100">
+        <h2 class="doc-h2">Quick Navigation</h2>
+        <p class="doc-muted">Jump to section (in this page):</p>
+        <div class="doc-navrow">
+            <a href="#principles" class="doc-navlink">Principles</a>
+            <a href="#deps" class="doc-navlink">Deps</a>
+            <a href="#roadmap" class="doc-navlink">Roadmap</a>
+            <a href="#glance" class="doc-navlink">Glance</a>
+            <a href="#decisions" class="doc-navlink">Decisions</a>
+            <a href="#index" class="doc-navlink">Index</a>
+            <a href="#w6" class="doc-navlink">Infra/Security</a>
+            <a href="#wv2" class="doc-navlink">V2 Migration</a>
+        </div>
+        <p>
+            <a href="/Documentation/MASTER_PLAN" target="_blank" rel="noopener" class="doc-navlink">↗ Open this plan in its own browser tab</a>
+            <span class="doc-muted"> — use this while in-tab navigation is being fixed (todo #2107); it keeps the planning tab intact.</span>
+        </p>
+        <p class="doc-backtop"><a href="#top">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+[%# ── SiteName-scoped context (CSC = coordinating site; other sites see their own slice) ── %]
+[% SET mp_sitename = c.stash.SiteName || c.session.SiteName || 'CSC' %]
+[% SET mp_is_csc   = (mp_sitename == 'CSC') ? 1 : 0 %]
+<div class="mp-site-context [% mp_is_csc ? 'mp-site-context-csc' : 'mp-site-context-other' %]">
+    [% IF mp_is_csc %]
+        <strong>Coordinating site (CSC):</strong> this is the full cross-site master plan. All other sites'
+        roadmaps roll up into the groups below.
+    [% ELSE %]
+        <strong>[% mp_sitename | html %] site view:</strong> the sequence below is the shared Comserv2 roadmap
+        coordinated by CSC. Work specific to <strong>[% mp_sitename | html %]</strong> is tracked under its own
+        projects and plans; items that don't apply to this site can be skipped. A site may maintain a dedicated
+        master-plan section — if one exists it is linked from here.
+    [% END %]
+</div>
+
+<p class="mp-back-link"><a href="/planning/daily#master-plan">← Back to Daily Plan · MASTER PLAN</a></p>
+
+<!-- On this page: horizontal nav built from the SAME theme-compliant doc classes -->
+<div class="doc-toc">
+    <div class="doc-h3">Projects by dependency</div>
+    <div class="doc-navrow">
+        <a class="doc-navlink" href="#wave0">0 · Source-of-truth</a>
+        <a class="doc-navlink" href="#wave1">1 · Defects</a>
+        <a class="doc-navlink" href="#wave2">2 · Chat/AI</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
+        <a class="doc-navlink" href="#wave3">3 · 3D/Sign</a>
+        <a class="doc-navlink" href="#wave4">4 · Inventory</a>
+        <a class="doc-navlink" href="#wave5">5 · Polish</a>
+    </div>
+    <div class="doc-h3">Reference</div>
+    <div class="doc-navrow">
+        <a class="doc-navlink" href="#principles">Principles</a>
+        <a class="doc-navlink" href="#deps">Deps</a>
+        <a class="doc-navlink" href="#glance">Glance</a>
+        <a class="doc-navlink" href="#decisions">Decisions</a>
+        <a class="doc-navlink" href="#index">Index</a>
+    </div>
+    <div class="doc-h3">Monitoring</div>
+    <div class="doc-navrow">
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/HardwareMonitorPlan') %]">Hardware Monitor &amp; Watchdog</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/LOG-AUDIT-PLAN') %]">Logging Audit</a>
+    </div>
+    <div class="doc-h3">Git</div>
+    <div class="doc-navrow">
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">Git Refactor</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">Worktree Create</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">Merge-to-Main</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">Branch Sync</a>
+    </div>
+    <div class="doc-h3">Planning</div>
+    <div class="doc-navrow">
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/DailyPlanSystem') %]">Planning System</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningQueueRoleVisibilityPlan') %]">Focus Queue Visibility</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/ProjectsPageFilterSearchPriorityPlan') %]">Projects Filter/Search</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/ProjectOwnershipBillingPlan') %]">Ownership/Billing</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/TodoCardUnificationPlan') %]">Todo Card Unify</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/TodoListPageDisplayTuningPlan') %]">Todo List Ranking</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Language Standard</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]">Autonomous Agents</a>
+    </div>
+</div>
+
+<div class="card" id="principles"><details><summary class="card-header">0. Guiding principles (apply to every group)</summary>
+<div class="card-body">
 <p>Hard constraints carried from <code>.hermes.md</code> / <code>.ai-policy.md</code>.</p>
 <ul>
     <li><strong>No app restart, no edit to <code>comserv_server.pl</code></strong> (Shanta owns lifecycle). Verify with <code>perl -c</code>, targeted scripts, SQL inspection, <code>node --check</code>.</li>
@@ -102,8 +151,11 @@ sub-plan remains the authoritative spec for its own work.</p>
     <li><strong>File-size discipline:</strong> Controllers ≤2,000 soft; Util/Model/Result ≤800 soft.</li>
 </ul>
 
-<h2 id="deps">1. Dependency map (what blocks what)</h2>
-<pre class="masterplan-pre">
+</div>
+</details></div>
+<div class="card" id="deps"><details><summary class="card-header">1. Dependency map (what blocks what)</summary>
+<div class="card-body">
+<div class="doc-codebox"><pre>
 Schema System Plan ──────────────┬──&gt; Inventory/Order/Fulfillment (all schema)
         │                        ├──&gt; Voice Inspection P1 (audio_file_id cols)
         │                        ├──&gt; 3D Browse Gallery (showcase col)
@@ -116,17 +168,31 @@ Herb Sign Generator (Phase 0) ──&gt; 3D Browse Gallery (openscad thumbnail r
 AI2 Migration (Phases 0-2 DONE) ─┬──&gt; local-chat.js V2 refactor
         │                        ├──&gt; Voice Inspection P3 (BeeMaster prompt)
         │                        └──&gt; AI2 Phase 4/5 cutover
-Git Subsystem Refactor ──────────&gt; Deployment Workflow Plan (git_pull owner)
-Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (backup/rollback)
-3D Browse Gallery (print queue) ─&gt; Inventory Plan Phase 6 (production dispatch)</pre>
+Git Subsystem Refactor ──────────> Deployment Workflow Plan (git_pull owner)
+Deploy backup/rename fix ────────> Deployment Workflow Plan (backup/rollback)
+3D Browse Gallery (print queue) ──> Inventory Plan Phase 6 (production dispatch)
+Schema System Plan (W0.1) ──────> Hardware Monitor & Watchdog (decimal(15,3) widen deployed via DBIC Result-class)
+Deployment Workflow Plan (W5.2) ─> Hardware Monitor & Watchdog (prod-container rebuild to ship run/watchdog bypass + column)
+Planning System cluster (proj #138 PLANNING) ──┬──> ImplementationPlan: Todo API + DB-driven Master Plan sync (W5 API/automation)
+        │                                      ├──> PlanningQueueRoleVisibilityPlan (234 PLAN-QUEUE): rejoins the two /planning vs /todo access gates
+        │                                      ├──> ProjectsPageFilterSearchPriorityPlan (235 PROJ-UI): priority col real + filter/search
+        │                                      ├──> ProjectOwnershipBillingPlan (236 PROJ-OWN): site ownership vs visibility vs billing
+        │                                      ├──> TodoCardUnificationPlan (240 TODOLIST-UI): one theme-compliant card everywhere
+        │                                      └──> TodoListPageDisplayTuningPlan (240 TODOLIST-UI): single ranking algo vs Focus Queue
+DailyPlanSystem.tt ─────────────────────────────> the planning-system feature doc (projects/todos/daily plan schema, controller, views)</pre></div>
 <p><strong>Independent / parallelizable:</strong> Git refactor, Security hardening, Static::Simple absolute include_path.</p>
 
-<h2 id="roadmap">2. The ordered roadmap (waves)</h2>
+</div>
+</details></div>
+<div class="card" id="roadmap"><details><summary class="card-header">2. The ordered roadmap (projects by dependency)</summary>
+<div class="card-body">
 
-<h3 id="wave0">WAVE 0 — Establish the two "single source of truth" mechanisms</h3>
+<div class="card" id="wave0"><details><summary class="card-header">GROUP 0 — Establish the two "single source of truth" mechanisms</summary>
+<div class="card-body">
 <p>Everything else references these. Do them first; both are largely additive / non-breaking, and independent of each other.</p>
 
-<h4 id="w0-1">W0.1 — Schema System Plan</h4>
+<div class="card" id="w0-1"><details><summary class="card-header">W0.1 — Schema System Plan</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">/Documentation/SchemaSystemPlan</a> (ACTIVE)</p>
 <ul>
     <li>Done: problem framed; <code>Util::SchemaCompare</code> exists; <code>/admin</code> endpoints work via DDL-from-Result; <code>INFRA_NAMING.md</code> states .20 primary / .198 backup.</li>
@@ -143,7 +209,10 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li>Gate: G0 + G1 land so other plans can add columns via schema-compare.</li>
 </ul>
 
-<h4 id="w0-2">W0.2 — Documentation System Standard</h4>
+</div>
+</details></div>
+<div class="card" id="w0-2"><details><summary class="card-header">W0.2 — Documentation System Standard</summary>
+<div class="card-body">
 <p>AI ref: <a href="[% c.uri_for('/Documentation/plans/documentation-system-standard') %]">/Documentation/plans/documentation-system-standard</a> (.md, PLANNING 4/22)</p>
 <ul>
     <li>Done: <code>STANDARD.md</code> written (S1–S7); summary in <code>.hermes.md</code>; superseded-plan banners; <code>load_from_db</code> additive reader added; <code>categories</code> JSON column pending (schema-compare).</li>
@@ -151,16 +220,25 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li>Gate: Steps 15–18 done so Inventory Phase 7 + AI2 citations follow the standard.</li>
 </ul>
 
-<h3 id="wave1">WAVE 1 — Stabilize production-visible defects (parallel, mostly independent)</h3>
+</div>
+</details></div>
+</div>
+</details></div>
+<div class="card" id="wave1"><details><summary class="card-header">GROUP 1 — Stabilize production-visible defects (parallel, mostly independent)</summary>
+<div class="card-body">
 
-<h4 id="w1-1">W1.1 — Deploy backup/rename fix</h4>
+<div class="card" id="w1-1"><details><summary class="card-header">W1.1 — Deploy backup/rename fix</summary>
+<div class="card-body">
 <p>AI ref: <a href="[% c.uri_for('/Documentation/plans/deploy-backup-rename-fix') %]">/Documentation/plans/deploy-backup-rename-fix</a> (.md, INVESTIGATION DONE; fix identified)</p>
 <ul>
     <li>Remaining: 2-file, 4-line naming edit in <code>Comserv/docker-compose.yml</code> + <code>DockerDeploy.pm</code> (standardize <code>comserv2-web-staging/dev</code> → <code>comserv-web-*</code>), + the backup-by-<code>docker commit</code> fix (compose destroys <code>docker rename</code> backups). <strong>Gated on user approval + build finished</strong>. One-time <code>docker rename</code> of running <code>comserv2-web-*</code> containers.</li>
     <li>Gate: before any deploy-reliant plan assumes backups work.</li>
 </ul>
 
-<h4 id="w1-2">W1.2 — Git Subsystem Refactor (finish)</h4>
+</div>
+</details></div>
+<div class="card" id="w1-2"><details><summary class="card-header">W1.2 — Git Subsystem Refactor (finish)</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">/Documentation/GitSubsystemRefactorPlan</a> (A / A2 / A3 / C DONE)</p>
 <ul>
     <li>Done: duplicate route removed; V2 CSS (<code>admin-*</code> components); <code>chdir</code> class-of-bug fixed; <code>Comserv::Util::Git</code> service with whitelisted <code>git -C</code> runner; read + write helpers ported; dashboard skeleton; G.1/G.2/G.5/G.10/G.11 done.</li>
@@ -168,23 +246,36 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li>Gate: D/E/F done before Deployment Workflow Plan reuses git_pull owner.</li>
 </ul>
 <p>Branch-sync extension: <a href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">/Documentation/BranchSyncConflictAssist</a> &mdash; adds bidirectional main&harr;worktree merge, multi-branch update, AI conflict assist, and an open-commit warning on branch creation (sub-plan of W1.2; tracking todo #2006 in project 3).</p>
+<p>Merge-to-Main review workflow: <a href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">/Documentation/git_worktree_merge_plan</a> &mdash; the AI-commit-in-worktree &rarr; human-review-merges-on-main workflow (shared single diff-view component + mandatory human audit approval before AI code enters main). <strong>All git todos live in project <a href="/project/details?project_id=238">#238 (GITWT-NEW)</a></strong>; tracking todos <a href="/todo/details?record_id=1991">#1991</a> (diff view+edit), <a href="/todo/details?record_id=1993">#1993</a> (human approve gate), <a href="/todo/details?record_id=1992">#1992</a> (AI/human provenance). The &sect;3.5 shared-widget decision is implemented as <code>root/static/js/git-diff-viewer.js</code> &mdash; see <a href="[% c.uri_for('/Documentation/changelog/2026-08-15-git-diff-viewer-shared-widget') %]">2026-08-15 — shared diff widget built</a> (and the <a href="[% c.uri_for('/Documentation/changelog/2026-08-15-git-file-diff-no-index-fix') %]">file_diff '--no-index' refused fix</a>). Pairs with the worktree-creation backend plan <a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">git_worktree_new_system_plan</a>.</p>
 
-<h4 id="w1-3">W1.3 — Security Hardening Free Stack</h4>
+</div>
+</details></div>
+<div class="card" id="w1-3"><details><summary class="card-header">W1.3 — Security Hardening Free Stack</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/security_hardening_free_stack') %]">/Documentation/security_hardening_free_stack</a> (tools installed)</p>
 <ul>
     <li>Done: gitleaks pre-commit hook; <code>security_scan.sh</code> unified scan; trivy image scan opt-in.</li>
     <li>Remaining: remediate <code>cpan-audit</code> advisories (CryptX, Catalyst Session/Auth, DBI, Starman, …) via <code>cpanm</code> upgrades, tracked through the existing error-audit / todo workflow. Can run in background.</li>
 </ul>
 
-<h4 id="w1-4">W1.4 — Static::Simple absolute include_path (defence-in-depth)</h4>
+</div>
+</details></div>
+<div class="card" id="w1-4"><details><summary class="card-header">W1.4 — Static::Simple absolute include_path (defence-in-depth)</summary>
+<div class="card-body">
 <ul>
     <li>Cross-cutting hardening flagged in Git plan A3.4 / H.6. Three live <code>chdir</code> bugs remain outside Git: <code>Admin.pm:463</code>, <code>Coding.pm:102</code>, <code>ProxyManager.pm:2160</code> — same restart-required CSS/JS 404 class.</li>
     <li>Fix: one line in <code>Comserv.pm</code> — <code>include_path =&gt; [ $c-&gt;path_to('root') ]</code> (absolute) so no <code>chdir</code> anywhere can 404 all assets. Touches core app config; its own reviewed commit.</li>
 </ul>
 
-<h3 id="wave2">WAVE 2 — Chat / AI unification (large, JS-heavy; unblocks voice features)</h3>
+</div>
+</details></div>
+</div>
+</details></div>
+<div class="card" id="wave2"><details><summary class="card-header">GROUP 2 — Chat / AI unification (large, JS-heavy; unblocks voice features)</summary>
+<div class="card-body">
 
-<h4 id="w2-1">W2.1 — AI2 Migration (Phases 3–5) + local-chat.js V2 refactor (combined "Chat Unification")</h4>
+<div class="card" id="w2-1"><details><summary class="card-header">W2.1 — AI2 Migration (Phases 3–5) + local-chat.js V2 refactor (combined "Chat Unification")</summary>
+<div class="card-body">
 <ul>
     <li>Route: <a href="[% c.uri_for('/Documentation/ai2_migration_plan') %]">/Documentation/ai2_migration_plan</a> (Phases 0–2 DONE)</li>
     <li>AI ref: <a href="[% c.uri_for('/Documentation/plans/local-chat-v2-refactor') %]">/Documentation/plans/local-chat-v2-refactor</a> (.md, NOT STARTED)</li>
@@ -200,23 +291,35 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li>Gate: done before Voice Inspection.</li>
 </ul>
 
-<h4 id="w2-2">W2.2 — Voice Inspection Plan</h4>
+</div>
+</details></div>
+<div class="card" id="w2-2"><details><summary class="card-header">W2.2 — Voice Inspection Plan</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/VoiceInspectionPlan') %]">/Documentation/VoiceInspectionPlan</a> (ACTIVE)</p>
 <ul>
     <li>Depends on: Schema System (W0.1) for P1 columns; AI2 (W2.1) for BeeMaster prompt + chat JS voice module.</li>
     <li>Order: <strong>P1</strong> link inspection↔voice/transcript (schema-compare) → <strong>P2</strong> fix <code>voice_recordings</code> double-row + pairing (B1/B2) → <strong>P3</strong> per-box/frame capture + standalone feeding action → <strong>P4</strong> queen health graph (chart JS) → <strong>P5</strong> frame inventory lifecycle.</li>
 </ul>
 
-<h3 id="wave3">WAVE 3 — 3D / Sign / Shop foundation (depends on Schema; enables Inventory)</h3>
+</div>
+</details></div>
+</div>
+</details></div>
+<div class="card" id="wave3"><details><summary class="card-header">GROUP 3 — 3D / Sign / Shop foundation (depends on Schema; enables Inventory)</summary>
+<div class="card-body">
 
-<h4 id="w3-1">W3.1 — Herb Sign Generator (remaining)</h4>
+<div class="card" id="w3-1"><details><summary class="card-header">W3.1 — Herb Sign Generator (remaining)</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/HerbSignGeneratorPlan') %]">/Documentation/HerbSignGeneratorPlan</a> (Phase 0 + A DONE)</p>
 <ul>
     <li>Done: openscad service container (8083); <code>Util::SignGenerator</code> + <code>Controller::SignGenerator</code>; STL/PDF/JSON stored; <code>printing_3d_models</code> row per sign. <em>The openscad service built here is reused by 3D Browse Gallery.</em></li>
     <li>Remaining: browse shows stored sign PDF + populate <code>thumbnail_url</code>; single 3MF multi-object export; sign list UI + reprint; <code>printing_3d_jobs</code> integration; queue routing (next-available printer, Moonraker adapter).</li>
 </ul>
 
-<h4 id="w3-2">W3.2 — 3D Browse Gallery Plan</h4>
+</div>
+</details></div>
+<div class="card" id="w3-2"><details><summary class="card-header">W3.2 — 3D Browse Gallery Plan</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/3dBrowseGalleryPlan') %]">/Documentation/3dBrowseGalleryPlan</a> (PLANNING)</p>
 <ul>
     <li>Depends on: Schema System (W0.1) for <code>showcase</code> column; openscad service (W3.1, done) for thumbnails.</li>
@@ -224,9 +327,15 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li>Gate: print queue established here feeds Inventory Phase 6.</li>
 </ul>
 
-<h3 id="wave4">WAVE 4 — Inventory / Order / Fulfillment (largest track)</h3>
+</div>
+</details></div>
+</div>
+</details></div>
+<div class="card" id="wave4"><details><summary class="card-header">GROUP 4 — Inventory / Order / Fulfillment (largest track)</summary>
+<div class="card-body">
 
-<h4 id="w4-1">W4.1 — Inventory / Order / Fulfillment Plan</h4>
+<div class="card" id="w4-1"><details><summary class="card-header">W4.1 — Inventory / Order / Fulfillment Plan</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/InventoryOrderFulfillmentPlan') %]">/Documentation/InventoryOrderFulfillmentPlan</a> (PLANNING, reviewed)</p>
 <ul>
     <li>Depends on: Schema System (W0.1) for all §8 columns; 3D Browse Gallery (W3.2) print queue for Phase 6; existing accounting (CoA/GL/Invoice) + Payment (PayPal extraction).</li>
@@ -240,21 +349,36 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li>Phases: 0 review → 1 split <code>Inventory.pm</code> + extract <code>Util::Inventory::Cart</code> → 2 <code>OrderOptions</code> + <code>/order/configure</code> → 3 schema + <code>Checkout</code> writes order+invoice → 4 payment registry (PayPal extract, consignment) → 5 <code>OrderQueue</code> + <code>Picking</code> + <code>/orders/*</code> → 6 <code>Production</code> contract + 3D provider → 7 docs (expand <code>Inventory/index.tt</code> §4.3, update <code>features/3d_printing.tt</code>, supersede LedgerSMB doc per doc standard S6).</li>
 </ul>
 
-<h3 id="wave5">WAVE 5 — Cross-cutting / lower-priority / polish</h3>
+</div>
+</details></div>
+</div>
+</details></div>
+<div class="card" id="wave5"><details><summary class="card-header">GROUP 5 — Cross-cutting / lower-priority / polish</summary>
+<div class="card-body">
 
-<h4 id="w5-1">W5.1 — Controller Routing Standardization</h4>
+<div class="card" id="w5-1"><details><summary class="card-header">W5.1 — Controller Routing Standardization</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/ControllerRoutingStandardization') %]">/Documentation/ControllerRoutingStandardization</a> (MCoop pilot done)</p>
 <ul><li>Apply chained routing to remaining controllers (CSC, USBM, BMaster, …) as each is touched. Incremental.</li></ul>
 
-<h4 id="w5-2">W5.2 — Deployment Workflow Plan</h4>
+</div>
+</details></div>
+<div class="card" id="w5-2"><details><summary class="card-header">W5.2 — Deployment Workflow Plan</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/DeploymentWorkflowPlan') %]">/Documentation/DeploymentWorkflowPlan</a> (PLANNING)</p>
 <ul><li>Depends on: Git refactor (W1.2) + deploy backup fix (W1.1). Build: dev server (3001), branch UI, testing indicators, prod deploy with backup/rollback. Also see the canonical <a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">Deploy Workflow</a> procedure doc.</li></ul>
 
-<h4 id="w5-3">W5.3 — Daily Plan Layout Redesign</h4>
+</div>
+</details></div>
+<div class="card" id="w5-3"><details><summary class="card-header">W5.3 — Daily Plan Layout Redesign</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/DAILY_PLAN_LAYOUT_REDESIGN') %]">/Documentation/DAILY_PLAN_LAYOUT_REDESIGN</a> (design spec)</p>
 <ul><li>Doc-UI nicety; independent. Phase 1 structure when convenient.</li></ul>
 
-<h4 id="w5-4">W5.4 — Infrastructure &amp; migration plan cluster (.tt)</h4>
+</div>
+</details></div>
+<div class="card" id="w5-4"><details><summary class="card-header">W5.4 — Infrastructure &amp; migration plan cluster (.tt)</summary>
+<div class="card-body">
 <p>These are the in-app <code>.tt</code> plans — listed here so they are not orphaned from the coordinator:</p>
 <ul>
     <li><a href="[% c.uri_for('/Documentation/Phase0KubernetesReadinessPlan') %]">Phase 0 Kubernetes Readiness Plan</a></li>
@@ -267,96 +391,203 @@ Deploy backup/rename fix ────────&gt; Deployment Workflow Plan (
     <li><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">Schema Naming Standardization Plan</a></li>
     <li><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">Canonical Deploy Workflow (production)</a></li>
     <li><a href="[% c.uri_for('/Documentation/DevelopmentPlans') %]">Development Plans initiative index</a> (links the older DOC-ROLE-001 etc.)</li>
+    <li><a href="[% c.uri_for('/Documentation/HardwareMonitorPlan') %]">Hardware Monitor &amp; Watchdog Plan</a> (proj #258, HWMON — watchdog false-CRITICAL fix on :3001 + prod rollout)</li>
+    <li><a href="[% c.uri_for('/Documentation/LOG-AUDIT-PLAN') %]">Logging Audit Plan</a> (proj #265, LOG-AUDIT — cron-driven logging-coverage audit; enforces .ai-policy.md §7 error-audit trail)</li>
 </ul>
 <p><strong>Note:</strong> the K8s/DB-migration family overlaps heavily with the Schema System Plan (W0.1) and the deploy backup fix (W1.1). Treat them as <em>in-flight infrastructure initiatives</em> that W0.1/W1.1/W5.2 must stay consistent with — not a separate wave to schedule from scratch. The migration plans are large and partly superseded by the canonical Deploy Workflow; confirm which are still live before investing.</p>
 
-<h4 id="w5-5">W5.5 — OFT Remaining Todos</h4>
+</div>
+</details></div>
+<div class="card" id="w5-5"><details><summary class="card-header">W5.5 — OFT Remaining Todos</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/OFT_Remaining_Todos') %]">/Documentation/OFT_Remaining_Todos</a> (7 of 11)</p>
 <ul><li><strong>Likely superseded</strong> by AI2 <code>Provider/Ollama.pm</code> + <code>Model::AI2::*</code>. Decision needed: close as obsolete or fold any still-wanted piece into AI2.</li></ul>
 
-<h4 id="w5-6">W5.6 — Database System Improvement Plan (remainder)</h4>
+</div>
+</details></div>
+<div class="card" id="w5-6"><details><summary class="card-header">W5.6 — Database System Improvement Plan (remainder)</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/DatabaseSystemImprovementPlan') %]">/Documentation/DatabaseSystemImprovementPlan</a></p>
 <ul><li>Its schema portions are <strong>superseded by the Schema System Plan</strong> (W0.1). Only Phase 1–3 function-reference documentation remains (low priority, no code).</li></ul>
 
-<h4 id="w5-7">W5.7 — Resource Tracking Integration</h4>
+</div>
+</details></div>
+<div class="card" id="w5-7"><details><summary class="card-header">W5.7 — Resource Tracking Integration</summary>
+<div class="card-body">
 <p>Route: <a href="[% c.uri_for('/Documentation/RESOURCE_TRACKING_INTEGRATION') %]">/Documentation/RESOURCE_TRACKING_INTEGRATION</a></p>
 <ul><li>Marked "Complete Integration Ready" — just deploy controller + start daemon.</li></ul>
 
-<h2 id="glance">3. Sequencing at a glance</h2>
-<pre class="masterplan-pre">
-WAVE 0   W0.1 Schema System ─┐
+</div>
+</details></div>
+</div>
+</details></div>
+</div>
+</details></div>
+<div class="card" id="w5-8"><details><summary class="card-header">Project #138 PLANNING — Planning System (sub-projects: 234 / 235 / 236 / 240)</summary>
+<div class="card-body">
+<p><strong>PROJECT = #138 PLANNING.</strong> The in-app planning system (projects, todos, daily plan, Focus Queue) and its phases — each phase is a SUB-PROJECT (with <code>parent_id = 138</code>). The plan docs below are the readable views of those rows.</p>
+<ul>
+    <li><strong>Planning System (feature doc)</strong> — <a href="[% c.uri_for('/Documentation/DailyPlanSystem') %]\">/Documentation/DailyPlanSystem</a> (the projects/todos/daily-plan schema, controller, views).</li>
+    <li><strong>Implementation Plan: Todo API &amp; DB-driven Master Plan sync</strong> — <a href="[% c.uri_for('/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync') %]\">/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync</a> (REST API + auto-synced master plan).</li>
+    <li><strong>Phase (proj 234 PLAN-QUEUE)</strong> — <a href="[% c.uri_for('/Documentation/PlanningQueueRoleVisibilityPlan') %]\">/Documentation/PlanningQueueRoleVisibilityPlan</a> (server-side role gate for Focus Queue).</li>
+    <li><strong>Phase (proj 235 PROJ-UI)</strong> — <a href="[% c.uri_for('/Documentation/ProjectsPageFilterSearchPriorityPlan') %]\">/Documentation/ProjectsPageFilterSearchPriorityPlan</a> (priority col real + filter/search).</li>
+    <li><strong>Phase (proj 236 PROJ-OWN)</strong> — <a href="[% c.uri_for('/Documentation/ProjectOwnershipBillingPlan') %]\">/Documentation/ProjectOwnershipBillingPlan</a> (ownership vs visibility vs billing).</li>
+    <li><strong>Phase (proj 240 TODOLIST-UI)</strong> — <a href="[% c.uri_for('/Documentation/TodoCardUnificationPlan') %]\">/Documentation/TodoCardUnificationPlan</a> (one theme-compliant card everywhere).</li>
+    <li><strong>Phase (proj 240 TODOLIST-UI)</strong> — <a href="[% c.uri_for('/Documentation/TodoListPageDisplayTuningPlan') %]\">/Documentation/TodoListPageDisplayTuningPlan</a> (single ranking algo across views).</li>
+</ul>
+<p><strong>Note:</strong> the phases above are in-flight SUB-PROJECTS of #138 (parent_id = 138). The Implementation Plan's "DB-driven Master Plan" is a separate concept from this coordinator doc — keep both consistent. All are tracked in the DB under #138; this card is just their index.</p>
+
+</div>
+</details></div>
+<div class="card" id="w6"><details><summary class="card-header">GROUP 6 — Infrastructure, Security & active product tracks (reconciled from DB)</summary>
+<div class="card-body">
+<p><strong>Coverage note:</strong> the DB <code>projects</code> table holds <strong>237</strong> project rows (primary Ency, 192.168.1.20:3307). This master plan previously indexed only a hand-picked subset (~54). The projects below are <em>active, strategic projects that were missing or buried</em> in the earlier version, surfaced by reconciling against the DB. The DB (<code>/api/projects</code>) remains the source of truth; this plan is a curated view of the important active work, not the full 237.</p>
+<ul>
+    <li><strong>Infrastructure HA</strong> — <a href="[% c.uri_for('/Documentation/K3S_APP_HA_PLAN') %]\">/Documentation/K3S_APP_HA_PLAN</a> (proj <a href="/project/details?project_id=202">#202 INFRA-HA</a>; phases A–H = #244–251). Previously buried in the infra-cluster bullet; now its own track. <em>HA for the whole app — foundational, not "polish".</em></li>
+    <li><strong>Security System</strong> — proj <a href="/project/details?project_id=201">#201 SECURITY</a>. Parent of AUTH-EVO.</li>
+    <li><strong>Authentication &amp; Credential Architecture</strong> — <a href="[% c.uri_for('/Documentation/AuthenticationEvolutionPlan') %]\">/Documentation/AuthenticationEvolutionPlan</a> (proj <a href="/project/details?project_id=243">#243 AUTH-EVO</a>, child of #201).</li>
+    <li><strong>Theme Compliance Audit</strong> — proj <a href="/project/details?project_id=221">#221 THEME-AUDIT</a> (phases P1–P5 = #222–226). Cross-cutting; affects every template. Admin authoring guide: <a href="[% c.uri_for('/Documentation/CssThemes') %]">/Documentation/CssThemes</a>. Theme Management System (proj <a href="/project/details?project_id=77">#77</a>) tracks the theme roadmap — DB-backed themes + more built-in themes from professional sources (todos #2133 / #2134).</li>
+    <li><strong>AI Model Presentation &amp; Selection</strong> — <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a> (proj <a href="/project/details?project_id=252">#252 AIMPS</a>; phases P1–P5 = #253–257, P5 = v2 migration sync).</li>
+    <li><strong>Point System</strong> — proj <a href="/project/details?project_id=193">#193 PointSystem</a> (phases: Ledger #194, Currency #195, PayPal #196, Spend #197, Crypto #198).</li>
+    <li><strong>3D Printing System</strong> — proj <a href="/project/details?project_id=206">#206 3DPRINT</a> (phases: Inv&amp;Accounting #207, File Mgmt #208, Sales #209).</li>
+    <li><strong>Buy &amp; Sell Marketplace</strong> — proj <a href="/project/details?project_id=210">#210</a> (7 phases #211–217).</li>
+    <li><strong>Git Worktree System (new backend)</strong> — <a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]\">/Documentation/git_worktree_new_system_plan</a> (proj <a href="/project/details?project_id=238">#238 GITWT-NEW</a>).</li>
+    <li><strong>Docker Image Credential Leak Remediation</strong> — proj <a href="/project/details?project_id=239">#239 IMGSEC</a> (child of #201 SECURITY).</li>
+    <li><strong>Production Server Health</strong> — proj <a href="/project/details?project_id=200">#200 PROD-HEALTH</a>.</li>
+</ul>
+<p><strong>Still intentionally excluded from the curated index:</strong> ~180 mostly legacy/duplicate/Requested rows (e.g. multiple <code>HelpDesk</code>/<code>UI/UX</code>/<code>Happygnome</code> duplicates, per-site equipment rows, <code>test</code>). These are real but not strategic; the DB is the place to see them all.</p>
+
+</div>
+</details></div>
+<div class="card" id="wv2"><details><summary class="card-header">V2 MIGRATION — own top-level project (#259 V2MIG, phases #260–264)</summary>
+<div class="card-body">
+<p><strong>PROJECT = #259 V2MIG.</strong> Migrate the whole app to the v2 standard (theme classes only / no inline style, <code>js_load.tt</code> data-* delegation / no inline script, documentation-standard S1-S7). It touches almost every <code>.tt</code> and many other files, so it is tracked as its own top-level plan — not a sub-bullet of another project.</p>
+<p><strong>Root-cause note:</strong> the current dire state of the <strong>Planning page</strong> is a direct symptom of v2 work NOT being done at the same time the page was improved. Phase <strong>V2MIG-P4 (#263)</strong> therefore fixes the Planning page <em>in lockstep</em> with its v2 migration — they ship together.</p>
+<ul>
+    <li><strong>V2 Migration Plan</strong> (human view) — <a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]\">/Documentation/V2MigrationPlan</a></li>
+    <li><strong>V2 Migration Plan</strong> (AI/assistant .md) — <a href="[% c.uri_for('/Documentation/V2MigrationPlan_md') %]\">/Documentation/V2MigrationPlan_md</a></li>
+    <li><strong>V2MIG-P1</strong> (#260) Baseline &amp; standards gate · <strong>V2MIG-P2</strong> (#261) core/shared .tt · <strong>V2MIG-P3</strong> (#262) feature .tt waves · <strong>V2MIG-P4</strong> (#263) Planning page in lockstep · <strong>V2MIG-P5</strong> (#264) sync &amp; verify.</li>
+</ul>
+<p>Note: former <code>AIMPS-P5 (#257) "v2 Migration &amp; Documentation Sync"</strong> is now absorbed by V2MIG-P5; #257 left in place (not deleted) to avoid destroying history.</p>
+
+</div>
+</details></div>
+<div class="card" id="glance"><details><summary class="card-header">3. Sequencing at a glance</summary>
+<div class="card-body">
+<div class="doc-codebox"><pre>
+GROUP 0   W0.1 Schema System ─┐
          W0.2 Doc Standard  ─┤
                              │
-WAVE 1   W1.1 Deploy backup fix ─┐  (parallel, independent)
+GROUP 1   W1.1 Deploy backup fix ─┐  (parallel, independent)
          W1.2 Git refactor ──────┤
          W1.3 Security scan ─────┤
          W1.4 Static::Simple abs ┘
                              │
-WAVE 2   W2.1 AI2 P3-5 + local-chat V2 ─┐
+GROUP 2   W2.1 AI2 P3-5 + local-chat V2 ─┐
          W2.2 Voice Inspection (P1-5) ──┘  (after W0.1 + W2.1)
                              │
-WAVE 3   W3.1 Herb Sign (remaining) ─┐
+GROUP 3   W3.1 Herb Sign (remaining) ─┐
          W3.2 3D Browse Gallery ──────┘  (after W0.1; reuses W3.1 service)
                              │
-WAVE 4   W4.1 Inventory/Order/Fulfillment ── (after W0.1 + W3.2 + accounting)
+GROUP 4   W4.1 Inventory/Order/Fulfillment ── (after W0.1 + W3.2 + accounting)
                              │
-WAVE 5   Routing std, Deploy WF, Daily Plan, K8s/infra cluster,
-         OFT review, DB-doc remainder, Resource Tracking deploy</pre>
+GROUP 5   Routing std, Deploy WF, Daily Plan, K8s/infra cluster,
+         OFT review, DB-doc remainder, Resource Tracking deploy,
+         Planning System cluster (#138: DailyPlan, Todo API/DB Master Plan,
+         PLAN-QUEUE 234, PROJ-UI 235, PROJ-OWN 236, TODOLIST-UI 240)
+GROUP 5   Hardware Monitor & Watchdog (HWMON, #258) ─ after W0.1 + W5.2;
+         local :3001 fixed, prod :5000 mirror pending rebuild
+GROUP 5   Logging Audit (LOG-AUDIT, #265) ─ cron scan of system_log + code grep
+         for silent error swallowing; results page + "Run scan now"; table
+         deploy via schema-compare still pending
+GROUP 6   INFRA-HA (#202, A-H phases), SECURITY (#201) + AUTH-EVO (#243)
+         + IMGSEC (#239), THEME-AUDIT (#221), AIMPS (#252), PointSystem (#193),
+         3DPRINT (#206), Marketplace (#210), GITWT-NEW (#238), PROD-HEALTH (#200)
+         ─ reconciled from DB (237 projects); previously missing/buried
+V2 MIG   V2MIG (#259) + P1-P5 (#260-264) ─ own top-level project; P4 = Planning page
+         fixed IN LOCKSTEP with its v2 migration (root cause of planning-page rot)</pre></div>
 
-<h2 id="decisions">4. Open decisions needed from the user</h2>
+</div>
+</details></div>
+<div class="card" id="decisions"><details><summary class="card-header">4. Open decisions needed from the user</summary>
+<div class="card-body">
 <ol>
     <li><strong>Deploy backup/rename fix</strong> — approve the 4-line naming edit + the <code>docker commit</code> backup fix, after the current build finishes. Unblocks W1.1.</li>
     <li><strong>OFT Remaining Todos</strong> — confirm superseded by AI2 migration and close, or name any piece still wanted.</li>
-    <li><strong>Inventory start timing</strong> — Wave 4 (after 3D print queue) or start just Phase 0–1 (cart/Inventory.pm split) earlier, since that is independent of the 3D queue.</li>
+    <li><strong>Inventory start timing</strong> — Group 4 (after 3D print queue) or start just Phase 0–1 (cart/Inventory.pm split) earlier, since that is independent of the 3D queue.</li>
     <li><strong>Static::Simple absolute include_path</strong> — confirm the one-line core-config change (W1.4) is in scope now.</li>
     <li><strong>K8s/infra cluster</strong> — confirm which migration plans are still live (vs. superseded by the canonical Deploy Workflow) so the coordinator doesn't over-schedule them.</li>
 </ol>
 
-<h2 id="index">5. Index of all plans</h2>
-<table class="data-table" style="width: 100%; border-collapse: collapse;">
+</div>
+</details></div>
+<div class="card" id="index"><details><summary class="card-header">5. Index of all plans</summary>
+<div class="card-body">
+<table class="doc-table">
     <thead>
-        <tr style="background: var(--table-header-bg, #f5f5f5);">
-            <th style="text-align: left; border: 1px solid var(--border-color);">Plan</th>
-            <th style="text-align: left; border: 1px solid var(--border-color);">In-app (.tt)</th>
-            <th style="text-align: left; border: 1px solid var(--border-color);">AI ref (.md)</th>
+        <tr>
+            <th class="doc-th">Plan</th>
+            <th class="doc-th">In-app (.tt)</th>
+            <th class="doc-th">AI ref (.md)</th>
         </tr>
     </thead>
     <tbody>
-        <tr><td style="border:1px solid var(--border-color);">Schema System Plan</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">/Documentation/SchemaSystemPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Documentation System Standard</td><td style="border:1px solid var(--border-color);">—</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/plans/documentation-system-standard') %]">/Documentation/plans/documentation-system-standard</a></td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Deploy backup/rename fix</td><td style="border:1px solid var(--border-color);">—</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/plans/deploy-backup-rename-fix') %]">/Documentation/plans/deploy-backup-rename-fix</a></td></tr>
-        <tr><td style="border:1px solid var(--border-color);">local-chat.js V2 refactor</td><td style="border:1px solid var(--border-color);">—</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/plans/local-chat-v2-refactor') %]">/Documentation/plans/local-chat-v2-refactor</a></td></tr>
-        <tr><td style="border:1px solid var(--border-color);">3D Browse Gallery</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/3dBrowseGalleryPlan') %]">/Documentation/3dBrowseGalleryPlan</a></td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/plans/3d-browse-gallery') %]">/Documentation/plans/3d-browse-gallery</a></td></tr>
-        <tr><td style="border:1px solid var(--border-color);">AI2 Migration</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/ai2_migration_plan') %]">/Documentation/ai2_migration_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">AI Model Presentation &amp; Selection (AIMPS, proj 252)</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">/Documentation/AIModelPresentationPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Git Subsystem Refactor</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">/Documentation/GitSubsystemRefactorPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Git Worktree — new isolated-creation backend</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">/Documentation/git_worktree_new_system_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Git Worktree — AI-commit → human merge-to-main</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">/Documentation/git_worktree_merge_plan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Branch Sync &amp; Conflict Assist (sub-plan of Git refactor)</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">/Documentation/BranchSyncConflictAssist</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Security Hardening</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/security_hardening_free_stack') %]">/Documentation/security_hardening_free_stack</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Voice Inspection</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/VoiceInspectionPlan') %]">/Documentation/VoiceInspectionPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Herb Sign Generator</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/HerbSignGeneratorPlan') %]">/Documentation/HerbSignGeneratorPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Inventory/Order/Fulfillment</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/InventoryOrderFulfillmentPlan') %]">/Documentation/InventoryOrderFulfillmentPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Deployment Workflow</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/DeploymentWorkflowPlan') %]">/Documentation/DeploymentWorkflowPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Controller Routing Standardization</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/ControllerRoutingStandardization') %]">/Documentation/ControllerRoutingStandardization</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Daily Plan Layout Redesign</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/DAILY_PLAN_LAYOUT_REDESIGN') %]">/Documentation/DAILY_PLAN_LAYOUT_REDESIGN</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">OFT Remaining Todos</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/OFT_Remaining_Todos') %]">/Documentation/OFT_Remaining_Todos</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Database System Improvement (remainder)</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/DatabaseSystemImprovementPlan') %]">/Documentation/DatabaseSystemImprovementPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Resource Tracking Integration</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/RESOURCE_TRACKING_INTEGRATION') %]">/Documentation/RESOURCE_TRACKING_INTEGRATION</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Phase 0 K8s Readiness</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/Phase0KubernetesReadinessPlan') %]">/Documentation/Phase0KubernetesReadinessPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Production DB → K8s Migration</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN') %]">/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">K3s Production DB Migration Guide</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE') %]">/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Infrastructure Migration Amendment</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]">/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Docker &amp; K8s Migration Strategy</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Credentials Audit &amp; Plan</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">/Documentation/CREDENTIALS_AUDIT_AND_PLAN</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Gateway Plan</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Schema Naming Standardization</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">/Documentation/SchemaNamingStandardizationPlan</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Canonical Deploy Workflow</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">/Documentation/DEPLOY_WORKFLOW</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
-        <tr><td style="border:1px solid var(--border-color);">Development Plans index</td><td style="border:1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/DevelopmentPlans') %]">/Documentation/DevelopmentPlans</a></td><td style="border:1px solid var(--border-color);">—</td></tr>
+        <tr><td class="doc-td">Schema System Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">/Documentation/SchemaSystemPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Documentation System Standard</td><td class="doc-td">—</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/plans/documentation-system-standard') %]">/Documentation/plans/documentation-system-standard</a></td></tr>
+        <tr><td class="doc-td">Deploy backup/rename fix</td><td class="doc-td">—</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/plans/deploy-backup-rename-fix') %]">/Documentation/plans/deploy-backup-rename-fix</a></td></tr>
+        <tr><td class="doc-td">local-chat.js V2 refactor</td><td class="doc-td">—</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/plans/local-chat-v2-refactor') %]">/Documentation/plans/local-chat-v2-refactor</a></td></tr>
+        <tr><td class="doc-td"><strong>V2 Migration — Overview &amp; sub-project index</strong></td><td class="doc-td">—</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/plans/v2-migration-overview') %]">/Documentation/plans/v2-migration-overview</a></td></tr>
+        <tr><td class="doc-td">↳ Calendar V2 migration <em>(BLOCKING on V2)</em></td><td class="doc-td">—</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/plans/calendar-v2-migration') %]">/Documentation/plans/calendar-v2-migration</a></td></tr>
+        <tr><td class="doc-td">3D Browse Gallery</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/3dBrowseGalleryPlan') %]">/Documentation/3dBrowseGalleryPlan</a></td><td class="doc-td"><a href="[% c.uri_for('/Documentation/plans/3d-browse-gallery') %]">/Documentation/plans/3d-browse-gallery</a></td></tr>
+        <tr><td class="doc-td">AI2 Migration</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/ai2_migration_plan') %]">/Documentation/ai2_migration_plan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">AI Model Presentation &amp; Selection (AIMPS, proj 252)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">/Documentation/AIModelPresentationPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Git Subsystem Refactor</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/GitSubsystemRefactorPlan') %]">/Documentation/GitSubsystemRefactorPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Git Worktree — new isolated-creation backend</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]">/Documentation/git_worktree_new_system_plan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Git Worktree — AI-commit → human merge-to-main</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/git_worktree_merge_plan') %]">/Documentation/git_worktree_merge_plan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Branch Sync &amp; Conflict Assist (sub-plan of Git refactor)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/BranchSyncConflictAssist') %]">/Documentation/BranchSyncConflictAssist</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Security Hardening</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/security_hardening_free_stack') %]">/Documentation/security_hardening_free_stack</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Voice Inspection</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/VoiceInspectionPlan') %]">/Documentation/VoiceInspectionPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Herb Sign Generator</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/HerbSignGeneratorPlan') %]">/Documentation/HerbSignGeneratorPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Inventory/Order/Fulfillment</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/InventoryOrderFulfillmentPlan') %]">/Documentation/InventoryOrderFulfillmentPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Deployment Workflow</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DeploymentWorkflowPlan') %]">/Documentation/DeploymentWorkflowPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Controller Routing Standardization</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/ControllerRoutingStandardization') %]">/Documentation/ControllerRoutingStandardization</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Daily Plan Layout Redesign</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DAILY_PLAN_LAYOUT_REDESIGN') %]">/Documentation/DAILY_PLAN_LAYOUT_REDESIGN</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">OFT Remaining Todos</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/OFT_Remaining_Todos') %]">/Documentation/OFT_Remaining_Todos</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Database System Improvement (remainder)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DatabaseSystemImprovementPlan') %]">/Documentation/DatabaseSystemImprovementPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Resource Tracking Integration</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/RESOURCE_TRACKING_INTEGRATION') %]">/Documentation/RESOURCE_TRACKING_INTEGRATION</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td"><strong>Hardware Monitor &amp; Watchdog</strong> (proj #258, HWMON)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/HardwareMonitorPlan') %]">/Documentation/HardwareMonitorPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Logging Audit (proj #265, LOG-AUDIT)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/LOG-AUDIT-PLAN') %]">/Documentation/LOG-AUDIT-PLAN</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Phase 0 K8s Readiness</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/Phase0KubernetesReadinessPlan') %]">/Documentation/Phase0KubernetesReadinessPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Production DB → K8s Migration</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN') %]">/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">K3s Production DB Migration Guide</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE') %]">/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Infrastructure Migration Amendment</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]">/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Docker &amp; K8s Migration Strategy</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Credentials Audit &amp; Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">/Documentation/CREDENTIALS_AUDIT_AND_PLAN</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Gateway Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Schema Naming Standardization</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">/Documentation/SchemaNamingStandardizationPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Canonical Deploy Workflow</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">/Documentation/DEPLOY_WORKFLOW</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Development Plans index</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DevelopmentPlans') %]">/Documentation/DevelopmentPlans</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td"><strong>Planning System (feature doc)</strong></td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DailyPlanSystem') %]\">/Documentation/DailyPlanSystem</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">↳ Implementation Plan: Todo API &amp; DB Master Plan sync</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync') %]\">/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">↳ PlanningQueueRoleVisibility (PLAN-QUEUE 234)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/PlanningQueueRoleVisibilityPlan') %]\">/Documentation/PlanningQueueRoleVisibilityPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">↳ Projects Filter/Search/Priority (PROJ-UI 235)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/ProjectsPageFilterSearchPriorityPlan') %]\">/Documentation/ProjectsPageFilterSearchPriorityPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">↳ Project Ownership/Billing (PROJ-OWN 236)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/ProjectOwnershipBillingPlan') %]\">/Documentation/ProjectOwnershipBillingPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">↳ Todo Card Unification (TODOLIST-UI 240)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/TodoCardUnificationPlan') %]\">/Documentation/TodoCardUnificationPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">↳ Todo List Ranking &amp; Display (TODOLIST-UI 240)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/TodoListPageDisplayTuningPlan') %]\">/Documentation/TodoListPageDisplayTuningPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td"><strong>Infrastructure HA</strong> (proj #202 INFRA-HA, phases A–H #244–251)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/K3S_APP_HA_PLAN') %]\">/Documentation/K3S_APP_HA_PLAN</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Security System (proj #201) + AUTH-EVO (#243) + IMGSEC (#239)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/AuthenticationEvolutionPlan') %]\">/Documentation/AuthenticationEvolutionPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Theme Compliance Audit (proj #221, phases #222–226)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">AI Model Presentation &amp; Selection (proj #252 AIMPS, phases #253–257)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Point System (proj #193, phases #194–198)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">3D Printing System (proj #206, phases #207–209)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Buy &amp; Sell Marketplace (proj #210, phases #211–217)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Git Worktree System — new backend (proj #238 GITWT-NEW)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]\">/Documentation/git_worktree_new_system_plan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">Production Server Health (proj #200 PROD-HEALTH)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td"><strong>V2 Migration</strong> (proj #259 V2MIG, phases #260–264)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]\">/Documentation/V2MigrationPlan</a></td><td class="doc-td"><a href="[% c.uri_for('/Documentation/V2MigrationPlan_md') %]\">/Documentation/V2MigrationPlan_md</a></td></tr>
     </tbody>
 </table>
 
-<div class="notice" style="margin-top: 10px;">
+<div class="doc-info">
     <strong>Two formats, one index.</strong> <code>.tt</code> plans render in-app (themed, clickable, the
     human-facing view). <code>.md</code> plans are the AI/helpdesk-friendly reference (no template markup to
     strip, quick to read for "how do I use X" answers) and now also live under
@@ -367,13 +598,79 @@ WAVE 5   Routing std, Deploy WF, Daily Plan, K8s/infra cluster,
     documentation-system-standard plan (Steps 15–18) is what wires <code>.md</code> + <code>.tt</code> into a
     single catalog row.
 </div>
-</table>
 
-<p style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 12px;">
+<p class="doc-muted">
     Cross-cutting hardening (W1.4, Static::Simple absolute include_path) is tracked in this master plan, not a
     separate file; it originated in <code>GitSubsystemRefactorPlan</code> A3.4 / H.6.
 </p>
 
-<a class="back-to-top" href="#top" style="color: var(--link-color, #007bff);">↑ Back to top</a>
+[%# ── PROJECT TRACKING (RULE P1 — REQUIRED for plan docs: META carries
+    project_id=138 / project_code=PLANNING). Phases are sub-projects, not
+    single todos. RULE P2: includes a recurring re-audit todo. ── %]
+<div class="row">
+    <div class="col-100">
+        <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+        <p class="doc-body">
+            Owning project:
+            <a href="/project/details?project_id=138" class="doc-link">#138 (PLANNING)</a>
+            &mdash; the in-app planning system (projects, todos, daily plan, Focus Queue).
+            Each group below is a real project; phases are <strong>sub-projects</strong> (rows with <code>parent_id</code>), not single todos.
+        </p>
+        <table class="doc-table">
+            <tr>
+                <th class="doc-th">Phase / Sub-project</th>
+                <th class="doc-th">Tracking item</th>
+                <th class="doc-th">Gate / Done when</th>
+            </tr>
+            <tr>
+                <td class="doc-td">MASTER_PLAN in-tab navigation fix</td>
+                <td class="doc-td"><a href="/todo/details?record_id=2107" class="doc-link">todo #2107</a></td>
+                <td class="doc-td">In-tab links navigate within the SPA; planning tab JS state + floating buttons stay intact</td>
+            </tr>
+            <tr class="doc-tr-alt">
+                <td class="doc-td">Planning-tab branch list (git)</td>
+                <td class="doc-td"><a href="/todo/details?record_id=2108" class="doc-link">todo #2108</a></td>
+                <td class="doc-td">Branch list view added (proj #238); does not break browser-tab navigation</td>
+            </tr>
+            <tr>
+                <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
+                <td class="doc-td"><a href="/todo/details?record_id=2109" class="doc-link">todo #2109</a> (recurring, quarterly)</td>
+                <td class="doc-td">Keeps this doc's META/TOC/new-tab bridge from going stale</td>
+            </tr>
+        </table>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</details>
+</div>
+
+[%# ── SEE ALSO (RULE P1 references; flat /Documentation/FILENAME links) ── %]
+<div class="row">
+    <div class="col-100">
+        <div id="see-also" class="doc-success">
+            <h2 class="doc-h3">See Also</h2>
+            <ul class="doc-body">
+                <li><a href="/Documentation/DocumentationTtTemplate" class="doc-link">Documentation TT Template</a> &mdash; required page structure / theme classes</li>
+                <li><a href="/Documentation/PlanningLanguageStandard" class="doc-link">Planning Language Standard</a> &mdash; PROJECT/PHASE/STEP/GATE vocabulary</li>
+                <li><a href="/Documentation/AutonomousAgentsPlan" class="doc-link">Autonomous Agents Plan</a> &mdash; newest sub-plan (proj #267)</li>
+                <li><a href="/admin" class="doc-link">Administrative Interface</a></li>
+            </ul>
+        </div>
+        <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <div class="doc-footer">
+            <p>For technical support or questions about this documentation, contact the system administrator.</p>
+            <p><em>This documentation is part of the Comserv system.</em></p>
+        </div>
+    </div>
+</div>
 
 </div>
+
+</div>
+</div>
+
+<a class="back-to-top" href="#top">↑ Back to top</a>
