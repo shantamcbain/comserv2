@@ -1,143 +1,295 @@
 [% META
    title = "In-App Git: Worktree AI-Commit → Human Merge-to-Main Workflow"
-   description = "Design for the Git subsystem so AI agents commit in a zenflow worktree, all testing happens there, and a human admin on the main instance (3001) reviews a contextual diff, then merges the worktree branch into main and pushes to GitHub. Same commit rules apply to any AI (in-app, Hermes, browser editor)."
+   description = "Design for the Git subsystem so AI agents commit in a worktree, all testing happens there, and a human admin on the main instance (3001) reviews a unified diff through ONE shared diff-view component, then merges the worktree branch into main and pushes to GitHub. Same commit rules apply to any AI (in-app, Hermes, browser editor)."
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
    category = "git,ai-systems,security,development-plan"
-   page_version = "0.1"
-   last_updated = "Mon Aug 03 11:10:00 UTC 2026"
+   project_id   = "238"
+   project_code = "GITWT-NEW"
+   page_version = "0.3"
+   last_updated = "Wed Aug 13 2026"
    site_specific = "false"
 %]
 
 <div class="container">
-    <h1>In-App Git: Worktree AI-Commit &rarr; Human Merge-to-Main</h1>
+    <h1 class="doc-h1">In-App Git: Worktree AI-Commit &rarr; Human Merge-to-Main</h1>
 
-    <div class="last-updated">
-        Status: 📋 DRAFT for review &middot; Scope: extend Comserv::Util::Git + Admin::Git so the
-        AI-commits-in-worktree / human-merges-on-main model from the BrightTALK talk is enforced by the tooling.
+    <div class="last-updated" doc-muted>
+        Status: In-Process &middot; Linked to project
+        <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a> &middot;
+        Decisions locked at &sect;3.5 (shared diff view) / &sect;3.6 (human approve gate) / &sect;6.
+        Todos: <a href="/todo/details?record_id=1991" class="doc-link">#1991</a>,
+        <a href="/todo/details?record_id=1993" class="doc-link">#1993</a>,
+        <a href="/todo/details?record_id=1992" class="doc-link">#1992</a>.
     </div>
 
-    <h2>1. The target workflow (matches the talk)</h2>
-    <ol>
-        <li><strong>AI works in a worktree.</strong> Agent (in-app AI, Hermes, or browser AI editor) edits files
-            in <code>~/.zenflow/worktrees/&lt;branch&gt;/Comserv</code> and commits there. The repo-level
-            <code>.git/hooks/pre-commit</code> (perl -c + gitleaks) gates every commit — same rule for all AIs.</li>
-        <li><strong>Testing happens in the worktree.</strong> The branch's own instance runs on its port
-            (aichatsystem-ef4e &rarr; 4010, etc., see _planning_tab.tt). <code>script/test_gate.sh</code> runs
-            there; must be green before merge.</li>
-        <li><strong>Human reviews on main (3001).</strong> The main instance dashboard lists worktree branches,
-            shows a per-file diff <em>with context</em>, lets the admin view/edit/stage changes, then
-            <strong>Merge to main</strong>.</li>
-        <li><strong>Human pushes to GitHub.</strong> After merge, main pushes <code>origin/main</code>.</li>
-    </ol>
+    <!-- PROMINENT PROJECT LINK (easy access to the full todo list) -->
+    <div class="bm-callout" style="border-left: 4px solid var(--primary-color, #2e7d32);">
+        <strong>&#128193; Git project:</strong>
+        <a href="/project/details?project_id=238" class="doc-link">Open project #238 (GITWT-NEW)</a>
+        &mdash; this is the master list of every todo for the git worktree / merge-to-main work, including
+        <a href="/todo/details?record_id=1991" class="doc-link">#1991</a> (diff view + edit),
+        <a href="/todo/details?record_id=1993" class="doc-link">#1993</a> (human approve gate), and
+        <a href="/todo/details?record_id=1992" class="doc-link">#1992</a> (AI/human provenance).
+    </div>
 
-    <h2>2. Current state (what exists, what's missing)</h2>
-    <table class="doc-table">
-        <tr class="doc-tr-alt">
-            <th class="doc-th">Capability</th>
-            <th class="doc-th">Today</th>
-            <th class="doc-th">Gap</th>
-        </tr>
-        <tr>
-            <td class="doc-td">AI commit in worktree (gated)</td>
-            <td class="doc-td">✅ pre-commit hook covers it</td>
-            <td class="doc-td">—</td>
-        </tr>
-        <tr>
-            <td class="doc-td">Test in worktree</td>
-            <td class="doc-td">✅ test_gate.sh + per-branch port</td>
-            <td class="doc-td">not yet a required pre-merge step</td>
-        </tr>
-        <tr>
-            <td class="doc-td">Main sees worktree branch</td>
-            <td class="doc-td">✅ shared .git — branch IS visible</td>
-            <td class="doc-td">no UI to pick/inspect it</td>
-        </tr>
-        <tr>
-            <td class="doc-td">Contextual diff review</td>
-            <td class="doc-td">partial (suggest_message reads diff)</td>
-            <td class="doc-td">no per-file view/edit/stage UI</td>
-        </tr>
-        <tr>
-            <td class="doc-td">Merge worktree &rarr; main</td>
-            <td class="doc-td">❌ not in app</td>
-            <td class="doc-td"><code>merge</code> not in Util::Git whitelist</td>
-        </tr>
-        <tr>
-            <td class="doc-td">Push main &rarr; GitHub</td>
-            <td class="doc-td">✅ push exists (but deploy.sh pushes are currently disabled)</td>
-            <td class="doc-td">wire as explicit human action</td>
-        </tr>
-    </table>
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#workflow" class="doc-navlink">1. Target workflow</a>
+                <a href="#current" class="doc-navlink">2. Current state</a>
+                <a href="#changes" class="doc-navlink">3. Changes required</a>
+                <a href="#c35" class="doc-navlink">3.5 Shared diff view</a>
+                <a href="#c36" class="doc-navlink">3.6 Human approve gate</a>
+                <a href="#safety" class="doc-navlink">4. Safety</a>
+                <a href="#sequencing" class="doc-navlink">5. Sequencing</a>
+                <a href="#decisions" class="doc-navlink">6. Decisions</a>
+                <a href="#changelog" class="doc-navlink">7. Changelog</a>
+            </div>
+        </div>
+    </div>
 
-    <h2>3. Changes required</h2>
-
-    <h3>3.1 Util::Git — add merge + worktree to the whitelist</h3>
-    <p>Add <code>merge</code> to <code>%ALLOWED_SUBCMD</code> and give it a tight flag allow-list
-    (<code>--no-ff</code>, <code>--no-commit</code>, <code>--abort</code>, <code>--squash</code>). Add
-    <code>worktree</code> (subcommands <code>list</code>, <code>prune</code> only — never <code>add</code> from the
-    app). Keep the no-shell / no-chdir / whitelist enforcement already in place.</p>
-
-    <h3>3.2 Admin::Git — worktree branch list + diff review endpoints</h3>
-    <ul>
-        <li><code>/admin/git/worktrees</code> (GET): list branches that have a worktree dir under
-            <code>~/.zenflow/worktrees/</code>, with ahead/behind vs main and last commit.</li>
-        <li><code>/admin/git/review/&lt;branch&gt;</code> (GET): for the chosen worktree branch, return a
-            structured per-file diff (<code>git diff main...&lt;branch&gt;</code>) with N lines of context,
-            file mode, and the worktree path. Front-end renders it as a reviewable, editable panel.</li>
-        <li><code>/admin/git/review/edit</code> (POST, admin-only): accept a corrected file body for a single
-            changed file (admin edits before merge); writes it into the worktree checkout and stages it there,
-            so the human's edits are part of the merged result. (Guard: only within the worktree dir;
-            path validated against the diff file list — no free-form paths.)</li>
-    </ul>
-
-    <h3>3.3 Admin::Git — the merge + push action (human-gated)</h3>
-    <ul>
-        <li><code>/admin/git/merge_to_main</code> (POST, admin-only):
-            <ol>
-                <li>Switch main repo to <code>main</code> (already have switch).</li>
-                <li>Run <code>script/test_gate.sh</code> against the worktree path; if not green, refuse merge
-                    with the failing output.</li>
-                <li><code>git merge --no-ff &lt;branch&gt;</code> (via the new whitelist entry).</li>
-                <li>On conflict, abort and report; human resolves in worktree then retries.</li>
+    <!-- 1. TARGET WORKFLOW -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="workflow" class="doc-h2">1. The target workflow (matches the talk)</h2>
+            <ol class="doc-body">
+                <li><strong>AI works in a worktree.</strong> Agent (in-app AI, Hermes, or browser AI editor) edits files
+                    in the worktree checkout and commits there. The repo-level
+                    <code>.git/hooks/pre-commit</code> (perl -c + gitleaks) gates every commit — same rule for all AIs.</li>
+                <li><strong>Testing happens in the worktree.</strong> The branch's own instance runs on its port;
+                    <code>script/test_gate.sh</code> runs there and must be green before merge.</li>
+                <li><strong>Human reviews on main (3001).</strong> The main instance dashboard lists worktree branches,
+                    shows a per-file diff <em>with context</em> through the shared diff view, lets the admin
+                    view/edit/stage changes, then <strong>Merge to main</strong>.</li>
+                <li><strong>Human approval is mandatory before AI code enters main.</strong> Any commit containing
+                    AI-generated or mixed-provenance code must carry an explicit human audit approval
+                    (<a href="/todo/details?record_id=1993" class="doc-link">todo #1993</a>) before it can be merged
+                    into or pushed to <code>main</code>. The AI may commit <em>only</em> inside the worktree; entry
+                    into <code>main</code> is gated on the human view &rarr; edit &rarr; approve flow
+                    (<a href="/todo/details?record_id=1991" class="doc-link">todo #1991</a>).</li>
+                <li><strong>Human pushes to GitHub.</strong> After merge, main pushes <code>origin/main</code>.</li>
             </ol>
-        </li>
-        <li><code>/admin/git/push_main</code> (POST, admin-only): <code>git push origin main</code> from the main
-            repo — the explicit "push to GitHub" the human performs (currently deploy.sh leaves push disabled,
-            so this restores a deliberate, human-driven push).</li>
-    </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-    <h3>3.4 Same rules for Hermes / browser AI editor</h3>
-    <p>The rule "AI commits only in the worktree, never to main" is enforced by two things that already cover
-    any AI: (a) the pre-commit hook is repo-level and shared by the worktree; (b) the app provides
-    <strong>no merge/push path for non-admins</strong> — <code>merge_to_main</code> and <code>push_main</code>
-    are admin-only. For Hermes/browser editors, the constraint is operational: they must be told to edit only
-    inside the worktree checkout path, exactly like the in-app AI. Add a one-line note to the AI dev-security
-    sub-project (ai_dev_security_quality_plan.tt) stating any AI — in-app, Hermes, or browser — commits solely
-    in the worktree and is merged only via the human merge action.</p>
+    <!-- 2. CURRENT STATE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="current" class="doc-h2">2. Current state (what exists, what's missing)</h2>
+            <table class="doc-table">
+                <tr class="doc-tr-alt">
+                    <th class="doc-th">Capability</th>
+                    <th class="doc-th">Today</th>
+                    <th class="doc-th">Gap</th>
+                </tr>
+                <tr><td class="doc-td">AI commit in worktree (gated)</td><td class="doc-td">✅ pre-commit hook covers it</td><td class="doc-td">—</td></tr>
+                <tr><td class="doc-td">Test in worktree</td><td class="doc-td">✅ test_gate.sh + per-branch port</td><td class="doc-td">not yet a required pre-merge step</td></tr>
+                <tr><td class="doc-td">Main sees worktree branch</td><td class="doc-td">✅ shared .git — branch IS visible</td><td class="doc-td">no UI to pick/inspect it</td></tr>
+                <tr><td class="doc-td">Contextual diff review</td><td class="doc-td">partial (suggest_message reads diff)</td><td class="doc-td">no shared per-file view/edit/stage UI (see &sect;3.5)</td></tr>
+                <tr><td class="doc-td">Merge worktree &rarr; main</td><td class="doc-td">❌ not in app</td><td class="doc-td"><code>merge</code> not in Util::Git whitelist</td></tr>
+                <tr><td class="doc-td">Push main &rarr; GitHub</td><td class="doc-td">✅ push exists (deploy.sh pushes currently disabled)</td><td class="doc-td">wire as explicit human action</td></tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-    <h2>4. Safety / guardrails</h2>
-    <ul>
-        <li><code>main</code> and <code>master</code> are protected: the app refuses to delete/force-push them
-            (already in <code>get_branch_details</code>).</li>
-        <li>Merge is admin-only and requires a green test gate; the app never auto-merges.</li>
-        <li>All git ops stay no-shell, no-chdir, whitelisted (existing Util::Git contract).</li>
-        <li>Worktree edits are path-confined to the diff's file list — no arbitrary file writes.</li>
-    </ul>
+    <!-- 3. CHANGES REQUIRED -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="changes" class="doc-h2">3. Changes required</h2>
 
-    <h2>5. Sequencing (proposed)</h2>
-    <ol>
-        <li><strong>Step 1:</strong> Util::Git whitelist: add <code>merge</code> + <code>worktree</code> (low risk).</li>
-        <li><strong>Step 2:</strong> Admin::Git endpoints: worktrees list + review diff (read-only, safe).</li>
-        <li><strong>Step 3:</strong> Admin::Git: review/edit (admin edits a file) + merge_to_main (gated on test_gate).</li>
-        <li><strong>Step 4:</strong> Admin::Git: push_main (explicit human push to GitHub).</li>
-        <li><strong>Step 5:</strong> Front-end review panel in root/admin/git/index.tt (per-file diff with context + edit + Merge/Push buttons).</li>
-        <li><strong>Step 6:</strong> Document the all-AI rule in ai_dev_security_quality_plan.tt.</li>
-    </ol>
+            <h3 id="c31" class="doc-h3">3.1 Util::Git — add merge + worktree to the whitelist</h3>
+            <p class="doc-body">Add <code>merge</code> to <code>%ALLOWED_SUBCMD</code> with a tight flag allow-list
+            (<code>--no-ff</code>, <code>--no-commit</code>, <code>--abort</code>, <code>--squash</code>). Add
+            <code>worktree</code> (subcommands <code>list</code>, <code>prune</code> only — never <code>add</code> from the
+            app). Keep the no-shell / no-chdir / whitelist enforcement already in place.</p>
 
-    <h2>6. Open question for the user</h2>
-    <p>Should the worktree diff review UI let the admin <strong>edit individual files</strong> before merge
-    (writes into the worktree checkout), or only <strong>view + stage/unstage</strong> (edits done by the AI in
-    the worktree, human just approves)? Editing in-app is more powerful but a larger surface; view-only is
-    simpler and safer. Recommend view + stage first, edit later.</p>
+            <h3 id="c32" class="doc-h3">3.2 Admin::Git — worktree branch list + diff review endpoints</h3>
+            <ul class="doc-body">
+                <li><code>/admin/git/worktrees</code> (GET): list branches that have a worktree dir, with ahead/behind vs main and last commit.</li>
+                <li><code>/admin/git/review/&lt;branch&gt;</code> (GET): for the chosen worktree branch, return a
+                    structured per-file diff (<code>git diff main...&lt;branch&gt;</code>) with N lines of context,
+                    file mode, and the worktree path. The shared diff-view widget renders it (see &sect;3.5).</li>
+                <li><code>/admin/git/review/edit</code> (POST, admin-only): accept a corrected file body for a single
+                    changed file (admin edits before merge); writes it into the worktree checkout and stages it there,
+                    so the human's edits are part of the merged result. (Guard: only within the worktree dir;
+                    path validated against the diff file list — no free-form paths.)</li>
+            </ul>
+
+            <h3 id="c33" class="doc-h3">3.3 Admin::Git — the merge + push action (human-gated)</h3>
+            <ul class="doc-body">
+                <li><code>/admin/git/merge_to_main</code> (POST, admin-only):
+                    <ol>
+                        <li>Switch main repo to <code>main</code> (already have switch).</li>
+                        <li>Run <code>script/test_gate.sh</code> against the worktree path; if not green, refuse merge
+                            with the failing output.</li>
+                        <li>Require a covering human audit approval (<a href="/todo/details?record_id=1993" class="doc-link">#1993</a>)
+                            before merging; refuse if missing/stale/doesn't cover the current diff.</li>
+                        <li><code>git merge --no-ff &lt;branch&gt;</code> (via the new whitelist entry).</li>
+                        <li>On conflict, abort and report; human resolves in worktree then retries.</li>
+                    </ol>
+                </li>
+                <li><code>/admin/git/push_main</code> (POST, admin-only): <code>git push origin main</code> from the main
+                    repo — the explicit "push to GitHub" the human performs.</li>
+            </ul>
+
+            <h3 id="c34" class="doc-h3">3.4 Same rules for Hermes / browser AI editor</h3>
+            <p class="doc-body">The rule "AI commits only in the worktree, never to main" is enforced by two things that already cover
+            any AI: (a) the pre-commit hook is repo-level and shared by the worktree; (b) the app provides
+            <strong>no merge/push path for non-admins</strong> — <code>merge_to_main</code> and <code>push_main</code>
+            are admin-only. For Hermes/browser editors, the constraint is operational: they must be told to edit only
+            inside the worktree checkout path, exactly like the in-app AI. Add a one-line note to the AI dev-security
+            sub-project (ai_dev_security_quality_plan.tt) stating any AI — in-app, Hermes, or browser — commits solely
+            in the worktree and is merged only via the human merge action.</p>
+
+            <h3 id="c35" class="doc-h3">3.5 Single shared diff-view component (one page to maintain) — DECIDED &amp; BUILT</h3>
+            <p class="doc-body">There is exactly <strong>one</strong> diff <em>renderer</em>; every surface embeds it and only adds its
+            own buttons around it. We do <strong>not</strong> build a separate diff viewer per page, and we do
+            <strong>not</strong> designate the AI2 editor's chat-coupled file as the "canonical" copy for others to
+            import — that would drag editor-only state (Ace instance, chat suggestion, auto-refresh poll) into pages
+            that have none of it. Instead the renderer itself is extracted to a neutral, surface-agnostic widget.</p>
+
+            <p class="doc-body"><strong>Canonical widget — BUILT:</strong> <code>root/static/js/git-diff-viewer.js</code> (namespace
+            <code>ComservGitDiff</code>) with the API <code>ComservGitDiff.render(targetEl, diffText, { scope, editable, onApprove, onReject, title, onClose })</code>
+            (the <code>title</code>/<code>onClose</code> options are additions over the originally sketched signature;
+            <code>scope</code>/<code>editable</code>/<code>onApprove</code>/<code>onReject</code> are exactly as decided).
+            It owns only the diff rendering: unified layout with line numbers, add/remove/hunk tinting, and load/error
+            states, all driven by CSS custom properties so it follows the active theme. It is loaded via
+            <code>js_load.tt</code> (versioned, <code>defer</code>) <em>before</em> any consumer. No surface re-implements rendering.</p>
+
+            <p class="doc-body"><strong>Backends that feed it (as actually implemented):</strong> the widget is a pure renderer and is
+            fed by whichever read-only endpoint the calling surface already has — there is no separate shared diff
+            endpoint, and the widget does not care which one supplies the text:
+            <ul class="doc-body">
+                <li>Git Dashboard working-tree rows &rarr; <code>GET /admin/git/file_diff?path=&lt;repo-relative&gt;</code>
+                    (admin-gated, path confined to repo root; handles tracked <code>git diff HEAD</code> + untracked
+                    <code>git diff --no-index /dev/null</code>).</li>
+                <li>AI2 editor "Changed Files / Diff" &rarr; <code>GET /ai2/file_diff?path=&lt;editor path&gt;</code>
+                    (editor-role gated).</li>
+                <li>The originally-cited <code>GET /admin/git/review/&lt;branch&gt;</code> is the planned branch-wide
+                    review endpoint (still pending build under &sect;3.2/&sect;3.3); when it lands, the merge-review
+                    surface will reuse the same widget with no renderer change.</li>
+            </ul></p>
+
+            <p class="doc-body"><strong>Surfaces are consumers of the widget, and legitimately differ ONLY at the affordance layer
+            (the buttons / shell around the diff), never at the renderer:</strong></p>
+            <ul class="doc-body">
+                <li><strong>Git Dashboard (<code>/admin/git</code>)</strong> Working Tree rows: each created/modified
+                    file gets a <em>Diff</em> button that opens the file in the AI2 editor
+                    (<code>/ai2/editing_widget_popup?file=&lt;path&gt;</code>, a separate window) — the editor is itself
+                    a widget consumer, and auto-shows that file's diff on open via <code>ai2editor/file-diff.js</code>
+                    &rarr; <code>ComservGitDiff.render</code>. (Earlier the dashboard rendered the diff inline into a
+                    <code>#git-file-diff</code> panel; that inline path was replaced by routing the user to the editor so
+                    there is a single rendering location. See the 2026-08-15 file_diff fix + dashboard re-route note.)</li>
+                <li><strong>Merge review (<code>/admin/git/review/&lt;branch&gt;</code>)</strong>: will embed the same widget
+                    and layer the edit + record-approval controls (<a href="/todo/details?record_id=1993"
+                    class="doc-link">todo #1993</a>) around it when the branch review endpoint is built.</li>
+                <li><strong>AI2 editor review pane</strong> (<code>root/ai2/editor/editing_widget_popup.tt</code>):
+                    the "Changed Files / Diff" action reuses the same widget (via
+                    <code>ai2editor/file-diff.js</code> &rarr; <code>ComservGitDiff.render</code>) into the
+                    <code>#git-diff-pane</code>, and layers its editor-specific controls — Approve/Reject applies a chat
+                    suggestion into the Ace instance, plus the file auto-refresh poll. This is the <em>only</em> surface
+                    that needs those controls; they live in the editor's own module, not in the shared widget.</li>
+                <li><strong>AI2 editor Project tab (<code>ai2editor/project-tree.js</code>)</strong>: the full project
+                    file tree + a "CHANGED FILES" section pinned at the top; every file row opens for editing on click and
+                    carries a <strong>Diff</strong> button that reuses the same widget into <code>#git-diff-pane</code>
+                    (delegated through <code>ComservAI2FileDiff.loadDiff</code>). Changed files are badged <code>M</code>/<code>U</code>.</li>
+                <li><strong>Commit-message preview / <code>suggest_message</code></strong>: reuses the same diff payload
+                    shape so there is a single diff source of truth in <code>Comserv::Util::Git</code>.</li>
+            </ul>
+            <p class="doc-body"><strong>The only legitimate reasons surfaces differ:</strong> (1) different interaction model — glance vs
+            edit+approve vs apply-to-Ace; (2) different embedding shell — editor popup vs admin page; (3) different data
+            scope — single file vs whole branch vs staged vs working-tree, expressed as a parameter, not a new component.
+            None of these justify a second diff renderer. <strong>Status:</strong> the two previously-bespoke renderers
+            (<code>git-dashboard.js</code> inline <code>&lt;pre&gt;</code> and <code>ai2editor/file-diff.js</code> inline
+            render) were removed and now both route through <code>git-diff-viewer.js</code> — see the dated changelog
+            <a href="/Documentation/changelog/2026-08-15-git-diff-viewer-shared-widget" class="doc-link">2026-08-15 — shared diff widget built</a>.
+            This is the resolution of the former open question — see &sect;6.</p>
+
+            <h3 id="c36" class="doc-h3">3.6 Mandatory human view &rarr; edit &rarr; approve before AI code enters main — DECIDED</h3>
+            <p class="doc-body">The former open question (view-only vs edit-before-merge) is <strong>resolved</strong>: the human flow
+            is <strong>view, edit, and approve</strong> before the AI's code may be merged to <code>main</code>:
+            the admin opens the shared diff view for a worktree branch, may edit individual files (writes into the
+            worktree checkout, staged there), and must record an explicit audit approval
+            (<a href="/todo/details?record_id=1993" class="doc-link">todo #1993</a>) before merge/push. This is owned by
+            <a href="/todo/details?record_id=1991" class="doc-link">todo #1991</a> (the diff review + edit surface).</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- 4. SAFETY -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="safety" class="doc-h2">4. Safety / guardrails</h2>
+            <ul class="doc-body">
+                <li><code>main</code> and <code>master</code> are protected: the app refuses to delete/force-push them
+                    (already in <code>get_branch_details</code>).</li>
+                <li>Merge is admin-only, requires a green test gate AND a covering human audit approval; the app never auto-merges.</li>
+                <li>All git ops stay no-shell, no-chdir, whitelisted (existing Util::Git contract).</li>
+                <li>Worktree edits are path-confined to the diff's file list — no arbitrary file writes.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- 5. SEQUENCING -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="sequencing" class="doc-h2">5. Sequencing (proposed)</h2>
+            <ol class="doc-body">
+                <li><strong>Step 1:</strong> Util::Git whitelist: add <code>merge</code> + <code>worktree</code> (low risk).</li>
+                <li><strong>Step 2:</strong> Admin::Git endpoints: worktrees list + review diff (read-only, safe).</li>
+                <li><strong>Step 3:</strong> Build the shared <code>git-diff-viewer.js</code> widget (&sect;3.5) and wire it into the
+                    Git Dashboard working-tree rows (<a href="/todo/details?record_id=1991" class="doc-link">#1991</a>).</li>
+                <li><strong>Step 4:</strong> Admin::Git: review/edit (admin edits a file) + merge_to_main gated on test_gate AND approval
+                    (<a href="/todo/details?record_id=1993" class="doc-link">#1993</a>).</li>
+                <li><strong>Step 5:</strong> Admin::Git: push_main (explicit human push to GitHub).</li>
+                <li><strong>Step 6:</strong> Document the all-AI rule in ai_dev_security_quality_plan.tt.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- 6. DECISIONS -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="decisions" class="doc-h2">6. Decision log (open questions resolved)</h2>
+            <p class="doc-body"><strong>Q (v0.1):</strong> should the worktree diff review UI let the admin <em>edit</em> individual files
+            before merge, or only <em>view + stage/unstage</em>? — <strong>ANSWER (v0.2/v0.3): view, edit, and approve.</strong>
+            The human may edit files in the worktree checkout before merge (&sect;3.6), but merge/push into <code>main</code>
+            is blocked until an explicit human audit approval exists and covers the current diff
+            (<a href="/todo/details?record_id=1993" class="doc-link">todo #1993</a>). Separately, the diff UI is a
+            <strong>single shared component</strong> (&sect;3.5), not one per surface.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- 7. CHANGELOG -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="changelog" class="doc-h2">7. Changelog</h2>
+            <p class="doc-body">See the dated entry
+            <a href="/Documentation/changelog/2026-08-15-git-diff-viewer-shared-widget" class="doc-link">2026-08-15 — shared diff widget built (git-diff-viewer.js)</a>
+            for the implementation record (files changed, how both surfaces now route through one renderer). The
+            original decision record is at
+            <a href="/Documentation/changelog/2026-08-13-git-merge-plan-shared-diff-view" class="doc-link">2026-08-13 — shared diff view + mandatory human approve</a>.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Owning project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>.
+                Todos: <a href="/todo/details?record_id=1991" class="doc-link">#1991</a> (diff view+edit),
+                <a href="/todo/details?record_id=1993" class="doc-link">#1993</a> (human approve gate),
+                <a href="/todo/details?record_id=1992" class="doc-link">#1992</a> (AI/human provenance).</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
 </div>

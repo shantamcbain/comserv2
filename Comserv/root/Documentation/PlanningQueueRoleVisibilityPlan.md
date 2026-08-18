@@ -1,12 +1,15 @@
 # Planning Queue Role Visibility Plan
 
-**Project code:** PLAN-QUEUE
-**Parent project:** 138 PLANNING (Planning System)
+**Project code:** PLAN-QUEUE (proj #234)
+**Parent project:** #138 PLANNING (this is a PHASE of the Planning System project)
 **Site:** CSC
 **Status:** In-Process
 **Audit date:** 2026-08-02
-**Tracking:** every phase below has a todo under project PLAN-QUEUE. The todo carries the
-gate condition. Do not work a phase whose gate is unmet.
+**Standard:** follows [Planning Language Standard](/Documentation/PlanningLanguageStandard) — PHASE = sub-project, STEP = todo, GATE = done-when
+**Coordinator:** [Comserv2 Master Plan](/Documentation/MASTER_PLAN) — Project #138 PLANNING
+**Deliverable (one line):** make Focus Queue role visibility server-side and real (not client-side JS that fails open), reconciling the two /planning vs /todo access gates.
+
+**Tracking:** every phase below is a STEP (todo) under project #234. Each todo carries the GATE condition. Do not work a step whose gate is unmet.
 
 ---
 

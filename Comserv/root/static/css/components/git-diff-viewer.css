@@ -1,0 +1,54 @@
+/* git-diff-viewer.css — theme-aware styles for the canonical shared diff
+ * widget (root/static/js/git-diff-viewer.js). All colours come from CSS
+ * custom properties so it follows the active light/dark theme. No inline hex. */
+
+.git-diff-viewer-pre {
+    background: var(--bg-code, #1e1f22);
+    color: var(--text-code, #9cdcfe);
+    padding: 10px;
+    border: 1px solid var(--border-color, #444);
+    border-radius: 4px;
+    max-height: 50vh;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: 12px;
+    font-family: var(--font-mono, monospace);
+    margin: 0;
+}
+
+.git-diff-line {
+    display: flex;
+    gap: 8px;
+    line-height: 1.4;
+}
+
+.git-diff-ln {
+    flex: 0 0 auto;
+    width: 3.5em;
+    text-align: right;
+    color: var(--text-muted-color, #6a737d);
+    user-select: none;
+    opacity: 0.7;
+}
+
+.git-diff-code {
+    flex: 1 1 auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.git-diff-add  .git-diff-code { color: var(--diff-add, #9f9); }
+.git-diff-del  .git-diff-code { color: var(--diff-del, #f99); }
+.git-diff-hunk .git-diff-code { color: var(--diff-hunk, #fd8); }
+
+.git-diff-empty,
+.git-diff-loading,
+.git-diff-message {
+    color: var(--text-color, #222);
+    padding: 8px 2px;
+}
+
+.git-diff-error {
+    color: var(--danger-color, #f66);
+    padding: 8px 2px;
+}

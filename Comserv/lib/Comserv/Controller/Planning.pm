@@ -1019,26 +1019,427 @@ sub daily :Path('/planning/daily') :Args {
         template => 'admin/planning/DailyPlan.tt',
     );
 
-    # Lazy-load tab content: when ?tab=xxx is passed, render only that tab's partial
-    my $requested_tab = $c->req->param('tab') || '';
-    if ($requested_tab) {
-        my %tab_templates = (
-            'daily-schedule' => 'todo/day.tt',
-            'weekly-view'    => 'todo/week.tt',
-            'month-view'     => 'todo/month.tt',
-        );
-        if (my $tab_template = $tab_templates{$requested_tab}) {
-            $c->stash->{is_daily_plan} = 1;
-            $c->stash->{base_url}      = '/planning/daily';
-            $c->stash->{day_hash}      = '#daily-schedule';
-            $c->stash->{planning_hash} = '#planning';
-            $c->stash->{week_hash}     = '#weekly-view';
-            $c->stash->{month_hash}    = '#month-view';
-            $c->stash->{template}      = $tab_template;
-            $c->res->content_type('text/html; charset=utf-8');
-            return;
+    # Rebuilt index + tabs: reuse daily_impl's full planning stash so the
+    # Priorities tab and the action card render with live data (focus queue,
+    # remaining todos, open_log_entry, is_admin, audit/helpdesk/dependencies).
+    # Tab content is INCLUDEd into the SAME document (never an AJAX ?tab= full
+    # page fetch) — that re-injection of layout.tt is exactly what previously
+    # buried the global floating buttons inside the tab.
+    # daily_impl ends by setting template => DailyPlan.legacy.tt; override it
+    # back to the clean index template.
+    $c->forward('daily_impl', \@args);
+    $c->stash->{template} = 'admin/planning/DailyPlan.tt';
+    return;
+}
+
+=head2 legacy_daily
+    # index that hard-links to separate pages (Daily Priorities / Master Plan /
+    # Calendar), avoiding the nested full-page injection that broke the global
+    # floating buttons. Features are added back one at a time.
+    return;
+}
+
+=head2 legacy_daily
+
+Reference copy of the original /planning/daily monolith (all tabs, lazy
+calendar). Kept read-only for comparison; not the default route.
+
+=cut
+
+sub legacy_daily :Path('/planning/daily-legacy') :Args {
+    my ($self, $c, @args) = @_;
+    $c->detach('daily_impl', \@args);
+}
+
+# Factored body of the original daily view (monolith) so legacy_daily can reuse
+# it without duplicating ~1000 lines. The clean `daily` above no longer calls this.
+sub daily_impl :Private {
+    my ($self, $c, @args) = @_;
+    my $requested_date = $args[0] if @args;
+
+    # Accessible to all sites — non-CSC sees only DB-driven sections.
+    # CSC sees text-based planning tabs in addition to DB-driven sections.
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
+    my $is_csc_admin = Comserv::Util::AdminAuth->new->is_csc_admin($c);
+
+    # Detect local/dev domain (.local, .zero, localhost) — shown branch servers panel
+    my $req_host = $c->req->uri->host_port;
+    my $is_local_domain = ($req_host =~ /\.local(?::\d+)?$/
+                        || $req_host =~ /\.zero(?::\d+)?$/
+                        || $req_host =~ /^localhost/) ? 1 : 0;
+    $c->stash->{is_local_domain} = $is_local_domain;
+
+    # Role check: any authenticated non-guest user
+    my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
+    my $has_access = $c->stash->{is_admin}
+        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
+    unless ($has_access) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
+            "Access denied for user: " . ($c->session->{username} || 'Guest'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+        $c->detach;
+    }
+
+    # Current date
+    my $now              = Time::Piece->new();
+    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_display  = $now->strftime('%A, %B %d, %Y');
+
+    # Selected date (from URL or today)
+    my $selected_date = $requested_date || $current_date_str;
+    my ($year, $month, $day);
+    if ($selected_date =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
+        ($year, $month, $day) = ($1, $2, $3);
+    } else {
+        $selected_date = $current_date_str;
+        ($year, $month, $day) = split('-', $current_date_str);
+    }
+
+    my $selected_tp;
+    eval { $selected_tp = Time::Piece->strptime("$year-$month-$day", "%Y-%m-%d") };
+    if ($@ || !$selected_tp) {
+        $selected_tp   = $now;
+        $selected_date = $current_date_str;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
+            "Invalid date requested: $year-$month-$day. Falling back to today.");
+    }
+
+    my $prev_tp      = $selected_tp - (24 * 60 * 60);
+    my $next_tp      = $selected_tp + (24 * 60 * 60);
+    my $prev_date    = $prev_tp->strftime('%Y-%m-%d');
+    my $next_date    = $next_tp->strftime('%Y-%m-%d');
+    my $display_date = $selected_tp->strftime('%A, %B %d, %Y');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+        "Accessing Planning daily view for date: $selected_date");
+
+    # Week/month data
+    my $dt = DateTime::Format::ISO8601->parse_datetime($selected_date);
+
+    my $start_of_week  = $dt->clone->subtract(days => $dt->day_of_week - 1)->strftime('%Y-%m-%d');
+    my $end_of_week    = $dt->clone->add(days => 7 - $dt->day_of_week)->strftime('%Y-%m-%d');
+    my $prev_week_date = $dt->clone->subtract(days => 7)->strftime('%Y-%m-%d');
+    my $next_week_date = $dt->clone->add(days => 7)->strftime('%Y-%m-%d');
+
+    my $start_dt = DateTime::Format::ISO8601->parse_datetime($start_of_week);
+    $start_dt = $start_dt->subtract(days => 1);
+
+    my @week_dates;
+    for my $day_offset (0..6) {
+        my $cur = $start_dt->clone->add(days => $day_offset);
+        my $d_str = $cur->strftime('%Y-%m-%d');
+        push @week_dates, {
+            date_str  => $d_str,
+            day_num   => $cur->day,
+            day_name  => $cur->strftime('%A'),
+            is_today  => ($d_str eq $current_date_str),
+            prev_date => $cur->clone->subtract(days => 1)->ymd,
+            next_date => $cur->clone->add(days => 1)->ymd,
+        };
+    }
+
+    my $start_of_month  = $dt->clone->set_day(1)->strftime('%Y-%m-%d');
+    my $end_of_month    = $dt->clone->set_day($dt->month_length)->strftime('%Y-%m-%d');
+    my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
+    my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
+
+    # Todos for calendar views
+    my $todos_for_today    = [];
+    my $overdue_todos      = [];
+    my $all_todos_calendar = [];
+    my %todos_by_day;
+
+    my @_done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my %_done_set  = map { $_ => 1 } @_done_vals;
+
+    my %week_todos_by_date;
+    my @week_overdue_todos;
+
+    if (my $todo_model = $c->model('Todo')) {
+        eval {
+            my @_cal_sites;
+            if ($is_csc) {
+                eval {
+                    my $site_model = $c->model('Site');
+                    my $all_s = $site_model->get_all_sites($c) || [];
+                    @_cal_sites = map { $_->name } @$all_s;
+                };
+                @_cal_sites = ($sitename) unless @_cal_sites;
+            } else {
+                eval {
+                    my $uid = $c->session->{user_id};
+                    if ($uid) {
+                        my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                            { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                        )->all;
+                        my %seen;
+                        for my $r (@rows) {
+                            eval {
+                                my $s = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                                push @_cal_sites, $s->name if $s && $s->name && !$seen{$s->name}++;
+                            };
+                        }
+                    }
+                };
+                push @_cal_sites, $sitename unless grep { $_ eq $sitename } @_cal_sites;
+            }
+            my $filter_site;
+            my $saved_filter = $c->session->{cal_filter_site} // '';
+            $filter_site = $saved_filter ? $saved_filter : $sitename;
+            my @_filtered_sites = ($filter_site && grep { $_ eq $filter_site } @_cal_sites) ? ($filter_site) : @_cal_sites;
+            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_filtered_sites);
+            if (my $filter_user = $c->session->{cal_filter_user} // '') {
+                $all_todos_calendar = [grep {
+                    my $dev = eval { $_->developer }          // '';
+                    my $uop = eval { $_->username_of_poster } // '';
+                    $dev eq $filter_user || $uop eq $filter_user;
+                } @$all_todos_calendar];
+            }
+            if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
+                my $week_first_day = $week_dates[0]{date_str};
+                my $today_str = $current_date_str;
+
+                for my $todo (@$all_todos_calendar) {
+                    my $start_raw = $todo->start_date || '';
+                    my $due_raw   = $todo->due_date   || '';
+                    $start_raw = $start_raw->ymd if ref $start_raw && eval { $start_raw->can('ymd') };
+                    $due_raw   = $due_raw->ymd   if ref $due_raw   && eval { $due_raw->can('ymd') };
+                    my $start = length($start_raw) >= 10 ? substr($start_raw, 0, 10) : '';
+                    my $due   = length($due_raw)   >= 10 ? substr($due_raw,   0, 10) : '';
+
+                    my $is_done    = exists $_done_set{ $todo->status // '' };
+                    my $is_recurr  = ($todo->can('is_recurring') && $todo->is_recurring)
+                        || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+                    my $anchor     = $start || $due || '';
+
+                    if ($is_recurr && !$is_done) {
+                        my $rec_sd = $start || '';
+                        push @$todos_for_today, $todo
+                            if (!$rec_sd || $rec_sd le $selected_date)
+                            && recurring_matches_date($todo, $selected_date);
+
+                        for my $day_info (@week_dates) {
+                            my $d_str = $day_info->{date_str};
+                            my $effective_start = $rec_sd || $today_str;
+                            next if $effective_start gt $d_str;
+                            next unless recurring_matches_date($todo, $d_str);
+                            my $already = grep { $_->record_id == $todo->record_id }
+                                          @{ $week_todos_by_date{$d_str} // [] };
+                            push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
+                        }
+                    } elsif ($start && $start eq $selected_date) {
+                        push @$todos_for_today, $todo;
+                    } elsif (!$start && $due && $due eq $selected_date) {
+                        push @$todos_for_today, $todo;
+                    } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
+                        push @$todos_for_today, $todo;
+                    } elsif (!$is_done && !$is_recurr) {
+                        if ($start && $start lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        } elsif (!$start && $due && $due lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        }
+                    }
+
+                    unless ($is_recurr) {
+                        my $anchor_key = $start || (!$start ? $due : '');
+                        if ($anchor_key) {
+                            if ($anchor_key lt $week_first_day) {
+                                push @week_overdue_todos, $todo;
+                            } else {
+                                push @{ $week_todos_by_date{$anchor_key} }, $todo
+                                    unless $anchor_key gt $week_dates[-1]{date_str};
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+                "Calendar data error: " . $@);
         }
     }
+
+    # Daily Priorities (Focus Queue) — top-ranked open todos.
+    # score_todo is a PROCEDURAL sub in Comserv::Util::TodoRanking (no ->new
+    # constructor); it takes a column hashref + a ctx hashref, exactly like the
+    # main Todo list (Controller/Todo.pm:427). The previous code called
+    # TodoRanking->new (no such method) and a non-existent
+    # Model::Todo->get_all_todos_for_listing, so the Focus Queue silently died.
+    my @active_priorities = ();
+    my @remaining_open_todos = ();
+    my @_focus_all;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        die "DB unavailable" unless $schema;
+
+        # Open (non-done) todos for the active site, ranked in Perl.
+        @_focus_all = $schema->resultset('Todo')->search(
+            { sitename => $sitename,
+              status   => { -not_in => [3, 4, 'done', 'completed', 'Completed', 'DONE', 'Closed', 'closed', 'Done'] } },
+            { order_by => [{ -asc => 'priority' }, { -desc => 'last_mod_date' }] }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+            "Priority ranking error (focus query): " . $@);
+    }
+
+    eval {
+        my %row_by_id = map { $_->record_id => { $_->get_columns } } @_focus_all;
+        my $now_epoch = time();
+        # Classify a todo as a scheduled break/meal event and rank it by time-of-day.
+        # Morning Break (10:00) -> 1, Lunch (12:00) -> 2, Afternoon Break (15:00) -> 3.
+        my $break_rank = sub {
+            my ($subj) = @_;
+            return 0 unless defined $subj;
+            return 1 if $subj =~ /morning\s*break/i;
+            return 2 if $subj =~ /\blunch\b/i;
+            return 3 if $subj =~ /afternoon\s*break/i;
+            return 0;
+        };
+        my @scored;
+        for my $t (@_focus_all) {
+            my $h = $row_by_id{ $t->record_id };
+            Comserv::Util::TodoRanking::score_todo($h, { now_epoch => $now_epoch });
+            # Pass the decorated column hash (has every real column PLUS ap_score /
+            # project_name / blocking_names / etc. set by score_todo) to the template,
+            # exactly like Controller/Todo.pm. Passing the bare DBIx row left those
+            # fields undef and (with the is_recurring skip) could empty the queue.
+            my $subj      = $h->{subject} // '';
+            my $is_break  = ($break_rank->($subj) ? 1 : 0);
+            my $tod       = $h->{time_of_day} // '';
+            my $time_min  = 9 * 60;   # default when no time set (matches _reschedule_time_min)
+            $time_min = $1 * 60 + $2 if $tod =~ /^(\d{1,2}):(\d{2})/;
+            push @scored, {
+                todo        => $h,
+                score       => $h->{ap_score},
+                pri         => $h->{priority},
+                in_progress => $h->{in_progress} ? 1 : 0,
+                is_break    => $is_break,
+                break_rank  => $break_rank->($subj),
+                time_min    => $time_min,
+            };
+        }
+        # Three-tier ordering for the priorities list:
+        #   tier 0 (top):   in-progress / active todos
+        #   tier 1:         scheduled break/meal events, by time-of-day (Morning -> Lunch -> Afternoon)
+        #   tier 2:         remaining open todos, by ap_score (desc)
+        @scored = sort {
+            my $ta = $a->{in_progress} ? 0 : ($a->{is_break} ? 1 : 2);
+            my $tb = $b->{in_progress} ? 0 : ($b->{is_break} ? 1 : 2);
+            $ta <=> $tb
+              || ($ta == 1 ? ($a->{break_rank} <=> $b->{break_rank})
+                           : ($b->{score} <=> $a->{score}))
+        } @scored;
+        @active_priorities = map { $_->{todo} } @scored[0..($#scored > 19 ? 19 : $#scored)];
+
+        # Remaining (eligible but not in top 20) — also pass the decorated hash.
+        my %top_ids = map { $_->{record_id} => 1 } @active_priorities;
+        for my $t (@_focus_all) {
+            my $h = $row_by_id{ $t->record_id };
+            next if $top_ids{ $h->{record_id} };
+            push @remaining_open_todos, $h;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+            "Priority ranking error (focus rank/remaining): " . $@);
+    }
+
+    my @planning_projects = ();
+    eval {
+        @planning_projects = $c->model('DBEncy')->resultset('Project')->search(
+            { parent_id => undef }, { order_by => 'name' }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+            "Planning projects error: " . $@);
+    }
+
+    # Stale log badge
+    my $stale_log_count = 0;
+    eval {
+        $stale_log_count = $c->model('DBEncy')->resultset('Log')->search(
+            { status => { '!=' => 3 }, end_time => '00:00:00' }
+        )->count;
+    };
+
+    my $open_log_entry = undef;
+    eval {
+        $open_log_entry = $c->model('DBEncy')->resultset('Log')->search(
+            { status => { '!=' => 3 }, end_time => '00:00:00' },
+            { order_by => 'record_id DESC', rows => 1 }
+        )->first;
+    };
+
+    my $ai_default_model = '';
+    eval {
+        my $cfg = $c->model('DBEncy')->resultset('AIModelCatalog')->search(
+            { is_default => 1, is_active => 1 }, { rows => 1 }
+        )->first;
+        $ai_default_model = $cfg->model_name if $cfg;
+    };
+
+    my $prev_date_calc = $prev_date;
+    my $next_date_calc = $next_date;
+
+    $c->stash(
+        selected_date     => $selected_date,
+        display_date      => $display_date,
+        current_date_str  => $current_date_str,
+        current_display   => $current_display,
+        prev_date         => $prev_date_calc,
+        next_date         => $next_date_calc,
+        week_dates        => \@week_dates,
+        start_of_week     => $start_of_week,
+        end_of_week       => $end_of_week,
+        prev_week_date    => $prev_week_date,
+        next_week_date    => $next_week_date,
+        start_of_month    => $start_of_month,
+        end_of_month      => $end_of_month,
+        prev_month_date   => $prev_month_date,
+        next_month_date   => $next_month_date,
+        todos_for_today   => $todos_for_today,
+        overdue_todos     => $overdue_todos,
+        week_todos_by_date=> \%week_todos_by_date,
+        week_overdue_todos=> \@week_overdue_todos,
+        all_todos_calendar=> $all_todos_calendar,
+        active_priorities => \@active_priorities,
+        remaining_open_todos => \@remaining_open_todos,
+        planning_projects => \@planning_projects,
+        stale_log_count   => $stale_log_count,
+        open_log_entry    => $open_log_entry,
+        ai_default_model  => $ai_default_model,
+        is_csc            => $is_csc,
+        is_csc_admin      => $is_csc_admin,
+        SiteName          => $sitename,
+        template          => 'admin/planning/DailyPlan.legacy.tt',
+    );
+}
+
+=head2 daily_priorities
+
+Clean Daily Priorities page (feature 1 of the rebuilt /planning/daily).
+Reuses daily_impl() to compute the focus-queue stash, then renders a
+focused template. This is a normal standalone page, so the global floating
+buttons (Back-to-Top / AI Editor / Chat) render correctly — no nested
+full-page injection.
+
+=cut
+
+sub daily_priorities :Path('/planning/daily-priorities') :Args {
+    my ($self, $c, @args) = @_;
+    # Populate the same stash daily_impl builds (focus queue, remaining, etc.)
+    $c->forward('daily_impl', \@args);
+    # Override the template to the focused Daily Priorities view.
+    $c->stash->{template} = 'admin/planning/DailyPriorities.tt';
 }
 
 =head2 daily_log
@@ -1741,34 +2142,12 @@ sub deploy :Path('deploy') :Args(0) {
 # Build the worktree registry list for the planning tab from
 # root/config/worktrees.json (via Comserv::Util::Git). Returns
 # [ { name, port, label, url, cmd }, ... ] with main first.
+# Delegates to Comserv::Util::Git->build_worktree_list — the single canonical
+# builder shared with the Git dashboard's "Develop Servers" card, so the two
+# surfaces can never drift apart.
 sub _build_worktree_list {
     my ($c) = @_;
-    my @list;
-    my $base = eval { Comserv::Util::Git->worktree_base_dir } // "$ENV{HOME}/.comserv/worktrees";
-    my $cfg  = eval { Comserv::Util::Git::_worktree_config() } // { branches => {} };
-
-    # main (primary checkout, port 3001)
-    push @list, {
-        name => 'main',
-        port => 3001,
-        label => 'MAIN',
-        url  => '/planning/daily',
-        cmd  => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
-    };
-
-    my $branches = $cfg->{branches} // {};
-    for my $name (sort keys %$branches) {
-        my $b = $branches->{$name};
-        push @list, {
-            name  => $name,
-            port  => $b->{port} // 0,
-            label => $b->{label} // $name,
-            url   => $b->{url}   // '/planning/daily',
-            cmd  => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
-                   . ($b->{port} // 0) . ' -r',
-        };
-    }
-    return \@list;
+    return Comserv::Util::Git->build_worktree_list;
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -142,38 +142,18 @@
         [%# ── Project search filter ── %]
         <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
             <input type="text" id="project-search" placeholder="🔍 Search projects by name, site, or status…"
-                oninput="filterProjects(this.value)"
+                data-action="filter-projects"
                 style="flex:1;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;font-size:0.88em;background:var(--bg-color);color:var(--text-color);">
-            <button onclick="document.getElementById('project-search').value='';filterProjects('');"
+            <button data-action="clear-project-search"
                 style="padding:5px 10px;border:1px solid var(--border-color);border-radius:4px;background:transparent;color:var(--text-muted-color);cursor:pointer;font-size:0.85em;">✕</button>
         </div>
-        <script>
-        function filterProjects(q) {
-            q = q.toLowerCase().trim();
-            var cards = document.querySelectorAll('.project-card');
-            var headers = document.querySelectorAll('.site-group-header');
-            cards.forEach(function(card) {
-                var text = card.textContent.toLowerCase();
-                card.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
-            });
-            headers.forEach(function(h) {
-                var next = h.nextElementSibling;
-                var visible = false;
-                while (next && !next.classList.contains('site-group-header')) {
-                    if (next.classList.contains('project-card') && next.style.display !== 'none') visible = true;
-                    next = next.nextElementSibling;
-                }
-                h.style.display = (!q || visible) ? '' : 'none';
-            });
-        }
-        </script>
 
         [%# ── Project → Plan hierarchy (from stash planning_projects) ── %]
         [% IF planning_projects && planning_projects.size %]
         [% IF is_admin %]
         <div id="project-reorder-bar" style="display:none;padding:8px 12px;background:color-mix(in srgb,var(--primary-color) 12%,var(--bg-color));border:1px solid var(--primary-color);border-radius:4px;margin-bottom:10px;font-size:0.85em;align-items:center;gap:12px;">
             <span>⇅ Drag rows to reorder projects</span>
-            <button id="save-order-btn" onclick="saveProjectOrder()" style="padding:3px 12px;background:var(--primary-color);color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Save Order</button>
+            <button id="save-order-btn" data-action="save-project-order" style="padding:3px 12px;background:var(--primary-color);color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Save Order</button>
             <span id="save-order-msg" style="color:green;display:none;">✓ Saved</span>
         </div>
         [% END %]
@@ -186,7 +166,7 @@
             [% IF in_site_group %]</details>[% END %]
             [% SET current_site_label = proj.sitename %]
             [% SET in_site_group = 1 %]
-            <details class="site-group" style="margin-bottom:6px;">
+            <details class="site-group" style="margin-bottom:6px;" open>
                 <summary class="site-group-header" style="padding:4px 10px;background:color-mix(in srgb,var(--primary-color) 20%,var(--bg-color));color:var(--text-color);border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
                     <span>🌐 [% proj.sitename %]</span>
                     <span style="font-size:0.9em;opacity:0.8;">▾</span>
@@ -199,7 +179,7 @@
                 class="project-card" open>
                 <summary style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none;">
                     <span style="display:flex;align-items:center;gap:8px;">
-                        [% IF is_admin %]<span class="drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--text-muted-color);font-size:1.1em;user-select:none;" onclick="event.stopPropagation()">⠿</span>[% END %]
+                        [% IF is_admin %]<span class="drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--text-muted-color);font-size:1.1em;user-select:none;" data-action="drag-handle">⠿</span>[% END %]
                         <strong>[% proj.name %]</strong>
                         [% IF proj.project_code %]<span style="font-size:0.8em;color:var(--text-muted-color);margin-left:6px;">[% proj.project_code %]</span>[% END %]
                         [% IF proj.developer_name %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">· [% proj.developer_name %]</span>[% END %]
@@ -213,7 +193,7 @@
                             [% proj.status %]
                         </span>
                         [% END %]
-                        <a href="/project/details?project_id=[% proj.id %]" style="font-size:0.78em;color:var(--primary-color);text-decoration:none;" onclick="event.stopPropagation()">Details</a>
+                        <a href="/project/details?project_id=[% proj.id %]" style="font-size:0.78em;color:var(--primary-color);text-decoration:none;" data-action="stop-propagation">Details</a>
                     </span>
                 </summary>
                 <div style="padding:0 14px 12px;">
@@ -284,7 +264,7 @@
                             <option value="[% ap.id %]">[% ap.plan_name %] [% IF ap.sitename %]([% ap.sitename %])[% END %]</option>
                             [% END %]
                         </select>
-                        <button onclick="linkPlanToProject(this, [% proj.id %])"
+                        <button data-action="link-plan" data-plan-id="[% proj.id %]"
                             style="font-size:0.78em;padding:2px 8px;border:1px solid var(--primary-color);border-radius:3px;background:transparent;color:var(--primary-color);cursor:pointer;">
                             Link
                         </button>
@@ -385,7 +365,7 @@
                 <td style="padding:7px 10px;color:var(--text-muted-color);font-size:0.9em;">[% dep.description | truncate(80) %]</td>
                 [% IF is_admin %]
                 <td style="padding:7px 4px;text-align:center;">
-                    <button onclick="resolveDep([% dep.id %], this)"
+                    <button data-action="resolve-dep" data-dep-id="[% dep.id %]"
                         style="font-size:0.72em;padding:2px 7px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark this dependency as resolved">✓ Resolved</button>
                 </td>
                 [% END %]

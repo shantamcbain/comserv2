@@ -1,0 +1,183 @@
+[% META
+        title = "INFRA-HA &mdash; .198 probed, disk cleared, 3rd node unlocked"
+   description = "2026-08-11: .198 was wrongly recorded as unprobeable / different credentials / the production DB. Verified it shares .199 SSH credentials, runs Docker v29.7.2, had a 100%-full disk that was personal data (not the DB), and is now a viable 3rd app node closing the Phase B quorum gap. Phase F.0 unblocked."
+   roles = "admin,devops,developer"
+   TemplateType = "Documentation"
+   category = "infrastructure,high-availability,deployment"
+   page_version = "1.00"
+   last_updated = "Tue Aug 11 2026"
+   site_specific = "true"
+   project_id = "202"
+   project_code = "INFRA-HA"
+%]
+
+<div class="container">
+    <h1 class="doc-h1">INFRA-HA &mdash; .198 probed, disk cleared, 3rd node unlocked</h1>
+
+    <div class="doc-muted last-updated">
+        Last Updated: 2026-08-11 | Version: 1.00 | Author: shanta | Status: Infrastructure change (cleanup only, no app container touched)
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#probe" class="doc-navlink">What .198 actually is</a>
+                <a href="#disk" class="doc-navlink">Disk cleanup</a>
+                <a href="#plan" class="doc-navlink">Plan corrections</a>
+                <a href="#next" class="doc-navlink">What unblocks</a>
+                <a href="#tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="summary" class="doc-h2">1. Summary</h2>
+            <p class="doc-body">
+                The master plan (v1.12) carried three false claims about
+                <strong>.198</strong>: (a) it "could not be probed (different SSH credentials)",
+                (b) it was the "Backup DB server", and (c) Phase F.0 was therefore blocked on
+                a credentials dependency. All three are now disproven by direct investigation on
+                2026-08-11. .198 shares the <em>same</em> SSH credentials as .199, is <em>not</em>
+                the production database, and its root disk &mdash; which was 100% full &mdash; was
+                filled with personal data, not the DB. The disk was cleared and the 2024 backups
+                were preserved. .198 is now a credible <strong>third app node</strong>, which
+                directly closes the &sect;3e quorum gap in the plan. No application container was
+                started, stopped, or modified.
+            </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="probe" class="doc-h2">2. What .198 actually is (verified)</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Property</th>
+                    <th class="doc-th">Plan v1.12 said</th>
+                    <th class="doc-th">Verified 2026-08-11</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">SSH credentials</td>
+                    <td class="doc-td">"different from .126; must be supplied by user"</td>
+                    <td class="doc-td"><strong>Same as .199</strong> (key auth works); probed successfully</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Docker</td>
+                    <td class="doc-td">"status could not be probed"</td>
+                    <td class="doc-td"><strong>v29.7.2 installed, daemon active</strong>, 0 containers</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Database role</td>
+                    <td class="doc-td">"Backup DB server (MySQL/MariaDB on 3306)"</td>
+                    <td class="doc-td">MariaDB present but holds <strong>zero application schemas</strong> (~377M system only); not the Comserv primary (.20:3307 is). Clean replica base, not a conflicting primary.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Disk</td>
+                    <td class="doc-td">(unverified)</td>
+                    <td class="doc-td">Was <strong>100% full (156G/164G, 61M free)</strong>; root cause was /home/shanta (102G personal) and /snap (42G), not the DB. Now <strong>32G free</strong> after cleanup.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">RAM / DB reachability</td>
+                    <td class="doc-td">(unverified)</td>
+                    <td class="doc-td">15 GB RAM free; can reach primary DB at <strong>.20:3307</strong> (confirmed by TCP probe).</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="disk" class="doc-h2">3. Disk cleanup performed (conservative, reversible where possible)</h2>
+            <p class="doc-body">Ran read-only-then-delete on .198 with the user's explicit go-ahead. The only "live" file touched was truncated, not deleted; the only data of possible value was copied off-box first.</p>
+            <ul class="doc-body">
+                <li><strong>Truncated</strong> a 4.6 GB runaway <code>/home/shanta/nohup.out</code> log (live, so truncated not removed) &mdash; freed ~4.6 GB immediately.</li>
+                <li><strong>Removed</strong> regenerable caches/crash dumps: <code>~/.codeium</code> (2.3 GB), <code>java_error_in_pycharm.hprof</code> (2.7 GB), <code>~/.cache</code> (Raspberry Pi Imager cache).</li>
+                <li><strong>Removed</strong> clearly-stale 2023 download tarballs (<code>beemast</code>, <code>iamnuts</code>) from <code>~/Downloads</code>.</li>
+                <li><strong>Preserved</strong> the "possibly important" 2024 <code>~/backups/comserv-24-04-01</code> (16 GB) by rsync-ing the full set to <code>.199:/home/shanta/comserv2-backups-198-2024</code> for safekeeping, then deleted the originals on .198.</li>
+                <li><strong>Did NOT touch</strong> MariaDB data, the NFS-exported comserv2 repo, or any file outside the listed junk.</li>
+            </ul>
+            <div class="doc-info">
+                <h3>Note on NFS &mdash; corrected</h3>
+                <p class="doc-body">The user mentioned an NFS server "to move important files to". Investigation found .198 <em>is</em> an NFS <em>server</em> (its <code>/etc/exports</code> lists the comserv2 repo shared to .199) but that export is currently <strong>dormant</strong> (nfs-server service not running) and is a dev code-share, <strong>not</strong> the app's shared-data NFS. The application's real shared-data NFS is <strong>192.168.1.175</strong> (<code>/mnt/data</code>), mounted at <code>/data/nfs</code> inside containers via the <code>workshop-files-nfs</code> volume in <code>docker-compose.prod.yml</code> (<code>type: nfs, o: addr=192.168.1.175,...,device: ":/"</code>). The 2024 backups were therefore relocated via rsync to .199 rather than NFS. Nothing on the live repo was affected.</p>
+                <p class="doc-body"><strong>Implication for new nodes:</strong> a .198 (or .126) app node gets <code>/data/nfs</code> automatically <em>only if</em> it is deployed via the same compose/k8s spec that declares <code>workshop-files-nfs</code> AND (a) it can route to .175:2049 and (b) .175's <code>/etc/exports</code> permits that node's IP. The NFS mount travels with the deployment spec, not the image. See Phase C / Phase F NFS prerequisite.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="plan" class="doc-h2">4. Master plan corrections (v1.12 &rarr; v1.13)</h2>
+            <p class="doc-body">The authoritative plan <a href="/Documentation/K3S_APP_HA_PLAN">Availability &amp; Load Balancing Master Plan</a> was updated to match this evidence:</p>
+            <ul class="doc-body">
+                <li>&sect;2 "Verified current state" &mdash; .198 row rewritten: Docker active, 32 GB free, viable 3rd app node. The "different credentials / unverified" standing constraint replaced with the corrected record.</li>
+                <li>&sect;3e "How many nodes?" &mdash; the "honest gap: no credible third node" paragraph replaced: .198 is now a real, owned, in-rack third node; B.2 topology should default to <strong>3 nodes (.126 / .199 / .198)</strong>.</li>
+                <li>Phase F (DB HA) &mdash; F.0 unblocked: .198 shares .199 creds and was probed; on-box MariaDB is a clean replica base. AUTH-R4 downgraded from blocker to recommendation.</li>
+                <li>&sect;8 retained SPOFs &mdash; .198 noted as the dedicated third node resolving the ".199 is the workstation" tension; OPNsense named as the remaining SPOF once the app tier is 3-node behind it.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="next" class="doc-h2">5. What this unblocks</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Previously blocked</th>
+                    <th class="doc-th">Now</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase B.2 topology decision (2 vs 3 nodes)</td>
+                    <td class="doc-td">3-node embedded-etcd HA control plane is a low-cost, owned-hardware option &mdash; no quorum gap.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase F.0 DB replica assessment (AUTH-R4 credentials)</td>
+                    <td class="doc-td">.198 reachable; F.0 can proceed to version-parity + drift check.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">App-tier SPOF on .199 workstation</td>
+                    <td class="doc-td">A dedicated .198 app node means the site no longer depends on the workstation staying up.</td>
+                </tr>
+            </table>
+            <p class="doc-body"><strong>Still requires explicit authorization before any change:</strong> standing up the registry on .199 (Phase A.3/A.4), any k3s install, OPNsense HAProxy changes, and DB replication. This entry is investigation + cleanup + documentation only.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="/project/details?project_id=202" class="doc-link">#202 (INFRA-HA)</a>.
+                Each phase is a sub-project of #202. This entry updates the plan text only;
+                no new phase todos were created &mdash; it clears blockers on existing ones
+                (Phase B.2 topology, Phase F.0/F.1).
+            </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">6. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="/Documentation/K3S_APP_HA_PLAN" class="doc-link">Availability &amp; Load Balancing Master Plan</a> &mdash; updated to v1.13 (&sect;2, &sect;3e, Phase F, &sect;8)</li>
+                    <li><a href="/Documentation/2026-08-10-infra-ha-phase-a-registry-decomposition" class="doc-link">Changelog 2026-08-10 (a)</a> &mdash; Phase A decomposition, registry port 5001</li>
+                    <li><a href="/Documentation/GatewayPlan" class="doc-link">Gateway Plan</a> &mdash; OPNsense HAProxy + ACME, the LB entry point for the 3-node tier</li>
+                    <li><a href="/project/details?project_id=202" class="doc-link">Project #202 (INFRA-HA)</a> &mdash; live phase tracking</li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+</div>

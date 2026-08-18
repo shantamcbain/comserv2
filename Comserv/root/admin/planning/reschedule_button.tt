@@ -5,10 +5,9 @@
     Reads ap_all_sitenames (array) from stash for the site dropdown.
     Omit ap_all_sitenames or have only one site to hide the site selector.
 
-    To add a new focus type:
-      1. Add an <option> in the focus <select> below.
-      2. Add the key/label in the focusLabel map in the JS.
-      3. Add a matching branch in Todo.pm _do_reschedule focus-filter block.
+    NO inline <script> / onclick= (forbidden by root/js_load.tt). All behaviour is
+    wired in static/js/planning/daily-plan-utils.js via data-action delegation.
+    The widget seeds window.ComservConfig.rescheduleSites on load from the select.
 -->
 <span id="reschedule-widget" style="display:inline-flex;align-items:center;gap:0;border:1px solid #6f42c1;border-radius:4px;overflow:hidden;flex-shrink:0;">
     [% IF ap_all_sitenames && ap_all_sitenames.size > 1 %]
@@ -29,80 +28,7 @@
         <option value="accounting">Data Entry</option>
         <option value="errors">Errors Only</option>
     </select>
-    <button onclick="rescheduleTodos(this)"
+    <button data-action="reschedule"
             style="padding:3px 8px;border:none;background:transparent;font-size:0.78em;color:#6f42c1;cursor:pointer;white-space:nowrap;"
             title="Re-schedule open todos from NOW onward. Each user gets their own timeline (same time OK across users).">&#9851; Reschedule</button>
 </span>
-
-<script>
-(function(){
-    if (window._rescheduleTodosLoaded) return;
-    window._rescheduleTodosLoaded = true;
-
-    function _rescheduleSelectedSites() {
-        var sites = [];
-        var sitesSel = document.getElementById('reschedule-sites');
-        if (sitesSel) {
-            var opts = sitesSel.options;
-            for (var i = 0; i < opts.length; i++) {
-                if (opts[i].selected && opts[i].value) sites.push(opts[i].value);
-            }
-        }
-        if (!sites.length) {
-            var gcalSite = document.getElementById('gcal-site-filter');
-            if (gcalSite && gcalSite.value) sites.push(gcalSite.value);
-        }
-        return sites;
-    }
-
-    window.rescheduleTodos = function(btn) {
-        var focusSel = document.getElementById('reschedule-focus');
-        var focus = focusSel ? focusSel.value : 'all';
-        var sites = _rescheduleSelectedSites();
-        btn.disabled = true;
-        var origText = btn.textContent;
-        btn.textContent = 'Rescheduling...';
-        fetch('/todo/reschedule', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-            body: JSON.stringify({focus: focus, sites: sites, scope: 'all'})
-        }).then(function(r) { return r.json(); }).then(function(d) {
-            if (d.ok) {
-                var labels = {
-                    all: 'All', programming: 'Programming',
-                    accounting: 'Data Entry', errors: 'Errors Only'
-                };
-                var focusLabel = labels[d.focus] || d.focus || 'All';
-                var siteLabel  = (d.sites && d.sites.length) ? d.sites.join(', ') : 'All Sites';
-                var msg = 'Rescheduled ' + d.count + ' todo' + (d.count !== 1 ? 's' : '')
-                        + ' [' + siteLabel + ' / ' + focusLabel + ']'
-                        + ' from ' + (d.today || 'today') + ' forward.';
-                if (d.error_count) msg += '\n' + d.error_count + ' update(s) failed.';
-                msg += '\n\nReloading page...';
-                alert(msg);
-                location.reload();
-            } else {
-                btn.disabled = false;
-                btn.textContent = origText;
-                alert('Error: ' + (d.error || 'unknown'));
-            }
-        }).catch(function(e) {
-            btn.disabled = false;
-            btn.textContent = origText;
-            alert('Error: ' + e);
-        });
-    };
-
-    document.addEventListener('DOMContentLoaded', function() {
-        var sitesSel = document.getElementById('reschedule-sites');
-        var gcalSite = document.getElementById('gcal-site-filter');
-        if (!sitesSel || !gcalSite || !gcalSite.value) return;
-        for (var i = 0; i < sitesSel.options.length; i++) {
-            if (sitesSel.options[i].value === gcalSite.value) {
-                sitesSel.options[i].selected = true;
-            }
-        }
-    });
-}());
-</script>

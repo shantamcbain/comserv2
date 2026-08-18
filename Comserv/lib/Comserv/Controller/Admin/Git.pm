@@ -311,10 +311,30 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             # validated against git status above. With nothing ticked, commit
             # whatever is already staged.
             if ($validated && @{ $validated->{valid} }) {
-                my ($aout, $acode) = $self->_git_list($c, 'add', '--', @{ $validated->{valid} });
-                if ($acode != 0) {
-                    $msg = "Stage-before-commit failed: $aout";
-                    goto COMMIT_DONE;
+                # Only stage paths that still have an UNSTAGED working-tree change.
+                # A path already in the index (e.g. a staged deletion shown as 'D  '
+                # in porcelain) must NOT be passed to `git add` — `git add` on a
+                # staged-deleted file errors with "pathspec did not match any files",
+                # which aborts the whole commit. Such paths are already staged and will
+                # be committed as-is.
+                my %stage_needed;
+                {
+                    my ($porc) = $self->_git_list($c, 'status', '--porcelain');
+                    for my $line (split /\n/, $porc // '') {
+                        next unless $line =~ /^(..)\s(.+)$/;
+                        my ($xy, $file) = ($1, $2);
+                        $file = (split / -> /, $file)[-1] if $file =~ / -> /;
+                        # untracked, or any unstaged change in column 2
+                        $stage_needed{$file} = 1 if ($xy eq '??' || substr($xy, 1, 1) ne ' ');
+                    }
+                }
+                my @to_add = grep { $stage_needed{$_} } @{ $validated->{valid} };
+                if (@to_add) {
+                    my ($aout, $acode) = $self->_git_list($c, 'add', '--', @to_add);
+                    if ($acode != 0) {
+                        $msg = "Stage-before-commit failed: $aout";
+                        goto COMMIT_DONE;
+                    }
                 }
             }
 
@@ -675,6 +695,11 @@ sub index :Path('/admin/git') :Args(0) {
         tracking        => $self->get_tracking_info($c),
         git_targets     => $self->git_service->list_targets($c),
         git_target      => $target_key,
+        # Develop-server (zenflow worktree) registry — single source of truth via
+        # Comserv::Util::Git->build_worktree_list (reads root/config/worktrees.json).
+        # The Git dashboard's "Develop Servers" card reuses the same data the planning
+        # tab's "Branch Servers" panel shows, so the two can never drift.
+        worktree_list   => $self->git_service->build_worktree_list,
         template        => 'admin/git/index.tt',
     );
 
@@ -685,6 +710,73 @@ sub index :Path('/admin/git') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Completed git dashboard");
+}
+
+=head2 file_diff
+
+GET /admin/git/file_diff?path=<repo-relative path>
+Read-only: return the unified diff of a single working-tree file vs HEAD so the
+dashboard can show exactly what an AI edit changed. For untracked (new) files we
+diff against /dev/null so the full new content shows as additions. Admin-gated.
+The path is validated to stay inside the resolved repo root (no traversal).
+
+=cut
+
+sub file_diff :Path('/admin/git/file_diff') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $self->admin_auth->require_admin_access($c, 'git_dashboard');
+
+    my $rel = $c->req->param('path') || '';
+    $c->res->content_type('application/json');
+
+    unless (length $rel) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'path required' }));
+        return;
+    }
+
+    # Normalise and confine to the repo root (block ../ traversal).
+    $rel =~ s#\\#/#g;
+    $rel =~ s#^\/+##;
+    if ($rel =~ /\.\./) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid path' }));
+        return;
+    }
+
+    my $git     = $self->git_service;
+    my $repo    = $git->repo_path($c);
+    my $abs     = File::Spec->catfile($repo, $rel);
+    my $repo_re = quotemeta($repo);
+    # resolved path must live inside the repo root
+    unless ($abs =~ /^$repo_re/) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid path' }));
+        return;
+    }
+
+    my $is_new = (!-e $abs) ? 1 : 0;
+    my $r = $is_new
+        ? $git->_run($c, 'diff', '--no-index', '/dev/null', $abs)
+        : $git->_run($c, 'diff', 'HEAD', '--', $rel);
+
+    # git diff exits 1 when there ARE differences (expected, not an error).
+    if (!$r->{success} && !length($r->{output} // '')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'file_diff',
+            "diff failed for path=$rel is_new=$is_new : " . ($r->{error} || 'unknown') .
+            " (git exit " . ($r->{exit_code} // -1) . ")");
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => $r->{error} || 'diff failed' }));
+        return;
+    }
+
+    $c->res->body(encode_json({
+        success => 1,
+        path    => $rel,
+        is_new  => $is_new ? 1 : 0,
+        diff    => $r->{output} // '',
+    }));
 }
 
 =head2 get_tracking_info
