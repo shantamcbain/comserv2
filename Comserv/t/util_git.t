@@ -17,12 +17,17 @@ use_ok('Comserv::Util::Git') or BAIL_OUT('Cannot load Comserv::Util::Git');
     sub new { bless {}, shift }
     sub stringify { $ENV{COMSERV_GIT_REPO} }
 
+    package FakeReq;
+    sub new  { bless {}, shift }
+    sub param { undef }
+
     package FakeC;
     sub new { bless { stash => {}, session => {} }, shift }
     sub config   { {} }
     sub path_to  { FakePath->new }
     sub stash    { $_[0]->{stash} }
     sub session  { $_[0]->{session} }
+    sub req      { FakeReq->new }
 }
 
 # Resolve the repo root (one level above the Comserv app dir) if not already set.
@@ -48,6 +53,13 @@ ok(length($git->repo_path($c)), 'repo_path resolves to a non-empty path');
 # current_branch returns a non-empty string
 my $branch = $git->get_current_branch($c);
 ok(defined $branch && length $branch, "current_branch returns a value ($branch)");
+
+# current_branch_and_commit returns the live branch + short sha (the value the
+# global header now uses, so it can never drift from the dashboard's branch).
+my $live = $git->current_branch_and_commit($c);
+ok(defined $live && ref $live eq 'HASH', 'current_branch_and_commit returns a hashref');
+is($live->{branch}, $branch, 'current_branch_and_commit branch matches get_current_branch');
+ok($live->{commit} =~ /^[a-f0-9]+$/, "current_branch_and_commit commit is a short sha ($live->{commit})");
 
 # status parses to the documented hashref shape
 my $status = $git->get_git_status($c);

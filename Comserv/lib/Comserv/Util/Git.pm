@@ -435,6 +435,29 @@ sub get_current_branch {
     return ($r->{success} && length $branch) ? $branch : 'unknown';
 }
 
+=head2 current_branch_and_commit($c)
+
+Returns a hashref C<{ branch => $branch, commit => $short_sha }> for the
+LIVE checkout of the resolved repo. Unlike the build-time stamp in
+C<version.json>, this always reflects the branch/worktree the app is actually
+running from, so the global header can't lie about which branch a developer is
+on. Returns C<undef> on any failure so callers can fall back to the build stamp.
+
+=cut
+
+sub current_branch_and_commit {
+    my ($self, $c) = @_;
+    my $branch = $self->get_current_branch($c);
+    return undef if !defined $branch || $branch eq '' || $branch eq 'unknown';
+
+    my $r = $self->_run($c, 'rev-parse', '--short', 'HEAD');
+    my $commit = $r->{success} ? $r->{output} : '';
+    chomp $commit if defined $commit;
+    $commit = '' unless defined $commit;
+
+    return { branch => $branch, commit => $commit };
+}
+
 =head2 get_available_branches($c)
 
 Fetch and return an arrayref of remote branch names (origin/*), main first,
