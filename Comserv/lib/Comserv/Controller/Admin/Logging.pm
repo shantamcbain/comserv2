@@ -99,7 +99,47 @@ sub index :Path('/admin/logging') :Args(0) {
         return @rows;
     };
 
-    eval {
+    # Run an operation, retrying ONCE with a fresh DB handle if a transient
+    # connection drop (e.g. "Lost connection to MySQL server during query") is
+    # the cause. mariadb_auto_reconnect only repairs the NEXT statement, not the
+    # in-flight one that failed, so we must disconnect + grab a new handle and
+    # retry. Mirrors the proven pattern in Admin::HardwareMonitor.
+    my $attempt_with_reconnect = sub {
+        my ($op) = @_;
+        my $ok = eval { $op->(); 1 };
+        unless ($ok) {
+            my $err = "$@";
+            if ($err =~ /Lost connection|server has gone away|MySQL server/i) {
+                my $schema = $c->model('DBEncy');
+                eval { $schema->storage->disconnect };
+                my $fresh = eval { $schema->storage->dbh };
+                if ($fresh) {
+                    $ok = eval { $op->(); 1 };
+                    $err = "$@" unless $ok;
+                }
+            }
+            return ($ok, $err);
+        }
+        return (1, '');
+    };
+
+    my $area_counts_stash = sub {
+        my ($schema) = @_;
+        my @area_counts;
+        if (%$search_params) {
+            my $rows = $schema->storage->dbh->selectall_arrayref(
+                "SELECT subroutine, COUNT(*) AS cnt FROM system_log
+                 WHERE " . join(' AND ', map { "$_ = ?" } keys %$search_params) . "
+                 GROUP BY subroutine ORDER BY cnt DESC LIMIT 25",
+                { Slice => {} }, values %$search_params
+            );
+            @area_counts = map { { area => $_->{subroutine} // 'unknown', count => $_->{cnt} } } @$rows;
+        }
+        $c->stash(level_area_counts => \@area_counts);
+    };
+
+    my ($ok, $err);
+    ($ok, $err) = $attempt_with_reconnect->(sub {
         my $schema = $c->model('DBEncy');
         my $dbh    = $schema->storage->dbh;
         if (%$search_params) {
@@ -115,33 +155,21 @@ sub index :Path('/admin/logging') :Args(0) {
             $total_count //= 0;
         }
         @db_logs = $fetch_logs->($schema, undef);  # try with all result-class columns
-
-        # Grouped breakdown ("number of each") by subroutine/area for the active
-        # filter, so a drill-down from the Logging Audit volume summary shows
-        # not just the rows but how many of each error type/area exist.
-        my @area_counts;
-        if (%$search_params) {
-            my $rows = $schema->storage->dbh->selectall_arrayref(
-                "SELECT subroutine, COUNT(*) AS cnt FROM system_log
-                 WHERE " . join(' AND ', map { "$_ = ?" } keys %$search_params) . "
-                 GROUP BY subroutine ORDER BY cnt DESC LIMIT 25",
-                { Slice => {} }, values %$search_params
-            );
-            @area_counts = map { { area => $_->{subroutine} // 'unknown', count => $_->{cnt} } } @$rows;
-        }
-        $c->stash(level_area_counts => \@area_counts);
-    };
-    if ($@) {
-        # Retry selecting only the base columns (system_identifier not yet in DB)
-        eval {
+        $area_counts_stash->($schema);
+    });
+    unless ($ok) {
+        # Retry selecting only the base columns (system_identifier not yet in DB),
+        # again with the transient-connection reconnect guard.
+        ($ok, $err) = $attempt_with_reconnect->(sub {
             my $schema = $c->model('DBEncy');
             @db_logs = $fetch_logs->($schema, \@base_cols);
-        };
-        if ($@) {
-            $db_error = "$@";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-                "Failed to fetch system_log records: $db_error");
-        }
+            $area_counts_stash->($schema);
+        });
+    }
+    if (!$ok) {
+        $db_error = $err;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "Failed to fetch system_log records: $db_error");
     }
 
     # Health evaluation status from HealthLogger

@@ -231,6 +231,7 @@
         <div class="col-100">
             <div class="doc-footer">
                 <p>Tracking project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a> — one Todo per phase; progress and time logged there.</p>
+                <p class="doc-muted">Related: <a href="/Documentation/HermesBranchContextPlan" class="doc-link">Hermes Branch Context</a> (per-branch AI guidance + in-app Hermes launch).</p>
                 <p><em>This documentation is part of the Comserv system.</em></p>
             </div>
         </div>
