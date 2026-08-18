@@ -4,6 +4,16 @@
    Extracted from DailyPlan.tt and _today_work_tab.tt
    ============================================================ */
 
+/* ── Page wrapper ─────────────────────────────────────────── */
+/* daily-index is intentionally NOT .container (which is max-width + centered
+   and would squeeze the Calendar gcal grid into a narrow column with huge
+   side margins). It spans the full content width instead. */
+.daily-index {
+    width: 100%;
+    padding: 0 var(--spacing-medium);
+    box-sizing: border-box;
+}
+
 /* ── Sticky Header ────────────────────────────────────────── */
 
 .daily-plan-header {
@@ -127,6 +137,13 @@
 .tab-content.active {
     display: block;
 }
+
+/* The MASTER PLAN tab (#master-plan) is server-rendered content (it
+   INCLUDEs Documentation/MASTER_PLAN.tt). Visibility is driven entirely by the
+   .tab-content / .tab-content.active rules in the block above (one tab shown
+   at a time), so no id-level display override is needed here. The old
+   #daily-plan-guide guard referenced the pre-rebuild monolith id and was dead
+   after the 2026-08-13 rename to #master-plan. */
 
 /* ── Tab Loading State ──────────────────────────────────── */
 .tab-loading {
@@ -697,6 +714,13 @@
 .ActionBarBtn--purple {
     color: #6f42c1;
     border-color: #6f42c1;
+}
+
+.ActionBarFeedback {
+    align-self: center;
+    margin-left: 4px;
+    font-size: 0.82em;
+    min-width: 1px;
 }
 
 .ActionBarBtn--blue {
@@ -1428,9 +1452,51 @@
     text-decoration: none;
 }
 
-/* ── Gantt data script ────────────────────────────────────── */
-/* Sits inside #gantt-chart as JSON — hidden by default */
+/* ── Legacy link (below the tabs) ─────────────────────────
+   NOTE 2026-08-14: the old "Clean Daily Index (v3)" block that re-declared
+   .daily-index { max-width:1100px; margin:0 auto } was REMOVED — it was
+   capping the whole /planning/daily page to 1100px centered. The live
+   .daily-index (full width) is defined at the top of this file. The
+   -intro/-grid/-card classes from that block are unused by DailyPlan.tt. */
 
-#gantt-data {
-    display: none;
+.daily-index-legacy {
+    margin-top: 28px;
+    font-size: var(--font-size-small, 0.9rem);
+    color: var(--text-muted-color, #666);
 }
+
+/* ── Action Card (above the tab bar) ───────────────────── */
+.daily-action-card {
+    background-color: var(--bg-secondary, #f5f6f8);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: var(--radius-md, 10px);
+    padding: 16px 20px;
+    margin: 18px 0 0 0;
+}
+.daily-action-card-title {
+    font-size: var(--font-size-small, 0.85rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted-color, #666);
+    margin-bottom: 10px;
+}
+/* The action card reuses .ActionBar / .ActionBarBtn styles from this file.
+   Give it breathing room so the buttons don't touch the card edge. */
+.daily-action-card .ActionBar {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    flex-wrap: wrap;
+}
+
+/* ── Tab iframe (Calendar tab) ─────────────────────────── */
+.dp-tab-iframe {
+    width: 100%;
+    min-height: 70vh;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: var(--radius-md, 10px);
+    background: var(--bg-color, #fff);
+}
+.daily-index-legacy a { color: var(--link-color, #007bff); }

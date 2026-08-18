@@ -1,10 +1,13 @@
-/* Project Cards CSS - v2.0 - Simplified Bootstrap Compatible */
+/* Project Cards CSS - v2.1 - Theme-aware (no hardcoded light backgrounds) */
 
-/* Base card styles */
+/* Base card styles — follow the theme; do NOT hardcode a light background
+   (that made the embedded todo cards unreadable on the dark theme). */
 .card {
     margin-bottom: 20px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 0.25rem;
+    background-color: var(--card-bg, var(--bg-secondary, transparent));
+    color: var(--text-color, #212529);
 }
 
 .card:hover {
@@ -13,18 +16,22 @@
 
 .card-header {
     padding: 0.75rem 1.25rem;
-    background-color: rgba(0, 0, 0, 0.03);
-    border-bottom: 1px solid #dee2e6;
+    background-color: var(--bg-secondary, #f1f3f5);
+    border-bottom: 1px solid var(--border-color, #dee2e6);
+    color: var(--text-color, #212529);
 }
 
 .card-body {
     padding: 1.25rem;
+    background-color: var(--card-bg, var(--bg-secondary, transparent));
+    color: var(--text-color, #212529);
 }
 
 .card-footer {
     padding: 0.75rem 1.25rem;
-    background-color: rgba(0, 0, 0, 0.03);
-    border-top: 1px solid #dee2e6;
+    background-color: var(--bg-secondary, #f1f3f5);
+    border-top: 1px solid var(--border-color, #dee2e6);
+    color: var(--text-color, #212529);
 }
 
 /* Project card specific styles */
@@ -178,11 +185,14 @@
 }
 
 .text-muted {
-    color: #6c757d !important;
+    color: var(--text-muted-color, #6c757d) !important;
 }
 
+/* bg-light must follow the theme, not a hardcoded gray — on the dark theme a
+   hardcoded #f8f9fa made the "Project ID" bar and comments box unreadable. */
 .bg-light {
-    background-color: #f8f9fa !important;
+    background-color: var(--bg-secondary, #f8f9fa) !important;
+    color: var(--text-color, #212529);
 }
 
 /* List styles */

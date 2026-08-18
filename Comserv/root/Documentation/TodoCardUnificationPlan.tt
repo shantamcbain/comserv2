@@ -1,11 +1,13 @@
 # Todo Card Unification Plan — one card, every list, theme-compliant
 
-- **Project:** 240 TODOLIST-UI (sub-project of 138 PLANNING)
+- **Project code:** TODOLIST-UI (proj #240)
+- **Parent project:** #138 PLANNING (this is a PHASE of the Planning System project)
+- **Standard:** follows [Planning Language Standard](/Documentation/PlanningLanguageStandard) — PHASE = sub-project, STEP = todo, GATE = done-when
+- **Coordinator:** [Comserv2 Master Plan](/Documentation/MASTER_PLAN) — Project #138 PLANNING
 - **Created:** 2026-08-06
-- **Purpose:** Make EVERY todo render through the SAME theme-compliant shared card
-  (`root/todo/todo_card.tt`) so it looks and functions identically on every page —
-  the main /todo list, the 🎯 Today's Focus Queue, the project pages, and the
-  day / week / month calendar views. No more three divergent renderings.
+- **Deliverable (one line):** Make EVERY todo render through the SAME theme-compliant shared card
+  (`root/todo/todo_card.tt`) so it looks and functions identically on every page — the main /todo list,
+  the 🎯 Today's Focus Queue, the project pages, and the day / week / month calendar views. No more three divergent renderings.
 
 ## Diagnosis (three different todo renderings today)
 

@@ -154,11 +154,15 @@ sub COMPONENT {
         my $dsn = "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port};
         $dsn .= ";mysql_connect_timeout=10;mysql_read_timeout=30;mysql_write_timeout=30" if $driver eq 'mysql';
 
+        my %reconnect_attrs = $driver eq 'MariaDB'
+            ? (mariadb_auto_reconnect => 1)
+            : (mysql_auto_reconnect => 1);  # mysql fallback: DBD::mysql attr name
         $connect_info = {
             dsn => $dsn,
             user => $conn->{username},
             password => $conn->{password},
             %driver_attrs,
+            %reconnect_attrs,
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,

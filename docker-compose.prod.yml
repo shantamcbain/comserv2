@@ -1,0 +1,95 @@
+services:
+  config-db:
+    image: mariadb:10.11
+    container_name: comserv2-config-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-changeme}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-comserv}
+      MARIADB_USER: ${MARIADB_USER:-comserv}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
+    volumes:
+      - comserv2_config_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: comserv2-redis
+    restart: unless-stopped
+    volumes:
+      - comserv2_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  web-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shantamcsbain/comserv-web-prod:latest
+    container_name: comserv2-web-prod
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PORT: 5000
+      CATALYST_ENV: production
+      CATALYST_DEBUG: 0
+      WEB_PORT: 5000
+      TZ: UTC
+      COMSERV_NO_HEALTH_LOG: 1
+      NFS_DATA_PATH: /data/nfs
+      COMSERV_LOG_DIR: /opt/comserv/root/log
+      DISABLE_FILE_LOGGING: "1"
+      COMSERV_LOG_MIN_LEVEL: "WARN"
+      DB_LOG_MIN_LEVEL: "WARN"
+      COMSERV_SESSION_DIR: /tmp/comserv/session
+      COMSERV_SESSION_COOKIE: comserv_session
+      DB_HOST: ${DB_HOST:-192.168.1.20}
+      DB_PORT: ${DB_PORT:-3307}
+      DB_NAME: ${DB_NAME:-ency}
+      SYSTEM_IDENTIFIER: ${SYSTEM_IDENTIFIER:-workstation-prod-local}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ${COMSERV_SECRETS_DIR:-~/.comserv/secrets}:/home/comserv/.comserv/secrets:ro
+      # Standardized comserv2_* cache volume
+      - comserv2_cache:/cache:rw
+      # Standardized comserv2_* volumes
+      - comserv2_logs:/opt/comserv/root/log
+      - comserv2_nfs_data:/data/nfs:rw
+      - comserv2_sessions:/tmp/comserv/session:rw
+      - comserv2_cache:/tmp/comserv/cache
+      - comserv2_temp:/tmp/comserv/temp
+      - comserv2_themes:/opt/comserv/root/themes
+      - comserv2_whisper_venv:/opt/comserv/whisper_venv
+      - comserv2_cpan_cache:/root/.cpan
+      # Static assets (CSS/JS/images) are baked into the image at build time
+      # under /opt/comserv/root/static. Do NOT bind-mount a host dir over them:
+      # the prod host /root/static is empty and shadows the baked assets, which
+      # breaks ALL CSS. The image's static tree serves directly.
+      # (Workstation dev can re-enable via STATIC_SRC if live-editing is needed.)
+      - ${LEGACY_STATIC_SRC:-/root/LegacyStaticPages}:/opt/comserv/root/LegacyStaticPages
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+# NOTE: Volumes are defined in docker-compose.yml (base compose) only.
+# No volume definitions here to avoid conflicting parameters
+# (driver: local vs external: true) when merging compose files.
+# All volumes are pre-created by ensure_all_required_volumes* methods
+# before docker compose up runs.

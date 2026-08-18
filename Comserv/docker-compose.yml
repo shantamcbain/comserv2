@@ -74,7 +74,7 @@ services:
       CATALYST_ENV: ${CATALYST_ENV:-production}
       CATALYST_DEBUG: ${CATALYST_DEBUG:-0}
       WEB_PORT: 5000
-      TZ: UTC
+      TZ: America/Los_Angeles
       NFS_DATA_PATH: /data/nfs
       COMSERV_LOG_DIR: /opt/comserv/root/log
     ports:
@@ -114,7 +114,7 @@ services:
       CATALYST_ENV: development
       CATALYST_DEBUG: ${CATALYST_DEBUG:-1}
       WEB_PORT: 3000
-      TZ: UTC
+      TZ: America/Los_Angeles
       COMSERV_LOG_DIR: /opt/comserv/root/log
     ports:
       - "3000:3000"
@@ -164,7 +164,7 @@ services:
       CATALYST_ENV: ${CATALYST_ENV:-staging}
       CATALYST_DEBUG: ${CATALYST_DEBUG:-0}
       WEB_PORT: 4000
-      TZ: UTC
+      TZ: America/Los_Angeles
       NFS_DATA_PATH: /data/nfs
       COMSERV_LOG_DIR: /opt/comserv/root/log
     ports:
@@ -229,6 +229,10 @@ volumes:
   comserv2_temp:
     driver: local
   comserv2_themes:
+    driver: local
+  comserv2_theme_config:
+    driver: local
+  comserv2_theme_css:
     driver: local
   comserv2_cache:
     driver: local

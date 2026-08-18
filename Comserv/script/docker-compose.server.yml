@@ -21,6 +21,14 @@ services:
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session
       SYSTEM_IDENTIFIER: ${SYSTEM_IDENTIFIER:-production1}
+      # Token the external monitoring cron (hardware_monitor.pl) sends to the
+      # /admin/hardware_monitor/* endpoints. Must match the host cron's
+      # HW_INGEST_TOKEN. Change 'changeme' to a real shared secret in .env.
+      HW_INGEST_TOKEN: ${HW_INGEST_TOKEN:-changeme}
+      # Reachable app endpoint(s) the monitoring cron curls. NOT localhost — the
+      # cron runs on a separate host and targets the container's real LAN address.
+      # Ordered by preference for this server (production1 first).
+      HW_MONITOR_NODES: ${HW_MONITOR_NODES:-http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run}
       TTYD_HOST_PORT: "7682"
       # Ollama address for THIS deployment. Overrides comserv.conf <Ollama> host
       # ONLY if set. Leave unset so the app auto-probes the fastest reachable
