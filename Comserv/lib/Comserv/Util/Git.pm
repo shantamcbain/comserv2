@@ -1178,24 +1178,57 @@ sub _worktree_row {
 # the old hardcoded .zenflow layout. There is NO static fallback: a branch not in
 # the JSON has port 0. Deleted ports stay deleted so they can be reused.
 my $_wt_config;
+my $_wt_config_mtime;
 sub _worktree_config {
-    return $_wt_config if $_wt_config;
     my $file = __FILE__;
     $file =~ s{lib/Comserv/Util/Git\.pm$}{root/config/worktrees.json};
+    # Re-read when the file is missing OR newer than the cached copy. The module-level
+    # cache is shared across all requests in a worker, and a multi-worker Catalyst server
+    # has several independent caches. Without this, one worker keeps serving a stale port
+    # map while another worker (or an external process) writes a new branch+port to the
+    # JSON — the next create_worktree then allocates a port that is ALREADY taken, causing
+    # two worktrees to collide on the same port (observed: a new branch was handed 4004,
+    # the port already claimed by `planning`). The file is the single source of truth; the
+    # cache must never outlive the file.
+    my $mtime = (stat($file))[9];
+    if ($_wt_config && defined $_wt_config_mtime && defined $mtime
+            && $mtime == $_wt_config_mtime && -f $file) {
+        return $_wt_config;
+    }
     if (-f $file) {
         eval {
             my $raw = do { local $/; open my $fh, '<', $file or die $!; <$fh> };
             my $j = decode_json($raw);
             $j->{base_dir} =~ s{^~([/\\]|$)}{$ENV{HOME}$1} if $j->{base_dir};
-            $_wt_config = $j;
+            $_wt_config      = $j;
+            $_wt_config_mtime = $mtime;
         };
         return $_wt_config if $_wt_config;
     }
-    $_wt_config = { base_dir => "$ENV{HOME}/.comserv/worktrees", branches => {} };
+    $_wt_config       = { base_dir => "$ENV{HOME}/.comserv/worktrees", branches => {} };
+    $_wt_config_mtime = undef;
     return $_wt_config;
 }
 
 sub worktree_base_dir { return _worktree_config()->{base_dir}; }
+
+# Fresh, cache-bypassing read of worktrees.json used by the PORT-ALLOCATION path
+# (next_free_port / create_worktree). The cached _worktree_config() is fine for UI
+# builders (staleness there is cosmetic), but the allocator must NEVER trust a cached
+# map: two create_worktree calls inside the same 1-second mtime window (or across
+# workers) would otherwise both read a stale port set and hand out the same port.
+# This reads the file straight from disk every time.
+sub _worktree_json_fresh {
+    my $file = __FILE__;
+    $file =~ s{lib/Comserv/Util/Git\.pm$}{root/config/worktrees.json};
+    return { base_dir => "$ENV{HOME}/.comserv/worktrees", branches => {} } unless -f $file;
+    my $j = eval {
+        my $raw = do { local $/; open my $fh, '<', $file or die $!; <$fh> };
+        decode_json($raw);
+    };
+    return $j if $j && ref $j eq 'HASH';
+    return { base_dir => "$ENV{HOME}/.comserv/worktrees", branches => {} };
+}
 
 # Build the worktree/develop-server registry for UI surfaces (the planning tab's
 # "Branch Servers" panel, the Git dashboard's "Develop Servers" card, etc.). This is
@@ -1257,7 +1290,8 @@ authority for what is taken. Returns the first free integer > floor.
 
 sub next_free_port {
     my ($self_or_c) = @_;
-    my $cfg  = _worktree_config();
+    # Read the file fresh (never the cache) so concurrent writers can't collide.
+    my $cfg  = _worktree_json_fresh();
     my $floor = $cfg->{port_start} // 4000;
     $floor = 4000 if $floor !~ /^\d+$/ || $floor < 4000;
     # Port 4000 is occupied by a live instance; never hand it out. The first
@@ -1325,12 +1359,31 @@ sub create_worktree {
     }
 
     # 3) port + 4) persist to JSON
+    # next_free_port already skips every port claimed in the current JSON. But between
+    # reading the config and writing it back, another request (on a different worker)
+    # could claim the same port. To be safe, re-read the live JSON right before writing
+    # and, if our chosen port was taken in the meantime, pick the next free one again.
+    # We then MERGE our branch into the current on-disk map (rather than overwriting the
+    # whole file) so a concurrent writer's new branch is not lost.
     my $port = $self->next_free_port($c);
     my $label = $opts->{label} // $branch;
     my $url   = $opts->{url}   // '/planning/daily';
-    $cfg->{branches} //= {};
-    $cfg->{branches}{$branch} = { port => $port, label => $label, url => $url };
-    unless (_save_worktree_config($self, $cfg)) {
+
+    my $live = _worktree_json_fresh();
+    if ($live->{branches} && $live->{branches}{$branch}) {
+        # existing entry (e.g. re-run) — keep its port
+        $port = $live->{branches}{$branch}{port};
+    }
+    elsif ($live->{branches}) {
+        my %taken = map { $_ => 1 }
+            grep { defined && /^\d+$/ }
+            map { $live->{branches}{$_}{port} } keys %{ $live->{branches} };
+        $port = 4001 if $port !~ /^\d+$/ || $port < 4001;
+        $port++ while $taken{$port};
+    }
+    $live->{branches} //= {};
+    $live->{branches}{$branch} = { port => $port, label => $label, url => $url };
+    unless (_save_worktree_config($self, $live)) {
         $res->{error} = 'Failed to write worktrees.json';
         return $res;
     }

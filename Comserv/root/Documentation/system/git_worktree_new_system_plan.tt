@@ -4,8 +4,8 @@
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
    category = "git,ai-systems,infrastructure,development-plan"
-   page_version = "0.2"
-   last_updated = "Wed Aug 06 14:00:00 UTC 2026"
+   page_version = "0.2.1"
+   last_updated = "Mon Aug 18 08:00:00 UTC 2026"
    project_id   = "238"
    project_code = "GITWT-NEW"
    site_specific = "false"
@@ -167,7 +167,7 @@
                     <ul>
                         <li>create the branch: <code>git branch $branch $parent</code> (from <code>main</code> if it does not yet exist),</li>
                         <li><code>git worktree add &lt;base_dir&gt;/&lt;branch&gt;/Comserv $branch</code>,</li>
-                        <li>pick the next free port (<code>max(existing ports in JSON)+1</code>, or <code>port_start</code> when none),</li>
+                        <li>pick the next free port by scanning <code>worktrees.json</code> for the first port &gt; <code>port_start</code> (4001 floor) <strong>not already assigned</strong> — read fresh from disk on every call (see §12 v0.2.1 fix: the allocator no longer trusts a cached map, so it cannot re-issue an occupied port),</li>
                         <li>append <code>{ port, label, url }</code> to <code>worktrees.json</code> under <code>branches.$branch</code>.</li>
                     </ul>
                 </li>
@@ -222,6 +222,26 @@
                     <li>Any change to the primary <code>main</code> checkout or port 3001.</li>
                 </ul>
             </div>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CHANGELOG SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="changelog" class="doc-h2">12. Changelog</h2>
+
+            <h3 class="doc-h3">2026-08-18 — Port-allocation collision fix (v0.2.1)</h3>
+            <p class="doc-body"><strong>Bug:</strong> the "next available port" logic in <code>Util::Git-&gt;next_free_port</code> handed a new branch a port that was <em>already taken</em> by another worktree (observed: a new branch was assigned <strong>4004</strong>, the port already owned by <code>planning</code>). Root cause: the port allocator read the module-level <strong>cached</strong> <code>worktrees.json</code> map (<code>$_wt_config</code>) instead of the live file. On a multi-worker Catalyst server each worker keeps its own cache; once primed it is never invalidated when another worker (or the dashboard) writes a new branch+port to the JSON, so the allocator stayed blind to reality and re-issued an occupied port. The skip-taken scan was correct in isolation — the cache defeated it.</p>
+            <p class="doc-body"><strong>Fix</strong> (in <code>lib/Comserv/Util/Git.pm</code>, no schema/API change):</p>
+            <ul class="doc-body">
+                <li><code>_worktree_config</code> is now <strong>mtime-aware</strong>: it re-reads the file whenever the on-disk mtime changes, so a stale cached port map cannot survive a concurrent write.</li>
+                <li>Added <code>_worktree_json_fresh</code> — a cache-<em>bypassing</em> direct read of the JSON — and routed the <strong>allocation</strong> path (<code>next_free_port</code> + <code>create_worktree</code>) through it. The allocator never trusts the cache, even for two creates inside the same 1-second mtime window.</li>
+                <li><code>create_worktree</code> now re-reads the live JSON right before writing, discards a port claimed in the interim, and <strong>merges</strong> its branch into the current on-disk map (instead of overwriting the file), so a concurrent writer's entry is not lost.</li>
+            </ul>
+            <p class="doc-body"><strong>Regression test:</strong> new <code>t/util_git_next_free_port.t</code> (7 cases) — collision (4001–4004 taken → 4005), stale-cache (out-of-band claim of 4002 → returns 4003), and confirms the existing owner keeps its port. Existing <code>t/util_git_create_worktree.t</code> (13 cases) stays green. Both pass.</p>
+            <p class="doc-body"><strong>Registry correction applied same day:</strong> <code>worktrees.json</code> was out of sync with the running servers — the <code>git</code> worktree (branch <code>git-dev</code>) was serving on <strong>4004</strong> but had no JSON entry, while <code>planning</code> wrongly claimed 4004. Fixed the registry to match reality: added <code>git</code> → <strong>4004</strong> (the port actually bound) and moved <code>planning</code> → <strong>4005</strong> (free). Final map: 4001 InventoryAccounting, 4002 DockerHA, 4003 3d, 4004 git, 4005 planning. No two entries share a port.</p>
+            <p class="doc-body"><strong>Cross-reference:</strong> <a href="/Documentation/changelog/2026-08-18-git-worktree-port-collision-fix" class="doc-link">2026-08-18 git-worktree port collision fix</a> (dated changelog).</p>
             <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
