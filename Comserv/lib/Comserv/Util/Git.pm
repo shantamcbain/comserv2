@@ -304,13 +304,23 @@ sub _run {
 
     my $result = { success => 0, exit_code => -1, output => '', error => '', data => {} };
 
-    my $tinfo = $self->resolve_target($c, $opts{target});
+    my $tinfo;
+    if ($opts{repo}) {
+        # Explicit repository path override (local mode). Used when the caller
+        # needs git to run inside a specific checkout (e.g. a branch worktree)
+        # rather than the resolved default repo. Bypasses resolve_target but
+        # still goes through the same argv whitelist below.
+        $tinfo = { mode => 'local', repo => $opts{repo}, host => '', user => '', port => 22, label => 'explicit' };
+    }
+    else {
+        $tinfo = $self->resolve_target($c, $opts{target});
+    }
 
     # If the caller didn't pass an explicit target, honor the one bound for this
     # request (set once by the controller from the dashboard's target selector).
     # This lets the whole subsystem route to a remote host with a single line of
     # controller code rather than threading target through every public method.
-    unless ($opts{target}) {
+    unless ($opts{target} || $opts{repo}) {
         my $req_target = $c->stash->{git_target}
                       // ($c->req ? $c->req->param('target') : undef);
         $tinfo = $self->resolve_target($c, $req_target) if defined $req_target;
@@ -475,6 +485,10 @@ sub get_local_branches {
         $line =~ s/^\s+|\s+$//g;
         $line =~ s/\x1b\[[0-9;]*m//g;
         next if !$line || $line =~ /^\(.*\)$/;
+        # 'git' is a reserved word (it collides with the git command itself) and
+        # can never be checked out or merged — skip it everywhere so it can't be
+        # offered in the UI or validated as a real branch.
+        next if $line eq 'git';
         push @branches, $line;
     }
     return \@branches;
@@ -1069,6 +1083,52 @@ sub list_worktrees {
     return \@rows;
 }
 
+=head2 worktree_checkout_path_for_branch($c, $branch)
+
+Resolve the on-disk checkout path where $branch is currently checked out, so
+git operations can run directly in that tree instead of trying to check the
+branch out elsewhere (which fails for worktree branches — a branch already
+checked out in another worktree cannot be checked out in the main repo).
+
+Returns the path string, or undef if the branch is not currently checked out
+in any worktree (e.g. a local-only branch with no worktree).
+
+=cut
+
+sub worktree_checkout_path_for_branch {
+    my ($self, $c, $branch) = @_;
+
+    # Primary strategy: scan the worktree base directory and check each
+    # checkout's ACTUAL current branch with `git branch --show-current`. This
+    # is robust even when `git worktree list --porcelain` has stale/corrupt
+    # metadata (e.g. a worktree whose directory was renamed but whose git
+    # bookkeeping still points at the old name — git-dev's porcelain entry
+    # drops its `worktree <path>` line, so list_worktrees records it with no
+    # path). Scanning the dirs directly always finds the real checkout.
+    my $cfg  = eval { _worktree_config() } // { base_dir => "$ENV{HOME}/.comserv/worktrees" };
+    my $base = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    if ($base && -d $base) {
+        opendir(my $dh, $base) or return undef;
+        my @entries = grep { -e "$base/$_/Comserv/.git" } readdir($dh);
+        closedir($dh);
+        for my $name (@entries) {
+            my $dir = "$base/$name/Comserv";
+            my $b   = $self->_run($c, 'branch', '--show-current',
+                { repo => $dir })->{output};
+            chomp $b if defined $b;
+            return $dir if defined $b && length $b && $b eq $branch;
+        }
+    }
+
+    # Fallback: trust list_worktrees (works for well-formed worktree metadata).
+    my $wts = $self->list_worktrees($c) or return undef;
+    for my $wt (@$wts) {
+        next unless $wt->{branch} && $wt->{branch} eq $branch;
+        return $wt->{path} if $wt->{path} && -d $wt->{path};
+    }
+    return undef;
+}
+
 sub _worktree_row {
     my ($path, $branch) = @_;
     my $cfg     = _worktree_config();
@@ -1134,6 +1194,10 @@ sub build_worktree_list {
         label => 'MAIN',
         url   => '/planning/daily',
         cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
+        # Hermes CLI for THIS checkout. Running from the worktree git-root makes Hermes
+        # auto-load the branch .hermes.md (which pulls in the global rules + domain
+        # expertise). -w = worktree-safe mode (parallel agents, no git conflicts).
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat -w',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
@@ -1147,6 +1211,8 @@ sub build_worktree_list {
             url   => $b->{url}   // '/planning/daily',
             cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
+            # Branch Hermes: cwd = the worktree's own git root so its .hermes.md loads.
+            hermes_cmd => "cd $base/$name/Comserv && hermes chat -w",
         };
     }
     return \@list;
@@ -1367,7 +1433,15 @@ sub merge_branch {
         $result->{error_msg} = "Branch name is required.";
         return $result;
     }
-    if ($branch eq 'main' || $branch eq 'master' || $branch eq 'Production') {
+    # Guard: refuse to merge a protected branch *into itself* (merging main INTO a
+    # worktree branch — the "pull main down" direction — is the normal, intended
+    # operation and must NOT be blocked). Previously this refused any merge that
+    # named main as the source, which broke the main->branch "update this branch"
+    # direction entirely. Now we only refuse main->main / master->master.
+    my $current = $self->get_current_branch($c);
+    if (($branch eq 'main'   && $current eq 'main')
+     || ($branch eq 'master' && $current eq 'master')
+     || ($branch eq 'Production' && $current eq 'Production')) {
         $result->{error_msg} = "Refusing to merge a protected branch into itself.";
         return $result;
     }
@@ -1384,6 +1458,34 @@ sub merge_branch {
             $result->{conflict} = 1;
         }
         $result->{error_msg} = "Merge of '$branch' failed (see output).";
+    }
+    return $result;
+}
+
+=head2 merge_abort($c)
+
+Cancel a conflicted in-progress merge via C<git merge --abort> (flag already
+whitelisted in C<_run>). Returns { success, output }. If there is nothing to
+abort, git exits cleanly and we report success with the (empty) output rather
+than raising a false error.
+
+=cut
+
+sub merge_abort {
+    my ($self, $c) = @_;
+    my $result = { success => 0, output => '', action => 'merge_abort' };
+
+    my $r = $self->_run($c, 'merge', '--abort');
+    $result->{output} = $r->{output};
+    # git merge --abort exits 0 when it aborts, and also exits 0 (no-op) when
+    # there is no merge in progress in modern git. Treat either as success so
+    # the UI's Abort button always resolves a conflicted state cleanly.
+    if ($r->{success}) {
+        $result->{success}     = 1;
+        $result->{success_msg} = "Merge aborted.";
+    }
+    else {
+        $result->{error_msg} = "Merge abort failed (see output).";
     }
     return $result;
 }

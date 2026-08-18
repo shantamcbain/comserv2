@@ -218,11 +218,149 @@
                     branchServerAction('open', openBranch, el.getAttribute('data-port'), el);
                     return;
                 }
+                // "Hermes" button: copy the branch's Hermes launch command to the
+                // clipboard. cwd = the worktree git-root, so Hermes auto-loads the
+                // branch .hermes.md (global rules + domain expertise). -w = worktree
+                // mode (parallel agents, no git conflicts). The dev console also
+                // shows it for manual copy.
+                var hermesBranch = el.getAttribute('data-hermes-branch');
+                if (hermesBranch) {
+                    var hcmd = el.getAttribute('data-hermes-cmd') || '';
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(hcmd).then(function () {
+                            if (typeof window.HermesNotify === 'function') {
+                                window.HermesNotify('Copied Hermes command for ' + hermesBranch);
+                            } else {
+                                window.alert('Copied to clipboard:\n' + hcmd);
+                            }
+                        }).catch(function () { window.alert(hcmd); });
+                    } else {
+                        window.alert(hcmd);
+                    }
+                    showDevConsole(hermesBranch, el.getAttribute('data-port') || '', '', hcmd);
+                    return;
+                }
                 var action = el.getAttribute('data-branch-action');
                 if (action) {
                     branchServerAction(action, el.getAttribute('data-branch'),
                         el.getAttribute('data-port'), el);
                 }
+            });
+        }
+
+        // --- "Merge" card: merge main into a selected branch, or the selected
+        // branch into main. POSTs to /admin/git/merge (source/target) and renders
+        // a status badge + output <pre>. On conflict, reveals the Abort button
+        // (POST /admin/git/merge/abort). Both directions run inside the branch's
+        // own worktree checkout (main->branch) or by branch-name ref (branch->main),
+        // so neither requires switching the active branch.
+        var mergeSelect = document.querySelector('[data-git-merge-select]');
+        var mergeStatus = document.querySelector('[data-git-merge-status]');
+        var mergeOutput = document.querySelector('[data-git-merge-output]');
+        var mergeAbortBtn = document.querySelector('[data-git-merge-abort]');
+
+        function showMergeResult(success, conflict, title, output) {
+            if (!mergeStatus) { return; }
+            mergeStatus.innerHTML = '';
+            var badge = document.createElement('span');
+            badge.className = 'status-badge ' + (conflict ? 'status-badge-warn'
+                : (success ? 'status-badge-ok' : 'status-badge-err'));
+            badge.textContent = title;
+            mergeStatus.appendChild(badge);
+            if (mergeOutput) {
+                mergeOutput.style.display = (output && output.length) ? 'block' : 'none';
+                mergeOutput.textContent = output || '';
+            }
+            if (mergeAbortBtn) {
+                mergeAbortBtn.style.display = conflict ? '' : 'none';
+            }
+        }
+
+        function runMerge(btn) {
+            if (!mergeSelect) { return; }
+            var direction = btn.getAttribute('data-merge-direction');
+            var selBranch = mergeSelect.value || '';
+            var source, target;
+            if (direction === 'main-to-branch') { source = 'main'; target = selBranch; }
+            else { source = selBranch; target = 'main'; }
+
+            if (btn.getAttribute('data-git-confirm')) {
+                var prompt = btn.getAttribute('data-git-confirm');
+                if (prompt && !window.confirm(prompt)) { return; }
+            }
+
+            if (mergeStatus) {
+                mergeStatus.innerHTML = '<span class="status-badge">working…</span>';
+            }
+            if (mergeAbortBtn) { mergeAbortBtn.style.display = 'none'; }
+            if (mergeOutput) { mergeOutput.style.display = 'none'; }
+
+            var body = new URLSearchParams();
+            body.set('source', source);
+            body.set('target', target);
+            if (targetSelect) { body.set('target_host', targetSelect.value); }
+
+            fetch(btn.getAttribute('data-merge-url'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); })
+              .then(function (res) {
+                  if (res.conflict) {
+                      showMergeResult(false, true, 'conflict', res.output || res.error || '');
+                      return;
+                  }
+                  if (res.success) {
+                      showMergeResult(true, false, 'merged', res.output || '');
+                  } else {
+                      showMergeResult(false, false, 'failed', res.output || res.error || res.detail || '');
+                  }
+                  // Success re-renders the dashboard so branch/current-branch update.
+                  if (res.success && typeof window.refreshGitDashboard === 'function') {
+                      window.refreshGitDashboard();
+                  } else if (res.success) {
+                      window.location.reload();
+                  }
+              })
+              .catch(function (err) {
+                  showMergeResult(false, false, 'error', String(err));
+              });
+        }
+
+        var mergeBtns = document.querySelectorAll('[data-git-merge]');
+        for (var mb = 0; mb < mergeBtns.length; mb++) {
+            mergeBtns[mb].addEventListener('click', function () { runMerge(this); });
+        }
+
+        if (mergeAbortBtn) {
+            mergeAbortBtn.addEventListener('click', function () {
+                if (!window.confirm('Abort the in-progress merge? This discards the merge attempt.')) {
+                    return;
+                }
+                if (mergeStatus) {
+                    mergeStatus.innerHTML = '<span class="status-badge">aborting…</span>';
+                }
+                var body = new URLSearchParams();
+                if (targetSelect) { body.set('target_host', targetSelect.value); }
+                fetch(mergeAbortBtn.getAttribute('data-merge-abort-url'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString(),
+                    credentials: 'same-origin'
+                }).then(function (r) { return r.json(); })
+                  .then(function (res) {
+                      showMergeResult(res.success, false, res.success ? 'aborted' : 'abort failed',
+                          res.output || res.error || '');
+                      if (res.success) {
+                          if (typeof window.refreshGitDashboard === 'function') {
+                              window.refreshGitDashboard();
+                          } else { window.location.reload(); }
+                      }
+                  })
+                  .catch(function (err) {
+                      showMergeResult(false, false, 'abort error', String(err));
+                  });
             });
         }
 
