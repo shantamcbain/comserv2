@@ -1,0 +1,96 @@
+[% META
+   title = "Logging Audit Feature Plan"
+   description = "In-app logging-coverage audit: cron-driven scan of system_log + code grep for silent error swallowing, with a results page and manual trigger."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning"
+   page_version = "0.01"
+   last_updated = "Sat Aug 15 2026"
+   project_id = 265
+   project_code = "LOG-AUDIT"
+%]
+
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h1>Logging Audit Feature Plan</h1>
+            <p class="muted">
+                Project <a href="/project/details?project_id=265" class="doc-link">#265 (LOG-AUDIT)</a>
+                &mdash; sub-project of
+                <a href="/project/details?project_id=258" class="doc-link">#258 (HWMON)</a>.
+            </p>
+            <div class="alert alert-info">
+                <strong>Goal:</strong> make the error-audit trail enforceable. The error-audit
+                pipeline (system_log &rarr; <code>[Error]</code> todo &rarr; admin email) is fed
+                <em>only</em> by <code>log_with_details</code>. A caught exception that never reaches
+                it is invisible. This feature runs a recurring scan that detects (a) error hotspots in
+                system_log and (b) code blocks that swallow errors without logging, and surfaces them on
+                an admin page so follow-up todos can be filed against the responsible project.
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2>Design</h2>
+            <p>
+                Mirrors the proven <code>hardware_monitor</code> architecture: a thin external cron
+                (<code>script/hardware_monitor.pl</code>) hits a token-guarded app endpoint
+                (<code>/admin/logging_audit/run</code>); the app does the real work and stores results.
+                No standalone script touches the DB.
+            </p>
+            <ul>
+                <li><strong>Trigger:</strong> <code>hardware_monitor.pl</code> now also POSTs to
+                    <code>/admin/logging_audit/run</code> on the node that answered (same token, same node).</li>
+                <li><strong>Auth:</strong> <code>Root.pm</code> auto-bypass for
+                    <code>/admin/logging_audit/run</code> (no browser session); manual
+                    <code>/admin/logging_audit/trigger</code> and the results page stay admin-gated.</li>
+                <li><strong>Scan logic:</strong> <code>Comserv::Util::LoggingAudit-&gt;run_scan</code> &mdash;
+                    (1) group <code>system_log</code> last 7 days by level/area; (2) grep
+                    <code>lib/</code> for <code>eval{}</code>/<code>catch</code> blocks with a
+                    <code>die</code>/<code>throw</code> but no <code>log_with_details</code>.</li>
+                <li><strong>Storage:</strong> <code>logging_audit</code> table (Result class =
+                    source of truth), deployed via the in-app schema-compare (never hand DDL).</li>
+                <li><strong>UI:</strong> <code>/admin/logging_audit</code> results page + &ldquo;Run scan
+                    now&rdquo; button; links added to the admin top menu and admin map.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2>Build phases (todos #2094, #2095&ndash;#2099)</h2>
+            <table class="table table-striped">
+                <thead><tr><th>Phase</th><th>What</th><th>Status</th></tr></thead>
+                <tbody>
+                    <tr><td>LA-P1</td><td>LoggingAudit Result class + schema-compare deploy</td><td>Result written; deploy pending</td></tr>
+                    <tr><td>LA-P2</td><td>Scan logic (Util): log grouping + silent-swallow grep</td><td>Done</td></tr>
+                    <tr><td>LA-P3</td><td>Controller: token-guarded run + index results page + trigger</td><td>Done</td></tr>
+                    <tr><td>LA-P4</td><td>Root.pm bypass + admin menu/map links</td><td>Done</td></tr>
+                    <tr><td>LA-P5</td><td>Cron wiring + this plan doc + changelog</td><td>Done (doc); cron wired</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2>Outstanding deploy step</h2>
+            <div class="alert alert-warning">
+                The <code>logging_audit</code> table must be created through the in-app
+                <strong>schema-compare</strong> workflow (the Result class is the source of truth; no
+                hand DDL). Until that deploy lands, the results page shows &ldquo;No findings yet&rdquo;
+                and <code>run</code> logs a warning. The code paths are defensive: they catch the
+                missing-table error and log it rather than crashing.
+            </div>
+            <h2>Follow-up behaviour</h2>
+            <p>
+                The scan <em>reports only</em> &mdash; it does not edit code. When a finding indicates
+                missing <code>log_with_details</code>, the admin reviews the listed
+                <code>file:line</code> and files a todo against the <em>responsible project</em> (not
+                LOG-AUDIT), carrying the exact call to add. This keeps the audit honest and routes the
+                fix to the code's owner.
+            </p>
+        </div>
+    </div>
+</div>

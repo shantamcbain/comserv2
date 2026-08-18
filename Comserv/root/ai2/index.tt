@@ -14,6 +14,14 @@
 
 <div class="ai-page-wrap">
 
+    <script>
+        // Same canonical model catalog the widget emits, so model-select.js
+        // uses the fast server-rendered path instead of fetching /ai2/providers
+        // (which left /ai2 with an empty dropdown). Carries price_* / tier now.
+        window.ComservConfig = window.ComservConfig || {};
+        window.ComservConfig.models = [% ai_model_catalog_json || '[]' %];
+    </script>
+
     <!-- Top control bar -->
     <div class="ai-topbar">
         <div class="ai-topbar-left">
@@ -23,30 +31,16 @@
             </span>
         </div>
         <div class="ai-topbar-center">
-            [% IF (can_select_model || (external_models && external_models.size > 0)) && (username && !username.match('^Guest-')) %]
-            <select id="model-select" class="ai-model-select" title="Select AI model">
-                [% IF installed_models && installed_models.size > 0 %]
-                    <optgroup label="Ollama (Local)">
-                    [% FOREACH model IN installed_models %]
-                        <option value="[% model.name %]" data-provider="ollama" [% IF model.name == current_model %]selected[% END %]>
-                            [% model.name %][% IF model.details.parameter_size %] ([% model.details.parameter_size %])[% END %]
-                        </option>
-                    [% END %]
-                    </optgroup>
-                [% END %]
-                [% IF external_models && external_models.size > 0 %]
-                    <optgroup label="External AI">
-                    [% FOREACH ext_model IN external_models %]
-                        <option value="[% ext_model.name %]" data-provider="[% ext_model.provider %]">
-                            [% ext_model.label %]
-                        </option>
-                    [% END %]
-                    </optgroup>
-                [% END %]
-                [% IF (!installed_models || installed_models.size == 0) && (!external_models || external_models.size == 0) %]
-                    <option value="">No models available</option>
-                [% END %]
-            </select>
+            [% IF (can_select_model || (ai_model_catalog && ai_model_catalog.size > 0)) && (username && !username.match('^Guest-')) %]
+            [%# SINGLE SOURCE OF TRUTH: server-rendered dropdown from the catalog
+               in stash (Root.pm auto -> ai_model_catalog). Sorted by role + page. #]
+            [% PROCESS 'ai/model_select.tt'
+                select_id = 'model-select',
+                select_name = 'model',
+                page = 'chat',
+                current = current_model || ai_default_model,
+                css_class = 'ai-model-select',
+                catalog = ai_model_catalog %]
             [% ELSE %]
             <span class="ai-model-name">[% current_model || 'AI' %]</span>
             [% END %]
@@ -568,9 +562,12 @@ window.AI_TASK_CONTEXT = {
 };
 [% END %]
 </script>
-<script src="/static/js/ai-common.js"></script>
 <script>
 // Sidebar-only state (core chat is handled by local-chat.js in page mode)
+// NOTE: ai-common.js is already loaded once by js_load.tt. The former inline
+// <script src="/static/js/ai-common.js"></script> here re-declared `const
+// AIUtils` and threw "Identifier 'AIUtils' has already been declared", breaking
+// chat init. Removed — do not re-add.
 let currentConversationId = null;
 
 // DOM elements needed by sidebar / server-status JS

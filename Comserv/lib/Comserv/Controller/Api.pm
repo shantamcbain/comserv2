@@ -1,12 +1,62 @@
 package Comserv::Controller::Api;
 use Moose;
-use namespace::autoclean;
+use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use JSON::MaybeXS;
 use DateTime;
 use Digest::SHA qw(sha256_hex);
 use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::DocumentationConfig;
+use Comserv::Util::ModelCatalog;
+
+# Resolve the default model for the AI Focus-Tune picker from the SAME shared
+# catalog every other AI surface uses (ModelCatalog::default_for) — NEVER a
+# hardcoded slug. Returns "provider|model" (e.g. "openrouter|...:free"). If the
+# catalog is empty there is genuinely no dynamic default, so we return '' (the
+# caller must then fall back to a real listed model, not invent one).
+sub _focus_default_model {
+    my ($c) = @_;
+    my $def = eval { Comserv::Util::ModelCatalog->default_for($c, page => 'chat') };
+    return $def if $def && $def =~ /\|/;
+    my $cat = eval { Comserv::Util::ModelCatalog->catalog($c) } || [];
+    return $cat->[0]{value} if @$cat && $cat->[0]{value};
+    return '';
+}
+
+# Live external (Grok/xAI, OpenRouter, ...) model list for the AI Focus-Tune
+# picker. Pulled from Model::AI2::Router::get_available_models — the SAME source
+# the chat dropdown and ModelCatalog use — which performs a real list_models()
+# call against each provider's API. This is the dynamic list: it reflects what
+# the provider actually offers for the configured key, NOT a stale DB snapshot
+# in UserApiKeys.metadata.available_models. No hardcoded fallback is added.
+sub _focus_external_models {
+    my ($c) = @_;
+    my @out;
+    eval {
+        my $router = $c->model('AI2::Router');
+        my $all    = $router->get_available_models($c);
+        return unless $all && ref($all) eq 'ARRAY';
+        for my $m (@$all) {
+            next unless $m && ref($m) eq 'HASH';
+            my $prov = $m->{provider} // '';
+            next if $prov eq 'ollama';                 # Ollama handled separately
+            next if $m->{disabled} || $m->{needs_key}; # skip unconfigured stubs
+            my $name = $m->{name} // $m->{id} // '';
+            next unless $name;
+            push @out, {
+                name     => $name,
+                provider => $prov,
+                label    => $m->{label} // $name,
+            };
+        }
+    };
+    if ($@) {
+        Comserv::Util::Logging->instance->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, 'api_focus',
+            "Live external model list failed: $@");
+    }
+    return @out;
+}
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -289,12 +339,69 @@ sub api_list_todos :Path('todos') :Args(0) {
     }
     
     my $schema = $c->model('DBEncy');
-    my @todos = $schema->resultset('Todo')->all;
-    
-    my @todo_list = map { { $_->get_columns } } @todos;
-    
+
+    # Honor query parameters so callers can actually search/filter.
+    # Mirrors the web /todo action's subject/description/comments LIKE logic.
+    my $search_term     = $c->request->query_parameters->{search}     || '';
+    my $project_id      = $c->request->query_parameters->{project_id} || '';
+    my $status_filter   = $c->request->query_parameters->{status}    || '';
+    my $sitename_filter = $c->request->query_parameters->{sitename}  || '';
+
+    my $cond = {};
+    if ($sitename_filter) {
+        $cond->{sitename} = $sitename_filter;
+    }
+    if ($status_filter ne '') {
+        $cond->{status} = $status_filter;
+    }
+    if ($project_id ne '') {
+        $cond->{project_id} = $project_id;
+    }
+    if ($search_term) {
+        # Per-word OR matching: a row matches if ANY query word appears in ANY
+        # of the searchable fields. Relevance ranking (below) then orders by how
+        # many distinct words matched, so "git worktree" floats rows with both up.
+        my @words = grep { length } split(/\s+/, $search_term);
+        my @field_or;
+        for my $w (@words) {
+            push @field_or, (
+                { subject     => { 'like', "%$w%" } },
+                { description => { 'like', "%$w%" } },
+                { comments    => { 'like', "%$w%" } },
+            );
+        }
+        $cond->{'-or'} = \@field_or if @field_or;
+    }
+
+    my @todos = $schema->resultset('Todo')->search($cond);
+
+    # Relevance ranking: when a search term is present, order results by the
+    # number of DISTINCT matched query words across subject/description/comments
+    # (desc) so the strongest hits surface first and low-relevance noise sinks.
+    my @todo_list;
+    if ($search_term) {
+        my @qwords = grep { length } split(/\s+/, lc($search_term));
+        my @scored;
+        for my $t (@todos) {
+            my %cols = $t->get_columns;
+            my $hay = lc(join(' ', $cols{subject} // '', $cols{description} // '', $cols{comments} // ''));
+            my $score = 0;
+            my %seen;
+            for my $w (@qwords) {
+                next if $seen{$w}++;
+                $score++ if index($hay, $w) >= 0;
+            }
+            push @scored, { row => \%cols, score => $score };
+        }
+        @scored = sort { $b->{score} <=> $a->{score} || $a->{row}{record_id} <=> $b->{row}{record_id} } @scored;
+        @todo_list = map { $_->{row} } @scored;
+    } else {
+        @todo_list = map { { $_->get_columns } } @todos;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_list_todos',
-        "Todos listed via API (Local: $is_local)");
+        "Todos listed via API (Local: $is_local)" . ($search_term ? " search='$search_term'" : '') .
+        " -> " . scalar(@todo_list) . " rows");
     
     $c->res->status(200);
     $c->res->content_type('application/json');
@@ -643,12 +750,59 @@ sub api_list_projects :Path('projects') :Args(0) {
     }
     
     my $schema = $c->model('DBEncy');
-    my @projects = $schema->resultset('Project')->all;
-    
-    my @project_list = map { { $_->get_columns } } @projects;
+
+    # Honor a `search` query param (name / project_code / description) so the
+    # project list is actually searchable via the API.
+    my $search_term = $c->request->query_parameters->{search} || '';
+    my $sitename_filter = $c->request->query_parameters->{sitename} || '';
+
+    my $cond = {};
+    if ($sitename_filter) {
+        $cond->{sitename} = $sitename_filter;
+    }
+    if ($search_term) {
+        # Per-word OR matching so multi-word queries match rows containing ANY
+        # of the words; relevance ranking (below) orders by how many matched.
+        my @words = grep { length } split(/\s+/, $search_term);
+        my @field_or;
+        for my $w (@words) {
+            push @field_or, (
+                { name         => { 'like', "%$w%" } },
+                { project_code => { 'like', "%$w%" } },
+                { description  => { 'like', "%$w%" } },
+            );
+        }
+        $cond->{'-or'} = \@field_or if @field_or;
+    }
+
+    my @projects = $schema->resultset('Project')->search($cond);
+
+    # Relevance ranking: when a search term is present, order by the number of
+    # DISTINCT matched query words across name/project_code/description (desc).
+    my @project_list;
+    if ($search_term) {
+        my @qwords = grep { length } split(/\s+/, lc($search_term));
+        my @scored;
+        for my $p (@projects) {
+            my %cols = $p->get_columns;
+            my $hay = lc(join(' ', $cols{name} // '', $cols{project_code} // '', $cols{description} // ''));
+            my $score = 0;
+            my %seen;
+            for my $w (@qwords) {
+                next if $seen{$w}++;
+                $score++ if index($hay, $w) >= 0;
+            }
+            push @scored, { row => \%cols, score => $score };
+        }
+        @scored = sort { $b->{score} <=> $a->{score} || $a->{row}{id} <=> $b->{row}{id} } @scored;
+        @project_list = map { $_->{row} } @scored;
+    } else {
+        @project_list = map { { $_->get_columns } } @projects;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_list_projects',
-        "Projects listed via API (Local: $is_local)");
+        "Projects listed via API (Local: $is_local)" . ($search_term ? " search='$search_term'" : '') .
+        " -> " . scalar(@project_list) . " rows");
     
     $c->res->status(200);
     $c->res->content_type('application/json');
@@ -656,6 +810,82 @@ sub api_list_projects :Path('projects') :Args(0) {
         success => 1,
         count => scalar(@project_list),
         projects => \@project_list
+    }));
+    $c->detach();
+}
+
+=head2 api_get_project
+
+GET /api/projects/:project_id - Get one project with its associated todos
+
+This endpoint is intentionally session-free for localhost/workstation.local, like
+the list endpoints above.  It is the machine-readable equivalent of the project
+details page and returns the complete direct todo collection, including done rows.
+=cut
+
+sub api_get_project :Path('projects') :Args(1) {
+    my ($self, $c, $project_id) = @_;
+
+    my $address = $c->req->address;
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1'
+        || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({
+                success => 0,
+                error => $validation->{error} || 'Authentication required',
+                code => $validation->{code} || 'unauthorized'
+            }));
+            $c->detach();
+        }
+    }
+
+    unless (defined $project_id && $project_id =~ /^\d+$/) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'Invalid project ID' }));
+        $c->detach();
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $project = $schema->resultset('Project')->find($project_id);
+    unless ($project) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Project $project_id not found" }));
+        $c->detach();
+    }
+
+    my @todos = map { { $_->get_columns } }
+        $schema->resultset('Todo')->search(
+            { project_id => $project_id },
+            { order_by => { -asc => 'start_date' } }
+        )->all;
+
+    my @sub_projects = map {
+        my %columns = $_->get_columns;
+        \%columns;
+    } $schema->resultset('Project')->search(
+        { parent_id => $project_id },
+        { order_by => { -asc => 'name' } }
+    )->all;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_get_project',
+        "Project $project_id fetched via API with " . scalar(@todos) . " direct todos");
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        project => { $project->get_columns },
+        todos => \@todos,
+        todo_count => scalar(@todos),
+        sub_projects => \@sub_projects,
+        sub_project_count => scalar(@sub_projects),
     }));
     $c->detach();
 }
@@ -1268,12 +1498,22 @@ sub api_project_update :Path('project/update') :Args(0) {
 
 sub _todo_to_hash {
     my ($self, $todo) = @_;
-    
+
+    # Resolve the attached project via the existing belongs_to(project)
+    # relationship so API/AI-agent callers see the SAME project name + link
+    # the web detail page renders (record.project.name ->
+    # /project/details?project_id=<id>), instead of only a raw project_id.
+    my $project = $todo->project;
+    my $project_name = $project ? $project->name : undef;
+    my $project_link = $project ? "/project/details?project_id=" . $project->id : undef;
+
     return {
         id => $todo->id,
         subject => $todo->subject,
         description => $todo->description,
         project_id => $todo->project_id,
+        project_name => $project_name,
+        project_link => $project_link,
         start_date => $todo->start_date,
         due_date => $todo->due_date,
         priority => $todo->priority,
@@ -1571,109 +1811,20 @@ sub api_focus_top5 :Path('focus/top5') :Args(0) {
 
     my $data = $self->_api_json_body($c);
     my $req_model = $data->{model} // '';
+    $req_model =~ s/^\s+|\s+$//g;
     my $now_epoch = time();
 
-    # ── (a) Gather CSC open todos, score them, take the top 50 by ap_score. ──
-    my @cands;
-    my %rbid;
-    eval {
-        my $schema = $c->model('DBEncy');
-        my @rows = $schema->resultset('Todo')->search(
-            { sitename => 'CSC', status => { '!=' => '3' } },
-            { order_by => { -asc => ['priority'] }, rows => 5000 }
-        )->all;
-        %rbid = map { $_->record_id => { $_->get_columns } } @rows;
-        for my $t (@rows) {
-            my $h = $rbid{$t->record_id};
-            Comserv::Util::TodoRanking::score_todo($h, { now_epoch => $now_epoch, row_by_id => \%rbid });
-            push @cands, $h;
-        }
-    };
-    @cands = sort { ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0) } @cands;
-    my @top = splice(@cands, 0, 50);
+    # ── Resolve which model(s) to ask (honors the UI's explicit choice; falls
+    #    back to the chat system's current model so the button works with no
+    #    selection). @targets / $can_select / @models feed the tail below. ──
+    my @targets;
+    my @models;
+    my $can_select = 0;
+    my $roles = $c->session->{roles} || [];
+    if (ref($roles) eq 'ARRAY') { $can_select = grep { $_ =~ /^(admin|developer|editor)$/i } @$roles; }
 
-    # ── (b) Gather plan docs: on-disk .tt corpus + DB DailyPlan rows. ──
-    my @plan_docs = _focus_top5_plan_docs($c);
-
-    unless (@top || @plan_docs) {
-        $c->res->body(encode_json({ success => 1, top5 => [], note => 'no open CSC todos or plan docs' }));
-        return;
-    }
-
-    # Build a compact, line-per-todo prompt input.
-    my @lines;
-    for my $h (@top) {
-        push @lines, sprintf(
-            "rec=%s | pri=%s | due=%s | proj=%s | subj=%s",
-            $h->{record_id}, $h->{priority},
-            substr($h->{due_date} // '', 0, 10),
-            $h->{project_code} // $h->{project_id} // '',
-            ($h->{subject} // '') =~ s/\n/ /gr
-        );
-    }
-    my $todo_block = join("\n", @lines);
-
-    # Plan-doc context: one block per doc, with plan_id (if a DB plan) and the
-    # open phase todos that already exist (so the AI can either pick the todo
-    # or cite a doc-only next step).
-    my @plan_blocks;
-    for my $pd (@plan_docs) {
-        my $head = "PLAN: " . ($pd->{title} // $pd->{name} // $pd->{path} // '?');
-        $head .= " [plan_id=" . $pd->{plan_id} . "]" if defined $pd->{plan_id};
-        $head .= " [status=" . ($pd->{status} // '?') . "]" if $pd->{status};
-        $head .= " path=" . ($pd->{path} // '?');
-        my @pb = ($head);
-        if ($pd->{open_phase_todos} && @{$pd->{open_phase_todos}}) {
-            push @pb, "  existing open todos for this plan:";
-            for my $pt (@{$pd->{open_phase_todos}}) {
-                push @pb, sprintf("    rec=%s | pri=%s | subj=%s",
-                    $pt->{record_id}, $pt->{priority} // '?',
-                    ($pt->{subject} // '') =~ s/\n/ /gr);
-            }
-        }
-        if ($pd->{next_steps} && @{$pd->{next_steps}}) {
-            push @pb, "  next steps named in the doc (may NOT yet be todos):";
-            for my $ns (@{$pd->{next_steps}}) {
-                push @pb, "    - " . $ns;
-            }
-        }
-        push @plan_blocks, join("\n", @pb);
-    }
-    my $plan_block = join("\n\n", @plan_blocks);
-
-    my $system = "You are the Comserv2 planning-title ranking tuner. You are given (1) open "
-                . "todos already scored by the current CODE algorithm (ap_score), and (2) the "
-                . "PLAN DOCS (on-disk .tt plan files + DB DailyPlan rows). Your job is to improve "
-                . "the ordering so the most important work for building the app and the plans "
-                . "surfaces first. The current algorithm only rewards stale-penalty, due-soon, "
-                . "blocking, and demotes SUPERSEDED + routine-noise. It cannot reason about "
-                . "business impact, dependencies across plans, or mis-set todo fields. "
-                . "Return ONLY a JSON object (no prose, no markdown fence) with these keys:\n"
-                . "  \"picks\": [ up to 5 objects, each EITHER\n"
-                . "      {\"record_id\": <int from rec=>, \"why\": \"<one short sentence>\"}  when picking an existing todo, OR\n"
-                . "      {\"plan_item\": {\"title\":\"<plan name>\", \"step\":\"<specific next step>\", \"plan_id\": <int|null>, \"path\":\"<doc path|null>\"}, \"why\":\"<one short sentence>\"} when the best next action is a plan-doc step with NO todo yet ];\n"
-                . "  \"proposed_order\": [ an array of ALL record_ids you would put first..last, as a better ordering than the code score — subset of the rec= values you judge most important, up to 50, most-important first ];\n"
-                . "  \"weights\": { a JSON object proposing better scoring weights for the code algorithm, keys: stale_90, stale_180, block, cross_block, due_overdue, due_today, due_soon, superseded, routine, status_tier — numeric. These RETUNE (not replace) the existing weights; explain reasoning in weights_why. };\n"
-                . "  \"weights_why\": \"<one paragraph: why these weights better reflect what to build next>\";\n"
-                . "  \"mis_set\": [ an array of {\"record_id\": <int>, \"issue\": \"<e.g. wrong priority / missing project / status should be done / looks routine-mislabelled>\"} — todos whose settings look WRONG and should be cleaned up (this backlog of mis-set todos is a known problem). Up to 15. ]\n"
-                . "All record_ids MUST be from the rec= values provided. Reasoning beats the raw code score.";
-    my $user_prompt = "";
-    $user_prompt .= "OPEN TODOS (current code ap_score shown; lower = more important):\n$todo_block\n\n" if $todo_block;
-    $user_prompt .= "PLAN DOCS (current intentions):\n$plan_block\n\n" if $plan_block;
-    $user_prompt .= "Return picks (max 5), a proposed full order, proposed retuning weights + "
-                  . "why, and the mis-set todos you would flag for cleanup.";
-
-    # ── Model selection ──
-    # The UI passes the operator's chosen model(s) (the one(s) they want to
-    # compare). We use them EXACTLY — no silent swap to a "better" model. Each
-    # target may carry its own host (qwen lives on localhost:11434; the chat
-    # config default host is 192.168.1.199). We auto-probe both so a model on
-    # either host works, and the chosen model is always honored.
-    $req_model =~ s/^\s+|\s+$//g;
     my $req_host = $data->{host} // '';
     my @req_models = ref($data->{models}) eq 'ARRAY' ? @{ $data->{models} } : ();
-    # Normalize models entries to {name, host}.
-    my @targets;
     if (@req_models) {
         for my $m (@req_models) {
             if (ref($m) eq 'HASH' && $m->{name}) {
@@ -1686,194 +1837,57 @@ sub api_focus_top5 :Path('focus/top5') :Args(0) {
         push @targets, { name => $req_model, host => $req_host };
     }
 
-    my $can_select = 0;
-    my $roles = $c->session->{roles} || [];
-    if (ref($roles) eq 'ARRAY') { $can_select = grep { $_ =~ /^(admin|developer|editor)$/i } @$roles; }
-
-    my $default_model = 'phi4:14b';
-    my $cfg_host = 'localhost';
-    my $cfg_port = 11434;
-    my $ai_facade = eval { $c->model('AI') };
+    # Build the list of selectable models for the UI (same facade the chat
+    # header dropdown uses). Surfaced in the response so the UI can label hosts.
+    # Default comes from the chat system's CURRENT model when available; if that
+    # is missing we fall back to the shared catalog default (ModelCatalog) rather
+    # than a hardcoded localhost Ollama slug.
+    my ($def_prov, $def_name) = split(/\|/, _focus_default_model($c), 2);
+    my $default_model = $def_name // '';
+    my $cfg_host      = 'localhost';
+    my $ai_facade     = eval { $c->model('AI') };
     if ($ai_facade) {
         my ($host, $port, $cur, $inst) = eval { $ai_facade->get_current_config($c, $can_select) };
-        $cfg_host = $host if $host;
-        $cfg_port = $port if $port;
-        $default_model = $cur if $cur;
-    }
-    # If no explicit targets, default to the chat system's current model (honoring it).
-    unless (@targets) {
-        push @targets, { name => $default_model, host => '' };
-    }
-
-    # Build the list of models the operator can choose from — uses Comserv::Model::AI
-    # (the SAME facade the chat-header dropdown uses). Surfaced in the response too so
-    # the UI can label hosts. Each entry: { name, provider, host }.
-    my @models;
-    if ($ai_facade) {
-        my ($host, $port, $cur, $inst) = eval { $ai_facade->get_current_config($c, $can_select) };
+        $cfg_host      = $host      if $host;
+        $default_model = $cur       if $cur;
         if ($inst && ref($inst) eq 'ARRAY') {
             for my $m (@$inst) {
                 my $n = ref($m) ? ($m->{name} // $m->{model} // $m) : $m;
                 push @models, { name => $n, provider => 'ollama', host => $host } if $n;
             }
         }
-        my @ext = eval { $ai_facade->get_external_models($c) } or ();
+        my @ext = _focus_external_models($c);
         for my $m (@ext) {
             push @models, { name => $m->{name}, provider => $m->{provider} // 'external',
                             label => $m->{label} // ($m->{name} // ''), host => '' };
         }
     }
+    # Default the target to the chat system's current model when none passed.
+    # Only when it is a real (non-empty) model — never invent one.
+    unless (@targets || !$default_model) {
+        push @targets, { name => $default_model, host => '' };
+    }
     push @models, { name => $default_model, provider => 'ollama', host => $cfg_host }
-        unless $default_model eq ($models[0]{name} // '') && @models;
+        if $default_model && !($default_model eq ($models[0]{name} // '') && @models);
     my %seen; @models = grep { !$seen{ $_->{name} }++ } @models;
 
-    # Resolve a host for a target: explicit host wins; else probe configured host,
-    # then localhost, using a 2s connection check (so qwen@localhost works too).
-    my $resolve_host = sub {
-        my ($name, $pref) = @_;
-        my @try = ($pref ? ($pref) : ());
-        push @try, $cfg_host if $cfg_host;
-        push @try, 'localhost' unless grep { $_ eq 'localhost' } @try;
-        for my $h (@try) {
-            my $t = Comserv::Model::Ollama->new(host => $h, port => $cfg_port || 11434, timeout => 2);
-            if ($t && $t->check_connection()) { return $h; }
-        }
-        return ($pref || $cfg_host || 'localhost');   # best guess if all probes fail
-    };
+    # ── Delegate the AI work to Model::AI2::FocusTune (the SAME brain the
+    #    Chat-with-AI focustune agent uses). One implementation, two callers. ──
+    my $tune = $c->model('AI2::FocusTune');
+    my ($top, $rbid) = $tune->gather_candidates($c, $now_epoch);
+    my @plan_docs = $tune->plan_docs($c);
+    my ($system, $user_prompt) = $tune->build_prompt($c, $top, \@plan_docs);
 
-    # Run one tuning pass for a single {model,host} target. Returns the parsed payload
-    # or { success => 0, error => ... }. Declared once, used by both single + compare.
-    my $run_one = sub {
-        my ($tgt) = @_;
-        my $model = $tgt->{name};
-        my $host  = $resolve_host->($model, $tgt->{host});
-        my $out = { model => $model, host => $host };
-        eval {
-            my $ollama = $c->model('Ollama');
-            $ollama->set_host($host);
-            $ollama->port($cfg_port) if $cfg_port;
-            $ollama->timeout(300);
-            my $resp = $ollama->chat(model => $model, messages => [
-                { role => 'system', content => $system },
-                { role => 'user',   content => $user_prompt },
-            ]);
-            if ($resp && $resp->{success}) {
-                $out->{success} = 1;
-                $out->{response} = $resp->{response} // '';
-            } else {
-                $out->{success} = 0;
-                $out->{error} = ($resp && $resp->{error}) ? $resp->{error} : 'AI ranking unavailable';
-            }
-        };
-        if ($@) { $out->{success} = 0; $out->{error} = "$@"; }
-        return $out;
-    };
-
-    # Batch mode: run every target and return an array of results.
     my @results;
     for my $tgt (@targets) {
-        push @results, $run_one->($tgt);
+        push @results, $tune->run_one($c, $tgt, $system, $user_prompt, $can_select);
     }
 
-    # For the single-model legacy shape, take the first result.
-    my $ai = $results[0];
-    if (!$ai || !$ai->{success}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_focus_top5',
-            "AI ranking unavailable: " . ($ai->{error} // 'unknown'));
-        $c->res->body(encode_json({ success => 0, error => 'AI ranking unavailable', detail => $ai->{error} // '' }));
-        return;
-    }
-
-    # ── Parse one AI result into the structured payload (picks/weights/comparison/
-    #    mis_set/proposed_order). Used for both single + batch responses. ──
-    my $parse_ai = sub {
-        my ($res) = @_;
-        my $out = { success => ($res->{success} ? 1 : 0), model => $res->{model} // '' };
-        unless ($res && $res->{success}) {
-            $out->{error} = $res->{error} // 'AI ranking unavailable';
-            return $out;
-        }
-        my $raw = $res->{response} // '';
-        $raw =~ s/^```(?:json)?\s*//i; $raw =~ s/\s*```$//;
-        my $parsed;
-        eval { require JSON; $parsed = JSON::decode_json($raw); };
-        $parsed = {} unless ref($parsed) eq 'HASH';
-        my %valid = map { $_->{record_id} => 1 } @top;
-
-        my @picks;
-        my $picks_ref = ref($parsed->{picks}) eq 'ARRAY' ? $parsed->{picks} : [];
-        for my $p (@$picks_ref) {
-            next unless ref($p) eq 'HASH';
-            if ($p->{record_id} && $valid{$p->{record_id}}) {
-                push @picks, { type => 'todo', record_id => $p->{record_id} + 0, why => $p->{why} // '' };
-            }
-            elsif ($p->{plan_item} && ref($p->{plan_item}) eq 'HASH' && $p->{plan_item}{step}) {
-                push @picks, {
-                    type    => 'plan_item',
-                    title   => $p->{plan_item}{title}    // '',
-                    step    => $p->{plan_item}{step},
-                    plan_id => (defined $p->{plan_item}{plan_id} ? $p->{plan_item}{plan_id} + 0 : undef),
-                    path    => $p->{plan_item}{path}     // undef,
-                    why     => $p->{why} // '',
-                };
-            }
-            last if @picks >= 5;
-        }
-
-        my %ai_weights;
-        if (ref($parsed->{weights}) eq 'HASH') {
-            for my $k (qw(stale_90 stale_180 block cross_block due_overdue due_today due_soon superseded routine status_tier)) {
-                my $v = $parsed->{weights}{$k};
-                $ai_weights{$k} = $v + 0 if defined $v && $v =~ /^[-+]?\d+(\.\d+)?$/;
-            }
-        }
-
-        my @coded_top = map { { record_id => $_->{record_id}, subject => $_->{subject} // '', ap_score => $_->{ap_score} // 0 } }
-                       @top[0 .. ($#top > 19 ? 19 : $#top)];
-
-        my @simulated = map { { %$_ } } @top;
-        if (%ai_weights) {
-            for my $h (@simulated) {
-                Comserv::Util::TodoRanking::score_todo($h, {
-                    now_epoch => $now_epoch, row_by_id => \%rbid, weights => \%ai_weights,
-                });
-            }
-            @simulated = sort { ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0) } @simulated;
-        }
-        my @sim_top = map { { record_id => $_->{record_id}, subject => $_->{subject} // '', ap_score => $_->{ap_score} // 0 } }
-                     @simulated[0 .. ($#simulated > 19 ? 19 : $#simulated)];
-
-        my @mis_set;
-        if (ref($parsed->{mis_set}) eq 'ARRAY') {
-            for my $m (@{$parsed->{mis_set}}) {
-                next unless ref($m) eq 'HASH' && $m->{record_id} && $valid{$m->{record_id}};
-                push @mis_set, { record_id => $m->{record_id} + 0, issue => $m->{issue} // '' };
-            }
-        }
-
-        my @proposed_order = grep { $valid{$_} } map { $_ + 0 }
-                             grep { /^\d+$/ } @{ ref($parsed->{proposed_order}) eq 'ARRAY' ? $parsed->{proposed_order} : [] };
-
-        $out->{picks}          = \@picks;
-        $out->{proposed_order} = \@proposed_order;
-        $out->{weights}        = \%ai_weights;
-        $out->{weights_why}    = $parsed->{weights_why} // '';
-        $out->{comparison}     = {
-            coded_top20     => \@coded_top,
-            simulated_top20 => \@sim_top,
-            note => 'SIMULATED only — nothing was written. Compare coded vs AI-weighted order before applying any change. The AI weights RETUNE the existing scorer, they do not replace it.',
-        };
-        $out->{mis_set_todos}  = \@mis_set;
-        return $out;
-    };
-
-    my @parsed_results = map { $parse_ai->($_) } @results;
+    my @parsed_results = map { $tune->parse_result($c, $_, $top, $rbid, $now_epoch) } @results;
     my $payload = $parsed_results[0];
     $payload->{models} = \@models;
     $payload->{note}   = 'Advisory + tuning preview only — does not reorder, close, or mutate any todo or plan. Independent of Focus Queue filters. Reads both plan docs and the todo system.'
                         . (@targets > 1 ? ' Batch comparison of ' . scalar(@targets) . ' models.' : '');
-    # When 2+ models requested, include the full per-model array so the UI can
-    # lay them out side by side for direct comparison.
     if (@targets > 1) {
         $payload->{results} = \@parsed_results;
     }
@@ -1908,19 +1922,64 @@ sub api_focus_models :Path('focus/models') :Args(0) {
                 push @models, { name => $n, provider => 'ollama', host => $host };
             }
         }
-        # External (Grok/xAI etc.) models.
-        my @ext = $ai->get_external_models($c);
+        # External (Grok/xAI, OpenRouter, ...) models — sourced from the SAME
+        # live catalog the chat dropdown uses (Model::AI2::Router::get_available_models),
+        # which does a real list_models() call against each provider's API. This
+        # is the dynamic list: it reflects what the provider actually offers for
+        # the configured key, not a stale DB snapshot. No hardcoded fallback.
+        my @ext = _focus_external_models($c);
         for my $m (@ext) {
             push @models, { name => $m->{name}, provider => $m->{provider} // 'external',
                             label => $m->{label} // ($m->{name} // '') };
         }
     };
     my %seen; @models = grep { !$seen{ $_->{name} }++ } @models;
-    # Always offer the chat's current default as a fallback so the picker is never empty.
-    unless (@models) {
-        push @models, { name => 'phi4:14b', provider => 'ollama', host => 'localhost' };
+    # Attach real per-token pricing (USD per 1M) from the live Router catalog so
+    # the picker can show cost like the chat dropdown does. Keyed by provider|name.
+    my %price_by_model;
+    my $price_src;
+    eval { $price_src = $c->model('AI2::Router')->get_available_models($c); };
+    $price_src = undef if $@;
+    if ($price_src && ref($price_src) eq 'ARRAY') {
+        for my $m (@$price_src) {
+            next unless $m && ref($m) eq 'HASH' && $m->{name};
+            my $svc  = $m->{provider} // '';
+            my $key  = "$svc|" . $m->{name};
+            $price_by_model{$key} = {
+                price_prompt     => ($m->{price_prompt}     // 0) + 0,
+                price_completion => ($m->{price_completion} // 0) + 0,
+                price_tier       => $m->{price_tier} // '',
+                free             => ($m->{free} || (($m->{name} // '') =~ /:free$/)) ? 1 : 0,
+                local            => ($svc eq 'ollama') ? 1 : 0,
+            };
+        }
     }
-    $c->res->body(encode_json({ success => 1, models => \@models }));
+    for my $m (@models) {
+        my $k = ($m->{provider} // '') . '|' . $m->{name};
+        if (my $p = $price_by_model{$k}) {
+            $m->{price_prompt}     = $p->{price_prompt};
+            $m->{price_completion} = $p->{price_completion};
+            $m->{price_tier}       = $p->{price_tier};
+            $m->{free}             = $p->{free};
+            $m->{local}            = $p->{local};
+        }
+    }
+    # The pre-selected default MUST be one of the dynamic models we just listed —
+    # never a hardcoded slug that isn't actually an option. Prefer the shared
+    # catalog default, but only if it is present in the live list; otherwise fall
+    # back to the first listed (dynamic) model. Surfaced as `default` so the JS
+    # picker pre-checks the right option instead of inventing one client-side.
+    my $default = '';
+    my $cat_def = _focus_default_model($c);
+    if ($cat_def && $cat_def =~ /\|/) {
+        my (undef, $cn) = split(/\|/, $cat_def, 2);
+        if (grep { $_->{name} eq $cn } @models) { $default = $cat_def; }
+    }
+    unless ($default) {
+        $default = (@models && $models[0]{provider})
+            ? ($models[0]{provider} . '|' . $models[0]{name}) : '';
+    }
+    $c->res->body(encode_json({ success => 1, models => \@models, default => $default }));
 }
 
 # Gather the plan-doc context for api_focus_top5: BOTH the on-disk planning

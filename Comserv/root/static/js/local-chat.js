@@ -27,7 +27,11 @@
         pageDocFetched: false,
         currentAgent: null,
         agentsConfig: null,
-        selectedProvider: 'ollama',
+        // No hardcoded provider default. The server renders the correct default
+        // into #ai-provider (role- and cost-aware) and mountProviderSelect()
+        // adopts it. Hardcoding 'ollama' here caused every request to go local
+        // regardless of what the dropdown displayed.
+        selectedProvider: '',
         conversationMessages: [],
         username: 'You',
         activeModel: null,
@@ -710,7 +714,7 @@
               '<option value="auto">⚡ Auto</option>' +
             '</select>' +
             '<label for="ai-provider">Model:</label>' +
-            '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
+            '<span id="ai-provider-mount"></span>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
                 '<input type="checkbox" id="enable-web-search" style="vertical-align:middle;"> 🔍 Web' +
@@ -744,6 +748,7 @@
             '<label id="attach-audio-btn" title="Upload a saved audio file (.mp3, .m4a, .wav, .ogg, .webm) for transcription" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio file">📂<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
             '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
+            '<button id="chat-add-todo-btn" title="Add a todo for this page’s project" style="padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Add todo">📝</button>' +
             '</div></div>';
 
         // Resize handle (bottom-right corner)
@@ -762,118 +767,36 @@
         chatPanel.appendChild(chatInput);
         chatPanel.appendChild(resizeHandle);
 
-        // ── Populate provider dropdown ────────────────────────────────────────
-        fetch('/ai2/providers', { method: 'GET', credentials: 'include' })
-            .then(r => r.json())
-            .then(function(data) {
-                if (data.success) {
-                    if (data.username)  state.username   = data.username;
-                    if (data.is_admin)  state.isAdmin    = !!data.is_admin;
-                    if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
-                    if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
-                }
-                if (data.success && data.providers && data.providers.length > 0) {
-                    const sel = document.getElementById('ai-provider');
-                    if (!sel) return;
-                    data.providers.forEach(function(p) {
-                        if (p.service === 'grok') {
-                            const grp = document.createElement('optgroup');
-                            grp.label = 'External AI (xAI)';
-                            const grokModels = (p.models && p.models.length > 0)
-                                ? p.models
-                                    .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
-                                    .map(function(m) {
-                                        const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-                                        return { val: 'grok|' + m.id, label: label + ' (xAI)' };
-                                    })
-                                : [
-                                    { val: 'grok|grok-4.3',               label: 'Grok 4.3 (xAI)' },
-                                    { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast (xAI)' }
-                                ];
-                            grokModels.forEach(function(m) {
-                                const opt = document.createElement('option');
-                                opt.value = m.val; opt.textContent = m.label;
-                                grp.appendChild(opt);
-                            });
-                            sel.appendChild(grp);
-                            // Cheapest Grok for complex queries (non-guest)
-                            if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4.3';
-                            }
-                            // Show web search toggle for any user who has Grok access
-                            // (toggle applies to Grok requests whether selected manually or via auto-routing)
-                            const wst = document.getElementById('web-search-toggle');
-                            if (wst) {
-                                wst.style.display = 'inline';
-                                wst.title = 'Enable web search for Grok requests (uses API credits)';
-                            }
-                        } else if (p.service === 'ollama') {
-                            state.ollamaHost = p.active_host;
-                            // Update the default "Ollama (Local)" option label
-                            const defaultOpt = sel.querySelector('option[value="ollama"]');
-                            if (defaultOpt) defaultOpt.textContent = p.name || 'Ollama (Local AI)';
+        // ── Provider / model dropdown ──────────────────────────────────────
+        // The #ai-provider <select> is SERVER-RENDERED (ai/model_select.tt via
+        // js_load.tt) from the catalog in stash, so it already shows the full,
+        // role-correct model list with no JS fetch or render race. We simply MOVE
+        // that server-rendered node into the provider-selector bar. The legacy
+        // shared-module fetch (ai-chat/model-select.js) is no longer needed to
+        // build the list and is only kept as a fallback if the server node is
+        // absent.
+        (function mountProviderSelect() {
+            var mount = document.getElementById('ai-provider-mount');
+            var src   = document.getElementById('ai-provider-server-rendered');
+            var sel   = src ? src.querySelector('#ai-provider') : null;
+            if (mount && sel) {
+                mount.appendChild(sel);
+                if (src) src.parentNode && src.parentNode.removeChild(src);
+                // Adopt the server-chosen default as the active provider. Without
+                // this, state.selectedProvider stayed at its 'ollama' initial value
+                // while the dropdown displayed (say) a free OpenRouter model, so the
+                // request went to Ollama and the status line said Ollama — exactly
+                // the mismatch the server-rendered default was meant to remove.
+                if (sel.value) state.selectedProvider = sel.value;
+            }
+        })();
 
-                            // Admin server switcher: add optgroup if multiple servers available
-                            if (p.servers && p.servers.length > 1 && data.is_admin) {
-                                const svrGrp = document.createElement('optgroup');
-                                svrGrp.label = 'Ollama Server';
-                                p.servers.forEach(function(srv) {
-                                    const opt = document.createElement('option');
-                                    opt.value = 'ollama_server|' + srv.host;
-                                    opt.textContent = srv.label + (srv.active ? ' ✓' : '');
-                                    if (srv.active) opt.selected = false; // keep default selected
-                                    svrGrp.appendChild(opt);
-                                });
-                                sel.appendChild(svrGrp);
-                            }
-
-                            // Build model tiers from chat-capable installed models.
-                            // Exclude sub-2B toy models (tinyllama, 1.1b, etc.) from
-                            // auto-selection — they produce unreliable answers.
-                            if (p.models && p.models.length > 0) {
-                                const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
-                                if (chatModels.length > 0) {
-                                    const sorted = chatModels.slice().sort(function(a, b) {
-                                        return modelSizeScore(a.id) - modelSizeScore(b.id);
-                                    });
-                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
-                                    const pool   = usable.length > 0 ? usable : sorted; // fallback if all tiny
-                                    state.modelTiers.small  = 'ollama|' + pool[0].id;
-                                    state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
-                                    state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
-                                }
-                            }
-                        } else {
-                            // Generic external provider (OpenRouter, OpenAI, Groq, ...)
-                            const grp = document.createElement('optgroup');
-                            grp.label = (p.name || p.service || 'External');
-                            const extModels = (p.models && p.models.length > 0)
-                                ? p.models
-                                    .filter(function(m) { return m.id && !m.id.match(/imagine|video|embed|rerank/i); })
-                                    .map(function(m) {
-                                        const label = (m.label || m.id).replace(/-/g, ' ');
-                                        return { val: p.service + '|' + m.id, label: label + ' (' + p.service + ')' };
-                                    })
-                                : [{ val: p.service + '|' + p.service, label: (p.name || p.service) + ' (external)' }];
-                            extModels.forEach(function(m) {
-                                const opt = document.createElement('option');
-                                opt.value = m.val; opt.textContent = m.label;
-                                grp.appendChild(opt);
-                            });
-                            sel.appendChild(grp);
-                            // Expose a tier for this external provider if none set
-                            if (!state.modelTiers[p.service]) {
-                                state.modelTiers[p.service] = extModels[0] ? extModels[0].val : (p.service + '|' + p.service);
-                            }
-                        }
-                    });
-                }
-
-                // Pre-warm the Ollama model at page-load time so the first real
-                // message doesn't hit a cold-start delay.  Re-warm every 25 min
-                // (keep_alive is 2h so this ensures the model stays in VRAM).
-                function _firePreload() {
-                    if ((state.selectedProvider || 'ollama').split('|')[0] !== 'ollama') return;
+        // Pre-warm the Ollama model at page-load time so the first real
+        // message doesn't hit a cold-start delay.  Re-warm every 25 min
+        // (keep_alive is 2h so this ensures the model stays in VRAM).
+        (function startPreload() {
+            function _firePreload() {
+                    if ((state.selectedProvider || '').split('|')[0] !== 'ollama') return;
                     const agentId = (state.pageContext && state.pageContext.agent_id) || '';
                     fetch('/ai/preload_model?provider=ollama&agent_id=' + encodeURIComponent(agentId), {
                         method: 'GET',
@@ -896,8 +819,7 @@
                 if (attachBtn) {
                     attachBtn.style.display = state.isAdmin ? '' : 'none';
                 }
-            })
-            .catch(function() {});
+            })();
 
         // ── Drag to move ──────────────────────────────────────────────────────
         (function initDrag() {
@@ -1117,6 +1039,30 @@
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
+
+        // Shared "Add Todo" button (chat feature module) — attaches to the
+        // current page's project. Uses detectPageContext() for page info.
+        var todoBtn = document.getElementById('chat-add-todo-btn');
+        if (todoBtn && window.ComservChat && ComservChat.featureTodo) {
+            todoBtn.addEventListener('click', function () {
+                var ctx = (window.ComservChat.pageContext && ComservChat.pageContext.detectPageContext)
+                    ? ComservChat.pageContext.detectPageContext() : null;
+                var lastText = '';
+                var msgs = document.querySelectorAll('#chat-messages .message');
+                for (var i = msgs.length - 1; i >= 0; i--) {
+                    if (/^AI:/.test(msgs[i].textContent || '')) { lastText = (msgs[i].textContent || '').replace(/^AI:\s*/, ''); break; }
+                }
+                ComservChat.featureTodo.open({
+                    pagePath: ctx ? ctx.page_path : (window.location.pathname + (window.location.search || '')),
+                    pageTitle: ctx ? ctx.page_title : (document.title || ''),
+                    prefill: lastText
+                });
+            });
+        }
+
+        // Apply the shared tooltip map to this widget's buttons.
+        if (window.ComservChat && ComservChat.tooltips) ComservChat.tooltips.apply(document.getElementById('chat-panel') || document);
+
         document.getElementById('message-input').addEventListener('paste', function(e) {
             if (!state.isAdmin) return;
             const items = (e.clipboardData || window.clipboardData).items;
@@ -1567,14 +1513,11 @@
 
             state.selectedProvider = selectedVal;
             state.userModelOverride = true;   // user chose manually — disable auto-select
-            let modelDisplay;
-            if (isGrok) {
-                modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
-            } else {
-                const host = state.ollamaHost || '';
-                const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
-                modelDisplay = (isLocalHost ? 'Ollama (Local)' : 'Ollama (Remote)') + (parts[1] ? ': ' + parts[1] : '');
-            }
+            // Label from the SHARED helper: it derives the provider from the
+            // "provider|model" value itself. The old code assumed anything that
+            // was not Grok must be Ollama, so picking an OpenRouter model (e.g.
+            // openrouter|tencent/hy3) was mislabelled "Ollama (Local)".
+            let modelDisplay = describeModel(selectedVal, { host: state.ollamaHost });
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
             statusEl.textContent = '🔵 ' + modelDisplay + ' (manual)';
@@ -1746,8 +1689,12 @@
             if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
             if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
-            // Hide provider selector and history button for guests / non-admins
-            if (data.is_guest || !data.can_access_history) {
+            // True guests (not logged in): hide the provider selector + history
+            // chrome, but still derive model tiers from local Ollama so query
+            // auto-tier routing works. Skip the visible dropdown population
+            // (it's hidden anyway).
+            const isTrueGuest = !!data.is_guest;
+            if (isTrueGuest) {
                 const selectorBar = document.querySelector('.provider-selector');
                 if (selectorBar) selectorBar.style.display = 'none';
                 const histBtn = document.getElementById('toggle-history-btn');
@@ -1757,8 +1704,8 @@
                 // Clear any stale conversation ID left from a previous login session
                 state.currentConversationId = null;
                 sessionStorage.removeItem('currentConversationId');
-                // For guests: still populate modelTiers from available Ollama models
-                // so query auto-tier selection works correctly.
+                // Still populate modelTiers from available Ollama models so query
+                // auto-tier selection works correctly.
                 if (data.providers) {
                     data.providers.forEach(function(p) {
                         if (p.service === 'ollama' && p.models && p.models.length > 0) {
@@ -1779,111 +1726,71 @@
                 return;
             }
 
+            // Logged-in users (admin OR regular user): always populate the model
+            // dropdown via the SHARED module so Ollama + Grok + external all
+            // appear. Previously a role-gate here skipped population for
+            // non-admins, leaving an empty selector.
             if (!data.providers || !data.providers.length) return;
 
             const providerSelect = document.getElementById('ai-provider');
             if (!providerSelect) return;
-            providerSelect.innerHTML = '';
 
-            data.providers.forEach(function(p) {
-                if (p.service === 'ollama') {
-                    state.ollamaHost = p.active_host;
-                    const grp = document.createElement('optgroup');
-                    const host = p.active_host || '';
-                    const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
-                    grp.label = isLocalHost ? 'Ollama (Local)' : 'Ollama (Remote: ' + host + ')';
-                    if (p.models && p.models.length > 0) {
-                        // Build model tiers from chat-capable models only, sorted by size.
-                        // Exclude sub-2B toy models from auto-selection.
-                        const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
-                        if (chatModels.length > 0) {
-                            const sorted = chatModels.slice().sort(function(a, b) {
-                                return modelSizeScore(a.id) - modelSizeScore(b.id);
+            // Delegate catalog fetch + dropdown rendering to the SHARED module
+            // (ai-chat/model-select.js). Both the general widget and the editor
+            // chat use the same code path now, so model selection can't diverge.
+            // Pin hy3 to the top + default for this chat context.
+            ComservChat.modelSelect.init({
+                selectEl: providerSelect,
+                context: 'chat',
+                pinModel: 'tencent/hy3',
+                onReady: function (catalog) {
+                    // Re-derive model tiers (used by auto-tier query routing).
+                    (catalog || []).forEach(function (p) {
+                        if (p.service === 'ollama') {
+                            state.ollamaHost = p.active_host;
+                            const chatModels = (p.models || []).filter(function (m) { return ComservChat.modelSelect.isChatModel(m.id); });
+                            const sorted = chatModels.slice().sort(function (a, b) {
+                                return ComservChat.modelSelect.modelSizeScore(a.id) - ComservChat.modelSelect.modelSizeScore(b.id);
                             });
-                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                            const usable = sorted.filter(function (m) { return ComservChat.modelSelect.modelSizeScore(m.id) >= 3; });
                             const pool   = usable.length > 0 ? usable : sorted;
-                            state.modelTiers.small  = 'ollama|' + pool[0].id;
-                            state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
-                            state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
-                        }
-                        // Only show usable (≥3B) models in dropdown; hide toy models
-                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 3; });
-                        const listModels = displayModels.length > 0 ? displayModels : chatModels;
-                        listModels.forEach(function(m) {
-                            const opt = document.createElement('option');
-                            opt.value = 'ollama|' + m.id;
-                            opt.textContent = m.id;
-                            // Unreachable sentinel (e.g. "Ollama (host:port unreachable)")
-                            // — show it so the user knows local AI exists, but
-                            // disable selection so a dead request isn't sent.
-                            if (m.unreachable) {
-                                opt.disabled = true;
-                                opt.textContent = m.label || 'Ollama (unreachable)';
+                            if (pool.length) {
+                                state.modelTiers.small  = 'ollama|' + pool[0].id;
+                                state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
+                                state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                             }
-                            grp.appendChild(opt);
-                        });
-                    } else {
-                        const opt = document.createElement('option');
-                        opt.value = 'ollama';
-                        opt.textContent = 'Ollama (default)';
-                        grp.appendChild(opt);
-                    }
-                    providerSelect.appendChild(grp);
-                } else if (p.service === 'grok') {
-                    const grp = document.createElement('optgroup');
-                    grp.label = 'xAI (Grok)';
-                    const grokModels = (p.models && p.models.length > 0)
-                        ? p.models
-                            .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
-                            .map(function(m) {
-                                const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-                                return { val: 'grok|' + m.id, label: label + ' (xAI)' };
-                            })
-                        : [
-                            { val: 'grok|grok-4.3',               label: 'Grok 4.3' },
-                            { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast' }
-                        ];
-                    grokModels.forEach(function(m) {
-                        const opt = document.createElement('option');
-                        opt.value = m.val;
-                        opt.textContent = m.label;
-                        grp.appendChild(opt);
+                        } else if (p.service === 'grok' && !state.isGuest && p.models && p.models.length) {
+                            const first = p.models.filter(function (m) { return m.id && !/imagine|video/i.test(m.id); })[0];
+                            if (first) state.modelTiers.grok = 'grok|' + first.id;
+                        } else if (!state.modelTiers[p.service] && p.models && p.models.length) {
+                            state.modelTiers[p.service] = p.service + '|' + p.models[0].id;
+                        }
                     });
-                    providerSelect.appendChild(grp);
-                    // Set grok tier for complex queries (non-guest users)
-                    if (!state.isGuest && grokModels.length > 0) {
-                        state.modelTiers.grok = grokModels[0].val;
-                    }
-                } else {
-                    const opt = document.createElement('option');
-                    opt.value = p.service;
-                    opt.textContent = p.name || p.display_name || p.service;
-                    providerSelect.appendChild(opt);
+
+                    // Sync our selectedProvider shadow. NOTE: do NOT set
+                    // userModelOverride here — this runs for the *programmatic
+                    // default* selection (smallest local Ollama model), not a
+                    // deliberate user choice. Marking it as an override would
+                    // disable auto-tiering and force every question onto the
+                    // default model (previously hy3, a paid external model)
+                    // instead of letting autoSelectProvider route simple queries
+                    // to a small/free local model. Real user picks still set the
+                    // flag via the change-event listener below.
+                    const curVal = providerSelect.value || '';
+                    state.selectedProvider = curVal || state.selectedProvider;
+                    // Web-search toggle: show it whenever the user HAS Grok
+                    // access (toggle applies to Grok requests whether selected
+                    // manually or reached via auto-routing) — not only when a
+                    // Grok model is the current selection.
+                    const wst = document.getElementById('web-search-toggle');
+                    if (wst) wst.style.display = state.modelTiers.grok ? 'inline' : 'none';
+
+                    console.debug('Loaded', (catalog || []).length, 'providers (shared model-select)');
+                },
+                onError: function (err) {
+                    console.error('Shared model-select failed:', err);
                 }
             });
-
-            // Auto-correct stale selection: if previously selected model was removed,
-            // reset to the first available option so the user doesn't silently use a
-            // model that no longer exists on the server.
-            if (state.selectedProvider && state.selectedProvider !== 'ollama') {
-                const allOpts = Array.from(providerSelect.options);
-                const stillExists = allOpts.some(function(o) {
-                    return o.value === state.selectedProvider;
-                });
-                if (!stillExists && allOpts.length > 0) {
-                    state.selectedProvider = allOpts[0].value;
-                    providerSelect.value   = allOpts[0].value;
-                    state.userModelOverride = false;
-                    console.warn('Previously selected model no longer available; reset to', allOpts[0].value);
-                }
-            }
-
-            // Show web-search toggle only when a Grok option is selected
-            const curVal = providerSelect.value || '';
-            const wst = document.getElementById('web-search-toggle');
-            if (wst) wst.style.display = curVal.startsWith('grok') ? 'inline' : 'none';
-
-            console.debug('Loaded', data.providers.length, 'providers');
         })
         .catch(error => {
             console.error('Failed to load user providers:', error);
@@ -2305,7 +2212,10 @@
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
         // We only specify a model when the user manually chose one, or for Grok (where model matters).
-        let effectiveProvider = state.selectedProvider || 'ollama';
+        // Fall back to whatever the dropdown currently shows, NOT a hardcoded
+        // 'ollama' — the dropdown holds the server-rendered role/cost-aware default.
+        let effectiveProvider = state.selectedProvider ||
+            (document.getElementById('ai-provider') || {}).value || '';
         let autoTier = null;
         if (!state.userModelOverride) {
             autoTier = classifyQuery(prompt);
@@ -2325,11 +2235,22 @@
         // Parse provider|model format (e.g. "grok|grok-mini" or "ollama|llama3.1:latest")
         const providerParts = effectiveProvider.split('|');
         const providerName = providerParts[0];
-        // Only pass a model name for Grok (client-chosen) or explicit user overrides.
-        // For Ollama without user override, let the server select the best model.
-        const modelName = (state.userModelOverride || providerName === 'grok')
-            ? (providerParts[1] || null)
-            : null;
+        // Always send the model name for non-Ollama providers (Grok + external like
+        // OpenRouter). Ollama keeps server-side best-model selection unless the user
+        // explicitly picked a specific Ollama model. Previously the model was only
+        // forwarded when userModelOverride was set; if that flag was false when a
+        // non-Ollama model was selected, model=null reached the backend, which cannot
+        // honor OpenRouter/Grok without an explicit model -> the request degraded to
+        // Ollama. Forwarding the model unconditionally for external providers removes
+        // that fragile dependency.
+        const modelName = (providerName === 'ollama' && !state.userModelOverride)
+            ? null
+            : (providerParts[1] || null);
+        if (typeof console !== 'undefined') {
+            console.warn('[sendAIRequest] provider=' + providerName +
+                ' model=' + (modelName || '(server-default)') +
+                ' override=' + !!state.userModelOverride);
+        }
 
         // Update loading message to show which tier is being used
         if (autoTier) {
@@ -2970,17 +2891,18 @@
                     }
                 }
                 
-                // Update status with provider + model name + host
-                const providerParts2 = (state.selectedProvider || 'ollama').split('|');
-                const provName = data.provider || providerParts2[0];
+                // Update status with provider + model name + host.
+                // Use the SHARED describeModel() helper so the label always matches
+                // the provider that actually served the request. The previous code
+                // treated every non-Grok response as Ollama, which is why an
+                // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
+                const providerParts2 = (state.selectedProvider || '').split('|');
+                const provName = data.provider || providerParts2[0] || '';
                 const rawModel = data.model || providerParts2[1] || '';
-                let modelLabel;
-                if (provName === 'grok') {
-                    modelLabel = 'Grok (xAI)' + (rawModel ? ': ' + rawModel : '');
-                } else {
-                    const hostLabel = data.ollama_host ? ' @' + data.ollama_host : ' (Local)';
-                    modelLabel = 'Ollama' + hostLabel + (rawModel ? ': ' + rawModel : '');
-                }
+                const modelLabel = describeModel(
+                    provName + (rawModel ? '|' + rawModel : ''),
+                    { host: data.ollama_host || state.ollamaHost }
+                );
                 state.activeModel = modelLabel;
                 statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
@@ -3258,9 +3180,35 @@
         return 'medium';
     }
 
-    // Pick the best provider string for a given complexity tier
+    // Label a "provider|model" value. Delegates to the SHARED module so every
+    // surface labels identically; the inline fallback only runs if model-select.js
+    // failed to load.
+    function describeModel(value, opts) {
+        if (window.ComservChat && window.ComservChat.modelSelect &&
+            typeof window.ComservChat.modelSelect.describeModel === 'function') {
+            return window.ComservChat.modelSelect.describeModel(value, opts);
+        }
+        if (!value) return 'AI Assistant';
+        var p = String(value).split('|');
+        return (p[0] || 'AI') + (p[1] ? ': ' + p[1] : '');
+    }
+
+    // Pick the best provider string for a given complexity tier.
+    //
+    // IMPORTANT: auto-tiering only ever picks between LOCAL Ollama sizes (plus
+    // Grok for complex queries). It must therefore NOT run when the current
+    // selection is an external provider — modelTiers only ever contains
+    // 'ollama|...' entries, so returning a tier would silently drag an
+    // OpenRouter selection (e.g. a free NVIDIA model) back onto local Ollama.
+    // That is the "I picked a free model but got Ollama" bug.
     function autoSelectProvider(complexity) {
         const t = state.modelTiers;
+        const current = state.selectedProvider || '';
+        const currentSvc = current.split('|')[0];
+
+        // Respect any non-Ollama selection (server-rendered default included).
+        if (currentSvc && currentSvc !== 'ollama') return current;
+
         if (complexity === 'nav' || complexity === 'simple') {
             return t.small || t.medium || state.selectedProvider;
         }
@@ -4997,14 +4945,8 @@
     function _applyPageModelSelection() {
         const modelSelectEl = document.getElementById('model-select');
         if (!modelSelectEl || !modelSelectEl.value) return;
-        const val = modelSelectEl.value;
-        const opt = modelSelectEl.options[modelSelectEl.selectedIndex];
-        const provider = (opt && opt.dataset.provider) || 'ollama';
-        if (provider === 'grok' || val.startsWith('grok')) {
-            state.selectedProvider = 'grok|' + val;
-        } else {
-            state.selectedProvider = 'ollama|' + val;
-        }
+        const val = modelSelectEl.value;            // "provider|model"
+        state.selectedProvider = val;
         state.userModelOverride = true;
     }
 
@@ -5087,11 +5029,28 @@
         });
         loadUserProviders().catch(function() {});
 
-        // Read model selection from page dropdown when it changes
+        // Read model selection from page dropdown when it changes.
+        // The #model-select element is populated by the SAME shared
+        // ComservChat.modelSelect module the floating widget uses (so every
+        // chat surface shows the identical provider list and default). Previously
+        // this page declared an empty <select id="model-select"> and nothing ever
+        // filled it, so the dropdown was permanently empty ("Chat with AI sees
+        // nothing"). We now delegate population to the shared module and parse its
+        // "provider|model" value format.
         const modelSelectEl = document.getElementById('model-select');
         if (modelSelectEl) {
-            modelSelectEl.addEventListener('change', _applyPageModelSelection);
-            _applyPageModelSelection();
+            ComservChat.modelSelect.init({
+                selectEl: modelSelectEl,
+                context: 'chat',
+                pinModel: 'tencent/hy3',
+                onReady: function () {
+                    modelSelectEl.addEventListener('change', _applyPageModelSelection);
+                    _applyPageModelSelection();
+                },
+                onError: function () {
+                    modelSelectEl.addEventListener('change', _applyPageModelSelection);
+                }
+            });
         }
 
         // Submit: Nav intercept → AI query (same logic as widget's sendMessage)
@@ -5752,6 +5711,11 @@
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
 
+        // Inside the AI2 code-editor popup we use the editor's own in-editor
+        // chat sidebar (ai2editor/chat.js) for file-aware suggestions, so the
+        // global floating "Chat with AI" widget is redundant there. Skip it.
+        const _inEditorPopup = /(\/ai2\/editing_widget_popup|\/ai\/editing_widget_popup)/.test(window.location.pathname);
+
         // When running inside the detached popup window, mark <body> so CSS can
         // override the chat panel to fill 100% of the window.
         if (window.AI_WIDGET_POPUP) {
@@ -5761,6 +5725,9 @@
         if (PAGE_MODE) {
             // /ai full-page mode: bind to existing DOM, no floating widget
             initPageMode();
+        } else if (_inEditorPopup) {
+            // Editor popup: no global floating chat widget (editor has its own)
+            console.log('[local-chat] skipped inside AI2 editor popup');
         } else {
             // Widget mode: create floating bubble + panel on every page
             createChatWidget();

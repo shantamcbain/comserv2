@@ -135,8 +135,24 @@
             <li>Displays detailed todo information</li>
             <li>Shows accumulated time from log entries</li>
             <li>Formatted time display (HH:MM format)</li>
+            <li><strong>Project</strong> row renders the attached project <em>name</em> as a clickable link to <code>/project/details?project_id=&lt;id&gt;</code> (via <code>belongs_to(project)</code>); falls back to the raw <code>project_id</code> text when none</li>
         </ul>
     </li>
+</ul>
+
+<h4><code>/api/todos</code> - Todo API (for AI agents / logged-in-user view)</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Access:</strong> localhost / 192.168.1.* bypass, otherwise requires a valid API token — the API is the surface an AI agent uses to see the app as a logged-in user.</li>
+    <li><strong>Query Parameters:</strong> <code>search</code> (subject/description/comments LIKE, per-word OR + relevance rank), <code>project_id</code>, <code>status</code>, <code>sitename</code>.</li>
+    <li><strong>Response:</strong> <code>{ success, count, todos: [ ... ] }</code>. Each todo is serialized by <code>_todo_to_hash</code> and now includes:
+        <ul>
+            <li><code>project_id</code> — raw integer (retained for backward compatibility)</li>
+            <li><code>project_name</code> — the attached project's name (or <code>null</code> when none)</li>
+            <li><code>project_link</code> — <code>/project/details?project_id=&lt;id&gt;</code> (or <code>null</code>), so an agent can name and navigate to the project exactly like the web page</li>
+        </ul>
+    </li>
+    <li><strong>Note:</strong> name/link are resolved from the same <code>belongs_to(project)</code> relationship the detail page uses, so the API and the browser never disagree.</li>
 </ul>
 
 <h4><code>/todo/addtodo</code> - Add New Todo Form</h4>

@@ -64,8 +64,6 @@
     [% END %]
 </div>
 
-<script src="/static/js/ai-common.js"></script>
-
 <style>
 .ai-result-container {
     max-width: 1000px;

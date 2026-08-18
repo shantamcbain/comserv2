@@ -5,101 +5,6 @@
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<!-- Critical inline styles to ensure cards display correctly -->
-<style>
-    /* Card and grid styles */
-    .card { display: flex; flex-direction: column; border: 1px solid var(--border-color, #dee2e6); border-radius: 0.25rem; margin-bottom: 1rem; background-color: rgba(255,255,255,0.88); }
-    .card-header { padding: 0.75rem 1.25rem; background-color: rgba(0,0,0,0.03); border-bottom: 1px solid var(--border-color, #dee2e6); }
-    .card-body { flex: 1 1 auto; padding: 1.25rem; }
-    .card-footer { padding: 0.75rem 1.25rem; background-color: rgba(0,0,0,0.03); border-top: 1px solid var(--border-color, #dee2e6); }
-    .row { display: flex; flex-wrap: wrap; margin-right: -15px; margin-left: -15px; }
-    .col-md-4 { position: relative; width: 100%; padding-right: 15px; padding-left: 15px; }
-    @media (min-width: 768px) { .col-md-4 { flex: 0 0 33.333333%; max-width: 33.333333%; } }
-    .col-12 { position: relative; width: 100%; padding-right: 15px; padding-left: 15px; flex: 0 0 100%; max-width: 100%; }
-    
-    /* Badge styles */
-    .badge { display: inline-block; padding: 0.25em 0.4em; font-size: 75%; font-weight: 700; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.25rem; }
-    .badge-danger { color: #fff; background-color: var(--danger-color, #dc3545); }
-    .badge-warning { color: #212529; background-color: #ffc107; }
-    .badge-info { color: #fff; background-color: #17a2b8; }
-    .badge-primary { color: #fff; background-color: var(--primary-color, #007bff); }
-    .badge-success { color: #fff; background-color: var(--success-color, #28a745); }
-    .badge-secondary { color: #fff; background-color: var(--text-muted-color, #6c757d); }
-    
-    /* Button styles */
-    .btn { display: inline-block; font-weight: 400; text-align: center; white-space: nowrap; vertical-align: middle; user-select: none; border: 1px solid transparent; padding: 0.375rem 0.75rem; font-size: 1rem; line-height: 1.5; border-radius: 0.25rem; }
-    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; line-height: 1.5; border-radius: 0.2rem; }
-    .btn-info { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
-    .btn-primary { color: #fff; background-color: var(--primary-color, #007bff); border-color: var(--link-color, #007bff); }
-    .btn-success { color: #fff; background-color: var(--success-color, #28a745); border-color: var(--success-color, #28a745); }
-    .btn-outline-secondary { color: var(--text-muted-color, #6c757d); background-color: transparent; border-color: var(--text-muted-color, #6c757d); }
-    
-    /* Utility classes */
-    .d-flex { display: flex !important; }
-    .justify-content-between { justify-content: space-between !important; }
-    .align-items-center { align-items: center !important; }
-    .mb-0 { margin-bottom: 0 !important; }
-    .mb-2 { margin-bottom: 0.5rem !important; }
-    .mb-3 { margin-bottom: 1rem !important; }
-    .mb-4 { margin-bottom: 1.5rem !important; }
-    .mt-2 { margin-top: 0.5rem !important; }
-    .mt-3 { margin-top: 1rem !important; }
-    .mt-4 { margin-top: 1.5rem !important; }
-    .p-3 { padding: 1rem !important; }
-    .text-muted { color: var(--text-muted-color, #6c757d) !important; }
-    .bg-light { background-color: var(--bg-secondary, #f8f9fa) !important; }
-    
-    /* List styles */
-    .list-unstyled { padding-left: 0; list-style: none; }
-    .list-unstyled li { margin-bottom: 0.5rem; }
-    
-    /* Alert styles */
-    .alert { position: relative; padding: 0.75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: 0.25rem; }
-    .alert-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
-    .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
-    
-    /* Form styles */
-    .form-group { margin-bottom: 1rem; }
-    .form-control { display: block; width: 100%; padding: 0.375rem 0.75rem; font-size: 1rem; line-height: 1.5; color: #495057; background-color: rgba(255,255,255,0.88); background-clip: padding-box; border: 1px solid #ced4da; border-radius: 0.25rem; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out; }
-    .form-inline { display: flex; flex-flow: row wrap; align-items: center; }
-    .form-inline .form-control { display: inline-block; width: auto; vertical-align: middle; }
-    .form-inline .form-group { display: flex; flex: 0 0 auto; flex-flow: row wrap; align-items: center; margin-bottom: 0; margin-right: 0.5rem; }
-    
-    /* Filter panel styles */
-    .filter-panel { background-color: var(--bg-secondary, #f8f9fa); border: 1px solid var(--border-color, #dee2e6); border-radius: 0.25rem; padding: 1rem; margin-bottom: 1.5rem; }
-    
-    /* Collapsible card styles */
-    .collapsible-card { margin-bottom: 1rem; }
-    .collapsible-card .card-header { cursor: pointer; }
-    .collapsible-card .card-header .collapse-icon { transition: transform 0.3s; }
-    .collapsible-card .card-header[aria-expanded="true"] .collapse-icon { transform: rotate(180deg); }
-    .collapsible-card .card-body { display: none; }
-    .collapsible-card .card-body.show { display: block; }
-    
-    /* Sub-project styles */
-    .sub-projects-container { padding-left: 1.5rem; border-left: 2px solid var(--border-color, #dee2e6); margin-top: 1rem; }
-    
-    /* Table styles */
-    .table { width: 100%; margin-bottom: 1rem; color: #212529; }
-    .table th, .table td { padding: 0.75rem; vertical-align: top; border-top: 1px solid var(--border-color, #dee2e6); }
-    .table thead th { vertical-align: bottom; border-bottom: 2px solid var(--border-color, #dee2e6); }
-    .table-responsive { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .table-sm th, .table-sm td { padding: 0.3rem; }
-    .table-striped tbody tr:nth-of-type(odd) { background-color: rgba(0,0,0,0.05); }
-    .thead-light th { color: #495057; background-color: #e9ecef; border-color: var(--border-color, #dee2e6); }
-    
-    /* Border utilities */
-    .border-left { border-left: 1px solid var(--border-color, #dee2e6) !important; }
-    .border-primary { border-left-color: var(--link-color, #007bff) !important; }
-    
-    /* Text decoration */
-    .text-decoration-none { text-decoration: none !important; }
-    
-    /* Additional spacing */
-    .ml-2 { margin-left: 0.5rem !important; }
-    .ml-3 { margin-left: 1rem !important; }
-    .mr-2 { margin-right: 0.5rem !important; }
-</style>
 
 <h1 class="mb-4">Projects</h1>
 
@@ -149,10 +54,11 @@
         <label for="project_search" style="white-space:nowrap;margin:0;">🔍</label>
         <input type="text" id="project_search" placeholder="Search name / code / description…"
                class="form-control" style="width:260px;"
-               oninput="filterProjects(this.value)">
+               oninput="if(window.ComservProjectSearch) ComservProjectSearch.onSearch(this.value)">
         <span id="project_search_count" style="font-size:0.82em;color:var(--text-muted-color,#6c757d);white-space:nowrap;min-width:80px;"></span>
         <label for="project_filter" class="mr-2" style="white-space:nowrap;margin:0;">Project:</label>
-        <select id="project_filter" name="project_id" class="form-control" style="width:auto;">
+        <select id="project_filter" name="project_id" class="form-control" style="width:auto;"
+                onchange="if(window.ComservProjectSearch) ComservProjectSearch.onDropdown()">
                 <option value="">All Projects</option>
                 [% FOREACH project IN projects.sort('name') %]
                     <option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]>[% project.name %]</option>
@@ -161,13 +67,39 @@
                     [% END %]
                 [% END %]
             </select>
-        <label for="priority_filter" style="white-space:nowrap;margin:0;">Priority:</label>
-        <select id="priority_filter" name="priority" class="form-control" style="width:auto;">
+        <label for="priority_filter" class="white-space:nowrap;margin:0;" style="white-space:nowrap;margin:0;">Priority:</label>
+        <select id="priority_filter" name="priority" class="form-control" style="width:auto;"
+                onchange="if(window.ComservProjectSearch) ComservProjectSearch.onDropdown()">
             <option value="">All</option>
             <option value="1" [% IF priority_filter == '1' %]selected[% END %]>High</option>
             <option value="2" [% IF priority_filter == '2' %]selected[% END %]>Medium</option>
             <option value="3" [% IF priority_filter == '3' %]selected[% END %]>Low</option>
         </select>
+        [% IF is_csc_admin && sites.size %]
+        <div class="dropdown" style="position:relative;display:inline-block;">
+            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" id="siteFilterBtn"
+                    onclick="var m=document.getElementById('siteFilterMenu'); m.style.display = (m.style.display==='block'?'none':'block');">
+                Site[% IF selected_sitenames.size %]: [% selected_sitenames.size %] selected[% ELSE %]s: All[% END %]
+            </button>
+            <div id="siteFilterMenu" class="card p-2" style="display:none;position:absolute;z-index:1000;min-width:200px;max-height:320px;overflow:auto;background:#fff;">
+                <div class="mb-1">
+                    <a href="#" class="small" onclick="document.querySelectorAll('#siteFilterMenu input[type=checkbox]').forEach(function(cb){cb.checked=true;}); return false;">Select all</a>
+                    &nbsp;|&nbsp;
+                    <a href="#" class="small" onclick="document.querySelectorAll('#siteFilterMenu input[type=checkbox]').forEach(function(cb){cb.checked=false;}); return false;">Clear</a>
+                </div>
+                [% FOREACH site IN sites %]
+                    [% SET sname = site.name %]
+                    <div class="form-check">
+                        <label class="form-check-label small" style="white-space:nowrap;">
+                            <input type="checkbox" name="sitename" value="[% sname %]"
+                                   [% IF selected_sitenames.contains(sname) %]checked[% END %]>
+                                [% sname %]
+                        </label>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
         <button type="submit" class="btn btn-primary btn-sm">Apply</button>
         <button type="button" id="clearFilters" class="btn btn-outline-secondary btn-sm">Clear</button>
     </form>
@@ -184,7 +116,8 @@
         
         [% SET proj_search_text = project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '') %]
         <div class="collapsible-card" id="project-[% project.id %]"
-             data-search="[% proj_search_text.lower %]">
+             data-search="[% proj_search_text.lower %]"
+             data-priority="[% project.priority || 2 %]">
             <div class="card">
                 <!-- Card header with priority badge, project summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
@@ -403,7 +336,8 @@
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% project.todos.size %])</h6>
                         [% FOREACH todo IN project.todos %]
-                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
+                            [% SET tcard_wrap_p = "data-todo-id='" _ todo.record_id _ "'" %]
+                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_wrapper_extra=tcard_wrap_p %]
                         [% END %]
                     </div>
                     [% ELSE %]
@@ -456,7 +390,10 @@
         <!-- Skip this subproject if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != subproject.priority %]
         
-        <div class="collapsible-card mb-3" id="subproject-[% subproject.id %]">
+        [% SET sub_search_text = subproject.name _ ' ' _ (subproject.project_code || '') _ ' ' _ (subproject.description || '') _ ' ' _ (subproject.sitename || '') %]
+        <div class="collapsible-card mb-3" id="subproject-[% subproject.id %]"
+             data-search="[% sub_search_text.lower %]"
+             data-priority="[% subproject.priority || 2 %]">
             <div class="card">
                 <!-- Card header with priority badge, subproject summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('subproject-body-[% subproject.id %]')" aria-expanded="false">
@@ -622,7 +559,8 @@
                     <div class="mb-3">
                         <h6><i class="fas fa-tasks"></i> Associated Todos ([% subproject.todos.size %])</h6>
                         [% FOREACH todo IN subproject.todos %]
-                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 %]
+                            [% SET tcard_wrap_p = "data-todo-id='" _ todo.record_id _ "'" %]
+                            [% INCLUDE 'todo/todo_card.tt' tc=todo tc_show_done=1 tc_wrapper_extra=tcard_wrap_p %]
                         [% END %]
                     </div>
                     [% ELSE %]
@@ -685,7 +623,9 @@
 [% END %]
 
 <!-- Start displaying projects -->
+<div id="project-tree">
 [% display_project_tree(projects) %]
+</div>
 
 <!-- Button to add a new project -->
 [% IF c.session.username %]
@@ -696,92 +636,4 @@
 </div>
 [% END %]
 
-<!-- JavaScript for collapsible cards and filter handling -->
-<script>
-    // Function to toggle collapse state of project cards
-    function toggleCollapse(elementId) {
-        const element = document.getElementById(elementId);
-        const header = element.parentNode.querySelector('.card-header');
-        const icon = header.querySelector('.collapse-icon');
-        
-        if (element.classList.contains('show')) {
-            element.classList.remove('show');
-            header.setAttribute('aria-expanded', 'false');
-            icon.classList.remove('fa-chevron-up');
-            icon.classList.add('fa-chevron-down');
-        } else {
-            element.classList.add('show');
-            header.setAttribute('aria-expanded', 'true');
-            icon.classList.remove('fa-chevron-down');
-            icon.classList.add('fa-chevron-up');
-        }
-    }
-    
-    // Real-time project search / filter
-    function filterProjects(query) {
-        const q = query.trim().toLowerCase();
-        const cards = document.querySelectorAll('.collapsible-card[data-search]');
-        let visible = 0;
-        cards.forEach(function(card) {
-            const text = card.getAttribute('data-search') || '';
-            const match = !q || text.indexOf(q) !== -1;
-            card.style.display = match ? '' : 'none';
-            if (match) visible++;
-        });
-        const countEl = document.getElementById('project_search_count');
-        if (countEl) {
-            countEl.textContent = q ? ('Showing ' + visible + ' of ' + cards.length) : '';
-        }
-    }
-
-    // Clear filters button functionality
-    document.getElementById('clearFilters').addEventListener('click', function() {
-        document.getElementById('project_filter').value = '';
-        document.getElementById('priority_filter').value = '';
-        document.getElementById('projectFilterForm').submit();
-    });
-    
-    // Auto-expand project if it's the filtered project
-    document.addEventListener('DOMContentLoaded', function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const projectFilter = urlParams.get('project_id');
-        
-        if (projectFilter) {
-            // If filtering by a specific project, expand that project
-            const projectElement = document.getElementById('project-body-' + projectFilter);
-            if (projectElement) {
-                toggleCollapse('project-body-' + projectFilter);
-            } else {
-                // Check if it's a subproject
-                const subprojectElement = document.getElementById('subproject-body-' + projectFilter);
-                if (subprojectElement) {
-                    toggleCollapse('subproject-body-' + projectFilter);
-                    // Also expand its parent project
-                    const parentCard = subprojectElement.closest('.collapsible-card[id^="project-"]');
-                    if (parentCard) {
-                        const parentId = parentCard.id.replace('project-', '');
-                        const parentBody = document.getElementById('project-body-' + parentId);
-                        if (parentBody && !parentBody.classList.contains('show')) {
-                            toggleCollapse('project-body-' + parentId);
-                        }
-                    }
-                } else {
-                    // If it's nested deeper, find and expand all parent containers
-                    const allProjects = document.querySelectorAll('.collapsible-card');
-                    allProjects.forEach(function(projectCard) {
-                        const projectId = projectCard.id.replace('project-', '').replace('subproject-', '');
-                        const projectBody = document.getElementById('project-body-' + projectId);
-                        
-                        // Check if this project contains the filtered subproject
-                        if (projectBody) {
-                            const hasFilteredSubproject = projectBody.innerHTML.includes('name="project_id" value="' + projectFilter + '"');
-                            if (hasFilteredSubproject) {
-                                toggleCollapse('project-body-' + projectId);
-                            }
-                        }
-                    });
-                }
-            }
-        }
-    });
-</script>
+<!-- End project macros / tree -->

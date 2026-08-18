@@ -147,8 +147,9 @@ sub process {
         $args{model}, $can_select,
         agent_id => $args{agent_id},
     );
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'process',
-        "AI2 using provider=$provider_name model=$use_model");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+        "AI2 chat dispatch: user=$username provider=$provider_name model="
+        . ($use_model // '(router-default)') . " can_select=$can_select");
 
     # Dispatch to the correct self-contained v2 provider client.
     my $dispatch = {
@@ -161,6 +162,9 @@ sub process {
     my $provider = try { $c->model($prov_class) } catch { undef };
 
     unless ($provider && $provider->can('chat')) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "No client available for provider=$provider_name (class="
+            . ($prov_class // 'undef') . ")");
         return { success => 0, error => "No client available for provider $provider_name" };
     }
 
@@ -174,7 +178,7 @@ sub process {
     my $resp = try {
         $provider->chat($c,
             messages => $messages,
-            model    => $use_model,
+            model    => $self->_bare_model($use_model),
             host     => $ollama_host,
             port     => $ollama_port,
         );
@@ -185,6 +189,9 @@ sub process {
     };
 
     unless ($resp && $resp->{success}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "Provider $provider_name failed: " . ($resp->{error} // 'AI provider error')
+            . " (model=" . ($use_model // '?') . ", user=$username)");
         return { success => 0, error => $resp->{error} // 'AI provider error' };
     }
 
@@ -274,6 +281,21 @@ sub _can_select_model {
     my $roles = $c->session->{roles} || [];
     $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
     return grep { $_ =~ /^(admin|developer|editor)$/i } @$roles ? 1 : 0;
+}
+
+# The Router identifies external models as "provider|slug" (e.g.
+# "openrouter|tencent/hy3"). Providers want the BARE slug ("tencent/hy3") —
+# sending the prefixed form to OpenRouter returns HTTP 400 "not a valid model
+# ID". This mirrors Router::_bare_model and MUST exist here too: process()
+# calls $self->_bare_model(...), and Chat.pm extends Catalyst::Model (it does
+# NOT inherit from Router), so without this the call dies with "Can't locate
+# object method _bare_model". The enclosing try{} swallowed that exception and
+# reported a misleading generic "OpenRouter provider error" instead.
+sub _bare_model {
+    my ($self, $model) = @_;
+    return $model unless defined $model;
+    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    return $model;
 }
 
 __PACKAGE__->meta->make_immutable;

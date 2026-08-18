@@ -99,6 +99,7 @@
             <h2 class="section-title"><i class="icon-system"></i> System Health</h2>
             <div class="map-links">
                 <a href="/admin/hardware_monitor" class="map-link"><i class="icon-server"></i> Hardware Monitor</a>
+                <a href="/admin/logging_audit" class="map-link"><i class="icon-log"></i> Logging Audit</a>
                 <a href="/admin/logging" class="map-link"><i class="icon-log"></i> Logging Administration</a>
                 <a href="/admin/logging/audit" class="map-link"><i class="icon-status"></i> Log Audit &amp; Health</a>
                 <a href="/admin/docker-containers" class="map-link"><i class="icon-docker"></i> Docker Containers</a>

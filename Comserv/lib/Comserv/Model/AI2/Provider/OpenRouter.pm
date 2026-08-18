@@ -82,12 +82,35 @@ sub list_models {
     my $data = try { decode_json($res->decoded_content) } catch { undef };
     return { success => 0, error => 'Bad JSON from provider' } unless $data;
 
-    # OpenRouter returns { data: [ { id, name, ... }, ... ] }
-    my @out = map { { id => $_->{id}, label => ($_->{name} || $_->{id}) } }
-              grep { $_->{id} }
-              @{ $data->{data} || [] };
+    # OpenRouter returns { data: [ { id, name, pricing => { prompt, completion,
+    #   request, image, web_search, ... }, ... } ] }. Pricing values are USD
+    # *per token* as strings (e.g. "0.000001"). We keep the raw pricing object
+    # and also expose per-1M-token USD numbers so downstream surfaces can sort,
+    # filter and display by real cost without re-deriving it. (AIMPS-P1 / #253)
+    my @out = map {
+        my $m = $_;
+        my $p = $m->{pricing} || {};
+        my $pp = _per_million($p->{prompt});
+        my $pc = _per_million($p->{completion});
+        {
+            id             => $m->{id},
+            label          => ($m->{name} || $m->{id}),
+            pricing        => $p,                       # raw hash, kept intact
+            price_prompt     => $pp,                    # USD / 1M input tokens
+            price_completion => $pc,                    # USD / 1M output tokens
+        }
+    } grep { $_->{id} }
+      @{ $data->{data} || [] };
 
     return { success => 1, models => \@out, count => scalar @out };
+}
+
+# OpenRouter reports per-token USD prices as strings; convert to per-1M USD.
+# Returns a number (0 when missing/non-numeric).
+sub _per_million {
+    my ($v) = @_;
+    return 0 unless defined $v && $v =~ /^-?\d+(?:\.\d+)?$/;
+    return $v * 1_000_000;
 }
 
 # Chat completion against OpenRouter (OpenAI-compatible). Returns the v2 shape.
@@ -95,13 +118,23 @@ sub chat {
     my ($self, $c, %args) = @_;
 
     my $api_key = $self->_resolve_api_key($c, $args{api_key});
-    return { success => 0, error => 'No active openrouter API key found' } unless $api_key;
+    unless ($api_key) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
+            "No active openrouter API key found (user=" . ($c->session->{username} // 'Guest') . ")");
+        return { success => 0, error => 'No active openrouter API key found' };
+    }
 
     my $messages = $args{messages} || [];
     return { success => 0, error => 'No messages provided' }
         unless ref($messages) eq 'ARRAY' && @$messages;
 
-    my $model = $args{model} or return { success => 0, error => 'No model specified' };
+    my $model = $args{model};
+    $model =~ s/^[^|]+\|// if $model;   # drop any "provider|" prefix
+    unless ($model) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'openrouter_chat',
+            "No model specified for OpenRouter chat (user=" . ($c->session->{username} // 'Guest') . ")");
+        return { success => 0, error => 'No model specified' };
+    }
     my $payload = {
         model       => $model,
         messages    => $messages,
@@ -118,13 +151,36 @@ sub chat {
 
     my $res = try { $ua->request($req) } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'openrouter_chat', "OpenRouter request failed: $_");
+            'openrouter_chat', "OpenRouter request threw: $_ (model=$model, user="
+            . ($c->session->{username} // 'Guest') . ")");
         return undef;
     };
-    return { success => 0, error => 'OpenRouter provider error' } unless $res && $res->is_success;
+    unless ($res && $res->is_success) {
+        my $status = $res ? $res->status_line : 'no response';
+        my $body   = $res ? substr($res->decoded_content // '', 0, 600) : '';
+        # Surface OpenRouter's own error text (e.g. "X is not a valid model ID")
+        # in the returned error, not just the HTTP status. The caller logs this
+        # string into the error-audit todo, and a bare "400 Bad Request" gives
+        # no way to tell a bad model id from a bad key or a rate limit.
+        my $detail = try {
+            my $j = decode_json($res->decoded_content // '{}');
+            ref($j->{error}) eq 'HASH' ? $j->{error}{message} : $j->{error};
+        } catch { undef };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'openrouter_chat',
+            "OpenRouter HTTP failure: $status (model=$model, user="
+            . ($c->session->{username} // 'Guest') . ") body=$body");
+        return { success => 0, error => "OpenRouter provider error: $status"
+                                      . ($detail ? " - $detail" : '') };
+    }
 
     my $data = try { decode_json($res->decoded_content) } catch { undef };
-    return { success => 0, error => 'Bad JSON from OpenRouter' } unless $data;
+    unless ($data) {
+        my $body = substr($res->decoded_content // '', 0, 600);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'openrouter_chat', "Bad JSON from OpenRouter (model=$model) body=$body");
+        return { success => 0, error => 'Bad JSON from OpenRouter' };
+    }
 
     my $text = '';
     if ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {

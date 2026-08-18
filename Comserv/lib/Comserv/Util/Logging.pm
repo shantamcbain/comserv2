@@ -13,6 +13,11 @@ use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
 use POSIX qw(strftime); # For timestamp formatting
 
 my $LOG_FH; # Global file handle for logging
+
+# Rate-limiting state for log-file open failures (see log_to_file). Prevents an
+# EMFILE storm from recursively re-logging itself thousands of times.
+my $_open_fail_last  = 0;
+my $_open_fail_count = 0;
 my $LOG_FILE; # Global log file path
 
 # When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
@@ -590,17 +595,44 @@ sub log_with_details {
             eval {
                 my $dbh = $c->model('DBEncy')->storage->dbh;
                 $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
-                $c->model('DBEncy')->resultset('SystemLog')->create({
-                    timestamp         => $timestamp,
-                    level             => $level,
-                    file              => $file,
-                    line              => $line,
-                    subroutine        => ($subroutine // 'unknown'),
-                    message           => $message,
-                    sitename          => $sitename,
-                    username          => $username,
-                    system_identifier => $system_id,
-                });
+                # Coalesce repeat events: identical (level, subroutine, message) on
+                # the same calendar day collapse into ONE row via occurrence_count,
+                # preserving history as a count + first/last_seen. This stops
+                # system_log growing unbounded on recurring monitoring noise
+                # (e.g. the health-eval loop re-logging the same warnings every
+                # cycle) while keeping the signal and the 7-day audit window.
+                # The initial UPDATE is bounded to today via the timestamp index so
+                # it never full-scans the table.
+                my $sub = $subroutine // 'unknown';
+                my $day = substr($timestamp, 0, 10);   # YYYY-MM-DD
+                my $affected = $dbh->do(
+                    "UPDATE system_log
+                        SET occurrence_count = occurrence_count + 1,
+                            last_seen = ?
+                      WHERE level = ?
+                        AND subroutine = ?
+                        AND message = ?
+                        AND timestamp >= ?
+                        AND DATE(timestamp) = ?",
+                    undef,
+                    $timestamp, $level, $sub, $message, "$day 00:00:00", $day
+                );
+                if (!defined $affected || $affected == 0) {
+                    $c->model('DBEncy')->resultset('SystemLog')->create({
+                        timestamp         => $timestamp,
+                        level             => $level,
+                        file              => $file,
+                        line              => $line,
+                        subroutine        => $sub,
+                        message           => $message,
+                        sitename          => $sitename,
+                        username          => $username,
+                        system_identifier => $system_id,
+                        occurrence_count  => 1,
+                        first_seen        => $timestamp,
+                        last_seen         => $timestamp,
+                    });
+                }
             };
             if ($@) {
                 $_db_log_failed_at = time();
@@ -986,7 +1018,24 @@ sub log_to_file {
     }
     
     unless (open $file, '>>', $file_path) {
-        _print_log("Failed to open file: $file_path - $!");
+        # Do NOT call _print_log() here. When the failure is EMFILE ("Too many
+        # open files") every request logs many lines, each of which re-enters
+        # this sub and fails again — the burst that filled ~2000 log lines with
+        # "Failed to open file" and starved the process of the fd needed to
+        # render error.tt. Rate-limit the complaint to STDERR only.
+        my $err = $!;
+        my $now = time;
+        if ($now - $_open_fail_last >= 60) {
+            my $skipped = $_open_fail_count;
+            $_open_fail_last  = $now;
+            $_open_fail_count = 0;
+            print STDERR "[LOGGING] Failed to open log file $file_path - $err"
+                       . ($skipped ? " (suppressed $skipped similar failures in the last 60s)" : "")
+                       . "\n";
+        }
+        else {
+            $_open_fail_count++;
+        }
         return;
     }
 

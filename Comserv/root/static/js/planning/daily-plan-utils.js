@@ -11,35 +11,51 @@
 (function() {
     'use strict';
 
-    /* ── Tab switching ──────────────────────────────────────────────────── */
+    /* ── Tab switching ────────────────────────────────────────────────────
 
-    function switchTab(evt, tabName) {
-        var i, tabcontent, tabbuttons;
-        tabcontent = document.getElementsByClassName('tab-content');
+       Two paths must keep the visible tab in sync with the URL hash:
+       1. A click on a .tab-button  -> switchTab() pushes the hash AND shows it.
+       2. Browser Back/Forward      -> the hash changes WITHOUT a click, so a
+          popstate/hashchange listener must re-show the tab. Without it the
+          hash reverts but no tab gets .active and the page goes blank
+          ("go back and nothing shows").
+
+       _activateTab(name) does the pure show/hide. switchTab() calls it then
+       pushState()s. The popstate/hashchange listeners call it WITHOUT pushing
+       (so navigating history never spawns duplicate entries). */
+
+    function _activateTab(name) {
+        var tabEl = document.getElementById(name);
+        if (!tabEl) return false;
+        var i;
+        var tabcontent = document.getElementsByClassName('tab-content');
         for (i = 0; i < tabcontent.length; i++) {
             tabcontent[i].classList.remove('active');
         }
-        tabbuttons = document.getElementsByClassName('tab-button');
+        var tabbuttons = document.getElementsByClassName('tab-button');
         for (i = 0; i < tabbuttons.length; i++) {
             tabbuttons[i].classList.remove('active');
         }
-        var tabEl = document.getElementById(tabName);
-        if (!tabEl) return;
         tabEl.classList.add('active');
-        // evt.currentTarget is the element the listener is bound to. When switchTab is
-        // invoked from the document-level click delegation (currentTarget === document)
-        // or with a null event, document/classList is undefined — guard before use.
-        var activeBtn = (evt && evt.currentTarget && evt.currentTarget.classList)
-            ? evt.currentTarget
-            : (evt && evt.target && evt.target.closest ? evt.target.closest('.tab-button') : null);
-        if (activeBtn) activeBtn.classList.add('active');
+        // Highlight the matching button(s) by data-tab (robust to currentTarget
+        // quirks when this is called from a non-click path).
+        var btns = document.querySelectorAll('.tab-button[data-tab="' + name + '"]');
+        for (i = 0; i < btns.length; i++) {
+            btns[i].classList.add('active');
+        }
+        return true;
+    }
+
+    function switchTab(evt, tabName) {
+        if (!_activateTab(tabName)) return;
         if (history.pushState) {
             history.pushState(null, null, '#' + tabName);
         } else {
             location.hash = '#' + tabName;
         }
         // Lazy-load tab content if not already fetched
-        if (tabEl.hasAttribute('data-lazy') && !tabEl.classList.contains('lazy-loaded')) {
+        var tabEl = document.getElementById(tabName);
+        if (tabEl && tabEl.hasAttribute('data-lazy') && !tabEl.classList.contains('lazy-loaded')) {
             lazyLoadTab(tabEl);
         }
     }
@@ -174,8 +190,13 @@
         var feedback = document.getElementById('dl-feedback');
         if (startBtn) startBtn.disabled = true;
         if (endBtn)   endBtn.disabled   = true;
-        feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
-        feedback.style.color = '';
+        // NOTE: the rebuilt DailyPlan.tt index does NOT carry the dl-feedback /
+        // dl-start-btn / dl-end-btn ids (those lived on the old monolith). Guard
+        // every use so a missing node can never throw before the fetch fires.
+        if (feedback) {
+            feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
+            feedback.style.color = '';
+        }
 
         fetch('/planning/daily_log', {
             method: 'POST',
@@ -191,21 +212,27 @@
             var plainMsg = msg.replace(/<[^>]+>/g, '');
             if (d.success) {
                 alert(plainMsg);
-                feedback.innerHTML = msg;
-                feedback.style.color = '#2a7a2a';
+                if (feedback) {
+                    feedback.innerHTML = msg;
+                    feedback.style.color = '#2a7a2a';
+                }
                 window.location.reload();
             } else {
                 alert(plainMsg);
-                feedback.innerHTML = msg;
-                feedback.style.color = '#9b0000';
+                if (feedback) {
+                    feedback.innerHTML = msg;
+                    feedback.style.color = '#9b0000';
+                }
             }
         })
         .catch(function(e) {
             if (startBtn) startBtn.disabled = false;
             if (endBtn)   endBtn.disabled   = false;
             alert('Request failed: ' + e);
-            feedback.textContent = 'Request failed';
-            feedback.style.color = '#9b0000';
+            if (feedback) {
+                feedback.textContent = 'Request failed';
+                feedback.style.color = '#9b0000';
+            }
         });
     }
 
@@ -574,16 +601,18 @@
     /* ── Branch server operations ───────────────────────────────────────── */
 
     function smartOpenBranch(branch, port, targetUrl) {
+        // Open synchronously from the user's click.  A delayed window.open is
+        // treated as a popup by browsers and is blocked, which made an already
+        // running branch appear not to open.
+        var branchWindow = targetUrl ? window.open(targetUrl, '_blank') : null;
         fetch('/admin/branch_server_action', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=open&branch=' + encodeURIComponent(branch) + '&port=' + port
         }).catch(function() {});
-        var cmd = encodeURIComponent('cd /home/shanta/.zenflow/worktrees/' + branch + '/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p ' + port + ' -r');
-        window.open('/admin/system-shell-terminal?cmd=' + cmd, '_blank');
-        setTimeout(function() {
-            window.open(targetUrl, '_blank');
-        }, 8000);
+        // Keep the command-output terminal available without making it the
+        // only new tab.  The branch page is the primary Open action.
+        if (!branchWindow && targetUrl) window.location.href = targetUrl;
     }
 
     function showBranchStartModal(branch, port, targetUrl) {
@@ -650,7 +679,12 @@
            thinks, with EXPLICIT multi-model selection (no silent swap) ───────── */
 
     // Selected models: array of {name, host}. Defaults to the first available.
+    // _aiTuneDefault: the catalog default "provider|model" seeded from
+    // window.ComservConfig.aiFocusDefault (set by the daily page), falling back
+    // to the value returned by /api/focus/models. No hardcoded localhost Ollama.
     var _aiTuneSelected = [];
+    var _aiTuneDefault  = (window.ComservConfig && window.ComservConfig.aiFocusDefault)
+                          ? window.ComservConfig.aiFocusDefault : '';
 
     function _aiTuneModelList() {
         var sel = document.getElementById('ai-tune-model-pop');
@@ -778,9 +812,14 @@
     }
 
     function _aiTuneTargets() {
-        // Use explicit selection if any; else default to first available model.
+        // Use explicit selection if any; else the catalog default seeded from
+        // window.ComservConfig.aiFocusDefault (no hardcoded model anywhere).
         if (_aiTuneSelected.length) return _aiTuneSelected.slice();
-        return [ { name: 'phi4:14b', host: 'localhost' } ];
+        if (_aiTuneDefault) {
+            var dp = _aiTuneDefault.split('|');
+            return [ { name: dp[1] || dp[0], host: '' } ];
+        }
+        return [];
     }
 
     function aiTuneRun() {
@@ -825,15 +864,39 @@
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 var list = (d && d.models) || [];
-                if (!list.length) list = [ { name: 'phi4:14b', host: 'localhost' } ];
-                // Initialize selection from current _aiTuneSelected or first item.
-                if (!_aiTuneSelected.length && list.length) _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                // Capture the catalog default from the server (no client hardcode).
+                _aiTuneDefault = (d && d.default) ? d.default : (_aiTuneDefault || '');
+                if (!list.length) {
+                    var dv = _aiTuneDefault.split('|');
+                    list = [ { name: dv[1] || dv[0], host: 'localhost' } ];
+                }
+                // Initialize selection from current _aiTuneSelected or the server default.
+                if (!_aiTuneSelected.length) {
+                    if (_aiTuneDefault) {
+                        var pd = _aiTuneDefault.split('|');
+                        _aiTuneSelected = [ { name: pd[1] || pd[0], host: '' } ];
+                    } else if (list.length) {
+                        _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                    }
+                }
                 var html = '<div class="AITuneModelPopInner">';
                 list.forEach(function(m) {
                     var checked = _aiTuneSelected.some(function(s) { return s.name === m.name; }) ? 'checked' : '';
+                    var label = esc(m.name) + (m.provider && m.provider !== 'ollama' ? ' <small>(' + esc(m.provider) + ')</small>' : '');
+                    // Cost marker so the user sees what a choice costs (matches the chat dropdown).
+                    var pp = Number(m.price_prompt) || 0, pc = Number(m.price_completion) || 0;
+                    if (m.local) {
+                        label += ' — local';
+                    } else if (m.free || (m.provider === 'openrouter' && /(^|:)(free)$/i.test(m.name || ''))) {
+                        label += ' — free';
+                    } else if (pp > 0 || pc > 0 || m.price_tier) {
+                        var fmt = function(n) { return (Math.round(n * 100) / 100).toFixed(2); };
+                        var tier = m.price_tier || (pp === 0 && pc === 0 ? 'free' : 'paid');
+                        label += ' — $' + fmt(pp) + '/$' + fmt(pc) + ' per 1M (' + tier + ')';
+                    }
                     html += '<label class="AITuneModelOpt"><input type="checkbox" data-model="'
                         + esc(m.name) + '" data-host="' + esc(m.host || '') + '" ' + checked + '> '
-                        + esc(m.name) + (m.provider && m.provider !== 'ollama' ? ' <small>(' + esc(m.provider) + ')</small>' : '') + '</label>';
+                        + label + '</label>';
                 });
                 html += '<div class="AITuneModelPopFoot"><button class="ActionBarBtn ActionBarBtn--blue" data-action="ai-tune-models-done">Done</button></div>';
                 html += '</div>';
@@ -848,13 +911,20 @@
                         } else {
                             _aiTuneSelected = _aiTuneSelected.filter(function(s){ return s.name !== n; });
                         }
-                        if (!_aiTuneSelected.length) _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
+                        if (!_aiTuneSelected.length) {
+                            var dd = _aiTuneDefault.split('|');
+                            _aiTuneSelected = [ { name: dd[1] || dd[0] || list[0].name, host: '' } ];
+                        }
                         _aiTuneUpdateCount();
                     });
                 });
             })
             .catch(function() {
-                pop.innerHTML = '<div class="AITuneModelPopInner"><label class="AITuneModelOpt"><input type="checkbox" data-model="phi4:14b" data-host="localhost" checked> phi4:14b</label></div>';
+                var dv = (_aiTuneDefault || '').split('|');
+                var fb = dv[1] || dv[0];
+                if (!fb) { pop.innerHTML = '<div class="AITuneModelPopInner">Model list unavailable</div>'; pop.style.display = 'block'; return; }
+                pop.innerHTML = '<div class="AITuneModelPopInner"><label class="AITuneModelOpt"><input type="checkbox" data-model="'
+                    + esc(fb) + '" data-host="localhost" checked> ' + esc(fb) + '</label></div>';
                 pop.style.display = 'block';
             });
     }
@@ -1021,13 +1091,22 @@
             return;
         }
         // Branch server
-        var sob = e.target.closest('[data-smart-open]');
+        // Planning markup uses data-open-branch/data-url; accept the older
+        // data-smart-open/data-target-url contract too.
+        var selectedOpen = e.target.closest('[data-open-selected]');
+        if (selectedOpen) {
+            e.preventDefault();
+            var branchSelect = document.getElementById('bs-select');
+            if (branchSelect && branchSelect.value) window.open(branchSelect.value, '_blank');
+            return;
+        }
+        var sob = e.target.closest('[data-open-branch], [data-smart-open]');
         if (sob) {
             e.preventDefault();
             smartOpenBranch(
-                sob.getAttribute('data-branch'),
+                sob.getAttribute('data-open-branch') || sob.getAttribute('data-branch'),
                 sob.getAttribute('data-port'),
-                sob.getAttribute('data-target-url')
+                sob.getAttribute('data-url') || sob.getAttribute('data-target-url')
             );
             return;
         }
@@ -1069,7 +1148,38 @@
             if (panel) { panel.style.display = 'block'; panel.scrollIntoView({ behavior: 'smooth' }); }
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
+        // Master Plan tab is server-rendered inline (not an iframe). Its doc
+        // links would otherwise navigate the whole browser away from
+        // /planning/daily and lose the tab bar. Open them in a new tab so the
+        // daily index stays put. (The Calendar tab is an iframe and handles
+        // its own breakout via the embed script in day.tt.)
+        var mp = document.getElementById('master-plan');
+        if (mp) {
+            var mpLinks = mp.querySelectorAll('a[href]');
+            for (var i = 0; i < mpLinks.length; i++) {
+                var href = mpLinks[i].getAttribute('href') || '';
+                // Leave in-page anchors and external doc routes alone; only
+                // force real navigations to a new tab.
+                if (href.indexOf('#') !== 0 && href.indexOf('javascript:') !== 0) {
+                    mpLinks[i].setAttribute('target', '_blank');
+                    mpLinks[i].setAttribute('rel', 'noopener');
+                }
+            }
+        }
     });
+
+    // Browser Back/Forward changes the URL hash WITHOUT a click. Re-sync the
+    // visible tab to the hash so navigating history never leaves every tab
+    // hidden (the "go back and nothing shows" bug). Called WITHOUT pushState
+    // so we don't spawn a second history entry.
+    function _syncTabFromHash() {
+        var hash = window.location.hash.replace(/^#/, '');
+        if (hash && document.getElementById(hash)) {
+            _activateTab(hash);
+        }
+    }
+    window.addEventListener('popstate', _syncTabFromHash);
+    window.addEventListener('hashchange', _syncTabFromHash);
 
     /* ── Expose start/done handlers for inline onclick callers (e.g. todo_row.tt
        on the project-details page, which calls startWorkTodoCard via onclick).

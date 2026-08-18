@@ -288,6 +288,15 @@ sub begin :Private {
 
     # If we get here, the user is authorized
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
+
+    # Flag pages that render todo_card.tt so js_load.tt loads the shared
+    # Start/Done delegated handler (daily-plan-utils.js) exactly once, instead
+    # of relying on a brittle per-URL match list. Any Todo route that renders a
+    # todo card sets this; the main /todo list + day/week/month were previously
+    # missing from js_load.tt and had dead Start/Done buttons.
+    if ($c->req->path =~ m{^todo(?:/$|/details|/day|/week|/month|/edit)}) {
+        $c->stash(needs_todo_card_js => 1);
+    }
 }
 
 # Main todo action with filtering capabilities
@@ -3437,7 +3446,7 @@ sub reschedule :Path('reschedule') :Args(0) {
 
     my @err_list = @{ $errors // [] };
     $c->response->body(JSON::encode_json({
-        ok            => JSON::true,
+        ok            => 1,
         count         => $count // 0,
         error_count   => scalar(@err_list),
         today         => $today // '',
@@ -3467,6 +3476,9 @@ sub open_log :Path('open_log') :Args(0) {
     my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
     my $data;
     eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    # HTMX submits hx-vals as form parameters, while API callers send JSON.
+    # Accept both request shapes for this shared work-log action.
+    $data ||= { $c->req->params };
     my $record_id = $data->{record_id} if $data;
     unless ($record_id) {
         $c->response->status(400);

@@ -1,0 +1,79 @@
+[%# ai/model_select.tt — SINGLE SOURCE OF TRUTH for the AI model <select>.
+    Server-rendered from the `catalog` array (Root.pm auto -> ai_model_catalog),
+    each entry: { value => "provider|model", label, provider }.
+    Params: select_id, select_name, page, current, css_class, catalog.
+    NOTE: a TT comment ends at the FIRST close tag, so never write a nested
+    close-tag sequence inside this block or the remainder leaks into the page.
+%]
+[% cat = catalog || [];
+   hy3 = 'openrouter|tencent/hy3';
+   svc_order  = [ 'ollama', 'grok', 'openrouter' ];
+   svc_labels = { ollama = 'Ollama (Local)', grok = 'xAI (Grok)', openrouter = 'OpenRouter' };
+
+   # Collect the provider keys actually present, known ones first (in order),
+   # then any unknown providers alphabetically.
+   present = {};
+   FOREACH m IN cat;
+       s = m.provider || m.value.split('\|').first || 'external';
+       present.$s = 1;
+   END;
+   svcs = [];
+   FOREACH s IN svc_order; svcs.push(s) IF present.$s; END;
+   FOREACH s IN present.keys.sort; svcs.push(s) UNLESS svc_order.grep("^$s\$").size; END;
+
+   has_hy3 = 0;
+   FOREACH m IN cat; has_hy3 = 1 IF m.value == hy3; END;
+%]
+<select id="[% select_id || 'ai-provider' | html %]"
+        name="[% select_name || 'model' | html %]"
+        class="[% css_class || 'ai-model-select' | html %]"
+        title="Select AI model">
+[% IF cat.size == 0 %]
+  <option value="">No models available</option>
+[% ELSE %]
+  [%# Editor surface pins the coding model to the very top. %]
+  [% IF page == 'editor' && has_hy3 %]
+  <option value="[% hy3 | html %]"[% IF current == hy3 %] selected[% END %]>&#9889; tencent/hy3 (OpenRouter)</option>
+  [% END %]
+  [% FOREACH svc IN svcs %]
+    [% items = [];
+       FOREACH m IN cat;
+           ms = m.provider || m.value.split('\|').first || 'external';
+           NEXT UNLESS ms == svc;
+           NEXT IF page == 'editor' && m.value == hy3;
+           # Drop non-chat families (embeddings, rerankers, media)
+           NEXT IF m.value.search('(?i)(embed|rerank|bge-|nomic|clip|whisper|tts|imagine|/image|-image|audio|video|moderation)');
+           items.push(m);
+       END;
+       # Free models first within a provider group, then alphabetical. This puts
+       # the no-cost options in front of the long paid OpenRouter list instead of
+       # burying them under "AI21: ..." alphabetical order.
+       free_items = []; paid_items = [];
+       FOREACH m IN items.sort('value');
+           IF m.free; free_items.push(m); ELSE; paid_items.push(m); END;
+       END;
+       items = free_items.merge(paid_items);
+    %]
+    [% NEXT UNLESS items.size %]
+    <optgroup label="[% svc_labels.$svc || svc | html %]">
+    [% FOREACH m IN items %]
+      [% short = m.value.split('\|').last;
+         text  = (svc == 'ollama') ? short : (m.label || m.value);
+         # Cost marker so the user can see what a choice costs before picking it.
+         IF m.free;      text = text _ ' — free';
+         ELSIF m.local;  text = text _ ' — local';
+         ELSIF m.paid || (m.price_prompt && m.price_prompt + 0 > 0) || (m.price_completion && m.price_completion + 0 > 0);
+            # Real per-token cost (AIMPS-P1/#253): prompt + completion USD per 1M.
+            pp_str = (m.price_prompt + 0) | format('%.2f');
+            pc_str = (m.price_completion + 0) | format('%.2f');
+            text = text _ ' — $' _ pp_str _ '/$' _ pc_str _ ' per 1M';
+            text = text _ ' (' _ (m.price_tier || 'paid') _ ')';
+         END;
+         sel   = (m.value == current || short == current) ? 1 : 0;
+      %]
+      <option value="[% m.value | html %]"[% IF sel %] selected[% END %]>[% text | html %]</option>
+    [% END %]
+    </optgroup>
+  [% END %]
+[% END %]
+</select>

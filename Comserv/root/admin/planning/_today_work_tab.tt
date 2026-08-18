@@ -1,8 +1,19 @@
 <!-- TAB 1: TODAY'S WORK (Default) -->
-    <div id="today-work" class="tab-content active">
+    <div id="today-work">
         <div id="today-work-content">
 
-            [%# ── Action bar (below tabs) ── %]
+            [%# Seed the AI Focus-Tune default WITHOUT inline JS. daily-plan-utils.js reads
+                window.ComservConfig.aiFocusDefault on load. Inline <script> blocks are
+                forbidden (root/js_load.tt) and were breaking tab switching on this page. %]
+            <script type="application/json" id="ai-focus-default" [% IF ai_default_model %]data-default="[% ai_default_model | html %]"[% END %]></script>
+
+            [%# ── Action bar (below tabs) ──
+                Canonical Start Day / End Day / Triage / Reschedule bar. Rendered on
+                DailyPriorities and DailyPlan.legacy (which INCLUDE this file without a
+                flag). On /planning/daily the same controls already live in the
+                top-level .daily-action-card above the tab bar, so DailyPlan.tt passes
+                hide_action_bar = 1 to suppress this duplicate. %]
+            [% IF hide_action_bar != 1 %]
             <div class="ActionBar">
                 <a href="/todo/addtodo" class="ActionBarLink ActionBarLink--primary">+ Add Todo</a>
                 <a href="/todo" class="ActionBarLink">All Todos</a>
@@ -15,8 +26,10 @@
                 [% END %]
                 <button class="ActionBarBtn ActionBarBtn--orange" data-action="triage-stale" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                 <button class="ActionBarBtn ActionBarBtn--purple" data-action="reschedule" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+                <span id="dl-feedback" class="ActionBarFeedback" aria-live="polite"></span>
                 [% END %]
             </div>
+            [% END %]
 
             [%# ── Cross-project dependency summary (always visible, collapsible) ── %]
             <details class="mb-8">
@@ -235,7 +248,7 @@
                         class="SortBtn">Project</button>
                     <button data-action="sort-due" id="sort-due"
                         class="SortBtn">Due</button>
-                    <a href="#planning" data-action="clear-filters"
+                    <a href="/planning/daily" data-action="clear-filters"
                         class="ClearFiltersLink">✕ Clear</a>
                 </div>
 
@@ -289,11 +302,29 @@
                 <div class="EmptyState">
                     <p>No active todos found[% IF filter_project || filter_site %] for the selected filter[% ELSE %] for your role and site[% END %].</p>
                     [% IF filter_project || filter_site %]
-                    <a href="/planning/daily#planning">✕ Clear filters</a>
+                    <a href="/planning/daily">✕ Clear filters</a>
                     [% ELSE %]
                     <a href="/todo/addtodo">+ Create your first todo</a>
                     [% END %]
                 </div>
+                [% END %]
+
+                [% IF remaining_open_todos && remaining_open_todos.size %]
+                <details class="RemainingTodosPanel">
+                    <summary class="RemainingTodosSummary">
+                        <span>📋 Remaining eligible todos</span>
+                        <span class="RemainingTodosCount">[% remaining_open_todos.size %]</span>
+                    </summary>
+                    <div class="RemainingTodosBody">
+                    [% FOREACH todo IN remaining_open_todos %]
+                        [% INCLUDE 'todo/todo_card.tt'
+                            tc           = todo
+                            tc_show_done = 1
+                            tc_done_fn   = 'quickClose'
+                        %]
+                    [% END %]
+                    </div>
+                </details>
                 [% END %]
             </div>
 

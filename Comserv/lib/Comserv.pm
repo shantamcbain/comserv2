@@ -8,6 +8,21 @@ use FindBin '$Bin';
 use Comserv::Util::Logging;
 use Comserv::Util::ConfigDatabaseInit;
 
+# ── Timezone fix (2026-08-14) ─────────────────────────────────────────────
+# The web container runs with TZ=UTC (see docker-compose.yml), but the owner
+# operates in America/Los_Angeles (PDT). DateTime->now therefore returned the
+# server's UTC "today" (one day ahead in the evening), which made calendar
+# "today" highlighting land on the wrong day. Pin the process timezone to the
+# owner's local zone so all "today" computations match the user's wall clock.
+# Overridable via $ENV{TZ} (already-respected by DateTime) so containers can
+# still set their own. POSIX::tzset makes the change live for the process.
+BEGIN {
+    unless ($ENV{TZ}) {
+        $ENV{TZ} = 'America/Los_Angeles';
+        eval { require POSIX; POSIX::tzset(); };
+    }
+}
+
 # Initialize the logging system
 BEGIN {
     Comserv::Util::Logging->init();
@@ -299,6 +314,22 @@ around 'finalize_error' => sub {
             $c->stash->{error_title} ||= 'Application Error';
             $c->stash->{error_msg}   ||= 'An unexpected error occurred.';
             $c->stash->{technical_details} ||= join(', ', @{$c->error // []});
+
+            # API/AJAX callers get JSON and never touch the TT view. Rendering
+            # error.tt requires opening a template file, which is exactly the
+            # resource that is unavailable under EMFILE ("Too many open files")
+            # — so the error page failed and produced a SECOND, more confusing
+            # error than the original. Serving a static string needs no fd.
+            my $wants_json = (($c->req->path // '') =~ m{^/?api/}i)
+                          || (($c->req->header('Accept') // '') =~ /application\/json/i)
+                          || (($c->req->header('X-Requested-With') // '') =~ /XMLHttpRequest/i);
+
+            if ($wants_json) {
+                $c->response->content_type('application/json; charset=utf-8');
+                $c->response->body('{"success":0,"error":"Internal Server Error"}');
+                return;
+            }
+
             $c->stash->{template} = 'error.tt';
 
             eval {

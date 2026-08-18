@@ -109,9 +109,17 @@
 <script src="/static/js/HealthMonitor.js" defer></script>
 [% END %]
 
-<!-- Admin Dashboard JS -->
+<!-- Hardware Monitor JS (charts + auto-refresh; V2 external module) -->
+[% IF c.request.uri.match('/admin/hardware_monitor') %]
+<script src="/static/js/hardware-monitor.js?v=[% cv %]" defer></script>
+[% END %]
 [% IF c.request.uri.match('/admin') %]
 <script src="/static/js/admin-dashboard.js?v=[% cv %]" defer></script>
+[% END %]
+
+<!-- Logging: live system_log row-count ticker during dedupe -->
+[% IF c.request.uri.match('/admin/logging') %]
+<script src="/static/js/logging-dedupe.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Schema Compare JS -->
@@ -119,9 +127,16 @@
 <script src="/static/js/schema-compare.js?v=[% cv %]" defer></script>
 [% END %]
 
+<!-- Shared "operation in progress" overlay — auto-binds to any
+     form[data-busy-on-submit]; safe to load globally (no-ops without the attr). -->
+<script src="/static/js/common/scan-progress.js?v=[% cv %]" defer></script>
+
 <!-- Git Dashboard JS -->
+<!-- Loaded AFTER the shared ai-chat module block (below) on purpose:
+     git-dashboard.js calls ComservChat.modelSelect.init() from its
+     DOMContentLoaded handler, so model-select.js MUST have executed
+     first. With `defer`, scripts run in document order within this file. -->
 [% IF c.request.uri.match('/admin/git') %]
-<script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Herb Sign Generator live preview -->
@@ -145,13 +160,46 @@
 
 
 <!-- AI2 Editor Suite (only when popup widget is active) -->
+<!-- Shared chat modules (load FIRST, before the widgets, so they exist when
+     local-chat.js / ai2editor/*.js build their DOM). Single source of truth for
+     model-selection, tooltips, and the Add-Todo feature, shared by BOTH chat UIs. -->
+<script src="/static/js/ai-chat/model-select.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-chat/tooltips.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai-chat/feature-todo.js?v=[% cv %]" defer></script>
+
+<!-- Git Dashboard JS: MUST come AFTER model-select.js above, because
+     git-dashboard.js calls ComservChat.modelSelect.init() from its
+     DOMContentLoaded handler. With `defer`, scripts run in document order. -->
+[% IF c.request.uri.match('/admin/git') %]
+<!-- Canonical shared diff widget (git_worktree_merge_plan §3.5). Loads BEFORE
+     git-dashboard.js so ComservGitDiff exists when bindFileDiff() runs. -->
+<script src="/static/js/git-diff-viewer.js?v=[% cv %]" defer></script>
+<link rel="stylesheet" href="/static/css/components/git-diff-viewer.css?v=[% cv %]">
+<script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
+<script>
+    // Give the git dashboard the same canonical catalog (with price_* / tier)
+    // so model-select.js uses the fast path and shows real per-token cost,
+    // instead of falling back to /ai2/providers (grouped shape drops price).
+    window.ComservConfig = window.ComservConfig || {};
+    window.ComservConfig.models = [% ai_model_catalog_json || '[]' %];
+</script>
+[% END %]
+
 [% IF c.request.uri.match('/ai2/editing_widget_popup') %]
+<script src="/static/js/git-dashboard.js?v=[% cv %]" defer></script>
+<!-- Canonical shared diff widget — must precede file-diff.js so
+     ComservGitDiff exists when the AI2 "Changed Files / Diff" action runs. -->
+<script src="/static/js/git-diff-viewer.js?v=[% cv %]" defer></script>
+<link rel="stylesheet" href="/static/css/components/git-diff-viewer.css?v=[% cv %]">
 <script src="/static/js/ai2editor/core.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/ace.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/adapters/richtext.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/sidebar-toggle.js?v=[% cv %]" defer></script>
 <script src="/static/js/ai2editor/git-review.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/file-diff.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/project-tree.js?v=[% cv %]" defer></script>
+<script src="/static/js/ai2editor/chat.js?v=[% cv %]" defer></script>
 [% END %]
 
 <!-- Other feature modules -->
@@ -171,6 +219,16 @@
 <script src="/static/js/planning/daily-plan.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-gantt.js?v=[% cv %]" defer></script>
 <script src="/static/js/planning/daily-plan-deploy-center.js?v=[% cv %]" defer></script>
+<script src="/static/js/planning/daily-plan-utils.js?v=[% cv %]" defer></script>
+<script src="/static/js/project/project-search.js?v=[% cv %]" defer></script>
+[% END %]
+
+<!-- Shared todo card Start/Done delegated handler. Loaded ONCE whenever a
+     controller sets needs_todo_card_js (any route that renders todo_card.tt:
+     /todo, /todo/details, /todo/day|week|month, /project, /project/details).
+     Driven by a stash flag set in the controller, NOT a per-URL match list, so
+     new card-bearing pages can't silently ship with dead Start/Done buttons. -->
+[% IF c.stash.needs_todo_card_js %]
 <script src="/static/js/planning/daily-plan-utils.js?v=[% cv %]" defer></script>
 [% END %]
 
@@ -223,6 +281,17 @@
         isEditor: [% c.stash.is_editor ? 'true' : 'false' %],
         siteName: '[% c.stash.SiteName || c.session.SiteName | html %]',
         cv: '[% cv %]',
+        // Canonical model catalog — THE single source of truth for every chat
+        // surface (floating "Chat with AI" widget, /ai page, admin/AI, git
+        // dashboard, AI2 editor). Built per-request in Root.pm auto from the v2
+        // Router (Model::AI2->get_available_models) — the SAME source as
+        // /ai2/providers — and emitted via the stash so it is always current and
+        // identical for every role (including an admin whose session predates a
+        // change). The chat widget reads this instead of fetching /ai2/providers
+        // on every open: no per-use fetch, no render race, guaranteed parity.
+        // NOTE: read the stash value (set every request), not the session value,
+        // so a stale per-session cache can never hide the full list.
+        models: [% c.stash.ai_model_catalog_json || '[]' %],
         // Add more as needed - keep this small
     };
 </script>
@@ -251,22 +320,35 @@
       - All new development must use this path
 ============================================================ %]
 <script src="/static/js/ai2editor/popup.js?v=[% cv %]" defer></script>
-[%# AI Editor Button (v2) - Separate Window %]
+[%# AI Editor Button (v2) - Separate Window
+    Pass the current page's editable source file (its .tt template, relative to
+    the project root) so the popup opens with that file already loaded. Pages
+    rendered without a stash template (e.g. body-only or external) fall back to
+    opening the editor empty, preserving prior behaviour. %]
+[% current_editor_file = '' %]
+[% IF c.stash.template %][% current_editor_file = 'root/' _ c.stash.template %][% END %]
 [% IF c.session.user_id && !c.request.uri.match('/ai2/') %]
 <button class="btn btn-primary btn-sm ai2-float-btn"
-        onclick="openAI2EditorWindow()"
-        title="Open AI2 Code Editor (v2)">
+        onclick="openAI2EditorWindow('[% current_editor_file | html %]')"
+        title="Open AI2 Code Editor (v2) — edits the current page source">
     ✏️ AI Editor
 </button>
 [% END %]
 
-[%# Chat with AI button - lower right %]
-[% IF c.session.user_id && !c.request.uri.match('/ai2/editing_widget_popup')%]
-<a href="#"
-   onclick="if(window.openChat) window.openChat(); return false;"
-   class="btn btn-success btn-sm"
-   style="position:fixed; bottom:24px; right:24px; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,0.3); border-radius:20px;"
-   title="Chat with AI">
-    💬 Chat with AI
-</a>
-[% END %]
+[%# ---------------------------------------------------------------------------
+   SERVER-RENDERED AI model <select> for the floating "Chat with AI" widget.
+   Rendered here (every page) from the catalog in stash so the widget never has
+   to build its dropdown in JS. The widget's createChatWidget() finds this node
+   by id and MOVES it into the provider-selector bar (replacing the placeholder).
+   Hidden until the widget needs it. This is the single source of truth — the
+   same ai/model_select.tt partial every other surface uses.
+--------------------------------------------------------------------------- %]
+<div id="ai-provider-server-rendered" style="display:none;">
+[% PROCESS 'ai/model_select.tt'
+    select_id   = 'ai-provider',
+    select_name = 'model',
+    page        = 'chat',
+    current     = ai_default_model,
+    css_class   = 'ai-model-select',
+    catalog     = ai_model_catalog %]
+</div>

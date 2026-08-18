@@ -6,6 +6,9 @@
 
 [% # Context-aware detection: Adjust behavior if included in DailyPlan or Planning documentation
    # OR when included from week.tt/month.tt (include_mode parameter)
+   # OR when loaded as the DailyPlan Calendar-tab embed (?embed) — that path must
+   # use the bare /planning/daily nav (no standalone /todo "+ New" / "List" links),
+   # not the full /todo/day standalone nav.
    IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan')) OR (c.req.path AND c.req.path.match('planning/daily'));
       is_daily_plan = 1;
       IF c.req.path AND c.req.path.match('planning/daily');
@@ -15,8 +18,8 @@
       END;
       day_hash     = '#daily-schedule';
       planning_hash = '#planning';
-      week_hash = '#weekly-view';
-      month_hash = '#month-view';
+      week_hash = '/todo/week/' _ date _ '#calendar';
+      month_hash = '/todo/month/' _ date _ '#calendar';
    ELSE;
       base_url = '/todo/day';
       planning_hash = '';
@@ -83,7 +86,12 @@
    END;
 %]
 
-[% UNLESS include_mode %]
+[%# Suppress the standalone-page <link>/<script> block whenever this template is
+    embedded (include_mode set by the includer) OR rendered as a DailyPlan calendar
+    tab (is_daily_plan auto-detected). Re-injecting these into the daily page reloads
+    JS/CSS a second time and breaks the whole page (the "wrapper double-injection"
+    regression). The page already loads these via js_load.tt / DailyPlan.tt. %]
+[% UNLESS include_mode OR is_daily_plan %]
 <link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
 <link rel="stylesheet" type="text/css" href="/static/css/components/tables.css">
 <link rel="stylesheet" type="text/css" href="/static/css/themes/themes.css">
@@ -119,6 +127,10 @@
     font-size: 0.82em; padding: 3px 6px; border: 1px solid #dadce0;
     border-radius: 4px; background: #fff; color: #3c4043; cursor: pointer;
     margin-left: auto;
+    /* Override the global base.css `select { width:100% }` — without this the
+       Day/Week/Month dropdown expands to fill the nowrap/overflow nav and gets
+       pushed off-screen (invisible). Match the other gcal selects. */
+    width: auto; flex-shrink: 0;
 }
 
 .gcal-sites-bar, .gcal-legend-bar {
@@ -597,7 +609,12 @@ function convertMeetingTimes() {
         } catch(e) {}
     });
 }
+[%# When this template is embedded (include_mode, e.g. inside /planning/daily) the
+    whole <script> is re-parsed, so DO NOT re-register the auto-run listener here —
+    only the standalone /todo/day page should run convertMeetingTimes on load. %]
+[% UNLESS include_mode OR is_daily_plan %]
 document.addEventListener('DOMContentLoaded', convertMeetingTimes);
+[% END %]
 
 function savePriority(sel) {
     var recordId = sel.getAttribute('data-record-id');
@@ -1499,12 +1516,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+    [%# Embedded in /planning/daily: the <script> is re-parsed, so skip the
+        auto-run bootstrap (avoid double popup binding). Function defs above
+        stay available for the embedded calendar. %]
+    [% UNLESS include_mode OR is_daily_plan %]
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', attachPopupListeners);
     } else {
         attachPopupListeners();
     }
-[% UNLESS include_mode %]
+    [% UNLESS include_mode %]
     // Scroll the gcal time-grid to the current hour on load
     setTimeout(function() {
         var outer = document.querySelector('.gcal-grid-outer');
@@ -1514,7 +1535,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (minsFromStart > 0) outer.scrollTop = Math.max(0, minsFromStart - 60);
         }
     }, 400);
-[% END %]
+    [% END %]
+    [% END %]
 })();
 </script>
 
@@ -1567,8 +1589,8 @@ document.addEventListener('DOMContentLoaded', function() {
     <a class="gcal-nav-btn" href="[% base_url %]/[% next_date %][% day_hash %]">&#8250;</a>
     <select class="gcal-view-select" onchange="window.location=this.value" style="margin-left:0;">
         <option value="[% base_url %]/[% date %][% day_hash %]" selected>Day</option>
-        <option value="[% base_url %]/[% date %][% week_hash %]">Week</option>
-        <option value="[% base_url %]/[% date %][% month_hash %]">Month</option>
+        <option value="/todo/week/[% date %]">Week</option>
+        <option value="/todo/month/[% date %]">Month</option>
     </select>
     [% ELSE %]
     <a class="gcal-today-btn" href="/todo/day/[% today || date %]">Today</a>
@@ -1758,7 +1780,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </div>
 
-[% SET is_embed = c.req.params.embed ? 1 : 0 %]
+[% SET is_embed = c.req.params.embed.defined ? 1 : 0 %]
 [% IF !is_embed AND ai_daily_conversations && ai_daily_conversations.size > 0 %]
 <div style="margin-top:30px; padding:15px; background:rgba(0,100,200,0.05); border-left:3px solid #0064c8; border-radius:4px; max-width:100%;">
     <h3 style="margin-top:0; color:#0064c8;">AI Activity for [% date %]</h3>
@@ -1802,7 +1824,8 @@ document.addEventListener('DOMContentLoaded', function() {
     <div style="margin-top:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end;">
       <button id="gcal-notes-cancel" style="padding:6px 18px;border:1px solid #ccc;border-radius:4px;background:#f8f9fa;cursor:pointer;">Cancel</button>
       <button id="gcal-notes-confirm" style="padding:6px 18px;border:none;border-radius:4px;background:#0d6efd;color:#fff;cursor:pointer;">OK</button>
-    </div>
-  </div>
+      </div>
 </div>
+
+[%# day.tt end — rendered inline inside /planning/daily (no iframe). %]
 
