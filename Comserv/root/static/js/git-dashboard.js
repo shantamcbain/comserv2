@@ -307,6 +307,7 @@
                 credentials: 'same-origin'
             }).then(function (r) { return r.json(); })
               .then(function (res) {
+                  console.log('[git-dashboard] merge response:', res);
                   if (res.conflict) {
                       showMergeResult(false, true, 'conflict', res.output || res.error || '');
                       return;
@@ -316,12 +317,11 @@
                   } else {
                       showMergeResult(false, false, 'failed', res.output || res.error || res.detail || '');
                   }
-                  // Success re-renders the dashboard so branch/current-branch update.
-                  if (res.success && typeof window.refreshGitDashboard === 'function') {
-                      window.refreshGitDashboard();
-                  } else if (res.success) {
-                      window.location.reload();
-                  }
+                  // NOTE: intentionally do NOT auto-refresh/reload on success.
+                  // refreshGitDashboard() / location.reload() re-renders the Merge
+                  // card and wipes the result before the user can read it (the
+                  // "vanishing result" bug). The result stays visible until a
+                  // manual hard-refresh.
               })
               .catch(function (err) {
                   showMergeResult(false, false, 'error', String(err));
