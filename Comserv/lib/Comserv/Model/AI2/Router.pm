@@ -40,8 +40,19 @@ sub _detect_provider {
     if ($requested_model =~ /^grok/i) {
         return ('grok', $requested_model);
     }
-    if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-)/i) {
+    # Namespaced models (provider/slug, e.g. "anthropic/claude-3-haiku",
+    # "openai/gpt-4o", "meta-llama/llama-3.1-8b-instruct", "tencent/hy3")
+    # come from OpenRouter and must go to the external provider. Local Ollama
+    # tags are bare names ("qwen2.5:72b", "phi4:14b") with NO slash — so a
+    # slash is a reliable external signal. Without this, every OpenRouter
+    # model except a few prefix matches (tencent, gpt, ...) was wrongly
+    # routed to Ollama and failed with "model not found".
+    if ($requested_model =~ m{/}) {
+        return ('external', $requested_model);
+    }
+    if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-|tencent)/i) {
         # External OpenAI-compatible / OpenRouter / x.AI model
+        # (tencent/hy3 etc. live on OpenRouter)
         return ('external', $requested_model);
     }
     # Anything else (e.g. "llama3.1:latest", "phi4") is a local Ollama tag
@@ -109,6 +120,45 @@ sub _is_chat_model {
     return $name !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
 }
 
+# The Router identifies external models as "provider|slug" (e.g.
+# "openrouter|tencent/hy3"). Providers want the BARE slug ("tencent/hy3"),
+# not the prefixed form — sending "openrouter|tencent/hy3" to OpenRouter's API
+# returns HTTP 400 "not a valid model ID". Strip the prefix once, here, so
+# every caller (dispatch_chat, Chat::process) hands the provider a clean id.
+sub _bare_model {
+    my ($self, $model) = @_;
+    return $model unless defined $model;
+    $model =~ s/^[^|]+\|//;   # drop leading "provider|"
+    return $model;
+}
+
+# True when the given "provider|model" external default can actually be served:
+# an API key/secret resolves for that provider AND the model appears in its live
+# catalog. Avoids silently defaulting to a model that will 401/404 — in which
+# case we fall through to the local Ollama preference below.
+sub _external_default_available {
+    my ($self, $c, $external) = @_;
+    return 0 unless $external && $external =~ /^([^|]+)\|(.+)$/;
+    my ($svc, $model) = ($1, $2);
+
+    my $cls = { grok => 'AI2::Provider::Grok', openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
+    return 0 unless $cls;
+    my $prov = try { $c->model($cls) } catch { undef };
+    return 0 unless $prov && $prov->can('_resolve_api_key');
+
+    # Key must resolve (k8s secret / env / DBEncy UserApiKeys).
+    my $key = try { $prov->_resolve_api_key($c) } catch { undef };
+    return 0 unless $key;
+
+    # Model must exist in the live catalog (skip the network check if the
+    # provider lacks list_models, e.g. some thin wrappers — then trust the key).
+    return 1 unless $prov->can('list_models');
+    my $listed = try { $prov->list_models($c) } catch { undef };
+    return 1 unless $listed && $listed->{success} && $listed->{models};
+    my %ids = map { ($_->{id} // '') => 1 } @{$listed->{models}};
+    return $ids{$model} ? 1 : 0;
+}
+
 # -------------------------------------------------------------------
 # select_model — the core routing decision.
 #
@@ -129,6 +179,17 @@ sub select_model {
     if ($requested) {
         my ($prov, $model) = $self->_detect_provider($requested);
         return ($prov, $model);
+    }
+
+    # 1.5) App-wide DEFAULT: prefer the off-host OpenRouter model so automatic
+    # selection never stalls the workstation by cold-loading a ~9GB local
+    # Ollama weight. This is the SINGLE default used by every surface that
+    # reaches the Router (chat widget, Git drafting, editor, focus-tune) so
+    # behavior is consistent across the whole app. Only used when an external
+    # key is actually resolvable AND the model is reachable.
+    my $default_external = 'openrouter|tencent/hy3';
+    if ($self->_external_default_available($c, $default_external)) {
+        return ('external', $default_external);
     }
 
     # 2) Build a lookup of installed chat models (short name -> full name).
@@ -172,6 +233,58 @@ sub select_best_model {
     my ($self, $c, %opts) = @_;
     my ($prov, $model) = $self->select_model($c, %opts);
     return [$model, $prov];
+}
+
+# -------------------------------------------------------------------
+# dispatch_chat — SINGLE place that turns (model name + messages) into a
+# provider response for the v2 AI system. Used by BOTH the chat widget
+# (Model::AI2::Chat::process) AND the AI Focus-Tune (Controller::Api
+# api_focus_top5), so Ollama / Grok / OpenRouter all route through one
+# code path and never bypass the provider layer (which is what made the
+# tune silently fail on non-Ollama models).
+# -------------------------------------------------------------------
+sub dispatch_chat {
+    my ($self, $c, $requested_model, $messages, %opts) = @_;
+
+    my $can_select = $opts{can_select} // 1;
+    my ($provider_name, $use_model) = $self->select_model($c,
+        requested_model => $requested_model, can_select => $can_select);
+
+    my $dispatch = {
+        ollama     => 'AI2::Provider::Ollama',
+        grok       => 'AI2::Provider::Grok',
+        openrouter => 'AI2::Provider::OpenRouter',
+        external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
+    };
+    my $prov_class = $dispatch->{$provider_name} || 'AI2::Provider::Ollama';
+    my $provider = try { $c->model($prov_class) } catch { undef };
+    return { success => 0, error => "No client available for provider $provider_name" }
+        unless $provider && $provider->can('chat');
+
+    # For Ollama, resolve the first reachable workstation address (LAN vs
+    # ZeroTier vs OLLAMA_HOST). Non-Ollama providers ignore host/port.
+    my ($host, $port);
+    if ($provider->can('resolve_host')) {
+        ($host, $port) = $provider->resolve_host($c);
+    }
+
+    my $resp = try {
+        $provider->chat($c,
+            messages => $messages,
+            model    => $self->_bare_model($use_model),
+            host     => $host,
+            port     => $port,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'router_dispatch_chat',
+            "Provider $provider_name threw: $_");
+        undef;
+    };
+
+    return { success => 0, error => "Provider $provider_name returned nothing" }
+        unless $resp && ref($resp) eq 'HASH';
+    $resp->{provider} = $provider_name;
+    return $resp;
 }
 
 # -------------------------------------------------------------------
@@ -281,6 +394,12 @@ sub get_available_models {
                         provider => $svc,
                         label    => ($m->{label} || $m->{id}) . " ($svc)",
                         local    => 0,
+                        # AIMPS-P1 (#253): keep real per-token pricing so the
+                        # catalog can sort/filter/display by cost. Free ":free"
+                        # models carry a pricing hash of zeros.
+                        pricing          => $m->{pricing}        || {},
+                        price_prompt     => $m->{price_prompt}     // 0,
+                        price_completion => $m->{price_completion} // 0,
                     };
                 }
                 next;
@@ -297,7 +416,80 @@ sub get_available_models {
         }
     }
 
+    # Sanitize: upstream provider JSON (Ollama /api/tags, OpenRouter /v1/models)
+    # can occasionally return a malformed entry (a bare string or array instead
+    # of a model object). Drop anything that isn't a hashref so the downstream
+    # grouping in /ai2/providers and ModelCatalog never hits "Not a HASH
+    # reference". Log the offending element tagged by provider so the source
+    # (and the exact bad payload) is visible in the error audit.
+    my @clean;
+    for my $m (@all) {
+        if (ref $m eq 'HASH') {
+            push @clean, $m;
+        } else {
+            # We can't read a provider off a non-hash element; infer a hint from
+            # the element shape so the log points at the likely culprit.
+            my $hint = defined $m
+                ? (ref $m ? ref($m) : "scalar '$m'")
+                : 'undef';
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'get_available_models',
+                "Dropping non-hash catalog element: $hint");
+        }
+    }
+    @all = @clean;
+
+    # ROLE FILTER — applied ONCE here, at the single source of truth, so every
+    # consumer (ModelCatalog, /ai2/providers, the widget, /ai, git dashboard)
+    # is role-filtered without each list re-implementing it. Tiers:
+    #   guest  : free OpenRouter + Ollama local only (no paid, no Grok)
+    #   member : free + cheap + mid (premium > $5 / 1M excluded, no Grok)
+    #   priv   : everything (admin / developer / editor)
+    @all = $self->_role_filter_models($c, \@all);
+
     return \@all;
+}
+
+# Keep only the models a role tier may see. Mirrors ModelCatalog's tiers so the
+# two paths (direct Router use and ModelCatalog caching) agree.
+sub _role_filter_models {
+    my ($self, $c, $all) = @_;
+    my $tier = $self->_role_tier($c);
+    return @$all if $tier eq 'priv';
+    my @out;
+    for my $m (@$all) {
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $svc  = $m->{provider} || '';
+        my $free = $m->{free} || ( ($m->{name} // '') =~ /:free$/ ? 1 : 0 );
+        my $local = $m->{local} || ( $svc eq 'ollama' ? 1 : 0 );
+        if ($tier eq 'guest') {
+            push @out, $m if $free || $local;
+        } else { # member
+            next if $svc eq 'grok';
+            my $pp = ($m->{price_prompt}     // 0) + 0;
+            my $pc = ($m->{price_completion} // 0) + 0;
+            my $max = ( $pp > $pc ) ? $pp : $pc;
+            next if $max > 5;   # premium excluded for members
+            push @out, $m;
+        }
+    }
+    return \@out;
+}
+
+sub _role_tier {
+    my ($self, $c) = @_;
+    my $roles = eval { $c->session->{roles} } || [];
+    $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
+    my $is_guest = 1;
+    my $is_priv  = 0;
+    for my $r (@$roles) {
+        next unless defined $r && length $r;
+        $is_guest = 0 if $r =~ /^(admin|developer|editor|member|user)$/i;
+        $is_priv  = 1 if $r =~ /^(admin|developer|editor)$/i;
+    }
+    return 'priv'  if $is_priv;
+    return 'guest' if $is_guest;
+    return 'member';
 }
 
 # -------------------------------------------------------------------

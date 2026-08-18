@@ -18,6 +18,15 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance },
 );
 
+# ── Candidate / comparison sizing (named, not magic numbers) ──
+# CANDIDATE_CAP  : how many scored todos become the candidate pool.
+# PROMPT_CAP     : how many candidates we actually send to the model (prompt
+#                  size / generation cost scales with this).
+# COMPARE_TOP    : how many we show in the coded-vs-AI "top N" diff table.
+use constant CANDIDATE_CAP => 50;
+use constant PROMPT_CAP    => 25;
+use constant COMPARE_TOP    => 20;
+
 # ===================================================================
 # AI2::FocusTune — the ONE place that knows how to ask an AI model
 # "what are the top 5 todos to do next, by FUNCTION".
@@ -55,19 +64,19 @@ sub gather_candidates {
         }
     };
     @cands = sort { ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0) } @cands;
-    my @top = splice(@cands, 0, 50);
+    my @top = splice(@cands, 0, CANDIDATE_CAP);
     return (\@top, \%rbid);
 }
 
 # Build the function-based prompt (judge by FUNCTION, ignore the inconsistent
 # ap_score ranking). Returns ($system, $user_prompt).
-# $top is the full candidate set (up to 50); we send only the top $cap (default
-# 25) to the model — generation cost scales with prompt size, and the model
-# only needs the most-relevant candidates to pick a strong top 5. Smaller
+# $top is the full candidate set (up to CANDIDATE_CAP); we send only the top
+# PROMPT_CAP to the model — generation cost scales with prompt size, and the
+# model only needs the most-relevant candidates to pick a strong top 5. Smaller
 # context = faster generation = less CPU pegged per call.
 sub build_prompt {
     my ($self, $c, $top, $plan_docs, $cap) = @_;
-    $cap //= 25;
+    $cap //= PROMPT_CAP;
     my @send = @$top;
     if (@send > $cap) { @send = @send[0 .. ($cap - 1)]; }
 
@@ -302,7 +311,7 @@ sub parse_result {
     }
 
     my @coded_top = map { { record_id => $_->{record_id}, subject => $_->{subject} // '', ap_score => $_->{ap_score} // 0 } }
-                     @$top[0 .. ($#$top > 19 ? 19 : $#$top)];
+                     @$top[0 .. ($#$top > (COMPARE_TOP - 1) ? (COMPARE_TOP - 1) : $#$top)];
 
     my @simulated = map { { %$_ } } @$top;
     if (%ai_weights) {
@@ -314,7 +323,7 @@ sub parse_result {
         @simulated = sort { ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0) } @simulated;
     }
     my @sim_top = map { { record_id => $_->{record_id}, subject => $_->{subject} // '', ap_score => $_->{ap_score} // 0 } }
-                 @simulated[0 .. ($#simulated > 19 ? 19 : $#simulated)];
+                 @simulated[0 .. ($#simulated > (COMPARE_TOP - 1) ? (COMPARE_TOP - 1) : $#simulated)];
 
     my @mis_set;
     if (ref($parsed->{mis_set}) eq 'ARRAY') {

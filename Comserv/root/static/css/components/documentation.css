@@ -15,7 +15,52 @@
     background: var(--background-color, #f8f9fa);
 }
 
-/* ── Page header ─────────────────────────────────────────────── */
+/* ── Shared doc page header (admin/documentation/_doc_header.tt) ──
+   Theme-compliant: every value consumes a canonical CSS variable so all
+   themes apply. Authors copy these classes — NEVER write inline style=. */
+.doc-page-header {
+    margin-bottom: var(--spacing-large, 30px);
+    padding: var(--spacing-medium, 20px);
+    background: var(--primary-color, #fff);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color, #ddd);
+    text-align: center;
+}
+
+.doc-page-header .doc-h1 {
+    margin: 0 0 10px 0;
+    font-size: 2em;
+}
+
+.doc-header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-medium, 16px);
+    font-size: var(--font-size-small, 0.9em);
+    color: var(--text-color, #555);
+    margin-bottom: var(--spacing-small, 10px);
+}
+
+.doc-header-item { white-space: nowrap; }
+
+.doc-header-label {
+    color: var(--text-muted-color, #666);
+    font-weight: bold;
+}
+
+.doc-header-value { color: var(--text-color, #333); }
+
+.doc-header-actions,
+.markdown-doc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-small, 10px);
+}
+
+/* ── Legacy .doc-header (kept for any pages still using it) ── */
 .doc-header {
     text-align: center;
     margin-bottom: 30px;
@@ -457,9 +502,66 @@
 @media (max-width: 768px) {
     .files-grid { grid-template-columns: 1fr; gap: 12px; }
     .user-context { flex-direction: column; gap: 5px; }
-    .container-header h2 { font-size: 1.2em; }
+    .container-header { padding: 12px 15px; font-size: 0.9em; }
     .search-input-group { flex-direction: column; }
     .search-input, .search-category, .search-button { width: 100%; }
     .container-header { padding: 12px 15px; font-size: 0.9em; }
     .file-card { padding: 12px; }
 }
+
+/* ── Plan/doc utility classes (DocumentationTtTemplate + plan docs) ──
+ * Theme-compliant: every value consumes a canonical CSS variable so all
+ * themes apply. Authors copy these classes — NEVER write inline style=. */
+.doc-h1      { color: var(--text-color); font-family: var(--header-font); }
+.doc-h2      { color: var(--text-color); font-family: var(--header-font); margin-top: 0; }
+.doc-h3      { color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0; }
+.doc-body    { color: var(--text-color); font-family: var(--body-font); }
+.doc-muted   { color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); }
+.doc-strong  { color: var(--text-color); font-family: var(--body-font); }
+
+.doc-toc        { margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; }
+.doc-navlink    { color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block; }
+.doc-navrow     { display: flex; flex-wrap: wrap; gap: var(--spacing-small); }
+.doc-backtop    { display: block; text-align: right; margin-top: var(--spacing-small); }
+.doc-backtop a  { color: var(--link-color); font-size: var(--font-size-small); text-decoration: none; }
+
+.doc-codebox    { background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); border-radius: 4px; margin: var(--spacing-small) 0; }
+.doc-codebox pre,
+.doc-code       { background-color: #1e1f22; color: #9cdcfe; padding: 10px; border-radius: 4px; overflow: auto; font-family: monospace; margin: 0; }
+
+.doc-warning    { background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-small) 0; }
+.doc-warning h3 { color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0; }
+.doc-info       { background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color, #17a2b8); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-small) 0; }
+.doc-info h3    { color: var(--info-color, #17a2b8); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0; }
+.doc-success    { background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0; }
+.doc-success h3 { color: var(--success-color); font-family: var(--header-font); margin-top: 0; }
+
+.doc-table     { width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0; }
+.doc-th        { background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left; }
+.doc-td        { color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); }
+.doc-tr-alt    { background-color: rgba(255,255,255,0.12); }
+.doc-link      { color: var(--link-color); text-decoration: none; }
+.doc-link:hover { color: var(--link-hover-color); }
+
+/* ── MASTER_PLAN coordinator doc ──
+ * Theme-compliant: canonical CSS variables ONLY. Typography, notices, tables
+ * and the section nav are expressed with the shared .doc-* classes already in
+ * this file. Only the SiteName-scoped context banner (no .doc-* equivalent) and
+ * the collapsible <details> disclosure marker live here. Inline style= and
+ * page <style> blocks are forbidden per DocumentationTtTemplate.tt. */
+.masterplan { color: var(--text-color); }
+
+/* SiteName-scoped context banner (CSC = coordinating; other sites scoped) */
+.mp-site-context { margin: 12px 0; padding: 8px 12px; border-radius: 4px; font-size: 0.92em; border-left: 4px solid var(--info-color); background: var(--secondary-color); }
+.mp-site-context-csc { border-left-color: var(--primary-color); }
+.mp-site-context-other { border-left-color: var(--warning-color); }
+.mp-back-link { margin: 10px 0 0; font-size: 0.9em; }
+
+/* Collapsible cards reuse the theme's .card/.card-header/.card-body; only the
+   disclosure marker (▸/▾) is styled so it matches the doc theme. */
+.masterplan details > summary.card-header { cursor: pointer; list-style: none; }
+.masterplan details > summary.card-header::-webkit-details-marker { display: none; }
+.masterplan details > summary.card-header::before { content: "\25B8 "; }
+.masterplan details[open] > summary.card-header::before { content: "\25BE "; }
+.masterplan .card > details[open] { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.doc-footer    { margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small); }

@@ -37,7 +37,7 @@
         <a href="/todo/details?record_id=[% tc.record_id %]"
            class="text-truncate font-weight-bold"
            style="max-width: 300px; color: var(--text-color);">
-            [% tc.subject || '(No subject)' %]
+            [% tc.subject || '(No subject)' | html %]
         </a>
     </div>
 

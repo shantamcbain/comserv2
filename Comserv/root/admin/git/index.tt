@@ -9,6 +9,12 @@
 %]
 [% PageVersion = 'admin/git/index.tt,v 0.02 2026/07/31 shanta Exp shanta ' %]
 
+[%# Absolute-URL building for branch links (RELATIVE-URL TRAP: a relative path
+    resolves against the current page origin, so the Open button would reopen
+    the SAME server instead of the branch's own port). Build the full URL. #]
+[% SET scheme = c.req.uri.scheme %]
+[% SET host = c.req.uri.host %]
+
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -23,6 +29,25 @@
     <div class="content-container">
         <div class="content-primary">
             <h1><i class="fas fa-code-branch"></i> Git Dashboard</h1>
+
+            <div class="admin-panel" data-create-worktree-panel="1">
+                <div class="admin-panel-header"><h3><i class="fas fa-plus"></i> New Branch + Worktree</h3></div>
+                <div class="admin-panel-body">
+                    <form data-create-worktree-form="1" class="git-inline">
+                        <label>Branch
+                            <input type="text" name="branch" required pattern="[A-Za-z0-9._/-]+"
+                                   placeholder="feature/name" class="form-control">
+                        </label>
+                        <label>Parent
+                            <input type="text" name="parent" value="main" class="form-control">
+                        </label>
+                        <button type="submit" class="admin-btn admin-btn-primary">
+                            <i class="fas fa-code-branch"></i> Create Branch + Worktree
+                        </button>
+                        <span data-create-worktree-status="1" class="section-info"></span>
+                    </form>
+                </div>
+            </div>
 
             [% IF debug_msg && c.session.debug_mode == 1 %]
                 <div class="admin-alert admin-alert-info">
@@ -95,6 +120,20 @@
                                 <span class="section-info-warn"><i class="fas fa-download"></i> [% tracking.behind %] behind</span>
                                 [% END %]
                             [% END %]
+                        [% ELSIF tracking.base %]
+                            [# This branch has no GitHub upstream (local-merge workflow).
+                               Show its relationship to the integration base (main), so the
+                               user can see if the branch is stale before starting work. #]
+                            [% IF tracking.base_ahead == 0 && tracking.base_behind == 0 %]
+                                <span class="section-info"><i class="fas fa-check"></i> in sync with [% tracking.base | html %]</span>
+                            [% ELSE %]
+                                [% IF tracking.base_ahead > 0 %]
+                                <span class="section-info"><i class="fas fa-code-branch"></i> [% tracking.base_ahead %] unmerged on [% tracking.base | html %]</span>
+                                [% END %]
+                                [% IF tracking.base_behind > 0 %]
+                                <span class="section-info-warn"><i class="fas fa-arrow-down"></i> [% tracking.base_behind %] behind [% tracking.base | html %] — update before working</span>
+                                [% END %]
+                            [% END %]
                         [% ELSE %]
                             <span class="section-info-warn">no upstream</span>
                         [% END %]
@@ -162,31 +201,49 @@
                                 [% FOREACH f IN git_status.staged_files %]
                                 <tr>
                                     <td><input type="checkbox" name="paths" value="[% f | html %]" data-git-file="1"></td>
-                                    <td><code class="code-inline">[% f | html %]</code></td>
+                                    <td><code class="code-inline">[% f | html %]</code>
+                                        <button type="button" class="admin-btn admin-btn-sm" data-git-view-diff="[% f | html %]" style="margin-left:8px;">Diff</button></td>
                                     <td><span class="status-badge">staged</span></td>
                                 </tr>
                                 [% END %]
                                 [% FOREACH f IN git_status.modified_files %]
                                 <tr>
                                     <td><input type="checkbox" name="paths" value="[% f | html %]" data-git-file="1"></td>
-                                    <td><code class="code-inline">[% f | html %]</code></td>
+                                    <td><code class="code-inline">[% f | html %]</code>
+                                        <button type="button" class="admin-btn admin-btn-sm" data-git-view-diff="[% f | html %]" style="margin-left:8px;">Diff</button></td>
                                     <td><span class="status-badge">modified</span></td>
                                 </tr>
                                 [% END %]
                                 [% FOREACH f IN git_status.untracked_files %]
                                 <tr>
                                     <td><input type="checkbox" name="paths" value="[% f | html %]"
-                                               data-git-file="1" data-git-untracked="1"></td>
-                                    <td><code class="code-inline">[% f | html %]</code></td>
+                                              data-git-file="1" data-git-untracked="1"></td>
+                                    <td><code class="code-inline">[% f | html %]</code>
+                                        <button type="button" class="admin-btn admin-btn-sm" data-git-view-diff="[% f | html %]" style="margin-left:8px;">Diff</button></td>
                                     <td><span class="status-badge">untracked</span></td>
                                 </tr>
                                 [% END %]
                             </tbody>
                         </table>
 
+                        <div id="git-file-diff" class="git-file-diff" style="display:none;margin-top:12px;">
+                            <div class="git-file-diff-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                <strong id="git-file-diff-title" style="color:var(--text-color,#222);"></strong>
+                                <button type="button" class="admin-btn admin-btn-sm" id="git-file-diff-close">Close</button>
+                            </div>
+                            <pre id="git-file-diff-content" class="git-file-diff-content" style="background:#1e1f22;color:#9cdcfe;padding:10px;border:1px solid #444;border-radius:4px;max-height:50vh;overflow:auto;white-space:pre-wrap;font-size:12px;"></pre>
+                        </div>
+
                         <p>
                             <textarea name="message" placeholder="Commit / stash message"
                                       class="form-control" rows="2" data-git-message="1"></textarea>
+                        </p>
+                        <p>
+                            <label for="git-commit-ai-model">AI model for commit message:</label>
+                            <select id="git-commit-ai-model" class="form-control"
+                                    data-git-ai-model="1">
+                                <option value="">Use automatic model selection</option>
+                            </select>
                         </p>
                         <p>
                             <button type="button" class="admin-btn admin-btn-sm"
@@ -228,6 +285,122 @@
                     [% END %]
                 </div>
             </div>
+
+            [%# ==================== Develop Servers (zenflow worktree registry) ==================== %]
+            [%# Single source of truth = stash.worktree_list (Comserv::Util::Git->build_worktree_list,\n               which reads root/config/worktrees.json). Mirrors the planning tab's "Branch Servers"\n               panel. Open/Stop/Restart buttons POST to /admin/branch_server_action (handled in\n               git-dashboard.js). No inline <script>. #]
+            [% IF worktree_list && worktree_list.size %]
+            <details class="git-collapse git-dev-servers">
+                <summary>Develop Servers <span class="git-count">([% worktree_list.size %])</span></summary>
+                <div class="git-collapse-body">
+                    <table class="data-table git-dev-server-table">
+                        <thead>
+                            <tr>
+                                <th>Branch</th>
+                                <th>Port</th>
+                                <th>Start Command</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH b IN worktree_list %]
+                            <tr[% IF b.name == current_branch %] class="git-dev-current"[% END %]>
+                                <td>
+                                    <code>[% b.label | html %]</code>
+                                    [% IF b.name == current_branch %]<span class="status-badge">current</span>[% END %]
+                                </td>
+                                <td><code>:[% b.port %]</code></td>
+                                <td>
+                                    <code class="git-dev-cmd" title="[% b.cmd | html %]">[% b.cmd | html %]</code>
+                                </td>
+                                <td class="git-dev-actions">
+                                    <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                            data-open-branch="[% b.name | html %]" data-port="[% b.port %]"
+                                            data-url="[% scheme %]://[% host %]:[% b.port %][% b.url | html %]"
+                                            data-cmd="[% b.cmd | html %]">Open</button>
+                                    <button type="button" class="admin-btn admin-btn-sm"
+                                            data-hermes-branch="[% b.name | html %]"
+                                            data-hermes-cmd="[% b.hermes_cmd | html %]">Hermes</button>
+                                    <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
+                                            data-branch-action="stop" data-branch="[% b.name | html %]" data-port="[% b.port %]">Stop</button>
+                                    <button type="button" class="admin-btn admin-btn-sm"
+                                            data-branch-action="restart" data-branch="[% b.name | html %]" data-port="[% b.port %]">Restart</button>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+
+            [%# Live console modal for a branch server's startup log. Shown by the Open
+               button (git-dashboard.js) so you can watch the server boot and read any
+               command-line errors. Markup only — JS + /admin/branch_server_log drive it. #]
+            <div id="git-dev-console" class="git-dev-console-overlay" style="display:none;">
+                <div class="git-dev-console">
+                    <div class="git-dev-console-header">
+                        <span id="git-dev-console-title">Server console</span>
+                        <button type="button" class="git-dev-console-close" data-git-dev-console-close="1">&times;</button>
+                    </div>
+                    <div class="git-dev-console-cmd" id="git-dev-console-cmd"></div>
+                    <pre class="git-dev-console-log" id="git-dev-console-log">(waiting for output…)</pre>
+                    <div class="git-dev-console-footer">
+                        <a id="git-dev-console-open" href="#" target="_blank" class="admin-btn admin-btn-sm admin-btn-primary">Open server →</a>
+                        <button type="button" class="admin-btn admin-btn-sm" data-git-dev-console-close="1">Close</button>
+                    </div>
+                </div>
+            </div>
+            [% END %]
+
+            [%# ===== Merge (main <-> branch, one at a time) =====
+                Driven by git-dashboard.js via data-attr delegation. Two directions:
+                merge main into the selected branch (always allowed), or merge the
+                selected branch into main (only when it is the active/checked-out
+                branch, mirroring PyCharm). Conflicts reveal the Abort button. %]
+            <details class="git-collapse git-merge-card">
+                <summary>Merge <span class="git-count">(main &harr; branch, one at a time)</span></summary>
+                <div class="git-collapse-body">
+                    <div class="git-inline git-merge-controls">
+                        <label>Branch
+                            <select name="merge_branch" class="form-control git-select"
+                                    id="git-merge-branch" data-git-merge-select="1"
+                                    title="Branch to merge with main">
+                                [% FOREACH b IN branch_details %]
+                                [% IF b.name != 'git' %]
+                                <option value="[% b.name | html %]"[% IF b.is_current %] selected[% END %]>[% b.name | html %][% IF b.is_current %] (active)[% END %]</option>
+                                [% END %]
+                                [% END %]
+                            </select>
+                        </label>
+                    </div>
+
+                    <p class="git-merge-hint">
+                        <i class="fas fa-info-circle"></i>
+                        Active branch: <code class="code-inline" data-git-current-branch="1">[% current_branch | html %]</code>
+                    </p>
+
+                    <div class="git-actions">
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                data-git-merge="1" data-merge-direction="main-to-branch"
+                                data-merge-url="[% c.uri_for('/admin/git/merge') %]">
+                            <i class="fas fa-arrow-down"></i> Merge main &rarr; this branch
+                        </button>
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
+                                data-git-merge="1" data-merge-direction="branch-to-main"
+                                data-merge-url="[% c.uri_for('/admin/git/merge') %]">
+                            <i class="fas fa-arrow-up"></i> Merge this branch &rarr; main
+                        </button>
+                        <button type="button" class="admin-btn admin-btn-sm admin-btn-danger"
+                                data-git-merge-abort="1"
+                                data-merge-abort-url="[% c.uri_for('/admin/git/merge/abort') %]"
+                                style="display:none;">
+                            <i class="fas fa-ban"></i> Abort merge
+                        </button>
+                    </div>
+
+                    <div data-git-merge-status="1" class="git-merge-status"></div>
+                    <pre data-git-merge-output="1" class="git-merge-output" style="display:none;"></pre>
+                </div>
+            </details>
 
             [%# ==================== Branches (collapsed) ==================== %]
             <details class="git-collapse">

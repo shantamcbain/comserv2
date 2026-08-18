@@ -5,6 +5,14 @@ use warnings;
 
 our $FOCUS_QUEUE_LIMIT = 20;
 
+# Cap on how many in-progress rows may occupy the Focus Queue (project 240 fix).
+# The scorer keeps in-progress only a minor tie-breaker above open (status_tier*3,
+# down from 100), so priority + due + staleness drive the real order. This cap is a
+# secondary guard: even though status no longer dominates, a large in-progress pool
+# can still cluster at the head of the queue, so we bound it and fill the rest with
+# the highest-priority OPEN todos — the actual "daily priorities".
+our $FOCUS_QUEUE_IN_PROGRESS_CAP = 8;
+
 sub done_statuses {
     return (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
 }

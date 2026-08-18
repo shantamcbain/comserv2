@@ -586,7 +586,13 @@
             state.chatHistory.push({ role: 'user', content: userText });
         }
         var prompt = isFollowUp ? userText : buildPrompt(userText);
-        var provider = ($('aew-provider') && $('aew-provider').value) || 'grok';
+        var provider = 'grok';
+        var aewSel = $('aew-provider');
+        if (aewSel && aewSel.value) {
+            // Shared module renders "provider|model"; the /ai2/chat endpoint
+            // accepts that format and routes correctly (e.g. openrouter|tencent/hy3).
+            provider = aewSel.value;
+        }
         setStatus('AI thinking…');
         $('aew-send-btn').disabled = true;
 
@@ -643,27 +649,28 @@
     }
 
     function loadProviders() {
-        fetchJson('/ai/get_user_providers')
-            .then(function(data) {
-                var sel = $('aew-provider');
-                if (!sel || !data.success || !data.providers) return;
-                sel.innerHTML = '';
-                data.providers.forEach(function(p) {
-                    if (p.service === 'grok') {
+        var sel = $('aew-provider');
+        if (!sel) return;
+        // Use the SAME shared model-select module every other chat surface uses,
+        // so the editing widget shows the identical provider list (Ollama + Grok +
+        // OpenRouter) and the same default. The module renders "provider|model"
+        // values; sendChat() parses that into the provider field below.
+        if (window.ComservChat && ComservChat.modelSelect) {
+            ComservChat.modelSelect.init({
+                selectEl: sel,
+                context: 'code',
+                pinModel: 'tencent/hy3',
+                onError: function () {
+                    // Fallback: keep a minimal grok/ollama pair if the module fails.
+                    sel.innerHTML = '';
+                    [['grok', 'Grok (cloud)'], ['ollama', 'Ollama (local)']].forEach(function (p) {
                         var o = document.createElement('option');
-                        o.value = 'grok';
-                        o.textContent = 'Grok (cloud)';
+                        o.value = p[0]; o.textContent = p[1];
                         sel.appendChild(o);
-                    }
-                    if (p.service === 'ollama') {
-                        var o2 = document.createElement('option');
-                        o2.value = 'ollama';
-                        o2.textContent = 'Ollama (local)';
-                        sel.appendChild(o2);
-                    }
-                });
-            })
-            .catch(function() {});
+                    });
+                }
+            });
+        }
     }
 
     function setupDeployTabs() {

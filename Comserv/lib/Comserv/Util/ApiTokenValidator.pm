@@ -7,6 +7,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 use Try::Tiny;
 use Digest::SHA qw(sha256_hex);
 use DateTime;
+use DateTime::Format::MySQL;
 use Comserv::Util::Logging;
 
 =head1 NAME
@@ -138,8 +139,15 @@ sub validate_token {
     if ($api_token->expires_at) {
         my $now = DateTime->now(time_zone => 'UTC');
         my $expires = $api_token->expires_at;
-        
-        if ($expires < $now) {
+        # expires_at may be returned as a string from the DB layer; coerce to a
+        # DateTime so the comparison below is valid (a DateTime can only be
+        # compared to another DateTime — comparing to a string throws and aborts
+        # all token validation).
+        if (!ref($expires)) {
+            try { $expires = DateTime::Format::MySQL->parse_datetime($expires) }
+            catch { $expires = undef };
+        }
+        if ($expires && $expires < $now) {
             return {
                 valid => 0,
                 error => 'Token has expired',

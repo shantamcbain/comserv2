@@ -1,42 +1,43 @@
 [% META
    title = "Git Worktree System — New Isolated-Creation Backend (replaces Zenflow)"
-   description = "Replace the dead Zenflow worktree registry with a self-hosted system rooted at ~/.comserv/worktrees/, driven by a single root/config/worktrees.json (read by both Perl and the planning tab). Retire the duplicated zenflow maps and hardcoded .zenflow path constants, and provide create_worktree so AI code creation gets an isolated branch/checkout/port on demand. ai and aichatsystem-ef4e migrate; main is untouched."
+   description = "Replace the dead Zenflow worktree registry with a self-hosted system rooted at ~/.comserv/worktrees/, driven by a single root/config/worktrees.json (read by both Perl and the planning tab). Provide a single in-app 'create branch' action that creates the git branch, pulls it into a worktree, registers it in worktrees.json, and refreshes the branch-servers list — all in one call. main is untouched until code is merged from a branch via the review-merge gate."
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
    category = "git,ai-systems,infrastructure,development-plan"
-   page_version = "0.1"
-   last_updated = "Mon Aug 03 20:30:00 UTC 2026"
+   page_version = "0.2"
+   last_updated = "Wed Aug 06 14:00:00 UTC 2026"
    project_id   = "238"
    project_code = "GITWT-NEW"
    site_specific = "false"
 %]
 
 <div class="container">
-    <h1 style="color: var(--text-color); font-family: var(--header-font);">Git Worktree System — New Isolated-Creation Backend (replaces Zenflow)</h1>
+    <h1 class="doc-h1">Git Worktree System — New Isolated-Creation Backend (replaces Zenflow)</h1>
 
-    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-        Last Updated: 2026-08-03 |
-        Version: 0.1 |
+    <div class="last-updated" doc-muted">
+        Last Updated: 2026-08-06 |
+        Version: 0.2 |
         Status: In-Process |
-        Tracked in project: <a href="/project/details?project_id=238" style="color: var(--link-color);">#238 (GITWT-NEW)</a>
+        Tracked in project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" class="row doc-toc">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
-            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
-            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Overview</a>
-                <a href="#decisions" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Decisions</a>
-                <a href="#inventory" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Inventory</a>
-                <a href="#contract" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Data Contract</a>
-                <a href="#phase0" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Phase 0</a>
-                <a href="#phase1" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Phase 1</a>
-                <a href="#phase2" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Phase 2</a>
-                <a href="#phase3" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Phase 3</a>
-                <a href="#verification" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Verification</a>
-                <a href="#out-of-scope" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Out of Scope</a>
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#decisions" class="doc-navlink">Decisions</a>
+                <a href="#inventory" class="doc-navlink">Inventory</a>
+                <a href="#contract" class="doc-navlink">Data Contract</a>
+                <a href="#phase0" class="doc-navlink">Phase 0</a>
+                <a href="#phase1" class="doc-navlink">Phase 1</a>
+                <a href="#phase2" class="doc-navlink">Phase 2</a>
+                <a href="#phase3" class="doc-navlink">Phase 3</a>
+                <a href="#phase4" class="doc-navlink">Phase 4</a>
+                <a href="#verification" class="doc-navlink">Verification</a>
+                <a href="#out-of-scope" class="doc-navlink">Out of Scope</a>
             </div>
         </div>
     </div>
@@ -44,67 +45,71 @@
     <!-- OVERVIEW SECTION -->
     <div class="row">
         <div class="col-100">
-            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
-            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Why:</strong> The Zenflow service priced itself out ~a month ago. Its worktree registry is hardcoded in two places that drift independently and most of its checkouts are already gone from disk (only <code>aichatsystem-ef4e</code> survives; the <code>ai</code> branch exists but was never in the registry). The AI2 editor's Review &amp; Merge panel (built last session) calls <code>/admin/git/worktrees</code> / <code>review</code> / <code>test_gate</code> / <code>merge_to_main</code> / <code>push_main</code> — all of which exist — but the <em>creation</em> half of "isolate AI code creation" is missing. This plan stands that up on a self-hosted directory with one source of truth.</p>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body"><strong>Why:</strong> The Zenflow service priced itself out ~a month ago. Its worktree registry is hardcoded in two places that drift independently and most of its checkouts are already gone from disk (only <code>aichatsystem-ef4e</code> survives; the <code>ai</code> branch exists but was never in the registry). The AI2 editor's Review &amp; Merge panel calls <code>/admin/git/worktrees</code> / <code>review</code> / <code>test_gate</code> / <code>merge_to_main</code> / <code>push_main</code> — all of which exist — but the <em>creation</em> half of "isolate AI code creation" is missing. This plan stands that up on a self-hosted directory with one source of truth.</p>
+            <p class="doc-body"><strong>What changed in v0.2:</strong> creating an isolated checkout is now a <em>single in-app action</em> — click "New Branch", type the name, and the system creates the git branch, pulls it into a worktree under <code>~/.comserv/worktrees/</code>, registers it in <code>worktrees.json</code> with the next free port, and refreshes the branch-servers list. No manual <code>git worktree add</code>, no hand-editing the JSON. The previous two-step "create branch then separately create worktree" is consolidated.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- DECISIONS SECTION -->
     <div class="row">
         <div class="col-100">
-            <h2 id="decisions" style="color: var(--text-color); font-family: var(--header-font);">2. Decisions (locked with user)</h2>
-            <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <h2 id="decisions" class="doc-h2">2. Decisions (locked with user)</h2>
+            <ul class="doc-body">
                 <li><strong>Base dir:</strong> <code>~/.comserv/worktrees/</code> (matches the <code>~/.comserv/secrets</code> convention; names the <em>system</em>, not a feature).</li>
                 <li><strong>Single source of truth:</strong> <code>root/config/worktrees.json</code> — read by both <code>Util::Git</code> and the planning tab. Kills the drift bug.</li>
-                <li><strong>Initial branches:</strong> only <code>ai</code> + <code>aichatsystem-ef4e</code> get a checkout + port. All other former zenflow entries are retired (their checkouts are already gone).</li>
-                <li><strong>main:</strong> unchanged. The primary repo checkout at <code>/home/shanta/PycharmProjects/comserv2/Comserv</code> stays on port 3001.</li>
+                <li><strong>One action creates the branch AND the worktree:</strong> the admin "New Branch" UI takes a branch name; the system creates the branch (from <code>main</code> by default, or a chosen parent), runs <code>git worktree add</code>, appends the entry to <code>worktrees.json</code>, and returns the launch command. The branch-servers list reads the JSON, so it updates automatically.</li>
+                <li><strong>Port scheme:</strong> <code>port_start</code> is <strong>4000</strong>. At rollout, every existing non-<code>main</code> entry (ports 4001, 4010, etc.) is removed; the first new checkout takes <strong>4000</strong>, then 4001, 4002, … (<code>create_worktree</code> assigns <code>max(existing)+1</code>, so after the cleanup 4000 is the first free).</li>
+                <li><strong>main:</strong> unchanged. The primary repo checkout at <code>/home/shanta/PycharmProjects/comserv2/Comserv</code> stays on port 3001. Code moves into main only via the human-gated <code>merge_to_main</code> review-merge flow after the test gate passes.</li>
+                <li><strong>Branch rename convention (retain history):</strong> to keep an old branch's commit history while starting fresh, append <code>-bk</code> (e.g. <code>InventoryAccounting</code> → <code>InventoryAccounting-bk</code>). A <code>git branch -m</code> is pure rename — all history is preserved. The new work branch then gets a clean name and its own worktree. <code>-bk</code> branches are historical snapshots, not active development targets.</li>
+                <li><strong>Launch command — one form only:</strong> <code>CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p &lt;port&gt; -r</code>. The ONLY difference between checkouts is the port number. No per-branch variant commands (the old <code>inventory-system-104a</code> zenflow command with a different flag set is retired).</li>
             </ul>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- INVENTORY SECTION -->
     <div class="row">
         <div class="col-100">
-            <h2 id="inventory" style="color: var(--text-color); font-family: var(--header-font);">3. Inventory of what the old system touches (must migrate)</h2>
-            <table style="border-collapse:collapse;width:100%;font-size:0.9em;">
-                <tr style="border-bottom:1px solid var(--border-color);">
-                    <th style="text-align:left;padding:4px 8px;color:var(--text-color);">File</th>
-                    <th style="text-align:left;padding:4px 8px;color:var(--text-color);">Hardcoded zenflow reference</th>
+            <h2 id="inventory" class="doc-h2">3. Inventory of what the old system touches (must migrate)</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">File</th>
+                    <th class="doc-th">Hardcoded zenflow reference</th>
                 </tr>
-                <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:4px 8px;color:var(--text-color);"><code>lib/Comserv/Util/Git.pm</code></td><td style="padding:4px 8px;color:var(--text-color);"><code>WORKTREE_PORTS</code> hash + <code>_worktree_row</code> regex <code>\.zenflow/worktrees/</code> + <code>run_test_gate</code> path <code>$HOME/.zenflow/worktrees/$branch/Comserv</code></td></tr>
-                <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:4px 8px;color:var(--text-color);"><code>root/admin/planning/_planning_tab.tt</code></td><td style="padding:4px 8px;color:var(--text-color);"><code>bp</code> + <code>all_branches</code> static maps (duplicate of the above) + literal <code>cd ~/.zenflow/worktrees/&lt;branch&gt;/Comserv &amp;&amp; perl ... -p &lt;port&gt;</code></td></tr>
-                <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:4px 8px;color:var(--text-color);"><code>lib/Comserv/Controller/Root.pm</code></td><td style="padding:4px 8px;color:var(--text-color);"><code>IS_DEV_WORKTREE</code> constant regex <code>\.zenflow[/\\]worktrees[/\\]</code> → stashes <code>is_dev_server</code></td></tr>
-                <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:4px 8px;color:var(--text-color);"><code>lib/Comserv/Util/SystemInfo.pm</code></td><td style="padding:4px 8px;color:var(--text-color);"><code>get_app_workflow</code> regex <code>/\.zenflow/worktrees/([^/]+)</code> → drives <code>app_workflow</code> stash + planning "currently on branch"</td></tr>
-                <tr style="border-bottom:1px solid var(--border-color);"><td style="padding:4px 8px;color:var(--text-color);"><code>lib/Comserv/Controller/Admin/Git.pm</code></td><td style="padding:4px 8px;color:var(--text-color);"><code>worktree_list</code> uses <code>list_worktrees</code> (porcelain parse; path-agnostic) — OK to keep, but port lookup must move to the JSON.</td></tr>
+                <tr><td class="doc-td"><code>lib/Comserv/Util/Git.pm</code></td><td class="doc-td"><code>WORKTREE_PORTS</code> hash + <code>_worktree_row</code> regex <code>\.zenflow/worktrees/</code> + <code>run_test_gate</code> path <code>$HOME/.zenflow/worktrees/$branch/Comserv</code></td></tr>
+                <tr><td class="doc-td"><code>root/admin/planning/_planning_tab.tt</code></td><td class="doc-td"><code>bp</code> + <code>all_branches</code> static maps (duplicate of the above) + literal <code>cd ~/.zenflow/worktrees/&lt;branch&gt;/Comserv &amp;&amp; perl ... -p &lt;port&gt;</code></td></tr>
+                <tr><td class="doc-td"><code>lib/Comserv/Controller/Root.pm</code></td><td class="doc-td"><code>IS_DEV_WORKTREE</code> constant regex <code>\.zenflow[/\\]worktrees[/\\]</code> → stashes <code>is_dev_server</code></td></tr>
+                <tr><td class="doc-td"><code>lib/Comserv/Util/SystemInfo.pm</code></td><td class="doc-td"><code>get_app_workflow</code> regex <code>/\.zenflow/worktrees/([^/]+)</code> → drives <code>app_workflow</code> stash + planning "currently on branch"</td></tr>
+                <tr><td class="doc-td"><code>lib/Comserv/Controller/Admin/Git.pm</code></td><td class="doc-td"><code>worktree_list</code> uses <code>list_worktrees</code> (porcelain parse; path-agnostic) — OK to keep, but port lookup must move to the JSON.</td></tr>
             </table>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- DATA CONTRACT SECTION -->
     <div class="row">
         <div class="col-100">
-            <h2 id="contract" style="color: var(--text-color); font-family: var(--header-font);">4. New data contract — <code>root/config/worktrees.json</code></h2>
-            <pre style="background:#1e1f22;color:#9cdcfe;padding:10px;border-radius:4px;overflow:auto;"><code>{
+            <h2 id="contract" class="doc-h2">4. New data contract — <code>root/config/worktrees.json</code></h2>
+            <pre class="doc-code"><code>{
   "base_dir": "/home/shanta/.comserv/worktrees",
-  "port_start": 4001,
+  "port_start": 4000,
   "branches": {
-    "ai":                { "port": 4001, "label": "AIChat",          "url": "/planning/daily" },
-    "aichatsystem-ef4e": { "port": 4010, "label": "AIChatSystem",    "url": "/planning/daily" }
+    "ai":                { "port": 4001, "label": "AIChat",       "url": "/planning/daily" },
+    "aichatsystem-ef4e": { "port": 4010, "label": "AIChatSystem", "url": "/planning/daily" }
   }
 }</code></pre>
-            <p style="color: var(--text-color); font-family: var(--body-font);">Rules: <code>base_dir</code> is absolute (expand <code>~</code> at load). <code>main</code> is never listed here (it is the primary checkout, port 3001). <code>create_worktree</code> appends a key with the next free port. A worktree path is always <code>&lt;base_dir&gt;/&lt;branch&gt;/Comserv</code>.</p>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-body"><strong>At rollout the non-<code>main</code> entries above are cleared</strong> and the scheme resets to <code>port_start: 4000</code>, so the first created worktree is <code>4000</code>, then 4001, … The example shown is the pre-reset state; after the dead-branch/zenflow cleanup the file is regenerated by the create action. Rules: <code>base_dir</code> is absolute (expand <code>~</code> at load). <code>main</code> is never listed here (it is the primary checkout, port 3001). <code>create_worktree</code> appends a key with the next free port. A worktree path is always <code>&lt;base_dir&gt;/&lt;branch&gt;/Comserv</code>.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- PHASE 0 -->
     <div class="row">
         <div class="col-100">
-            <h2 id="phase0" style="color: var(--text-color); font-family: var(--header-font);">5. Phase 0 — Infra / config (do this first, gate before any app code)</h2>
-            <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <h2 id="phase0" class="doc-h2">5. Phase 0 — Infra / config (do this first, gate before any app code)</h2>
+            <ol class="doc-body">
                 <li>Create <code>root/config/worktrees.json</code> with the contract above.</li>
                 <li>Create the base dir and migrate the two live checkouts:
                     <ul>
@@ -116,15 +121,15 @@
                 </li>
                 <li>Verify the old <code>~/.zenflow</code> entries are fully unreferenced after Phase 2 (no remaining <code>.zenflow</code> string in code).</li>
             </ol>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- PHASE 1 -->
     <div class="row">
         <div class="col-100">
-            <h2 id="phase1" style="color: var(--text-color); font-family: var(--header-font);">6. Phase 1 — Single source of truth in Perl</h2>
-            <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <h2 id="phase1" class="doc-h2">6. Phase 1 — Single source of truth in Perl</h2>
+            <ol class="doc-body">
                 <li><code>Util::Git</code>: add <code>load_worktree_config($c)</code> (read + cache <code>worktrees.json</code>, expand <code>~</code>). Replace <code>WORKTREE_PORTS</code> usage:
                     <ul>
                         <li><code>_worktree_row</code>: detect a worktree by <code>base_dir</code> instead of the <code>.zenflow</code> regex; port from the JSON (fallback <code>0</code>).</li>
@@ -133,77 +138,106 @@
                 </li>
                 <li><code>Root.pm</code>: change <code>IS_DEV_WORKTREE</code> to match <code>base_dir</code> (<code>\.comserv[/\\]worktrees[/\\]</code>).</li>
                 <li><code>SystemInfo-&gt;get_app_workflow</code>: change the regex to <code>/\.comserv/worktrees/([^/]+)</code>.</li>
-                <li>Keep <code>WORKTREE_PORTS</code> only as an internal fallback if JSON is missing; prefer the JSON.</li>
+                <li><strong>Remove the <code>WORKTREE_PORTS</code> static hash entirely</strong> (decided 2026-08-06: a deleted/non-JSON port must never be resurrected from a static map — removed ports stay removed so they can be reused). <code>_worktree_port</code> returns 0 when a branch is absent from the JSON; <code>next_free_port</code> scans upward from <code>port_start</code> for the first port not already in the JSON.</li>
             </ol>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- PHASE 2 -->
     <div class="row">
         <div class="col-100">
-            <h2 id="phase2" style="color: var(--text-color); font-family: var(--header-font);">7. Phase 2 — Planning tab reads the JSON (kill the duplicate)</h2>
-            <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <h2 id="phase2" class="doc-h2">7. Phase 2 — Planning tab reads the JSON (kill the duplicate)</h2>
+            <ol class="doc-body">
                 <li>Controller feeding <code>_planning_tab.tt</code> (Documentation.pm <code>daily_plan</code> / Planning.pm) stashes <code>worktree_list</code> derived from <code>load_worktree_config</code> (name, port, label, url, and the launch <code>cmd</code> built from <code>base_dir</code>).</li>
-                <li><code>_planning_tab.tt</code>: replace the static <code>bp</code> + <code>all_branches</code> maps with a FOREACH over the stashed list. "Start command" becomes <code>cd &lt;base_dir&gt;/&lt;branch&gt;/Comserv &amp;&amp; CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p &lt;port&gt; -r</code>.</li>
+                <li><code>_planning_tab.tt</code>: replace the static <code>bp</code> + <code>all_branches</code> maps with a FOREACH over the stashed list. "Start command" is the single form: <code>cd &lt;base_dir&gt;/&lt;branch&gt;/Comserv &amp;&amp; CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p &lt;port&gt; -r</code>.</li>
                 <li>No inline <code>&lt;script&gt;</code> added here; existing <code>smartOpenBranch</code>/<code>branchAction</code> JS stays.</li>
             </ol>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- PHASE 3 -->
     <div class="row">
         <div class="col-100">
-            <h2 id="phase3" style="color: var(--text-color); font-family: var(--header-font);">8. Phase 3 — create_worktree (the isolation primitive)</h2>
-            <ol style="color: var(--text-color); font-family: var(--body-font);">
-                <li><code>Util::Git-&gt;create_worktree($c, $branch, $opts)</code>: pick next free port (max existing +1, or <code>port_start</code>), <code>git worktree add &lt;base_dir&gt;/&lt;branch&gt;/Comserv &lt;branch&gt;</code> (create branch from <code>main</code> if it does not exist), append the key to <code>worktrees.json</code>.</li>
-                <li><code>Admin/Git</code>: <code>POST /admin/git/create_worktree</code> (admin-gated) → returns <code>{branch, port, path, cmd}</code>. Used by the AI2 editor to spin up an isolated checkout on demand.</li>
+            <h2 id="phase3" class="doc-h2">8. Phase 3 — create_branch + worktree (one in-app action, the isolation primitive)</h2>
+            <ol class="doc-body">
+                <li><strong>Admin "New Branch" UI:</strong> a single form field for the branch name (and an optional parent-branch selector defaulting to <code>main</code>). On submit it calls <code>POST /admin/git/create_worktree</code> (admin-gated).</li>
+                <li><code>Util::Git-&gt;create_worktree($c, $branch, $opts)</code> performs, in order:
+                    <ul>
+                        <li>create the branch: <code>git branch $branch $parent</code> (from <code>main</code> if it does not yet exist),</li>
+                        <li><code>git worktree add &lt;base_dir&gt;/&lt;branch&gt;/Comserv $branch</code>,</li>
+                        <li>pick the next free port (<code>max(existing ports in JSON)+1</code>, or <code>port_start</code> when none),</li>
+                        <li>append <code>{ port, label, url }</code> to <code>worktrees.json</code> under <code>branches.$branch</code>.</li>
+                    </ul>
+                </li>
+                <li><code>Admin/Git</code>: the endpoint returns <code>{ branch, port, path, cmd }</code> where <code>cmd</code> is the single launch form with that port. The branch-servers list reads the JSON, so it shows the new entry with no extra step.</li>
+                <li><strong>History-retention rename:</strong> if the requested name collides with an existing branch you want to keep, the convention is to <code>git branch -m</code> the old one to <code>&lt;name&gt;-bk</code> first (history preserved), then create the new <code>&lt;name&gt;</code>. This is a manual pre-step the admin does before clicking "New Branch"; the create action itself never deletes or renames.</li>
                 <li>Optional follow-up (separate plan): a one-click "launch instance" from the planning tab using the returned <code>cmd</code>.</li>
             </ol>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 4 -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phase4" class="doc-h2">9. Phase 4 — Worked example: InventoryAccounting + dead-branch cleanup</h2>
+            <ol class="doc-body">
+                <li><strong>Rename to retain history:</strong> <code>git branch -m InventoryAccounting InventoryAccounting-bk</code> (DONE — executed 2026-08-06; all history preserved). The <code>-bk</code> copy is a historical snapshot, not an active dev target.</li>
+                <li><strong>Create the live work branch via the new action:</strong> click New Branch, name <code>InventoryAccounting</code> (or the agreed clean name), parent <code>main</code>; the action creates the branch + worktree <code>~/.comserv/worktrees/InventoryAccounting/Comserv</code> + registers it in <code>worktrees.json</code> at the next free port (4000 after the reset).</li>
+                <li><strong>Link to planning:</strong> the InventoryAccounting planning project's todos stay as-is; stamp the branch name onto the project/todo so every commit in that worktree traces back to its planning context. This is the missing link noted in the overview — branch ↔ planning project must be recorded.</li>
+                <li><strong>Retire dead branches (manual, user-run):</strong> remove zenflow-era branches (<code>inventory-system</code>, <code>inventory-system-104a</code>, and the broader set of &gt;6-month-old / abandoned branches) from local and remote. Tracked as its own todo so it is not silently dropped. The new create action is the only sanctioned way to make replacements.</li>
+                <li><strong>Launch:</strong> <code>cd ~/.comserv/worktrees/InventoryAccounting/Comserv &amp;&amp; CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p &lt;port&gt; -r</code> — identical form to every other checkout, port only.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- VERIFICATION SECTION -->
     <div class="row">
         <div class="col-100">
-            <h2 id="verification" style="color: var(--text-color); font-family: var(--header-font);">9. Verification</h2>
-            <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <h2 id="verification" class="doc-h2">10. Verification</h2>
+            <ul class="doc-body">
                 <li><code>perl -c</code> on every modified <code>.pm</code>.</li>
-                <li><code>GET /admin/git/worktrees</code> on 3001 now returns <code>ai</code> + <code>aichatsystem-ef4e</code> with ports 4001/4010 and <code>is_main:0</code>; <code>main</code> flagged <code>is_main:1</code>.</li>
-                <li>Planning tab dropdown lists exactly the two branches; "currently on" reflects the running worktree via <code>app_workflow</code>.</li>
-                <li><code>grep -rn "zenflow" lib/ root/</code> returns nothing after Phase 2.</li>
+                <li><code>GET /admin/git/worktrees</code> on 3001 returns the registered branches with correct ports and <code>is_main:0</code>; <code>main</code> flagged <code>is_main:1</code>.</li>
+                <li>Planning tab dropdown lists exactly the JSON branches; "currently on" reflects the running worktree via <code>app_workflow</code>.</li>
+                <li>"New Branch" with name <code>InventoryAccounting</code> creates the branch, the worktree dir, and the JSON entry in one call; the returned <code>cmd</code> launches on the assigned port.</li>
+                <li><code>git worktree list</code> shows the new checkout under <code>~/.comserv/worktrees/</code>; <code>InventoryAccounting-bk</code> retains full history and is NOT in the worktree list.</li>
+                <li><code>grep -rn "zenflow" lib/ root/</code> returns nothing after Phase 1/2/4.</li>
                 <li>AI2 editor Review panel loads the diff/test-gate/merge against the new paths.</li>
             </ul>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- OUT OF SCOPE SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="out-of-scope" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
-                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">10. Out of scope (call out, don't do)</h2>
-                <ul style="color: var(--text-color); font-family: var(--body-font);">
-                    <li>DB isolation for worktree app instances (separate <a href="/Documentation/dev_isolation_and_backups_plan" style="color: var(--link-color);">dev_isolation_and_backups_plan</a> concern).</li>
-                    <li>Re-registering the 25+ dead former zenflow branches.</li>
+            <div id="out-of-scope" class="success" doc-success">
+                <h2 class="doc-h2">11. Out of scope (call out, don't do)</h2>
+                <ul class="doc-body">
+                    <li>DB isolation for worktree app instances (separate <a href="/Documentation/dev_isolation_and_backups_plan" class="doc-link">dev_isolation_and_backups_plan</a> concern).</li>
+                    <li>The create action renaming or deleting any branch. Rename-to-<code>-bk</code> and dead-branch removal are manual admin steps done before/outside the action.</li>
                     <li>Any change to the primary <code>main</code> checkout or port 3001.</li>
                 </ul>
             </div>
-            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>
 
     <!-- FOOTER SECTION -->
     <div class="row">
         <div class="col-100">
-            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
-                <p>Tracking project: <a href="/project/details?project_id=238" style="color: var(--link-color);">#238 (GITWT-NEW)</a> — one Todo per phase; progress and time logged there.</p>
+            <div class="doc-footer">
+                <p>Tracking project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a> — one Todo per phase; progress and time logged there.</p>
                 <p><em>This documentation is part of the Comserv system.</em></p>
             </div>
         </div>
     </div>
 </div>
 
-[%# ai-plan-sync created todo_ids: 1867,1868,1869,1870 under project_id=238 %]
+[%# ai-plan-sync created todo_ids: 1867,1868,1869,1870 under project_id=238
+    v0.2 added: Phase 3 = create_branch+worktree single action; Phase 4 = InventoryAccounting example + dead-branch cleanup;
+    port scheme reset to 4000; -bk rename convention. New phase todos to be created under #238.
+%]

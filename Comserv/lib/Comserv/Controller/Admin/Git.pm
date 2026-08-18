@@ -311,10 +311,30 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             # validated against git status above. With nothing ticked, commit
             # whatever is already staged.
             if ($validated && @{ $validated->{valid} }) {
-                my ($aout, $acode) = $self->_git_list($c, 'add', '--', @{ $validated->{valid} });
-                if ($acode != 0) {
-                    $msg = "Stage-before-commit failed: $aout";
-                    goto COMMIT_DONE;
+                # Only stage paths that still have an UNSTAGED working-tree change.
+                # A path already in the index (e.g. a staged deletion shown as 'D  '
+                # in porcelain) must NOT be passed to `git add` — `git add` on a
+                # staged-deleted file errors with "pathspec did not match any files",
+                # which aborts the whole commit. Such paths are already staged and will
+                # be committed as-is.
+                my %stage_needed;
+                {
+                    my ($porc) = $self->_git_list($c, 'status', '--porcelain');
+                    for my $line (split /\n/, $porc // '') {
+                        next unless $line =~ /^(..)\s(.+)$/;
+                        my ($xy, $file) = ($1, $2);
+                        $file = (split / -> /, $file)[-1] if $file =~ / -> /;
+                        # untracked, or any unstaged change in column 2
+                        $stage_needed{$file} = 1 if ($xy eq '??' || substr($xy, 1, 1) ne ' ');
+                    }
+                }
+                my @to_add = grep { $stage_needed{$_} } @{ $validated->{valid} };
+                if (@to_add) {
+                    my ($aout, $acode) = $self->_git_list($c, 'add', '--', @to_add);
+                    if ($acode != 0) {
+                        $msg = "Stage-before-commit failed: $aout";
+                        goto COMMIT_DONE;
+                    }
                 }
             }
 
@@ -352,6 +372,12 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
         # Switch to a branch that exists in the local branch list. Name validated
         # against that list — never interpolated or free-form.
         my $target = $c->req->param('branch') // '';
+        # 'git' is a reserved word (collides with the git command) and is excluded
+        # from get_local_branches, but reject it explicitly so the message is clear.
+        if ($target eq 'git') {
+            $msg = "The branch name 'git' is reserved and cannot be switched to.";
+        }
+        else {
         my %known  = map { $_ => 1 } @{ $self->get_local_branches($c) };
         if (!$known{$target}) {
             $msg = "Unknown local branch: '$target'.";
@@ -365,6 +391,7 @@ sub dashboard_action :Path('/admin/git/action') :Args(0) {
             $ok  = $r->{success};
             $msg = $r->{success} ? ($r->{success_msg} || "Switched to '$target'.")
                                  : ($r->{error_msg}   || "Switch to '$target' failed.");
+        }
         }
     }
     elsif ($op eq 'delbranch') {
@@ -535,54 +562,39 @@ Diff${\ ($truncated ? ' (truncated)' : '')}:
 $diff
 PROMPT
 
-    # Resolve an installed local model via the same Router the chat uses.
-    my $provider = try { $c->model('AI2::Provider::Ollama') } catch { undef };
-    unless ($provider && $provider->can('chat')) {
-        $c->response->body(encode_json({ success => 0, error => 'AI provider unavailable' }));
+    # An explicit model from the Git dashboard wins. The dropdown offers the
+    # FULL catalog (Ollama + Grok + OpenRouter); the selected value is
+    # "provider|model" (e.g. "openrouter|tencent/hy3"). If empty, the Router
+    # falls back to the app-wide default (openrouter|tencent/hy3) unless no
+    # external key is configured, in which case it uses local Ollama — so the
+    # behavior is consistent with the chat widget and editor.
+    my $requested_model = $c->req->param('model') || '';
+    $requested_model = '' if $requested_model =~ /[\x00\r\n]/;
+
+    # SINGLE dispatch brain — identical code path to the chat widget and the
+    # Focus-Tune agent (Model::AI2::Router::dispatch_chat). No bespoke Ollama
+    # branch here: local vs external is decided once, in the Router, so the Git
+    # dashboard can never diverge from the rest of the app.
+    my $router = try { $c->model('AI2::Router') } catch { undef };
+    unless ($router && $router->can('dispatch_chat')) {
+        $c->response->body(encode_json({ success => 0, error => 'AI router unavailable' }));
         return;
     }
 
-    my ($host, $port) = $provider->resolve_host($c);
-
-    # Prefer a model that is ALREADY resident in Ollama — a commit message only
-    # describes a diff (which already contains the code + your comments), so
-    # code-awareness buys little, and paying a cold ~9GB weight-load is the main
-    # cost. If something chat-capable is warm, use it; otherwise let the Router
-    # pick (which may trigger a load).
-    my $model;
-    my $running = try { $provider->running_models($c, $host, $port) } catch { [] };
-    my @warm_chat = grep {
-        $_ && $_ !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-    } @$running;
-
-    if (@warm_chat) {
-        $model = $warm_chat[0];
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
-            "Reusing already-loaded model '$model' (warm) for $scope");
-    }
-    else {
-        my $installed = try { $provider->list_models($c) } catch { [] };
-        (my $prov_name, $model) = $c->model('AI2::Router')->select_model($c,
-            installed_models => $installed,
-            agent_id         => 'coding',
-        );
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
-            "No warm model; Router selected '$model' (cold load likely) for $scope");
-    }
+    my $messages = [
+        { role => 'system', content => 'You are a precise git commit message generator.' },
+        { role => 'user',   content => $prompt },
+    ];
 
     my $resp = try {
-        $provider->chat($c,
-            model    => $model,
-            host     => $host,
-            port     => $port,
-            messages => [
-                { role => 'system', content => 'You are a precise git commit message generator.' },
-                { role => 'user',   content => $prompt },
-            ],
+        $router->dispatch_chat($c,
+            $requested_model,
+            $messages,
+            can_select => 1,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'suggest_commit_message', "AI call threw: $_");
+            'suggest_commit_message', "AI dispatch threw: $_");
         undef;
     };
 
@@ -594,18 +606,19 @@ PROMPT
         return;
     }
 
+    my $used_model = $resp->{model} // $requested_model // 'unknown';
     my $message = $resp->{response};
     $message =~ s/^\s+//; $message =~ s/\s+$//;
     # Strip any stray code fences the model may add despite instructions.
     $message =~ s/^```[a-zA-Z]*\n?//; $message =~ s/\n?```$//;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'suggest_commit_message',
-        "Suggested commit message (" . length($message) . " chars) via $model");
+        "Suggested commit message (" . length($message) . " chars) via $used_model");
 
     $c->response->body(encode_json({
         success => 1,
         message => $message,
-        model   => $resp->{model} // $model,
+        model   => $used_model,
     }));
 }
 
@@ -689,6 +702,11 @@ sub index :Path('/admin/git') :Args(0) {
         tracking        => $self->get_tracking_info($c),
         git_targets     => $self->git_service->list_targets($c),
         git_target      => $target_key,
+        # Develop-server (zenflow worktree) registry — single source of truth via
+        # Comserv::Util::Git->build_worktree_list (reads root/config/worktrees.json).
+        # The Git dashboard's "Develop Servers" card reuses the same data the planning
+        # tab's "Branch Servers" panel shows, so the two can never drift.
+        worktree_list   => $self->git_service->build_worktree_list,
         template        => 'admin/git/index.tt',
     );
 
@@ -699,6 +717,73 @@ sub index :Path('/admin/git') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Completed git dashboard");
+}
+
+=head2 file_diff
+
+GET /admin/git/file_diff?path=<repo-relative path>
+Read-only: return the unified diff of a single working-tree file vs HEAD so the
+dashboard can show exactly what an AI edit changed. For untracked (new) files we
+diff against /dev/null so the full new content shows as additions. Admin-gated.
+The path is validated to stay inside the resolved repo root (no traversal).
+
+=cut
+
+sub file_diff :Path('/admin/git/file_diff') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $self->admin_auth->require_admin_access($c, 'git_dashboard');
+
+    my $rel = $c->req->param('path') || '';
+    $c->res->content_type('application/json');
+
+    unless (length $rel) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'path required' }));
+        return;
+    }
+
+    # Normalise and confine to the repo root (block ../ traversal).
+    $rel =~ s#\\#/#g;
+    $rel =~ s#^\/+##;
+    if ($rel =~ /\.\./) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid path' }));
+        return;
+    }
+
+    my $git     = $self->git_service;
+    my $repo    = $git->repo_path($c);
+    my $abs     = File::Spec->catfile($repo, $rel);
+    my $repo_re = quotemeta($repo);
+    # resolved path must live inside the repo root
+    unless ($abs =~ /^$repo_re/) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid path' }));
+        return;
+    }
+
+    my $is_new = (!-e $abs) ? 1 : 0;
+    my $r = $is_new
+        ? $git->_run($c, 'diff', '--no-index', '/dev/null', $abs)
+        : $git->_run($c, 'diff', 'HEAD', '--', $rel);
+
+    # git diff exits 1 when there ARE differences (expected, not an error).
+    if (!$r->{success} && !length($r->{output} // '')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'file_diff',
+            "diff failed for path=$rel is_new=$is_new : " . ($r->{error} || 'unknown') .
+            " (git exit " . ($r->{exit_code} // -1) . ")");
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => $r->{error} || 'diff failed' }));
+        return;
+    }
+
+    $c->res->body(encode_json({
+        success => 1,
+        path    => $rel,
+        is_new  => $is_new ? 1 : 0,
+        diff    => $r->{output} // '',
+    }));
 }
 
 =head2 get_tracking_info
@@ -1510,7 +1595,15 @@ sub branch_management :Path('/admin/branch_management') :Args(0) {
         if ($action eq 'create_branch') {
             my $branch_name = $c->req->param('branch_name');
             my $source_branch = $c->req->param('source_branch') || 'main';
-            $result = $self->create_branch($c, $branch_name, $source_branch);
+            # New Branch is one isolation action: create the git branch, add its
+            # worktree, allocate/register its port, and return the launch command.
+            $result = $self->git_service->create_worktree($c, $branch_name,
+                { parent => $source_branch, label => $branch_name, url => '/planning/daily' });
+            $self->logging->log_with_details($c, $result->{success} ? 'info' : 'error',
+                __FILE__, __LINE__, 'create_worktree',
+                "branch='" . ($branch_name // '') . "' parent='$source_branch' port="
+                . ($result->{port} // '?')
+                . ($result->{error} ? " error=$result->{error}" : ''));
         } elsif ($action eq 'delete_branch') {
             my $branch_name = $c->req->param('branch_name');
             $result = $self->delete_branch($c, $branch_name);
@@ -1739,6 +1832,196 @@ deploy.sh currently leaves disabled). Admin-only.
 
 =cut
 
+=head2 merge
+
+POST /admin/git/merge (admin-gated git_merge)
+General merge dispatcher for the dashboard Merge card. Params C<source> and
+C<target> (one branch each). The server is the single source of truth for
+direction safety:
+
+  * Rejects source eq target.
+  * main -> branch (source=main, target=branch):
+      switch_branch(target), then merge_branch('main'). No test gate
+      (we are updating a worktree, not main).
+  * branch -> main (source=branch, target=main):
+      - Guard: get_current_branch must eq source (the branch must be the
+        active/checked-out one, mirroring PyCharm). Else error.
+      - run_test_gate(source); block on failure.
+      - switch to main (idempotent), then merge_branch(source).
+  * On conflict -> { conflict=>1, output=>... } so the UI can offer Abort.
+  * Returns { success, target, direction, conflict, error, output }.
+
+All git goes through git_service (_run whitelist). Logged via log_with_details.
+
+=cut
+
+sub merge :Path('/admin/git/merge') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $source = $c->req->param('source') // '';
+    my $target = $c->req->param('target') // '';
+
+    unless ($source && $target) {
+        $c->response->body(encode_json({ success => 0, error => 'Both source and target are required.' }));
+        return;
+    }
+    if ($source eq $target) {
+        $c->response->body(encode_json({ success => 0, error => 'Cannot merge a branch into itself.' }));
+        return;
+    }
+
+    # The literal 'git' branch is reserved (collides with the command). The UI
+    # should never offer it, but reject defensively — same guard as op=switch.
+    if ($source eq 'git' || $target eq 'git') {
+        $c->response->body(encode_json({ success => 0, error => "Branch 'git' is reserved and cannot be merged." }));
+        return;
+    }
+
+    my $direction;
+    my $res;
+
+    # Both directions run INSIDE the branch's own worktree checkout:
+    #   * A worktree branch is already checked out in its own worktree, so it
+    #     cannot be checked out (switch_branch) in the main repo — git refuses
+    #     ("already used by worktree"). The worktree checkout is already on the
+    #     branch, so we run the merge there directly.
+    #   * run_test_gate runs script/test_gate.sh in that same worktree, so the
+    #     gate decision and the merge happen in the SAME tree (authoritative).
+    my $wt_path = $self->git_service->worktree_checkout_path_for_branch($c, $target);
+
+    if ($source eq 'main' && $target ne 'main') {
+        # main -> branch: pull main's current state down into the target branch.
+        # The branch is already checked out in its worktree, so we just merge
+        # the local 'main' ref into it there. We merge the LOCAL main (the code
+        # the user is actually looking at on the dashboard), NOT origin/main —
+        # origin is frequently stale (unpushed commits), and "merge main" must
+        # mean "the main I see", not "whatever is on origin". No test gate (we
+        # are updating a worktree, not main).
+        $direction = 'main->branch';
+        unless (defined $wt_path) {
+            $c->response->body(encode_json({
+                success => 0,
+                error   => "Branch '$target' is not checked out in any worktree; cannot merge main into it from the dashboard.",
+            }));
+            return;
+        }
+        # Bring the worktree's view of main up to date so 'main' resolves to the
+        # local main tip, then merge local main into the branch.
+        my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
+        # Ensure the worktree has a 'main' ref tracking origin/main so the local
+        # main ref is present; then merge the literal local 'main' ref.
+        my $up = $self->git_service->_run($c, 'merge', '--no-ff', 'main',
+            { repo => $wt_path });
+        $res = {
+            success   => $up->{success} ? 1 : 0,
+            output    => ($fetch->{output} // '') . "\n" . ($up->{output} // ''),
+            error_msg => $up->{success} ? undef : ($up->{error} || 'merge failed'),
+            conflict  => ($up->{output} // '') =~ /CONFLICT|Automatic merge failed/ ? 1 : 0,
+        };
+    }
+    elsif ($source ne 'main' && $target eq 'main') {
+        # branch -> main: merge the worktree branch's work into the main repo.
+        #   - Gate: run the worktree test suite (authoritative for this branch).
+        #   - Then merge the branch ref into the main repo (which is on 'main').
+        #     We merge the branch by NAME, which is visible from the main repo
+        #     (refs/heads/<branch>), so no worktree checkout is needed here.
+        $direction = 'branch->main';
+        my $gate = $self->git_service->run_test_gate($c, $source);
+        unless ($gate->{success}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+                "test gate FAILED for '$source' — merge blocked");
+            $c->response->body(encode_json({
+                success => 0,
+                error   => "Test gate FAILED for '$source' — merge blocked. Fix tests in the worktree first.",
+                detail  => $gate->{output},
+            }));
+            return;
+        }
+        # If the branch has its own worktree, first bring it up to latest main
+        # so the worktree stays consistent (optional, best-effort).
+        if (defined $wt_path) {
+            $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
+            $self->git_service->_run($c, 'merge', '--no-ff', 'main',
+                { repo => $wt_path });
+        }
+        my $mr = $self->git_service->merge_branch($c, $source);
+        $res = {
+            success   => $mr->{success} ? 1 : 0,
+            output    => $mr->{output} // '',
+            error_msg => $mr->{error_msg},
+            conflict  => $mr->{conflict} ? 1 : 0,
+        };
+    }
+    else {
+        $c->response->body(encode_json({
+            success => 0,
+            error   => "Unsupported merge direction: source='$source', target='$target'.",
+        }));
+        return;
+    }
+
+    if ($res->{conflict}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge conflict: direction=$direction source=$source target=$target");
+        $c->response->body(encode_json({
+            success  => 0,
+            conflict => 1,
+            target   => $target,
+            direction => $direction,
+            error    => "Merge conflict. Resolve in the worktree, then retry (or abort).",
+            output   => $res->{output},
+        }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'git_merge', "direction=$direction source=$source target=$target success=" . ($res->{success} // 0));
+
+    $c->response->body(encode_json({
+        success   => $res->{success} ? 1 : 0,
+        target    => $target,
+        direction => $direction,
+        conflict  => 0,
+        error     => $res->{error_msg},
+        output    => $res->{output},
+    }));
+}
+
+=head2 merge_abort
+
+POST /admin/git/merge/abort (admin-gated git_merge)
+Cancel a conflicted in-progress merge. Wraps git_service->merge_abort
+(git merge --abort, flag already whitelisted in _run). Returns
+{ success, output, error }.
+
+=cut
+
+sub merge_abort :Path('/admin/git/merge/abort') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $res = $self->git_service->merge_abort($c);
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'git_merge_abort', "success=" . ($res->{success} // 0));
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        output  => $res->{output},
+        error   => $res->{error_msg},
+    }));
+}
+
 sub push_main :Path('/admin/git/push_main') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
@@ -1753,6 +2036,70 @@ sub push_main :Path('/admin/git/push_main') :Args(0) {
         success => $res->{success} ? 1 : 0,
         output  => $res->{output},
         error   => $res->{error_msg},
+    }));
+}
+
+sub create_worktree :Path('/admin/git/create_worktree') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_worktrees');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $p       = $c->req->params;
+    my $branch  = $p->{branch}  // '';
+    my $parent  = $p->{parent}  // 'main';
+    my $label   = $p->{label}   // $branch;
+    my $url     = $p->{url}     // '/planning/daily';
+
+    unless ($branch) {
+        $c->response->body(encode_json({ success => 0, error => 'branch is required' }));
+        return;
+    }
+
+    my $res = $self->git_service->create_worktree($c, $branch,
+        { parent => $parent, label => $label, url => $url });
+
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'create_worktree', "branch='$branch' parent='$parent' port=" . ($res->{port} // '?') .
+        ($res->{error} ? " error=$res->{error}" : ''));
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        port    => $res->{port},
+        path    => $res->{path},
+        cmd     => $res->{cmd},
+        ($res->{error} ? (error => $res->{error}) : ()),
+    }));
+}
+
+sub remove_worktree :Path('/admin/git/remove_worktree') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    return unless $self->admin_auth->require_admin_access($c, 'git_worktrees');
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $p      = $c->req->params;
+    my $branch = $p->{branch} // '';
+    unless ($branch) {
+        $c->response->body(encode_json({ success => 0, error => 'branch is required' }));
+        return;
+    }
+
+    my $res = $self->git_service->remove_worktree($c, $branch);
+    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'remove_worktree', "branch='$branch'" . ($res->{error} ? " error=$res->{error}" : ''));
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        ($res->{error} ? (error => $res->{error}) : ()),
     }));
 }
 

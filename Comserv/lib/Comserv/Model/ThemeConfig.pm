@@ -157,6 +157,7 @@ sub set_site_theme {
         $config_data->{site_themes} ||= {};
         $config_data->{site_themes}{ lc($site_name) } = $theme_name;
 
+        $self->_ensure_parent_dir($c, $config_file);
         write_file($config_file, encode_json($config_data));
 
         # Update session cache
@@ -210,6 +211,7 @@ sub create_theme {
             variables   => $variables,
         };
 
+        $self->_ensure_parent_dir($c, $config_file);
         write_file($config_file, encode_json($config_data));
 
         # Generate the CSS file for the new theme
@@ -249,6 +251,29 @@ sub generate_all_theme_css {
         $self->log_with_details($c, 'error', __FILE__, __LINE__, 'generate_all_theme_css',
             "Error generating CSS files: $_");
     };
+}
+
+# Internal helper – make sure the parent directory of a target file exists.
+# write_file (File::Slurp) fails with ENOENT if the directory is missing, so we
+# mkdir -p it first. Mirrors the directory-creation done in _write_theme_css.
+sub _ensure_parent_dir {
+    my ($self, $c, $file) = @_;
+
+    require File::Basename;
+    require File::Path;
+
+    my $dir = File::Basename::dirname($file);
+    return $dir if -d $dir;
+
+    try {
+        File::Path::make_path($dir);
+    }
+    catch {
+        $self->log_with_details($c, 'error', __FILE__, __LINE__, '_ensure_parent_dir',
+            "Cannot create directory '$dir': $_");
+    };
+
+    return $dir;
 }
 
 # Internal helper – write a single theme's CSS file
@@ -317,6 +342,7 @@ sub save_theme {
         
         # Write back to file
         my $json_output = encode_json($config_data);
+        $self->_ensure_parent_dir($c, $config_file);
         write_file($config_file, $json_output);
         
         $self->log_with_details($c, 'info', __FILE__, __LINE__, 'save_theme', 
@@ -392,6 +418,7 @@ sub set_domain_favicon {
         }
         $config_data->{domain_favicons} ||= {};
         $config_data->{domain_favicons}{ lc($domain) } = $favicon_url;
+        $self->_ensure_parent_dir($c, $config_file);
         write_file($config_file, encode_json($config_data));
         return 1;
     }
@@ -417,6 +444,7 @@ sub set_site_favicon {
         }
         $config_data->{site_favicons} ||= {};
         $config_data->{site_favicons}{ lc($site_name) } = $favicon_url;
+        $self->_ensure_parent_dir($c, $config_file);
         write_file($config_file, encode_json($config_data));
         return 1;
     }

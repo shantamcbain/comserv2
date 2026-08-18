@@ -20,6 +20,39 @@
     }
 
     ready(function () {
+        // Shared branch + worktree creation used by both the Git dashboard and
+        // the AI editor Git panel.  Both surfaces call the same admin endpoint.
+        var createForms = document.querySelectorAll('[data-create-worktree-form]');
+        for (var cf = 0; cf < createForms.length; cf++) {
+            createForms[cf].addEventListener('submit', function (e) {
+                e.preventDefault();
+                var formEl = this;
+                var statusEl = formEl.querySelector('[data-create-worktree-status]')
+                    || formEl.parentNode.querySelector('[data-create-worktree-status]');
+                var data = new URLSearchParams(new FormData(formEl));
+                var branch = data.get('branch') || '';
+                if (!branch) return;
+                if (statusEl) statusEl.textContent = 'Creating branch and worktree…';
+                fetch('/admin/git/create_worktree', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    credentials: 'same-origin',
+                    body: data.toString()
+                }).then(function (r) { return r.json(); })
+                  .then(function (result) {
+                      if (!result.success) throw new Error(result.error || 'Creation failed');
+                      if (statusEl) statusEl.textContent = 'Created ' + result.branch +
+                          ' on port ' + result.port + '\n' + (result.path || '');
+                      formEl.reset();
+                      var parent = formEl.querySelector('[name="parent"]');
+                      if (parent) parent.value = 'main';
+                  })
+                  .catch(function (err) {
+                      if (statusEl) statusEl.textContent = 'Git error: ' + err.message;
+                  });
+            });
+        }
+
         var form = document.querySelector('[data-git-file-form]');
 
         // "Select all" toggle (only present when the working tree has changes).
@@ -96,6 +129,241 @@
             appendTarget(postForms[p]);
         }
 
+        // --- "Develop Servers" card: Open / Stop / Restart for zenflow worktree
+        // branches. BOUND BEFORE the `if (!form) return` guard below, because the
+        // working-tree form is absent when the tree is clean — otherwise these
+        // buttons would never get wired and clicking would do nothing. Open opens the
+        // branch in a new window (like the old planning-tab button) AND shows a live
+        // console you can copy the command from; Stop/Restart POST to
+        // /admin/branch_server_action and surface the JSON result.
+
+        // Live console modal elements (resolved once).
+        var devConsole    = document.getElementById('git-dev-console');
+        var devTitle      = document.getElementById('git-dev-console-title');
+        var devCmd        = document.getElementById('git-dev-console-cmd');
+        var devLog        = document.getElementById('git-dev-console-log');
+        var devOpenLink   = document.getElementById('git-dev-console-open');
+        var devPollTimer  = null;
+
+        function closeDevConsole() {
+            if (devConsole) { devConsole.style.display = 'none'; }
+            if (devPollTimer) { clearInterval(devPollTimer); devPollTimer = null; }
+        }
+
+        function showDevConsole(branch, port, url, cmd) {
+            if (!devConsole) { return; }
+            devTitle.textContent = 'Starting ' + branch + ' on port ' + port + '…';
+            devCmd.textContent = cmd || '';
+            devLog.textContent = '(waiting for output…)';
+            devLog.scrollTop = 0;
+            if (devOpenLink && url) { devOpenLink.href = url; devOpenLink.style.display = ''; }
+            else if (devOpenLink) { devOpenLink.style.display = 'none'; }
+            devConsole.style.display = 'flex';
+
+            if (devPollTimer) { clearInterval(devPollTimer); }
+            devPollTimer = setInterval(function () {
+                fetch('/admin/branch_server_log?branch=' + encodeURIComponent(branch), {
+                    credentials: 'same-origin'
+                }).then(function (r) { return r.text(); })
+                  .then(function (text) {
+                      if (devLog) {
+                          devLog.textContent = text || '(no output yet)';
+                          devLog.scrollTop = devLog.scrollHeight;
+                      }
+                  })
+                  .catch(function () {});
+            }, 1500);
+        }
+
+        // Close buttons inside the console.
+        var devCloseBtns = document.querySelectorAll('[data-git-dev-console-close]');
+        for (var dc = 0; dc < devCloseBtns.length; dc++) {
+            devCloseBtns[dc].addEventListener('click', closeDevConsole);
+        }
+
+        function branchServerAction(action, branch, port, btn) {
+            if (!branch || !port) return;
+            if (btn) { btn.disabled = true; var prev = btn.textContent; }
+            var body = new URLSearchParams();
+            body.set('action', action);
+            body.set('branch', branch);
+            body.set('port', port);
+            fetch('/admin/branch_server_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); })
+              .then(function (res) {
+                  if (!res || res.ok == 0) {
+                      throw new Error((res && res.error) || (action + ' failed'));
+                  }
+              })
+              .catch(function (err) { window.alert(action + ' ' + branch + ': ' + err.message); })
+              .finally(function () { if (btn) { btn.disabled = false; btn.textContent = prev; } });
+        }
+
+        var devServerButtons = document.querySelectorAll('.git-dev-actions button');
+        for (var ds = 0; ds < devServerButtons.length; ds++) {
+            devServerButtons[ds].addEventListener('click', function () {
+                var el = this;
+                var openBranch = el.getAttribute('data-open-branch');
+                if (openBranch) {
+                    var url = el.getAttribute('data-url') || '';
+                    var cmd = el.getAttribute('data-cmd') || '';
+                    // Old behaviour first: open the branch in a new browser window.
+                    if (url) { window.open(url, '_blank'); }
+                    // Then show the console so you can watch boot / copy the command.
+                    showDevConsole(openBranch, el.getAttribute('data-port'), url, cmd);
+                    branchServerAction('open', openBranch, el.getAttribute('data-port'), el);
+                    return;
+                }
+                // "Hermes" button: copy the branch's Hermes launch command to the
+                // clipboard. cwd = the worktree git-root, so Hermes auto-loads the
+                // branch .hermes.md (global rules + domain expertise). -w = worktree
+                // mode (parallel agents, no git conflicts). The dev console also
+                // shows it for manual copy.
+                var hermesBranch = el.getAttribute('data-hermes-branch');
+                if (hermesBranch) {
+                    var hcmd = el.getAttribute('data-hermes-cmd') || '';
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(hcmd).then(function () {
+                            if (typeof window.HermesNotify === 'function') {
+                                window.HermesNotify('Copied Hermes command for ' + hermesBranch);
+                            } else {
+                                window.alert('Copied to clipboard:\n' + hcmd);
+                            }
+                        }).catch(function () { window.alert(hcmd); });
+                    } else {
+                        window.alert(hcmd);
+                    }
+                    showDevConsole(hermesBranch, el.getAttribute('data-port') || '', '', hcmd);
+                    return;
+                }
+                var action = el.getAttribute('data-branch-action');
+                if (action) {
+                    branchServerAction(action, el.getAttribute('data-branch'),
+                        el.getAttribute('data-port'), el);
+                }
+            });
+        }
+
+        // --- "Merge" card: merge main into a selected branch, or the selected
+        // branch into main. POSTs to /admin/git/merge (source/target) and renders
+        // a status badge + output <pre>. On conflict, reveals the Abort button
+        // (POST /admin/git/merge/abort). Both directions run inside the branch's
+        // own worktree checkout (main->branch) or by branch-name ref (branch->main),
+        // so neither requires switching the active branch.
+        var mergeSelect = document.querySelector('[data-git-merge-select]');
+        var mergeStatus = document.querySelector('[data-git-merge-status]');
+        var mergeOutput = document.querySelector('[data-git-merge-output]');
+        var mergeAbortBtn = document.querySelector('[data-git-merge-abort]');
+
+        function showMergeResult(success, conflict, title, output) {
+            if (!mergeStatus) { return; }
+            mergeStatus.innerHTML = '';
+            var badge = document.createElement('span');
+            badge.className = 'status-badge ' + (conflict ? 'status-badge-warn'
+                : (success ? 'status-badge-ok' : 'status-badge-err'));
+            badge.textContent = title;
+            mergeStatus.appendChild(badge);
+            if (mergeOutput) {
+                mergeOutput.style.display = (output && output.length) ? 'block' : 'none';
+                mergeOutput.textContent = output || '';
+            }
+            if (mergeAbortBtn) {
+                mergeAbortBtn.style.display = conflict ? '' : 'none';
+            }
+        }
+
+        function runMerge(btn) {
+            if (!mergeSelect) { return; }
+            var direction = btn.getAttribute('data-merge-direction');
+            var selBranch = mergeSelect.value || '';
+            var source, target;
+            if (direction === 'main-to-branch') { source = 'main'; target = selBranch; }
+            else { source = selBranch; target = 'main'; }
+
+            if (btn.getAttribute('data-git-confirm')) {
+                var prompt = btn.getAttribute('data-git-confirm');
+                if (prompt && !window.confirm(prompt)) { return; }
+            }
+
+            if (mergeStatus) {
+                mergeStatus.innerHTML = '<span class="status-badge">working…</span>';
+            }
+            if (mergeAbortBtn) { mergeAbortBtn.style.display = 'none'; }
+            if (mergeOutput) { mergeOutput.style.display = 'none'; }
+
+            var body = new URLSearchParams();
+            body.set('source', source);
+            body.set('target', target);
+            if (targetSelect) { body.set('target_host', targetSelect.value); }
+
+            fetch(btn.getAttribute('data-merge-url'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); })
+              .then(function (res) {
+                  console.log('[git-dashboard] merge response:', res);
+                  if (res.conflict) {
+                      showMergeResult(false, true, 'conflict', res.output || res.error || '');
+                      return;
+                  }
+                  if (res.success) {
+                      showMergeResult(true, false, 'merged', res.output || '');
+                  } else {
+                      showMergeResult(false, false, 'failed', res.output || res.error || res.detail || '');
+                  }
+                  // NOTE: intentionally do NOT auto-refresh/reload on success.
+                  // refreshGitDashboard() / location.reload() re-renders the Merge
+                  // card and wipes the result before the user can read it (the
+                  // "vanishing result" bug). The result stays visible until a
+                  // manual hard-refresh.
+              })
+              .catch(function (err) {
+                  showMergeResult(false, false, 'error', String(err));
+              });
+        }
+
+        var mergeBtns = document.querySelectorAll('[data-git-merge]');
+        for (var mb = 0; mb < mergeBtns.length; mb++) {
+            mergeBtns[mb].addEventListener('click', function () { runMerge(this); });
+        }
+
+        if (mergeAbortBtn) {
+            mergeAbortBtn.addEventListener('click', function () {
+                if (!window.confirm('Abort the in-progress merge? This discards the merge attempt.')) {
+                    return;
+                }
+                if (mergeStatus) {
+                    mergeStatus.innerHTML = '<span class="status-badge">aborting…</span>';
+                }
+                var body = new URLSearchParams();
+                if (targetSelect) { body.set('target_host', targetSelect.value); }
+                fetch(mergeAbortBtn.getAttribute('data-merge-abort-url'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString(),
+                    credentials: 'same-origin'
+                }).then(function (r) { return r.json(); })
+                  .then(function (res) {
+                      showMergeResult(res.success, false, res.success ? 'aborted' : 'abort failed',
+                          res.output || res.error || '');
+                      if (res.success) {
+                          if (typeof window.refreshGitDashboard === 'function') {
+                              window.refreshGitDashboard();
+                          } else { window.location.reload(); }
+                      }
+                  })
+                  .catch(function (err) {
+                      showMergeResult(false, false, 'abort error', String(err));
+                  });
+            });
+        }
+
         if (!form) { return; }
 
         var opField        = form.querySelector('[data-git-op-field]');
@@ -108,6 +376,27 @@
         // "Suggest message with AI" — POST selected paths (if any) to the suggest
         // endpoint and drop the returned message into the commit/stash input.
         var suggestBtn = document.querySelector('[data-git-suggest]');
+        var aiModelSelect = document.querySelector('[data-git-ai-model]');
+        if (aiModelSelect && window.ComservChat && ComservChat.modelSelect) {
+            ComservChat.modelSelect.init({
+                selectEl: aiModelSelect,
+                context: 'code',
+                onReady: function () {
+                    // Full provider list is shown (Ollama + Grok + OpenRouter) so
+                    // the user can choose a model that won't stall the workstation.
+                    // Per explicit direction, all models are available everywhere;
+                    // per-page defaulting/visibility is a separate later choice.
+                    var automatic = document.createElement('option');
+                    automatic.value = '';
+                    automatic.textContent = 'Use automatic model selection';
+                    aiModelSelect.insertBefore(automatic, aiModelSelect.firstChild);
+                    aiModelSelect.value = '';
+                },
+                onError: function () {
+                    aiModelSelect.innerHTML = '<option value="">Automatic model selection</option>';
+                }
+            });
+        }
         if (suggestBtn) {
             suggestBtn.addEventListener('click', function () {
                 var url    = suggestBtn.getAttribute('data-git-suggest-url');
@@ -119,6 +408,9 @@
                 var boxes = selectedBoxes();
                 for (var k = 0; k < boxes.length; k++) {
                     body.append('paths', boxes[k].value);
+                }
+                if (aiModelSelect && aiModelSelect.value) {
+                    body.append('model', aiModelSelect.value);
                 }
 
                 suggestBtn.disabled = true;
@@ -159,6 +451,30 @@
             }
             return false;
         }
+
+        // --- Per-file "Diff" buttons: open the file in the AI2 editor (which
+        // shows its own diff via ai2editor/file-diff.js), instead of the inline
+        // panel. The AI2 editor accepts ?file=<repo-relative path> and loads it.
+        // (git_worktree_merge_plan §3.5 — the editor is one of the widget's
+        // consumer surfaces; we route the user there rather than re-render.)
+        function bindFileDiff() {
+            var diffBtns = document.querySelectorAll('[data-git-view-diff]');
+            for (var i = 0; i < diffBtns.length; i++) {
+                diffBtns[i].addEventListener('click', function () {
+                    var path = this.getAttribute('data-git-view-diff');
+                    if (!path) return;
+                    // git status is repo-relative (e.g. "Comserv/root/..."), but
+                    // the AI2 editor + /ai2/file_diff expect app-relative paths
+                    // (e.g. "root/..."), so strip the leading app-dir segment.
+                    path = path.replace(/^Comserv\//, '');
+                    var url = '/ai2/editing_widget_popup?file=' + encodeURIComponent(path);
+                    window.open(url, 'AI2Editor',
+                        'width=1250,height=820,resizable=yes,scrollbars=yes,' +
+                        'menubar=no,toolbar=no,status=no,noopener,noreferrer');
+                });
+            }
+        }
+        bindFileDiff();
 
         var actionButtons = form.querySelectorAll('[data-git-action]');
         for (var b = 0; b < actionButtons.length; b++) {

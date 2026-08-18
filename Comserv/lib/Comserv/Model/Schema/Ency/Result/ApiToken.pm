@@ -1,6 +1,12 @@
 package Comserv::Model::Schema::Ency::Result::ApiToken;
 use base 'DBIx::Class::Core';
 
+# Inflate datetime columns (created_at/expires_at/last_used_at/revoked_at) into
+# DateTime objects. Without this the DB layer returns plain strings and any
+# comparison such as "$expires < $now" dies with "A DateTime object can only be
+# compared to another DateTime object", aborting all API token validation.
+__PACKAGE__->load_components('InflateColumn::DateTime');
+
 __PACKAGE__->table('api_tokens');
 __PACKAGE__->add_columns(
     id => {

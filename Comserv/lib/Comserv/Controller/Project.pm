@@ -378,26 +378,76 @@ sub _create_governance_ticket {
     };
 }
 
+sub project_dbg2 :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    # TEMP DIAGNOSTIC ONLY (hermes-debug): render /project with a debug session
+    # so the logged-in-only AI Editor button + todo cards appear in the DOM we
+    # can grep. REMOVE after diagnosis.
+    $c->session->{user_id}  = 178;
+    $c->session->{username} = 'hermes-debug';
+    $c->session->{is_admin} = 1;
+    $c->session->{SiteName} = 'CSC';
+    $self->project($c);
+}
+
+sub project_dbg :Local :Args(0) {
+    my ( $self, $c ) = @_;
+    # TEMP DIAGNOSTIC ONLY. Renders the real project action with the login gate
+    # skipped so the rendered DOM can be inspected headlessly for the
+    # floating-button regression. Guarded to dev worktree path; REMOVE after.
+    if (__FILE__ =~ m{\.comserv[/\\]worktrees[/\\]}) {
+        return $self->project($c);
+    }
+    $c->detach('/default');
+}
+
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
     return unless $self->_require_login($c);
 
+    # Renders todo/project.tt (which includes todo_card.tt) — flag the shared
+    # Start/Done handler for js_load.tt so it loads daily-plan-utils.js once.
+    $c->stash(needs_todo_card_js => 1);
+
     # Log the start of the project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');
     
-    # Get filter parameters from query string
+    # Get filter parameters from query string.
+    # Coerce the id / priority filters to integers so the template's
+    # [%- NEXT IF ... != ... %] comparisons are type-stable (query params arrive
+    # as strings; project.priority is an integer column — the loose compare was
+    # the cause of inconsistent server-side priority filtering).
     my $role_filter = $c->request->query_parameters->{role} || '';
-    my $project_filter = $c->request->query_parameters->{project_id} || '';
-    my $priority_filter = $c->request->query_parameters->{priority} || '';
-    
+    my $project_filter_raw = $c->request->query_parameters->{project_id} || '';
+    my $priority_filter_raw = $c->request->query_parameters->{priority} || '';
+    my $project_filter  = ($project_filter_raw  =~ /^\d+$/) ? int($project_filter_raw)  : '';
+    my $priority_filter = ($priority_filter_raw =~ /^\d+$/) ? int($priority_filter_raw) : '';
+
+    # CSC admin SiteName multi-select (reuses the existing site list — no new table).
+    my $is_admin     = $c->session->{is_admin} || 0;
+    my $site_name    = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $is_csc_admin = $is_admin && (uc($site_name) eq 'CSC');
+    # Read the (possibly repeated) 'sitename' param. query_parameters may be a
+    # plain hashref in this Catalyst version, so read it defensively.
+    my $qp = $c->request->query_parameters;
+    my $raw = (ref $qp eq 'HASH') ? $qp->{sitename} : undef;
+    my @selected_sites = ref $raw eq 'ARRAY' ? @$raw : (defined $raw ? ($raw) : ());
+    # Only honour a selection for CSC admins; everyone else keeps their own site.
+    my $site_filter = ($is_csc_admin && @selected_sites) ? [ @selected_sites ] : undef;
+
+    my $site_controller = $c->controller('Site');
+    # Reuse the existing site list (already in the system: 17 sites via get_all_sites).
+    my $sites = ($is_csc_admin && $site_controller) ? $site_controller->fetch_available_sites($c) : [];
+
     # Log the filter parameters
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 
-        "Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter");
+        "Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter"
+        . ($is_csc_admin ? ", SiteNames: " . join(',', @selected_sites) : ""));
 
     # Read ?all=1 query parameter
     my $show_all = $c->request->query_parameters->{all} ? 1 : 0;
     # Use the existing method to fetch projects with sub-projects (request full data including todos)
-    my $projects = $self->fetch_projects_with_subprojects($c, 1, $show_all);
+    my $projects = $self->fetch_projects_with_subprojects($c, 1, $show_all, $site_filter);
 
     # Provide a link for "Show All Projects" (bypasses parent_id filter)
     my $all_link = $show_all
@@ -414,6 +464,9 @@ sub project :Path('project') :Args(0) {
         project_filter => $project_filter,
         priority_filter => $priority_filter,
         all_link => $all_link,
+        sites => $sites,
+        is_csc_admin => $is_csc_admin,
+        selected_sitenames => [ @selected_sites ],
         template => 'todo/project.tt', # Use the original template
         template_timestamp => time(), # Add a timestamp to force template reload
         success_message => 'Project priority display has been updated. All projects without a priority are now shown as Medium priority.',
@@ -435,6 +488,10 @@ sub project :Path('project') :Args(0) {
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
     return unless $self->_require_login($c);
+
+    # Renders todo/projectdetails.tt (→ ProjectTodosList.tt → todo_card.tt) —
+    # flag the shared Start/Done handler for js_load.tt.
+    $c->stash(needs_todo_card_js => 1);
 
     # Logging: Start of the details action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');
@@ -552,7 +609,16 @@ sub details :Path('details') :Args(0) {
         todos            => \@todos,
         ai_conversations => \@ai_conversations,
         can_see_ai       => $can_see_ai,
-        template         => 'todo/projectdetails.tt'
+        template         => 'todo/projectdetails.tt',
+        # Load BOTH the page's own theme CSS and todo_shared.css — the latter
+        # holds the .todo-card.card / .todo-card .card-body theme overrides that
+        # stop the embedded todo_card.tt cards reverting to Bootstrap's white
+        # .card (light-on-light on the dark theme). Without it the embedded
+        # cards were unreadable on /project/details (symptom (a)).
+        additional_css   => [
+            '/static/css/todo_shared.css?v=' . time(),
+            '/static/css/components/project-details.css?v=' . time()
+        ]
     );
 
     # Logging: End of details action
@@ -565,7 +631,7 @@ sub details :Path('details') :Args(0) {
 # See the implementation there
 
 sub fetch_projects_with_subprojects :Private {
-    my ($self, $c, $full_data, $show_all) = @_;
+    my ($self, $c, $full_data, $show_all, $site_filter) = @_;
     
     # Default to basic data (just names, IDs) unless explicitly requested
     $full_data //= 0;
@@ -580,7 +646,7 @@ sub fetch_projects_with_subprojects :Private {
     # Get the schema and SiteName
     my $schema = $c->model('DBEncy');
     my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || '';
-    my $is_admin = $c->stash->{is_admin} || 0;
+    my $is_admin = $c->stash->{is_admin} || $c->session->{is_admin} || 0;
     my $is_csc_admin = $is_admin && (uc($SiteName) eq 'CSC');
 
     # Check if SiteName is defined
@@ -608,7 +674,17 @@ sub fetch_projects_with_subprojects :Private {
             );
         }
         unless ($show_all || $is_csc_admin) {
-            $search_cond{sitename} = $SiteName;
+            # Qualify with 'me.' — the prefetch below LEFT JOINs project_dependencies
+            # (and depends_on_me), which ALSO has a sitename column, so a bare
+            # `sitename` in the WHERE is ambiguous and throws DBI error 1052.
+            $search_cond{'me.sitename'} = $SiteName;
+        }
+        # CSC admin SiteName multi-select: when a non-empty selection is passed,
+        # restrict top-level projects to those whose sitename column matches.
+        # (project_sites is empty in this DB, so the sitename COLUMN is authoritative.)
+        if ($is_csc_admin && $site_filter && ref($site_filter) eq 'ARRAY' && @$site_filter) {
+            # Qualify with 'me.' for the same ambiguous-column reason as above.
+            $search_cond{'me.sitename'} = { -in => $site_filter };
         }
         @top_projects = $schema->resultset('Project')->search(
             \%search_cond,
@@ -617,6 +693,9 @@ sub fetch_projects_with_subprojects :Private {
                     { -asc => \[ 'COALESCE(parent_id, 0)' ] },
                     { -asc => 'name' }
                 ],
+                # distinct: the sites.name join can return duplicate rows for a
+                # project linked to multiple selected sites.
+                distinct => 1,
                 # Conservative addition: prefetch project_dependencies so listings/calendar
                 # include dependency status without changing existing recursion logic.
                 prefetch => ['project_dependencies', 'depends_on_me']

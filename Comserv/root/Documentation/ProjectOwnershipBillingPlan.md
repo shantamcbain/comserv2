@@ -1,11 +1,14 @@
 # Project Ownership, Sponsorship & Billing Plan
 
-**Project code:** PROJ-OWN (id 236)
-**Parent project:** 138 PLANNING
+**Project code:** PROJ-OWN (proj #236)
+**Parent project:** #138 PLANNING (this is a PHASE of the Planning System project)
 **Site:** CSC
-**Status:** In-Process — A1/A2/A3 decided; **Q4 and Q6 still block Ph3**
+**Status:** In-Process — A1/A2/A3 decided; **Q4 and Q6 (steps) still block Ph3**
 **Audit date:** 2026-08-02
-**Related:** PROJ-UI (235) todo 1847 — CSC SiteName filter
+**Standard:** follows [Planning Language Standard](/Documentation/PlanningLanguageStandard) — PHASE = sub-project, STEP = todo, GATE = done-when
+**Coordinator:** [Comserv2 Master Plan](/Documentation/MASTER_PLAN) — Project #138 PLANNING
+**Related phase:** PROJ-UI (235) todo 1847 — CSC SiteName filter
+**Deliverable (one line):** separate who OWNS, who can SEE, and who PAYS for a project, so one site can sponsor another site's sub-project without handing over edit rights.
 
 ---
 

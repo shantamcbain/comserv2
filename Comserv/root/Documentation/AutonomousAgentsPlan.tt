@@ -1,0 +1,224 @@
+[% META
+   title = "Autonomous Agents (job-specific) — Incorporation Plan"
+   description = "How to bring the outskill.com / Claude & AI Mastermind concept of independent agents that do specific jobs into Comserv2. Built on the existing AI2 Router + Provider layer and the /ai2/token-login agent gateway; ships a generic agent framework plus a first wave of concrete job agents."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "planning,ai,agents,automation"
+   project_code = "AGENTS"
+   project_id = 267
+   page_version = "1.0"
+   last_updated = "Sat Aug 15 2026 (v1.0 — initial plan, projects #267-#270 created)"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/AutonomousAgentsPlan.tt,v 1.0 2026/08/15 shanta Exp - initial incorporation plan for job-specific autonomous agents' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+/* Scoped density + themed chrome for this doc (layout only; colours via var(--*)) */
+.ag { color: var(--text-color); }
+.ag h1 { margin: 0 0 6px; }
+.ag h2 { margin: 16px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--border-color); }
+.ag h3 { margin: 12px 0 4px; }
+.ag p  { margin: 5px 0; }
+.ag ul, .ag ol { margin: 5px 0 5px 20px; padding: 0; }
+.ag li { margin: 2px 0; }
+.ag pre.ag-pre { font-size: 0.8em; line-height: 1.3; margin: 6px 0; padding: 8px; background: var(--table-header-bg, #f5f5f5); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); overflow-x: auto; }
+.ag table.data-table td, .ag table.data-table th { padding: 4px 8px; }
+.ag .notice { margin: 10px 0; padding: 8px 12px; border-left: 4px solid var(--info-color, #17a2b8); background: var(--info-bg, #d1ecf1); border-radius: 4px; }
+.ag .gate { margin: 8px 0; padding: 8px 12px; border-left: 4px solid var(--primary-color, #007bff); background: var(--bg-secondary, #f8f9fa); border-radius: 4px; }
+.ag .back-to-top { margin-top: 16px; display: inline-block; }
+</style>
+
+<div class="container ag">
+
+<h1 id="top">Autonomous Agents (job-specific) — Incorporation Plan</h1>
+
+<div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+    Created: 2026-08-15 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Status: PLANNING &nbsp;|&nbsp;
+    Project: <a href="/project/details?project_id=267">#267 AGENTS</a>
+</div>
+
+<p>This plan answers one question: <strong>how do we bring the outskill.com "Claude &amp; AI Mastermind" idea —
+independent agents that each do a specific job — into Comserv2?</strong> The good news: the foundation already
+exists. We do <em>not</em> start from scratch. The AI2 subsystem already has a model/provider router, a
+provider abstraction (Ollama / Grok / OpenRouter), and a purpose-built <code>/ai2/token-login</code> endpoint
+described in its own source as the "agent/test harness login". This plan wraps that into a first-class,
+observable <strong>agent framework</strong> and then ships a first wave of concrete <strong>job agents</strong>.</p>
+
+<div class="notice">
+    <strong>Reuse, do not duplicate.</strong> Two prior designs already exist and are folded in here, not
+    rewritten:
+    <a href="[% c.uri_for('/Documentation/ai_workflows/DailyPlanAutomatorDesign') %]">Daily Plan Automator Design</a>
+    (the 4-agent Audit &rarr; DocsSync &rarr; MasterPlanUpdater &rarr; DailyPlansGenerator pipeline) becomes the
+    flagship job agent; and
+    <a href="[% c.uri_for('/Documentation/ai_workflows/docker-agent-guide') %]">Docker Agent guide</a> shows the
+    existing agent-spec pattern. This plan promotes that into a real runtime.
+</div>
+
+<p class="back-to-top"><a href="/planning/daily#master-plan">&#8592; Back to Daily Plan &middot; MASTER PLAN</a></p>
+
+<nav class="masterplan-nav" aria-label="Plan sections">
+    <div class="submenu-section">
+        <span class="submenu-section-title">Sections</span>
+        <div class="nav-row">
+            <a class="menu-item" href="#concept">Concept</a>
+            <a class="menu-item" href="#grounding">Existing Grounding</a>
+            <a class="menu-item" href="#architecture">Architecture</a>
+            <a class="menu-item" href="#framework">Framework (#268)</a>
+            <a class="menu-item" href="#jobs">Job Agents (#269)</a>
+            <a class="menu-item" href="#ops">Ops &amp; Safety (#270)</a>
+            <a class="menu-item" href="#roadmap">Roadmap</a>
+            <a class="menu-item" href="#gates">Gates</a>
+        </div>
+    </div>
+</nav>
+
+<div class="card" id="concept"><details open><summary class="card-header">1. The concept (from the seminar)</summary>
+<div class="card-body">
+<p>The outskill.com "Claude &amp; AI Mastermind" session is about <strong>independent agents that each own one
+specific job</strong> — not one giant chatbot, but small, purpose-built workers that run on a trigger, do their
+task against real tools/data, and report back. Translate that to Comserv2 vocabulary:</p>
+<ul>
+    <li><strong>Agent</strong> = a named, registered worker with one job (e.g. "Daily Audit", "Docs Sync", "DB Drift Guard", "Email Triage").</li>
+    <li><strong>Job</strong> = a deterministic procedure the agent executes: inputs &rarr; tool calls &rarr; outputs written back to the app (DB rows, docs, todos, files).</li>
+    <li><strong>Trigger</strong> = schedule (cron), event (todo closed, deploy finished), or manual (button / API).</li>
+    <li><strong>Gateway</strong> = the agent authenticates as a real app identity (via the existing <code>/ai2/token-login</code>) and is confined to scoped tools — never a raw shell.</li>
+    <li><strong>Observability</strong> = every run is a logged record: what it did, which model/provider it used, tokens/cost, and pass/fail.</li>
+</ul>
+<p>This is exactly the shape of the Daily Plan Automator's 4-agent pipeline, generalised.</p>
+</div>
+</details></div>
+
+<div class="card" id="grounding"><details><summary class="card-header">2. What already exists (grounding — do not rebuild)</summary>
+<div class="card-body">
+<table class="data-table">
+    <thead><tr><th>Component</th><th>Where</th><th>What it gives the agent system</th></tr></thead>
+    <tbody>
+        <tr><td>AI2 Router</td><td><code>lib/Comserv/Model/AI2/Router.pm</code></td><td>Single brain that picks provider+model per context/role. <code>dispatch_chat()</code> is the one place every agent should send chat — already used by chat widget, Git drafting, Focus-Tune.</td></tr>
+        <tr><td>Provider layer</td><td><code>Model/AI2/Provider/{Ollama,Grok,OpenRouter}.pm</code></td><td>Local-first (free) + external (paid) chat clients. Agent cost stays at zero by preferring Ollama.</td></tr>
+        <tr><td>Agent gateway</td><td><code>Controller/AI2.pm :: token_login</code> (line ~471)</td><td>Purpose-built <code>/ai2/token-login</code>: exchanges an <code>ApiToken</code> for a real authenticated Catalyst session so a CLI/agent "acts as the user". This is the agent auth path — reuse it.</td></tr>
+        <tr><td>Diagnostics / test harness</td><td><code>Controller/AI2.pm :: diagnostics, test_model</code></td><td>Live "what is the system doing" snapshot persisted to <code>logs/ai2_diagnostics/</code>. Reuse as the agent run-record seed.</td></tr>
+        <tr><td>Daily Plan Automator</td><td><code>root/Documentation/ai_workflows/DailyPlanAutomatorDesign.tt</code></td><td>Already-designed 4-agent pipeline. Becomes the first shipped job agent, not new design.</td></tr>
+        <tr><td>Project/Todo API</td><td><code>Controller/Api.pm</code> (<code>/api/project/create</code>, <code>/api/project/update</code>, <code>/api/projects</code>)</td><td>Agents create/update real projects &amp; todos; human reviews them. Local-network auth already in place.</td></tr>
+    </tbody>
+</table>
+<p><strong>Principle:</strong> agents talk to the app the same way the AI2 diagnostics harness already does — through
+authenticated endpoints — and think through the Router. No new LLM plumbing.</p>
+</div>
+</details></div>
+
+<div class="card" id="architecture"><details><summary class="card-header">3. Target architecture (thin, layered, reuse-first)</summary>
+<div class="card-body">
+<pre class="ag-pre">
+                         ┌──────────────────────────────────────────────┐
+   TRIGGER  (cron /      │            AGENT RUNTIME  (new, thin)          │
+   event / API)  ───────▶│  Comserv::Model::AI2::Agent::*                 │
+                         │   • Registry   (agent defs: job, tools, sched) │
+                         │   • Runner      (spawn, call Router, capture)  │
+                         │   • Sandbox     (scoped tool allow-list)       │
+                         │   • RunLedger   (every run logged)             │
+                         └───────┬───────────────────────┬────────────────┘
+                                 │ thinks via            │ acts via
+                                 ▼                        ▼
+                    AI2::Router (dispatch_chat)   App endpoints (token-login session)
+                    Ollama ▸ Grok ▸ OpenRouter     /api/projects, /api/todos, /Documentation,
+                                                        schema-compare, git (whitelisted)
+                                 │
+                                 ▼
+                    AGENT OPS (#270): run log + token/cost accounting + human-approval gate + kill-switch
+</pre>
+<p>Hard constraints carried from <code>.hermes.md</code> / <code>.ai-policy.md</code> (same as the Master Plan):</p>
+<ul>
+    <li><strong>No app restart, no edit to <code>comserv_server.pl</code></strong> (Shanta owns lifecycle). Verify with <code>perl -c</code>, <code>node --check</code>, endpoint calls.</li>
+    <li><strong>Schema rule:</strong> any new agent/run table goes through the in-app schema-compare workflow. Result class = source of truth. NEVER hand-write DDL.</li>
+    <li><strong>One schema mechanism:</strong> all DB in <code>Util::SchemaCompare</code> + <code>Util::Schema::*</code>. Zero raw SQL in controllers.</li>
+    <li><strong>JS:</strong> modular <code>static/js/</code> wired through <code>js_load.tt</code>, <code>data-*</code> delegation. No inline <code>&lt;script&gt;</code>. Theme via <code>var(--*)</code>.</li>
+    <li><strong>No duplicate files; consolidate; stay in scope.</strong> Reuse the AI2 Router, not a second LLM path.</li>
+</ul>
+</div>
+</details></div>
+
+<div class="card" id="framework"><details><summary class="card-header">4. Phase (proj #268 AGENTS-CORE) — Generic Agent Framework</summary>
+<div class="card-body">
+<p><strong>Goal:</strong> a small, reusable runtime any job agent can plug into. Keep it &le;800 lines (Util/Model soft limit).</p>
+<ol>
+    <li><strong>Registry</strong> — <code>Model::AI2::Agent::Registry</code>. Agent definitions are rows (not code forks): <code>agent_jobs</code> table (code, name, description, job_class, trigger_type, schedule_cron, tool_allow_list, default_context, enabled). Defined via schema-compare.</li>
+    <li><strong>Identity &amp; gateway reuse</strong> — agents authenticate through the existing <code>/ai2/token-login</code> (an <code>ApiToken</code> &rarr; Catalyst session). No new auth surface. Document the token-scoping contract.</li>
+    <li><strong>Runner</strong> — <code>Model::AI2::Agent::Runner</code>. Loads a job, opens a token session, calls <code>Router-&gt;dispatch_chat</code> for reasoning, executes only allow-listed tools, writes outputs back via app endpoints, returns a structured result.</li>
+    <li><strong>Sandbox / tool allow-list</strong> — every agent declares the tools it may call (e.g. <code>schema_compare</code>, <code>todo_write</code>, <code>doc_update</code>, <code>git_whitelisted</code>). Anything outside the list is denied by the Runner. Mirrors the existing <code>Util::Git</code> whitelisted-<code>git -C</code> runner pattern.</li>
+    <li><strong>RunLedger</strong> — <code>agent_runs</code> table (agent_code, trigger, started, finished, status, model_used, provider, tokens_in, tokens_out, cost_usd, output_ref, error). Seed from the existing diagnostics snapshot format.</li>
+</ol>
+<div class="gate"><strong>Gate #268:</strong> one toy agent ("Echo/Self-test") runs end-to-end through the framework and writes a <code>agent_runs</code> row with zero code bypassing the Router.</div>
+</div>
+</details></div>
+
+<div class="card" id="jobs"><details><summary class="card-header">5. Phase (proj #269 AGENTS-JOBS) — Built-in Job Agents (first wave)</summary>
+<div class="card-body">
+<p>Ship concrete agents on the framework. Each is one registered job + one tool allow-list. Reuse the Daily Plan
+Automator design rather than re-deriving it.</p>
+<table class="data-table">
+    <thead><tr><th>Agent</th><th>Job</th><th>Tools (allow-list)</th><th>Trigger</th></tr></thead>
+    <tbody>
+        <tr><td>Daily Plan Automator</td><td>The existing 4-step pipeline (Audit &rarr; DocsSync &rarr; MasterPlanUpdater &rarr; DailyPlansGenerator), wired as one multi-step job.</td><td>todo_read, doc_read, doc_update, project_update, git_whitelisted</td><td>Schedule (early UTC)</td></tr>
+        <tr><td>Docs Sync</td><td>Map recent code/doc changes to <code>/Documentation/*.tt</code> and flag stale docs (ties to Doc Standard S1–S7).</td><td>doc_read, doc_update, git_whitelisted</td><td>Event (deploy finished) / schedule</td></tr>
+        <tr><td>DB Drift Guard</td><td>Report-only schema drift vs Result classes; one-click repair via schema-compare. Ties to W0.1 (Schema System Plan).</td><td>schema_compare</td><td>Schedule (daily)</td></tr>
+        <tr><td>Email Triage</td><td>Summarise inbox, draft replies, create linked todos/projects. Reuses the email skill pattern.</td><td>todo_write, project_update, (read-only mail)</td><td>Schedule / manual</td></tr>
+    </tbody>
+</table>
+<p>Order: Daily Plan Automator first (design exists), then Docs Sync and DB Drift Guard (both read-mostly, low risk), then Email Triage (external surface, needs approval gate from #270).</p>
+<div class="gate"><strong>Gate #269:</strong> Daily Plan Automator runs unattended against the live app and produces a verifiable <code>agent_runs</code> record + real (human-reviewable) doc/project changes.</div>
+</div>
+</details></div>
+
+<div class="card" id="ops"><details><summary class="card-header">6. Phase (proj #270 AGENTS-OPS) — Agent Ops &amp; Safety</summary>
+<div class="card-body">
+<ul>
+    <li><strong>Run log &amp; audit:</strong> every run persisted to <code>agent_runs</code>; surfaced in a thin <code>/admin/agents</code> view (reuse <code>container</code>/<code>data-table</code> theme). Wire into the existing error-audit pipeline (<code>Comserv::Util::Logging</code> only).</li>
+    <li><strong>Cost / token accounting:</strong> aggregate <code>tokens_in/out</code> + <code>cost_usd</code> per agent per day from Router pricing (already carried by the catalog). Local Ollama = $0; external capped per the role tiers in <code>Router.pm</code>.</li>
+    <li><strong>Human-approval gate:</strong> agents that write externally-facing changes (Email Triage, anything that deploys) require a pending state + human "approve" before the write executes. Mirrors the git worktree human-audit gate.</li>
+    <li><strong>Kill-switch:</strong> <code>agent_jobs.enabled = 0</code> stops a misbehaving agent; a global "pause all agents" flag in config. No app restart needed (Starman -r reloads).</li>
+    <li><strong>Budget guard:</strong> hard daily token/$ ceiling per agent; over-budget runs fail closed and log.</li>
+</ul>
+<div class="gate"><strong>Gate #270:</strong> an agent pushed past its token budget fails closed, is visible in <code>/admin/agents</code>, and the event reaches the error-audit log.</div>
+</div>
+</details></div>
+
+<div class="card" id="roadmap"><details><summary class="card-header">7. Sequencing / roadmap</summary>
+<div class="card-body">
+<pre class="ag-pre">
+#268 AGENTS-CORE  ──┐  (framework: registry, gateway reuse, runner, sandbox, run-ledger)
+                    ├──▶ #269 AGENTS-JOBS  (Daily Plan Automator first, then Docs Sync, Drift Guard, Email)
+#270 AGENTS-OPS    ──┘  (ops can land in parallel once #268 RunLedger exists; gates enforced before JOBS writes go live)
+</pre>
+<p><strong>Dependency:</strong> #269 and #270 both depend on #268's RunLedger + gateway. #269's Email Triage depends on
+#270's approval gate. Build order: #268 &rarr; #270 (minimal) &rarr; #269 (Automator) &rarr; remaining jobs &rarr; #270 full.</p>
+<p><strong>Independent / parallelizable:</strong> DB Drift Guard (read-only, ties to W0.1) and Docs Sync can be built
+as soon as #268 Runner exists.</p>
+</div>
+</details></div>
+
+<div class="card" id="gates"><details><summary class="card-header">8. Done-when (gates recap)</summary>
+<div class="card-body">
+<ul>
+    <li><strong>G1 (#268):</strong> toy agent runs end-to-end via the framework, writes an <code>agent_runs</code> row, uses only the Router for LLM calls.</li>
+    <li><strong>G2 (#269):</strong> Daily Plan Automator runs unattended and produces verifiable, human-reviewable changes.</li>
+    <li><strong>G3 (#270):</strong> budget breach fails closed + visible + audited.</li>
+    <li><strong>G4 (all):</strong> no raw SQL in controllers, no app restart, theme via <code>var(--*)</code>, docs cross-linked from MASTER_PLAN.</li>
+</ul>
+</div>
+</details></div>
+
+<div class="card" id="links"><details><summary class="card-header">9. Cross-links (bidirectional)</summary>
+<div class="card-body">
+<ul>
+    <li>Parent project: <a href="/project/details?project_id=267">#267 AGENTS</a> · sub-projects <a href="/project/details?project_id=268">#268 AGENTS-CORE</a>, <a href="/project/details?project_id=269">#269 AGENTS-JOBS</a>, <a href="/project/details?project_id=270">#270 AGENTS-OPS</a></li>
+    <li>Reuses: <a href="[% c.uri_for('/Documentation/ai_workflows/DailyPlanAutomatorDesign') %]">Daily Plan Automator Design</a> (flagship job agent) · <a href="[% c.uri_for('/Documentation/ai_workflows/docker-agent-guide') %]">Docker Agent guide</a> (agent-spec pattern)</li>
+    <li>Depends on: <a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">Schema System Plan (W0.1)</a> (for <code>agent_jobs</code> / <code>agent_runs</code> tables) · AI2 Router (<code>lib/Comserv/Model/AI2/Router.pm</code>)</li>
+    <li>Coordinates with: <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan</a> · <a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]">V2 Migration Plan</a> (theme compliance for the <code>/admin/agents</code> view)</li>
+</ul>
+</div>
+</details></div>
+
+<p class="back-to-top"><a href="#top">&#8593; Back to top</a></p>
+
+</div>

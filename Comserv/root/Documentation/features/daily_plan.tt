@@ -32,7 +32,7 @@ The <strong>Start Day</strong> action runs an AI-assisted audit of blocking work
 <hr>
 
 <h2 id="layout">1. Page Layout</h2>
-<p>The page has three always-visible collapsible panels and an action bar below the tab toolbar:</p>
+<p>The page has a single action bar (the top "Day Controls" card above the tabs) with Add Todo, All Todos, Logs (permanent link to /log), Start Day, End Day (plus Triage Stale / Reschedule for admins). The Open Logs icon button appears only when a log is still open, alerting the user that a log was missed. Below it are three always-visible collapsible panels:</p>
 <ul>
     <li><strong>Audit Todos</strong> — P1/P2/P3 open todos</li>
     <li><strong>HelpDesk</strong> — open support tickets</li>

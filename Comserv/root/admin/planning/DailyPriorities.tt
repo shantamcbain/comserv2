@@ -1,0 +1,29 @@
+[% META
+   title = "Daily Priorities"
+   description = "Focus queue — top-ranked open todos for the selected day."
+   roles = "admin,developer,devops,editor,user,normal"
+   TemplateType = "Application"
+   category = "planning,priorities"
+   page_version = "1.0"
+   last_updated = "2026-08-13"
+%]
+[% SET is_csc = is_csc || (c.stash.SiteName == 'CSC') || (c.session.SiteName == 'CSC') %]
+
+<link rel="stylesheet" href="/static/css/planning/daily-plan.css">
+
+<div class="container daily-priorities">
+
+    <div class="daily-plan-header">
+        <h1>[DAILY PRIORITIES] <a href="/planning/daily/[% selected_date %]">[% display_date %]</a></h1>
+        <div class="header-date-nav">
+            <a href="/planning/daily-priorities/[% prev_date %]" class="prev-day-link">← Prev Day</a>
+            | Viewing [% display_date %] |
+            <a href="/planning/daily-priorities/[% next_date %]" class="next-day-link">Next Day →</a>
+            &nbsp;|&nbsp;
+            <a href="/planning/daily/[% current_date_str %]">Index</a>
+        </div>
+    </div>
+
+    [% INCLUDE 'admin/planning/_today_work_tab.tt' %]
+
+</div>

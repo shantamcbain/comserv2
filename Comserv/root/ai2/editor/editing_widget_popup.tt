@@ -14,7 +14,7 @@
         .header { background:#2b2b2b; color:#fff; padding:6px 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #555; }
         .header select, .header button { font-size:0.9em; }
         select { background:#313335; color:#ddd; border:1px solid #555; padding:2px 6px; border-radius:3px; }
-        .main { display:flex; flex:1; overflow:hidden; }
+        .main { display:flex; flex:1; overflow:hidden; position:relative; }
         .sidebar { width:64px; background:#313335; color:#bbb; padding:12px 0; border-right:1px solid #555; display:flex; flex-direction:column; align-items:center; gap:2px; }
         .sidebar-icon { width:52px; padding:8px 0 4px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; font-size:11px; color:#aaa; transition:background .1s; position:relative; }
         .sidebar-icon:hover { background:#3c3f41; }
@@ -75,7 +75,7 @@
             </div>
             <div class="sidebar-icon" data-panel="git" title="Git">
                 <div class="icon">🔀</div>
-                <div class="label">Commit</div>
+                <div class="label">Git</div>
             </div>
             <div class="sidebar-icon" data-panel="terminal" title="Terminal">
                 <div class="icon">💻</div>
@@ -96,25 +96,20 @@
         </div>
 
         <!-- Sidebar Panels Container -->
-        <div id="sidebar-panels" style="position:absolute; left:56px; top:0; bottom:0; width:220px; background:#2b2b2b; border-right:1px solid #555; display:none; z-index:10; overflow:auto;">
+        <div id="sidebar-panels" style="position:relative; width:220px; flex:0 0 auto; background:#2b2b2b; border-right:1px solid #555; display:none; overflow:auto; z-index:10;">
             <!-- Panels populated by popup.js -->
             <div id="panel-projects" class="sidebar-panel" style="display:none; padding:12px;">
                 <h4 style="margin:0 0 8px 0; font-size:12px; color:#aaa;">PROJECTS</h4>
-                <ul class="file-tree">
-                    <li data-path="lib/Comserv/Controller/AI2.pm" class="file-item">📄 AI2.pm</li>
-                    <li data-path="root/ai2/editor/editing_widget_popup.tt" class="file-item active">📄 editing_widget_popup.tt</li>
-                </ul>
+                <!-- Live project file tree (all files) + changed files at top
+                     are rendered by static/js/ai2editor/project-tree.js into
+                     #ai2-changed-files (below) and a generated #ai2-project-tree. -->
+                <div id="ai2-changed-files" style="margin-top:4px;"></div>
             </div>
 
             <div id="panel-git" class="sidebar-panel" style="display:none; padding:0; width:100%; background:#2b2b2b; font-size:13px;">
-                <!-- Commit panel HTML (kept minimal) -->
-                <div style="padding:12px; border-top:1px solid #444;">
-                    <textarea id="commit-message" placeholder="feat: improve AI2 editor" style="width:100%; height:70px; background:#1e1f22; color:#ddd; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; resize:vertical; margin-bottom:10px;"></textarea>
-                    <div style="display:flex; gap:8px;">
-                        <button id="do-commit-btn" style="flex:1; background:#0e639c; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; font-size:13px;">Commit</button>
-                        <button id="cancel-commit-btn" style="flex:1; background:#555; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; font-size:13px;">Cancel</button>
-                    </div>
-                </div>
+                <!-- The editor and Git desktop intentionally share one implementation. -->
+                <iframe src="/admin/git" title="Git Dashboard"
+                        style="width:100%;height:calc(100vh - 42px);min-height:620px;border:0;background:#1e1f22;"></iframe>
             </div>
 
             <div id="panel-terminal" class="sidebar-panel" style="display:none; padding:12px;">
@@ -171,40 +166,65 @@
             </div>
         </div>
 
-        <!-- Main Editor Area -->
-        <div class="editor-area" style="flex:1; display:flex; flex-direction:column;">
-            <div class="editor-tabs" style="background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between;">
-                <span id="file-tab-label" style="font-size:12px;">[% IF file_to_load %][% file_to_load | html %][% ELSE %]No file loaded[% END %]</span>
-                <span style="display:flex;align-items:center;gap:8px;">
-                    <span id="file-status" style="font-size:11px;color:#888;"></span>
-                    <button id="save-btn" style="background:#0e639c;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;font-size:12px;display:none;">Save</button>
-                </span>
-            </div>
-            <div class="editor-content" style="flex:1; position:relative;">
-                <div id="ace-editor" style="width:100%;height:100%;"></div>
-            </div>
-            <!-- AI Diff Pane -->
-            <div class="diff-pane" style="height:140px; background:#2b2b2b; color:#0f0; padding:8px; border-top:1px solid #555; font-size:0.85em;">
-                <strong>AI Suggestion (+/- diff)</strong><br>
-                <span style="color:#0f0">+ new line added by AI</span><br>
-                <span style="color:#f66">- old line removed</span>
-                <div style="margin-top:8px">
-                    <button>Approve</button>
-                    <button>Reject</button>
+        <!-- Main Editor Area (row: code on left, diff rail on right) -->
+        <div class="editor-area" style="flex:1; display:flex; flex-direction:row; min-width:0;">
+            <!-- Left: editor (tabs + Ace) -->
+            <div class="editor-main" style="flex:1; display:flex; flex-direction:column; min-width:0;">
+                <div class="editor-tabs" style="background:#2b2b2b; padding:4px 8px; color:#aaa; display:flex; align-items:center; justify-content:space-between;">
+                    <span id="file-tab-label" style="font-size:12px;">[% IF file_to_load %][% file_to_load | html %][% ELSE %]No file loaded[% END %]</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <span id="file-status" style="font-size:11px;color:#888;"></span>
+                        <button id="editor-diff-btn" type="button" title="Show this file's git diff (right panel)" style="background:#3c3f41;color:#ddd;border:1px solid #555;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 8px;">Diff</button>
+                        <button id="save-btn" style="background:#0e639c;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;font-size:12px;display:none;">Save</button>
+                    </span>
                 </div>
+                <div class="editor-content" style="flex:1; position:relative; min-height:0;">
+                    <div id="ace-editor" style="width:100%;height:100%;"></div>
+                </div>
+            </div>
+            <!-- Right rail: diff panes (AI suggestion + git diff) sit BESIDE the editor -->
+            <div id="editor-right-rail" style="flex:0 0 42%; min-width:260px; max-width:70vw; display:flex; flex-direction:column; border-left:1px solid #555; overflow:auto;">
+                <!-- AI Diff Pane -->
+                <div id="ai-diff-pane" class="diff-pane" style="flex:0 0 auto; max-height:38vh; background:#2b2b2b; color:#0f0; padding:8px; border-bottom:1px solid #555; font-size:0.85em; overflow:auto; display:none;">
+                    <strong style="color:#9cdcfe;">AI Suggestion</strong>
+                    <span id="ai-diff-status" style="color:#888; font-size:0.9em;"></span>
+                    <pre id="ai-diff-content" style="white-space:pre-wrap; margin:6px 0; color:#0f0;"></pre>
+                    <div style="margin-top:8px">
+                        <button id="ai-approve-btn" type="button" style="background:#2e7d32;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;">Approve</button>
+                        <button id="ai-reject-btn" type="button" style="background:#555;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;">Reject</button>
+                    </div>
+                </div>
+                <!-- git diff pane (injected by ai2editor/file-diff.js into this rail) -->
             </div>
         </div>
 
-        <!-- Right Chat Sidebar -->
-        <div class="chat-sidebar" style="width:320px; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555;">
-            <div class="chat-header" style="padding:6px 10px; background:#2b2b2b; font-weight:bold;">AI Chat (Router-selected)</div>
-            <div class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
+        <!-- Right Chat Sidebar (resizable + detachable) -->
+        <div id="ai-chat-sidebar" class="chat-sidebar" style="width:var(--ai-chat-w,320px); min-width:220px; max-width:70vw; background:#313335; color:#ddd; display:flex; flex-direction:column; border-left:1px solid #555; position:relative;">
+            <!-- Resize handle (drag left edge to resize) -->
+            <div id="ai-chat-resize" title="Drag to resize" style="position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:5;"></div>
+            <div class="chat-header" style="padding:6px 10px; background:#2b2b2b; font-weight:bold; display:flex; align-items:center; justify-content:space-between;">
+                <span>AI Chat (Hy3)</span>
+                <span style="display:flex; gap:4px;">
+                    <button id="ai-chat-todo" type="button" title="Add a todo for this page’s project" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">📝 Todo</button>
+                    <button id="ai-chat-detach" type="button" title="Open chat in its own window" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">⤢ Detach</button>
+                    <button id="ai-chat-clear" type="button" title="Clear chat" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">Clear</button>
+                    <button id="ai-chat-close" type="button" title="Hide chat (reopen from the 💬 button)" style="background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;">✕</button>
+                </span>
+            </div>
+            <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
-            <div class="chat-input" style="padding:6px; border-top:1px solid #555;">
-                <input type="text" style="width:100%" placeholder="Ask AI...">
+            <div class="chat-input" style="padding:6px; border-top:1px solid #555; display:flex; gap:6px;">
+                <input id="ai-chat-input" type="text" style="flex:1" placeholder="Ask AI about this file...">
+                <button id="ai-chat-send" type="button" style="background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">Send</button>
             </div>
         </div>
+
+        <!-- Floating reopen button: shown only when the chat sidebar is closed -->
+        <button id="ai-chat-reopen" type="button" title="Show AI chat"
+                style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); z-index:30;
+                       background:#0e639c; color:#fff; border:none; border-radius:50%; width:38px; height:38px;
+                       cursor:pointer; font-size:18px; box-shadow:0 0 6px rgba(0,0,0,0.5);">💬</button>
     </div>
 
     <!-- Status bar -->
@@ -220,6 +240,10 @@
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 var filePath = '[% file_to_load | html %]';
+                // Expose the opened file so ai2editor/file-diff.js can auto-show
+                // its diff when the editor is opened from the Git Dashboard Diff
+                // button (no extra click needed).
+                window.AI2_FILE_TO_LOAD = filePath;
                 var fileName = filePath.split('/').pop();
                 var editor = null;
                 var hasChanges = false;
@@ -259,6 +283,9 @@
                                 }
                                 if (tabLabel) tabLabel.textContent = fileName;
                                 setStatus('Loaded');
+                                // Make Save available now that a file is loaded
+                                // (it also appears on edit via updateDirtyState).
+                                if (saveBtn) saveBtn.style.display = 'inline-block';
                             }
                         }).catch(function(err) {
                             console.error('[AI2] Failed to load file:', err);

@@ -47,7 +47,7 @@ Logging uses the standard helper; all public methods therefore take C<$c>.
 
 # Allowed git subcommands. Anything else is refused by _run.
 my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
-    status log rev-parse rev-list branch diff fetch pull push
+    status log rev-parse rev-list branch diff fetch pull push ls-files
     add commit stash checkout show restore rm merge worktree
 );
 
@@ -55,13 +55,14 @@ my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
 my %ALLOWED_FLAGS = (
     status   => { map { $_ => 1 } qw(--porcelain --short -s --no-color) },
     log      => { map { $_ => 1 } qw(--oneline --no-color --stat -n) },
-    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short) },
+    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet --show-prefix --show-toplevel) },
     'rev-list'  => { map { $_ => 1 } qw(--left-right --count) },
     branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color --format) },
-    diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified) },
+    diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified --no-index) },
     fetch    => { map { $_ => 1 } qw(--prune) },
     pull     => { map { $_ => 1 } qw(--ff-only) },
     push     => { map { $_ => 1 } qw(--set-upstream -u --delete) },
+    'ls-files' => { map { $_ => 1 } qw(--error-unmatch --others --exclude-standard) },
     add      => {},
     commit   => { map { $_ => 1 } qw(-m --amend) },
     stash    => { map { $_ => 1 } qw(push pop drop list -m) },
@@ -73,9 +74,9 @@ my %ALLOWED_FLAGS = (
     # --no-ff (always create a merge commit), --no-commit (review then commit),
     # --abort (cancel a conflicted merge), --squash (optional single-commit merge).
     merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash) },
-    # Worktree is read/maintenance only from the app: list + prune. Never 'add'
-    # (worktrees are created out-of-band by the branch-server tooling).
-    worktree => { map { $_ => 1 } qw(list prune) },
+    # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
+    # allow add, remove (with --force to clear a dirty checkout), list, prune.
+    worktree => { map { $_ => 1 } qw(add remove list prune --force) },
 );
 
 sub new {
@@ -303,13 +304,23 @@ sub _run {
 
     my $result = { success => 0, exit_code => -1, output => '', error => '', data => {} };
 
-    my $tinfo = $self->resolve_target($c, $opts{target});
+    my $tinfo;
+    if ($opts{repo}) {
+        # Explicit repository path override (local mode). Used when the caller
+        # needs git to run inside a specific checkout (e.g. a branch worktree)
+        # rather than the resolved default repo. Bypasses resolve_target but
+        # still goes through the same argv whitelist below.
+        $tinfo = { mode => 'local', repo => $opts{repo}, host => '', user => '', port => 22, label => 'explicit' };
+    }
+    else {
+        $tinfo = $self->resolve_target($c, $opts{target});
+    }
 
     # If the caller didn't pass an explicit target, honor the one bound for this
     # request (set once by the controller from the dashboard's target selector).
     # This lets the whole subsystem route to a remote host with a single line of
     # controller code rather than threading target through every public method.
-    unless ($opts{target}) {
+    unless ($opts{target} || $opts{repo}) {
         my $req_target = $c->stash->{git_target}
                       // ($c->req ? $c->req->param('target') : undef);
         $tinfo = $self->resolve_target($c, $req_target) if defined $req_target;
@@ -380,7 +391,26 @@ sub _run {
     $result->{error}     = defined $err ? $err : '';
     $result->{success}   = ($code == 0) ? 1 : 0;
 
-    my $level = $result->{success} ? 'info' : 'error';
+    # Log level: a non-zero exit is usually an error, but some expected/graceful
+    # conditions legitimately exit non-zero and are handled by the caller:
+    #   * `rev-parse --abbrev-ref --symbolic-full-name @{u}` exits 128 with
+    #     "fatal: no upstream configured for branch '...'" when a branch simply
+    #     has no tracking branch. get_tracking_info() treats that as
+    #     upstream => undef (a normal dashboard state), so logging it as ERROR
+    #     just creates noise / false error-audit todos. Demote such known-benign
+    #     "no upstream" results to info so real failures still stand out.
+    #   * The same is true for `rev-list --left-right --count @{u}...HEAD`.
+    # Detect this structurally (the argv asks about @{u}) as well as by message
+    # text, because git's wording varies by version/locale and a text-only match
+    # silently stops working after a git upgrade.
+    my $combined   = ($result->{output} // '') . "\n" . ($result->{error} // '');
+    my $asks_upstream = grep { defined $_ && /\@\{u(pstream)?\}/ } @argv;
+    my $benign   = !$result->{success}
+                && ( $asks_upstream
+                  || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
+    my $level    = $result->{success} ? 'info'
+                 : $benign            ? 'info'
+                 :                      'error';
     $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_run',
         "git " . join(' ', @argv) . " -> exit=$code out=" . substr($result->{output}, 0, 500));
 
@@ -455,6 +485,10 @@ sub get_local_branches {
         $line =~ s/^\s+|\s+$//g;
         $line =~ s/\x1b\[[0-9;]*m//g;
         next if !$line || $line =~ /^\(.*\)$/;
+        # 'git' is a reserved word (it collides with the git command itself) and
+        # can never be checked out or merged — skip it everywhere so it can't be
+        # offered in the UI or validated as a real branch.
+        next if $line eq 'git';
         push @branches, $line;
     }
     return \@branches;
@@ -586,26 +620,79 @@ sub get_git_status {
 
 =head2 get_tracking_info($c)
 
-Ahead/behind vs upstream (does not fetch): { upstream, ahead, behind }.
+Ahead/behind vs the branch's integration base.
+
+This project does NOT use a GitHub-style push/pull workflow per branch.
+Worktrees are *linked* to the main (PyCharm) repo's .git, so a branch in a
+worktree IS the same ref as that branch in the PyCharm repo — the AI commits
+in the worktree, the user verifies and commits, then merges into `main`.
+
+We therefore compute the relationship in two layers:
+
+  1. GitHub upstream (@{u}) if it exists — the classic ahead/behind.
+  2. FALLBACK when there is no @{u} (the normal local-merge case): compare the
+     current branch against `main` using a local-only `rev-list --count` (no
+     fetch, no network — `main` is a local branch in the shared repo). This is
+     the signal the dashboard needs: "is my branch behind main?" so the branch
+     can be updated before new work starts.
+
+Returns { upstream, ahead, behind, base, base_ahead, base_behind } where the
+`base*` fields describe the relationship to `main` (or whatever integration
+base we pick) regardless of whether a GitHub upstream is configured.
 
 =cut
 
 sub get_tracking_info {
     my ($self, $c) = @_;
-    my $info = { upstream => undef, ahead => 0, behind => 0 };
+    my $info = {
+        upstream     => undef,
+        ahead        => 0,
+        behind       => 0,
+        base         => undef,   # integration base we fell back to (e.g. 'main')
+        base_ahead   => 0,       # commits in branch not in base
+        base_behind  => 0,       # commits in base not in branch (branch is stale)
+    };
 
+    # --- Layer 1: GitHub-style upstream if configured -------------------
     my $r = $self->_run($c, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}');
     my $upstream = $r->{output};
     chomp $upstream if defined $upstream;
-    return $info if !$r->{success} || !$upstream || $upstream =~ /fatal|no upstream/i;
-    $info->{upstream} = $upstream;
+    if ($r->{success} && $upstream && $upstream !~ /fatal|no upstream/i) {
+        $info->{upstream} = $upstream;
+        my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', '@{u}...HEAD');
+        my $counts = $cr->{output};
+        chomp $counts if defined $counts;
+        if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
+            $info->{behind} = $1;
+            $info->{ahead}  = $2;
+        }
+        return $info;
+    }
 
-    my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', '@{u}...HEAD');
+    # --- Layer 2: local-merge fallback vs integration base -----------------
+    # Pick a base branch: `main` if it exists, else `master`, else the repo's
+    # first existing local branch that is not the current branch.
+    my $current = $self->get_current_branch($c);
+    my $base;
+    for my $cand (qw(main master)) {
+        my $br = $self->_run($c, 'rev-parse', '--verify', '--quiet', $cand);
+        if ($br->{success} && length($br->{output} // '')) {
+            $base = $cand;
+            last;
+        }
+    }
+    return $info unless defined $base;          # no base to compare against
+    return $info if defined $current && $current eq $base;  # already on base
+
+    $info->{base} = $base;
+    my $cr = $self->_run($c, 'rev-list', '--left-right', '--count', "$base...HEAD");
     my $counts = $cr->{output};
     chomp $counts if defined $counts;
     if ($counts && $counts =~ /^(\d+)\s+(\d+)$/) {
-        $info->{behind} = $1;
-        $info->{ahead}  = $2;
+        # left  = commits only in $base (branch is BEHIND $base -> stale)
+        # right = commits only in HEAD (branch is AHEAD of $base -> unmerged work)
+        $info->{base_behind} = $1;
+        $info->{base_ahead}  = $2;
     }
     return $info;
 }
@@ -961,9 +1048,9 @@ sub switch_branch {
 
 Return an arrayref of worktree entries for the repo:
   { path, branch, is_main, port }
-Port is derived from the known worktree layout (~/.zenflow/worktrees/<branch>/Comserv)
+Port is derived from the configured worktree layout (~/.comserv/worktrees/<branch>/Comserv)
 using the same port map the dashboard uses (BranchServerControl / _planning_tab.tt).
-Main repo (no .zenflow/worktrees in its path) is reported as is_main => 1.
+Main repo (no configured worktree path in its path) is reported as is_main => 1.
 
 =cut
 
@@ -996,6 +1083,52 @@ sub list_worktrees {
     return \@rows;
 }
 
+=head2 worktree_checkout_path_for_branch($c, $branch)
+
+Resolve the on-disk checkout path where $branch is currently checked out, so
+git operations can run directly in that tree instead of trying to check the
+branch out elsewhere (which fails for worktree branches — a branch already
+checked out in another worktree cannot be checked out in the main repo).
+
+Returns the path string, or undef if the branch is not currently checked out
+in any worktree (e.g. a local-only branch with no worktree).
+
+=cut
+
+sub worktree_checkout_path_for_branch {
+    my ($self, $c, $branch) = @_;
+
+    # Primary strategy: scan the worktree base directory and check each
+    # checkout's ACTUAL current branch with `git branch --show-current`. This
+    # is robust even when `git worktree list --porcelain` has stale/corrupt
+    # metadata (e.g. a worktree whose directory was renamed but whose git
+    # bookkeeping still points at the old name — git-dev's porcelain entry
+    # drops its `worktree <path>` line, so list_worktrees records it with no
+    # path). Scanning the dirs directly always finds the real checkout.
+    my $cfg  = eval { _worktree_config() } // { base_dir => "$ENV{HOME}/.comserv/worktrees" };
+    my $base = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    if ($base && -d $base) {
+        opendir(my $dh, $base) or return undef;
+        my @entries = grep { -e "$base/$_/Comserv/.git" } readdir($dh);
+        closedir($dh);
+        for my $name (@entries) {
+            my $dir = "$base/$name/Comserv";
+            my $b   = $self->_run($c, 'branch', '--show-current',
+                { repo => $dir })->{output};
+            chomp $b if defined $b;
+            return $dir if defined $b && length $b && $b eq $branch;
+        }
+    }
+
+    # Fallback: trust list_worktrees (works for well-formed worktree metadata).
+    my $wts = $self->list_worktrees($c) or return undef;
+    for my $wt (@$wts) {
+        next unless $wt->{branch} && $wt->{branch} eq $branch;
+        return $wt->{path} if $wt->{path} && -d $wt->{path};
+    }
+    return undef;
+}
+
 sub _worktree_row {
     my ($path, $branch) = @_;
     my $cfg     = _worktree_config();
@@ -1018,9 +1151,9 @@ sub _worktree_row {
 }
 
 # Cached worktree config loaded from root/config/worktrees.json. This is the
-# single source of truth for the worktree base dir + branch→port map, replacing
-# the old hardcoded .zenflow layout. Falls back to the static WORKTREE_PORTS hash
-# (below) if the JSON is missing.
+# single source of truth for the worktree base dir + branch->port map, replacing
+# the old hardcoded .zenflow layout. There is NO static fallback: a branch not in
+# the JSON has port 0. Deleted ports stay deleted so they can be reused.
 my $_wt_config;
 sub _worktree_config {
     return $_wt_config if $_wt_config;
@@ -1041,35 +1174,221 @@ sub _worktree_config {
 
 sub worktree_base_dir { return _worktree_config()->{base_dir}; }
 
-# Port map mirrored from root/admin/planning/_planning_tab.tt so the dashboard
-# can deep-link each worktree's running instance.
-my %WORKTREE_PORTS = (
-    'aichatsystem-ef4e'                    => 4010,
-    'schema-managment-system-7eb3'        => 4002,
-    'infrastructuremanagement-d133'        => 4003,
-    'workshops-7d21'                       => 4004,
-    'users-e5b8'                           => 4005,
-    'new-task-bb05'                        => 4006,
-    'unified-mail-system-site-managed-2c53' => 4007,
-    'membership-1304'                      => 4008,
-    'pointsystem-3230'                     => 4009,
-    'cssthemes-9195'                       => 4011,
-    'ency-53b0'                            => 4012,
-    'helpdesk-7217'                        => 4013,
-    'healthplanning-9db9'                  => 4014,
-    'productionserverhealth-82fb'          => 4015,
-    'security-764f'                        => 4016,
-    'documentation-9122'                   => 4017,
-    'api-bc05'                             => 4018,
-    'bmaster-f0fd'                         => 4019,
-    'aichatsystem-planning-system-int-f187' => 4020,
-    'inventory-system-104a'                => 4021,
-    '3dprinting-use-this-as-the-branc-41f3' => 4030,
-    'developer-time-logging-points-ba-542a' => 4022,
-    'page-management-system-implement-41a1' => 4023,
-    'docker-5c15'                          => 4024,
-    'planning-system-continue-from-pl-bdac' => 4001,
-);
+# Build the worktree/develop-server registry for UI surfaces (the planning tab's
+# "Branch Servers" panel, the Git dashboard's "Develop Servers" card, etc.). This is
+# the SINGLE canonical builder — the planning tab and the Git dashboard must both call
+# it so they can never drift apart. Returns [ { name, port, label, url, cmd }, ... ]
+# with `main` first (port 3001), then every branch from root/config/worktrees.json
+# sorted by name. `cmd` is the one launch form used everywhere:
+#   cd <base_dir>/<branch>/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p <port> -r
+# BranchServerControl (per-branch start/stop/restart) consumes the same path/port, so
+# the list, the launch command, and the running server all agree.
+sub build_worktree_list {
+    my ($self) = @_;
+    my @list;
+
+    my $base = eval { worktree_base_dir() } // "$ENV{HOME}/.comserv/worktrees";
+    push @list, {
+        name  => 'main',
+        port  => 3001,
+        label => 'MAIN',
+        url   => '/planning/daily',
+        cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
+        # Hermes CLI for THIS checkout. Running from the worktree git-root makes Hermes
+        # auto-load the branch .hermes.md (which pulls in the global rules + domain
+        # expertise). -w = worktree-safe mode (parallel agents, no git conflicts).
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat -w',
+    };
+
+    my $cfg = eval { _worktree_config() } // { branches => {} };
+    my $branches = $cfg->{branches} // {};
+    for my $name (sort keys %$branches) {
+        my $b = $branches->{$name} // {};
+        push @list, {
+            name  => $name,
+            port  => $b->{port} // 0,
+            label => $b->{label} // $name,
+            url   => $b->{url}   // '/planning/daily',
+            cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
+                   . ($b->{port} // 0) . ' -r',
+            # Branch Hermes: cwd = the worktree's own git root so its .hermes.md loads.
+            hermes_cmd => "cd $base/$name/Comserv && hermes chat -w",
+        };
+    }
+    return \@list;
+}
+
+# NOTE: the old hardcoded WORKTREE_PORTS hash has been REMOVED. The single source
+# of truth for branch->port is root/config/worktrees.json. A deleted/non-JSON port
+# must NEVER be resurrected from a static map (user rule: removed ports stay removed
+# so they can be reused). If a branch is not in the JSON, its port is 0.
+
+=head2 next_free_port($c)
+
+Scan upward from the configured floor (port_start, default 4000) for the first
+port not already assigned to a branch in worktrees.json. Port 4000 itself is
+treated as occupied if anything is listening there; the caller's JSON is the
+authority for what is taken. Returns the first free integer > floor.
+
+=cut
+
+sub next_free_port {
+    my ($self_or_c) = @_;
+    my $cfg  = _worktree_config();
+    my $floor = $cfg->{port_start} // 4000;
+    $floor = 4000 if $floor !~ /^\d+$/ || $floor < 4000;
+    # Port 4000 is occupied by a live instance; never hand it out. The first
+    # usable port is one above the floor (your rule: first available AFTER 4000).
+    my $start = $floor < 4001 ? 4001 : $floor;
+    my %taken;
+    if ($cfg->{branches}) {
+        for my $b (keys %{ $cfg->{branches} }) {
+            my $p = $cfg->{branches}{$b}{port};
+            $taken{$p} = 1 if $p && $p =~ /^\d+$/;
+        }
+    }
+    my $p = $start;
+    $p++ while $taken{$p};   # first port >= start not already in the JSON
+    return $p;
+}
+
+=head2 create_worktree($c, $branch, \%opts)
+
+The isolation primitive. In one call:
+  1. create the branch from $opts{parent} (default 'main') if it does not exist,
+  2. git worktree add <base_dir>/<branch>/Comserv <branch>,
+  3. assign the next free port (next_free_port),
+  4. append { port, label, url } to root/config/worktrees.json,
+  5. return { success, branch, port, path, cmd }.
+
+The branch-servers list reads the JSON, so it refreshes automatically.
+Never renames or deletes an existing branch.
+
+=cut
+
+sub create_worktree {
+    my ($self, $c, $branch, $opts) = @_;
+    $opts //= {};
+    my $res = { success => 0, action => 'create_worktree', branch => $branch };
+
+    unless ($branch && $branch =~ /^[A-Za-z0-9._\/-]+$/) {
+        $res->{error} = 'A valid branch name is required.';
+        return $res;
+    }
+    my $cfg    = _worktree_config();
+    my $base   = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    my $wt_dir = "$base/$branch/Comserv";
+    my $parent = $opts->{parent} // 'main';
+
+    # 1) branch (create from parent if missing)
+    my $have = $self->_run($c, 'branch', '--list', '--no-color', $branch);
+    if (!$have->{success} || $have->{output} !~ /\b\Q$branch\E\b/) {
+        my $cr = $self->_run($c, 'branch', $branch, $parent);
+        unless ($cr->{success}) {
+            $res->{error} = "Failed to create branch '$branch' from '$parent': " . ($cr->{error} // $cr->{output});
+            return $res;
+        }
+    }
+
+    # 2) worktree add
+    if (-d $wt_dir) {
+        $res->{error} = "Worktree dir already exists: $wt_dir";
+        return $res;
+    }
+    my $ar = $self->_run($c, 'worktree', 'add', $wt_dir, $branch);
+    unless ($ar->{success}) {
+        $res->{error} = "git worktree add failed: " . ($ar->{error} // $ar->{output});
+        return $res;
+    }
+
+    # 3) port + 4) persist to JSON
+    my $port = $self->next_free_port($c);
+    my $label = $opts->{label} // $branch;
+    my $url   = $opts->{url}   // '/planning/daily';
+    $cfg->{branches} //= {};
+    $cfg->{branches}{$branch} = { port => $port, label => $label, url => $url };
+    unless (_save_worktree_config($self, $cfg)) {
+        $res->{error} = 'Failed to write worktrees.json';
+        return $res;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_worktree',
+        "Created worktree branch='$branch' parent='$parent' port=$port path=$wt_dir");
+
+    $res->{success} = 1;
+    $res->{port}    = $port;
+    $res->{path}    = $wt_dir;
+    # The Catalyst app lives one level deeper: the worktree checkout is the
+    # comserv2 repo, and the app dir is <wt_dir>/Comserv (where script/ lives).
+    my $app_dir = "$wt_dir/Comserv";
+    $res->{cmd}     = "cd $app_dir && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p $port -r";
+    return $res;
+}
+
+=head2 remove_worktree($c, $branch)
+
+Inverse of create_worktree (user rule 3): remove the worktree checkout, delete
+the branch from git, and drop the JSON entry so its port is freed for reuse.
+main is never touched.
+
+=cut
+
+sub remove_worktree {
+    my ($self, $c, $branch) = @_;
+    my $res = { success => 0, action => 'remove_worktree', branch => $branch };
+    return $res->{error} = 'Refusing to remove main.' if $branch eq 'main';
+
+    my $cfg    = _worktree_config();
+    my $base   = $cfg->{base_dir} // "$ENV{HOME}/.comserv/worktrees";
+    my $wt_dir = "$base/$branch/Comserv";
+
+    # remove the checkout
+    if (-d $wt_dir) {
+        my $rr = $self->_run($c, 'worktree', 'remove', $wt_dir, '--force');
+        unless ($rr->{success}) {
+            $res->{error} = "worktree remove failed: " . ($rr->{error} // $rr->{output});
+            return $res;
+        }
+    }
+    # delete the branch
+    my $br = $self->_run($c, 'branch', '-D', $branch);
+    unless ($br->{success}) {
+        $res->{error} = "branch delete failed: " . ($br->{error} // $br->{output});
+        # still try to drop the JSON entry below
+    }
+    # free the port
+    if ($cfg->{branches} && $cfg->{branches}{$branch}) {
+        delete $cfg->{branches}{$branch};
+        _save_worktree_config($self, $cfg);
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_worktree',
+        "Removed worktree branch='$branch' dir=$wt_dir");
+    $res->{success} = 1;
+    return $res;
+}
+
+# Write the in-memory worktree config back to root/config/worktrees.json and
+# clear the cache so the next read picks up the change. Returns 1 on success.
+sub _save_worktree_config {
+    my ($self, $cfg) = @_;
+    my $file = __FILE__;
+    $file =~ s{lib/Comserv/Util/Git\.pm$}{root/config/worktrees.json};
+    my $ok = eval {
+        open my $fh, '>', $file or die $!;
+        print $fh encode_json($cfg);
+        close $fh;
+        1;
+    };
+    if ($ok) { $_wt_config = $cfg; }
+    else {
+        my $err = $@;
+        if ($self && $self->can('logging')) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'wt_cfg',
+                "worktrees.json write failed: $err");
+        }
+    }
+    return $ok ? 1 : 0;
+}
 
 sub _worktree_port {
     my ($branch) = @_;
@@ -1077,7 +1396,7 @@ sub _worktree_port {
     if ($cfg->{branches} && $cfg->{branches}{$branch}) {
         return $cfg->{branches}{$branch}{port} // 0;
     }
-    return $WORKTREE_PORTS{$branch} // 0;
+    return 0;   # no static fallback — only the JSON knows ports
 }
 
 =head2 diff_against_main($c, $branch, $context)
@@ -1114,7 +1433,15 @@ sub merge_branch {
         $result->{error_msg} = "Branch name is required.";
         return $result;
     }
-    if ($branch eq 'main' || $branch eq 'master' || $branch eq 'Production') {
+    # Guard: refuse to merge a protected branch *into itself* (merging main INTO a
+    # worktree branch — the "pull main down" direction — is the normal, intended
+    # operation and must NOT be blocked). Previously this refused any merge that
+    # named main as the source, which broke the main->branch "update this branch"
+    # direction entirely. Now we only refuse main->main / master->master.
+    my $current = $self->get_current_branch($c);
+    if (($branch eq 'main'   && $current eq 'main')
+     || ($branch eq 'master' && $current eq 'master')
+     || ($branch eq 'Production' && $current eq 'Production')) {
         $result->{error_msg} = "Refusing to merge a protected branch into itself.";
         return $result;
     }
@@ -1131,6 +1458,34 @@ sub merge_branch {
             $result->{conflict} = 1;
         }
         $result->{error_msg} = "Merge of '$branch' failed (see output).";
+    }
+    return $result;
+}
+
+=head2 merge_abort($c)
+
+Cancel a conflicted in-progress merge via C<git merge --abort> (flag already
+whitelisted in C<_run>). Returns { success, output }. If there is nothing to
+abort, git exits cleanly and we report success with the (empty) output rather
+than raising a false error.
+
+=cut
+
+sub merge_abort {
+    my ($self, $c) = @_;
+    my $result = { success => 0, output => '', action => 'merge_abort' };
+
+    my $r = $self->_run($c, 'merge', '--abort');
+    $result->{output} = $r->{output};
+    # git merge --abort exits 0 when it aborts, and also exits 0 (no-op) when
+    # there is no merge in progress in modern git. Treat either as success so
+    # the UI's Abort button always resolves a conflicted state cleanly.
+    if ($r->{success}) {
+        $result->{success}     = 1;
+        $result->{success_msg} = "Merge aborted.";
+    }
+    else {
+        $result->{error_msg} = "Merge abort failed (see output).";
     }
     return $result;
 }

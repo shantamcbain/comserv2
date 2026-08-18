@@ -78,9 +78,24 @@ sub list_available_models {
 
 sub _fetch_ollama_library {
     my ($self) = @_;
-    my $ua = LWP::UserAgent->new(timeout => 15);
-    my $res = $ua->get('https://ollama.com/library');
-    return undef unless $res->is_success;
+    # Hard connect + total timeouts so a slow/hung ollama.com egress can NEVER
+    # wedge the app. The /ai/models action calls list_available_models()
+    # synchronously; without a connect timeout a DNS/egress stall would block
+    # the entire request (and on the single-threaded dev server, every other
+    # request too). 8s is the same bound the v2 external providers use.
+    my $ua = LWP::UserAgent->new(
+        timeout => 8,
+        schemes => ['https', 'http'],
+    );
+    $ua->connect_timeout(5);
+    # Disable environment proxy inheritance to avoid proxy-induced stalls.
+    $ua->env_proxy if 0;
+    my $res = try {
+        $ua->get('https://ollama.com/library');
+    } catch {
+        undef;
+    };
+    return undef unless $res && $res->is_success;
     my @models;
     while ($res->content =~ m{href="/library/([^"]+)"}g) {
         my $name = $1;
