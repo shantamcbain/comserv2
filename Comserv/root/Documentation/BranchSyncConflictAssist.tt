@@ -239,6 +239,7 @@
                     <li><a href="/Documentation/MASTER_PLAN" >Comserv2 Master Plan</a> (parent plan; Git Subsystem Refactor W1.2)</li>
                     <li><a href="/Documentation/git_worktree_merge_plan" >git_worktree_merge_plan</a> (In-App Git: Worktree AI-Commit &rarr; Human Merge-to-Main)</li>
                     <li><a href="/Documentation/git_worktree_new_system_plan" >git_worktree_new_system_plan</a> (isolated worktree creation backend)</li>
+                    <li><a href="/Documentation/HermesBranchContextPlan" >HermesBranchContextPlan</a> (per-branch AI guidance + in-app Hermes launch)</li>
                     <li><a href="/Documentation/GitSubsystemRefactorPlan" >Git Subsystem Refactor Plan</a></li>
                     <li><a href="/Documentation/Git" >Git</a></li>
                     <li><a href="/admin/git" >Git Dashboard</a></li>
