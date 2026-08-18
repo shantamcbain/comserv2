@@ -1898,8 +1898,11 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     if ($source eq 'main' && $target ne 'main') {
         # main -> branch: pull main's current state down into the target branch.
         # The branch is already checked out in its worktree, so we just merge
-        # origin/main into it there. No test gate (we are updating a worktree,
-        # not main).
+        # the local 'main' ref into it there. We merge the LOCAL main (the code
+        # the user is actually looking at on the dashboard), NOT origin/main —
+        # origin is frequently stale (unpushed commits), and "merge main" must
+        # mean "the main I see", not "whatever is on origin". No test gate (we
+        # are updating a worktree, not main).
         $direction = 'main->branch';
         unless (defined $wt_path) {
             $c->response->body(encode_json({
@@ -1908,9 +1911,12 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             }));
             return;
         }
-        # Make sure the worktree has the latest main before merging.
+        # Bring the worktree's view of main up to date so 'main' resolves to the
+        # local main tip, then merge local main into the branch.
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
-        my $up = $self->git_service->_run($c, 'merge', '--no-ff', 'origin/main',
+        # Ensure the worktree has a 'main' ref tracking origin/main so the local
+        # main ref is present; then merge the literal local 'main' ref.
+        my $up = $self->git_service->_run($c, 'merge', '--no-ff', 'main',
             { repo => $wt_path });
         $res = {
             success   => $up->{success} ? 1 : 0,
@@ -1941,7 +1947,7 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         # so the worktree stays consistent (optional, best-effort).
         if (defined $wt_path) {
             $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
-            $self->git_service->_run($c, 'merge', '--no-ff', 'origin/main',
+            $self->git_service->_run($c, 'merge', '--no-ff', 'main',
                 { repo => $wt_path });
         }
         my $mr = $self->git_service->merge_branch($c, $source);
