@@ -1,0 +1,223 @@
+[% META
+   title = "AI Agent Orchestration + Notification Recovery"
+   description = "Two-layer AI agent strategy (in-app agents: HelpDesk/Beekeeping/Ency; operational agents: Email agent + Secretary agent running outside the app via Hermes/cron, migrating to the AI editor). Reuses the existing production-health/error-audit -> DB -> DailyPlan signal. Restores the regressed in-app + system notification channels (only email works today). Adds a user-VoIP-number config page (successor to the old Perl4 'call a page') so the Secretary can text/voice/browser-call the user for critical reminders."
+   roles = "admin,developer,devops,ai"
+   TemplateType = "Documentation"
+   category = "ai,agents,automation,planning,development-plan"
+   page_version = "0.1"
+   last_updated = "Wed Aug 19 20:00:00 UTC 2026"
+   project_id   = "267"
+   project_code = "AGENTS"
+   site_specific = "false"
+%]
+
+<div class="container">
+    <h1 class="doc-h1">AI Agent Orchestration + Notification Recovery</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-19 | Version: 0.1 | Status: DRAFT (approved for authoring) |
+        Tracked in project: <a href="/project/details?project_id=267" class="doc-link">#267 (AGENTS — Autonomous Agents, job-specific)</a>
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#regression" class="doc-navlink">Notification regression</a>
+                <a href="#twoclasses" class="doc-navlink">Two classes of agent</a>
+                <a href="#operational" class="doc-navlink">Operational agents</a>
+                <a href="#inapp" class="doc-navlink">In-app agents (blocked)</a>
+                <a href="#secretary" class="doc-navlink">Secretary sub-project</a>
+                <a href="#principles" class="doc-navlink">Principles</a>
+                <a href="#phasing" class="doc-navlink">Phasing</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">This plan defines how we use AI in TWO layers and the migration path between them, and records a real notification regression that must be fixed independently.</p>
+            <ul class="doc-body">
+                <li><strong>In-app agents</strong> (user-facing, live in the AI2 / AI-editor surface, NOT Hermes): HelpDesk, Beekeeping, Ency (herb research). Already "in the works." Migration target is the AI editor, not Hermes.</li>
+                <li><strong>Operational agents</strong> (run outside the app via Hermes/cron, later migrate into the AI editor): the <strong>Email agent</strong> (fills the missing input) and the <strong>Secretary agent</strong> (reads the DB, judges what is critical, and <strong>calls you</strong> via your registered VoIP number — text/voice/in-browser). The Secretary is the reference example of an agent that <strong>orchestrates other agents and uses more than one model</strong>.</li>
+            </ul>
+            <p class="doc-body"><strong>Hermes stays the coding agent.</strong> The AI editor is the in-app AI host. Standalone operational agents migrate INTO the editor as it matures; they are not built on Hermes long-term.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- REGRESSION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="regression" class="doc-h2">2. Notification regression (real defect — fix separately)</h2>
+            <p class="doc-body">Historically the app notified via <strong>in-app + system + email</strong>. Today <strong>only email still works</strong>; the in-app and system notification paths are broken/regressed. This is a genuine defect, independent of the agent work, and is logged as a blocking todo (NOT folded into Phase 1). Restore both paths before relying on any agent notification.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TWO CLASSES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="twoclasses" class="doc-h2">3. Two classes of agent (do not conflate)</h2>
+            <ul class="doc-body">
+                <li><strong>(a) Branch-context files</strong> (<code>.hermes.md</code>) — already built. These are NOT agents; they are static context that keeps a general coding agent on-track inside a worktree. They must contain ONLY the branch's own domain + code-ownership + the global compliance rules (by pointer). The full branch map lives in the coordinator (main <code>.hermes.md</code> + this plan's sibling <code>HermesBranchContextPlan</code>).</li>
+                <li><strong>(b) Specialized agents</strong> — purpose-built for RECURRING, BOUNDED, AUTONOMOUS work. They earn their keep only when the task repeats and is well-scoped. The Secretary/Email agents qualify; a 3d/inventory <em>coding</em> agent does NOT yet (still human-supervised worktree flow — a SKILL is the lighter right tool there).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OPERATIONAL AGENTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="operational" class="doc-h2">4. Operational agents (outside app; migrate to AI editor later)</h2>
+
+            <h3 id="email-agent" class="doc-h3">4.1 Email agent — the missing input</h3>
+            <p class="doc-body">The production-health / serious-error &#8594; DB &#8594; DailyPlan pipeline ALREADY exists and is the signal source. The gap is <strong>email</strong>. The Email agent scans/summarizes mail (reuse himalaya/IMAP — not a new channel) and feeds the existing DB/DailyPlan flow. It does not rebuild monitoring; it adds the missing input.</p>
+
+            <h3 id="secretary-agent" class="doc-h3">4.2 Secretary agent — orchestrator + VoIP call</h3>
+            <p class="doc-body">The Secretary <strong>evaluates the DB</strong> (todos, serious errors, calendar) for critical items and <strong>calls you</strong> when something needs your attention. It is the multi-agent example you asked for:</p>
+            <ul class="doc-body">
+                <li><strong>Orchestrator</strong> (cheap local model — Ollama): decides what to check, fans out.</li>
+                <li><strong>Sub-agent A</strong> (cheap): DB evaluation/triage of todos + errors + calendar.</li>
+                <li><strong>Sub-agent B</strong> (stronger — OpenRouter or Grok): when something is critical, DRAFT the notification and summarize for the user.</li>
+                <li><strong>Reach you via VoIP</strong>: a NEW user-VoIP-number config page (successor to the old Perl4 "call a page" feature) lets the Secretary call you by <strong>text, voice, or in-browser</strong>. You can interact back via text / voice / browser. Models available today in the AI chat system: Ollama (local/cheap), OpenRouter, Grok.</li>
+            </ul>
+            <p class="doc-body"><strong>Reuse, do not duplicate:</strong> the Secretary consumes the existing error/todo signal; it does not re-implement health checks. Gateway/VoIP delivery only — never ad-hoc SMTP.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- IN-APP AGENTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="inapp" class="doc-h2">5. In-app agents (HelpDesk / Beekeeping / Ency) — BLOCKED</h2>
+            <p class="doc-body">These cannot be built until their <strong>blocking todos exist</strong> and are listed in DailyPlan. Phase 2 enumerates those blockers and adds them to DailyPlan first; only then do we formalize each agent's boundary. <strong>Beekeeping (BMaster)</strong> is the cleanest isolated domain and the first candidate. These currently live outside Hermes and will migrate into the AI editor.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SECRETARY SUB-PROJECT SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="secretary" class="doc-h2">6. Secretary sub-project (where it lives)</h2>
+            <p class="doc-body">The Secretary agent is tracked as a <strong>sub-project of #267 (AGENTS — Autonomous Agents, job-specific)</strong>, NOT under the Planning project. (Parent #267 already has the agent taxonomy: 268 Agent Framework Core, 269 Built-in Job Agents, 270 Agent Ops &amp; Safety.) The exact Secretary sub-project ID must be created in the app (the <code>/api/projects</code> write did not persist in this session — create it via the project UI, then stamp its ID here). Until then, reference it as "<strong>SECRETARY-AGENT</strong>, child of #267."</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PRINCIPLES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="principles" class="doc-h2">7. Principles (avoid agent sprawl)</h2>
+            <ul class="doc-body">
+                <li><strong>Registry single source</strong> — one place defines agents (proposed: <code>root/config/agents.json</code> or this Documentation plan). No drifting copies.</li>
+                <li><strong>Reuse before create</strong> — agents reuse existing pipelines (error-audit, cron, gateway, VoIP); never reinvent.</li>
+                <li><strong>Observability</strong> — every agent action goes through <code>Logging-&gt;log_with_details</code>. No silent agents.</li>
+                <li><strong>Deliver via gateway / VoIP</strong> — never direct SMTP hacks.</li>
+                <li><strong>Skill vs agent</strong> — a one-off domain task = SKILL (loadable by any agent); a recurring autonomous task = AGENT. Keeps the count down.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phasing" class="doc-h2">8. Phasing</h2>
+            <ul class="doc-body">
+                <li><strong>Phase 0</strong> — Author this plan + registry shape; log the notification-regression blocking todo; create the SECRETARY-AGENT sub-project under #267.</li>
+                <li><strong>Phase 1</strong> — Email agent (fill the gap) + Secretary agent (DB-eval &#8594; VoIP call, text/voice/browser) + the user-VoIP-number config page. Reuses existing error/todo signal.</li>
+                <li><strong>Phase 2</strong> — Enumerate in-app trio (HelpDesk/Beekeeping/Ency) blockers; add to DailyPlan; formalize each agent's boundary. Beekeeping first.</li>
+                <li><strong>Phase 3</strong> — Migrate operational agents into the AI editor when it can host them; retire the standalone copy.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PROJECT TRACKING SECTION (RULE P1) -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="/project/details?project_id=267" class="doc-link">#267 (AGENTS — Autonomous Agents, job-specific)</a>.
+                The Secretary agent is a sub-project of #267 (create it in-app; code SECRETARY-AGENT).
+                Each phase below is a <strong>sub-project</strong>, not a single todo.
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase / Sub-project</th>
+                    <th class="doc-th">Tracking item</th>
+                    <th class="doc-th">Gate / Done when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Notification regression (in-app + system broken; only email works)</td>
+                    <td class="doc-td">BLOCKING TODO (separate from agent work)</td>
+                    <td class="doc-td">in-app + system notifications restored and verified</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Create SECRETARY-AGENT sub-project under #267</td>
+                    <td class="doc-td">app project UI</td>
+                    <td class="doc-td">sub-project exists; ID stamped in this plan &#167;6</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Email agent (missing input)</td>
+                    <td class="doc-td">todo under SECRETARY-AGENT</td>
+                    <td class="doc-td">mail summarized into existing DB/DailyPlan flow</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Secretary agent + VoIP-number config page</td>
+                    <td class="doc-td">todo under SECRETARY-AGENT</td>
+                    <td class="doc-td">DB-eval &#8594; critical call (text/voice/browser) works; multi-model</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">In-app trio blockers in DailyPlan</td>
+                    <td class="doc-td">todo under #267</td>
+                    <td class="doc-td">HelpDesk/Beekeeping/Ency blockers enumerated</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
+                    <td class="doc-td">recurring todo (set recurrence in Todo UI)</td>
+                    <td class="doc-td">keeps plan + files in sync</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">9. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="/Documentation/AutonomousAgentsPlan" class="doc-link">Autonomous Agents Plan</a> (proj #267 — parent of this plan)</li>
+                    <li><a href="/Documentation/HermesBranchContextPlan" class="doc-link">Hermes Branch Context</a> (class (a) branch-context files)</li>
+                    <li><a href="/Documentation/git_worktree_new_system_plan" class="doc-link">Git Worktree — new isolated-creation backend</a> (proj #238)</li>
+                    <li><a href="/Documentation/MASTER_PLAN" class="doc-link">MASTER_PLAN</a> — index of all plans</li>
+                    <li><a href="/Documentation/changelog/2026-08-19-ai-agent-orchestration" class="doc-link">Changelog 2026-08-19 — AI Agent Orchestration + Notification Recovery</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Tracking project: <a href="/project/details?project_id=267" class="doc-link">#267 (AGENTS)</a> — one Todo per phase; progress and time logged there.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
