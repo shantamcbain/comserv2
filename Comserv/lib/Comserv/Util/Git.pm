@@ -1555,19 +1555,53 @@ sub run_test_gate {
     my ($self, $c, $branch) = @_;
     my $repo = $self->repo_path($c) // return { success => 0, output => 'no repo' };
 
-    my $base = $self->worktree_base_dir // "$ENV{HOME}/.comserv/worktrees";
-    my $wt_dir = ($branch && $branch ne 'main')
-        ? "$base/$branch/Comserv"
-        : $repo;
-    $wt_dir = $repo unless $wt_dir && -d $wt_dir;
+    # The Catalyst app lives one level under the git root: <root>/Comserv
+    # (where script/ lives). Worktree checkouts are <base>/<branch>/Comserv.
+    my $app_dir_for = sub {
+        my $root = shift;
+        return -d "$root/Comserv" ? "$root/Comserv" : $root;
+    };
 
-    my $script = "$wt_dir/script/test_gate.sh";
-    $script = "$repo/script/test_gate.sh" unless -f $script;
+    my $base = $self->worktree_base_dir // "$ENV{HOME}/.comserv/worktrees";
+    # Worktree checkouts store the app one level under the git root:
+    # <base>/<branch>/Comserv is the git root, <base>/<branch>/Comserv/Comserv
+    # is the Catalyst app dir (where script/ and t/ live). main's app dir is
+    # <repo>/Comserv.
+    my $wt_dir = ($branch && $branch ne 'main')
+        ? "$base/$branch/Comserv/Comserv"
+        : $app_dir_for->($repo);
+    $wt_dir = $app_dir_for->($repo) unless $wt_dir && -d $wt_dir;
+
+    # The gate MUST run the canonical script shipped with the RUNNING app (the
+    # one with this fix), NOT a per-worktree copy. Worktree copies are divergent
+    # and can stale-false-pass (e.g. prove with zero existing test files exits 0,
+    # so "no tests ran" looked like green). The only per-branch difference is
+    # COMSERV_DIR, which tells the script WHICH checkout to test. Never fall back
+    # to another repo's or the worktree's own script.
+    my $app_script = ($c && $c->path_to('script'))
+        ? $c->path_to('script')->stringify . '/test_gate.sh'
+        : $app_dir_for->($repo) . '/script/test_gate.sh';
+    my $script = $app_script;
     return { success => 0, output => "test_gate.sh not found at $script" } unless -f $script;
 
-    my $out = `cd "$wt_dir" && bash "$script" --fast 2>&1`;
+    # Pass the *target checkout* explicitly so the gate tests the branch being
+    # merged (COMSERV_DIR honored by the script) and not the repo the script
+    # file happens to live in. This makes the per-worktree gate meaningful.
+    local $ENV{COMSERV_DIR} = $wt_dir;
+
+    my $out = `bash "$script" --fast 2>&1`;
     my $code = $? >> 8;
-    return { success => ($code == 0 ? 1 : 0), output => $out // '' };
+    my $res = { success => ($code == 0 ? 1 : 0), output => $out // '' };
+
+    # exit 2 from the script means a harness problem or a stale worktree with no
+    # test suite (not a real test failure). Make that distinction explicit so the
+    # UI doesn't show a misleading "fix tests" message for an un-mergeable branch.
+    if ($code == 2) {
+        $res->{stale} = 1;
+        $res->{error_msg} = "Test gate could not run for '$branch': the worktree has no test suite. "
+                          . "Update the branch from main (merge main into it) so it gains the tests, then re-run.";
+    }
+    return $res;
 }
 
 =head2 push_main($c)
