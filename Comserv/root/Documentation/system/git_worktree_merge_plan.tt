@@ -221,6 +221,25 @@
         </div>
     </div>
 
+    <!-- 3.7 MERGE UI -->
+    <div class="row">
+        <div class="col-100">
+            <h3 id="c37" class="doc-h3">3.7 Merge UI — merge main &harr; a branch from the dashboard (one at a time) — SHIPPED</h3>
+            <p class="doc-body">A PyCharm-equivalent merge from <code>/admin/git</code>: <strong>merge main &rarr; a selected branch</strong>
+            (pull main's changes down into the branch's worktree) and <strong>merge the selected branch &rarr; main</strong>
+            (only when that branch is the active/checked-out one, mirroring PyCharm's constraint). Built 2026-08-17 and
+            verified live (port 3001 &rarr; <code>git-dev</code> merged main's code; the result stays visible).</p>
+            <ul class="doc-body">
+                <li><strong>Full plan:</strong> <a href="/Documentation/plans/2026-08-17-git-dashboard-merge-ui" class="doc-link">2026-08-17 Git Dashboard Merge UI plan</a> (&sect;7.1 backlog: first-class "Rename branch" control).</li>
+                <li><strong>Changelog:</strong> <a href="/Documentation/changelog/2026-08-17-git-dashboard-merge-ui" class="doc-link">2026-08-17 — Git Dashboard: Merge UI (Shipped)</a>.</li>
+                <li><strong>Backend:</strong> <code>Controller::Admin::Git::merge</code> (POST /admin/git/merge, admin-gated <code>git_merge</code>) + <code>merge_abort</code>; <code>Util::Git::worktree_checkout_path_for_branch</code> hardened to resolve a branch's worktree by actual branch (the <code>git</code>&rarr;<code>git-dev</code> rename left stale <code>git worktree list</code> metadata).</li>
+                <li><strong>Key design decision (as built):</strong> the main&rarr;branch merge runs <em>inside the branch's own worktree checkout</em> (a worktree branch is already checked out, so it cannot be switched in the main repo), and merges the <strong>local <code>main</code></strong> ref (not <code>origin/main</code> — origin is stale when local main has unpushed commits).</li>
+                <li><strong>Linked project:</strong> <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
     <!-- 4. SAFETY -->
     <div class="row">
         <div class="col-100">
@@ -288,6 +307,7 @@
                 Todos: <a href="/todo/details?record_id=1991" class="doc-link">#1991</a> (diff view+edit),
                 <a href="/todo/details?record_id=1993" class="doc-link">#1993</a> (human approve gate),
                 <a href="/todo/details?record_id=1992" class="doc-link">#1992</a> (AI/human provenance).</p>
+                <p class="doc-muted">Related: <a href="/Documentation/HermesBranchContextPlan" class="doc-link">Hermes Branch Context</a> (per-branch AI guidance + in-app Hermes launch).</p>
                 <p><em>This documentation is part of the Comserv system.</em></p>
             </div>
         </div>
