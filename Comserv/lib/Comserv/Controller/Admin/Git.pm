@@ -1758,6 +1758,7 @@ sub test_gate :Path('/admin/git/test_gate') :Args(1) {
     $c->response->body(encode_json({
         success => $res->{success} ? 1 : 0,
         branch  => $branch,
+        stale   => $res->{stale} ? 1 : 0,
         output  => $res->{output},
         error   => $res->{error_msg},
     }));
@@ -1799,9 +1800,15 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
     # Gate: tests must be green in the worktree before merge.
     my $gate = $self->git_service->run_test_gate($c, $branch);
     unless ($gate->{success}) {
+        # Prefer the gate's own diagnostic (e.g. a stale worktree with no test
+        # suite) over the generic "fix tests" message, which is misleading when
+        # no test actually ran.
+        my $msg = $gate->{error_msg}
+            || "Test gate FAILED for '$branch' — merge blocked. Fix tests in the worktree first.";
         $c->response->body(encode_json({
             success => 0,
-            error   => "Test gate FAILED for '$branch' — merge blocked. Fix tests in the worktree first.",
+            stale   => $gate->{stale} ? 1 : 0,
+            error   => $msg,
             detail  => $gate->{output},
         }));
         return;
