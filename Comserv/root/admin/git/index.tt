@@ -28,7 +28,8 @@
 <div class="app-container">
     <div class="content-container">
         <div class="content-primary">
-            <h1><i class="fas fa-code-branch"></i> Git Dashboard</h1>
+            <h1><i class="fas fa-code-branch"></i> Git Dashboard <span class="git-current-branch git-current-branch--head" title="Branch this dashboard is operating on">
+                <i class="fas fa-code-branch"></i> <strong>[% current_branch | html %]</strong></span></h1>
 
             <div class="admin-panel" data-create-worktree-panel="1">
                 <div class="admin-panel-header"><h3><i class="fas fa-plus"></i> New Branch + Worktree</h3></div>
@@ -377,6 +378,15 @@
                     <p class="git-merge-hint">
                         <i class="fas fa-info-circle"></i>
                         Active branch: <code class="code-inline" data-git-current-branch="1">[% current_branch | html %]</code>
+                    </p>
+                    <p class="git-merge-guideline">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Only <code class="code-inline">main</code> merges branches in.</strong>
+                        Bring a branch into <code class="code-inline">main</code> with
+                        <em>Merge this branch &rarr; main</em> (only enabled for the active branch — mirroring PyCharm).
+                        The <em>Merge main &rarr; this branch</em> button is the opposite direction: it refreshes a
+                        branch with the latest <code class="code-inline">main</code> <em>before</em> you start work, it does
+                        not "merge main into main". There is no main &rarr; main inbound merge.
                     </p>
 
                     <div class="git-actions">
