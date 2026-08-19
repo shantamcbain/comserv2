@@ -153,6 +153,37 @@ sub main_repo_path {
     return $main_path // $repo;
 }
 
+=head2 worktree_checkout_dir($c, $branch, $repo)
+
+Resolve the app dir of the worktree that has C<$branch> checked out, derived
+authoritatively from C<git worktree list --porcelain> (not from string-built
+paths, which drift by a directory level). Returns C<undef> if the branch is
+not found in the worktree list; callers fall back to app_dir_for($repo).
+
+=cut
+
+sub worktree_checkout_dir {
+    my ($self, $c, $branch, $repo) = @_;
+    my $r = $self->_run($c, 'worktree', 'list', '--porcelain');
+    return undef unless $r->{success};
+
+    my ($found, $cur_path);
+    for my $line (split /\n/, $r->{output} // '') {
+        if ($line =~ m{^worktree\s+(.+)$}) {
+            $cur_path = $1;
+        }
+        elsif ($line =~ m{^branch\s+refs/heads/(.+)$}) {
+            if ($1 eq $branch && $cur_path) {
+                $found = $cur_path;
+                last;
+            }
+        }
+    }
+    return undef unless $found;
+    # $found is the worktree git root; the Catalyst app lives one level under it.
+    return -d "$found/Comserv" ? "$found/Comserv" : $found;
+}
+
 =head2 resolve_target($c, $target)
 
 Map a dashboard "target" selector to where git should actually run.
@@ -1625,15 +1656,18 @@ sub run_test_gate {
         return -d "$root/Comserv" ? "$root/Comserv" : $root;
     };
 
-    my $base = $self->worktree_base_dir // "$ENV{HOME}/.comserv/worktrees";
-    # Worktree checkouts store the app one level under the git root:
-    # <base>/<branch>/Comserv is the git root, <base>/<branch>/Comserv/Comserv
-    # is the Catalyst app dir (where script/ and t/ live). main's app dir is
-    # <repo>/Comserv.
-    my $wt_dir = ($branch && $branch ne 'main')
-        ? "$base/$branch/Comserv/Comserv"
-        : $app_dir_for->($repo);
-    $wt_dir = $app_dir_for->($repo) unless $wt_dir && -d $wt_dir;
+    # Resolve the checkout we actually test, AUTHORITATIVELY, from `git worktree
+    # list` (the same source main_repo_path uses) rather than string-building a
+    # path that can land one directory too high/low. For `main` we use the app
+    # dir of $repo; for a worktree branch we find the worktree path whose branch
+    # matches and take its app dir. Falls back to app_dir_for($repo) only if the
+    # list is unavailable.
+    my $checkout;
+    if ($branch && $branch ne 'main') {
+        $checkout = $self->worktree_checkout_dir($c, $branch, $repo);
+    }
+    $checkout = $app_dir_for->($repo) unless $checkout && -d $checkout;
+    my $wt_dir = $checkout;
 
     # The gate MUST run the canonical script shipped with the RUNNING app (the
     # one with this fix), NOT a per-worktree copy. Worktree copies are divergent
