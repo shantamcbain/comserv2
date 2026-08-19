@@ -76,7 +76,7 @@ my %ALLOWED_FLAGS = (
     merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash) },
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
-    worktree => { map { $_ => 1 } qw(add remove list prune --force) },
+    worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
 );
 
 sub new {
@@ -104,6 +104,53 @@ sub repo_path {
     $path ||= $ENV{COMSERV_GIT_REPO};
     $path ||= $c->path_to('..')->stringify if $c;
     return $path;
+}
+
+=head2 main_repo_path($c)
+
+Resolve the PRIMARY checkout — the working tree where C<main> is actually
+checked out — so operations that mutate C<main> (merge_to_main) run there
+instead of in a feature worktree.
+
+In a linked-worktree setup the feature worktree cannot check out C<main>
+(git refuses: "already checked out at <primary>"), and running
+C<git merge --no-ff E<lt>branchE<gt>> inside the feature worktree merges the
+branch into ITSELF (a no-op / "Already up to date"). So we must target the
+primary repo. We derive it from C<git worktree list>: the entry whose branch
+is C<main> (and which is not the current worktree). Falls back to repo_path()
+when worktree list is unavailable.
+
+=cut
+
+sub main_repo_path {
+    my ($self, $c) = @_;
+    my $repo = $self->repo_path($c);
+    unless (defined $repo && length $repo) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            'main_repo_path: could not resolve repo_path (no repo)');
+        return undef;
+    }
+    my $r = $self->_run($c, 'worktree', 'list', '--porcelain');
+    if (!$r->{success}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "main_repo_path: git worktree list failed (" . ($r->{error} // 'unknown') . "); falling back to repo_path");
+        return $repo;
+    }
+
+    my ($main_path, $cur_path);
+    my $cur_branch = $self->get_current_branch($c) // '';
+    for my $line (split /\n/, $r->{output} // '') {
+        if ($line =~ m{^worktree\s+(.+)$}) {
+            $cur_path = $1;
+        }
+        elsif ($line =~ m{^branch\s+refs/heads/(.+)$}) {
+            my $b = $1;
+            if ($b eq 'main' && $cur_path && $cur_path ne $repo) {
+                $main_path = $cur_path;
+            }
+        }
+    }
+    return $main_path // $repo;
 }
 
 =head2 resolve_target($c, $target)
@@ -1479,10 +1526,15 @@ NOT auto-run here; the controller reports the conflict and offers abort.
 =cut
 
 sub merge_branch {
-    my ($self, $c, $branch) = @_;
+    my ($self, $c, $branch, $opts) = @_;
     my $result = { success => 0, output => '', action => 'merge_branch' };
 
+    $opts //= {};
+    my $repo = $opts->{repo};   # optional explicit checkout (e.g. the primary repo for merge_to_main)
+
     if (!$branch) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            'merge_branch: branch name is required');
         $result->{error_msg} = "Branch name is required.";
         return $result;
     }
@@ -1495,15 +1547,19 @@ sub merge_branch {
     if (($branch eq 'main'   && $current eq 'main')
      || ($branch eq 'master' && $current eq 'master')
      || ($branch eq 'Production' && $current eq 'Production')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: refusing to merge protected branch '$branch' into itself");
         $result->{error_msg} = "Refusing to merge a protected branch into itself.";
         return $result;
     }
 
-    my $r = $self->_run($c, 'merge', '--no-ff', $branch);
+    my $r = $self->_run($c, 'merge', '--no-ff', $branch, ($repo ? { repo => $repo } : ()));
     $result->{output} = $r->{output};
     if ($r->{success}) {
         $result->{success}     = 1;
         $result->{success_msg} = "Merged '$branch' into current branch.";
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: merged '$branch' into " . ($repo // 'current checkout') . " (success)");
     }
     else {
         # Detect conflict so the UI can offer --abort.
@@ -1511,6 +1567,8 @@ sub merge_branch {
             $result->{conflict} = 1;
         }
         $result->{error_msg} = "Merge of '$branch' failed (see output).";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: merge of '$branch' failed" . ($result->{conflict} ? ' (conflict)' : '') . ": " . ($r->{output} // ''));
     }
     return $result;
 }
@@ -1552,8 +1610,13 @@ path is derived from the standard layout; falls back to the repo root if unknown
 =cut
 
 sub run_test_gate {
-    my ($self, $c, $branch) = @_;
-    my $repo = $self->repo_path($c) // return { success => 0, output => 'no repo' };
+    my ($self, $c, $branch, $repo_override) = @_;
+    my $repo = $repo_override // $self->repo_path($c);
+    unless (defined $repo && length $repo) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+            'run_test_gate: could not resolve a repo path (no repo)');
+        return { success => 0, output => 'no repo' };
+    }
 
     # The Catalyst app lives one level under the git root: <root>/Comserv
     # (where script/ lives). Worktree checkouts are <base>/<branch>/Comserv.
@@ -1582,7 +1645,11 @@ sub run_test_gate {
         ? $c->path_to('script')->stringify . '/test_gate.sh'
         : $app_dir_for->($repo) . '/script/test_gate.sh';
     my $script = $app_script;
-    return { success => 0, output => "test_gate.sh not found at $script" } unless -f $script;
+    unless (-f $script) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+            "run_test_gate: test_gate.sh not found at $script");
+        return { success => 0, output => "test_gate.sh not found at $script" };
+    }
 
     # Pass the *target checkout* explicitly so the gate tests the branch being
     # merged (COMSERV_DIR honored by the script) and not the repo the script
