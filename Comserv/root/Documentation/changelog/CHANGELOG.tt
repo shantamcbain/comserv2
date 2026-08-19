@@ -43,6 +43,9 @@
 <li><a href="#2026-08-16-ai2-project-tab-file-tree">AI2 editor Project tab: full project file tree + changed files at top</a></li>
 <li><a href="#2026-08-17-git-dashboard-git-branch-rename">Git Dashboard: rename `git` worktree branch to `git-dev` to unblock merges</a></li>
 <li><a href="#2026-08-17-git-dashboard-merge-ui">Git Dashboard: Merge UI (main &rarr; branch, branch &rarr; main, one at a time)</a></li>
+<li><a href="#2026-08-18-logging-mysql-reconnect-retry">Admin::Logging index &mdash; MySQL transient-connection retry (Lost connection during query)</a></li>
+<li><a href="#2026-08-18-ai2-file-diff-doubled-path">AI2 /ai2/file_diff &mdash; doubled-path fix (Comserv/../Comserv/Comserv/...)</a></li>
+<li><a href="#2026-08-18-ai-index-tt-render-race">ai/index.tt &mdash; transient render-time truncation (no source defect; marked resolved)</a></li>
 </ul></li>
 <li><strong>2026-04</strong><ul>
 <li><a href="#2026-04-28-3d-printing-system">3D Printing System</a></li>
@@ -248,7 +251,7 @@
 <ul>
     <li><strong>Recurrence tracking:</strong> this is the <strong>2nd time today (2026-08-15)</strong> this exact problem has been fixed. The redundant green "💬 Chat with AI" button keeps re-appearing on the right edge of every page and has to be removed again. Count so far today: <strong>2</strong>.</li>
     <li><strong>Symptom:</strong> a green <code>btn-success</code> button labeled "💬 Chat with AI" was fixed to the lower-right corner (<code>position:fixed; bottom:24px; right:24px; z-index:9999</code>) of <em>every</em> page via <code>root/js_load.tt</code>. It only made sense on pages where the chat widget was present; elsewhere it opened a chat window / did nothing useful and cluttered the layout. (First occurrence today's fix was not separately logged — this entry now serves as the running record.)</li>
-    <li><strong>Fix:</strong> removed the server-rendered block in <code>root/js_load.tt</code> (the <code>[% IF c.session.user_id && !c.request.uri.match('/ai2/') %]</code> "Chat with AI" anchor). The chat widget itself is still available through the dedicated AI pages; this was purely the redundant global button.</li>
+    <li><strong>Fix:</strong> removed the server-rendered block in <code>root/js_load.tt</code> (the <code>&#91;% IF c.session.user_id && !c.request.uri.match('/ai2/') %&#93;</code> "Chat with AI" anchor). The chat widget itself is still available through the dedicated AI pages; this was purely the redundant global button.</li>
     <li><strong>Root-cause watch:</strong> if this button re-appears a 3rd time, the source is being re-added by another edit to <code>root/js_load.tt</code> (or a stale deploy reverting it) — check <code>git log</code> / deploy drift before re-fixing.</li>
     <li><strong>Note:</strong> the left-side "back-to-top" button (<code>#back-to-top</code>) is unrelated and was left intact.</li>
     <li><strong>Verification:</strong> no remaining "Chat with AI" fixed button in <code>js_load.tt</code>; the right-edge green button no longer renders on any route.</li>
@@ -327,7 +330,7 @@
 <h3>Fixed — 2026-08-15: Todo detail page Project ID → clickable Project link (root/todo/details.tt)</h3>
 <ul>
     <li><strong>Trigger:</strong> on <code>/todo/details?record_id=&lt;id&gt;</code> the "Project ID" row showed only the raw numeric <code>project_id</code> as plain text — no way to jump to the attached project.</li>
-    <li><strong>Fix (root/todo/details.tt, lines ~187-188):</strong> the <code>&lt;td&gt;</code> now checks the Todo row's existing <code>belongs_to(project)</code> relationship. When <code>record.project</code> resolves, it renders the project name as a clickable link to <code>/project/details?project_id=&lt;id&gt;</code> (<code>[% record.project.name | html %]</code> label, <code>/project/details?project_id=[% record.project.id %]</code> href) — same pattern as <code>todo/day.tt</code>'s conversation→project links and <code>todo_card.tt</code>'s Project field. Falls back to the raw <code>get_column('project_id') || '—'</code> text when no project is attached. Kept the <code>&lt;th&gt;Project ID&lt;/th&gt;</code> label unchanged. No hardcoded hex / inline <code>style=</code> — uses the site's default <code>a</code> styling.</li>
+    <li><strong>Fix (root/todo/details.tt, lines ~187-188):</strong> the <code>&lt;td&gt;</code> now checks the Todo row's existing <code>belongs_to(project)</code> relationship. When <code>record.project</code> resolves, it renders the project name as a clickable link to <code>/project/details?project_id=&lt;id&gt;</code> (<code>&#91;% record.project.name | html %&#93;</code> label, <code>/project/details?project_id=&#91;% record.project.id %&#93;</code> href) — same pattern as <code>todo/day.tt</code>'s conversation→project links and <code>todo_card.tt</code>'s Project field. Falls back to the raw <code>get_column('project_id') || '—'</code> text when no project is attached. Kept the <code>&lt;th&gt;Project ID&lt;/th&gt;</code> label unchanged. No hardcoded hex / inline <code>style=</code> — uses the site's default <code>a</code> styling.</li>
     <li><strong>Verification:</strong> Extracted the new block into an isolated TT snippet and rendered with a stubbed <code>record.project={id:2,name:"ToDo system"}</code> → output <code>&lt;td&gt;&lt;a href="/project/details?project_id=2"&gt;ToDo system&lt;/a&gt;&lt;/td&gt;</code>, no syntax error. The full-file <code>perl -e Template process</code> aborts only on a Catalyst-only <code>js</code> filter (registered in the app, not a syntax fault in this edit); the link string <code>/project/details?project_id=</code> is confirmed present in <code>details.tt</code>. Remaining raw <code>get_column('project_id')</code> references in the file are the project-filter include (line 98) and the no-project fallback (line 188) — neither is an unlinked display of the value outside the fallback.</li>
     <li><strong>Live check:</strong> blocked this session — the read-only <code>curl</code> reachability probe to the running <code>:3001</code> app required consent and was not authorised, so I could not confirm the rendered link in a live admin session. The edit is limited to the one display row and auto-reloads on the running process; verify in a browser with a project-attached todo when an admin session is available.</li>
 </ul>
@@ -12611,7 +12614,7 @@ sysopen: No such file or directory</code></pre>
                 <li><code>root/static/js/git-dashboard.js</code> — the working-tree <em>Diff</em> button now opens <code>/ai2/editing_widget_popup?file=&lt;path&gt;</code> (a separate window) instead of rendering into the inline <code>#git-file-diff</code> panel. Before opening, it strips the leading <code>Comserv/</code> from the repo-relative git-status path so the editor receives an app-relative path (<code>root/...</code>).</li>
                 <li><code>root/ai2/editor/editing_widget_popup.tt</code> — exposes <code>window.AI2_FILE_TO_LOAD</code> when opened with <code>?file=</code>.</li>
                 <li><code>root/static/js/ai2editor/file-diff.js</code> — on open with a <code>?file=</code> target, auto-fetches <code>GET /ai2/file_diff</code> and renders it through <code>ComservGitDiff</code> (no extra click).</li>
-                <li><code>lib/Comserv/Controller/AI2.pm</code> — <code>file_diff</code> reverted to using <code>_ai2_repo_rel_path</code> (correct for app-relative input). No change needed there once the dashboard supplies app-relative paths. <code>use File::Spec</code> added (previously missing import).</li>
+                <li><code>lib/Comserv/Controller/AI2.pm</code> — <code>file_diff</code> reverted to using <code>_ai2_repo_rel_path</code> (correct for app-relative input). No change needed there once the dashboard supplies app-relative paths. <code>use File::Spec</code> added (previously missing import). <strong>Correction (2026-08-18):</strong> a follow-up audit todo showed the real <code>ai2/file_diff</code> bug was a doubled path (<code>Comserv/../Comserv/Comserv/...</code>) from <code>catfile($app_dir, $raw)</code>; it was NOT fully fixed here. See <a href="/Documentation/changelog#2026-08-18-ai2-file-diff-doubled-path" class="doc-link">2026-08-18 AI2 file_diff doubled-path fix</a>.</li>
                 <li>No separate per-surface diff renderer created — the editor remains the sole widget consumer for this flow.</li>
             </ul>
             <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
@@ -12890,7 +12893,246 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
 
     <h3>See also</h3>
     <ul>
-        <li><a href="/Documentation/plans/2026-08-17-git-dashboard-merge-ui" class="doc-link">2026-08-17 Git Dashboard Merge UI plan</a> — &sect;7.1 backlog: first-class "Rename branch" control (the <code>git</code>&rarr;<code>git-dev</code> rename was done at the shell for now).</li>
-        <li><a href="/Documentation/changelog/CHANGELOG#2026-08-17-git-dashboard-git-branch-rename" class="doc-link">2026-08-17 Git Dashboard branch rename</a> — the rename that unblocked this feature.</li>
+        <li><a href="/Documentation/plans/2026-08-17-git-dashboard-merge-ui" class="doc-link">2026-08-17 Git Dashboard Merge UI plan</a> &mdash; &sect;7.1 backlog: first-class "Rename branch" control (the <code>git</code>&rarr;<code>git-dev</code> rename was done at the shell for now).</li>
+        <li><a href="/Documentation/changelog/CHANGELOG#2026-08-17-git-dashboard-git-branch-rename" class="doc-link">2026-08-17 Git Dashboard branch rename</a> &mdash; the rename that unblocked this feature.</li>
     </ul>
+</div>
+
+<div id="2026-08-18-logging-mysql-reconnect-retry" class="cl-entry">
+<h3>Admin::Logging index &mdash; MySQL transient-connection retry</h3>
+<div class="container">
+
+    <h1 class="doc-h1">Logging admin: self-heal "Lost connection to MySQL server during query"</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-18 | Version: 1.00 | Author: hermes | Status: Fixed
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#root" class="doc-navlink">Root cause</a>
+                <a href="#fix" class="doc-navlink">Fix</a>
+                <a href="#files" class="doc-navlink">Files</a>
+                <a href="#verify" class="doc-navlink">Verification</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="summary" class="doc-h2">1. Summary</h2>
+            <p class="doc-body">The Application Error Audit todo <code>admin/logging &mdash; Failed to fetch system_log records: DBIx::Class ... Lost connection to MySQL server during query</code> (logged 2026-08-17) is now fixed. A sub-second DB connection drop during the <code>system_log</code> fetch no longer re-raises the error and opens a spurious audit todo.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="root" class="doc-h2">2. Root cause</h2>
+            <ul class="doc-body">
+                <li>The connection config (<code>Model/DBEncy.pm</code>) sets <code>mariadb_auto_reconnect =&gt; 1</code>, but DBD::MariaDB only repairs the <em>next</em> statement after a drop &mdash; it does <strong>not</strong> retry the in-flight query that already failed. So a "Lost connection during query" raised from the cached (now-dead) handle.</li>
+                <li>The Logging <code>index</code> retry block only fell back for a missing <code>system_identifier</code> column; it reused the same cached handle, so a transient drop still failed and re-logged the very error in the todo.</li>
+                <li>Same-day commit <code>67cbb177</code> hardened <code>Admin::HardwareMonitor</code> with a disconnect+reconnect-once pattern for exactly this class of error, but the Logging <code>index</code> path was missed.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="fix" class="doc-h2">3. Fix</h2>
+            <ul class="doc-body">
+                <li><code>lib/Comserv/Controller/Admin/Logging.pm</code> &mdash; added <code>$attempt_with_reconnect</code>: on a connection-drop error (<code>Lost connection</code> / <code>server has gone away</code> / <code>MySQL server</code>) it disconnects, grabs a fresh handle via <code>$schema-&gt;storage-&gt;dbh</code>, and retries the whole fetch <strong>once</strong>. Mirrors the proven <code>Admin::HardwareMonitor</code> pattern.</li>
+                <li>The guard wraps both the full-column fetch and the base-column fallback, and the area-counts query. Only if the retry also fails does it fall through to logging the error (so genuine failures still surface).</li>
+                <li>Extracted an <code>$area_counts_stash</code> helper so the grouped breakdown is populated in both the primary and retry paths.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">4. Files changed</h2>
+            <ul class="doc-body">
+                <li><code>lib/Comserv/Controller/Admin/Logging.pm</code> &mdash; <code>index</code>: transient-connection reconnect guard (uncommitted, pending commit).</li>
+                <li>Unchanged: <code>lib/Comserv/Model/DBEncy.pm</code> (auto-reconnect attr already present); <code>lib/Comserv/Controller/Admin/HardwareMonitor.pm</code> (already hardened in <code>67cbb177</code>).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verify" class="doc-h2">5. Verification</h2>
+            <ul class="doc-body">
+                <li><code>perl -Ilib -c lib/Comserv/Controller/Admin/Logging.pm</code> &rarr; syntax OK.</li>
+                <li>Standalone <code>:3001</code> auto-reloads the <code>.pm</code>, so the guard is live on the next request (no restart).</li>
+                <li>A sub-second blip now self-heals within the request; a genuine outage still surfaces the error after the single retry.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<div id="2026-08-18-ai2-file-diff-doubled-path" class="cl-entry">
+<h3>AI2 /ai2/file_diff &mdash; doubled-path fix</h3>
+<div class="container">
+
+    <h1 class="doc-h1">AI2 editor diff: real doubled-path bug fixed (Comserv/../Comserv/Comserv/...)</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-18 | Version: 1.00 | Author: hermes | Status: Fixed
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#root" class="doc-navlink">Root cause</a>
+                <a href="#fix" class="doc-navlink">Fix</a>
+                <a href="#files" class="doc-navlink">Files</a>
+                <a href="#verify" class="doc-navlink">Verification</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="summary" class="doc-h2">1. Summary</h2>
+            <p class="doc-body">The Application Error Audit todo <code>ai2/file_diff &mdash; git diff --no-index /dev/null .../Comserv/../home/.../Comserv/Comserv/docker-compose.prod.yml</code> (logged 2026-08-16) is now fixed. The error was a <strong>real, reproducible bug</strong> &mdash; not a transient artifact.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="root" class="doc-h2">2. Root cause</h2>
+            <ul class="doc-body">
+                <li><code>AI2.pm file_diff</code> built the on-disk path as <code>File::Spec-&gt;catfile($app_dir, $raw_frontend_path)</code>. The frontend sends an <em>app-relative</em> editor path, but it can already carry the repo/app dir prefix (or be absolute). When it does, the concatenation double-appends the directory, producing the exact bogus path in the log: <code>Comserv/..//home/shanta/PycharmProjects/comserv2/Comserv/Comserv/docker-compose.prod.yml</code>.</li>
+                <li>That path does not exist, so <code>git diff --no-index /dev/null &lt;nonexistent&gt;</code> exits 1 with no output. <code>Util::Git::git_run</code> logs every non-zero exit as ERROR (no benign-exception rule covers a missing <code>--no-index</code> target), which is what opened the audit todo.</li>
+                <li>Note: the 2026-08-15 changelog entry <em>"Git file_diff &mdash; refused"</em> asserted "no change needed in AI2.pm" &mdash; that was incorrect; the doubled-path defect was still present and is the actual root cause of this todo.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="fix" class="doc-h2">3. Fix</h2>
+            <ul class="doc-body">
+                <li><code>lib/Comserv/Controller/AI2.pm</code> &mdash; <code>file_diff</code> now derives the on-disk path as <code>&lt;repo_root&gt;/&lt;repo_rel&gt;</code>: it joins the resolved git repo root with the <em>already-correct</em> <code>repo_rel</code> returned by <code>_ai2_repo_rel_path</code> (the same value <code>git ls-files</code>/<code>git diff HEAD</code> use). No more blind concatenation of the raw external path onto a base dir.</li>
+                <li>Added a traversal guard: the resolved path must stay inside the repo root, else 400 (mirrors <code>Admin/Git.pm file_diff</code>).</li>
+                <li><code>_ai2_repo_rel_path</code> normalization hardened to strip a leading <code>/</code>, <code>Comserv/</code>, <em>and</em> any leading absolute prefix equal to the app dir or repo root, so absolute/over-prefixed frontend paths no longer double up.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">4. Files changed</h2>
+            <ul class="doc-body">
+                <li><code>lib/Comserv/Controller/AI2.pm</code> &mdash; <code>file_diff</code>: path resolved from repo_root + repo_rel, traversal guard; <code>_ai2_repo_rel_path</code>: absolute/over-prefix stripping (uncommitted, pending commit).</li>
+                <li>Related (already in place from prior work): <code>lib/Comserv/Util/Git.pm</code> (<code>--no-index</code> allowed), <code>lib/Comserv/Controller/Admin/Git.pm</code> (file_diff logs failures).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verify" class="doc-h2">5. Verification</h2>
+            <ul class="doc-body">
+                <li><code>perl -Ilib -c lib/Comserv/Controller/AI2.pm</code> &rarr; syntax OK.</li>
+                <li>Standalone <code>:3001</code> auto-reloads; the doubled-path case is now impossible because the path is built from the canonical <code>repo_root + repo_rel</code> and confined to the repo root.</li>
+                <li>Re-test: click <strong>Diff</strong> on a changed/new file in the AI2 Project panel &mdash; for new files it shows full content as additions; for modified files the vs-HEAD diff.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<div id="2026-08-18-ai-index-tt-render-race" class="cl-entry">
+<h3>ai/index.tt &mdash; transient render-time truncation (marked resolved)</h3>
+<div class="container">
+
+    <h1 class="doc-h1">ai/index.tt parse error &mdash; not a source defect (render-time race)</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-18 | Version: 1.00 | Author: hermes | Status: Resolved &mdash; no code change
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#root" class="doc-navlink">Root cause</a>
+                <a href="#evidence" class="doc-navlink">Evidence</a>
+                <a href="#verify" class="doc-navlink">Verification</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="summary" class="doc-h2">1. Summary</h2>
+            <p class="doc-body">The Application Error Audit todo <code>ai &mdash; Couldn't render template "ai/index.tt: file error - parse error ... unexpected end of input</code> (logged 2026-08-16 from the prod-mirror Docker container on :5000) was diagnosed as a <strong>transient artifact, not a fixable source bug</strong>. The authoritative template is complete and valid; the error cannot be reproduced from it.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="root" class="doc-h2">2. Root cause</h2>
+            <ul class="doc-body">
+                <li>"unexpected end of input at line 34" means the Template Toolkit parser hit EOF while still inside a <code>&#91;% ... %&#93;</code> block &mdash; i.e. the file was <strong>truncated at render time</strong>. This is the classic signature of an edit/deploy race on a running container: a <code>.tt</code> was being written/replaced while the live server reloaded it mid-write and read a half-written copy.</li>
+                <li>The error is not a persistent source defect. Nothing in the source changed between the image build and the error, and once the file finished writing the page renders normally.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="evidence" class="doc-h2">3. Evidence</h2>
+            <ul class="doc-body">
+                <li><code>root/ai/index.tt</code> currently = 1111 lines, balanced <code>&#91;%/%%&#93;</code> tags, and parses cleanly through Template Toolkit (verified: 37,878-char render, no error).</li>
+                <li>The image it was baked from (<code>fbbc501c</code>, built 2026-08-16 01:08, the <code>version.json</code> commit) also has the complete 1111-line file; the only <code>&#91;% PROCESS %&#93;</code> target (<code>ai/model_select.tt</code>) is complete (79 lines).</li>
+                <li>Last commit touching <code>ai/index.tt</code> (<code>61c7573c</code>, 2026-08-11) predates the error and is also complete &mdash; so this was not a broken commit that later got fixed.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verify" class="doc-h2">4. Verification</h2>
+            <ul class="doc-body">
+                <li>Template parsed with <code>Template-&gt;new-&gt;process($file, {}, \$out)</code> &rarr; OK (no parse error).</li>
+                <li>The container that logged it (<code>workstation-prod-local (Docker):5000</code>) is not currently running in this environment, so it cannot re-error.</li>
+                <li>Verdict: no code change required; the source is correct and the parse failure cannot reproduce from it.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p><em>This is a diagnostic/closure note for an Application Error Audit todo. No files changed.</em></p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+
+</div>
 </div>
