@@ -1787,18 +1787,24 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
         return;
     }
 
-    # Ensure we are on main before merging.
-    my $cur = $self->get_current_branch($c);
-    if ($cur ne 'main') {
-        my $sw = $self->git_service->switch_branch($c, 'main');
-        unless ($sw->{success}) {
-            $c->response->body(encode_json({ success => 0, error => "Could not switch to main: $sw->{error_msg}" }));
-            return;
-        }
+    # The merge must land in the PRIMARY checkout (where `main` is actually
+    # checked out), NOT in this feature worktree. A linked worktree cannot
+    # check out `main` (git refuses: "already checked out at <primary>"), and
+    # running `git merge --no-ff <branch>` inside the worktree merges the branch
+    # into ITSELF (a "Already up to date" no-op). So we resolve the primary repo
+    # and run both the gate and the merge there. main is already checked out
+    # there, so no branch switch is required or attempted.
+    my $main_repo = $self->git_service->main_repo_path($c);
+    unless ($main_repo) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            'merge_to_main: could not resolve the primary repo (main checkout)');
+        $c->response->body(encode_json({ success => 0, error => 'Could not resolve the primary repo (main checkout).' }));
+        return;
     }
 
-    # Gate: tests must be green in the worktree before merge.
-    my $gate = $self->git_service->run_test_gate($c, $branch);
+    # Gate: tests must be green in the worktree before merge. Run the gate against
+    # the primary repo so the checkout it tests is consistent with the merge target.
+    my $gate = $self->git_service->run_test_gate($c, $branch, $main_repo);
     unless ($gate->{success}) {
         # Prefer the gate's own diagnostic (e.g. a stale worktree with no test
         # suite) over the generic "fix tests" message, which is misleading when
@@ -1814,7 +1820,7 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
         return;
     }
 
-    my $res = $self->git_service->merge_branch($c, $branch);
+    my $res = $self->git_service->merge_branch($c, $branch, { repo => $main_repo });
     if ($res->{conflict}) {
         $c->response->body(encode_json({
             success  => 0,
