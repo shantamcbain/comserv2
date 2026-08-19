@@ -473,6 +473,16 @@
     font-weight: bold;
 }
 
+.git-merge-guideline {
+    margin: 6px 0 10px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--accent-color, #FF9900);
+    background: var(--bg-muted-color, #f5f5f5);
+    color: var(--text-color, #333);
+    font-size: var(--font-size-small, 13px);
+    line-height: 1.45;
+}
+
 .section-info-danger {
     color: var(--danger-color, #c0392b);
     font-weight: bold;
