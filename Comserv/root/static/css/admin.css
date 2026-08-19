@@ -473,6 +473,37 @@
     font-weight: bold;
 }
 
+.section-info-danger {
+    color: var(--danger-color, #c0392b);
+    font-weight: bold;
+}
+
+.section-info-muted {
+    color: var(--text-muted-color, #6c757d);
+    font-style: italic;
+    font-size: var(--font-size-small, 13px);
+    opacity: 0.85;
+}
+
+/* Current checked-out branch indicator on the Git dashboard.
+   Kept small + theme-tinted so it reads as "where you are", not a CTA. */
+.git-current-branch {
+    margin-left: 0.5rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent-color, #FF9900);
+    color: #fff;
+    font-size: var(--font-size-small, 13px);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.git-current-branch--head {
+    /* Sits inline in the "Repository" card header as the primary branch label. */
+    margin-left: 0.4rem;
+    font-size: 0.8rem;
+    vertical-align: middle;
+}
+
 .btn-sm {
     padding: 6px 12px;
     font-size: 12px;
