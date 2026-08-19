@@ -136,6 +136,7 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/TodoListPageDisplayTuningPlan') %]">Todo List Ranking</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Language Standard</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]">Autonomous Agents</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]">AI Agent Orchestration</a>
     </div>
 </div>
 
@@ -655,6 +656,7 @@ V2 MIG   V2MIG (#259) + P1-P5 (#260-264) ─ own top-level project; P4 = Plannin
                 <li><a href="/Documentation/DocumentationTtTemplate" class="doc-link">Documentation TT Template</a> &mdash; required page structure / theme classes</li>
                 <li><a href="/Documentation/PlanningLanguageStandard" class="doc-link">Planning Language Standard</a> &mdash; PROJECT/PHASE/STEP/GATE vocabulary</li>
                 <li><a href="/Documentation/AutonomousAgentsPlan" class="doc-link">Autonomous Agents Plan</a> &mdash; newest sub-plan (proj #267)</li>
+                <li><a href="/Documentation/AIAgentOrchestrationPlan" class="doc-link">AI Agent Orchestration + Notification Recovery</a> &mdash; sub-plan of #267 (Email + Secretary agents, VoIP call, notification regression)</li>
                 <li><a href="/admin" class="doc-link">Administrative Interface</a></li>
             </ul>
         </div>
