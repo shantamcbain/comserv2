@@ -155,6 +155,7 @@ sub process {
     my $dispatch = {
         ollama     => 'AI2::Provider::Ollama',
         grok       => 'AI2::Provider::Grok',
+        supergrok  => 'AI2::Provider::Grok',
         openrouter => 'AI2::Provider::OpenRouter',
         external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
     };
