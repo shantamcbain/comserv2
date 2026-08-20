@@ -19,6 +19,7 @@
 <h3>2026</h3>
 <ul class="cl-toc-year">
 <li><strong>2026-08</strong><ul>
+<li><a href="#2026-08-19-hermes-no-nested-worktree">2026-08-19 — Git dashboard Hermes launch must not use -w</a></li>
 <li><a href="#2026-08-19-merge-to-main-primary-repo">2026-08-19 — In-app merge branch→main targets the primary repo + test-gate path fix</a></li>
 <li><a href="#2026-08-10-ai-model-catalog-single-source">AI Model Catalog &amp;mdash; Single Source of Truth &amp;amp; Chat Widget Repair</a></li>
 <li><a href="#2026-08-10-ai2-providers-hashref-guard">AI2 Providers &amp;mdash; guard against malformed catalog elements</a></li>
@@ -13224,6 +13225,22 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
             </ul>
             <p class="doc-body"><strong>Fix:</strong> resolve the primary checkout via <code>git rev-parse --git-common-dir</code> (<code>main_repo_path</code>); run both the gate and <code>git merge --no-ff &lt;branch&gt;</code> with an explicit repo override; never switch branches; whitelist <code>--porcelain</code> and <code>--git-common-dir</code>; honor <code>COMSERV_DIR</code> in <code>test_gate.sh</code> so the running app's script tests the branch checkout. Same path is used by <code>POST /admin/git/merge_to_main</code> and the dashboard <code>POST /admin/git/merge</code> (branch→main).</p>
             <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>lib/Comserv/Controller/Admin/Git.pm</code>, <code>script/test_gate.sh</code>, <code>t/util_git.t</code>. Tracked under <a href="/todo/details?record_id=2006" class="doc-link">todo #2006</a> / project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-hermes-no-nested-worktree" class="cl-entry">
+<h3>2026-08-19 — Git dashboard Hermes launch must not use -w</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body">The Git dashboard Develop Servers &quot;Hermes&quot; button copied <code>hermes chat -w</code>. That flag creates a nested <code>hermes/hermes-*</code> worktree + branch (often from <code>origin/main</code>), so the agent is not on the feature branch the user clicked. Comserv already isolates via <code>~/.comserv/worktrees/&lt;branch&gt;/Comserv</code>.</p>
+            <ul class="doc-body">
+                <li><code>Util::Git-&gt;build_worktree_list</code> now emits <code>cd &lt;git-root&gt; &amp;&amp; hermes chat</code> (no <code>-w</code>) for <code>main</code> and every registered branch.</li>
+                <li>Plan + 3d branch context updated: never launch Hermes with <code>-w</code> from a Comserv worktree.</li>
+            </ul>
+            <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>root/static/js/git-dashboard.js</code>, <code>root/Documentation/HermesBranchContextPlan.tt</code>. Tracked under <a href="/todo/details?record_id=2143" class="doc-link">todo #2143</a> / project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
         </div>
     </div>
 </div>
