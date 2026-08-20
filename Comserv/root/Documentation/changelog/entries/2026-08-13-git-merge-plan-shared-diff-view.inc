@@ -1,0 +1,106 @@
+<div id="2026-08-13-git-merge-plan-shared-diff-view" class="cl-entry">
+<h3>Git merge plan — single shared diff view + mandatory human approve before AI enters main</h3>
+<div class="container">
+
+    <h1 class="doc-h1">Git merge plan — single shared diff view + mandatory human approve</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-13 | Version: 1.00 | Author: hermes | Status: Plan decision recorded (links to project #238)
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#decisions" class="doc-navlink">Decisions</a>
+                <a href="#todos" class="doc-navlink">Linked Todos</a>
+                <a href="#files" class="doc-navlink">Files Changed</a>
+                <a href="#related" class="doc-navlink">Related</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="summary" class="doc-h2">1. Summary</h2>
+            <p class="doc-body">Updated <a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a> from v0.1 → v0.2 to capture two decisions the user made about the git page / review UI:</p>
+            <ul class="doc-body">
+                <li><strong>One shared diff view.</strong> Created and modified files on the Git Dashboard must each link to a diff view, but there is exactly ONE diff-view component, and every surface (<code>/admin/git</code> working-tree rows, merge review, commit-message preview) links to or embeds it. No per-surface diff fork to maintain. <strong>Correction (2026-08-15):</strong> the original wording here claimed this was "seeded in the AI2 editor <code>git-review.js</code>" — that file never existed. What shipped instead were two bespoke inline renderers: <code>git-dashboard.js</code> (working-tree <code>#git-file-diff</code> panel via <code>GET /admin/git/file_diff</code>) and <code>ai2editor/file-diff.js</code> (<code>#git-diff-pane</code> via <code>GET /ai2/file_diff</code>). On 2026-08-15 the decision was actually implemented: a real canonical widget <code>root/static/js/git-diff-viewer.js</code> (namespace <code>ComservGitDiff</code>) was built and both renderers were refactored to route through it. See <a href="/Documentation/changelog#2026-08-15-git-diff-viewer-shared-widget" class="doc-link">2026-08-15 — shared diff widget built</a>.</li>
+                <li><strong>View, edit, approve before AI commits to main.</strong> The AI may commit only inside its worktree. Entry into <code>main</code> requires a human to open the shared diff view, optionally edit files, and record an explicit audit approval that covers the current diff. Merge/push to main are blocked without it.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="decisions" class="doc-h2">2. Decisions locked</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">Topic</th><th class="doc-th">Decision</th><th class="doc-th">Plan section</th></tr>
+                <tr>
+                    <td class="doc-td">Diff viewer architecture</td>
+                    <td class="doc-td">Single shared component, reused by all surfaces. One page + one code path to maintain. <em>Implemented 2026-08-15 as <code>root/static/js/git-diff-viewer.js</code> (namespace <code>ComservGitDiff</code>); both the dashboard and AI2 editor renderers route through it. See the 2026-08-15 entry.</em></td>
+                    <td class="doc-td">§3.5</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Human gate before AI → main</td>
+                    <td class="doc-td">View → edit → approve. AI commits only in worktree; merge/push to main blocked until explicit human audit approval covers the diff.</td>
+                    <td class="doc-td">§3.6, §6</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="todos" class="doc-h2">3. Linked todos (project #238 GITWT-NEW)</h2>
+            <div class="bm-callout" style="border-left: 4px solid var(--primary-color, #2e7d32);">
+                <strong>&#128193; All git todos in one place:</strong>
+                <a href="/project/details?project_id=238" class="doc-link">Open project #238 (GITWT-NEW)</a>
+                for the full, live list of every todo in this work.
+            </div>
+            <ul class="doc-body">
+                <li><a href="/todo/details?record_id=1991" class="doc-link">Todo #1991</a> — Git Desktop: add PyCharm-style per-file diff review and edit workflow. The shared diff view + edit surface (the review surface required before commit).</li>
+                <li><a href="/todo/details?record_id=1993" class="doc-link">Todo #1993</a> — Git Desktop: enforce mandatory human audit approval before AI code enters main. The approval gate that blocks merge/push.</li>
+                <li><a href="/todo/details?record_id=1992" class="doc-link">Todo #1992</a> — record AI-versus-human commit provenance & changed-file attribution. Shown inside the diff/commit/review screens.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">4. Files changed in this change</h2>
+            <ul class="doc-body">
+                <li><code>root/Documentation/system/git_worktree_merge_plan.tt</code> — v0.2: added <code>project_id</code>/<code>project_code</code> META, §3.5 (single shared diff view), §3.6 (mandatory human approve), and §6 decision log. Cross-linked todos #1991/#1993.</li>
+                <li><code>root/Documentation/changelog/2026-08-13-git-merge-plan-shared-diff-view.tt</code> — this entry.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="related" class="doc-h2">5. Related</h2>
+            <ul class="doc-body">
+                <li><a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a> (the git page plan this records against).</li>
+                <li><a href="/Documentation/system/git_worktree_new_system_plan" class="doc-link">git_worktree_new_system_plan.tt</a> (worktree creation backend, project #238 phases).</li>
+                <li><a href="/project/details?project_id=238" class="doc-link">Project #238 (GITWT-NEW)</a>.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Owning project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>. Plan decisions recorded against <a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a> v0.2.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
