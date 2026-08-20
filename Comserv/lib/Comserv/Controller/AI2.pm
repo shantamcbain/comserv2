@@ -114,6 +114,12 @@ sub providers :Local :Args(0) {
                 $h;
             };
         }
+        elsif ($p->{service} eq 'supergrok') {
+            $p->{name} = 'SuperGrok (prepaid)';
+        }
+        elsif ($p->{service} eq 'grok') {
+            $p->{name} = 'xAI (Grok)';
+        }
     }
 
     # Prime the shared catalog cache from the catalog we just built, so every
