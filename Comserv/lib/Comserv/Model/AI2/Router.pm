@@ -37,8 +37,19 @@ sub _detect_provider {
     my ($self, $requested_model) = @_;
     return ('ollama', $requested_model) unless $requested_model;
 
-    if ($requested_model =~ /^grok/i) {
-        return ('grok', $requested_model);
+    my $bare = $requested_model;
+    my $prefix = '';
+    if ($bare =~ s/^([^|]+)\|//) {
+        $prefix = lc($1);
+    }
+    if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
+        return ('supergrok', $bare);
+    }
+    if ($prefix eq 'grok' || $bare =~ /^grok/i) {
+        return ('grok', $bare);
+    }
+    if ($prefix eq 'openrouter' || $prefix eq 'external' || $bare =~ m{/}) {
+        return ('external', $bare);
     }
     # Namespaced models (provider/slug, e.g. "anthropic/claude-3-haiku",
     # "openai/gpt-4o", "meta-llama/llama-3.1-8b-instruct", "tencent/hy3")
@@ -141,7 +152,8 @@ sub _external_default_available {
     return 0 unless $external && $external =~ /^([^|]+)\|(.+)$/;
     my ($svc, $model) = ($1, $2);
 
-    my $cls = { grok => 'AI2::Provider::Grok', openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
+    my $cls = { grok => 'AI2::Provider::Grok', supergrok => 'AI2::Provider::Grok',
+                openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
     return 0 unless $cls;
     my $prov = try { $c->model($cls) } catch { undef };
     return 0 unless $prov && $prov->can('_resolve_api_key');
@@ -253,6 +265,7 @@ sub dispatch_chat {
     my $dispatch = {
         ollama     => 'AI2::Provider::Ollama',
         grok       => 'AI2::Provider::Grok',
+        supergrok  => 'AI2::Provider::Grok',
         openrouter => 'AI2::Provider::OpenRouter',
         external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
     };
@@ -368,10 +381,11 @@ sub get_available_models {
     # We never emit a bare service-name id (e.g. "grok") as a selectable
     # model — that would be sent to chat and fail with "model not found".
     my %external = (
+        supergrok  => 'AI2::Provider::Grok',
         grok       => 'AI2::Provider::Grok',
         openrouter => 'AI2::Provider::OpenRouter',
     );
-    for my $svc (sort keys %external) {
+    for my $svc (qw(supergrok grok openrouter)) {
         my $cls  = $external{$svc};
         my $prov = try { $c->model($cls) } catch { undef };
         unless ($prov && $prov->can('list_models') && $prov->can('_resolve_api_key')) {
@@ -381,12 +395,24 @@ sub get_available_models {
             next;
         }
 
-        # Can we resolve a key? _resolve_api_key needs $c for session/DB; if it
-        # returns nothing, the provider is configured-but-no-key.
-        my $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
+        my $has_key;
+        my $listed;
+        if ($svc eq 'supergrok' && $prov->can('resolve_prepaid_key')) {
+            $has_key = try { $prov->resolve_prepaid_key($c) } catch { undef };
+            $listed  = try { $prov->list_models($c, undef, mode => 'prepaid') } catch { undef }
+                if $has_key;
+        }
+        elsif ($svc eq 'grok' && $prov->can('resolve_paid_key')) {
+            $has_key = try { $prov->resolve_paid_key($c) } catch { undef };
+            $listed  = try { $prov->list_models($c, undef, mode => 'paid') } catch { undef }
+                if $has_key;
+        }
+        else {
+            $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
+            $listed  = try { $prov->list_models($c) } catch { undef } if $has_key;
+        }
 
         if ($has_key) {
-            my $listed = try { $prov->list_models($c) } catch { undef };
             if ($listed && $listed->{success} && $listed->{models} && @{$listed->{models}}) {
                 for my $m (@{$listed->{models}}) {
                     push @all, {
@@ -394,9 +420,7 @@ sub get_available_models {
                         provider => $svc,
                         label    => ($m->{label} || $m->{id}) . " ($svc)",
                         local    => 0,
-                        # AIMPS-P1 (#253): keep real per-token pricing so the
-                        # catalog can sort/filter/display by cost. Free ":free"
-                        # models carry a pricing hash of zeros.
+                        prepaid  => ($svc eq 'supergrok' || $m->{prepaid}) ? 1 : 0,
                         pricing          => $m->{pricing}        || {},
                         price_prompt     => $m->{price_prompt}     // 0,
                         price_completion => $m->{price_completion} // 0,
@@ -465,7 +489,7 @@ sub _role_filter_models {
         if ($tier eq 'guest') {
             push @out, $m if $free || $local;
         } else { # member
-            next if $svc eq 'grok';
+            next if $svc eq 'grok' || $svc eq 'supergrok';
             my $pp = ($m->{price_prompt}     // 0) + 0;
             my $pc = ($m->{price_completion} // 0) + 0;
             my $max = ( $pp > $pc ) ? $pp : $pc;
