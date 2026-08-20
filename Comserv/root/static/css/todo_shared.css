@@ -182,17 +182,17 @@
    Bootstrap's hardcoded colors. ── */
 .todo-card.card,
 .todo-card details.card {
-    background-color: var(--card-bg, var(--bg-secondary, transparent));
+    background-color: var(--card-bg, var(--bg-color, #fff));
     border-color: var(--border-color, #ddd);
-    color: var(--text-color, #333);
+    color: var(--text-color, #000);
 }
 .todo-card .card-body {
-    background-color: var(--card-bg, var(--bg-secondary, transparent));
-    color: var(--text-color, #333);
+    background-color: var(--card-bg, var(--bg-color, #fff));
+    color: var(--text-color, #000);
 }
 .todo-card-pre {
     background-color: var(--bg-secondary, #f8f9fa);
-    color: var(--text-color, #333);
+    color: var(--text-color, #000);
     border-color: var(--border-color, #ddd);
 }
 .todo-card .text-muted { color: var(--text-muted-color, #666) !important; }
