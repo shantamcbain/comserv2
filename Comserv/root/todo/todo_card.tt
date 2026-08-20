@@ -59,7 +59,7 @@
 
 <div [% IF tc_wrapper_id %]id="[% tc_wrapper_id %]"[% END %]
      [% tc_wrapper_extra_data %][% IF tc_wrapper_extra %] [% tc_wrapper_extra %][% END %]
-     class="todo-card pri-[% tci_p %][% IF tc_drag_class %] [% tc_drag_class %][% END %][% IF tci_is_done OR tc_is_blocked %] opacity-60[% END %]">
+     class="todo-card[% IF tc_drag_class %] [% tc_drag_class %][% END %][% IF tci_is_done OR tc_is_blocked %] opacity-60[% END %]">
   <details [% IF tc_open %]open[% END %] class="card">
     [%# ── Closed summary row ── %]
     [% IF tc_calendar %]

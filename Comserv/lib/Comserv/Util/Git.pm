@@ -1370,6 +1370,9 @@ sub build_worktree_list {
             # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
             # No -w — see main hermes_cmd comment above.
             hermes_cmd => "cd $base/$name/Comserv && hermes chat",
+            # Optional planning-project link (worktrees.json project_id). Used by
+            # /planning/daily to scope the Focus Queue to this branch's todos.
+            project_id => $b->{project_id} // undef,
         };
     }
     return \@list;
