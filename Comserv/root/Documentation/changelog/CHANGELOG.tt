@@ -19,6 +19,7 @@
 <h3>2026</h3>
 <ul class="cl-toc-year">
 <li><strong>2026-08</strong><ul>
+<li><a href="#2026-08-20-git-pull-worktree-checkout">2026-08-20 — Git pull must not checkout main from a worktree</a></li>
 <li><a href="#2026-08-19-supergrok-docs">2026-08-19 — Docs: SuperGrok is its own prepaid provider</a></li>
 <li><a href="#2026-08-19-supergrok-source">2026-08-19 — SuperGrok prepaid models as a portable catalog source</a></li>
 <li><a href="#2026-08-19-aisystem-coordinator">2026-08-19 — AISYSTEM coordinator plan: ordered AI-use waves + Hermes aliases</a></li>
@@ -13294,6 +13295,23 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
                 <li>Plan + 3d branch context updated: never launch Hermes with <code>-w</code> from a Comserv worktree.</li>
             </ul>
             <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>root/static/js/git-dashboard.js</code>, <code>root/Documentation/HermesBranchContextPlan.tt</code>. Tracked under <a href="/todo/details?record_id=2143" class="doc-link">todo #2143</a> / project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-20-git-pull-worktree-checkout" class="cl-entry">
+<h3>2026-08-20 — Git pull must not checkout main from a worktree</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body"><code>/admin/git_pull</code> on a worktree server (e.g. planning:4005) ran <code>git checkout main</code>, which git refuses with exit 128 (<code>already used by worktree</code> at the primary checkout). That was logged as ERROR at <code>git_run</code> and spawned an audit todo. <code>switch_branch</code> already refused this; <code>pull</code> and <code>delete_branch</code> did not.</p>
+            <ul class="doc-body">
+                <li>Shared <code>_checkout_collision_reason</code> used by switch / pull / delete — refuse before git runs.</li>
+                <li>Controller no longer defaults a missing branch param to <code>main</code>; it uses the current checkout.</li>
+                <li><code>_run</code> demotes leftover checkout-collision 128s to info so they do not create error todos.</li>
+            </ul>
+            <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>lib/Comserv/Controller/Admin/Git.pm</code>, <code>t/util_git.t</code>. Git dashboard / worktree isolation is project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
         </div>
     </div>
 </div>
