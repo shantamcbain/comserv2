@@ -1,0 +1,118 @@
+<div id="2026-08-10-model-dropdown-price-display" class="cl-entry">
+<h3>AI Model Dropdown &amp;mdash; Show per-token Price</h3>
+&#91;% IF c.session.debug_mode == 1 %&#93;&#91;% PageVersion %&#93;&#91;% END %&#93;
+
+
+
+
+
+
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>AI Model Dropdown &mdash; Show per-token Price</h1>
+        <div class="changelog-meta">
+            <span class="date">August 10, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Feature / AIMPS-P2 (#254)</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>
+            The shared model <code>&lt;select&gt;</code> (rendered by
+            <code>ai/model_select.tt</code> &mdash; the single source of truth used by the
+            floating &ldquo;Chat with AI&rdquo; widget, <code>/ai</code>, <code>/ai2</code> and
+            the AI2 editor) now shows the real per-token cost for paid models, drawn from
+            the pricing feed delivered in AIMPS-P1 (#253). The user sees what a choice
+            costs <em>before</em> picking it.
+        </p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>What changed</h2>
+        <ul>
+            <li>In <code>ai/model_select.tt</code>, the cost marker block now renders for
+                paid (or any priced) model:
+                <code>$&lt;price_prompt&gt;/$&lt;price_completion&gt; per 1M (&lt;price_tier&gt;)</code>,
+                e.g. <code>$0.10/$0.40 per 1M (cheap)</code> for Gemini 2.0 Flash or
+                <code>$3.00/$15.00 per 1M (premium)</code> for Claude 3.5 Sonnet.</li>
+            <li>Free models still read <code>— free</code>; Ollama still reads
+                <code>— local</code>. The existing free-first / alphabetical ordering is
+                unchanged.</li>
+            <li>The cost is formatted with the TT <code>format('%.2f')</code> filter
+                (already used across payment / 3d / ai templates in this app). Note:
+                <code>sprintf</code> and <code>int()</code> are <em>not</em> available as
+                TT functions/methods in this build, so <code>format</code> is the correct
+                tool &mdash; verified by render test, not assumption.</li>
+        </ul>
+
+        <h2>Correction &mdash; the widget is JS-rendered, not server-rendered</h2>
+        <p>
+            The original note claimed the widget reuses the server-rendered
+            <code>&lt;select&gt;</code> and needs no JS change. That was <strong>wrong</strong>.
+            <code>ai-chat/model-select.js</code> is what actually builds the dropdown for the
+            floating widget, <code>/ai</code>, <code>/ai2</code> and the git dashboard: on
+            <code>init()</code> it does <code>selectEl.innerHTML = ''</code> and rebuilds options
+            from <code>window.ComservConfig.models</code>. Two bugs followed:
+        </p>
+        <ul>
+            <li><strong>No price in the widget:</strong> <code>fromFlat()</code> mapped only
+                <code>{value,label,provider}</code> and threw away <code>price_prompt</code> /
+                <code>price_completion</code> / <code>pricing</code>, and <code>render()</code>
+                never appended a cost marker. Fixed: carry the price fields through
+                <code>fromFlat()</code> and append
+                <code>— $pp/$pc per 1M (tier)</code> / <code>— free</code> / <code>— local</code>
+                in <code>render()</code>.</li>
+            <li><strong>Doubled provider name:</strong> the catalog <code>label</code> already
+                contained the provider (e.g. <code>Cohere: North Mini Code (free) (openrouter)</code>)
+                and the option was grouped under an <code>OpenRouter</code> optgroup header,
+                so the provider showed twice. Fixed by stripping the trailing
+                <code>(provider)</code> suffix from the label in <code>render()</code> (the
+                optgroup header is the single source of truth for the provider).</li>
+            <li><strong><code>/ai</code> / git showed no list (or empty):</strong> those pages
+                never emitted <code>window.ComservConfig.models</code>, so
+                <code>model-select.js</code> fell back to a <code>/ai2/providers</code> fetch
+                (slow, and the grouped shape drops price). Fixed by emitting the global on
+                <code>/ai</code> and <code>/ai2</code> (from the stash, like the widget) and in
+                the <code>/admin/git</code> block of <code>js_load.tt</code>.</li>
+        </ul>
+        <p>
+            The server-rendered <code>ai/model_select.tt</code> still renders correctly for any
+            surface that uses it directly; the JS fix is what the user actually sees in the
+            widget and the AI pages.
+        </p>
+
+        <h2>Verified</h2>
+        <p>
+            Live browser render of the floating widget (and the shared
+            <code>model-select.js</code> path) now shows:
+            <code>AI21: Jamba Large 1.7 (openrouter) — $2.00/$8.00 per 1M (premium)</code>,
+            <code>AllenAI: Olmo 3 32B Think (openrouter) — $0.15/$0.50 per 1M (cheap)</code>,
+            <code>gemma4-64k:latest — local</code>,
+            <code>NVIDIA: Nemotron 3 Nano 30B A3B (free) (openrouter) — free</code>.
+            Provider name appears once (optgroup header), no longer doubled. The
+            <code>/ai</code> page now emits the 414-model catalog global (382 priced).
+        </p>
+
+        <h2>Remaining P2 work (still open)</h2>
+        <ul>
+            <li>Premium-tier &ldquo;show all models&rdquo; toggle (the full OpenRouter list is
+                long and not a usable default dropdown).</li>
+            <li>Tier-then-capability ordering to replace the current
+                free-first-then-alphabetical sort.</li>
+        </ul>
+
+        <h2>Files changed</h2>
+        <ul>
+            <li><code>root/ai/model_select.tt</code> &mdash; render price + tier on paid models (server path)</li>
+            <li><code>root/static/js/ai-chat/model-select.js</code> &mdash; carry price through <code>fromFlat</code>, append cost marker + de-dupe provider in <code>render</code></li>
+            <li><code>root/ai/index.tt</code>, <code>root/ai2/index.tt</code> &mdash; emit <code>ComservConfig.models</code> global (fast path)</li>
+            <li><code>root/js_load.tt</code> &mdash; emit the global on <code>/admin/git</code> (convention: no inline JS in templates)</li>
+            <li><code>root/Documentation/AIModelPresentationPlan.tt</code> &mdash; mark P2 price display delivered</li>
+            <li><code>root/Documentation/changelog/2026-08-10-model-dropdown-price-display.tt</code> &mdash; this entry</li>
+        </ul>
+    </section>
+</div>
+</div>
