@@ -66,6 +66,7 @@
 
         if (svc === 'supergrok') return 'SuperGrok (prepaid)' + suffix;
         if (svc === 'grok')       return 'Grok (xAI)' + suffix;
+        if (svc === 'supergrok')  return 'SuperGrok (prepaid)' + suffix;
         if (svc === 'openrouter') return 'OpenRouter' + suffix;
         // The chat backend reports the generic bucket name 'external' for any
         // OpenAI-compatible provider (OpenRouter today). Recover the real
@@ -249,7 +250,7 @@
             var grp = document.createElement('optgroup');
             if (svc === 'ollama')       grp.label = 'Ollama (Local)';
             else if (svc === 'supergrok') grp.label = 'SuperGrok (prepaid)';
-            else if (svc === 'grok')    grp.label = 'xAI (Grok)';
+            else if (svc === 'grok')    grp.label = 'xAI Grok (auto-fill)';
             else if (svc === 'openrouter') grp.label = 'OpenRouter';
             else                        grp.label = svc;
 
