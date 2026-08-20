@@ -1,0 +1,97 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Test::More;
+use POSIX ();
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+
+use Comserv::Util::TodoRanking;
+use Comserv::Util::FocusRanking;
+
+my $now = time();
+
+sub score {
+    my (%h) = @_;
+    Comserv::Util::TodoRanking::score_todo(\%h, { now_epoch => $now });
+    return \%h;
+}
+
+{
+    my $schema = score(
+        subject => 'Design new schema',
+        priority => 1,
+        status => 1,
+        last_mod_by => 'reschedule',
+        last_mod_date => '2026-08-18',
+        date_time_posted => '2026-05-01',
+    );
+    ok($schema->{p1_dampened}, 'inflated P1 is dampened');
+    is($schema->{rank_priority}, 5, 'inflated P1 scores as planned backlog');
+}
+
+{
+    my $err = score(
+        subject => "[Error] git_merge merge of 'planning' failed (conflict): Auto-merging",
+        priority => 2,
+        status => 1,
+        last_mod_date => POSIX::strftime('%Y-%m-%d', localtime($now)),
+        date_time_posted => POSIX::strftime('%Y-%m-%d', localtime($now)),
+    );
+    ok(!$err->{p1_dampened}, 'recent error is not dampened');
+    ok(($err->{incident_bonus} // 0) < 0, 'recent incident gets a boost');
+}
+
+{
+    my $outage = score(
+        subject => 'deploy.sh monitor recovery removes container and cannot restore it',
+        description => 'Outage 2026-08-07. container removed, port 5000 dead',
+        priority => 1,
+        status => 2,
+        last_mod_date => POSIX::strftime('%Y-%m-%d', localtime($now)),
+    );
+    ok(!$outage->{p1_dampened}, 'cannot-restore outage keeps P1');
+    is($outage->{rank_priority}, 1, 'real blocker rank_priority stays 1');
+}
+
+{
+    my $noise = score(
+        subject => 'Design new schema',
+        priority => 1,
+        status => 1,
+        last_mod_by => 'reschedule',
+        last_mod_date => POSIX::strftime('%Y-%m-%d', localtime($now)),
+        date_time_posted => '2026-05-01',
+    );
+    my $live = score(
+        subject => "[Error] git checkout main -> exit=128",
+        priority => 2,
+        status => 2,
+        last_mod_date => POSIX::strftime('%Y-%m-%d', localtime($now)),
+        date_time_posted => POSIX::strftime('%Y-%m-%d', localtime($now)),
+    );
+    ok($live->{ap_score} < $noise->{ap_score}, 'live error outranks inflated P1');
+}
+
+{
+    my $ok = Comserv::Util::FocusRanking::passes_filters(
+        { project_id => 273, parent_id => 272, role_cats => 'general', sitename => 'CSC' },
+        { proj_filtered => 1, checked_projects => { 272 => 1 }, is_csc_admin => 1 },
+    );
+    ok($ok, 'filter on parent project includes phase child');
+    my $no = Comserv::Util::FocusRanking::passes_filters(
+        { project_id => 273, parent_id => 272, role_cats => 'general', sitename => 'CSC' },
+        { proj_filtered => 1, checked_projects => { 999 => 1 }, is_csc_admin => 1 },
+    );
+    ok(!$no, 'unrelated project filter excludes the child');
+}
+
+{
+    use Comserv::Util::TodoTypes qw(is_calendar_fixture);
+    ok(is_calendar_fixture({ subject => "\x{1F957} Lunch", todo_type => 'task' }), 'emoji lunch is a fixture');
+    ok(is_calendar_fixture({ subject => 'Morning Break', is_fixed => 1 }), 'morning break is a fixture');
+    ok(is_calendar_fixture({ subject => 'Dentist', todo_type => 'appointment' }), 'appointment type is a fixture');
+    ok(!is_calendar_fixture({ subject => 'Fix merge conflict', todo_type => 'task' }), 'real work is not a fixture');
+}
+
+done_testing();
