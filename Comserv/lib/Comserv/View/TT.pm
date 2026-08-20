@@ -51,6 +51,62 @@ $Template::Stash::SCALAR_OPS->{format_time} = sub {
     my $minutes = int(($seconds % 3600) / 60);
     return sprintf("%02d:%02d", $hours, $minutes);
 };
+
+# workstation-prod-local bind-mounts ./Comserv over /opt/comserv. Saving a .tt
+# while TT compiles it produces: parse error / unexpected end of input.
+# That is NOT a source defect (ai/index.tt is complete). Retry once after a
+# short wait so the finished write is what we compile. Caller of the retry
+# (this method) logs both outcomes — see _log_tt.
+sub is_truncated_parse_error {
+    my ($err) = @_;
+    return 0 unless defined $err && length $err;
+    return ($err =~ /parse error/i && $err =~ /unexpected end of input/i) ? 1 : 0;
+}
+
+sub _flush_template_cache {
+    my ($self) = @_;
+    eval {
+        my $tt = $self->template;
+        $tt->context->reset if $tt && $tt->can('context') && $tt->context;
+    };
+    return;
+}
+
+sub _log_tt {
+    my ($c, $level, $line, $msg) = @_;
+    # Helper: caller (render) already decided level/message. Logging itself
+    # must not mask the render outcome — failures here are non-fatal.
+    eval {
+        require Comserv::Util::Logging;
+        Comserv::Util::Logging->instance->log_with_details(
+            $c, $level, __FILE__, $line, 'tt_render_retry', $msg
+        );
+    };
+    return;
+}
+
+sub render {
+    my ($self, $c, $template, $args) = @_;
+    my $out = eval { $self->next::method($c, $template, $args) };
+    my $err = $@;
+    return $out unless $err;
+    unless (is_truncated_parse_error("$err")) {
+        die $err;
+    }
+    $self->_flush_template_cache;
+    select(undef, undef, undef, 0.15);
+    my $retry = eval { $self->next::method($c, $template, $args) };
+    my $err2 = $@;
+    if ($err2) {
+        _log_tt($c, 'error', __LINE__,
+            "Template parse retry failed for $template: $err2 (first: $err)");
+        die $err2;
+    }
+    _log_tt($c, 'warning', __LINE__,
+        "Recovered from truncated-template parse for $template");
+    return $retry;
+}
+
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 
 1;

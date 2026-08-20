@@ -2260,7 +2260,11 @@
         // Update loading message to show which tier is being used
         if (autoTier) {
             const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
-            const displayName = providerName === 'grok' ? ('Grok: ' + (providerParts[1] || 'auto')) : ('Ollama/' + tierLabel);
+            const displayName = providerName === 'supergrok'
+                ? ('SuperGrok: ' + (providerParts[1] || 'auto'))
+                : providerName === 'grok'
+                    ? ('Grok: ' + (providerParts[1] || 'auto'))
+                    : ('Ollama/' + tierLabel);
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
         }
 
@@ -2902,7 +2906,12 @@
                 // treated every non-Grok response as Ollama, which is why an
                 // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
                 const providerParts2 = (state.selectedProvider || '').split('|');
-                const provName = data.provider || providerParts2[0] || '';
+                // Prefer the user's selected prefix when the backend collapses
+                // SuperGrok onto the Grok client (same API, different billing).
+                let provName = data.provider || providerParts2[0] || '';
+                if ((providerParts2[0] || '') === 'supergrok' && (provName === 'grok' || !provName)) {
+                    provName = 'supergrok';
+                }
                 const rawModel = data.model || providerParts2[1] || '';
                 const modelLabel = describeModel(
                     provName + (rawModel ? '|' + rawModel : ''),
