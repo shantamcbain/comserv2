@@ -260,6 +260,35 @@
         var mergeOutput = document.querySelector('[data-git-merge-output]');
         var mergeAbortBtn = document.querySelector('[data-git-merge-abort]');
 
+        var MERGE_RESULT_KEY = 'comserv-git-merge-result';
+
+        function persistMergeResult(payload) {
+            try {
+                sessionStorage.setItem(MERGE_RESULT_KEY, JSON.stringify(payload));
+            } catch (e) {
+                // sessionStorage can be blocked; reload still proceeds.
+            }
+        }
+
+        function restorePersistedMergeResult() {
+            try {
+                var raw = sessionStorage.getItem(MERGE_RESULT_KEY);
+                if (!raw) { return; }
+                sessionStorage.removeItem(MERGE_RESULT_KEY);
+                var p = JSON.parse(raw);
+                if (!p || !p.title) { return; }
+                showMergeResult(!!p.success, !!p.conflict, p.title, p.output || '');
+            } catch (e) {
+                try { sessionStorage.removeItem(MERGE_RESULT_KEY); } catch (e2) {}
+            }
+        }
+
+        function reloadGitDashboardSoon() {
+            window.setTimeout(function () {
+                window.location.reload();
+            }, 1500);
+        }
+
         function showMergeResult(success, conflict, title, output) {
             if (!mergeStatus) { return; }
             mergeStatus.innerHTML = '';
@@ -276,6 +305,8 @@
                 mergeAbortBtn.style.display = conflict ? '' : 'none';
             }
         }
+
+        restorePersistedMergeResult();
 
         function runMerge(btn) {
             if (!mergeSelect) { return; }
@@ -326,16 +357,18 @@
                       return;
                   }
                   if (res.success) {
-                      showMergeResult(true, false, 'merged', res.output || '');
+                      showMergeResult(true, false, 'merged \u2014 reloading\u2026', res.output || '');
+                      persistMergeResult({
+                          success: true,
+                          conflict: false,
+                          title: 'merged',
+                          output: res.output || ''
+                      });
+                      reloadGitDashboardSoon();
                   } else {
                       var failText = (res.error || '') + (res.output && res.output.replace(/\s/g,'') ? ('\n' + res.output) : '') + (res.detail ? ('\n' + res.detail) : '');
                       showMergeResult(false, false, 'failed', failText || 'merge failed');
                   }
-                  // NOTE: intentionally do NOT auto-refresh/reload on success.
-                  // refreshGitDashboard() / location.reload() re-renders the Merge
-                  // card and wipes the result before the user can read it (the
-                  // "vanishing result" bug). The result stays visible until a
-                  // manual hard-refresh.
               })
               .catch(function (err) {
                   showMergeResult(false, false, 'error', String(err));
