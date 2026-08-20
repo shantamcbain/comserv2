@@ -1,0 +1,7 @@
+{
+  "alert_percent": 80,
+  "supergrok_monthly_limit_usd": 30,
+  "supergrok_monthly_request_limit": 400,
+  "xai_auto_fill": true,
+  "openrouter_auto_fill": false
+}

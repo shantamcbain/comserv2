@@ -88,11 +88,14 @@ sub passes_filters {
         $show_site = $cs->{ $t->{sitename} // '' } ? 1 : 0;
     }
 
-    # Project
+    # Project — exact id OR the project's parent (phase sub-projects live
+    # under a parent; filtering DRYER-INT must include #273–#279).
     my $show_proj = 1;
     if ($ctx->{proj_filtered}) {
         my $cp = $ctx->{checked_projects} || {};
-        $show_proj = $cp->{ $t->{project_id} // '' } ? 1 : 0;
+        my $pid    = $t->{project_id} // '';
+        my $parent = $t->{parent_id}  // '';
+        $show_proj = ($cp->{$pid} || ($parent ne '' && $cp->{$parent})) ? 1 : 0;
     }
 
     return ($show_role && $show_site && $show_proj) ? 1 : 0;
