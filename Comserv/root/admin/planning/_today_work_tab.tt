@@ -133,6 +133,13 @@
                         <span>(showing top [% focus_queue_limit %])</span>
                         [% END %]
                     </span>
+                    [% IF branch_focus_filter %]
+                    <span class="FocusStats">
+                        Branch <code>[% branch_focus_filter.branch | html %]</code>
+                        — Active (any) + blockers + this project's todos
+                        <a href="/planning/daily?filter_project=all" class="BacklogLink">Show all</a>
+                    </span>
+                    [% END %]
                     [% IF active_priorities_backlog %]
                     <a href="/todo" class="BacklogLink">+ [% active_priorities_backlog %] more in backlog →</a>
                     [% END %]

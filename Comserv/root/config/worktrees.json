@@ -1,1 +1,41 @@
-{"port_start":4000,"branches":{"aisystem":{"url":"/planning/daily","port":4006,"label":"aisystem"},"InventoryAccounting":{"url":"/planning/daily","port":4001,"label":"InventoryAccounting"},"planning":{"url":"/planning/daily","port":4005,"label":"planning"},"3d":{"url":"/planning/daily","port":4003,"label":"3d"},"git":{"label":"git","port":4004,"url":"/planning/daily"},"DockerHA":{"port":4002,"label":"DockerHA","url":"/planning/daily"}},"base_dir":"/home/shanta/.comserv/worktrees"}
+{
+  "port_start": 4000,
+  "base_dir": "/home/shanta/.comserv/worktrees",
+  "branches": {
+    "aisystem": {
+      "url": "/planning/daily",
+      "port": 4006,
+      "label": "aisystem",
+      "project_id": 280
+    },
+    "InventoryAccounting": {
+      "url": "/planning/daily",
+      "port": 4001,
+      "label": "InventoryAccounting"
+    },
+    "planning": {
+      "url": "/planning/daily",
+      "port": 4005,
+      "label": "planning",
+      "project_id": 138
+    },
+    "3d": {
+      "url": "/planning/daily",
+      "port": 4003,
+      "label": "3d",
+      "project_id": 272
+    },
+    "git": {
+      "label": "git",
+      "port": 4004,
+      "url": "/planning/daily",
+      "project_id": 238
+    },
+    "DockerHA": {
+      "port": 4002,
+      "label": "DockerHA",
+      "url": "/planning/daily",
+      "project_id": 202
+    }
+  }
+}

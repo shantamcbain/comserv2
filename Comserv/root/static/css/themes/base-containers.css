@@ -2325,14 +2325,17 @@ mark {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--card-bg, var(--bg-color, #fff));
+    color: var(--text-color, #000);
 }
 .card-header {
     padding: 0.75rem 1.25rem;
     background-color: var(--table-header-bg, rgba(0,0,0,0.03));
     border-bottom: 1px solid var(--border-color);
+    color: var(--text-color, #000);
 }
 .card-body {
     padding: 1.25rem;
+    color: var(--text-color, #000);
 }
 
 /* --- Badges --- */
@@ -2354,11 +2357,12 @@ mark {
 .badge-success { color: #fff; background-color: var(--success-color, #28a745); }
 .badge-secondary { color: #fff; background-color: var(--text-muted-color, #6c757d); }
 
-/* Priority scale (theme-owned; used by todo priority badges) */
-.pri-1 { background: var(--danger-color, #dc3545); color: #fff; }
-.pri-2, .pri-3, .pri-4 { background: var(--accent-color, #FF9900); color: var(--text-color, #000); }
-.pri-5, .pri-6 { background: var(--caution-color, #ffc107); color: var(--text-color, #000); }
-.pri-7, .pri-8, .pri-9, .pri-10 { background: var(--text-muted-color, #6c757d); color: #fff; }
+/* Priority scale — BADGES ONLY. Never put .pri-N on a card wrapper;
+   that painted the whole todo card (white text on gray P7–P10). */
+.badge.pri-1 { background: var(--danger-color, #dc3545); color: #fff; }
+.badge.pri-2, .badge.pri-3, .badge.pri-4 { background: var(--accent-color, #FF9900); color: var(--text-color, #000); }
+.badge.pri-5, .badge.pri-6 { background: var(--caution-color, #ffc107); color: var(--text-color, #000); }
+.badge.pri-7, .badge.pri-8, .badge.pri-9, .badge.pri-10 { background: var(--text-muted-color, #6c757d); color: #fff; }
 
 /* --- Flex utilities --- */
 .d-flex { display: flex !important; }
