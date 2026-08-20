@@ -7,7 +7,7 @@ use Comserv::Util::AdminAuth;
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoRanking;
 use Comserv::Util::FocusRanking;
-use Comserv::Util::TodoTypes qw(recurring_matches_date);
+use Comserv::Util::TodoTypes qw(recurring_matches_date is_calendar_fixture);
 use Comserv::Util::ErrorAudit;
 use Comserv::Model::Ollama;
 use JSON qw(encode_json);
@@ -563,8 +563,9 @@ sub daily :Path('/planning/daily') :Args {
             next if Comserv::Util::ProjectDependencies::is_audit_panel_todo(
                 $h{subject}, $h{parent_id}
             );
-            next if ($h{todo_type} // '') =~ /^(appointment|meeting|event|reminder)$/i;
+            next if Comserv::Util::TodoTypes::is_calendar_fixture(\%h);
             next if ($h{is_recurring} // 0);
+            next if (($h{status} // '') =~ /^(cancelled|canceled)$/i);
 
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
@@ -629,7 +630,10 @@ sub daily :Path('/planning/daily') :Args {
         } @scored;
 
         if ($filter_project) {
-            @all_sorted = grep { ($_->{project_id} // '') eq $filter_project } @all_sorted;
+            @all_sorted = grep {
+                ($_->{project_id} // '') eq $filter_project
+                || ($_->{parent_id} // '') eq $filter_project
+            } @all_sorted;
         }
 
         my $focus_total = scalar @all_sorted;
@@ -640,22 +644,23 @@ sub daily :Path('/planning/daily') :Args {
 
         my $limit = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_LIMIT;
         my $ip_cap = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_IN_PROGRESS_CAP;
+        my $proj_cap = int($limit / 2) || 1;
 
         # Build the Focus Queue so a flood of in-progress rows cannot bury the
-        # highest-priority OPEN todos (project 240 fix). The scorer already sorts
-        # every in-progress row above every open row, so a plain top-N slice would
-        # surface only in-progress items when the in-progress pool is large. Walk the
-        # score-sorted list, keeping at most $ip_cap in-progress rows, then fill the
-        # rest of the queue (up to $limit) with the next highest-priority open rows.
-        # When the in-progress pool is smaller than the cap, the open rows simply
-        # continue filling the queue in score order.
+        # highest-priority OPEN todos (project 240 fix), and so one project
+        # cannot occupy more than half the queue (#1828 F5).
         my (@ip_picked, @open_picked);
+        my %proj_n;
         for my $row (@all_sorted) {
+            my $pid = $row->{project_id} // 0;
+            next if ($proj_n{$pid} // 0) >= $proj_cap;
             if ($row->{in_progress}) {
-                push @ip_picked, $row if scalar(@ip_picked) < $ip_cap;
+                next if scalar(@ip_picked) >= $ip_cap;
+                push @ip_picked, $row;
             } else {
                 push @open_picked, $row;
             }
+            $proj_n{$pid}++;
             last if (scalar(@ip_picked) + scalar(@open_picked)) >= $limit;
         }
         @active_priorities = (@ip_picked, @open_picked);
@@ -1293,26 +1298,16 @@ sub daily_impl :Private {
     eval {
         my %row_by_id = map { $_->record_id => { $_->get_columns } } @_focus_all;
         my $now_epoch = time();
-        # Classify a todo as a scheduled break/meal event and rank it by time-of-day.
-        # Morning Break (10:00) -> 1, Lunch (12:00) -> 2, Afternoon Break (15:00) -> 3.
-        my $break_rank = sub {
-            my ($subj) = @_;
-            return 0 unless defined $subj;
-            return 1 if $subj =~ /morning\s*break/i;
-            return 2 if $subj =~ /\blunch\b/i;
-            return 3 if $subj =~ /afternoon\s*break/i;
-            return 0;
-        };
         my @scored;
         for my $t (@_focus_all) {
             my $h = $row_by_id{ $t->record_id };
+            next if Comserv::Util::TodoTypes::is_calendar_fixture($h);
+            next if ($h->{is_recurring} // 0);
             Comserv::Util::TodoRanking::score_todo($h, { now_epoch => $now_epoch });
             # Pass the decorated column hash (has every real column PLUS ap_score /
             # project_name / blocking_names / etc. set by score_todo) to the template,
             # exactly like Controller/Todo.pm. Passing the bare DBIx row left those
             # fields undef and (with the is_recurring skip) could empty the queue.
-            my $subj      = $h->{subject} // '';
-            my $is_break  = ($break_rank->($subj) ? 1 : 0);
             my $tod       = $h->{time_of_day} // '';
             my $time_min  = 9 * 60;   # default when no time set (matches _reschedule_time_min)
             $time_min = $1 * 60 + $2 if $tod =~ /^(\d{1,2}):(\d{2})/;
@@ -1321,21 +1316,13 @@ sub daily_impl :Private {
                 score       => $h->{ap_score},
                 pri         => $h->{priority},
                 in_progress => $h->{in_progress} ? 1 : 0,
-                is_break    => $is_break,
-                break_rank  => $break_rank->($subj),
                 time_min    => $time_min,
             };
         }
-        # Three-tier ordering for the priorities list:
-        #   tier 0 (top):   in-progress / active todos
-        #   tier 1:         scheduled break/meal events, by time-of-day (Morning -> Lunch -> Afternoon)
-        #   tier 2:         remaining open todos, by ap_score (desc)
+        # Priorities are work only — lunch/breaks/appointments stay on the calendar.
         @scored = sort {
-            my $ta = $a->{in_progress} ? 0 : ($a->{is_break} ? 1 : 2);
-            my $tb = $b->{in_progress} ? 0 : ($b->{is_break} ? 1 : 2);
-            $ta <=> $tb
-              || ($ta == 1 ? ($a->{break_rank} <=> $b->{break_rank})
-                           : ($b->{score} <=> $a->{score}))
+            ($a->{score} // 0) <=> ($b->{score} // 0)
+            || ($a->{pri} // 5) <=> ($b->{pri} // 5)
         } @scored;
         @active_priorities = map { $_->{todo} } @scored[0..($#scored > 19 ? 19 : $#scored)];
 

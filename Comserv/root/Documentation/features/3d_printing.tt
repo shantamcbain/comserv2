@@ -27,6 +27,7 @@ when jobs are fulfilled. The store is unified with the Shop system.
     <li><a href="#consignment">Consignment Integration</a></li>
     <li><a href="#admin">Admin Dashboard</a></li>
     <li><a href="#urls">URL Reference</a></li>
+    <li><a href="#import">Internal project import (playbook)</a></li>
 </ol>
 
 <hr>
@@ -151,3 +152,30 @@ Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts ma
         <tr><td><code>/3d/search_deeper</code></td><td>Deep inventory search</td><td>Admin</td></tr>
     </tbody>
 </table>
+
+<hr>
+
+<h2 id="import">9. Internal project import (playbook)</h2>
+<p>
+Use this when a new 3D project arrives as a folder of 3MF/STL/PDF (the HDRY filament dryer is the
+worked example). Full tracking:
+<a href="/Documentation/DryerProjectImportPlan">/Documentation/DryerProjectImportPlan</a>
+(project <a href="/project/details?project_id=272">#272 DRYER-INT</a>).
+</p>
+<ol>
+    <li><strong>Catalog</strong> the download. Deduplicate copies. Keep license + provider invoice.</li>
+    <li><strong>File Manager</strong> — <a href="/file/admin_browser">/file/admin_browser</a>.
+        Upload into an NFS project folder via <a href="/file/upload_file">/file/upload_file</a>,
+        then import each file into the <code>files</code> table (do not point the 3D importer at <code>~/Downloads</code>).</li>
+    <li><strong>Parent assembly</strong> — <a href="/Inventory/item/add">/Inventory/item/add</a>,
+        hidden from shop (<code>show_in_shop=0</code>, <code>list_in_marketplace=0</code>), <code>is_assemblable=1</code>.</li>
+    <li><strong>Parts</strong> — each printable file becomes a <code>printing_3d_models</code> row
+        (see <a href="/3d/models">/3d/models</a>) + child inventory item + BOM line
+        (<a href="/Inventory/bom/add">/Inventory/bom/add</a>). Review the mesh before queueing.</li>
+    <li><strong>Pay the provider</strong> — supplier at
+        <a href="/Inventory/suppliers">/Inventory/suppliers</a>; files invoice at
+        <a href="/Inventory/invoice/new">/Inventory/invoice/new</a>. Monthly support is not a first-class
+        recurring AP yet (todo #2190 on #207).</li>
+    <li><strong>Print</strong> — <a href="/3d/queue">/3d/queue</a>, complete with
+        <a href="/3d/queue_print">/3d/queue_print</a>. Filament reservations use <code>3D-JOB-{id}</code>.</li>
+</ol>

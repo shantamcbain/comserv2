@@ -47,6 +47,19 @@ sub _is_routine_subject {
     return 0;
 }
 
+# Stored priority=1 is not trustworthy (P1-inflation). Only treat a row as a
+# real blocker for scoring when the text or is_blocking flag says so.
+sub _looks_like_real_blocker {
+    my ($h) = @_;
+    return 0 unless $h;
+    return 1 if $h->{is_blocking};
+    my $text = join "\n", map { defined $_ ? $_ : '' } ($h->{subject}, $h->{description});
+    return 1 if $text =~ /\[Error\]/i;
+    return 1 if $text =~ /outage|connection reset|site down|data loss|cannot restore/i;
+    return 1 if $text =~ /merge of '.+' failed|merge conflict|conflict\):/i;
+    return 0;
+}
+
 =head2 score_todo
 
     Comserv::Util::TodoRanking::score_todo(\%h, \%ctx)
@@ -93,13 +106,21 @@ sub score_todo {
     };
 
     my $st          = $h->{status} // '';
-    my $in_progress = (   $st == 2
-                       || $st == 5
-                       || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i ) ? 1 : 0;
+    my $stn         = ($st =~ /^-?\d+$/) ? 0+$st : -1;
+    my $in_progress = (   $stn == 2
+                       || $stn == 5
+                       || $st =~ /^(in.progress|in.process|IN PROGRESS|In-Process)$/i ) ? 1 : 0;
     my $status_tier = $in_progress ? 0 : 1;
     $h->{in_progress} = $in_progress;
 
+    # A bulk reschedule rewrites last_mod_date without meaning the work moved.
+    # Rank staleness off the real activity date so "reschedule" cannot park
+    # old P1s at the top of the Focus Queue.
+    my $mod_by = lc($h->{last_mod_by} // '');
     my $activity_str = $h->{last_mod_date} || $h->{date_time_posted} || '';
+    if ($mod_by eq 'reschedule') {
+        $activity_str = $h->{date_time_posted} || $h->{start_date} || $activity_str;
+    }
     my $days_stale   = 0;
     if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
         my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
@@ -111,7 +132,18 @@ sub score_todo {
     $h->{is_stale}   = $days_stale > STALE_180_DAYS ? 1 : 0;
 
     my $priority         = ($h->{priority} || 5);
+    my $rank_priority    = $priority;
+    if ($rank_priority == 1 && !_looks_like_real_blocker($h)) {
+        $rank_priority = 5;
+        $h->{p1_dampened} = 1;
+    }
+    $h->{rank_priority} = $rank_priority;
     my $block_bonus      = $h->{is_blocking} ? $w->('block', BLOCK_BONUS) : 0;
+    my $incident_bonus   = 0;
+    if (_looks_like_real_blocker($h) && $days_stale <= 3) {
+        $incident_bonus = $w->('incident', -8);
+    }
+    $h->{incident_bonus} = $incident_bonus;
     my $cross_block_bonus = 0;
     my $cbp = $ctx->{cross_blocker_projects} || {};
     if ($h->{project_id} && $cbp->{$h->{project_id}} && $h->{is_blocking}) {
@@ -156,7 +188,7 @@ sub score_todo {
     # due, staleness), where in-progress edges out new. Priority + due + staleness
     # drive the real order.
     $h->{ap_score} = ($status_tier * $w->('status_tier', 0.5))
-                   + ($priority + $block_bonus + $cross_block_bonus + $due_bonus)
+                   + ($rank_priority + $block_bonus + $cross_block_bonus + $due_bonus + $incident_bonus)
                    + $stale_penalty
                    + $demotion;
 
