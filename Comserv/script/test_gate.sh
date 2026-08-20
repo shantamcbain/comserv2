@@ -28,8 +28,16 @@
 #       the smoke test, so local boot breakage is always caught.
 set -uo pipefail
 
-cd "$(dirname "$0")/.." || { echo "❌ cannot resolve Comserv dir"; exit 2; }
-COMSERV_DIR="$PWD"
+# Prefer an explicit COMSERV_DIR (controller passes the *worktree* checkout
+# so the gate tests the branch being merged, not the repo the script lives in).
+if [ -n "${COMSERV_DIR:-}" ] && [ -d "$COMSERV_DIR" ]; then
+    : # caller-supplied target checkout
+elif [ -d "$(dirname "$0")/.." ]; then
+    COMSERV_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+else
+    echo "❌ cannot resolve Comserv dir"; exit 2
+fi
+cd "$COMSERV_DIR" || { echo "❌ cannot cd to $COMSERV_DIR"; exit 2; }
 
 export PATH="$HOME/.local/bin:$HOME/perl5/bin:$PATH"
 PROVE_BIN="$(command -v prove || true)"
@@ -96,7 +104,19 @@ case "$MODE" in
         ;;
     --fast|*)
         echo "=== FAST TEST GATE (boot-light subset) ==="
-        run_prove t/01app.t t/controller_AI_models.t t/bot_prevention_and_purging.t
+        # Only run smoke tests that actually exist in THIS checkout.
+        # Stale worktrees predate the suite — say so instead of a generic FAIL.
+        FILES=()
+        for f in t/01app.t t/controller_AI_models.t t/bot_prevention_and_purging.t; do
+            [ -f "$COMSERV_DIR/$f" ] && FILES+=("$f")
+        done
+        if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "🛑 No fast-subset test files in this checkout ($COMSERV_DIR/t)."
+            echo "   This worktree is stale and has no test suite. Update it from main"
+            echo "   (merge main into this branch) so it gains the tests, then re-run the gate."
+            exit 2
+        fi
+        run_prove "${FILES[@]}"
         rc=$?
         ;;
 esac
