@@ -95,7 +95,9 @@
                     <h4>Repository <span class="git-current-branch git-current-branch--head" title="Branch this dashboard is operating on">
                         <i class="fas fa-code-branch"></i> <strong>[% current_branch | html %]</strong></span></h4>
                     <div class="git-inline">
-                        [%# Switch branch by selecting from the dropdown %]
+                        [% IF current_branch && current_branch != 'main' && current_branch != 'master' %]
+                        <span class="section-info"><i class="fas fa-lock"></i> Worktree checkout — stays on <code class="code-inline">[% current_branch | html %]</code>. Cannot switch to main (already checked out in the primary repo). Merge main into this branch below.</span>
+                        [% ELSE %]
                         <form method="post" action="[% c.uri_for('/admin/git/action') %]"
                               class="inline-form" data-git-switch-form="1">
                             <input type="hidden" name="op" value="switch">
@@ -120,6 +122,7 @@
                                 [% END %]
                             </select>
                         </form>
+                        [% END %]
 
                         [%# -- Relationship to the integration base (main) = the PRIMARY signal -- %]
                         [% IF tracking.upstream %]
@@ -376,10 +379,14 @@
                             <select name="merge_branch" class="form-control git-select"
                                     id="git-merge-branch" data-git-merge-select="1"
                                     title="Branch to merge with main">
+                                [% IF current_branch && current_branch != 'main' && current_branch != 'master' %]
+                                <option value="[% current_branch | html %]" selected>[% current_branch | html %] (this checkout)</option>
+                                [% ELSE %]
                                 [% SET merge_sel = 0 %]
                                 [% FOREACH b IN branch_details %]
                                 [% IF b.name != 'git' && b.name != 'main' && b.name != 'master' %]
                                 <option value="[% b.name | html %]"[% UNLESS merge_sel %] selected[% SET merge_sel = 1 %][% END %]>[% b.name | html %][% IF b.is_current %] (this checkout)[% END %]</option>
+                                [% END %]
                                 [% END %]
                                 [% END %]
                             </select>
@@ -388,16 +395,22 @@
 
                     <p class="git-merge-hint">
                         <i class="fas fa-info-circle"></i>
-                        Active branch: <code class="code-inline" data-git-current-branch="1">[% current_branch | html %]</code>
+                        This checkout: <code class="code-inline" data-git-current-branch="1">[% current_branch | html %]</code>
                     </p>
+                    [% IF current_branch && current_branch != 'main' %]
+                    <p class="git-merge-guideline">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        You are on worktree <code class="code-inline">[% current_branch | html %]</code>.
+                        <em>Merge main &rarr; this branch</em> updates <strong>this</strong> checkout from local main.
+                        Do not switch to main. To land this branch on main, use the main dashboard (port 3001).
+                    </p>
+                    [% ELSE %]
                     <p class="git-merge-guideline">
                         <i class="fas fa-exclamation-triangle"></i>
                         <strong>Only <code class="code-inline">main</code> receives inbound merges.</strong>
-                        Pick a worktree branch in the dropdown, then
-                        <em>Merge this branch &rarr; main</em>.
-                        You do this from the main dashboard (port 3001) — do not switch this checkout to the worktree branch.
-                        <em>Merge main &rarr; this branch</em> only refreshes that worktree from local main (it will refuse if the worktree is dirty).
+                        Pick a worktree branch, then <em>Merge this branch &rarr; main</em>.
                     </p>
+                    [% END %]
 
                     <div class="git-actions">
                         <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
