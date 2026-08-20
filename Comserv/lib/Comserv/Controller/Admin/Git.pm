@@ -843,7 +843,14 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     # Check if this is a POST request (user confirmed the git pull)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         
-        my $selected_branch = $c->req->param('branch') || 'main';
+        # Default to THIS checkout's branch, never bare 'main'. A worktree
+        # server cannot `git checkout main` — already used by the primary
+        # (exit 128 + ERROR audit todo).
+        my $selected_branch = $c->req->param('branch');
+        if (!defined $selected_branch || $selected_branch !~ /\S/) {
+            $selected_branch = $self->get_current_branch($c);
+            $selected_branch = 'main' if !$selected_branch || $selected_branch eq 'unknown';
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
             "Git pull confirmed for branch '$selected_branch', executing");
@@ -939,7 +946,11 @@ sub safe_git_pull :Path('/admin/safe_git_pull') :Args(0) {
     # Check if this is a POST request (user confirmed the operation)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         
-        my $selected_branch = $c->req->param('branch') || 'main';
+        my $selected_branch = $c->req->param('branch');
+        if (!defined $selected_branch || $selected_branch !~ /\S/) {
+            $selected_branch = $self->get_current_branch($c);
+            $selected_branch = 'main' if !$selected_branch || $selected_branch eq 'unknown';
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'safe_git_pull', 
             "Safe git pull confirmed for branch '$selected_branch', executing");

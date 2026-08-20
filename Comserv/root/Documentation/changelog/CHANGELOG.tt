@@ -20,7 +20,10 @@
 <ul class="cl-toc-year">
 <li><strong>2026-08</strong><ul>
 <li><a href="#2026-08-20-plan-header-project-todos">2026-08-20 — Plan header: Open project + View todos</a></li>
+<li><a href="#2026-08-20-todo-card-theme-branch-sort">2026-08-20 — Todo cards: black-on-light default; branch queue Active → blockers → branch work</a></li>
+<li><a href="#2026-08-20-branch-focus-queue">2026-08-20 — Branch Daily Plan shows only that project's todos + blockers</a></li>
 <li><a href="#2026-08-20-git-dashboard-reload-after-merge">2026-08-20 — Git dashboard reloads after a successful merge</a></li>
+<li><a href="#2026-08-20-git-pull-worktree-checkout">2026-08-20 — Git pull must not checkout main from a worktree</a></li>
 <li><a href="#2026-08-19-dryer-import-playbook">2026-08-19 — HDRY dryer 3D import playbook (project #272)</a></li>
 <li><a href="#2026-08-19-supergrok-docs">2026-08-19 — Docs: SuperGrok is its own prepaid provider</a></li>
 <li><a href="#2026-08-19-supergrok-source">2026-08-19 — SuperGrok prepaid models as a portable catalog source</a></li>
@@ -13204,6 +13207,37 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
 </div>
 </div>
 
+<div id="2026-08-20-todo-card-theme-branch-sort" class="cl-entry">
+<h3>2026-08-20 — Todo cards: black-on-light default; branch queue Active → blockers → branch work</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Last Updated: 2026-08-20 | Version: 1.00 | Tracked in project: <a href="/project/details?project_id=138" class="doc-link">#138 (PLANNING)</a>.</p>
+            <p class="doc-body">Todo cards on <code>/planning/daily</code> were white text on gray because the shared card wrapper carried <code>pri-N</code>. P7–P10 in the theme painted the <em>whole card</em> <code>color:#fff</code> on muted gray. Priority colour is now badge-only (<code>.badge.pri-N</code>). Global card text default is <code>var(--text-color, #000)</code> on a light <code>--card-bg</code>; dark themes still override <code>--text-color</code>.</p>
+            <p class="doc-body">Branch Focus Queue sort is now: <strong>Active (any branch)</strong> first so nobody starts a todo already in a work log, then <strong>blockers from any branch</strong>, then this branch's project todos by scored priority. <code>/planning/daily</code> no longer forwards into <code>daily_impl</code> (that overwrite hid the branch filter).</p>
+            <p class="doc-body">Files: <code>todo_card.tt</code>, <code>base-containers.css</code>, <code>todo.css</code>, <code>todo_shared.css</code>, <code>Header.tt</code>, <code>Planning.pm</code>, <code>FocusRanking.pm</code>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-20-branch-focus-queue" class="cl-entry">
+<h3>2026-08-20 — Branch Daily Plan shows only that project's todos + blockers</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Last Updated: 2026-08-20 | Version: 1.00 | Tracked in project: <a href="/project/details?project_id=138" class="doc-link">#138 (PLANNING)</a>.</p>
+            <p class="doc-body">On a worktree server, <code>/planning/daily</code> no longer dumps the whole site Focus Queue. It keeps todos on the branch's project tree (root + phase children) and todos that actually block that project (<code>blocked_by_todo_id</code> or an active cross-project <code>is_blocking</code> dependency). <code>main</code> is unchanged. <code>?filter_project=all</code> is the escape hatch; <code>?filter_project=N</code> on a branch uses N as the root.</p>
+            <ul class="doc-body">
+                <li>Branch &rarr; project comes from <code>root/config/worktrees.json</code> <code>project_id</code>, then a name/code/<code>Branch:</code> comment match.</li>
+                <li>Known links: planning #138, git #238, aisystem #280, DockerHA #202, 3d #272. InventoryAccounting still resolves by name until stamped.</li>
+            </ul>
+            <p class="doc-body">Files: <code>lib/Comserv/Controller/Planning.pm</code>, <code>lib/Comserv/Util/FocusRanking.pm</code>, <code>lib/Comserv/Util/ProjectDependencies.pm</code>, <code>lib/Comserv/Util/Git.pm</code>, <code>root/config/worktrees.json</code>, <code>root/admin/planning/_today_work_tab.tt</code>, <code>t/util_todo_ranking.t</code>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
 <div id="2026-08-20-git-dashboard-reload-after-merge" class="cl-entry">
 <h3>2026-08-20 — Git dashboard reloads after a successful merge</h3>
 <div class="container">
@@ -13451,6 +13485,23 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
                 <li>Plan + 3d branch context updated: never launch Hermes with <code>-w</code> from a Comserv worktree.</li>
             </ul>
             <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>root/static/js/git-dashboard.js</code>, <code>root/Documentation/HermesBranchContextPlan.tt</code>. Tracked under <a href="/todo/details?record_id=2143" class="doc-link">todo #2143</a> / project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-20-git-pull-worktree-checkout" class="cl-entry">
+<h3>2026-08-20 — Git pull must not checkout main from a worktree</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body"><code>/admin/git_pull</code> on a worktree server (e.g. planning:4005) ran <code>git checkout main</code>, which git refuses with exit 128 (<code>already used by worktree</code> at the primary checkout). That was logged as ERROR at <code>git_run</code> and spawned an audit todo. <code>switch_branch</code> already refused this; <code>pull</code> and <code>delete_branch</code> did not.</p>
+            <ul class="doc-body">
+                <li>Shared <code>_checkout_collision_reason</code> used by switch / pull / delete — refuse before git runs.</li>
+                <li>Controller no longer defaults a missing branch param to <code>main</code>; it uses the current checkout.</li>
+                <li><code>_run</code> demotes leftover checkout-collision 128s to info so they do not create error todos.</li>
+            </ul>
+            <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>lib/Comserv/Controller/Admin/Git.pm</code>, <code>t/util_git.t</code>. Git dashboard / worktree isolation is project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
         </div>
     </div>
 </div>

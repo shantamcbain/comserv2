@@ -462,8 +462,15 @@ sub _run {
     # silently stops working after a git upgrade.
     my $combined   = ($result->{output} // '') . "\n" . ($result->{error} // '');
     my $asks_upstream = grep { defined $_ && /\@\{u(pstream)?\}/ } @argv;
+    # Linked worktrees cannot check out a branch already used elsewhere
+    # (typical: `git checkout main` from planning/aisystem → exit 128,
+    # "already used by worktree"). Callers must refuse first; if one still
+    # hits git, do not spawn an ERROR audit todo — the refusal is expected.
+    my $checkout_collision = ($subcmd eq 'checkout')
+        && $combined =~ /already used by worktree|already checked out/i;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
+                  || $checkout_collision
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
     my $level    = $result->{success} ? 'info'
                  : $benign            ? 'info'
@@ -879,12 +886,24 @@ match the legacy execute_git_pull contract used by callers.
 
 sub pull {
     my ($self, $c, $branch) = @_;
-    $branch ||= 'main';
     my $output  = '';
     my $success = 0;
     my $warning;
 
     my $app_dir = $self->repo_path($c);
+    my $current = $self->get_current_branch($c);
+    $branch ||= $current;
+    $branch = 'main' if !$branch || $branch eq 'unknown';
+
+    # Refuse BEFORE stash/fetch/checkout. `git checkout main` from a linked
+    # worktree is exit 128 and used to spawn an ERROR audit todo.
+    if ($current ne $branch) {
+        if (my $why = $self->_checkout_collision_reason($c, $branch)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull',
+                "refused pull of '$branch' from checkout $current: $why");
+            return (0, "Error: $why\n", undef);
+        }
+    }
 
     my $theme_file = "$app_dir/Comserv/root/static/config/theme_mappings.json";
     my $has_theme_changes = 0;
@@ -909,7 +928,7 @@ sub pull {
     $output .= "Fetching latest changes...\n";
     $output .= $self->_run($c, 'fetch', 'origin')->{output};
 
-    my $current = $self->get_current_branch($c);
+    $current = $self->get_current_branch($c);
     if ($current ne $branch) {
         $output .= "Switching to branch '$branch'...\n";
         my $co = $self->_run($c, 'checkout', $branch);
@@ -1016,6 +1035,12 @@ sub delete_branch {
 
     my $current = $self->get_current_branch($c);
     if ($current eq $branch_name) {
+        if (my $why = $self->_checkout_collision_reason($c, 'main')) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_delete_branch',
+                "refused checkout of main before deleting '$branch_name': $why");
+            $result->{error_msg} = "Cannot delete the currently checked-out worktree branch (would need to switch to main). Remove the worktree first.";
+            return $result;
+        }
         $result->{output} .= "Switching to main branch before deletion...\n";
         my $co = $self->_run($c, 'checkout', 'main');
         $result->{output} .= $co->{output};
@@ -1053,6 +1078,36 @@ sub delete_branch {
     return $result;
 }
 
+=head2 _checkout_collision_reason($c, $branch_name)
+
+Return an error string if this checkout cannot C<git checkout $branch_name>
+because another linked worktree already has that branch (including C<main>
+in the primary). Undef means checkout is allowed. Used by switch/pull/delete
+so a doomed checkout never runs (and never logs ERROR at git_run).
+
+=cut
+
+sub _checkout_collision_reason {
+    my ($self, $c, $branch_name) = @_;
+    return unless defined $branch_name && length $branch_name;
+
+    my $here = $self->repo_path($c) // '';
+    my $base = $self->worktree_base_dir // '';
+    if (($branch_name eq 'main' || $branch_name eq 'master')
+            && $base && $here =~ /\Q$base\E/) {
+        return "Cannot switch to '$branch_name' in a worktree: it is already checked out in the primary repo. Stay on this worktree's branch.";
+    }
+    my $other = $self->worktree_checkout_path_for_branch($c, $branch_name);
+    if (defined $other && length $other) {
+        my $here_abs  = eval { Cwd::abs_path($here) }  || $here;
+        my $other_abs = eval { Cwd::abs_path($other) } || $other;
+        if ($other_abs ne $here_abs) {
+            return "Branch '$branch_name' is already checked out at $other. Open that worktree's server — do not switch this checkout.";
+        }
+    }
+    return;
+}
+
 =head2 switch_branch($c, $branch_name)
 
 Switch to $branch_name, auto-stashing uncommitted changes, creating the local
@@ -1072,25 +1127,11 @@ sub switch_branch {
     # Linked worktrees cannot steal each other's branch, and cannot check out
     # main (already checked out in the primary). Refuse BEFORE stashing so a
     # doomed switch never hides the user's dirty files.
-    my $here = $self->repo_path($c) // '';
-    my $base = $self->worktree_base_dir // '';
-    if (($branch_name eq 'main' || $branch_name eq 'master')
-            && $base && $here =~ /\Q$base\E/) {
+    if (my $why = $self->_checkout_collision_reason($c, $branch_name)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
-            "refused switch to '$branch_name' from worktree checkout $here");
-        $result->{error_msg} = "Cannot switch to '$branch_name' in a worktree: it is already checked out in the primary repo. Stay on this worktree's branch.";
+            "refused switch to '$branch_name': $why");
+        $result->{error_msg} = $why;
         return $result;
-    }
-    my $other = $self->worktree_checkout_path_for_branch($c, $branch_name);
-    if (defined $other && length $other) {
-        my $here_abs  = eval { Cwd::abs_path($here) }  || $here;
-        my $other_abs = eval { Cwd::abs_path($other) } || $other;
-        if ($other_abs ne $here_abs) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
-                "refused switch to '$branch_name': already checked out at $other");
-            $result->{error_msg} = "Branch '$branch_name' is already checked out at $other. Open that worktree's server — do not switch this checkout.";
-            return $result;
-        }
     }
 
     $result->{output} .= "Fetching latest changes...\n";
@@ -1329,6 +1370,9 @@ sub build_worktree_list {
             # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
             # No -w — see main hermes_cmd comment above.
             hermes_cmd => "cd $base/$name/Comserv && hermes chat",
+            # Optional planning-project link (worktrees.json project_id). Used by
+            # /planning/daily to scope the Focus Queue to this branch's todos.
+            project_id => $b->{project_id} // undef,
         };
     }
     return \@list;
