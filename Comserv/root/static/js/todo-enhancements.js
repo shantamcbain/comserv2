@@ -242,15 +242,15 @@ function initializeFloatingElements() {
     `;
     document.body.appendChild(floatingHeader);
     
-    // Create back-to-top button
-    const backToTop = document.createElement('button');
-    backToTop.className = 'back-to-top';
-    backToTop.innerHTML = '↑';
-    backToTop.title = 'Back to top';
-    backToTop.onclick = () => window.scrollTo({top: 0, behavior: 'smooth'});
-    document.body.appendChild(backToTop);
-    
-    // Handle scroll events
+    // NOTE: do NOT inject a second ".back-to-top" button here. The canonical,
+    // JS-wired back-to-top control is the #back-to-top element in layout.tt
+    // (styled by back-to-top.css, shown/clicked via back-to-top.js +
+    // floating-buttons.js). Creating a class="back-to-top" element here is
+    // unstyled (no CSS targets the class), never gets a scroll listener, and
+    // renders as a dead static "↑" at the page bottom — a known duplicate-arrow
+    // bug. The floating header above already carries its own working "↑ Top".
+
+    // Handle scroll events for the floating header only.
     let ticking = false;
     function handleScroll() {
         if (!ticking) {
@@ -261,10 +261,8 @@ function initializeFloatingElements() {
                 // Show/hide floating header
                 if (scrollTop > showThreshold) {
                     floatingHeader.classList.add('visible');
-                    backToTop.classList.add('visible');
                 } else {
                     floatingHeader.classList.remove('visible');
-                    backToTop.classList.remove('visible');
                 }
                 
                 ticking = false;

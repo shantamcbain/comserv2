@@ -55,7 +55,7 @@ my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
 my %ALLOWED_FLAGS = (
     status   => { map { $_ => 1 } qw(--porcelain --short -s --no-color) },
     log      => { map { $_ => 1 } qw(--oneline --no-color --stat -n) },
-    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet --show-prefix --show-toplevel) },
+    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet --show-prefix --show-toplevel --git-common-dir) },
     'rev-list'  => { map { $_ => 1 } qw(--left-right --count) },
     branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color --format) },
     diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified --no-index) },
@@ -76,7 +76,7 @@ my %ALLOWED_FLAGS = (
     merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash) },
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
-    worktree => { map { $_ => 1 } qw(add remove list prune --force) },
+    worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
 );
 
 sub new {
@@ -104,6 +104,63 @@ sub repo_path {
     $path ||= $ENV{COMSERV_GIT_REPO};
     $path ||= $c->path_to('..')->stringify if $c;
     return $path;
+}
+
+=head2 main_repo_path($c)
+
+Resolve the PRIMARY checkout — the working tree where C<main> is actually
+checked out — so operations that mutate C<main> (merge_to_main) run there
+instead of in a feature worktree.
+
+A linked worktree cannot check out C<main> (git refuses: "already checked
+out at <primary>"), and C<git merge --no-ff E<lt>branchE<gt>> inside the
+feature worktree merges the branch into itself ("Already up to date").
+We derive the primary from C<git rev-parse --git-common-dir> (shared
+object db of a linked worktree) and fall back to L</repo_path>. Porcelain
+C<git worktree list> is not used here: it can drop the path line after a
+branch rename.
+
+=cut
+
+sub main_repo_path {
+    my ($self, $c) = @_;
+    my $repo = $self->repo_path($c);
+    unless (defined $repo && length $repo) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            'main_repo_path: could not resolve repo_path (no repo)');
+        return undef;
+    }
+    my $r = $self->_run($c, 'rev-parse', '--git-common-dir');
+    my $common = $r->{output} // '';
+    $common =~ s/\s+\z//;
+    if ($r->{success} && length $common) {
+        $common = "$repo/$common" unless $common =~ m{^/};
+        $common =~ s{/\.git\z}{};
+        return $common if $common && -d $common;
+    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+        'main_repo_path: git-common-dir failed; falling back to repo_path');
+    return $repo;
+}
+
+=head2 worktree_checkout_dir($c, $branch)
+
+Resolve the Catalyst app dir of the worktree that has C<$branch> checked
+out. Uses the directory-scan resolver (robust when porcelain metadata is
+stale after a rename). Returns undef if the branch has no worktree.
+
+=cut
+
+sub worktree_checkout_dir {
+    my ($self, $c, $branch) = @_;
+    return undef unless $branch && $branch ne 'main';
+    my $git_root = $self->worktree_checkout_path_for_branch($c, $branch);
+    unless ($git_root) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_gate',
+            "worktree_checkout_dir: no checkout found for branch '$branch'");
+        return undef;
+    }
+    return -d "$git_root/Comserv" ? "$git_root/Comserv" : $git_root;
 }
 
 =head2 resolve_target($c, $target)
@@ -1012,6 +1069,30 @@ sub switch_branch {
         return $result;
     }
 
+    # Linked worktrees cannot steal each other's branch, and cannot check out
+    # main (already checked out in the primary). Refuse BEFORE stashing so a
+    # doomed switch never hides the user's dirty files.
+    my $here = $self->repo_path($c) // '';
+    my $base = $self->worktree_base_dir // '';
+    if (($branch_name eq 'main' || $branch_name eq 'master')
+            && $base && $here =~ /\Q$base\E/) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
+            "refused switch to '$branch_name' from worktree checkout $here");
+        $result->{error_msg} = "Cannot switch to '$branch_name' in a worktree: it is already checked out in the primary repo. Stay on this worktree's branch.";
+        return $result;
+    }
+    my $other = $self->worktree_checkout_path_for_branch($c, $branch_name);
+    if (defined $other && length $other) {
+        my $here_abs  = eval { Cwd::abs_path($here) }  || $here;
+        my $other_abs = eval { Cwd::abs_path($other) } || $other;
+        if ($other_abs ne $here_abs) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
+                "refused switch to '$branch_name': already checked out at $other");
+            $result->{error_msg} = "Branch '$branch_name' is already checked out at $other. Open that worktree's server — do not switch this checkout.";
+            return $result;
+        }
+    }
+
     $result->{output} .= "Fetching latest changes...\n";
     $result->{output} .= $self->_run($c, 'fetch', 'origin')->{output};
 
@@ -1479,10 +1560,15 @@ NOT auto-run here; the controller reports the conflict and offers abort.
 =cut
 
 sub merge_branch {
-    my ($self, $c, $branch) = @_;
+    my ($self, $c, $branch, $opts) = @_;
     my $result = { success => 0, output => '', action => 'merge_branch' };
 
+    $opts //= {};
+    my $repo = $opts->{repo};   # optional explicit checkout (primary repo for merge_to_main)
+
     if (!$branch) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            'merge_branch: branch name is required');
         $result->{error_msg} = "Branch name is required.";
         return $result;
     }
@@ -1495,15 +1581,19 @@ sub merge_branch {
     if (($branch eq 'main'   && $current eq 'main')
      || ($branch eq 'master' && $current eq 'master')
      || ($branch eq 'Production' && $current eq 'Production')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: refusing to merge protected branch '$branch' into itself");
         $result->{error_msg} = "Refusing to merge a protected branch into itself.";
         return $result;
     }
 
-    my $r = $self->_run($c, 'merge', '--no-ff', $branch);
+    my $r = $self->_run($c, 'merge', '--no-ff', $branch, ($repo ? { repo => $repo } : ()));
     $result->{output} = $r->{output};
     if ($r->{success}) {
         $result->{success}     = 1;
         $result->{success_msg} = "Merged '$branch' into current branch.";
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: merged '$branch' into " . ($repo // 'current checkout') . " (success)");
     }
     else {
         # Detect conflict so the UI can offer --abort.
@@ -1511,6 +1601,10 @@ sub merge_branch {
             $result->{conflict} = 1;
         }
         $result->{error_msg} = "Merge of '$branch' failed (see output).";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            "merge_branch: merge of '$branch' failed"
+            . ($result->{conflict} ? ' (conflict)' : '')
+            . ': ' . ($r->{output} // ''));
     }
     return $result;
 }
@@ -1552,22 +1646,67 @@ path is derived from the standard layout; falls back to the repo root if unknown
 =cut
 
 sub run_test_gate {
-    my ($self, $c, $branch) = @_;
-    my $repo = $self->repo_path($c) // return { success => 0, output => 'no repo' };
+    my ($self, $c, $branch, $repo_override) = @_;
+    my $repo = $repo_override // $self->repo_path($c);
+    unless (defined $repo && length $repo) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+            'run_test_gate: could not resolve a repo path (no repo)');
+        return { success => 0, output => 'no repo' };
+    }
 
-    my $base = $self->worktree_base_dir // "$ENV{HOME}/.comserv/worktrees";
-    my $wt_dir = ($branch && $branch ne 'main')
-        ? "$base/$branch/Comserv"
-        : $repo;
-    $wt_dir = $repo unless $wt_dir && -d $wt_dir;
+    # App dir is one level under the git root (<root>/Comserv). Worktree
+    # checkouts are <base>/<branch>/Comserv (git root) with the app at
+    # <base>/<branch>/Comserv/Comserv.
+    my $app_dir_for = sub {
+        my $root = shift;
+        return -d "$root/Comserv" ? "$root/Comserv" : $root;
+    };
 
-    my $script = "$wt_dir/script/test_gate.sh";
-    $script = "$repo/script/test_gate.sh" unless -f $script;
-    return { success => 0, output => "test_gate.sh not found at $script" } unless -f $script;
+    # Resolve the checkout we actually test via directory scan (not a
+    # string-built path that can land one directory too high/low). For main
+    # we use the app dir of $repo. Falls back to app_dir_for($repo) if the
+    # branch has no worktree.
+    my $checkout;
+    if ($branch && $branch ne 'main') {
+        $checkout = $self->worktree_checkout_dir($c, $branch);
+    }
+    $checkout = $app_dir_for->($repo) unless $checkout && -d $checkout;
+    my $wt_dir = $checkout;
 
-    my $out = `cd "$wt_dir" && bash "$script" --fast 2>&1`;
+    # The gate MUST run the canonical script shipped with the RUNNING app (the
+    # one with this fix), NOT a per-worktree copy. Worktree copies are divergent
+    # and can stale-false-pass (e.g. prove with zero existing test files exits 0,
+    # so "no tests ran" looked like green). The only per-branch difference is
+    # COMSERV_DIR, which tells the script WHICH checkout to test. Never fall back
+    # to another repo's or the worktree's own script.
+    my $app_script = ($c && $c->path_to('script'))
+        ? $c->path_to('script')->stringify . '/test_gate.sh'
+        : $app_dir_for->($repo) . '/script/test_gate.sh';
+    my $script = $app_script;
+    unless (-f $script) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+            "run_test_gate: test_gate.sh not found at $script");
+        return { success => 0, output => "test_gate.sh not found at $script" };
+    }
+
+    # Pass the *target checkout* explicitly so the gate tests the branch being
+    # merged (COMSERV_DIR honored by the script) and not the repo the script
+    # file happens to live in.
+    local $ENV{COMSERV_DIR} = $wt_dir;
+
+    my $out = `bash "$script" --fast 2>&1`;
     my $code = $? >> 8;
-    return { success => ($code == 0 ? 1 : 0), output => $out // '' };
+    my $res = { success => ($code == 0 ? 1 : 0), output => $out // '' };
+
+    # exit 2 from the script means a harness problem or a stale worktree with no
+    # test suite (not a real test failure). Make that distinction explicit so the
+    # UI doesn't show a misleading "fix tests" message for an un-mergeable branch.
+    if ($code == 2) {
+        $res->{stale} = 1;
+        $res->{error_msg} = "Test gate could not run for '$branch': the worktree has no test suite. "
+                          . "Update the branch from main (merge main into it) so it gains the tests, then re-run.";
+    }
+    return $res;
 }
 
 =head2 push_main($c)
