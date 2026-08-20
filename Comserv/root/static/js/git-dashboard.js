@@ -284,6 +284,12 @@
             if (direction === 'main-to-branch') { source = 'main'; target = selBranch; }
             else { source = selBranch; target = 'main'; }
 
+            if (!selBranch || selBranch === 'main' || selBranch === 'master') {
+                showMergeResult(false, false, 'failed',
+                    'Pick a worktree branch in the dropdown. main cannot merge into itself.');
+                return;
+            }
+
             if (btn.getAttribute('data-git-confirm')) {
                 var prompt = btn.getAttribute('data-git-confirm');
                 if (prompt && !window.confirm(prompt)) { return; }

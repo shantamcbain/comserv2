@@ -103,10 +103,20 @@
                             <select name="branch" class="form-control git-select"
                                     data-git-switch-select="1" title="Switch branch">
                                 [% FOREACH b IN branch_details %]
+                                [% IF b.name != 'git' %]
+                                [% SET skip_wt = 0 %]
+                                [% UNLESS b.is_current %]
+                                    [% FOREACH w IN worktree_list %]
+                                        [% IF w.name == b.name && w.name != 'main' %][% SET skip_wt = 1 %][% END %]
+                                    [% END %]
+                                [% END %]
+                                [% UNLESS skip_wt %]
                                 <option value="[% b.name | html %]"
                                     [% IF b.is_current %]selected[% END %]>
                                     [% b.name | html %][% IF b.last_commit_relative %] · [% b.last_commit_relative | html %][% END %]
                                 </option>
+                                [% END %]
+                                [% END %]
                                 [% END %]
                             </select>
                         </form>
@@ -366,9 +376,10 @@
                             <select name="merge_branch" class="form-control git-select"
                                     id="git-merge-branch" data-git-merge-select="1"
                                     title="Branch to merge with main">
+                                [% SET merge_sel = 0 %]
                                 [% FOREACH b IN branch_details %]
-                                [% IF b.name != 'git' %]
-                                <option value="[% b.name | html %]"[% IF b.is_current %] selected[% END %]>[% b.name | html %][% IF b.is_current %] (active)[% END %]</option>
+                                [% IF b.name != 'git' && b.name != 'main' && b.name != 'master' %]
+                                <option value="[% b.name | html %]"[% UNLESS merge_sel %] selected[% SET merge_sel = 1 %][% END %]>[% b.name | html %][% IF b.is_current %] (this checkout)[% END %]</option>
                                 [% END %]
                                 [% END %]
                             </select>
@@ -381,12 +392,11 @@
                     </p>
                     <p class="git-merge-guideline">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Only <code class="code-inline">main</code> merges branches in.</strong>
-                        Bring a branch into <code class="code-inline">main</code> with
-                        <em>Merge this branch &rarr; main</em> (only enabled for the active branch — mirroring PyCharm).
-                        The <em>Merge main &rarr; this branch</em> button is the opposite direction: it refreshes a
-                        branch with the latest <code class="code-inline">main</code> <em>before</em> you start work, it does
-                        not "merge main into main". There is no main &rarr; main inbound merge.
+                        <strong>Only <code class="code-inline">main</code> receives inbound merges.</strong>
+                        Pick a worktree branch in the dropdown, then
+                        <em>Merge this branch &rarr; main</em>.
+                        You do this from the main dashboard (port 3001) — do not switch this checkout to the worktree branch.
+                        <em>Merge main &rarr; this branch</em> only refreshes that worktree from local main (it will refuse if the worktree is dirty).
                     </p>
 
                     <div class="git-actions">

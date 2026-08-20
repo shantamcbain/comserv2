@@ -1069,6 +1069,30 @@ sub switch_branch {
         return $result;
     }
 
+    # Linked worktrees cannot steal each other's branch, and cannot check out
+    # main (already checked out in the primary). Refuse BEFORE stashing so a
+    # doomed switch never hides the user's dirty files.
+    my $here = $self->repo_path($c) // '';
+    my $base = $self->worktree_base_dir // '';
+    if (($branch_name eq 'main' || $branch_name eq 'master')
+            && $base && $here =~ /\Q$base\E/) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
+            "refused switch to '$branch_name' from worktree checkout $here");
+        $result->{error_msg} = "Cannot switch to '$branch_name' in a worktree: it is already checked out in the primary repo. Stay on this worktree's branch.";
+        return $result;
+    }
+    my $other = $self->worktree_checkout_path_for_branch($c, $branch_name);
+    if (defined $other && length $other) {
+        my $here_abs  = eval { Cwd::abs_path($here) }  || $here;
+        my $other_abs = eval { Cwd::abs_path($other) } || $other;
+        if ($other_abs ne $here_abs) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
+                "refused switch to '$branch_name': already checked out at $other");
+            $result->{error_msg} = "Branch '$branch_name' is already checked out at $other. Open that worktree's server — do not switch this checkout.";
+            return $result;
+        }
+    }
+
     $result->{output} .= "Fetching latest changes...\n";
     $result->{output} .= $self->_run($c, 'fetch', 'origin')->{output};
 
