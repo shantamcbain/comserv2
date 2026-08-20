@@ -32,13 +32,7 @@
         </div>
         <div class="ai-topbar-center">
             [% IF (can_select_model || (ai_model_catalog && ai_model_catalog.size > 0)) && (username && !username.match('^Guest-')) %]
-            [%# SINGLE SOURCE OF TRUTH: server-rendered dropdown from the catalog
-               in stash (Root.pm auto -> ai_model_catalog). Sorted by role + page.
-               Rendered with id="model-select" — local-chat.js initPageMode() calls
-               ComservChat.modelSelect.init({selectEl:#model-select}) which reads
-               window.ComservConfig.models (this same catalog, JSON form) and, when
-               non-empty, uses it directly instead of refetching /ai2/providers.
-               Keep this id in sync with local-chat.js (do NOT rename to ai-provider). #]
+            <label class="ai-model-label" for="model-select">Model</label>
             [% PROCESS 'ai/model_select.tt'
                 select_id = 'model-select',
                 select_name = 'model',
@@ -51,19 +45,23 @@
             [% END %]
 
             [% IF can_select_model %]
-            <select id="host-select" class="ai-host-select" title="Ollama server">
+            [%# Keep #host-select in the DOM for the existing page-mode JS, but do
+                not present the Ollama IP as if it were the model list. Host changes
+                belong on /ai/models. %]
+            <select id="host-select" class="ai-host-select" title="Ollama server (also on Model Management)" aria-label="Ollama host">
                 <option value="localhost" [% IF current_host == 'localhost' || current_host == '127.0.0.1' %]selected[% END %]>localhost</option>
                 <option value="192.168.1.199" [% IF current_host == '192.168.1.199' %]selected[% END %]>192.168.1.199</option>
             </select>
-            <span id="connection-status" class="ai-conn-status">
+            <span id="connection-status" class="ai-conn-status" title="Ollama host [% current_host | html %]">
                 <span class="status-indicator" id="status-indicator"></span>
-                <span id="status-text">[% current_host || 'localhost' %]</span>
+                <span id="status-text">Ollama</span>
             </span>
             <button id="start-server-btn" class="ai-start-btn" style="display:none;">Start Ollama</button>
             [% END %]
         </div>
         <div class="ai-topbar-right">
             [% IF username && !username.match('^Guest-') %]
+            <a href="/ai/usage" class="ai-topbar-btn" title="Usage and cost by model">📊 Usage</a>
             <a href="/ai/conversations" class="ai-topbar-btn" title="View conversation history">📋 History</a>
             <a href="/ai/manage_api_keys" class="ai-topbar-btn" title="Manage API keys">🔑</a>
             <a href="/ai/models" class="ai-topbar-btn" title="Manage models">⚙️</a>
@@ -219,14 +217,21 @@
 .ai-topbar-center {
     display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap;
 }
+.ai-model-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-color);
+    opacity: 0.8;
+    white-space: nowrap;
+}
 .ai-model-select, .ai-host-select {
     padding: 5px 10px; border: 1px solid var(--border-color);
     border-radius: 6px; font-size: 13px;
     background-color: var(--background-color); color: var(--text-color);
     cursor: pointer;
 }
-.ai-model-select { min-width: 180px; }
-.ai-host-select { min-width: 130px; }
+.ai-model-select { min-width: 280px; flex: 1; max-width: 520px; }
+.ai-host-select { min-width: 0; max-width: 9.5em; font-size: 11px; opacity: 0.75; }
 .ai-model-name { font-size: 13px; color: var(--link-color); font-family: monospace; }
 .ai-conn-status {
     display: inline-flex; align-items: center; gap: 6px;

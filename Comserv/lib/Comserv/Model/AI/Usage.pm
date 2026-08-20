@@ -3,6 +3,8 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
 use JSON;
+use DateTime;
+use LWP::UserAgent;
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -157,6 +159,14 @@ sub _estimate_cost_usd {
         'grok' => {
             default => { prompt => 0.000002, completion => 0.000006 },
             'grok-4' => { prompt => 0.000002, completion => 0.000006 },
+            'grok-4.6' => { prompt => 0.000002, completion => 0.000006 },
+        },
+        'supergrok' => {
+            default => { prompt => 0.000002, completion => 0.000006 },
+            'grok-4.6' => { prompt => 0.000002, completion => 0.000006 },
+        },
+        'openrouter' => {
+            default => { prompt => 0.0000005, completion => 0.0000015 },
         },
         'openai' => {
             'gpt-4o' => { prompt => 0.000005, completion => 0.000015 },
@@ -172,6 +182,270 @@ sub _estimate_cost_usd {
 
     my $cost = ($prompt_tokens * $rates->{prompt}) + ($completion_tokens * $rates->{completion});
     return sprintf("%.6f", $cost);
+}
+
+sub _load_config {
+    my ($self, $c) = @_;
+    my $path;
+    eval { $path = $c->path_to('root', 'config', 'ai_usage.json') if $c && $c->can('path_to') };
+    $path ||= 'root/config/ai_usage.json';
+    my $cfg = {
+        alert_percent                 => 80,
+        supergrok_monthly_limit_usd   => 30,
+        supergrok_monthly_request_limit => 400,
+    };
+    if ($path && -e $path && open my $fh, '<', $path) {
+        my $raw = do { local $/; <$fh> };
+        close $fh;
+        my $parsed = eval { decode_json($raw) };
+        if (ref($parsed) eq 'HASH') {
+            $cfg->{$_} = $parsed->{$_} for keys %$parsed;
+        }
+    }
+    return $cfg;
+}
+
+# Daily rollup from ai_usage_logs — which models ran and what they cost.
+sub daily_model_summary {
+    my ($self, $c, $days) = @_;
+    $days = 14 unless $days && $days =~ /^\d+$/;
+    my @rows;
+    eval {
+        my $schema = $c->model('DBEncy')->schema or return;
+        my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
+        my $rs = $schema->resultset('AiUsageLog')->search({
+            created_at    => { '>=' => $since },
+            request_type  => { -not_in => [qw(grok_balance_check provider_snapshot)] },
+        }, { order_by => { -desc => 'created_at' }, rows => 2000 });
+        my %by;
+        while (my $log = $rs->next) {
+            my $day = '';
+            if (my $ts = $log->created_at) {
+                $day = $ts->can('ymd') ? $ts->ymd : substr("$ts", 0, 10);
+            }
+            my $prov = $log->provider || 'unknown';
+            my $mod  = $log->model || 'unknown';
+            next if $mod eq '_api_snapshot' || $mod eq 'xai-usage-check';
+            my $k = "$day\t$prov\t$mod";
+            $by{$k}{day}      = $day;
+            $by{$k}{provider} = $prov;
+            $by{$k}{model}    = $mod;
+            $by{$k}{calls}   += 1;
+            $by{$k}{ok}      += (($log->status || '') eq 'success') ? 1 : 0;
+            $by{$k}{tokens}  += $log->total_tokens || 0;
+            $by{$k}{cost}    += $log->estimated_cost_usd || 0;
+        }
+        @rows = sort { $b->{day} cmp $a->{day} || $a->{provider} cmp $b->{provider} || $a->{model} cmp $b->{model} }
+                values %by;
+        for my $r (@rows) {
+            $r->{cost} = sprintf('%.4f', $r->{cost} || 0);
+            $r->{cost_per_ok} = ($r->{ok} && $r->{ok} > 0)
+                ? sprintf('%.5f', ($r->{cost} || 0) / $r->{ok})
+                : '0.00000';
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily_model_summary',
+            "Failed to build daily model summary: $@");
+    }
+    return \@rows;
+}
+
+sub fetch_openrouter_status {
+    my ($self, $c) = @_;
+    my $out = { provider => 'openrouter', source => 'openrouter_auth_key', ok => 0 };
+    my $key;
+    eval {
+        my $prov = $c->model('AI2::Provider::OpenRouter');
+        $key = $prov->_resolve_api_key($c) if $prov && $prov->can('_resolve_api_key');
+    };
+    unless ($key) {
+        $out->{error} = 'No OpenRouter API key';
+        return $out;
+    }
+    my $ua = LWP::UserAgent->new(timeout => 10);
+    my $res = eval {
+        $ua->get('https://openrouter.ai/api/v1/auth/key',
+            Authorization => "Bearer $key",
+            Accept        => 'application/json',
+        );
+    };
+    if ($@ || !$res) {
+        $out->{error} = "OpenRouter request failed: $@";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_openrouter_status', $out->{error});
+        return $out;
+    }
+    $out->{http_status} = $res->code;
+    unless ($res->is_success) {
+        $out->{error} = 'OpenRouter returned ' . $res->status_line;
+        return $out;
+    }
+    my $data = eval { decode_json($res->decoded_content) } || {};
+    my $d = $data->{data} || $data;
+    $out->{ok}          = 1;
+    $out->{usage}       = 0 + ($d->{usage} // 0);
+    $out->{limit}       = defined $d->{limit} ? 0 + $d->{limit} : undef;
+    $out->{remaining}   = defined $d->{limit_remaining} ? 0 + $d->{limit_remaining} : undef;
+    $out->{is_free_tier}= $d->{is_free_tier} ? 1 : 0;
+    $out->{auto_fill}   = 0;
+    if ($out->{limit} && $out->{limit} > 0) {
+        $out->{pct} = sprintf('%.1f', 100 * $out->{usage} / $out->{limit});
+    }
+    $out->{exhausted} = (defined $out->{remaining} && $out->{remaining} <= 0) ? 1 : 0;
+    return $out;
+}
+
+sub supergrok_month_status {
+    my ($self, $c) = @_;
+    my $cfg = $self->_load_config($c);
+    my $out = {
+        provider      => 'supergrok',
+        source        => 'internal_logs+allowance',
+        ok            => 0,
+        limit_usd     => 0 + ($cfg->{supergrok_monthly_limit_usd} || 30),
+        limit_calls   => 0 + ($cfg->{supergrok_monthly_request_limit} || 400),
+        alert_percent => 0 + ($cfg->{alert_percent} || 80),
+        spend_usd     => 0,
+        calls         => 0,
+    };
+    eval {
+        my $schema = $c->model('DBEncy')->schema or return;
+        my $start = DateTime->now->truncate(to => 'month')->ymd . ' 00:00:00';
+        # SuperGrok only — never mix xAI grok (auto-fill pay-per-token) into this meter.
+        my $rs = $schema->resultset('AiUsageLog')->search({
+            provider     => 'supergrok',
+            created_at   => { '>=' => $start },
+            request_type => { -not_in => [qw(grok_balance_check provider_snapshot)] },
+            status       => 'success',
+        });
+        while (my $row = $rs->next) {
+            next if ($row->model || '') =~ /^(xai-usage-check|_api_snapshot)$/;
+            $out->{calls}     += 1;
+            $out->{spend_usd} += $row->estimated_cost_usd || 0;
+            $out->{tokens}    += $row->total_tokens || 0;
+        }
+        $out->{ok} = 1;
+    };
+    if ($@) {
+        $out->{error} = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'supergrok_month_status',
+            "Failed SuperGrok month rollup: $@");
+    }
+    $out->{spend_usd} = sprintf('%.4f', $out->{spend_usd} || 0);
+    my $pct_usd   = $out->{limit_usd}   > 0 ? 100 * $out->{spend_usd} / $out->{limit_usd} : 0;
+    my $pct_calls = $out->{limit_calls} > 0 ? 100 * $out->{calls} / $out->{limit_calls} : 0;
+    $out->{pct} = sprintf('%.1f', $pct_usd > $pct_calls ? $pct_usd : $pct_calls);
+    $out->{over_threshold} = ($out->{pct} + 0) >= $out->{alert_percent} ? 1 : 0;
+    $out->{source} = 'internal_logs_only';
+    $out->{live_quota} = 0;
+    $out->{quota_note} = 'xAI does not publish SuperGrok remaining %. grok.com Settings → Usage is the 43% bar. Numbers below are only our logged SuperGrok chat turns.';
+    return $out;
+}
+
+# xAI pay-per-token (provider grok) — auto-fill is ON. Informational only.
+sub grok_month_status {
+    my ($self, $c) = @_;
+    my $out = {
+        provider    => 'grok',
+        source      => 'internal_logs',
+        ok          => 0,
+        auto_fill   => 1,
+        spend_usd   => 0,
+        calls       => 0,
+        tokens      => 0,
+    };
+    eval {
+        my $schema = $c->model('DBEncy')->schema or return;
+        my $start = DateTime->now->truncate(to => 'month')->ymd . ' 00:00:00';
+        my $rs = $schema->resultset('AiUsageLog')->search({
+            provider     => 'grok',
+            created_at   => { '>=' => $start },
+            request_type => { -not_in => [qw(grok_balance_check provider_snapshot)] },
+            status       => 'success',
+        });
+        while (my $row = $rs->next) {
+            next if ($row->model || '') =~ /^(xai-usage-check|_api_snapshot|_alert_)/;
+            $out->{calls}     += 1;
+            $out->{spend_usd} += $row->estimated_cost_usd || 0;
+            $out->{tokens}    += $row->total_tokens || 0;
+        }
+        $out->{ok} = 1;
+    };
+    if ($@) {
+        $out->{error} = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grok_month_status',
+            "Failed xAI grok month rollup: $@");
+    }
+    $out->{spend_usd} = sprintf('%.4f', $out->{spend_usd} || 0);
+    return $out;
+}
+
+# Fire a system-error audit when SuperGrok hits 80% — once per calendar day.
+sub maybe_alert_supergrok {
+    my ($self, $c, $status) = @_;
+    $status ||= $self->supergrok_month_status($c);
+    return $status unless $status->{over_threshold};
+
+    my $already = 0;
+    eval {
+        my $schema = $c->model('DBEncy')->schema or return;
+        my $today  = DateTime->now->ymd . ' 00:00:00';
+        $already = $schema->resultset('AiUsageLog')->search({
+            provider     => 'supergrok',
+            model        => '_alert_supergrok',
+            request_type => 'provider_snapshot',
+            created_at   => { '>=' => $today },
+        })->count;
+    };
+    if ($already) {
+        $status->{alerted_today} = 1;
+        return $status;
+    }
+
+    my $msg = sprintf(
+        '[Error] SuperGrok usage at %s%% of monthly allowance (\$%s / \$%s, %s requests). Review /ai/usage',
+        $status->{pct}, $status->{spend_usd}, $status->{limit_usd}, $status->{calls}
+    );
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'maybe_alert_supergrok', $msg);
+    eval {
+        $self->log($c,
+            provider          => 'supergrok',
+            model             => '_alert_supergrok',
+            request_type      => 'provider_snapshot',
+            prompt_tokens     => 0,
+            completion_tokens => 0,
+            total_tokens      => 0,
+            estimated_cost_usd=> $status->{spend_usd},
+            status            => 'success',
+            metadata          => { pct => $status->{pct}, alert => 1 },
+        );
+    };
+    $status->{alerted_now} = 1;
+    $status->{alert_msg}   = $msg;
+    return $status;
+}
+
+sub snapshot_provider_status {
+    my ($self, $c) = @_;
+    my $or = $self->fetch_openrouter_status($c);
+    my $sg = $self->maybe_alert_supergrok($c);
+    my $xk = $self->grok_month_status($c);
+    eval {
+        if ($or->{ok}) {
+            $self->log($c,
+                provider          => 'openrouter',
+                model             => '_api_snapshot',
+                request_type      => 'provider_snapshot',
+                estimated_cost_usd=> $or->{usage} || 0,
+                prompt_tokens     => 0,
+                completion_tokens => 0,
+                total_tokens      => 0,
+                status            => 'success',
+                metadata          => { limit => $or->{limit}, remaining => $or->{remaining}, pct => $or->{pct} },
+            );
+        }
+    };
+    return { openrouter => $or, supergrok => $sg, grok => $xk };
 }
 
 1;
