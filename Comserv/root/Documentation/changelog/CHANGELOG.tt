@@ -20,6 +20,10 @@
 <ul class="cl-toc-year">
 <li><strong>2026-08</strong><ul>
 <li><a href="#2026-08-19-dryer-import-playbook">2026-08-19 — HDRY dryer 3D import playbook (project #272)</a></li>
+<li><a href="#2026-08-19-supergrok-docs">2026-08-19 — Docs: SuperGrok is its own prepaid provider</a></li>
+<li><a href="#2026-08-19-supergrok-source">2026-08-19 — SuperGrok prepaid models as a portable catalog source</a></li>
+<li><a href="#2026-08-19-aisystem-coordinator">2026-08-19 — AISYSTEM coordinator plan: ordered AI-use waves + Hermes aliases</a></li>
+<li><a href="#2026-08-19-ai-index-tt-parse-retry">2026-08-19 — ai/index.tt unexpected-EOF: retry truncated TT compile</a></li>
 <li><a href="#2026-08-19-hermes-no-nested-worktree">2026-08-19 — Git dashboard Hermes launch must not use -w</a></li>
 <li><a href="#2026-08-19-merge-to-main-primary-repo">2026-08-19 — In-app merge branch→main targets the primary repo + test-gate path fix</a></li>
 <li><a href="#2026-08-10-ai-model-catalog-single-source">AI Model Catalog &amp;mdash; Single Source of Truth &amp;amp; Chat Widget Repair</a></li>
@@ -13246,6 +13250,55 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
             </ul>
             <p class="doc-body"><strong>Fix:</strong> resolve the primary checkout via <code>git rev-parse --git-common-dir</code> (<code>main_repo_path</code>); run both the gate and <code>git merge --no-ff &lt;branch&gt;</code> with an explicit repo override; never switch branches; whitelist <code>--porcelain</code> and <code>--git-common-dir</code>; honor <code>COMSERV_DIR</code> in <code>test_gate.sh</code> so the running app's script tests the branch checkout. Same path is used by <code>POST /admin/git/merge_to_main</code> and the dashboard <code>POST /admin/git/merge</code> (branch→main).</p>
             <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>lib/Comserv/Controller/Admin/Git.pm</code>, <code>script/test_gate.sh</code>, <code>t/util_git.t</code>. Tracked under <a href="/todo/details?record_id=2006" class="doc-link">todo #2006</a> / project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-supergrok-docs" class="cl-entry">
+<h3>2026-08-19 — Docs: SuperGrok is its own prepaid provider</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body">Plans and user docs now match the four-group picker. SuperGrok (prepaid) is not xAI (Grok). Credentials are portable (secrets file / env / DB). Status line keeps SuperGrok after send.</p>
+            <p class="doc-body">Updated: <code>AISYSTEMPlan.tt</code> (section 4b), <code>AIModelPresentationPlan.tt</code>, <code>AIChatSystemUserGuide.tt</code>, <code>models/Grok.tt</code>, <code>MASTER_PLAN.tt</code>. Code already shipped under <a href="/todo/details?record_id=2202" class="doc-link">#2202</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-supergrok-source" class="cl-entry">
+<h3>2026-08-19 — SuperGrok prepaid models as a portable catalog source</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body">The in-app picker can now list SuperGrok models (<code>grok-4.6</code> first) using the same prepaid subscription Hermes uses. Credential resolution is <strong>container-portable</strong>: <code>/run/secrets/supergrok_oauth</code>, mounted <code>/home/comserv/.comserv/secrets/supergrok_oauth</code>, <code>COMSERV_SECRETS_DIR</code>, env <code>SUPERGROK_OAUTH_TOKEN</code>/<code>XAI_OAUTH_TOKEN</code>, then Ency <code>UserApiKeys</code> service <code>supergrok</code>/<code>xai-oauth</code>. Host <code>~/.hermes/auth.json</code> is a last-resort local-dev fallback only.</p>
+            <p class="doc-body">Sync a workstation token into the shared secrets dir (already bind-mounted into every compose service): <code>perl script/sync_supergrok_token.pl</code>. Files: <code>lib/Comserv/Model/AI2/Provider/Grok.pm</code>, <code>Router.pm</code>, <code>Util/ModelCatalog.pm</code>, <code>root/ai/model_select.tt</code>, <code>root/static/js/ai-chat/model-select.js</code>, <code>t/provider_grok_supergrok.t</code>. Tracked as <a href="/todo/details?record_id=2202" class="doc-link">#2202</a> under <a href="/project/details?project_id=282" class="doc-link">#282 AISYS-W1</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-aisystem-coordinator" class="cl-entry">
+<h3>2026-08-19 — AISYSTEM coordinator plan: ordered AI-use waves + Hermes aliases</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body">Audit of AI plans/docs/todos showed fragmentation: AIMPS still has the real in-app model work, AGENTS #267–270 have <strong>zero todos</strong>, V2MIG phases have no steps, the Jan 2026 Master Audit is stale, and the <code>aisystem</code> worktree had no <code>.hermes.md</code>.</p>
+            <p class="doc-body"><strong>Coordinator:</strong> project <a href="/project/details?project_id=280" class="doc-link">#280 AISYSTEM</a> (parent #114) + plan <code>root/Documentation/AISYSTEMPlan.tt</code>. Waves #281–284. Todos #2191–2201. W0 applied now: worktree <code>.hermes.md</code> + Hermes aliases <code>code</code>/<code>cheap</code>/<code>local</code>/<code>delegate</code> via <code>hermes config set</code>. Next human/agent work is W1 on AIMPS record_ids #2026–2030 / #2036.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-ai-index-tt-parse-retry" class="cl-entry">
+<h3>2026-08-19 — ai/index.tt unexpected-EOF: retry truncated TT compile</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body">Application Error Audit todo <a href="/todo/details?record_id=2147" class="doc-link">#2147</a> (site 3d, <code>workstation-prod-local:5000</code>, 114 hits) is <code>Couldn't render template "ai/index.tt ... line 34: unexpected end of input"</code>. The on-disk template is complete (1111 lines) and compiles. The live :5000 compose bind-mounts <code>./Comserv</code> over <code>/opt/comserv</code>, so a request that compiles the file mid-save reads a half-written copy. Earlier diagnosis closed this as non-reproducible; it kept firing.</p>
+            <p class="doc-body"><strong>Fix:</strong> <code>Comserv::View::TT::render</code> retries once after 150ms + TT cache reset when the error is this truncation class. Recovered races log <code>warning</code>; a still-broken template logs <code>error</code> and rethrows (audit trail kept). No change to <code>root/ai/index.tt</code> (already over the 1000-line soft target; source is valid).</p>
+            <p class="doc-body">Files: <code>lib/Comserv/View/TT.pm</code>, <code>t/view_TT.t</code>. Verify: <code>prove -l t/view_TT.t</code>.</p>
         </div>
     </div>
 </div>
