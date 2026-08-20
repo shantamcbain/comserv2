@@ -220,9 +220,10 @@
                 }
                 // "Hermes" button: copy the branch's Hermes launch command to the
                 // clipboard. cwd = the worktree git-root, so Hermes auto-loads the
-                // branch .hermes.md (global rules + domain expertise). -w = worktree
-                // mode (parallel agents, no git conflicts). The dev console also
-                // shows it for manual copy.
+                // branch .hermes.md (global rules + domain expertise). Do NOT add
+                // -w here: Comserv worktrees already isolate; -w nests a
+                // hermes/hermes-* scratch branch. The dev console also shows the
+                // command for manual copy.
                 var hermesBranch = el.getAttribute('data-hermes-branch');
                 if (hermesBranch) {
                     var hcmd = el.getAttribute('data-hermes-cmd') || '';
