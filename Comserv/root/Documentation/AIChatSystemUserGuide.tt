@@ -4,7 +4,7 @@
    roles = "user,admin,developer,helpdesk"
    category = "AI Module"
    page_version = "1.0"
-   last_updated = "2026-05-09"
+   last_updated = "2026-08-19"
 %]
 [% PageVersion = 'Documentation/AIChatSystemUserGuide.tt,v 1.0 2026/05/09 shanta' %]
 [% IF c.session.debug_mode == 1 %]
@@ -285,14 +285,16 @@
     </tr>
 </table>
 
-<h3>Ollama vs Grok</h3>
+<h3>Ollama vs SuperGrok vs xAI vs OpenRouter</h3>
 <ul>
-    <li><strong>Ollama</strong> — Runs locally on your own server. Private, no data leaves your network. Slower on CPU hardware; much faster if GPU is available. Has a 10-minute timeout for cold starts.</li>
-    <li><strong>Grok (xAI)</strong> — Cloud model. Fast response (seconds), supports large context windows and web search. Used automatically when Ollama is overloaded, or you can switch manually using the provider dropdown.</li>
+    <li><strong>Ollama</strong> — Runs locally on your own server. Private, no data leaves your network. Slower on CPU; faster with GPU. Has a long timeout for cold starts.</li>
+    <li><strong>SuperGrok (prepaid)</strong> — Same Grok models (grok-4.6 first) billed to the SuperGrok / X Premium+ subscription. A different provider group than xAI. Admin, developer, and editor only. Pick this group to spend the prepaid token. After send, the status line should stay SuperGrok (prepaid), not flip to Grok (xAI).</li>
+    <li><strong>xAI (Grok)</strong> — Pay-per-token cloud key. Same model names can appear here. Do not confuse this group with SuperGrok.</li>
+    <li><strong>OpenRouter</strong> — Cloud catalog (free and paid). Guests see free models only.</li>
 </ul>
 
 <h3>Manual Override</h3>
-<p>You can override the automatic selection at any time using the provider/model dropdown in the chat header. Select <em>Grok</em> for fast cloud responses, or pick a specific Ollama model if you need a particular capability.</p>
+<p>You can override the automatic selection at any time using the provider/model dropdown in the chat header. Select <em>SuperGrok (prepaid)</em> for the subscription, <em>xAI (Grok)</em> for a pay-per-token key, or a specific Ollama / OpenRouter model.</p>
 
 <h3>Timeout and Retry</h3>
 <p>If Ollama takes too long (over 11 minutes), the widget shows a <strong>Retry Ollama</strong> button and a <strong>Switch to Grok</strong> button. Clicking "Switch to Grok" immediately resends your question to the cloud model. A <strong>✕ Cancel</strong> button is also available during any request to abort it immediately.</p>

@@ -88,8 +88,8 @@
             <ul class="doc-body">
                 <li><strong>Orchestrator</strong> (cheap local model — Ollama): decides what to check, fans out.</li>
                 <li><strong>Sub-agent A</strong> (cheap): DB evaluation/triage of todos + errors + calendar.</li>
-                <li><strong>Sub-agent B</strong> (stronger — OpenRouter or Grok): when something is critical, DRAFT the notification and summarize for the user.</li>
-                <li><strong>Reach you via VoIP</strong>: a NEW user-VoIP-number config page (successor to the old Perl4 "call a page" feature) lets the Secretary call you by <strong>text, voice, or in-browser</strong>. You can interact back via text / voice / browser. Models available today in the AI chat system: Ollama (local/cheap), OpenRouter, Grok.</li>
+                <li><strong>Sub-agent B</strong> (stronger — SuperGrok prepaid or OpenRouter): when something is critical, DRAFT the notification and summarize for the user.</li>
+                <li><strong>Reach you via VoIP</strong>: a NEW user-VoIP-number config page (successor to the old Perl4 "call a page" feature) lets the Secretary call you by <strong>text, voice, or in-browser</strong>. You can interact back via text / voice / browser. Models available today: Ollama (local/cheap), SuperGrok (prepaid), xAI (Grok pay-per-token), OpenRouter. SuperGrok is not xAI — see <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" class="doc-link">AISYSTEMPlan</a> §4b.</li>
             </ul>
             <p class="doc-body"><strong>Reuse, do not duplicate:</strong> the Secretary consumes the existing error/todo signal; it does not re-implement health checks. Gateway/VoIP delivery only — never ad-hoc SMTP.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>

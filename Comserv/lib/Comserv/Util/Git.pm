@@ -1069,6 +1069,30 @@ sub switch_branch {
         return $result;
     }
 
+    # Linked worktrees cannot steal each other's branch, and cannot check out
+    # main (already checked out in the primary). Refuse BEFORE stashing so a
+    # doomed switch never hides the user's dirty files.
+    my $here = $self->repo_path($c) // '';
+    my $base = $self->worktree_base_dir // '';
+    if (($branch_name eq 'main' || $branch_name eq 'master')
+            && $base && $here =~ /\Q$base\E/) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
+            "refused switch to '$branch_name' from worktree checkout $here");
+        $result->{error_msg} = "Cannot switch to '$branch_name' in a worktree: it is already checked out in the primary repo. Stay on this worktree's branch.";
+        return $result;
+    }
+    my $other = $self->worktree_checkout_path_for_branch($c, $branch_name);
+    if (defined $other && length $other) {
+        my $here_abs  = eval { Cwd::abs_path($here) }  || $here;
+        my $other_abs = eval { Cwd::abs_path($other) } || $other;
+        if ($other_abs ne $here_abs) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
+                "refused switch to '$branch_name': already checked out at $other");
+            $result->{error_msg} = "Branch '$branch_name' is already checked out at $other. Open that worktree's server — do not switch this checkout.";
+            return $result;
+        }
+    }
+
     $result->{output} .= "Fetching latest changes...\n";
     $result->{output} .= $self->_run($c, 'fetch', 'origin')->{output};
 
@@ -1284,10 +1308,11 @@ sub build_worktree_list {
         label => 'MAIN',
         url   => '/planning/daily',
         cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
-        # Hermes CLI for THIS checkout. Running from the worktree git-root makes Hermes
-        # auto-load the branch .hermes.md (which pulls in the global rules + domain
-        # expertise). -w = worktree-safe mode (parallel agents, no git conflicts).
-        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat -w',
+        # Hermes CLI for THIS checkout. cwd = checkout so Hermes loads .hermes.md.
+        # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
+        # creates a nested hermes/hermes-* branch (often from origin/main) and
+        # the agent then edits the wrong tree.
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
@@ -1301,8 +1326,9 @@ sub build_worktree_list {
             url   => $b->{url}   // '/planning/daily',
             cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
-            # Branch Hermes: cwd = the worktree's own git root so its .hermes.md loads.
-            hermes_cmd => "cd $base/$name/Comserv && hermes chat -w",
+            # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
+            # No -w — see main hermes_cmd comment above.
+            hermes_cmd => "cd $base/$name/Comserv && hermes chat",
         };
     }
     return \@list;
