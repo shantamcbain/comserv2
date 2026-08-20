@@ -55,7 +55,7 @@ my %ALLOWED_SUBCMD = map { $_ => 1 } qw(
 my %ALLOWED_FLAGS = (
     status   => { map { $_ => 1 } qw(--porcelain --short -s --no-color) },
     log      => { map { $_ => 1 } qw(--oneline --no-color --stat -n) },
-    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet --show-prefix --show-toplevel) },
+    'rev-parse' => { map { $_ => 1 } qw(--abbrev-ref --symbolic-full-name --short --verify --quiet --show-prefix --show-toplevel --git-common-dir) },
     'rev-list'  => { map { $_ => 1 } qw(--left-right --count) },
     branch   => { map { $_ => 1 } qw(-r -a -D -d --list --show-current --no-color --format) },
     diff     => { map { $_ => 1 } qw(--cached --stat --no-color --name-only -U --unified --no-index) },
@@ -112,13 +112,13 @@ Resolve the PRIMARY checkout — the working tree where C<main> is actually
 checked out — so operations that mutate C<main> (merge_to_main) run there
 instead of in a feature worktree.
 
-In a linked-worktree setup the feature worktree cannot check out C<main>
-(git refuses: "already checked out at <primary>"), and running
-C<git merge --no-ff E<lt>branchE<gt>> inside the feature worktree merges the
-branch into ITSELF (a no-op / "Already up to date"). So we must target the
-primary repo. We derive it from C<git worktree list>: the entry whose branch
-is C<main> (and which is not the current worktree). Falls back to repo_path()
-when worktree list is unavailable.
+A linked worktree cannot check out C<main> (git refuses: "already checked
+out at <primary>"), and C<git merge --no-ff E<lt>branchE<gt>> inside the
+feature worktree merges the branch into itself ("Already up to date").
+We derive the primary from C<git rev-parse --git-common-dir> (shared
+object db of a linked worktree) and fall back to L</repo_path>. Porcelain
+C<git worktree list> is not used here: it can drop the path line after a
+branch rename.
 
 =cut
 
@@ -130,58 +130,37 @@ sub main_repo_path {
             'main_repo_path: could not resolve repo_path (no repo)');
         return undef;
     }
-    my $r = $self->_run($c, 'worktree', 'list', '--porcelain');
-    if (!$r->{success}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
-            "main_repo_path: git worktree list failed (" . ($r->{error} // 'unknown') . "); falling back to repo_path");
-        return $repo;
+    my $r = $self->_run($c, 'rev-parse', '--git-common-dir');
+    my $common = $r->{output} // '';
+    $common =~ s/\s+\z//;
+    if ($r->{success} && length $common) {
+        $common = "$repo/$common" unless $common =~ m{^/};
+        $common =~ s{/\.git\z}{};
+        return $common if $common && -d $common;
     }
-
-    my ($main_path, $cur_path);
-    my $cur_branch = $self->get_current_branch($c) // '';
-    for my $line (split /\n/, $r->{output} // '') {
-        if ($line =~ m{^worktree\s+(.+)$}) {
-            $cur_path = $1;
-        }
-        elsif ($line =~ m{^branch\s+refs/heads/(.+)$}) {
-            my $b = $1;
-            if ($b eq 'main' && $cur_path && $cur_path ne $repo) {
-                $main_path = $cur_path;
-            }
-        }
-    }
-    return $main_path // $repo;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+        'main_repo_path: git-common-dir failed; falling back to repo_path');
+    return $repo;
 }
 
-=head2 worktree_checkout_dir($c, $branch, $repo)
+=head2 worktree_checkout_dir($c, $branch)
 
-Resolve the app dir of the worktree that has C<$branch> checked out, derived
-authoritatively from C<git worktree list --porcelain> (not from string-built
-paths, which drift by a directory level). Returns C<undef> if the branch is
-not found in the worktree list; callers fall back to app_dir_for($repo).
+Resolve the Catalyst app dir of the worktree that has C<$branch> checked
+out. Uses the directory-scan resolver (robust when porcelain metadata is
+stale after a rename). Returns undef if the branch has no worktree.
 
 =cut
 
 sub worktree_checkout_dir {
-    my ($self, $c, $branch, $repo) = @_;
-    my $r = $self->_run($c, 'worktree', 'list', '--porcelain');
-    return undef unless $r->{success};
-
-    my ($found, $cur_path);
-    for my $line (split /\n/, $r->{output} // '') {
-        if ($line =~ m{^worktree\s+(.+)$}) {
-            $cur_path = $1;
-        }
-        elsif ($line =~ m{^branch\s+refs/heads/(.+)$}) {
-            if ($1 eq $branch && $cur_path) {
-                $found = $cur_path;
-                last;
-            }
-        }
+    my ($self, $c, $branch) = @_;
+    return undef unless $branch && $branch ne 'main';
+    my $git_root = $self->worktree_checkout_path_for_branch($c, $branch);
+    unless ($git_root) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_gate',
+            "worktree_checkout_dir: no checkout found for branch '$branch'");
+        return undef;
     }
-    return undef unless $found;
-    # $found is the worktree git root; the Catalyst app lives one level under it.
-    return -d "$found/Comserv" ? "$found/Comserv" : $found;
+    return -d "$git_root/Comserv" ? "$git_root/Comserv" : $git_root;
 }
 
 =head2 resolve_target($c, $target)
@@ -1561,7 +1540,7 @@ sub merge_branch {
     my $result = { success => 0, output => '', action => 'merge_branch' };
 
     $opts //= {};
-    my $repo = $opts->{repo};   # optional explicit checkout (e.g. the primary repo for merge_to_main)
+    my $repo = $opts->{repo};   # optional explicit checkout (primary repo for merge_to_main)
 
     if (!$branch) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
@@ -1599,7 +1578,9 @@ sub merge_branch {
         }
         $result->{error_msg} = "Merge of '$branch' failed (see output).";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
-            "merge_branch: merge of '$branch' failed" . ($result->{conflict} ? ' (conflict)' : '') . ": " . ($r->{output} // ''));
+            "merge_branch: merge of '$branch' failed"
+            . ($result->{conflict} ? ' (conflict)' : '')
+            . ': ' . ($r->{output} // ''));
     }
     return $result;
 }
@@ -1649,22 +1630,21 @@ sub run_test_gate {
         return { success => 0, output => 'no repo' };
     }
 
-    # The Catalyst app lives one level under the git root: <root>/Comserv
-    # (where script/ lives). Worktree checkouts are <base>/<branch>/Comserv.
+    # App dir is one level under the git root (<root>/Comserv). Worktree
+    # checkouts are <base>/<branch>/Comserv (git root) with the app at
+    # <base>/<branch>/Comserv/Comserv.
     my $app_dir_for = sub {
         my $root = shift;
         return -d "$root/Comserv" ? "$root/Comserv" : $root;
     };
 
-    # Resolve the checkout we actually test, AUTHORITATIVELY, from `git worktree
-    # list` (the same source main_repo_path uses) rather than string-building a
-    # path that can land one directory too high/low. For `main` we use the app
-    # dir of $repo; for a worktree branch we find the worktree path whose branch
-    # matches and take its app dir. Falls back to app_dir_for($repo) only if the
-    # list is unavailable.
+    # Resolve the checkout we actually test via directory scan (not a
+    # string-built path that can land one directory too high/low). For main
+    # we use the app dir of $repo. Falls back to app_dir_for($repo) if the
+    # branch has no worktree.
     my $checkout;
     if ($branch && $branch ne 'main') {
-        $checkout = $self->worktree_checkout_dir($c, $branch, $repo);
+        $checkout = $self->worktree_checkout_dir($c, $branch);
     }
     $checkout = $app_dir_for->($repo) unless $checkout && -d $checkout;
     my $wt_dir = $checkout;
@@ -1687,7 +1667,7 @@ sub run_test_gate {
 
     # Pass the *target checkout* explicitly so the gate tests the branch being
     # merged (COMSERV_DIR honored by the script) and not the repo the script
-    # file happens to live in. This makes the per-worktree gate meaningful.
+    # file happens to live in.
     local $ENV{COMSERV_DIR} = $wt_dir;
 
     my $out = `bash "$script" --fast 2>&1`;

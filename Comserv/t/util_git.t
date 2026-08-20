@@ -23,6 +23,7 @@ use_ok('Comserv::Util::Git') or BAIL_OUT('Cannot load Comserv::Util::Git');
     sub path_to  { FakePath->new }
     sub stash    { $_[0]->{stash} }
     sub session  { $_[0]->{session} }
+    sub req      { undef }
 }
 
 # Resolve the repo root (one level above the Comserv app dir) if not already set.
@@ -86,5 +87,17 @@ like($bad_flag->{error}, qr/not allowed for git log/, 'refusal message for bad f
 # A user-looking value after -- must NOT be treated as a flag (positional safety).
 my $dd = $git->_run($c, 'status', '--porcelain', '--', '--not-a-flag.txt');
 ok($dd->{success}, 'positional argument after -- is accepted (not flag-scanned)');
+
+# ---- Merge-to-main prerequisites (local-merge / linked worktree) ----
+my $porcelain = $git->_run($c, 'worktree', 'list', '--porcelain');
+ok($porcelain->{success}, 'worktree list --porcelain is allowed');
+
+ok($git->can('main_repo_path'), 'main_repo_path exists');
+my $main_repo = $git->main_repo_path($c);
+ok(defined $main_repo && length $main_repo, 'main_repo_path resolves');
+ok(-d $main_repo, "main_repo_path is a directory ($main_repo)");
+
+my $common = $git->_run($c, 'rev-parse', '--git-common-dir');
+ok($common->{success}, 'rev-parse --git-common-dir is allowed');
 
 done_testing();
