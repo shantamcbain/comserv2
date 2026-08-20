@@ -28,10 +28,12 @@
 #       the smoke test, so local boot breakage is always caught.
 set -uo pipefail
 
-# Prefer an explicit COMSERV_DIR (controller passes the *worktree* checkout
-# so the gate tests the branch being merged, not the repo the script lives in).
+# Resolve the Comserv checkout to test. Prefer an explicit COMSERV_DIR (the
+# controller passes the *worktree* checkout here so the gate tests the branch
+# being merged, not the repo the script file happens to live in). Fall back to
+# deriving it from the script location only when nothing was provided.
 if [ -n "${COMSERV_DIR:-}" ] && [ -d "$COMSERV_DIR" ]; then
-    : # caller-supplied target checkout
+    : # caller-supplied target checkout (e.g. a git worktree)
 elif [ -d "$(dirname "$0")/.." ]; then
     COMSERV_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 else
@@ -104,8 +106,10 @@ case "$MODE" in
         ;;
     --fast|*)
         echo "=== FAST TEST GATE (boot-light subset) ==="
-        # Only run smoke tests that actually exist in THIS checkout.
-        # Stale worktrees predate the suite — say so instead of a generic FAIL.
+        # Only run the standard smoke tests that actually exist in THIS checkout.
+        # Older/stale worktrees predate the test suite and have none of these
+        # files — reporting a generic "FAILED" there is misleading (no test ran).
+        # Detect that and say so clearly instead.
         FILES=()
         for f in t/01app.t t/controller_AI_models.t t/bot_prevention_and_purging.t; do
             [ -f "$COMSERV_DIR/$f" ] && FILES+=("$f")

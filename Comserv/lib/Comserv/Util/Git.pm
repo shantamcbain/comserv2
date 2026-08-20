@@ -116,7 +116,9 @@ A linked worktree cannot check out C<main> (git refuses: "already checked
 out at <primary>"), and C<git merge --no-ff E<lt>branchE<gt>> inside the
 feature worktree merges the branch into itself ("Already up to date").
 We derive the primary from C<git rev-parse --git-common-dir> (shared
-object db of a linked worktree) and fall back to L</repo_path>.
+object db of a linked worktree) and fall back to L</repo_path>. Porcelain
+C<git worktree list> is not used here: it can drop the path line after a
+branch rename.
 
 =cut
 
@@ -1636,6 +1638,10 @@ sub run_test_gate {
         return -d "$root/Comserv" ? "$root/Comserv" : $root;
     };
 
+    # Resolve the checkout we actually test via directory scan (not a
+    # string-built path that can land one directory too high/low). For main
+    # we use the app dir of $repo. Falls back to app_dir_for($repo) if the
+    # branch has no worktree.
     my $checkout;
     if ($branch && $branch ne 'main') {
         $checkout = $self->worktree_checkout_dir($c, $branch);
@@ -1643,9 +1649,12 @@ sub run_test_gate {
     $checkout = $app_dir_for->($repo) unless $checkout && -d $checkout;
     my $wt_dir = $checkout;
 
-    # Always run the RUNNING app's canonical script (the one with this fix),
-    # never a stale per-worktree copy. COMSERV_DIR tells the script which
-    # checkout to test.
+    # The gate MUST run the canonical script shipped with the RUNNING app (the
+    # one with this fix), NOT a per-worktree copy. Worktree copies are divergent
+    # and can stale-false-pass (e.g. prove with zero existing test files exits 0,
+    # so "no tests ran" looked like green). The only per-branch difference is
+    # COMSERV_DIR, which tells the script WHICH checkout to test. Never fall back
+    # to another repo's or the worktree's own script.
     my $app_script = ($c && $c->path_to('script'))
         ? $c->path_to('script')->stringify . '/test_gate.sh'
         : $app_dir_for->($repo) . '/script/test_gate.sh';
@@ -1656,12 +1665,18 @@ sub run_test_gate {
         return { success => 0, output => "test_gate.sh not found at $script" };
     }
 
+    # Pass the *target checkout* explicitly so the gate tests the branch being
+    # merged (COMSERV_DIR honored by the script) and not the repo the script
+    # file happens to live in.
     local $ENV{COMSERV_DIR} = $wt_dir;
 
     my $out = `bash "$script" --fast 2>&1`;
     my $code = $? >> 8;
     my $res = { success => ($code == 0 ? 1 : 0), output => $out // '' };
 
+    # exit 2 from the script means a harness problem or a stale worktree with no
+    # test suite (not a real test failure). Make that distinction explicit so the
+    # UI doesn't show a misleading "fix tests" message for an un-mergeable branch.
     if ($code == 2) {
         $res->{stale} = 1;
         $res->{error_msg} = "Test gate could not run for '$branch': the worktree has no test suite. "
