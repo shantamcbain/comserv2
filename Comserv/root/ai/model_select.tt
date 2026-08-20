@@ -7,8 +7,8 @@
 %]
 [% cat = catalog || [];
    hy3 = 'openrouter|tencent/hy3';
-   svc_order  = [ 'ollama', 'grok', 'openrouter' ];
-   svc_labels = { ollama = 'Ollama (Local)', grok = 'xAI (Grok)', openrouter = 'OpenRouter' };
+   svc_order  = [ 'ollama', 'supergrok', 'grok', 'openrouter' ];
+   svc_labels = { ollama = 'Ollama (Local)', supergrok = 'SuperGrok (prepaid)', grok = 'xAI (Grok)', openrouter = 'OpenRouter' };
 
    # Collect the provider keys actually present, known ones first (in order),
    # then any unknown providers alphabetically.

@@ -158,8 +158,21 @@
             <code>/ai2</code> and <code>/admin/git</code> now emit the
             <code>ComservConfig.models</code> global so the fast path is used. The
             server-rendered <code>ai/model_select.tt</code> also shows the price for any
-            surface that uses it directly. Remaining P2 work (premium-tier &ldquo;show
-            all&rdquo; toggle, tier-then-capability ordering) is still open.</li>
+            surface that uses it directly. Remaining P2 work (premium-tier show-all
+            toggle, tier-then-capability ordering) is still open.</li>
+        <li><strong>SuperGrok is its own provider (AISYSTEM W1.0 / #2202, 2026-08-19).</strong>
+            The picker has four groups: Ollama, <strong>SuperGrok (prepaid)</strong>,
+            xAI (Grok) pay-per-token, OpenRouter. SuperGrok is not a label on xAI.
+            Wire value is <code>supergrok|grok-4.6</code> (pinned first). Credentials
+            are container-portable (<code>supergrok_oauth</code> secret file, env,
+            or DB service <code>supergrok</code>) — not host
+            <code>~/.hermes/auth.json</code>. <code>price_tier</code> includes
+            <code>prepaid</code>. After send, the status line must stay SuperGrok
+            (Router keeps the prefix; Chat.pm dispatches SuperGrok to the Grok
+            client). Admin/developer/editor only; guests/members still do not see
+            Grok or SuperGrok. See
+            <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]">AISYSTEMPlan</a>
+            section 4b.</li>
       </ul>
 
       <h3 class="doc-h3">Why free OpenRouter beats Ollama for guests</h3>
@@ -184,7 +197,7 @@
         <tr><th>Field</th><th>Meaning</th></tr>
         <tr><td>price_prompt</td><td>USD per 1M input tokens</td></tr>
         <tr><td>price_completion</td><td>USD per 1M output tokens</td></tr>
-        <tr><td>price_tier</td><td>free / cheap / mid / premium, derived from thresholds</td></tr>
+        <tr><td>price_tier</td><td>free / cheap / mid / premium / prepaid (SuperGrok subscription)</td></tr>
       </table>
       <p class="doc-note">
         Tiers must be threshold-driven, never a hardcoded list of model names &mdash;
@@ -210,9 +223,9 @@
         <li><strong>Role visibility delivered (AIMPS-P3 / #255).</strong> The shared catalog
             (<code>Comserv::Util::ModelCatalog</code>) now role-filters at the single source of
             truth, so a not-logged-in user no longer sees the full admin list. Tiers:
-            <strong>guest</strong> &rarr; free OpenRouter + Ollama local only (no paid, no Grok);
+            <strong>guest</strong> &rarr; free OpenRouter + Ollama local only (no paid, no Grok, no SuperGrok);
             <strong>member</strong> (logged-in, non-privileged) &rarr; free + cheap + mid
-            (premium &gt; $5 / 1M excluded, no Grok); <strong>privileged</strong>
+            (premium &gt; $5 / 1M excluded, no Grok, no SuperGrok); <strong>privileged</strong>
             (admin/developer/editor) &rarr; everything. Verified live: an unauthenticated
             request to the widget returns 19 models (5 Ollama + 14 free OpenRouter), 0 paid,
             0 Grok &mdash; down from the full 414-model admin list. See changelog
