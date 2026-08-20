@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "3d-printing,planning,import,internal-build"
-   page_version = "0.2"
-   last_updated = "Wed Aug 19 2026"
+   page_version = "0.21"
+   last_updated = "Thu Aug 20 2026"
    site_specific = "false"
    project_id   = "272"
    project_code = "DRYER-INT"
 %]
-[% PageVersion = 'Documentation/DryerProjectImportPlan.tt,v 0.2 2026/08/19 hermes-agent Exp - HDRY test scenario + File Manager + AP invoice + queue + KB playbook; real project 272' %]
+[% PageVersion = 'Documentation/DryerProjectImportPlan.tt,v 0.21 2026/08/20 hermes-agent Exp - header Open project + View todos via shared _doc_header' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]

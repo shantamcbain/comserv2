@@ -2,6 +2,7 @@ package Comserv::Controller::Documentation;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::Changelog;
 use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages _parse_meta_block _extract_md_metadata);
 use File::Find;
 use File::Basename;
@@ -851,6 +852,7 @@ sub view :Path('/Documentation') :Args(1) {
                     site_name => $site_name,
                     template => $path
                 };
+                $self->_stash_changelog_index($c, $stash_data);
                 
                 # Special handling for DailyPlans pages - fetch todos for that day
                 if ($page =~ /DailyPlans-(\d{4})-(\d{2})-(\d{2})/) {
@@ -991,17 +993,22 @@ sub view :Path('/Documentation') :Args(1) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
             "Found unregistered .tt file: $tt_path");
 
-        # Read the file's own META block to determine required roles
+        # Read the file's own META block for roles + RULE P1 project linkage
         my @unreg_roles;
+        my $meta = {};
         eval {
             open my $fh, '<:encoding(UTF-8)', $tt_full_path or die $!;
             my $content = do { local $/; <$fh> };
             close $fh;
-            my $meta = Comserv::Controller::Documentation::ScanMethods::_parse_meta_block($content);
+            $meta = Comserv::Controller::Documentation::ScanMethods::_parse_meta_block($content) || {};
             if ($meta->{roles}) {
                 @unreg_roles = split(/\s*,\s*/, $meta->{roles});
             }
         };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                "Failed to parse META for unregistered page $page ($tt_path): $@");
+        }
 
         # If no roles in META or 'guest' listed → public; otherwise use the META roles
         my $unreg_ok = $is_admin
@@ -1031,14 +1038,18 @@ sub view :Path('/Documentation') :Args(1) {
             return;
         }
 
-        # Handle template files
+        # Handle template files (stash META project so _doc_header can link it)
         my $stash_data = {
             page_name => $page,
-            page_title => $self->_format_title($page),
+            page_title => $meta->{title} || $self->_format_title($page),
+            last_updated => $meta->{last_updated} || '',
+            project_id => $meta->{project_id} || '',
+            project_code => $meta->{project_code} || '',
             user_role => $user_role,
             site_name => $site_name,
             template => $tt_path
         };
+        $self->_stash_changelog_index($c, $stash_data);
         
         # Special handling for DailyPlans pages - fetch todos for that day
         if ($page =~ /DailyPlans-(\d{4})-(\d{2})-(\d{2})/) {
@@ -2321,6 +2332,17 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my $dest = $date_arg ? "/planning/daily/$date_arg" : "/planning/daily";
     $c->res->redirect($c->uri_for($dest));
     $c->detach;
+}
+
+# CHANGELOG.tt is a generated reader. Fragments live in changelog/entries/*.inc
+# so two branches adding notes do not collide on the same TOC/tail.
+sub _stash_changelog_index {
+    my ($self, $c, $stash_data) = @_;
+    return unless $stash_data && ($stash_data->{page_name} // '') =~ /^changelog$/i;
+    my $dir = $c->path_to('root', 'Documentation', 'changelog', 'entries');
+    my $entries = Comserv::Util::Changelog->list_entries("$dir");
+    $stash_data->{changelog_entries} = $entries;
+    $stash_data->{changelog_groups}  = Comserv::Util::Changelog->group_entries($entries);
 }
 
 __PACKAGE__->meta->make_immutable;
