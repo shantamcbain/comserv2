@@ -2,6 +2,7 @@ package Comserv::Controller::Documentation;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::Changelog;
 use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages _parse_meta_block _extract_md_metadata);
 use File::Find;
 use File::Basename;
@@ -851,6 +852,7 @@ sub view :Path('/Documentation') :Args(1) {
                     site_name => $site_name,
                     template => $path
                 };
+                $self->_stash_changelog_index($c, $stash_data);
                 
                 # Special handling for DailyPlans pages - fetch todos for that day
                 if ($page =~ /DailyPlans-(\d{4})-(\d{2})-(\d{2})/) {
@@ -1047,6 +1049,7 @@ sub view :Path('/Documentation') :Args(1) {
             site_name => $site_name,
             template => $tt_path
         };
+        $self->_stash_changelog_index($c, $stash_data);
         
         # Special handling for DailyPlans pages - fetch todos for that day
         if ($page =~ /DailyPlans-(\d{4})-(\d{2})-(\d{2})/) {
@@ -2329,6 +2332,17 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my $dest = $date_arg ? "/planning/daily/$date_arg" : "/planning/daily";
     $c->res->redirect($c->uri_for($dest));
     $c->detach;
+}
+
+# CHANGELOG.tt is a generated reader. Fragments live in changelog/entries/*.inc
+# so two branches adding notes do not collide on the same TOC/tail.
+sub _stash_changelog_index {
+    my ($self, $c, $stash_data) = @_;
+    return unless $stash_data && ($stash_data->{page_name} // '') =~ /^changelog$/i;
+    my $dir = $c->path_to('root', 'Documentation', 'changelog', 'entries');
+    my $entries = Comserv::Util::Changelog->list_entries("$dir");
+    $stash_data->{changelog_entries} = $entries;
+    $stash_data->{changelog_groups}  = Comserv::Util::Changelog->group_entries($entries);
 }
 
 __PACKAGE__->meta->make_immutable;
