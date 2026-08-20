@@ -270,8 +270,8 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
                     <li><a href="/Documentation/git_worktree_merge_plan" class="doc-link">Git Worktree — AI-commit to human merge-to-main</a> (sibling plan, #238)</li>
                     <li><a href="/Documentation/BranchSyncConflictAssist" class="doc-link">Branch Sync &amp; Conflict Assist</a> (sibling sub-plan)</li>
                     <li><a href="/Documentation/MASTER_PLAN" class="doc-link">MASTER_PLAN</a> — index of all plans</li>
-                    <li><a href="/Documentation/changelog/2026-08-17-hermes-branch-context" class="doc-link">Changelog 2026-08-17 — Hermes Branch Context</a></li>
-                    <li><a href="/Documentation/changelog/2026-08-19-hermes-branch-context-authoring" class="doc-link">Changelog 2026-08-19 — authoring guideline + status correction</a></li>
+                    <li><a href="/Documentation/CHANGELOG#2026-08-17-hermes-branch-context" class="doc-link">Changelog 2026-08-17 — Hermes Branch Context</a></li>
+                    <li><a href="/Documentation/CHANGELOG#2026-08-19-hermes-branch-context-authoring" class="doc-link">Changelog 2026-08-19 — authoring guideline + status correction</a></li>
                     <li><a href="/admin/git" class="doc-link">Git Dashboard</a> — the "Hermes" button lives here</li>
                 </ul>
             </div>
