@@ -142,7 +142,8 @@ sub _external_default_available {
     return 0 unless $external && $external =~ /^([^|]+)\|(.+)$/;
     my ($svc, $model) = ($1, $2);
 
-    my $cls = { grok => 'AI2::Provider::Grok', openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
+    my $cls = { grok => 'AI2::Provider::Grok', supergrok => 'AI2::Provider::Grok',
+                openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
     return 0 unless $cls;
     my $prov = try { $c->model($cls) } catch { undef };
     return 0 unless $prov && $prov->can('_resolve_api_key');

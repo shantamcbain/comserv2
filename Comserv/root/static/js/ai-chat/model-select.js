@@ -64,6 +64,7 @@
         var model  = parts[1] || '';
         var suffix = model ? ': ' + model : '';
 
+        if (svc === 'supergrok') return 'SuperGrok (prepaid)' + suffix;
         if (svc === 'grok')       return 'Grok (xAI)' + suffix;
         if (svc === 'supergrok')  return 'SuperGrok (prepaid)' + suffix;
         if (svc === 'openrouter') return 'OpenRouter' + suffix;
