@@ -1237,19 +1237,27 @@
 /* ── Cross Blocker Banner ─────────────────────────────────── */
 
 .BlockerBanner {
-    background: color-mix(in srgb, #dc3545 10%, var(--bg-color));
-    border: 2px solid #dc3545;
+    background: var(--bg-secondary, var(--bg-color));
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--warning-color, #dc3545);
     border-radius: 6px;
     padding: 8px 12px;
     margin-bottom: 10px;
 }
+
+.BlockerBanner > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.BlockerBanner > summary::-webkit-details-marker { display: none; }
 
 .BlockerBannerHeader {
     display: flex;
     align-items: center;
     gap: 8px;
     font-weight: 600;
-    color: #dc3545;
+    color: var(--text-color, #000);
     font-size: 0.95em;
     margin-bottom: 6px;
 }
@@ -1263,7 +1271,7 @@
 }
 
 .BlockerItemArrow {
-    color: #dc3545;
+    color: var(--warning-color, #dc3545);
     font-weight: 700;
 }
 
