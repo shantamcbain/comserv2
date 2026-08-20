@@ -20,6 +20,12 @@
 <ul class="cl-toc-year">
 <li><strong>2026-08</strong><ul>
 <li><a href="#2026-08-19-merge-to-main-primary-repo">2026-08-19 — In-app merge branch→main targets the primary repo + test-gate path fix</a></li>
+<li><a href="#2026-08-19-paid-ai-usage-monitor">2026-08-19 — SuperGrok 80% alert + daily OpenRouter/xAI usage log</a></li>
+<li><a href="#2026-08-19-focus-queue-p1-trust">2026-08-19 — Focus Queue ranks trusted blockers, not inflated P1s</a></li>
+<li><a href="#2026-08-19-hermes-branch-context-authoring">2026-08-19 — Hermes Branch Context: authoring guideline + status correction</a></li>
+<li><a href="#2026-08-19-ai-agent-orchestration">2026-08-19 — AI Agent Orchestration + Notification Recovery</a></li>
+<li><a href="#2026-08-18-git-worktree-port-collision-fix">2026-08-18 — Git Worktree port-allocation collision fix</a></li>
+<li><a href="#2026-08-17-hermes-branch-context">2026-08-17 — Hermes Branch Context system</a></li>
 <li><a href="#2026-08-10-ai-model-catalog-single-source">AI Model Catalog &amp;mdash; Single Source of Truth &amp;amp; Chat Widget Repair</a></li>
 <li><a href="#2026-08-10-ai2-providers-hashref-guard">AI2 Providers &amp;mdash; guard against malformed catalog elements</a></li>
 <li><a href="#2026-08-10-focustune-default-model">AI Focus-Tune — Use catalog default model, not hardcoded phi4:14b</a></li>
@@ -13195,3 +13201,130 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
     </div>
 </div>
 </div>
+
+<div id="2026-08-19-hermes-branch-context-authoring" class="cl-entry">
+<h3>2026-08-19 — Hermes Branch Context: authoring guideline + status correction</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Last Updated: 2026-08-19 | Version: 0.1 | Tracked in project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>. Folded here from a standalone dated changelog file (policy: single CHANGELOG.tt).</p>
+            <h4 class="doc-h3">What changed</h4>
+            <ul class="doc-body">
+                <li><strong>Authoring guideline added (new §3.3).</strong> <a href="/Documentation/HermesBranchContextPlan" class="doc-link">HermesBranchContextPlan</a> now has a concrete &quot;How to build a branch <code>.hermes.md</code>&quot; recipe: exact file path (<code>~/.comserv/worktrees/&lt;branch&gt;/Comserv/.hermes.md</code>, the worktree git root), the MANDATORY global-pointer header (point to <code>/home/shanta/PycharmProjects/comserv2/.hermes.md</code> — do NOT copy rules), required Branch identity / domain / worktree-rules blocks, port-from-worktrees.json rule, and a 4-point post-create verification (incl. asserting the GLOBAL file is unchanged).</li>
+                <li><strong>Status correction.</strong> The prior plan asserted the branch <code>.hermes.md</code> files were &quot;DONE&quot; on 2026-08-17. They did NOT exist on disk then. The 7 active worktree files (planning, InventoryAccounting, 3d, DockerHA, ai, aichatsystem-ef4e, git) were actually created 2026-08-19 with the §3.3 template. The <code>planning</code> branch (missing from the original list of 6) is now included.</li>
+                <li><strong>Incident recorded.</strong> A batch-seeding step overwrote the GLOBAL <code>/home/shanta/PycharmProjects/comserv2/.hermes.md</code> with a branch template; it was detected and the original 104-line global content restored verbatim. §3.3.4 + the §3.3 gotcha now forbid iterating over <code>main</code> with the branch template — the global path is read-only.</li>
+                <li><strong>Plan bumped</strong> to page_version 0.2; todo 2142 gate text corrected; MASTER_PLAN nav + index already cross-link this doc.</li>
+            </ul>
+            <p class="doc-body">Related: <a href="/Documentation/HermesBranchContextPlan" class="doc-link">Hermes Branch Context Plan</a>, <a href="/Documentation/git_worktree_new_system_plan" class="doc-link">git_worktree_new_system_plan</a>, <a href="/Documentation/CHANGELOG#2026-08-17-hermes-branch-context" class="doc-link">2026-08-17 Hermes Branch Context</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-ai-agent-orchestration" class="cl-entry">
+<h3>2026-08-19 — AI Agent Orchestration + Notification Recovery</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Last Updated: 2026-08-19 | Version: 0.1 | Tracked in project: <a href="/project/details?project_id=267" class="doc-link">#267 (AGENTS)</a>. Folded here from a standalone dated changelog file (policy: single CHANGELOG.tt).</p>
+            <h4 class="doc-h3">What changed</h4>
+            <ul class="doc-body">
+                <li><strong>New plan <a href="/Documentation/AIAgentOrchestrationPlan" class="doc-link">AIAgentOrchestrationPlan</a></strong> (proj #267 AGENTS, sub-project of the Autonomous Agents plan). Defines: (a) the two agent classes — branch-context <code>.hermes.md</code> files (done, focused) vs specialized recurring agents; (b) operational agents (Email agent = missing input; Secretary agent = DB-eval → VoIP critical call, text/voice/browser, multi-model Ollama/OpenRouter/Grok); (c) in-app agents (HelpDesk/Beekeeping/Ency) blocked until their todos exist; (d) principles + phasing + project tracking.</li>
+                <li><strong>Notification regression recorded.</strong> Historically in-app + system + email worked; today ONLY email works. Logged as a separate blocking todo (not folded into agent work).</li>
+                <li><strong>VoIP config page planned.</strong> Successor to the old Perl4 &quot;call a page&quot; feature — a new page where the user registers their own VoIP number so the Secretary can call them.</li>
+                <li><strong>Cross-links added.</strong> MASTER_PLAN Planning nav + reference list now link the new plan; AutonomousAgentsPlan (parent #267) gained a &quot;Child plan&quot; link.</li>
+            </ul>
+            <p class="doc-body"><strong>Open item (not done that session):</strong> the SECRETARY-AGENT sub-project under #267 was not persisted via the API. Create it in the app project UI, then stamp its ID into the plan. The plan references it as &quot;SECRETARY-AGENT, child of #267&quot; until then.</p>
+            <p class="doc-body">Related: <a href="/Documentation/AIAgentOrchestrationPlan" class="doc-link">AI Agent Orchestration</a>, <a href="/Documentation/AutonomousAgentsPlan" class="doc-link">Autonomous Agents Plan</a>, <a href="/Documentation/HermesBranchContextPlan" class="doc-link">Hermes Branch Context</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-18-git-worktree-port-collision-fix" class="cl-entry">
+<h3>2026-08-18 — Git Worktree port-allocation collision fix</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Last Updated: 2026-08-18 | Version: 1.0 | Owning plan: <a href="/Documentation/git_worktree_new_system_plan" class="doc-link">git_worktree_new_system_plan (v0.2.1)</a> — project <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>. Folded here from a standalone dated changelog file (policy: single CHANGELOG.tt).</p>
+            <p class="doc-body"><strong>Symptom:</strong> creating a new worktree branch assigned it a port already in use. A new branch came up on <strong>4004</strong> — the port the <code>git</code> worktree (branch <code>git-dev</code>) was already serving. The Branch Servers list then showed two entries pointing at the same port.</p>
+            <p class="doc-body"><strong>Root cause:</strong> <code>Util::Git-&gt;next_free_port</code> (and <code>create_worktree</code>) read the module-level cached <code>worktrees.json</code> map (<code>$_wt_config</code>) rather than the live file. On a multi-worker Catalyst server each worker holds its own cache; once primed it was never invalidated when another worker wrote a new branch+port. The allocator kept serving a stale port set.</p>
+            <p class="doc-body"><strong>Fix</strong> (in <code>lib/Comserv/Util/Git.pm</code>, no schema/API change):</p>
+            <ul class="doc-body">
+                <li><code>_worktree_config</code> is now mtime-aware: re-reads the file whenever the on-disk mtime changes.</li>
+                <li>Added <code>_worktree_json_fresh</code> — a cache-bypassing direct read — and routed the allocation path (<code>next_free_port</code> + <code>create_worktree</code>) through it.</li>
+                <li><code>create_worktree</code> re-reads the live JSON right before writing, discards a port claimed in the interim, and merges its branch into the current on-disk map.</li>
+            </ul>
+            <p class="doc-body"><strong>Tests:</strong> new <code>t/util_git_next_free_port.t</code> (7 cases); <code>t/util_git_create_worktree.t</code> (13 cases) still green.</p>
+            <p class="doc-body"><strong>Registry correction (same day):</strong> <code>git</code> (git-dev) → 4004; <code>planning</code> → 4005. Final map: 4001 InventoryAccounting, 4002 DockerHA, 4003 3d, 4004 git, 4005 planning.</p>
+            <p class="doc-body">See <a href="/Documentation/git_worktree_new_system_plan#changelog" class="doc-link">git_worktree_new_system_plan §12 Changelog (v0.2.1)</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-17-hermes-branch-context" class="cl-entry">
+<h3>2026-08-17 — Hermes Branch Context system</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Last Updated: 2026-08-17 | Version: 0.1 | Tracked in project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>. Folded here from a standalone dated changelog file (policy: single CHANGELOG.tt).</p>
+            <h4 class="doc-h3">What changed</h4>
+            <ul class="doc-body">
+                <li><strong>Branch <code>.hermes.md</code> domain files</strong> written for the then-6 existing worktrees: InventoryAccounting, 3d, DockerHA, ai, aichatsystem-ef4e, git. Each re-includes the global <code>/home/shanta/PycharmProjects/comserv2/.hermes.md</code> then adds domain expertise. BMaster (beekeeping) deferred until its worktree exists. Status later corrected on 2026-08-19 (files were not actually on disk until then; planning added).</li>
+                <li><strong>Git dashboard &quot;Hermes&quot; button</strong> — <code>Util/Git.pm -&gt; build_worktree_list</code> emits <code>hermes_cmd</code>; <code>root/admin/git/index.tt</code> adds the button (and fixes Open to use an absolute <code>scheme://host:port/path</code> URL); <code>root/static/js/git-dashboard.js</code> copies the command to clipboard. Later corrected: do not copy <code>hermes chat -w</code> (that flag nests a <code>hermes/hermes-*</code> scratch branch).</li>
+                <li><strong>Planning plan doc</strong> — <a href="/Documentation/HermesBranchContextPlan" class="doc-link">/Documentation/HermesBranchContextPlan</a>, tracked under #238 with todos 2142–2146 (2146 recurring re-audit, set recurrence in the Todo UI).</li>
+                <li><strong>MASTER_PLAN</strong> — new index row + &quot;Hermes Context&quot; navlink; back-links added from the sibling git-worktree plans.</li>
+            </ul>
+            <p class="doc-body">Why: each worktree is its own git root, so Hermes does not inherit the repo-root global rules. Related: <a href="/Documentation/HermesBranchContextPlan" class="doc-link">Hermes Branch Context Plan</a>, <a href="/Documentation/CHANGELOG#2026-08-19-hermes-branch-context-authoring" class="doc-link">2026-08-19 authoring correction</a>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-focus-queue-p1-trust" class="cl-entry">
+<h3>2026-08-19 — Focus Queue ranks trusted blockers, not inflated P1s</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Last Updated: 2026-08-19 | Tracked: <a href="/todo/details?record_id=1828" class="doc-link">#1828 PLAN-QUEUE Ph4</a> / <a href="/todo/details?record_id=1817" class="doc-link">#1817 priority triage</a>.</p>
+            <p class="doc-body">The Focus Queue and /todo list ranked on stored <code>priority</code>. ~248 active rows are still P1, so real work (and any honest P2/P3) sat at rank ~200. Agents were gaming due dates and moving phase todos onto the parent project so they could appear. That is the wrong layer.</p>
+            <ul class="doc-body">
+                <li><strong>P1 trust:</strong> <code>TodoRanking</code> now scores a stored P1 as P5 unless <code>is_blocking</code> is set or the subject/description is a real incident (<code>[Error]</code>, outage, merge conflict, cannot restore, etc.). Displayed priority is unchanged.</li>
+                <li><strong>Reschedule does not refresh freshness.</strong> Staleness uses <code>date_time_posted</code> when <code>last_mod_by=reschedule</code>.</li>
+                <li><strong>Recent incidents</strong> get an extra boost so today's error todos beat planned work without rewriting due dates.</li>
+                <li><strong>Project filter includes children.</strong> <code>filter_project=272</code> (DRYER-INT) now includes phase projects whose <code>parent_id</code> is 272. No need to reparent todos.</li>
+                <li><strong>Per-project cap</strong> of half the Focus Queue (#1828 F5) so one project cannot fill all 20 slots.</li>
+                <li><strong>No lunch / appointments in Daily Priorities.</strong> Breaks are created as <code>is_fixed</code> tasks (not <code>todo_type=appointment</code>), so the old type filter missed them. <code>TodoTypes::is_calendar_fixture</code> now drops appointments, meetings, events, reminders, and any subject matching lunch/break/standup. They stay on the calendar.</li>
+            </ul>
+            <p class="doc-body"><strong>AI assist:</strong> do not ask an LLM to sort 1000 rows on every page load. <code>GET /api/focus/top5</code> already re-ranks the <em>top 50 by ap_score</em>. This scorer change is what makes that candidate pool honest. Stored-priority cleanup remains <a href="/todo/details?record_id=1817" class="doc-link">#1817</a> (batch, local Ollama).</p>
+            <p class="doc-body">Files: <code>lib/Comserv/Util/TodoRanking.pm</code>, <code>lib/Comserv/Util/FocusRanking.pm</code>, <code>lib/Comserv/Util/TodoTypes.pm</code>, <code>lib/Comserv/Controller/Planning.pm</code>, <code>t/util_todo_ranking.t</code>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<div id="2026-08-19-paid-ai-usage-monitor" class="cl-entry">
+<h3>2026-08-19 — SuperGrok 80% alert + daily OpenRouter/xAI usage log</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-muted">Tracked: <a href="/todo/details?record_id=2203" class="doc-link">#2203</a> / project <a href="/project/details?project_id=267" class="doc-link">#267 AGENTS</a>.</p>
+            <p class="doc-body">Paid AI spend was only half-tracked: v1 chat wrote <code>ai_usage_logs</code>, v2 AI2 chat did not. SuperGrok had no quota alert. OpenRouter credits were never pulled from their API.</p>
+            <ul class="doc-body">
+                <li>Every AI2 chat turn now logs provider, model, tokens, estimated cost, success/fail.</li>
+                <li>SuperGrok is routed through the Grok client (it was falling through to Ollama).</li>
+                <li>OpenRouter live credits from <code>GET /api/v1/auth/key</code>.</li>
+                <li>SuperGrok 80% of monthly allowance (config <code>root/config/ai_usage.json</code>) writes a system <code>[Error]</code> once per day so Application Error Audit pops it. Banner on <code>/ai/usage</code>.</li>
+                <li>Daily-by-model table on <code>/ai/usage</code> so we can see which models ran and what they cost.</li>
+            </ul>
+            <p class="doc-body">Assumption: xAI does not publish remaining SuperGrok OAuth quota. 80% is tracked month spend vs <code>supergrok_monthly_limit_usd</code> (default $30) or request count vs <code>supergrok_monthly_request_limit</code> (default 400), whichever is higher. Edit the JSON if the real SuperGrok allowance is different.</p>
+            <p class="doc-body"><strong>Providers are not interchangeable.</strong> SuperGrok = prepaid OAuth (no auto-fill, no remaining-quota API). xAI grok = pay-per-token with auto-fill ON. OpenRouter = live credits, no auto-fill (HTTP 402 when empty). When SuperGrok or OpenRouter is exhausted, every v2 path (<code>Chat::process</code> and <code>Router::dispatch_chat</code>, including FocusTune) falls back to a live OpenRouter <code>:free</code> model then the first chat-capable Ollama tag. xAI credit errors do not trigger that fallback.</p>
+            <p class="doc-body"><code>/ai</code> admin chrome: the Ollama host IP was sitting in the top bar like the model picker. The labelled <strong>Model</strong> dropdown is now the main control (role-filtered catalog: Ollama, SuperGrok prepaid, xAI auto-fill, OpenRouter). Host stays in the DOM for page-mode JS but is visually secondary. <code>📊 Usage</code> links to <code>/ai/usage</code>.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+
+

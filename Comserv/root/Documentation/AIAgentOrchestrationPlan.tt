@@ -204,7 +204,7 @@
                     <li><a href="/Documentation/HermesBranchContextPlan" class="doc-link">Hermes Branch Context</a> (class (a) branch-context files)</li>
                     <li><a href="/Documentation/git_worktree_new_system_plan" class="doc-link">Git Worktree — new isolated-creation backend</a> (proj #238)</li>
                     <li><a href="/Documentation/MASTER_PLAN" class="doc-link">MASTER_PLAN</a> — index of all plans</li>
-                    <li><a href="/Documentation/changelog/2026-08-19-ai-agent-orchestration" class="doc-link">Changelog 2026-08-19 — AI Agent Orchestration + Notification Recovery</a></li>
+                    <li><a href="/Documentation/CHANGELOG#2026-08-19-ai-agent-orchestration" class="doc-link">Changelog 2026-08-19 — AI Agent Orchestration + Notification Recovery</a></li>
                 </ul>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
