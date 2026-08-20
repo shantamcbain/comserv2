@@ -70,6 +70,36 @@ Don't repeat that; scope to the specific project's site.
 
 ---
 
+## 3.1 Finding (2026-08-18): the rollup assumed in A1 is **incomplete and partly wrong**
+
+A1 states *"Hours already roll up… the only missing piece is who pays for them."*
+Tracing the live code shows the rollup is **not** trustworthy today — and since these
+hours become the basis for **billing owners and paying developers**, that matters before
+any sponsorship table is built:
+
+- `done_with_log` (`Controller/Todo.pm` ~3699-3702) closes a todo and writes a completed
+  `log` row **without** adding elapsed time to `todo.accumulative_time`. Only
+  `close_log`, `next_step`, and `Log.pm::create_log` bump the column. So hours logged via
+  "mark done with notes" are **invisible to the stored total** — the cached column
+  (`accumulative_time`) and the true sum (`log` WHERE status=3) disagree.
+- `root/todo/project.tt` sums `todo.accumulated_time`, but the real column is
+  `accumulative_time` (Result/Todo.pm). Every per-project "Xh" total computes against an
+  **undefined accessor → 0**. The project-level rollup that billing would read is silently zero.
+- `projectdetails_enhanced*.tt` references `todo.formatted_accumulated_time`, which is
+  defined nowhere → no time shown / error.
+- `log` carries `start_time`/`end_time` as TIME **only (no end_date)**; a session left
+  open across midnight is clamped to 1 minute by `close_log`. Cross-day billing is wrong.
+
+**Consequence for Ph3 / billing:** do **not** treat `accumulative_time` as the billing
+number. Make `log` (status=3 rows) the single source of truth and recompute the rolled-up
+column from `Log.pm::calculate_accumulative_time` on *every* close/done; fix the
+`accumulated_time`→`accumulative_time` mismatch and the dead accessor; add `end_date` to
+the close path; and add tests around the accumulator. Until then, any sponsorship/billing
+rollup built on the current column would under-bill. Cross-reference:
+`DAILY_PLAN_LAYOUT_REDESIGN.md` §"Time Tracking — evaluation + constraints".
+
+---
+
 ## 4. How the industry solves this
 
 Nobody sponsors a project *directly*. Every mature system inserts a **funding source**

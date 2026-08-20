@@ -1847,6 +1847,11 @@
                         chatButton.classList.remove('popup-active');
                         chatButton.title = 'Open AI assistant';
                     }
+                    // The popup window is gone — drop the persistent flag so a later
+                    // session does not inherit a stale "popup active" marker and render
+                    // a dead zombie button. (beforeunload also clears it, but this covers
+                    // close paths that don't fire beforeunload reliably.)
+                    try { localStorage.removeItem('ai_popup_active'); } catch (e) {}
                     // Resume the conversation the user had in the popup
                     try {
                         const popupConvId = localStorage.getItem('ai_popup_conv_id');
@@ -5743,17 +5748,26 @@
                 }
             });
 
-            // Restore last mode: popup window (default on desktop) or inline dock (if no active popup)
-            const isPopupActive = localStorage.getItem('ai_popup_active') === '1';
+            // Restore last mode: popup window (default on desktop) or inline dock (if no active popup).
+            //
+            // A detached popup is a LIVE window object that does NOT survive a page reload
+            // — on every fresh load state._popupWindow is null. So a stale
+            // 'ai_popup_active' flag inherited from a previous session is a ZOMBIE: the
+            // button would render popup-active (title "click to bring to front") but
+            // clicking does nothing because the window no longer exists. Honor the flag
+            // only when a real popup window is open in THIS JS session (set by
+            // detachToPopup / cleared by its close-poll and the click handler). On load,
+            // clear any stale flag so the button falls back to its default behavior
+            // (click → open the preferred mode) instead of becoming a dead stub.
+            try {
+                const _popupStillOpen = state._popupWindow && !state._popupWindow.closed;
+                if (!_popupStillOpen) {
+                    localStorage.removeItem('ai_popup_active');
+                }
+            } catch (e) {}
+
             if (window.AI_WIDGET_POPUP) {
                 openChat();
-            } else if (isPopupActive) {
-                // If a popup is active, ensure the chat button is visually marked as popup-active
-                const chatButton = document.getElementById('chat-button');
-                if (chatButton) {
-                    chatButton.classList.add('popup-active');
-                    chatButton.title = 'AI chat is open in a separate window — click to bring to front';
-                }
             } else if (sessionStorage.getItem('ai_chat_open') === 'inline') {
                 openChat();
             } else if (sessionStorage.getItem('ai_chat_open') === 'popup'

@@ -12,9 +12,9 @@ The "Back to Top" feature adds a floating button to all pages in the application
 
 The feature is implemented using HTML, CSS, and JavaScript:
 
-1. **HTML**: A button element with the ID `back-to-top` is added to the main wrapper template.
-2. **CSS**: Styles for the button are defined in `/static/css/back-to-top.css`.
-3. **JavaScript**: Functionality for the button is implemented in `/static/js/back-to-top.js`.
+1. **HTML**: A button element with the ID `back-to-top` is added to the main wrapper template (`layout.tt`, inside the `<body>` — **not** in `ai_popup_mode`, which renders a bare popup with no nav/footer/back-to-top).
+2. **CSS**: Styles for the button are defined in `/static/css/back-to-top.css`. **Position is fixed bottom-LEFT (`bottom:20px; left:20px`), z-index `2147483647`** — not bottom-right (that corner is where the floating *Chat with AI* button lives). The button is hidden (`display:none`) until JS adds the `.show` class after `scrollY > 300`.
+3. **JavaScript**: Functionality is wired by **both** `/static/js/back-to-top.js` and `/static/js/floating-buttons.js` (each attaches its own scroll/click handlers to `#back-to-top`), and shown after scrolling >300px. A **separate, duplicate** `.back-to-top` element was previously injected by `todo-enhancements.js` on todo pages — that is an unstyled, non-fixed static "↑" and was removed (see commit `c6bd92b6`); the canonical `#back-to-top` is the only one.
 
 ## Features
 
@@ -88,12 +88,9 @@ The "Back to Top" button includes the following accessibility features:
 
 ## Integration with Themes
 
-The button's appearance automatically adapts to the current site theme:
+The button's appearance adapts to the current site theme via `var(--button-bg)`, `var(--button-text)`, `var(--button-border)`, `var(--button-hover-bg)`, and `var(--link-color)` (see `/static/css/back-to-top.css`). **However, its position (offset/z-index) is still a hardcoded `position:fixed` literal**, not a theme token — so a theme switch does not move it, and AI-authored edits have repeatedly broken its placement / collided with the AI2 float button (`bottom:90px;left:24px`).
 
-- **Default Theme**: Blue button
-- **CSC Theme**: Green button
-- **APIS Theme**: Red button
-- **USBM Theme**: Purple button
+> **Governance / forward fix — todo [#2160](/todo/details?record_id=2160):** drive the floating-button offsets, z-index, and colors from theme variables (not inline literals) so the theme system controls placement, make the rule survive AI edits without drift, and guarantee no collision with other floating elements. Shared with the V2 JS/CSS migration (proj [#259 V2MIG](/project/details?project_id=259)).
 
 ## Troubleshooting
 
@@ -102,7 +99,7 @@ If the "Back to Top" button is not appearing or functioning correctly:
 1. Check if jQuery is loaded before the back-to-top.js script
 2. Verify that the CSS file is correctly linked in the head section
 3. Check the browser console for any JavaScript errors
-4. Ensure that the button HTML is present in the page source
+4. Ensure that the button HTML is present in the page source (it is absent in `ai_popup_mode` windows by design)
 
 ## Future Enhancements
 
@@ -112,3 +109,4 @@ Potential future enhancements for the "Back to Top" feature:
 2. Add a progress indicator showing scroll position
 3. Allow users to customize the button position in their profile settings
 4. Add analytics to track button usage
+5. **Move position/z-index to theme variables (see todo [#2160](/todo/details?record_id=2160))** — the current hardcoded `bottom:20px;left:20px` is the source of AI-edit placement drift.

@@ -345,11 +345,21 @@ sub _ai2_repo_rel_path {
         }
     };
 
-    # Normalise the incoming path: forward slashes, drop a leading slash/Comserv/.
+    # Normalise the incoming path. The frontend usually sends an app-relative
+    # path, but it may also send an absolute path (e.g. the full repo path) or
+    # one carrying a "Comserv/" repo-subdir prefix. Strip a leading slash, a
+    # leading "Comserv/" prefix, AND any leading absolute prefix that equals the
+    # resolved repo root or app dir so the result is always repo-relative. This
+    # prevents the doubled-path bug (app_dir + absolute path => ".../Comserv/../home/.../Comserv/...").
     my $p = $rel_path;
     $p =~ s#\\#/#g;
     $p =~ s#^/+##;
     $p =~ s#^Comserv/##;
+    for my $base ($app_dir, $repo_root) {
+        my $qb = quotemeta($base);
+        $p =~ s#^$qb/?##;
+    }
+    $p =~ s#^/+##;
 
     my $repo_rel = $prefix . $p;
     $repo_rel =~ s#^/+##;
@@ -400,14 +410,23 @@ sub file_diff :Local :Args(0) {
     my $git  = Comserv::Util::Git->new(logging => $self->logging);
 
     # Resolve the REAL on-disk location of the file WITHOUT any hardcoded path.
-    # $rel_path is the app-relative path the frontend sends; the app dir is the
-    # directory THIS code runs in (runtime-derived, never a literal). Joining the
-    # two gives the real file for the --no-index (new-file) branch. We do NOT
-    # reuse $repo_rel here -- that one is relative to the git repo root (used for
-    # the ls-files/diff pathspecs below), not to the app dir.
-    require Cwd;
-    my $app_dir = Cwd::abs_path($c->path_to('')->stringify) || $c->path_to('')->absolute->stringify;
-    my $abs = File::Spec->canonpath(File::Spec->catfile($app_dir, $rel_path));
+    # The frontend sends an app-relative editor path (it may already include a
+    # "Comserv/" prefix or the repo root, and may even be absolute). Blindly
+    # catfile()'ing it onto $app_dir double-appends the repo/app dir and produces
+    # a bogus path like "Comserv/../home/.../Comserv/Comserv/..." (observed in the
+    # error audit). Instead derive the on-disk path from the SAME repo_rel that
+    # git itself uses (computed above via _ai2_repo_rel_path) joined to the
+    # resolved git repo root, then confine it to that root to block traversal.
+    my $repo_root = $git->repo_path($c);
+    $repo_root = $c->path_to('..')->absolute->stringify unless $repo_root;
+    $repo_root = File::Spec->canonpath(Cwd::abs_path($repo_root) || $repo_root);
+    my $abs = File::Spec->canonpath(File::Spec->catfile($repo_root, $repo_rel));
+    my $repo_re = quotemeta($repo_root);
+    unless ($abs =~ /^$repo_re/) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'Invalid path' }));
+        return;
+    }
 
     # "New" means git does not track it (untracked) — not merely "not found
     # under the configured repo path". Use ls-files so the tracked-vs-new
