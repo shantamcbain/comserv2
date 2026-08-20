@@ -24,7 +24,7 @@ See project 240 TODOLIST-UI, Phase 5 / 5b / 6.
 =cut
 
 use parent qw(Exporter);
-our @EXPORT_OK = qw(score_todo passes_filters);
+our @EXPORT_OK = qw(score_todo passes_filters in_branch_scope);
 
 # Scoring is owned by TodoRanking (single source of truth for ap_score).
 use Comserv::Util::TodoRanking ();
@@ -99,6 +99,54 @@ sub passes_filters {
     }
 
     return ($show_role && $show_site && $show_proj) ? 1 : 0;
+}
+
+# ----------------------------------------------------------------------------
+# in_branch_scope( \%todo, \%ctx )
+#
+# On a worktree server the Focus Queue should not dump the whole site backlog.
+# Keep a row if it belongs to the branch's project tree, or if it is actually
+# blocking that tree (cross-project is_blocking, or a blocked_by_todo_id).
+#
+#   %ctx = {
+#       branch_project_ids     => { 138 => 1, 234 => 1, ... },
+#       blocked_by_ids         => { 99 => 1 },   # todos that block a branch todo
+#       cross_blocker_projects => { $blocker_pid => [ blocked pids ] },
+#   }
+# ----------------------------------------------------------------------------
+sub in_branch_scope {
+    my ($t, $ctx) = @_;
+    $t   //= {};
+    $ctx //= {};
+
+    my $ids = $ctx->{branch_project_ids} || {};
+    return 0 unless %$ids;
+
+    my $pid = $t->{project_id} // '';
+    return 1 if $pid ne '' && $ids->{$pid};
+
+    # Active work (status 5 / in_progress) from ANY project — so another
+    # developer does not start a todo already being worked.
+    if ($ctx->{keep_active}) {
+        my $st = $t->{status} // '';
+        return 1 if $st eq '5' || $t->{in_progress};
+    }
+
+    my $rid = $t->{record_id} // '';
+    my $blockers = $ctx->{blocked_by_ids} || {};
+    return 1 if $rid ne '' && $blockers->{$rid};
+
+    # A todo on a depended-on project that is marked blocking, and that
+    # dependency targets a project in this branch's tree.
+    my $cbp     = $ctx->{cross_blocker_projects} || {};
+    my $blocked = ($pid ne '' && $cbp->{$pid}) ? $cbp->{$pid} : [];
+    if (ref($blocked) eq 'ARRAY' && @$blocked
+        && ($t->{is_cross_blocker} || $t->{is_blocking})) {
+        for my $bp (@$blocked) {
+            return 1 if $ids->{$bp};
+        }
+    }
+    return 0;
 }
 
 # Re-export the scorer so callers import from one place.

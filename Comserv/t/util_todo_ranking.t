@@ -87,6 +87,45 @@ sub score {
 }
 
 {
+    my $scope = {
+        branch_project_ids     => { 138 => 1, 234 => 1 },
+        blocked_by_ids         => { 99 => 1 },
+        cross_blocker_projects => { 201 => [138] },
+    };
+    ok(Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 1, project_id => 138 }, $scope
+    ), 'branch project todo is in scope');
+    ok(Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 2, project_id => 234 }, $scope
+    ), 'phase child of branch project is in scope');
+    ok(!Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 3, project_id => 272 }, $scope
+    ), 'unrelated project todo is out of scope');
+    ok(Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 99, project_id => 201 }, $scope
+    ), 'todo that blocks a branch todo is in scope');
+    ok(Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 4, project_id => 201, is_blocking => 1, is_cross_blocker => 1 },
+        $scope
+    ), 'cross-project blocker of the branch project is in scope');
+    ok(!Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 5, project_id => 201, is_blocking => 1, is_cross_blocker => 1 },
+        { branch_project_ids => { 138 => 1 }, cross_blocker_projects => { 201 => [999] } }
+    ), 'blocker of a different project is out of scope');
+    ok(!Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 6, project_id => 138 }, { branch_project_ids => {} }
+    ), 'empty scope matches nothing');
+    ok(Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 7, project_id => 999, status => '5', in_progress => 1 },
+        { branch_project_ids => { 138 => 1 }, keep_active => 1 }
+    ), 'active todo from another branch is kept as a safeguard');
+    ok(!Comserv::Util::FocusRanking::in_branch_scope(
+        { record_id => 8, project_id => 999, status => '1' },
+        { branch_project_ids => { 138 => 1 }, keep_active => 1 }
+    ), 'idle todo from another branch is still excluded');
+}
+
+{
     use Comserv::Util::TodoTypes qw(is_calendar_fixture);
     ok(is_calendar_fixture({ subject => "\x{1F957} Lunch", todo_type => 'task' }), 'emoji lunch is a fixture');
     ok(is_calendar_fixture({ subject => 'Morning Break', is_fixed => 1 }), 'morning break is a fixture');

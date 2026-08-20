@@ -573,6 +573,7 @@ sub daily :Path('/planning/daily') :Args {
                     $proj_cache{$h{project_id}} = $p ? { name => $p->name, parent_id => ($p->parent_id || '') } : { name => '', parent_id => '' };
                 }
                 $h{project_name} = $proj_cache{$h{project_id}}{name};
+                $h{project_parent_id} = $proj_cache{$h{project_id}}{parent_id} || '';
                 $ap_projects_seen{$h{project_id}} //= {
                     project_id   => $h{project_id},
                     project_name => $proj_cache{$h{project_id}}{name} || $h{project_code} || "Project #$h{project_id}",
@@ -629,9 +630,85 @@ sub daily :Path('/planning/daily') :Args {
                 || $a->{priority} <=> $b->{priority}
         } @scored;
 
-        if ($filter_project) {
+        # Branch worktrees: Focus Queue shows this branch's project tree plus
+        # todos that actually block it. main stays unfiltered. Escape hatch:
+        # ?filter_project=all. Explicit ?filter_project=N on a branch uses N
+        # as the root (plus children + blockers).
+        my $cur_branch = $c->stash->{app_workflow} || 'main';
+        my $show_all_projects = ($filter_project eq 'all');
+        my @branch_pids;
+        if (!$show_all_projects && $cur_branch ne 'main') {
+            my $hint = $filter_project;
+            if (!$hint) {
+                my $list = _build_worktree_list($c);
+                my ($wt) = grep { ($_->{name} || '') eq $cur_branch } @$list;
+                $hint = $wt->{project_id} if $wt;
+            }
+            @branch_pids = eval {
+                Comserv::Util::ProjectDependencies::resolve_branch_project_ids(
+                    $c, $cur_branch, $hint
+                );
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+                    "Branch focus resolve failed for '$cur_branch': $@");
+                @branch_pids = ();
+            }
+            if (@branch_pids) {
+                $c->stash->{branch_focus_filter} = {
+                    branch      => $cur_branch,
+                    root_id     => $branch_pids[0],
+                    project_ids => \@branch_pids,
+                };
+            }
+            else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
+                    "Branch focus: no project resolved for '$cur_branch' (hint="
+                    . ($hint // '') . ") — showing unfiltered queue");
+            }
+        }
+
+        if (@branch_pids) {
+            my %scope = map { $_ => 1 } @branch_pids;
+            my %blocker_ids;
+            for my $h (@all_sorted) {
+                next unless $scope{ $h->{project_id} // '' };
+                my $bid = $h->{blocked_by_todo_id} // '';
+                $blocker_ids{$bid} = 1 if $bid ne '';
+            }
+            my $before = scalar @all_sorted;
+            @all_sorted = grep {
+                Comserv::Util::FocusRanking::in_branch_scope($_, {
+                    branch_project_ids     => \%scope,
+                    blocked_by_ids         => \%blocker_ids,
+                    cross_blocker_projects => \%cross_blocker_projects,
+                    keep_active            => 1,
+                })
+            } @all_sorted;
+            # Sort: Active (any branch) → blockers (any branch) → this
+            # branch's todos by scored priority. Active-first is the
+            # multi-dev safeguard (do not start a todo already in a log).
+            @all_sorted = sort {
+                my $a_act = ((($a->{status} // '') eq '5') || $a->{in_progress}) ? 1 : 0;
+                my $b_act = ((($b->{status} // '') eq '5') || $b->{in_progress}) ? 1 : 0;
+                my $a_blk = ($a->{is_cross_blocker} || $a->{is_blocking}
+                    || $blocker_ids{ $a->{record_id} // '' }) ? 1 : 0;
+                my $b_blk = ($b->{is_cross_blocker} || $b->{is_blocking}
+                    || $blocker_ids{ $b->{record_id} // '' }) ? 1 : 0;
+                $b_act <=> $a_act
+                    || $b_blk <=> $a_blk
+                    || ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0)
+                    || ($a->{priority} // 5) <=> ($b->{priority} // 5)
+            } @all_sorted;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                "Branch focus '$cur_branch': kept " . scalar(@all_sorted)
+                . " of $before todos (projects " . join(',', @branch_pids)
+                . "; active-any-branch + blockers + branch work)");
+        }
+        elsif ($filter_project && !$show_all_projects) {
             @all_sorted = grep {
                 ($_->{project_id} // '') eq $filter_project
+                || ($_->{project_parent_id} // '') eq $filter_project
                 || ($_->{parent_id} // '') eq $filter_project
             } @all_sorted;
         }
@@ -1022,18 +1099,13 @@ sub daily :Path('/planning/daily') :Args {
         },
 
         template => 'admin/planning/DailyPlan.tt',
+        needs_todo_card_js => 1,
+        additional_css => [
+            '/static/css/todo.css?v=' . time(),
+            '/static/css/todo_shared.css?v=' . time(),
+        ],
     );
 
-    # Rebuilt index + tabs: reuse daily_impl's full planning stash so the
-    # Priorities tab and the action card render with live data (focus queue,
-    # remaining todos, open_log_entry, is_admin, audit/helpdesk/dependencies).
-    # Tab content is INCLUDEd into the SAME document (never an AJAX ?tab= full
-    # page fetch) — that re-injection of layout.tt is exactly what previously
-    # buried the global floating buttons inside the tab.
-    # daily_impl ends by setting template => DailyPlan.legacy.tt; override it
-    # back to the clean index template.
-    $c->forward('daily_impl', \@args);
-    $c->stash->{template} = 'admin/planning/DailyPlan.tt';
     return;
 }
 
