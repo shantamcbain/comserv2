@@ -100,4 +100,22 @@ ok(-d $main_repo, "main_repo_path is a directory ($main_repo)");
 my $common = $git->_run($c, 'rev-parse', '--git-common-dir');
 ok($common->{success}, 'rev-parse --git-common-dir is allowed');
 
+# Linked-worktree checkout collision: never `git checkout main` from a
+# worktree (exit 128, "already used by worktree"). pull('main') is safe
+# here because it refuses before fetch/checkout.
+ok($git->can('_checkout_collision_reason'), '_checkout_collision_reason exists');
+my $main_collision = $git->_checkout_collision_reason($c, 'main');
+if ($branch ne 'main' && $branch ne 'master') {
+    ok($main_collision, "checkout main is refused on worktree branch '$branch'");
+    like($main_collision, qr/worktree|already checked out/i,
+        'collision reason names the worktree constraint');
+    my $self_ok = $git->_checkout_collision_reason($c, $branch);
+    ok(!defined $self_ok, "current branch '$branch' is not a collision with itself");
+    my ($pull_ok, $pull_out) = $git->pull($c, 'main');
+    ok(!$pull_ok, 'pull(main) fails closed on a worktree (no git checkout)');
+    like($pull_out, qr/worktree|already checked out/i, 'pull(main) explains the collision');
+} else {
+    ok(!defined $main_collision, 'on main, checkout main is not a cross-worktree collision');
+}
+
 done_testing();
