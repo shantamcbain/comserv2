@@ -19,11 +19,8 @@
 <h3>2026</h3>
 <ul class="cl-toc-year">
 <li><strong>2026-08</strong><ul>
-<<<<<<< HEAD
 <li><a href="#2026-08-20-git-pull-worktree-checkout">2026-08-20 — Git pull must not checkout main from a worktree</a></li>
-=======
 <li><a href="#2026-08-19-dryer-import-playbook">2026-08-19 — HDRY dryer 3D import playbook (project #272)</a></li>
->>>>>>> main
 <li><a href="#2026-08-19-supergrok-docs">2026-08-19 — Docs: SuperGrok is its own prepaid provider</a></li>
 <li><a href="#2026-08-19-supergrok-source">2026-08-19 — SuperGrok prepaid models as a portable catalog source</a></li>
 <li><a href="#2026-08-19-aisystem-coordinator">2026-08-19 — AISYSTEM coordinator plan: ordered AI-use waves + Hermes aliases</a></li>
@@ -13432,7 +13429,6 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
 </div>
 </div>
 
-<<<<<<< HEAD
 <div id="2026-08-20-git-pull-worktree-checkout" class="cl-entry">
 <h3>2026-08-20 — Git pull must not checkout main from a worktree</h3>
 <div class="container">
@@ -13445,7 +13441,11 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
                 <li><code>_run</code> demotes leftover checkout-collision 128s to info so they do not create error todos.</li>
             </ul>
             <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>lib/Comserv/Controller/Admin/Git.pm</code>, <code>t/util_git.t</code>. Git dashboard / worktree isolation is project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
-=======
+        </div>
+    </div>
+</div>
+</div>
+
 <div id="2026-08-19-paid-ai-usage-monitor" class="cl-entry">
 <h3>2026-08-19 — SuperGrok 80% alert + daily OpenRouter/xAI usage log</h3>
 <div class="container">
@@ -13463,7 +13463,6 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
             <p class="doc-body">Assumption: xAI does not publish remaining SuperGrok OAuth quota. 80% is tracked month spend vs <code>supergrok_monthly_limit_usd</code> (default $30) or request count vs <code>supergrok_monthly_request_limit</code> (default 400), whichever is higher. Edit the JSON if the real SuperGrok allowance is different.</p>
             <p class="doc-body"><strong>Providers are not interchangeable.</strong> SuperGrok = prepaid OAuth (no auto-fill, no remaining-quota API). xAI grok = pay-per-token with auto-fill ON. OpenRouter = live credits, no auto-fill (HTTP 402 when empty). When SuperGrok or OpenRouter is exhausted, every v2 path (<code>Chat::process</code> and <code>Router::dispatch_chat</code>, including FocusTune) falls back to a live OpenRouter <code>:free</code> model then the first chat-capable Ollama tag. xAI credit errors do not trigger that fallback.</p>
             <p class="doc-body"><code>/ai</code> admin chrome: the Ollama host IP was sitting in the top bar like the model picker. The labelled <strong>Model</strong> dropdown is now the main control (role-filtered catalog: Ollama, SuperGrok prepaid, xAI auto-fill, OpenRouter). Host stays in the DOM for page-mode JS but is visually secondary. <code>📊 Usage</code> links to <code>/ai/usage</code>.</p>
->>>>>>> main
         </div>
     </div>
 </div>
