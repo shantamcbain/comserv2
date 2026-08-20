@@ -16,12 +16,23 @@
     doc_project_id    – owning project id (META project_id, or stash override)
     doc_project_code  – owning project code (META project_code, or stash override)
 
+  RULE P1 (plans): when doc_project_id is set, the header ALWAYS renders
+  Open project + View todos immediately under the title so every plan page
+  jumps to tracking without scrolling to a Project Tracking section.
+
   Theme compliance: uses only .doc-* classes from
   static/css/components/documentation.css — NO inline style=, NO hardcoded hex.
   ───────────────────────────────────────────────────────────────────────── %]
 
 <div class="doc-page-header">
     <h1 class="doc-h1">[% page_title | html %]</h1>
+
+    [% IF doc_project_id %]
+        <div class="doc-navrow">
+            <a href="[% c.uri_for('/project/details') %]?project_id=[% doc_project_id | html %]" class="doc-navlink">Open project #[% doc_project_id | html %][% IF doc_project_code %] ([% doc_project_code | html %])[% END %]</a>
+            <a href="[% c.uri_for('/todo') %]?project_id=[% doc_project_id | html %]" class="doc-navlink">View todos</a>
+        </div>
+    [% END %]
 
     <div class="doc-header-meta">
         [% IF site_name %]
@@ -35,7 +46,7 @@
         [% END %]
         [% IF doc_project_id %]
             <span class="doc-header-item"><span class="doc-header-label">Project:</span>
-                <a href="/project/details?project_id=[% doc_project_id | html %]" class="doc-link">[% IF doc_project_code %]#[% doc_project_id | html %] ([% doc_project_code | html %])[% ELSE %]#[% doc_project_id | html %][% END %]</a>
+                <a href="[% c.uri_for('/project/details') %]?project_id=[% doc_project_id | html %]" class="doc-link">[% IF doc_project_code %]#[% doc_project_id | html %] ([% doc_project_code | html %])[% ELSE %]#[% doc_project_id | html %][% END %]</a>
             </span>
         [% END %]
     </div>
