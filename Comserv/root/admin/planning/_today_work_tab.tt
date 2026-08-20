@@ -260,22 +260,25 @@
                 </div>
 
                 [% IF cross_blocker_count %]
-                <div id="cross-blocker-banner" class="BlockerBanner">
-                    <div class="BlockerBannerHeader">
+                <details id="cross-blocker-banner" class="BlockerBanner" open>
+                    <summary class="BlockerBannerHeader">
                         <span>🚨</span>
                         <span>[% cross_blocker_count %] Cross-Project Blocker[% IF cross_blocker_count != 1 %]s[% END %] — Resolve first to unblock other projects</span>
-                    </div>
-                    [% FOREACH ap IN active_priorities %]
-                    [% IF ap.is_cross_blocker %]
+                    </summary>
+                    [% SET xb_list = cross_blocker_todos || [] %]
+                    [% IF xb_list.size %]
+                    [% FOREACH ap IN xb_list %]
                     <div class="BlockerItem">
                         <span class="BlockerItemArrow">↳</span>
                         <a href="/todo/details?record_id=[% ap.record_id %]" class="BlockerItemLink">[% ap.subject | html %]</a>
                         <span class="BlockerItemProject">([% ap.project_name || ap.project_code || 'No project' %])</span>
-                        <span class="BlockerItemBlocks">blocks: [% ap.blocking_names %]</span>
+                        [% IF ap.blocking_names %]<span class="BlockerItemBlocks">blocks: [% ap.blocking_names | html %]</span>[% END %]
                     </div>
                     [% END %]
+                    [% ELSE %]
+                    <p class="BlockerItem">[% cross_blocker_count %] blocker[% IF cross_blocker_count != 1 %]s[% END %] counted but not listed. Use Remaining eligible todos below.</p>
                     [% END %]
-                </div>
+                </details>
                 [% END %]
 
                 [% IF active_priorities && active_priorities.size %]
