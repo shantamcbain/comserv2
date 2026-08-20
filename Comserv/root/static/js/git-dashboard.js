@@ -284,9 +284,15 @@
             if (direction === 'main-to-branch') { source = 'main'; target = selBranch; }
             else { source = selBranch; target = 'main'; }
 
-            if (!selBranch || selBranch === 'main' || selBranch === 'master') {
+            var curEl = document.querySelector('[data-git-current-branch]');
+            var current = (curEl && curEl.textContent) ? curEl.textContent.trim() : '';
+            if (current && current !== 'main' && current !== 'master') {
+                if (direction === 'main-to-branch') { target = current; }
+                else { source = current; }
+            }
+            if (source === target || !target || target === 'main' && direction === 'main-to-branch') {
                 showMergeResult(false, false, 'failed',
-                    'Pick a worktree branch in the dropdown. main cannot merge into itself.');
+                    'Pick the worktree branch. main cannot merge into itself.');
                 return;
             }
 
@@ -321,7 +327,8 @@
                   if (res.success) {
                       showMergeResult(true, false, 'merged', res.output || '');
                   } else {
-                      showMergeResult(false, false, 'failed', res.output || res.error || res.detail || '');
+                      var failText = (res.error || '') + (res.output && res.output.replace(/\s/g,'') ? ('\n' + res.output) : '') + (res.detail ? ('\n' + res.detail) : '');
+                      showMergeResult(false, false, 'failed', failText || 'merge failed');
                   }
                   // NOTE: intentionally do NOT auto-refresh/reload on success.
                   // refreshGitDashboard() / location.reload() re-renders the Merge

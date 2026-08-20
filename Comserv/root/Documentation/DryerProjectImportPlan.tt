@@ -1,0 +1,314 @@
+[% META
+   title = "Dryer Project — Import STL/PDF into Inventory + Print Queue"
+   description = "Import the downloaded dryer STL+PDF files into Comserv2 as an internal (not-for-sale) 3D build: parent assembly item, per-part inventory + BOM, automated print-queue placement, and automatic stock-in on print completion."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "3d-printing,planning,import,internal-build"
+   page_version = "0.1"
+   last_updated = "Tue Aug 19 2026"
+   site_specific = "false"
+   project_id   = "14"
+   project_code = "DRYER-INT"
+%]
+[% PageVersion = 'Documentation/DryerProjectImportPlan.tt,v 0.1 2026/08/19 hermes-agent Exp - DocumentationTtTemplate-compliant plan for dryer internal 3D build import' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Dryer Project — Import STL/PDF into Inventory + Print Queue'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#what-exists" class="doc-navlink">What Already Exists</a>
+                <a href="#data-model" class="doc-navlink">Data Model</a>
+                <a href="#automation" class="doc-navlink">Import Automation</a>
+                <a href="#inventory" class="doc-navlink">Auto Inventory Update</a>
+                <a href="#schema-gaps" class="doc-navlink">Schema Gaps</a>
+                <a href="#files" class="doc-navlink">Files to Create/Modify</a>
+                <a href="#verification" class="doc-navlink">Verification</a>
+                <a href="#open-decisions" class="doc-navlink">Open Decisions</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">You downloaded a set of STL and PDF files for a new <strong>dryer</strong> project. This plan imports them into Comserv2 as an <strong>internal project (not for sale)</strong>: one parent "Dryer" assembly item (hidden from shop/marketplace), a printable inventory record + BOM line for every STL, the build PDF/pictures attached, each part queued for printing, and inventory updated automatically as each part finishes. A step-by-step Project (with phase sub-projects + todos) guides the human while the file-reading/record-creating/queueing is automated.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- WHAT EXISTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="what-exists" class="doc-h2">2. What Already Exists (reuse, do not rebuild)</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Need</th>
+                    <th class="doc-th">Existing Implementation</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Model / STL catalog</td>
+                    <td class="doc-td"><code>printing_3d_models</code> (name, nfs_path, file_type, stl_volume_cm3, stl_weight_g, item_id&rarr;InventoryItem, thumbnail_url, tags). Result <code>Printing3dModel</code>.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Print queue</td>
+                    <td class="doc-td"><code>printing_3d_jobs</code> (status queued&rarr;printing&rarr;completed; source_type / source_item_id / item_name; filament reservation via <code>inventory_transactions</code>). Result <code>Printing3dJob</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Bill of Materials</td>
+                    <td class="doc-td"><code>inventory_item_bom</code> (parent_item_id, component_item_id, quantity, unit, is_optional, scrap_factor). Result <code>InventoryItemBOM</code>. Generic — already used for beehive frames, honey jars, 3D brackets.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Inventory items</td>
+                    <td class="doc-td"><code>inventory_items</code> with <code>requires_printing</code>, <code>filament_color</code>, <code>filament_type</code>, <code>show_in_shop</code>, <code>list_in_marketplace</code>, <code>item_origin</code>. Result <code>InventoryItem</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">STL geometry</td>
+                    <td class="doc-td"><code>_parse_stl()</code> in <code>Controller/3d.pm</code> computes volume_cm3 + triangles; weight = vol&times;1.24 g (PLA).</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">File storage</td>
+                    <td class="doc-td"><code>Comserv::Model::File</code> records uploads (<code>files</code> table). <code>upload_and_record($c, $upload, 'path:/data/nfs/3d/models')</code> already used by the model-upload action.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Job completion</td>
+                    <td class="doc-td"><code>Controller/3d.pm</code> already does filament <code>reserve</code>/<code>reserve_release</code>/<code>issue</code> transactions and sets job&rarr;completed. This is the hook we extend.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Projects / Todos</td>
+                    <td class="doc-td"><code>projects</code> (parent_id, priority) + <code>todo</code>. Used for step-by-step tracking.</td>
+                </tr>
+            </table>
+            <p class="doc-body"><strong>Conclusion:</strong> no new tables are required. The work is (a) a thin import utility + controller action, (b) wiring job-completion to BOM consumption, (c) small Result-file-first column additions for PDF attachment, and (d) the in-app Project/todos (already created — see Project Tracking).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DATA MODEL SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="data-model" class="doc-h2">3. Data Model for This Project</h2>
+            <ul class="doc-body">
+                <li><strong>Parent item:</strong> <code>Dryer — Internal Build</code> (sku e.g. <code>INT-DRYER-001</code>, <code>item_origin='3d_printed'</code>, <code>show_in_shop=0</code>, <code>list_in_marketplace=0</code>, <code>is_assemblable=1</code>, <code>requires_printing=0</code>).</li>
+                <li><strong>Each STL file</strong> &rarr; one <code>printing_3d_models</code> row (source='project_import') + one child <code>InventoryItem</code> (<code>requires_printing=1</code>, <code>show_in_shop=0</code>, qty 0) + one <code>inventory_item_bom</code> line on the parent (quantity = how many of that part the dryer needs, parsed from a <code>_xN</code> filename suffix else 1).</li>
+                <li><strong>Each PDF</strong> &rarr; FileManager <code>files</code> row; the build PDF links to the parent item, per-part images set <code>thumbnail_url</code> on the model.</li>
+                <li><strong>Print queue:</strong> one <code>printing_3d_jobs</code> per child item, <code>source_type='project'</code>, <code>source_item_id=parent item id</code>, quantity = BOM quantity.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- AUTOMATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="automation" class="doc-h2">4. Import Automation (the "read the files" engine)</h2>
+            <p class="doc-body">New module <code>Comserv::Util::DryerImport</code> (thin; keeps logic out of the already-large <code>Controller/3d.pm</code>). New thin controller <code>Comserv::Controller::ProjectImport</code> with an <code>import_project</code> action. Per the 3D-subsystem skill, <strong>do not append to <code>3d.pm</code></strong>.</p>
+            <h3 id="automation-input" class="doc-h3">4.1 Input</h3>
+            <p class="doc-body">A <strong>selection of files</strong> chosen through the FileManager (directory selection is possible via the file management system). The import accepts a list of <code>files.id</code> values (STL + PDF) plus one parent-project name. No hardcoded local path.</p>
+            <h3 id="automation-perfile" class="doc-h3">4.2 Per-file processing</h3>
+            <ul class="doc-body">
+                <li><strong>STL</strong> &rarr; call existing <code>_parse_stl</code> for volume/weight; create <code>printing_3d_models</code> row (file_id, nfs_path, stl_volume_cm3, stl_weight_g, source='project_import', tags='project:dryer').</li>
+                <li>Create child <code>InventoryItem</code> (sku <code>DRYER-&lt;slug&gt;-&lt;n&gt;</code>, <code>requires_printing=1</code>, <code>show_in_shop=0</code>, <code>item_origin='3d_printed'</code>, qty 0). Link model&rarr;item.</li>
+                <li>Add <code>inventory_item_bom</code> line: parent = Dryer assembly, component = child item, quantity = parsed.</li>
+                <li>Create <code>printing_3d_jobs</code> row: <code>model_id</code>, <code>source_type='project'</code>, <code>source_item_id=parent</code>, <code>item_name=child</code>, <code>quantity=BOM qty</code>, <code>status='queued'</code>.</li>
+                <li><strong>PDF</strong> &rarr; FileManager <code>files</code> row; build PDF links to parent item; per-part images &rarr; <code>thumbnail_url</code>.</li>
+            </ul>
+            <h3 id="automation-safety" class="doc-h3">4.3 Idempotency / safety</h3>
+            <p class="doc-body">Skip files already imported (match on <code>file_id</code> against existing <code>printing_3d_models</code>). <strong>Dry-run mode</strong> reports what would be created before writing (the skill's "staff prep" principle — never silently mass-create). The action shows a confirmation table first.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- INVENTORY SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="inventory" class="doc-h2">5. Inventory Auto-Update on Print Completion</h2>
+            <p class="doc-body">Extend the existing job-completion block in <code>Controller/3d.pm</code> (the one that already does filament <code>issue</code> on completion):</p>
+            <ul class="doc-body">
+                <li><strong>Receive finished part into stock:</strong> +quantity of the child <code>InventoryItem</code> (via <code>inventory_transactions</code> type <code>receive</code> / stock level increase).</li>
+                <li><strong>Consume BOM components for that part:</strong> for each <code>inventory_item_bom</code> line where <code>parent_item_id = the printed child item</code>, issue the component quantity &times; job qty (already the pattern used for filament; generalize to all BOM components).</li>
+                <li>If the printed child is itself a BOM component of the <strong>Dryer assembly</strong>, the assembly's available-to-build count is now implicitly higher; a later "assemble" step can receive the parent.</li>
+            </ul>
+            <p class="doc-body">This satisfies: filament + components consumed, finished part stocked, automatically, on each successful print.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SCHEMA GAPS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="schema-gaps" class="doc-h2">6. Schema Gaps to Close</h2>
+            <p class="doc-body">Result-file-first, via schema-compare — <strong>NEVER hand DDL.</strong></p>
+            <ul class="doc-body">
+                <li><strong>Parent "not for sale" flag:</strong> <code>inventory_items</code> already has <code>show_in_shop</code> and <code>list_in_marketplace</code> (default 0). The import sets both = 0 and <code>item_origin='3d_printed'</code>. No new column required.</li>
+                <li><strong>PDF / picture attachment home:</strong> reuse existing columns — master build PDF + pictures on the parent <code>InventoryItem</code> via <code>image_path</code> and a FileManager <code>files</code> row referenced from <code>printing_3d_models.description</code> (JSON), or a new nullable <code>printing_3d_models.build_doc_file_id</code> column (add to <code>Printing3dModel.pm</code>, then <code>/schema-comparison/sync_result_to_table</code>).</li>
+                <li><strong>Project&harr;print linkage:</strong> no schema change — the import records <code>source_type='project'</code> + <code>source_item_id</code>/<code>notes</code> carrying the parent project id on each <code>printing_3d_jobs</code> row (already supported).</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FILES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">7. Files to Create / Modify</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">File</th>
+                    <th class="doc-th">Action</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>Comserv/lib/Comserv/Util/DryerImport.pm</code></td>
+                    <td class="doc-td">NEW — import logic + STL parse reuse.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>Comserv/lib/Comserv/Controller/ProjectImport.pm</code></td>
+                    <td class="doc-td">NEW (thin) — file-selection UI + confirm + run. Registers under site_module <code>printing_3d</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/Printing3dModel.pm</code></td>
+                    <td class="doc-td">MODIFY (optional <code>build_doc_file_id</code>) — then schema-compare sync.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>Comserv/lib/Comserv/Controller/3d.pm</code></td>
+                    <td class="doc-td">MODIFY — extend job-completion to do BOM consumption + finished-part receive.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>Comserv/root/3d/import_project.tt</code></td>
+                    <td class="doc-td">NEW — selection + confirm table UI.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>Comserv/root/Navigation/Menu.tt</code></td>
+                    <td class="doc-td">MODIFY — link the new import action.</td>
+                </tr>
+            </table>
+            <p class="doc-body">Plus Documentation + dated changelog per AGENTS.md (<code>.tt</code> only, in the same commit).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- VERIFICATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verification" class="doc-h2">8. Verification</h2>
+            <ul class="doc-body">
+                <li><code>npm run test</code> (and confirm the Perl server reloads without error).</li>
+                <li>Dry-run of DryerImport on a 2-file sample (1 STL + 1 PDF) &rarr; confirm proposed rows.</li>
+                <li>Approve &rarr; confirm: 1 parent item (hidden from shop), 1 child item, 1 model, 1 BOM line, 1 queued job, PDF linked.</li>
+                <li>Mark the job completed &rarr; confirm child item stock +1 and filament/component issued.</li>
+                <li>Dashboard <code>/3d/admin</code> shows the new model + queued job.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OPEN DECISIONS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="open-decisions" class="doc-h2">9. Open Decisions (defaults assumed)</h2>
+            <div class="doc-info">
+                <h3>PDF attachment</h3>
+                <p class="doc-body">Default = master build PDF on parent + per-part images on models. (Confirm if you want PDF only on parent, or both.)</p>
+            </div>
+            <div class="doc-info">
+                <h3>Auto inventory update on completion</h3>
+                <p class="doc-body">Default = YES (BOM consumption + finished-part stock-in). (Confirm if you want manual receive.)</p>
+            </div>
+            <div class="doc-info">
+                <h3>File source</h3>
+                <p class="doc-body">FileManager file selection (confirmed: directory selection is possible via the file management system). No hardcoded local path.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PROJECT TRACKING SECTION (RULE P1 — REQUIRED FOR PLAN DOCUMENTS) -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="/project/details?project_id=14" class="doc-link">#14 (DRYER-INT)</a>
+                &mdash; parent: <a href="/project/details?project_id=14" class="doc-link">#14</a>.
+                Each phase below is a <strong>sub-project</strong>, not a single todo.
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase / Sub-project</th>
+                    <th class="doc-th">Project link</th>
+                    <th class="doc-th">Gate / Done when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase 1 &mdash; Gather &amp; select files</td>
+                    <td class="doc-td"><a href="/project/details?project_id=15" class="doc-link">#15 (DRYER-INT-P1)</a></td>
+                    <td class="doc-td">Files located; STL+PDF selected in FileManager; BOM qty per part confirmed.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase 2 &mdash; Run import</td>
+                    <td class="doc-td"><a href="/project/details?project_id=16" class="doc-link">#16 (DRYER-INT-P2)</a></td>
+                    <td class="doc-td">DryerImport dry-run approved; parent + child items + BOM + queued jobs verified.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Phase 3 &mdash; Print queue execution</td>
+                    <td class="doc-td"><a href="/project/details?project_id=17" class="doc-link">#17 (DRYER-INT-P3)</a></td>
+                    <td class="doc-td">Jobs assigned + printed; auto stock-in confirmed per completed job.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Phase 4 &mdash; Assembly &amp; verification</td>
+                    <td class="doc-td"><a href="/project/details?project_id=18" class="doc-link">#18 (DRYER-INT-P4)</a></td>
+                    <td class="doc-td">All parts received; dryer assembled; build PDF attached; project marked done.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Re-audit (RULE P2 analogue)</td>
+                    <td class="doc-td"><a href="/todo/details?record_id=55" class="doc-link">todo 55</a></td>
+                    <td class="doc-td">Keeps this doc from going stale (quarterly).</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">10. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="/Documentation/3d" class="doc-link">3D Printing module</a></li>
+                    <li><a href="/Documentation/STANDARD" class="doc-link">Documentation Standard (S1-S7)</a></li>
+                    <li><a href="/admin" class="doc-link">Administrative Interface</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
