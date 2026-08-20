@@ -685,18 +685,18 @@ sub daily :Path('/planning/daily') :Args {
                     keep_active            => 1,
                 })
             } @all_sorted;
-            # Sort: Active (any branch) → blockers (any branch) → this
-            # branch's todos by scored priority. Active-first is the
-            # multi-dev safeguard (do not start a todo already in a log).
+            # Sort: Active (any branch) first, then this branch's projects,
+            # with blocking todos above the todos they block.
             @all_sorted = sort {
                 my $a_act = ((($a->{status} // '') eq '5') || $a->{in_progress}) ? 1 : 0;
                 my $b_act = ((($b->{status} // '') eq '5') || $b->{in_progress}) ? 1 : 0;
-                my $a_blk = ($a->{is_cross_blocker} || $a->{is_blocking}
-                    || $blocker_ids{ $a->{record_id} // '' }) ? 1 : 0;
-                my $b_blk = ($b->{is_cross_blocker} || $b->{is_blocking}
-                    || $blocker_ids{ $b->{record_id} // '' }) ? 1 : 0;
+                my $a_br  = $scope{ $a->{project_id} // '' } ? 1 : 0;
+                my $b_br  = $scope{ $b->{project_id} // '' } ? 1 : 0;
+                my $a_blocked = ($a->{blocked_by_todo_id} && !$a->{blocker_done}) ? 1 : 0;
+                my $b_blocked = ($b->{blocked_by_todo_id} && !$b->{blocker_done}) ? 1 : 0;
                 $b_act <=> $a_act
-                    || $b_blk <=> $a_blk
+                    || $b_br <=> $a_br
+                    || $a_blocked <=> $b_blocked
                     || ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0)
                     || ($a->{priority} // 5) <=> ($b->{priority} // 5)
             } @all_sorted;
@@ -714,8 +714,10 @@ sub daily :Path('/planning/daily') :Args {
         }
 
         my $focus_total = scalar @all_sorted;
-        my $cross_blocker_count = scalar grep { $_->{is_cross_blocker} } @all_sorted;
+        my @cross_blocker_todos = grep { $_->{is_cross_blocker} } @all_sorted;
+        my $cross_blocker_count = scalar @cross_blocker_todos;
         $c->stash->{cross_blocker_count}       = $cross_blocker_count;
+        $c->stash->{cross_blocker_todos}       = \@cross_blocker_todos;
         $c->stash->{active_priorities_total}   = $focus_total;
         $c->stash->{focus_queue_limit}         = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_LIMIT;
 
