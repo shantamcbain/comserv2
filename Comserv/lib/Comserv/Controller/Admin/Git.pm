@@ -1758,6 +1758,7 @@ sub test_gate :Path('/admin/git/test_gate') :Args(1) {
     $c->response->body(encode_json({
         success => $res->{success} ? 1 : 0,
         branch  => $branch,
+        stale   => $res->{stale} ? 1 : 0,
         output  => $res->{output},
         error   => $res->{error_msg},
     }));
@@ -1789,7 +1790,8 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
     # Land the merge in the PRIMARY checkout (where main is checked out).
     # Never switch_branch('main') from a linked worktree — git refuses
     # ("already checked out at <primary>") and merging inside the worktree
-    # is a no-op ("Already up to date").
+    # is a no-op ("Already up to date"). main is already checked out in the
+    # primary, so no branch switch is required or attempted.
     my $main_repo = $self->git_service->main_repo_path($c);
     unless ($main_repo) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
@@ -1800,6 +1802,9 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
 
     my $gate = $self->git_service->run_test_gate($c, $branch, $main_repo);
     unless ($gate->{success}) {
+        # Prefer the gate's own diagnostic (e.g. a stale worktree with no test
+        # suite) over the generic "fix tests" message, which is misleading when
+        # no test actually ran.
         my $msg = $gate->{error_msg}
             || "Test gate FAILED for '$branch' — merge blocked. Fix tests in the worktree first.";
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
