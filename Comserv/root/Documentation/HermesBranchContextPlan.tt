@@ -1,11 +1,11 @@
 [% META
    title = "Hermes Branch Context — per-branch AI guidance + in-app Hermes launch"
-   description = "Give every git worktree its own branch-specific Hermes context (.hermes.md that re-includes the global rules then adds domain expertise, e.g. InventoryAccounting = SQL-Ledger/Postgres <-> MySQL inventory integration; 3d = printing_3d consuming inventory/feeding accounting; DockerHA = K3s/HA; ai = v2 AI; BMaster = beekeeping). Add a 'Hermes' button to the Git dashboard that copies the branch's hermes chat -w launch command. Cover the one-install/no-per-branch-restart model and automate seeding for new branches."
+   description = "Give every git worktree its own branch-specific Hermes context (.hermes.md that re-includes the global rules then adds domain expertise, e.g. InventoryAccounting = SQL-Ledger/Postgres <-> MySQL inventory integration; 3d = printing_3d consuming inventory/feeding accounting; DockerHA = K3s/HA; ai = v2 AI; BMaster = beekeeping). Add a 'Hermes' button to the Git dashboard that copies the branch's hermes chat launch command (never -w). Cover the one-install/no-per-branch-restart model and automate seeding for new branches."
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
    category = "git,ai-systems,hermes,development-plan"
-   page_version = "0.2"
-   last_updated = "Tue Aug 19 18:00:00 UTC 2026"
+   page_version = "0.3"
+   last_updated = "Wed Aug 19 19:30:00 UTC 2026"
    project_id   = "238"
    project_code = "GITWT-NEW"
    site_specific = "false"
@@ -15,8 +15,8 @@
     <h1 class="doc-h1">Hermes Branch Context — per-branch AI guidance + in-app Hermes launch</h1>
 
     <div class="last-updated" doc-muted>
-        Last Updated: 2026-08-17 |
-        Version: 0.1 |
+        Last Updated: 2026-08-19 |
+        Version: 0.3 |
         Status: In-Process |
         Tracked in project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>
     </div>
@@ -46,7 +46,7 @@
     <div class="row">
         <div class="col-100">
             <h2 id="overview" class="doc-h2">1. Overview</h2>
-            <p class="doc-body">Each git worktree is its own git root, so Hermes (which loads <code>.hermes.md</code> by walking parents up to the git root and stopping there) does NOT inherit the repo-root global rules when run inside a worktree. This plan makes every branch carry its own context: a <code>.hermes.md</code> that (a) re-includes the global rules and (b) adds domain expertise (SQL-Ledger accounting, 3D printing, HA, AI v2, beekeeping), plus an in-app "Hermes" button on the Git dashboard that copies the correct <code>hermes chat -w</code> launch command for that branch.</p>
+            <p class="doc-body">Each git worktree is its own git root, so Hermes (which loads <code>.hermes.md</code> by walking parents up to the git root and stopping there) does NOT inherit the repo-root global rules when run inside a worktree. This plan makes every branch carry its own context: a <code>.hermes.md</code> that (a) re-includes the global rules and (b) adds domain expertise (SQL-Ledger accounting, 3D printing, HA, AI v2, beekeeping), plus an in-app "Hermes" button on the Git dashboard that copies the correct <code>hermes chat</code> launch command for that branch. <strong>Never <code>hermes chat -w</code></strong> — Comserv worktrees already isolate; <code>-w</code> nests a disposable <code>hermes/hermes-*</code> branch (often from <code>origin/main</code>) and the agent edits the wrong tree.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -88,8 +88,9 @@
             <div class="doc-codebox">
                 <pre><code>
 # cd into the worktree's OWN git root so its .hermes.md loads:
-cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat -w
-# -w = worktree mode (parallel agents, no git conflicts)
+cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat
+# NEVER add -w. Comserv worktrees ARE the isolation. hermes chat -w
+# creates a nested hermes/hermes-* scratch branch (often from origin/main).
                 </code></pre>
             </div>
             <p class="doc-body"><strong>Authoring the file is mechanical — follow this recipe exactly. A wrong path or a missing global pointer silently breaks branch context.</strong></p>
@@ -139,7 +140,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
   `&lt;branch&gt;` ref; the user merges into main. Do not push to origin per-branch.
 - Verify the active checkout before trusting git results:
   `git -C &lt;git root&gt; rev-parse --show-toplevel --abbrev-ref HEAD`
-- Launch Hermes with cwd = this git root: `cd &lt;git root&gt; &amp;&amp; hermes chat -w`
+- Launch Hermes with cwd = this git root: `cd &lt;git root&gt; &amp;&amp; hermes chat`
   (the web dashboard daemon does NOT see branch context — never rely on it).</code></pre>
             </div>
             <p class="doc-body"><strong>The global-pointer line is non-negotiable.</strong> Hermes stops its parent-walk at the worktree git root, so without that pointer the branch file would silently drop every global rule (writing styles, naming, API rules, schema-compare). Do not COPY the global rules into the branch file — point to them. Global rules stay edited in ONE place.</p>
@@ -155,7 +156,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
                 <li><code>git -C ~/.comserv/worktrees/&lt;branch&gt;/Comserv rev-parse --show-toplevel</code> == the git root where you wrote the file.</li>
                 <li>The file's first non-blank line names the branch (<code># Comserv2 — Branch: &lt;Name&gt;</code>) and contains the pointer to <code>/home/shanta/PycharmProjects/comserv2/.hermes.md</code>.</li>
                 <li>The GLOBAL file is UNCHANGED: <code>head -1 /home/shanta/PycharmProjects/comserv2/.hermes.md</code> must still be <code># Comserv2 — AI Guidance (Consolidated)</code>.</li>
-                <li>Run <code>cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat -w</code> and confirm Hermes reports the correct branch + domain constraints.</li>
+                <li>Run <code>cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat</code> and confirm Hermes reports the correct branch + domain constraints. Do not add <code>-w</code>.</li>
             </ul>
             <p class="doc-body"><strong>Gotcha (2026-08-19):</strong> when seeding MANY branches in one batch, generate each file into its OWN worktree path. Never iterate over <code>main</code> with the branch template — that overwrites the global file. Treat the global path as read-only.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
@@ -168,7 +169,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
             <h2 id="button" class="doc-h2">4. Hermes launch button on the Git dashboard</h2>
             <p class="doc-body">Mirrors the existing server "Open" button in the Develop Servers card (<code>root/admin/git/index.tt</code>). Implemented in the same change as the domain files:</p>
             <ul class="doc-body">
-                <li><code>Util/Git.pm -&gt; build_worktree_list</code> now emits <code>hermes_cmd</code> for <code>main</code> and every branch: <code>cd &lt;worktree-git-root&gt; &amp;&amp; hermes chat -w</code>.</li>
+                <li><code>Util/Git.pm -&gt; build_worktree_list</code> now emits <code>hermes_cmd</code> for <code>main</code> and every branch: <code>cd &lt;worktree-git-root&gt; &amp;&amp; hermes chat</code> (never <code>-w</code>).</li>
                 <li><code>root/admin/git/index.tt</code> gains a "Hermes" button per row (next to Open/Stop/Restart) with <code>data-hermes-branch</code> + <code>data-hermes-cmd</code>. Also fixed the Open button to build the absolute <code>scheme://host:port/path</code> URL (RELATIVE-URL TRAP rule).</li>
                 <li><code>root/static/js/git-dashboard.js</code> copies <code>hermes_cmd</code> to the clipboard and shows it in the dev console for manual copy.</li>
             </ul>
@@ -180,7 +181,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
     <div class="row">
         <div class="col-100">
             <h2 id="automate" class="doc-h2">5. Automation for NEW branches (outstanding)</h2>
-            <p class="doc-body">Today the <code>.hermes.md</code> files are authored by hand. The remaining work is to make <code>Util::Git-&gt;create_worktree</code> seed each new worktree's <code>.hermes.md</code> = global-pointer header + a per-branch domain block pulled from a small checked-in domain store (one block per branch). The same action should document/launch isolated Hermes (<code>hermes chat -w -p &lt;branch&gt;</code>) from the worktree dir, so "open a branch &#8594; get its context + isolated Hermes" is one action. Author the BMaster beekeeping block at the same time (todo #2144).</p>
+            <p class="doc-body">Today the <code>.hermes.md</code> files are authored by hand. The remaining work is to make <code>Util::Git-&gt;create_worktree</code> seed each new worktree's <code>.hermes.md</code> = global-pointer header + a per-branch domain block pulled from a small checked-in domain store (one block per branch). The same action should document/launch Hermes (<code>hermes chat</code>, never <code>-w</code>) from the worktree dir, so "open a branch &#8594; get its context + isolated Hermes" is one action. Author the BMaster beekeeping block at the same time (todo #2144).</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -191,7 +192,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
             <h2 id="install" class="doc-h2">6. One Hermes install / no per-branch restart</h2>
             <ul class="doc-body">
                 <li><strong>Single install:</strong> <code>/home/shanta/.local/bin/hermes</code> exec's one venv at <code>/home/shanta/.hermes/hermes-agent/venv/bin/hermes</code>. Every surface (CLI in any branch, dashboard, desktop, gateway, spawned agents) runs that ONE binary. Config/skills/memory shared under <code>~/.hermes/</code> (<code>HERMES_HOME</code> unset).</li>
-                <li><strong>Unlike Comserv:</strong> Comserv runs a separate long-lived server per branch on its own port (restart each). Hermes CLI is a short-lived process — after <code>hermes update</code>, the next <code>hermes chat -w</code> already runs new code.</li>
+                <li><strong>Unlike Comserv:</strong> Comserv runs a separate long-lived server per branch on its own port (restart each). Hermes CLI is a short-lived process — after <code>hermes update</code>, the next <code>hermes chat</code> already runs new code.</li>
                 <li><strong>Restart only the persistent daemons</strong> after an update: <code>hermes dashboard</code>, <code>hermes desktop</code>, <code>hermes gateway</code>, and any long-lived tmux agents. Branches are just cwds — nothing to restart.</li>
             </ul>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
@@ -205,9 +206,9 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
             <ul class="doc-body">
                 <li><code>perl -c lib/Comserv/Util/Git.pm</code> passes with <code>PERL5LIB=lib</code> (DONE).</li>
                 <li>Each worktree <code>.hermes.md</code> exists and opens by re-including the global rules. <strong>Actually created 2026-08-19</strong> for all 7 active worktrees (planning, InventoryAccounting, 3d, DockerHA, ai, aichatsystem-ef4e, git); the prior "DONE 2026-08-17" claim was false — the files did not exist on disk then. Verify each: <code>grep -l "PycharmProjects/comserv2/.hermes.md" ~/.comserv/worktrees/*/Comserv/.hermes.md</code>.</li>
-                <li>On the live Git dashboard (<code>/admin/git</code>), click "Hermes" on a worktree row &#8594; clipboard contains <code>cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat -w</code> and the dev console shows it.</li>
+                <li>On the live Git dashboard (<code>/admin/git</code>), click "Hermes" on a worktree row &#8594; clipboard contains <code>cd ~/.comserv/worktrees/&lt;branch&gt;/Comserv &amp;&amp; hermes chat</code> (no <code>-w</code>) and the dev console shows it.</li>
                 <li>Running that command in the worktree loads the branch <code>.hermes.md</code> (and through it the global rules) — confirm by asking Hermes "what branch am I on / what are my domain constraints".</li>
-                <li><code>hermes update</code> then a fresh <code>hermes chat -w</code> in the worktree uses new code with no branch restart.</li>
+                <li><code>hermes update</code> then a fresh <code>hermes chat</code> in the worktree uses new code with no branch restart.</li>
             </ul>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
@@ -237,7 +238,7 @@ are owned here. Keep it short — the domain block from §3.1 is the reference.&
                 <tr class="doc-tr-alt">
                     <td class="doc-td">"Hermes" launch button on Git dashboard</td>
                     <td class="doc-td"><a href="/todo/details?record_id=2143" class="doc-link">todo 2143</a></td>
-                    <td class="doc-td">Button copies hermes_cmd; perl -c OK</td>
+                    <td class="doc-td">Button copies hermes_cmd without -w; perl -c OK</td>
                 </tr>
                 <tr>
                     <td class="doc-td">Automate seeding for NEW branches</td>
