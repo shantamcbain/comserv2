@@ -136,6 +136,7 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/TodoListPageDisplayTuningPlan') %]">Todo List Ranking</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Language Standard</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]">Autonomous Agents</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]">AI Agent Orchestration</a>
     </div>
 </div>
 
@@ -447,7 +448,11 @@ DailyPlanSystem.tt ────────────────────�
     <li><strong>Infrastructure HA</strong> — <a href="[% c.uri_for('/Documentation/K3S_APP_HA_PLAN') %]\">/Documentation/K3S_APP_HA_PLAN</a> (proj <a href="/project/details?project_id=202">#202 INFRA-HA</a>; phases A–H = #244–251). Previously buried in the infra-cluster bullet; now its own track. <em>HA for the whole app — foundational, not "polish".</em></li>
     <li><strong>Security System</strong> — proj <a href="/project/details?project_id=201">#201 SECURITY</a>. Parent of AUTH-EVO.</li>
     <li><strong>Authentication &amp; Credential Architecture</strong> — <a href="[% c.uri_for('/Documentation/AuthenticationEvolutionPlan') %]\">/Documentation/AuthenticationEvolutionPlan</a> (proj <a href="/project/details?project_id=243">#243 AUTH-EVO</a>, child of #201).</li>
-    <li><strong>Theme Compliance Audit</strong> — proj <a href="/project/details?project_id=221">#221 THEME-AUDIT</a> (phases P1–P5 = #222–226). Cross-cutting; affects every template. Admin authoring guide: <a href="[% c.uri_for('/Documentation/CssThemes') %]">/Documentation/CssThemes</a>. Theme Management System (proj <a href="/project/details?project_id=77">#77</a>) tracks the theme roadmap — DB-backed themes + more built-in themes from professional sources (todos #2133 / #2134).</li>
+    <li><strong>Theme Compliance Audit</strong> — proj <a href="/project/details?project_id=221">#221 THEME-AUDIT</a> (phases P1–P5 = #222–226). Cross-cutting; affects every template. Admin authoring guide: <a href="[% c.uri_for('/Documentation/CssThemes') %]">/Documentation/CssThemes</a>. Theme Management System (proj <a href="/project/details?project_id=77">#77</a>) tracks the theme roadmap — DB-backed themes + more built-in themes from professional sources (todos #2133 / #2134).
+        <ul>
+            <li><strong>Floating-button theme respect (todo <a href="/todo/details?record_id=2160">#2160</a>)</strong> — the floating <em>Chat with AI</em> (<code>.chat-button</code>) and <code>#back-to-top</code> buttons use hardcoded <code>position:fixed</code> offsets/z-index/colors (not theme <code>var(--*)</code> tokens), so AI-authored edits repeatedly break their placement and they collide with the AI2 float button (<code>bottom:90px;left:24px</code>). Forward fix lives in this audit: drive offsets/z-index/colors from theme variables and guarantee no collision. Shared with <a href="/project/details?project_id=259">#259 V2MIG</a> (V2 JS/CSS migration). NOTE: distinct from the c6bd92b6 zombie-button / duplicate-arrow fix — that was a stale <code>localStorage</code> flag, not placement.</li>
+        </ul>
+    </li>
     <li><strong>AI Model Presentation &amp; Selection</strong> — <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a> (proj <a href="/project/details?project_id=252">#252 AIMPS</a>; phases P1–P5 = #253–257, P5 = v2 migration sync).</li>
     <li><strong>Point System</strong> — proj <a href="/project/details?project_id=193">#193 PointSystem</a> (phases: Ledger #194, Currency #195, PayPal #196, Spend #197, Crypto #198).</li>
     <li><strong>3D Printing System</strong> — proj <a href="/project/details?project_id=206">#206 3DPRINT</a> (phases: Inv&amp;Accounting #207, File Mgmt #208, Sales #209).</li>
@@ -656,6 +661,7 @@ V2 MIG   V2MIG (#259) + P1-P5 (#260-264) ─ own top-level project; P4 = Plannin
                 <li><a href="/Documentation/DocumentationTtTemplate" class="doc-link">Documentation TT Template</a> &mdash; required page structure / theme classes</li>
                 <li><a href="/Documentation/PlanningLanguageStandard" class="doc-link">Planning Language Standard</a> &mdash; PROJECT/PHASE/STEP/GATE vocabulary</li>
                 <li><a href="/Documentation/AutonomousAgentsPlan" class="doc-link">Autonomous Agents Plan</a> &mdash; newest sub-plan (proj #267)</li>
+                <li><a href="/Documentation/AIAgentOrchestrationPlan" class="doc-link">AI Agent Orchestration + Notification Recovery</a> &mdash; sub-plan of #267 (Email + Secretary agents, VoIP call, notification regression)</li>
                 <li><a href="/admin" class="doc-link">Administrative Interface</a></li>
             </ul>
         </div>

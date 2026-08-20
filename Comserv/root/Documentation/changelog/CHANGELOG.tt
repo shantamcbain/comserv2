@@ -19,6 +19,7 @@
 <h3>2026</h3>
 <ul class="cl-toc-year">
 <li><strong>2026-08</strong><ul>
+<li><a href="#2026-08-19-merge-to-main-primary-repo">2026-08-19 — In-app merge branch→main targets the primary repo + test-gate path fix</a></li>
 <li><a href="#2026-08-10-ai-model-catalog-single-source">AI Model Catalog &amp;mdash; Single Source of Truth &amp;amp; Chat Widget Repair</a></li>
 <li><a href="#2026-08-10-ai2-providers-hashref-guard">AI2 Providers &amp;mdash; guard against malformed catalog elements</a></li>
 <li><a href="#2026-08-10-focustune-default-model">AI Focus-Tune — Use catalog default model, not hardcoded phi4:14b</a></li>
@@ -47,6 +48,7 @@
 <li><a href="#2026-08-18-ai2-file-diff-doubled-path">AI2 /ai2/file_diff &mdash; doubled-path fix (Comserv/../Comserv/Comserv/...)</a></li>
 <li><a href="#2026-08-18-ai-index-tt-render-race">ai/index.tt &mdash; transient render-time truncation (no source defect; marked resolved)</a></li>
 <li><a href="#2026-08-19-3d-branch-context">3d branch .hermes.md &mdash; expanded to printing_3d domain + cross-branch handoff</a></li>
+<li><a href="#2026-08-19-floating-button-theme-respect-todo">Floating buttons (Chat with AI + Back-to-Top) &mdash; theme-respect todo #2160 + doc/plan sync</a></li>
 </ul></li>
 <li><strong>2026-04</strong><ul>
 <li><a href="#2026-04-28-3d-printing-system">3D Printing System</a></li>
@@ -13091,6 +13093,45 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
         </div>
     </div>
 
+    <div id="2026-08-19-floating-button-theme-respect-todo" class="cl-entry">
+        <h2>2026-08-19 — Floating buttons (Chat with AI + Back-to-Top): theme-respect todo #2160 + plan/doc sync</h2>
+        <p><strong>Last Updated:</strong> 2026-08-19 | <strong>Version:</strong> 1.00 | <strong>Author:</strong> hermes | <strong>Status:</strong> Tracked (linked to project #221 THEME-AUDIT; shared with #259 V2MIG)</p>
+
+        <div class="row">
+            <div class="col-100">
+                <h3 class="doc-h3">What changed</h3>
+                <ul class="doc-body">
+                    <li>Created todo <a href="/todo/details?record_id=2160" class="doc-link">#2160</a> under <strong>proj #221 Theme Compliance Audit</strong> (cross-referenced to <strong>proj #259 V2MIG</strong> for the V2 JS/CSS migration). Subject: <em>"Floating buttons (Chat with AI + Back-to-Top) ignore theme/placement rules — fix in V2 JS/CSS"</em>.</li>
+                    <li>Registered #2160 in <code>Documentation/MASTER_PLAN.tt</code> as a sub-item of the #221 Theme Compliance Audit bullet, with a note that it is distinct from the <code>c6bd92b6</code> zombie-button / duplicate-arrow fix (that was a stale <code>localStorage</code> flag, not placement).</li>
+                    <li>Updated <code>Documentation/features/back_to_top.tt</code> to correct the implementation notes (the button is fixed <strong>bottom-LEFT</strong> at <code>bottom:20px;left:20px</code>, not bottom-right as the old doc claimed), document that it is wired by both <code>back-to-top.js</code> and <code>floating-buttons.js</code>, note the removed duplicate <code>.back-to-top</code> injected by <code>todo-enhancements.js</code>, and add a theme-governance callout + Future-Enhancement item pointing at todo #2160.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-100">
+                <h3 class="doc-h3">Root cause the todo addresses</h3>
+                <ul class="doc-body">
+                    <li>The floating <em>Chat with AI</em> (<code>.chat-button</code>) and <code>#back-to-top</code> buttons use hardcoded <code>position:fixed</code> offsets, z-index, and colors (literals, not theme <code>var(--*)</code> tokens). AI-authored edits therefore repeatedly break their placement and collide with the AI2 float button (<code>bottom:90px;left:24px</code>).</li>
+                    <li>Forward fix (todo #2160): drive offsets/z-index/colors from theme variables so the theme system controls placement, make the rule survive AI edits without drift, and guarantee no collision with other floating elements.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-100">
+                <h3 class="doc-h3">Files touched (documentation only — no code behavior changed)</h3>
+                <ul class="doc-body">
+                    <li><code>root/Documentation/MASTER_PLAN.tt</code> — #221 bullet extended with todo #2160 sub-item.</li>
+                    <li><code>root/Documentation/features/back_to_top.tt</code> — corrected implementation/theme notes + #2160 cross-reference.</li>
+                    <li><code>root/Documentation/changelog/CHANGELOG.tt</code> — this entry + TOC anchor.</li>
+                </ul>
+                <p class="doc-note"><strong>Note:</strong> the actual bug fixes (zombie popup-active flag + removal of the injected duplicate <code>.back-to-top</code>) shipped earlier in commit <code>c6bd92b6</code>. This entry only records the planning/documentation sync for the separate theme-respect governance task.</p>
+            </div>
+        </div>
+        <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+    </div>
+
     <div class="row">
         <div class="col-100">
             <h2 id="root" class="doc-h2">2. Root cause</h2>
@@ -13167,5 +13208,23 @@ unreachable. Patching CSS/JS on top of that structure was whack-a-mole.</p>
     </div>
 </div>
 
+</div>
+</div>
+
+<div id="2026-08-19-merge-to-main-primary-repo" class="cl-entry">
+<h3>2026-08-19 — In-app merge branch→main targets the primary repo + test-gate path fix</h3>
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <p class="doc-body">The Git dashboard / AI2 &quot;merge this branch into main&quot; path was a no-op or hard-blocked on every worktree branch. Two independent bugs, both in the code that runs on <code>main</code> (port 3001) — a fix that only lived on <code>planning</code> could never be merged through the broken gateway.</p>
+            <ul class="doc-body">
+                <li><strong>Test gate looked one directory too high.</strong> <code>run_test_gate</code> used <code>&lt;base&gt;/&lt;branch&gt;/Comserv</code> (the worktree git root) and fell back to <code>&lt;repo&gt;/script/test_gate.sh</code> where <code>repo</code> is the toplevel <code>comserv2/</code>. The script actually lives at <code>comserv2/Comserv/script/test_gate.sh</code>. Result: every merge reported <code>test_gate.sh not found</code> and blocked.</li>
+                <li><strong><code>merge_to_main</code> tried to <code>switch_branch('main')</code>.</strong> On a linked worktree that fails (<code>main</code> is already checked out in the primary). Even without the switch, <code>git -C &lt;worktree&gt; merge --no-ff &lt;branch&gt;</code> merges the branch into itself → &quot;Already up to date&quot; and <code>main</code> is never touched.</li>
+                <li><strong><code>git worktree list --porcelain</code> was refused</strong> (flag missing from the whitelist), so worktree list / primary-repo discovery failed closed.</li>
+            </ul>
+            <p class="doc-body"><strong>Fix:</strong> resolve the primary checkout via <code>git rev-parse --git-common-dir</code> (<code>main_repo_path</code>); run both the gate and <code>git merge --no-ff &lt;branch&gt;</code> with an explicit repo override; never switch branches; whitelist <code>--porcelain</code> and <code>--git-common-dir</code>; honor <code>COMSERV_DIR</code> in <code>test_gate.sh</code> so the running app's script tests the branch checkout. Same path is used by <code>POST /admin/git/merge_to_main</code> and the dashboard <code>POST /admin/git/merge</code> (branch→main).</p>
+            <p class="doc-body">Files: <code>lib/Comserv/Util/Git.pm</code>, <code>lib/Comserv/Controller/Admin/Git.pm</code>, <code>script/test_gate.sh</code>, <code>t/util_git.t</code>. Tracked under <a href="/todo/details?record_id=2006" class="doc-link">todo #2006</a> / project <a href="/project/details?project_id=238" class="doc-link">#238 GITWT-NEW</a>.</p>
+        </div>
+    </div>
 </div>
 </div>
