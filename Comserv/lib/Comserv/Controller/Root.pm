@@ -874,6 +874,12 @@ sub auto :Private {
                 JSON::decode_json($json);
             };
             $c->stash->{app_version} = $app_version if $app_version && ref $app_version eq 'HASH';
+            # version.json is a build stamp (always "main" on a baked image).
+            # Worktree servers must show the live checkout, not the bake label.
+            if (IS_DEV_WORKTREE && $c->stash->{app_version} && $c->stash->{app_workflow}
+                    && $c->stash->{app_workflow} ne 'main') {
+                $c->stash->{app_version}{branch} = $c->stash->{app_workflow};
+            }
         }
 
         # Overlay the LIVE branch/commit onto the build-time stamp so the global

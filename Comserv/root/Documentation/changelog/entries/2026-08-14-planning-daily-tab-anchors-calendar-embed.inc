@@ -1,0 +1,35 @@
+<div id="2026-08-14-planning-daily-tab-anchors-calendar-embed" class="cl-entry">
+<h3>2026-08-14 — /planning/daily tab switching + Calendar tab embed fixes</h3>
+<h2>2026-08-14 — <code>/planning/daily</code>: tab return-to-Priorities + Calendar embed</h2>
+
+<h3>Defect 1 — Daily Priorities panel blank when returning to it</h3>
+<p><strong>Symptom:</strong> on <code>/planning/daily</code> you could switch TO Master Plan / Calendar, but switching BACK to the 🎯 Daily Priorities tab showed an empty panel. The tab button worked; the content was gone.</p>
+<p><strong>Root cause:</strong> the Daily Priorities panel (<code>DailyPlan.tt</code> → <code>id="priorities" class="tab-content active"</code>) INCLUDEs <code>_today_work_tab.tt</code>, whose root element was <code>&lt;div id="today-work" class="tab-content active"&gt;</code>. So the content lived inside a <em>second</em> <code>.tab-content</code>. When <code>_activateTab()</code> in <code>daily-plan-utils.js</code> switches tabs it strips <code>active</code> from <em>every</em> <code>.tab-content</code> and re-adds it only to the matched outer one — the inner <code>#today-work</code> lost its <code>active</code> and, under <code>.tab-content { display: none }</code>, stayed hidden. Returning to priorities re-activated the outer <code>#priorities</code> but never the inner wrapper, so the panel rendered empty.</p>
+<p><strong>Fix:</strong> <code>root/admin/planning/_today_work_tab.tt</code> — removed <code>class="tab-content active"</code> from the inner <code>#today-work</code> div (now a plain container). It is already inside one <code>.tab-content</code>, so it no longer fights the tab switcher.</p>
+
+<h3>Defect 2 — Calendar tab loaded the full page, not just the calendar body</h3>
+<p><strong>Symptom:</strong> the 📅 Calendar tab showed the entire wrapped page (nav, footer, floating buttons) inside the iframe instead of just the day-calendar body.</p>
+<p><strong>Root cause:</strong> the iframe was <code>src="/todo/day/&lt;date&gt;?embed"</code> — a <em>valueless</em> query param. In Catalyst <code>$c-&gt;req-&gt;param('embed')</code> returns <code>''</code> (empty string) for <code>?embed</code>, which is <strong>false</strong>, so the bare-render branch in <code>Todo.pm sub day</code> (<code>if ($c-&gt;req-&gt;param('embed'))</code>) was skipped and <code>day.tt</code> rendered through the normal TT view with <code>layout.tt</code> wrapper — the whole page.</p>
+<p><strong>Fixes:</strong></p>
+<ul>
+    <li><code>root/admin/planning/DailyPlan.tt</code> — iframe <code>src</code> → <code>/todo/day/&lt;date&gt;?embed=1</code> (truthy).</li>
+    <li><code>lib/Comserv/Controller/Todo.pm</code> — embed gate changed to <code>if (defined $c-&gt;req-&gt;param('embed'))</code> so any caller (bare or <code>=1</code>) triggers the true bare fragment (no <code>layout.tt</code> wrapper, rendered via a fresh <code>Template-&gt;new</code>).</li>
+    <li><code>root/todo/day.tt</code> — <code>is_embed</code> check uses <code>.defined</code> for consistency.</li>
+</ul>
+
+<h3>Cleanup — stale monolith anchors (2026-08-13 rename drift)</h3>
+<ul>
+    <li><code>root/Documentation/MASTER_PLAN.tt</code> — the "← Back to Daily Plan" link pointed at <code>#daily-plan-guide</code>, an id that no longer exists on the rebuilt index (the tab is <code>id="master-plan"</code>). Changed to <code>#master-plan</code>.</li>
+    <li><code>root/static/css/planning/daily-plan.css</code> — removed the obsolete <code>#daily-plan-guide { display:block }</code> / <code>.tab-hidden</code> guard that targeted the pre-rebuild monolith id (dead after the rename).</li>
+</ul>
+
+<h3>Verification</h3>
+<p><code>perl -Ilib -c lib/Comserv/Controller/Todo.pm</code> → "syntax OK". No remaining bare <code>?embed</code> in the live index. Inner <code>#today-work</code> wrapper no longer carries <code>class="tab-content"</code>. Static <code>.tt</code> / <code>.pm</code> recompile per request via <code>Module::Refresh</code> on the running <code>:3001</code> process (no restart performed, per ops rules).</p>
+
+<h3>Related</h3>
+<ul>
+    <li><a href="/planning/daily">Planning · Daily</a> — Daily Priorities now stays populated on return; Calendar tab shows the bare day calendar.</li>
+    <li><a href="/Documentation/MASTER_PLAN">Comserv2 Master Plan</a></li>
+    <li><a href="/Documentation/changelog#2026-08-14-planning-daily-focus-queue-fix">2026-08-14 Focus Queue + Start Day fix</a></li>
+</ul>
+</div>

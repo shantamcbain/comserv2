@@ -193,4 +193,83 @@ sub sync_dependencies {
     return $result->();
 }
 
+# ----------------------------------------------------------------------------
+# resolve_branch_project_ids($c, $branch, $hint_pid)
+#
+# Map a git worktree branch onto its planning project tree (root + descendants).
+# $hint_pid is the optional project_id from worktrees.json. Caller logs failures.
+# Returns a list of project ids, or empty if the branch cannot be resolved.
+# ----------------------------------------------------------------------------
+sub resolve_branch_project_ids {
+    my ($c, $branch, $hint_pid) = @_;
+    return () unless $c;
+
+    my $prs = eval { $c->model('DBEncy')->resultset('Project') };
+    return () unless $prs;
+
+    my $root;
+    if (defined $hint_pid && $hint_pid =~ /^\d+$/ && $hint_pid > 0) {
+        my $p = eval { $prs->find($hint_pid) };
+        $root = $hint_pid if $p;
+    }
+    if (!$root && $branch && $branch ne 'main') {
+        $root = _match_branch_project($prs, $branch);
+    }
+    return () unless $root;
+
+    return _descendant_project_ids($prs, $root);
+}
+
+# Caller logs. Match by exact name, exact project_code, then comments "Branch: X".
+sub _match_branch_project {
+    my ($prs, $branch) = @_;
+    return unless $prs && defined $branch && length $branch;
+
+    my $row = eval {
+        $prs->search(
+            {
+                -or => [
+                    { name         => $branch },
+                    { project_code => $branch },
+                ],
+            },
+            { rows => 1, order_by => 'id' }
+        )->first;
+    };
+    return $row->id if $row;
+
+    $row = eval {
+        $prs->search(
+            { comments => { -like => '%Branch: ' . $branch . '%' } },
+            { rows => 1, order_by => 'id' }
+        )->first;
+    };
+    return $row->id if $row;
+    return;
+}
+
+sub _descendant_project_ids {
+    my ($prs, $root) = @_;
+    return () unless $prs && $root;
+
+    my %ids = ($root => 1);
+    my @frontier = ($root);
+    while (@frontier) {
+        my @kids = eval {
+            $prs->search(
+                { parent_id => { -in => \@frontier } },
+                { columns => ['id'] }
+            )->all;
+        };
+        @frontier = ();
+        for my $k (@kids) {
+            my $id = eval { $k->id } // next;
+            next if $ids{$id};
+            $ids{$id} = 1;
+            push @frontier, $id;
+        }
+    }
+    return ($root, grep { $_ != $root } sort { $a <=> $b } keys %ids);
+}
+
 1;
