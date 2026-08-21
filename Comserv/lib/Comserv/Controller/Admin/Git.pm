@@ -1936,13 +1936,24 @@ sub merge :Path('/admin/git/merge') :Args(0) {
             return;
         }
         my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
-        my $up = $self->git_service->_run($c, 'merge', '--no-ff', 'main',
+        # --autostash: the worktree routinely has uncommitted WIP; a plain merge
+        # refuses ("Your local changes would be overwritten"). Autostash stashes
+        # the WIP, merges, then reapplies. If reapplying conflicts, git KEEPS the
+        # stash entry (recoverable via the dashboard's Stash Pop) — nothing lost.
+        my $up = $self->git_service->_run($c, 'merge', '--no-ff', '--autostash', 'main',
             { repo => $dest });
         my $combined = join("\n", grep { defined && length }
             $fetch->{output}, $fetch->{error}, $up->{output}, $up->{error});
+        my $autostash_used = ($combined // '') =~ /Created autostash|Applied autostash/ ? 1 : 0;
+        # WIP could not be reapplied cleanly: git saved it as stash@{0}. Surface
+        # that distinctly so the user knows to recover via Stash Pop.
+        my $autostash_conflict = ($combined // '') =~ /Cannot store stash|Please commit or stash|stash.*conflict/i
+            && $autostash_used ? 1 : 0;
         $res = {
             success   => $up->{success} ? 1 : 0,
             output    => $combined,
+            autostash => $autostash_used,
+            autostash_conflict => $autostash_conflict,
             error_msg => $up->{success} ? undef : ($up->{error} || $up->{output} || 'merge failed'),
             conflict  => ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0,
         };
@@ -2016,6 +2027,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         target    => $target,
         direction => $direction,
         conflict  => 0,
+        autostash => $res->{autostash} ? 1 : 0,
+        autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         error     => $res->{error_msg},
         output    => $res->{output},
     }));
