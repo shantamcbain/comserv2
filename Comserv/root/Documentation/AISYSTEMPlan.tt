@@ -5,7 +5,7 @@
    TemplateType = "Documentation"
    category = "planning,ai"
    page_version = "1.01"
-   last_updated = "Wed Aug 19 2026"
+   last_updated = "Thu Aug 20 2026"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
@@ -233,7 +233,7 @@
                 <li>Ollama fine-tune / Modelfile OFT #266–278</li>
                 <li>chain_query multi-model #262–265 — after shortlists exist</li>
             </ul>
-            <p class="doc-body">Keep live: #562 (AI create todos), #778 (document adding a project), GITWT Hermes context #2142–2146, AIMPS #2024–2036.</p>
+            <p class="doc-body">Keep live: <a href="[% c.uri_for('/todo/details') %]?record_id=562" class="doc-link">#562</a> (AI create todos — chat widget + editor now share <code>Model::AI2::TodoCreate</code>: SiteName match, ask to create a project if none fit), #778 (document adding a project), GITWT Hermes context #2142–2146, AIMPS #2024–2036.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
