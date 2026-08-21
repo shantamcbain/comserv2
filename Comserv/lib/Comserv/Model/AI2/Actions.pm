@@ -273,89 +273,23 @@ sub perform {
     }
 
     # ── create_todo ───────────────────────────────────────────────────────────
+    # Sitename + project matching lives in AI2::TodoCreate so chat, editor,
+    # and /ai2/action share one brain (never dump onto project #1 / CSC).
     if ($action_name eq 'create_todo') {
-        my $subject = $params->{subject};
-        unless ($subject) {
-            $c->response->status(400);
-            $c->response->body(encode_json({ success => JSON::false, error => 'subject required' }));
-            return;
-        }
-        my $project_id = ($params->{project_id} && $params->{project_id} =~ /^\d+$/)
-                       ? $params->{project_id} : undef;
+        require Comserv::Model::AI2::TodoCreate;
+        my $brain = eval { $c->model('AI2::TodoCreate') };
+        $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+        $brain->perform_create($c, $params);
+        return;
+    }
 
-        # Look up project_code from project_id (optional)
-        my $project_code = '';
-        if ($project_id) {
-            eval {
-                my $proj = $schema->resultset('Project')->find($project_id);
-                $project_code = $proj->project_code if $proj && $proj->project_code;
-            };
-        }
-
-        my $due_date = $params->{due_date} || do {
-            my $dt = DateTime->now->add(days => 7); $dt->ymd;
-        };
-        unless ($due_date =~ /^\d{4}-\d{2}-\d{2}$/) {
-            $due_date = DateTime->now->add(days => 7)->ymd;
-        }
-
-        # Map numeric status codes to DB text values
-        my %status_map = ( 1 => 'NEW', 2 => 'IN PROGRESS', 3 => 'COMPLETED', 4 => 'CANCELLED' );
-        my $raw_status  = $params->{status} // 1;
-        my $todo_status = $status_map{$raw_status} || ($raw_status =~ /^[A-Z ]/ ? $raw_status : 'NEW');
-
-        my $priority    = $params->{priority} // 3;
-        my $description = $params->{description} || '';
-        my $parent_id   = $params->{parent_id}  || undef;
-        my $sitename    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        my $user_id     = $c->session->{user_id} || 1;
-        my $roles       = $c->session->{roles}   || [];
-        my $group       = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
-
-        my $new_todo;
-        eval {
-            $new_todo = $schema->resultset('Todo')->create({
-                sitename            => $sitename,
-                start_date          => $today,
-                parent_todo         => '',
-                due_date            => $due_date,
-                subject             => $subject,
-                description         => $description,
-                estimated_man_hours => 0,
-                comments            => '',
-                reporter            => $current_user,
-                company_code        => 'default',
-                owner               => $current_user,
-                project_code        => $project_code,
-                developer           => $current_user,
-                username_of_poster  => $current_user,
-                status              => $todo_status,
-                priority            => $priority,
-                share               => 0,
-                last_mod_by         => $current_user,
-                last_mod_date       => $today,
-                user_id             => $user_id,
-                group_of_poster     => $group,
-                ($project_id ? (project_id => $project_id) : ()),
-                date_time_posted    => $today,
-                ($parent_id ? (parent_id => $parent_id) : ()),
-            });
-        };
-        if ($@ || !$new_todo) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "create_todo failed: $@");
-            $c->response->status(500);
-            $c->response->body(encode_json({ success => JSON::false, error => 'Todo creation failed' }));
-            return;
-        }
-        my $new_id = $new_todo->record_id // $new_todo->id // '?';
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
-            "AI action create_todo: id=$new_id project=$project_id subject='$subject' by=$current_user");
-        $c->response->body(encode_json({
-            success  => JSON::true,
-            message  => "Todo #$new_id created: \"$subject\"",
-            todo_id  => $new_id + 0,
-            todo_url => "/todo/details?record_id=$new_id",
-        }));
+    # ── resolve_todo_project ──────────────────────────────────────────────────
+    # Preview: which project on this SiteName would a draft todo land on?
+    if ($action_name eq 'resolve_todo_project') {
+        require Comserv::Model::AI2::TodoCreate;
+        my $brain = eval { $c->model('AI2::TodoCreate') };
+        $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+        $brain->perform_resolve($c, $params);
         return;
     }
 

@@ -404,10 +404,35 @@
               }
               const usedModel = (data.model ? data.model + (data.provider ? ' (' + data.provider + ')' : '') : EDITOR_MODEL);
               const resp = data.response || '';
+              const extracted = (window.ComservChat && ComservChat.featureTodo && ComservChat.featureTodo.extractActions)
+                  ? ComservChat.featureTodo.extractActions(resp)
+                  : { cleanText: resp, actions: [] };
+              const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
-              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(resp).replace(/\n/g, '<br>'));
+              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
 
-              const block = extractCodeBlock(resp);
+              if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+                  && typeof ComservChat.featureTodo.handleServerResult === 'function') {
+                  ComservChat.featureTodo.handleServerResult(data.todo_action, {
+                      host: document.getElementById('chat-messages'),
+                      status: target.status,
+                      pagePath: currentFilePath() || window.location.pathname
+                  });
+              }
+
+              if (extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
+                  extracted.actions.forEach(function (a) {
+                      if (a.action === 'create_todo' || a.action === 'create_project') {
+                          ComservChat.featureTodo.handleAction(a, {
+                              host: document.getElementById('chat-messages'),
+                              status: target.status,
+                              pagePath: currentFilePath() || window.location.pathname
+                          });
+                      }
+                  });
+              }
+
+              const block = extractCodeBlock(display);
               if (block) {
                   // A suggestion is always applied to the MAIN editor window,
                   // even when chat is detached into its own window.
