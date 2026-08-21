@@ -289,7 +289,7 @@
             }, 1500);
         }
 
-        function showMergeResult(success, conflict, title, output) {
+        function showMergeResult(success, conflict, title, output, autostashNote) {
             if (!mergeStatus) { return; }
             mergeStatus.innerHTML = '';
             var badge = document.createElement('span');
@@ -297,6 +297,13 @@
                 : (success ? 'status-badge-ok' : 'status-badge-err'));
             badge.textContent = title;
             mergeStatus.appendChild(badge);
+            if (autostashNote) {
+                var note = document.createElement('span');
+                note.className = 'status-badge status-badge-warn';
+                note.style.marginLeft = '6px';
+                note.textContent = autostashNote;
+                mergeStatus.appendChild(note);
+            }
             if (mergeOutput) {
                 mergeOutput.style.display = (output && output.length) ? 'block' : 'none';
                 mergeOutput.textContent = output || '';
@@ -356,8 +363,14 @@
                       showMergeResult(false, true, 'conflict', res.output || res.error || '');
                       return;
                   }
+                  var stashNote = '';
+                  if (res.autostash_conflict) {
+                      stashNote = 'WIP not cleanly reapplied \u2014 safe in stash@{0} (use Stash Pop)';
+                  } else if (res.autostash) {
+                      stashNote = 'uncommitted changes preserved & reapplied';
+                  }
                   if (res.success) {
-                      showMergeResult(true, false, 'merged \u2014 reloading\u2026', res.output || '');
+                      showMergeResult(true, false, 'merged \u2014 reloading\u2026', res.output || '', stashNote);
                       persistMergeResult({
                           success: true,
                           conflict: false,
@@ -367,7 +380,7 @@
                       reloadGitDashboardSoon();
                   } else {
                       var failText = (res.error || '') + (res.output && res.output.replace(/\s/g,'') ? ('\n' + res.output) : '') + (res.detail ? ('\n' + res.detail) : '');
-                      showMergeResult(false, false, 'failed', failText || 'merge failed');
+                      showMergeResult(false, false, 'failed', failText || 'merge failed', stashNote);
                   }
               })
               .catch(function (err) {
