@@ -72,8 +72,10 @@ my %ALLOWED_FLAGS = (
     rm       => { map { $_ => 1 } qw(--cached -r) },
     # Merge is human-gated (admin-only in the controller). Allowed flags keep it safe:
     # --no-ff (always create a merge commit), --no-commit (review then commit),
-    # --abort (cancel a conflicted merge), --squash (optional single-commit merge).
-    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash) },
+    # --abort (cancel a conflicted merge), --squash (optional single-commit merge),
+    # --autostash (stash uncommitted WIP before the merge and reapply it after —
+    # keeps the stash entry if reapplying conflicts, so WIP is never lost).
+    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash --autostash) },
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
     worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
@@ -497,6 +499,29 @@ sub get_current_branch {
     my $branch = $r->{output};
     chomp $branch if defined $branch;
     return ($r->{success} && length $branch) ? $branch : 'unknown';
+}
+
+=head2 current_branch_and_commit($c)
+
+Returns a hashref C<{ branch => $branch, commit => $short_sha }> for the
+LIVE checkout of the resolved repo. Unlike the build-time stamp in
+C<version.json>, this always reflects the branch/worktree the app is actually
+running from, so the global header can't lie about which branch a developer is
+on. Returns C<undef> on any failure so callers can fall back to the build stamp.
+
+=cut
+
+sub current_branch_and_commit {
+    my ($self, $c) = @_;
+    my $branch = $self->get_current_branch($c);
+    return undef if !defined $branch || $branch eq '' || $branch eq 'unknown';
+
+    my $r = $self->_run($c, 'rev-parse', '--short', 'HEAD');
+    my $commit = $r->{success} ? $r->{output} : '';
+    chomp $commit if defined $commit;
+    $commit = '' unless defined $commit;
+
+    return { branch => $branch, commit => $commit };
 }
 
 =head2 get_available_branches($c)
@@ -1370,9 +1395,12 @@ sub build_worktree_list {
             # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
             # No -w — see main hermes_cmd comment above.
             hermes_cmd => "cd $base/$name/Comserv && hermes chat",
-            # Optional planning-project link (worktrees.json project_id). Used by
-            # /planning/daily to scope the Focus Queue to this branch's todos.
             project_id => $b->{project_id} // undef,
+            host       => $b->{host} // undef,
+            sitename   => $b->{sitename} // undef,
+            origin     => ($b->{host} && $b->{port})
+                ? ("http://" . $b->{host} . ":" . $b->{port})
+                : undef,
         };
     }
     return \@list;

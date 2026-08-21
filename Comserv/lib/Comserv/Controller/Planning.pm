@@ -630,18 +630,18 @@ sub daily :Path('/planning/daily') :Args {
                 || $a->{priority} <=> $b->{priority}
         } @scored;
 
-        # Branch worktrees: Focus Queue shows this branch's project tree plus
-        # todos that actually block it. main stays unfiltered. Escape hatch:
-        # ?filter_project=all. Explicit ?filter_project=N on a branch uses N
-        # as the root (plus children + blockers).
+        # Branch worktrees: RANK, do not exclusive-filter. Active (status 5)
+        # first, then this branch's projects, blocking above blocked. main
+        # keeps the global score order. Escape hatch: ?filter_project=all.
         my $cur_branch = $c->stash->{app_workflow} || 'main';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
             "Branch focus check: cur_branch='" . ($cur_branch // '')
             . "' filter_project='" . ($filter_project // '') . "'");
         my $show_all_projects = ($filter_project eq 'all');
         my @branch_pids;
+        my %branch_scope;
         if (!$show_all_projects && $cur_branch ne 'main') {
-            my $hint = $filter_project;
+            my $hint = ($filter_project && $filter_project =~ /^\d+$/) ? $filter_project : '';
             if (!$hint) {
                 my $list = _build_worktree_list($c);
                 my ($wt) = grep { ($_->{name} || '') eq $cur_branch } @$list;
@@ -657,56 +657,25 @@ sub daily :Path('/planning/daily') :Args {
                     "Branch focus resolve failed for '$cur_branch': $@");
                 @branch_pids = ();
             }
-            if (@branch_pids) {
-                $c->stash->{branch_focus_filter} = {
-                    branch      => $cur_branch,
-                    root_id     => $branch_pids[0],
-                    project_ids => \@branch_pids,
-                };
-            }
-            else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
-                    "Branch focus: no project resolved for '$cur_branch' (hint="
-                    . ($hint // '') . ") — showing unfiltered queue");
-            }
-        }
-
-        if (@branch_pids) {
-            my %scope = map { $_ => 1 } @branch_pids;
-            my %blocker_ids;
-            for my $h (@all_sorted) {
-                next unless $scope{ $h->{project_id} // '' };
-                my $bid = $h->{blocked_by_todo_id} // '';
-                $blocker_ids{$bid} = 1 if $bid ne '';
-            }
-            my $before = scalar @all_sorted;
-            @all_sorted = grep {
-                Comserv::Util::FocusRanking::in_branch_scope($_, {
-                    branch_project_ids     => \%scope,
-                    blocked_by_ids         => \%blocker_ids,
-                    cross_blocker_projects => \%cross_blocker_projects,
-                    keep_active            => 1,
+            %branch_scope = map { $_ => 1 } @branch_pids;
+            my $matched = scalar grep {
+                Comserv::Util::FocusRanking::todo_matches_branch($_, $cur_branch, \%branch_scope)
+            } @all_sorted;
+            $c->stash->{branch_focus_filter} = {
+                branch      => $cur_branch,
+                root_id     => $branch_pids[0],
+                project_ids => \@branch_pids,
+                matched     => $matched,
+            };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                "Branch focus '$cur_branch': $matched todos match branch "
+                . "(projects " . join(',', @branch_pids) . ")");
+            @all_sorted = sort {
+                Comserv::Util::FocusRanking::cmp_branch_focus($a, $b, {
+                    branch             => $cur_branch,
+                    branch_project_ids => \%branch_scope,
                 })
             } @all_sorted;
-            # Sort: Active (any branch) first, then this branch's projects,
-            # with blocking todos above the todos they block.
-            @all_sorted = sort {
-                my $a_act = ((($a->{status} // '') eq '5') || $a->{in_progress}) ? 1 : 0;
-                my $b_act = ((($b->{status} // '') eq '5') || $b->{in_progress}) ? 1 : 0;
-                my $a_br  = $scope{ $a->{project_id} // '' } ? 1 : 0;
-                my $b_br  = $scope{ $b->{project_id} // '' } ? 1 : 0;
-                my $a_blocked = ($a->{blocked_by_todo_id} && !$a->{blocker_done}) ? 1 : 0;
-                my $b_blocked = ($b->{blocked_by_todo_id} && !$b->{blocker_done}) ? 1 : 0;
-                $b_act <=> $a_act
-                    || $b_br <=> $a_br
-                    || $a_blocked <=> $b_blocked
-                    || ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0)
-                    || ($a->{priority} // 5) <=> ($b->{priority} // 5)
-            } @all_sorted;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
-                "Branch focus '$cur_branch': kept " . scalar(@all_sorted)
-                . " of $before todos (projects " . join(',', @branch_pids)
-                . "; active-any-branch + blockers + branch work)");
         }
         elsif ($filter_project && !$show_all_projects) {
             @all_sorted = grep {
@@ -728,24 +697,37 @@ sub daily :Path('/planning/daily') :Args {
         my $ip_cap = $Comserv::Util::ProjectDependencies::FOCUS_QUEUE_IN_PROGRESS_CAP;
         my $proj_cap = int($limit / 2) || 1;
 
-        # Build the Focus Queue so a flood of in-progress rows cannot bury the
-        # highest-priority OPEN todos (project 240 fix), and so one project
-        # cannot occupy more than half the queue (#1828 F5).
-        my (@ip_picked, @open_picked);
-        my %proj_n;
-        for my $row (@all_sorted) {
-            my $pid = $row->{project_id} // 0;
-            next if ($proj_n{$pid} // 0) >= $proj_cap;
-            if ($row->{in_progress}) {
-                next if scalar(@ip_picked) >= $ip_cap;
-                push @ip_picked, $row;
-            } else {
-                push @open_picked, $row;
+        my @picked;
+        if ($cur_branch ne 'main' && !$show_all_projects) {
+            # Preserve Active → branch → score order. Do not re-split
+            # in-progress vs open — that buried Active and mixed branches.
+            for my $row (@all_sorted) {
+                $row->{is_active_work} = Comserv::Util::FocusRanking::is_active_work($row) ? 1 : 0;
+                $row->{is_branch_todo} = Comserv::Util::FocusRanking::todo_matches_branch(
+                    $row, $cur_branch, \%branch_scope
+                ) ? 1 : 0;
+                push @picked, $row;
+                last if @picked >= $limit;
             }
-            $proj_n{$pid}++;
-            last if (scalar(@ip_picked) + scalar(@open_picked)) >= $limit;
         }
-        @active_priorities = (@ip_picked, @open_picked);
+        else {
+            my (@ip_picked, @open_picked);
+            my %proj_n;
+            for my $row (@all_sorted) {
+                my $pid = $row->{project_id} // 0;
+                next if ($proj_n{$pid} // 0) >= $proj_cap;
+                if ($row->{in_progress}) {
+                    next if scalar(@ip_picked) >= $ip_cap;
+                    push @ip_picked, $row;
+                } else {
+                    push @open_picked, $row;
+                }
+                $proj_n{$pid}++;
+                last if (scalar(@ip_picked) + scalar(@open_picked)) >= $limit;
+            }
+            @picked = (@ip_picked, @open_picked);
+        }
+        @active_priorities = @picked;
         $c->stash->{active_priorities_backlog} = $focus_total - scalar(@active_priorities);
 
         # Keep the complete eligible backlog available separately from the
@@ -1915,17 +1897,41 @@ sub _ensure_break_todos {
     );
 
     for my $brk (@breaks) {
-        my $already = 0;
+        my $canon;
         eval {
-            $already = $schema->resultset('Todo')->search(
-                { sitename           => $sitename,
-                  username_of_poster => $username,
-                  start_date         => $today,
-                  is_fixed           => 1,
-                  time_of_day        => $brk->{time_of_day} }
-            )->count;
+            my @rows = $schema->resultset('Todo')->search(
+                { sitename    => $sitename,
+                  is_fixed    => 1,
+                  time_of_day => $brk->{time_of_day} },
+                { order_by => { -asc => 'record_id' } }
+            )->all;
+            $canon = $rows[0] if @rows;
         };
-        next if $already;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_break_todos',
+            "Break lookup error: $@") if $@;
+
+        if ($canon) {
+            # One per SiteName: keep the oldest row as the daily recurring meeting.
+            # Do not create another copy for today / this user. Do not rewrite
+            # todo_type (user may have set task). Extras are deleted by hand.
+            my $rec = eval { $canon->is_recurring } || 0;
+            my $rule = eval { $canon->recurrence_rule } || '';
+            unless ($rec && $rule) {
+                my $cid = eval { $canon->record_id } // '?';
+                eval {
+                    $canon->update({
+                        is_recurring    => 1,
+                        recurrence_rule => 'daily',
+                        is_fixed        => 1,
+                    });
+                };
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    '_ensure_break_todos',
+                    "Could not mark break #$cid as recurring: $@") if $@;
+            }
+            next;
+        }
+
         my ($hh, $mm) = $brk->{time_of_day} =~ /^(\d+):(\d+)/;
         my $end_min = $hh * 60 + $mm + $brk->{dur};
         my $end_str = sprintf('%02d:%02d:00', int($end_min / 60), $end_min % 60);
@@ -1947,9 +1953,12 @@ sub _ensure_break_todos {
                 group_of_poster      => 'admin',
                 username_of_poster   => $username,
                 parent_todo          => '',
-                share                => 0,
+                share                => 1,
                 is_blocking          => 0,
                 is_fixed             => 1,
+                is_recurring         => 1,
+                recurrence_rule      => 'daily',
+                todo_type            => 'meeting',
                 time_of_day          => $brk->{time_of_day},
                 scheduled_start      => "$today " . $brk->{time_of_day},
                 scheduled_end        => "$today $end_str",
@@ -1958,6 +1967,73 @@ sub _ensure_break_todos {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_break_todos',
             "Break create error: $@") if $@;
     }
+}
+
+=head2 todo_remove
+
+POST /planning/todo_remove  body: record_id, confirm=1
+Uses this controller because /todo/delete 404s (Catalyst) and Todo.pm
+reload on :4005 has been unreliable. Same auth as other planning writes.
+
+=cut
+
+sub todo_remove :Path('/planning/todo_remove') :Args(0) {
+    my ($self, $c) = @_;
+    my $record_id = $c->req->param('record_id') || '';
+
+    unless (uc($c->req->method || '') eq 'POST' && $c->req->param('confirm')) {
+        $c->response->redirect($c->uri_for('/todo/details', {
+            record_id => $record_id,
+            do_delete => 1,
+        }));
+        $c->detach();
+    }
+
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [$roles] unless ref $roles eq 'ARRAY';
+    my $can = $c->stash->{is_admin}
+        || grep { lc($_) =~ /^(admin|developer|editor)$/ } @$roles;
+    unless ($can) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'todo_remove',
+            'denied for ' . ($c->session->{username} || 'Guest'));
+        $c->flash->{error_msg} = 'You do not have permission to delete todos.';
+        $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+        $c->detach();
+    }
+
+    unless ($record_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Record ID is required.';
+        $c->response->redirect($c->uri_for('/planning/daily'));
+        $c->detach();
+    }
+
+    my $todo = eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'todo_remove',
+            "lookup $record_id failed: $@");
+    }
+    unless ($todo) {
+        $c->flash->{error_msg} = "Todo #$record_id not found.";
+        $c->response->redirect($c->uri_for('/planning/daily'));
+        $c->detach();
+    }
+
+    my $subject = eval { $todo->subject } // '';
+    eval { $todo->delete };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'todo_remove',
+            "delete #$record_id failed: $err");
+        $c->flash->{error_msg} = "Could not delete todo #$record_id.";
+        $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+        $c->detach();
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo_remove',
+        "deleted #$record_id ($subject) by " . ($c->session->{username} || 'unknown'));
+    $c->flash->{success_msg} = "Deleted todo #$record_id.";
+    $c->response->redirect($c->uri_for('/planning/daily'));
+    $c->detach();
 }
 
 sub schedule_day :Path('/planning/schedule_day') :Args(0) {

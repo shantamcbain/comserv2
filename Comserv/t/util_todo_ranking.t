@@ -133,4 +133,28 @@ sub score {
     ok(!is_calendar_fixture({ subject => 'Fix merge conflict', todo_type => 'task' }), 'real work is not a fixture');
 }
 
+{
+    ok(Comserv::Util::FocusRanking::is_active_work({ status => '5' }), 'status 5 is Active');
+    ok(!Comserv::Util::FocusRanking::is_active_work({ status => '2', in_progress => 1 }), 'in-progress 2 is not Active');
+    ok(Comserv::Util::FocusRanking::todo_matches_branch(
+        { project_id => 280, project_code => 'AISYSTEM' }, 'aisystem', {}
+    ), 'aisystem matches AISYSTEM code');
+    ok(Comserv::Util::FocusRanking::todo_matches_branch(
+        { project_id => 272, project_code => 'DRYER-INT' }, '3d', { 272 => 1 }
+    ), '3d matches dryer project id');
+    ok(Comserv::Util::FocusRanking::todo_matches_branch(
+        { project_id => 138, project_code => 'PLANNING' }, 'planning', {}
+    ), 'planning matches PLANNING code');
+    ok(!Comserv::Util::FocusRanking::todo_matches_branch(
+        { project_id => 272, project_code => 'DRYER-INT' }, 'planning', { 138 => 1 }
+    ), 'dryer is not a planning todo');
+
+    my $ctx = { branch => 'planning', branch_project_ids => { 138 => 1 } };
+    my $active = { status => '5', project_id => 999, ap_score => 50, priority => 5 };
+    my $plan   = { status => '1', project_id => 138, project_code => 'PLANNING', ap_score => 10, priority => 2 };
+    my $other  = { status => '1', project_id => 272, project_code => 'DRYER-INT', ap_score => 1, priority => 1 };
+    ok(Comserv::Util::FocusRanking::cmp_branch_focus($active, $plan, $ctx) < 0, 'Active ranks above branch work');
+    ok(Comserv::Util::FocusRanking::cmp_branch_focus($plan, $other, $ctx) < 0, 'planning ranks above 3d on planning branch');
+}
+
 done_testing();
