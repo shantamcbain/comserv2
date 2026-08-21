@@ -6,36 +6,48 @@
       "url": "/planning/daily",
       "port": 4006,
       "label": "aisystem",
-      "project_id": 280
+      "project_id": 280,
+      "host": "workstation.local",
+      "sitename": "CSC"
     },
     "InventoryAccounting": {
       "url": "/planning/daily",
       "port": 4001,
-      "label": "InventoryAccounting"
+      "label": "InventoryAccounting",
+      "host": "workstation.local",
+      "sitename": "CSC"
     },
     "planning": {
       "url": "/planning/daily",
       "port": 4005,
       "label": "planning",
-      "project_id": 138
+      "project_id": 138,
+      "host": "workstation.local",
+      "sitename": "CSC"
     },
     "3d": {
       "url": "/planning/daily",
       "port": 4003,
       "label": "3d",
-      "project_id": 272
+      "project_id": 272,
+      "host": "3d.local",
+      "sitename": "3d"
     },
     "git": {
       "label": "git",
       "port": 4004,
       "url": "/planning/daily",
-      "project_id": 238
+      "project_id": 238,
+      "host": "workstation.local",
+      "sitename": "CSC"
     },
     "DockerHA": {
       "port": 4002,
       "label": "DockerHA",
       "url": "/planning/daily",
-      "project_id": 202
+      "project_id": 202,
+      "host": "workstation.local",
+      "sitename": "CSC"
     }
   }
 }

@@ -457,12 +457,35 @@ sub project :Path('project') :Args(0) {
     # Enhance project data with additional fields needed for filtering
     $projects = $self->enhance_project_data($c, $projects);
 
+    # Live/GET search: flatten the tree and return a ranked LIST of matching
+    # projects (name / project_code / id). Word-or-prefix, not substring.
+    my $project_search = $c->request->query_parameters->{search} || '';
+    $project_search =~ s/^\s+|\s+$//g;
+    my @search_hits;
+    if ($project_search ne '') {
+        my @qwords = $self->_tokenize_search($project_search);
+        my $flat = $self->_flatten_project_tree($projects);
+        my @scored;
+        foreach my $hit (@$flat) {
+            my $score = $self->_project_search_score($hit, \@qwords);
+            next unless $score > 0;
+            push @scored, { %$hit, score => $score };
+        }
+        @search_hits = sort {
+            ($b->{score} <=> $a->{score}) || ($a->{id} <=> $b->{id})
+        } @scored;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project',
+            "Project search q='$project_search' hits=" . scalar(@search_hits));
+    }
+
     # Add the projects and filter info to the stash
     $c->stash(
         projects => $projects,
         role_filter => $role_filter,
         project_filter => $project_filter,
         priority_filter => $priority_filter,
+        project_search => $project_search,
+        search_hits => \@search_hits,
         all_link => $all_link,
         sites => $sites,
         is_csc_admin => $is_csc_admin,
@@ -818,6 +841,69 @@ sub enhance_project_data :Private {
     return $projects;
 }
 
+sub _tokenize_search {
+    my ($self, $s) = @_;
+    $s = lc($s // '');
+    $s =~ s/[^a-z0-9]+/ /g;
+    return grep { length } split /\s+/, $s;
+}
+
+# Flatten parent + nested sub-projects into a list of hashrefs for search hits.
+sub _flatten_project_tree {
+    my ($self, $projects, $parent, $out) = @_;
+    $out ||= [];
+    foreach my $p (@{ $projects || [] }) {
+        next unless ref $p eq 'HASH';
+        push @$out, {
+            id            => $p->{id},
+            name          => $p->{name} // '',
+            project_code  => $p->{project_code} // '',
+            description   => $p->{description} // '',
+            sitename      => $p->{sitename} // '',
+            parent_id     => $parent ? $parent->{id} : ($p->{parent_id} || ''),
+            parent_name   => $parent ? ($parent->{name} // '') : '',
+        };
+        if ($p->{sub_projects} && @{ $p->{sub_projects} }) {
+            $self->_flatten_project_tree($p->{sub_projects}, $p, $out);
+        }
+    }
+    return $out;
+}
+
+# Score one project against query words. Every word must hit (AND).
+# Exact id = 4, id prefix / exact token = 3, token prefix = 2. No substring.
+sub _project_search_score {
+    my ($self, $hit, $qwords) = @_;
+    return 0 unless $qwords && @$qwords;
+    my $id = defined $hit->{id} ? "$hit->{id}" : '';
+    my @tokens = $self->_tokenize_search(join(' ',
+        $id,
+        $hit->{name} // '',
+        $hit->{project_code} // '',
+        $hit->{description} // '',
+        $hit->{sitename} // '',
+    ));
+    my $total = 0;
+    foreach my $qw (@$qwords) {
+        my $best = 0;
+        if ($id ne '' && lc($id) eq $qw) {
+            $best = 4;
+        }
+        elsif ($id ne '' && CORE::index(lc($id), $qw) == 0) {
+            $best = 3;
+        }
+        else {
+            foreach my $t (@tokens) {
+                if ($t eq $qw) { $best = 3; last; }
+                if (CORE::index($t, $qw) == 0 && $best < 2) { $best = 2; }
+            }
+        }
+        return 0 unless $best;
+        $total += $best;
+    }
+    return $total;
+}
+
 # This build_project_tree implementation has been moved to line 672
 # See the implementation there
 
@@ -953,8 +1039,17 @@ sub build_project_tree :Private {
         username_of_poster => $project->username_of_poster,
         group_of_poster => $project->group_of_poster,
         date_time_posted => $project->date_time_posted,
-        record_id => $project->record_id
+        record_id => $project->record_id,
+        parent_name => '',
     };
+    if ($project->parent_id) {
+        eval {
+            my $parent = $schema->resultset('Project')->find($project->parent_id);
+            $project_hash->{parent_name} = $parent->name if $parent;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'build_project_tree',
+            "Could not load parent #" . $project->parent_id . ": $@") if $@;
+    }
 
     # Fetch todos for this project
     my @todos = ();

@@ -24,7 +24,8 @@ See project 240 TODOLIST-UI, Phase 5 / 5b / 6.
 =cut
 
 use parent qw(Exporter);
-our @EXPORT_OK = qw(score_todo passes_filters in_branch_scope);
+our @EXPORT_OK = qw(score_todo passes_filters in_branch_scope is_active_work
+                    todo_matches_branch cmp_branch_focus);
 
 # Scoring is owned by TodoRanking (single source of truth for ap_score).
 use Comserv::Util::TodoRanking ();
@@ -147,6 +148,75 @@ sub in_branch_scope {
         }
     }
     return 0;
+}
+
+# Status 5 (open work log) is "Active" in the todo card.
+sub is_active_work {
+    my ($t) = @_;
+    return 0 unless $t;
+    my $st = $t->{status} // '';
+    return 1 if $st =~ /^5$/;
+    return 0;
+}
+
+# Branch identity via project id tree, parent, name, or code keywords.
+# Do NOT match a bare "ai" substring (hits "daily"). 
+sub todo_matches_branch {
+    my ($t, $branch, $scope) = @_;
+    $t      //= {};
+    $scope  //= {};
+    $branch = lc($branch // '');
+    return 0 unless $branch && $branch ne 'main';
+
+    my $pid = $t->{project_id} // '';
+    return 1 if $pid ne '' && $scope->{$pid};
+    my $pp = $t->{project_parent_id} // '';
+    return 1 if $pp ne '' && $scope->{$pp};
+
+    my $code = lc($t->{project_code} // '');
+    my $name = lc($t->{project_name} // '');
+    return 1 if $code eq $branch || $name eq $branch;
+    return 1 if $code ne '' && index($code, $branch) >= 0;
+    return 1 if $name ne '' && index($name, $branch) >= 0;
+
+    my %hints = (
+        planning             => [qw(planning plan-queue todolist-ui)],
+        aisystem             => [qw(aisystem aimps agents aichat ai2 v2mig)],
+        '3d'                 => [qw(dryer 3d printing_3d)],
+        git                  => [qw(gitwt git-dev)],
+        dockerha             => [qw(infra-ha dockerha k3s)],
+        inventoryaccounting  => [qw(inventory accounting sql-ledger)],
+    );
+    my $keys = $hints{$branch} || [];
+    for my $k (@$keys) {
+        return 1 if $code ne '' && index($code, $k) >= 0;
+        return 1 if $name ne '' && index($name, $k) >= 0;
+    }
+    return 0;
+}
+
+# Sort: Active first, then this branch's projects, then blocking above blocked,
+# then ap_score. Used on worktree servers only.
+sub cmp_branch_focus {
+    my ($a, $b, $ctx) = @_;
+    $a   //= {};
+    $b   //= {};
+    $ctx //= {};
+    my $scope = $ctx->{branch_project_ids} || {};
+    my $branch = $ctx->{branch} || '';
+
+    my $a_act = is_active_work($a) ? 1 : 0;
+    my $b_act = is_active_work($b) ? 1 : 0;
+    my $a_br  = todo_matches_branch($a, $branch, $scope) ? 1 : 0;
+    my $b_br  = todo_matches_branch($b, $branch, $scope) ? 1 : 0;
+    my $a_blocked = ($a->{blocked_by_todo_id} && !$a->{blocker_done}) ? 1 : 0;
+    my $b_blocked = ($b->{blocked_by_todo_id} && !$b->{blocker_done}) ? 1 : 0;
+
+    return $b_act <=> $a_act
+        || $b_br <=> $a_br
+        || $a_blocked <=> $b_blocked
+        || ($a->{ap_score} // 0) <=> ($b->{ap_score} // 0)
+        || ($a->{priority} // 5) <=> ($b->{priority} // 5);
 }
 
 # Re-export the scorer so callers import from one place.
