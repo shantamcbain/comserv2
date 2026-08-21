@@ -2522,6 +2522,17 @@ sub _track_nav_back_url {
 
 sub _port_label {
     my ($port) = @_;
+    # Single source of truth first: worktrees.json maps each live branch to its
+    # port. Use the branch name as the label so favicons follow the registry
+    # instead of the stale zenflow-era static map below.
+    my $cfg = eval { Comserv::Util::Git->_worktree_config };
+    if ($cfg && $cfg->{branches}) {
+        for my $name (sort keys %{$cfg->{branches}}) {
+            my $b = $cfg->{branches}{$name};
+            return ucfirst(substr($name, 0, 2))
+                if $b && ($b->{port} || 0) == $port;
+        }
+    }
     my %named = (
         3000 => 'PC',   # ProjectConfig
         4001 => 'Pl',   # PlanningSystem
