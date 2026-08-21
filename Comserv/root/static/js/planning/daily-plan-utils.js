@@ -496,19 +496,11 @@
         }
     }
 
-    // Ensure a work-log session exists for this todo before a close/done op,
-    // so close_log/done_with_log can never fail with "No open log found".
-    // The server's open_log is idempotent (returns already_open if a session
-    // is live), so calling it unconditionally is safe. The Start button is the
-    // source of truth for session state; close/done build on top of it.
-    function _ensureSession(recordId) {
-        return fetch('/todo/open_log', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ record_id: recordId })
-        }).then(function(r) { return r.json(); }).catch(function() { return { ok: false }; });
-    }
+    // NOTE: no _ensureSession pre-call. Server-side close_log / done_with_log
+    // (Comserv::Util::TodoLog) are self-sufficient: close is graceful when no
+    // log is open, and done inserts a completed log if none was open. Calling
+    // open_log first would now TOGGLE-stop an active session (open_log is a
+    // start/stop toggle), which is not what Close/Done mean.
 
     function startWorkTodoCard(btn, recordId) {
         btn.disabled = true;
@@ -539,10 +531,9 @@
         notes = notes || '';
         btn.disabled = true;
         btn.textContent = '…';
-        // Start button is the source of truth: guarantee a session exists so the
-        // close can never hit "No open log found" (see _ensureSession).
-        _ensureSession(recordId).then(function() {
-            fetch('/todo/close_log', {
+        // Server-side close_log is self-sufficient and graceful (no open log
+        // is a warn, not an error) — no pre-call needed.
+        fetch('/todo/close_log', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
@@ -558,7 +549,6 @@
                 btn.disabled = false;
                 btn.textContent = '⏸ Active';
             });
-        });
     }
 
     function doneWithLogTodoCard(btn, recordId) {
@@ -569,32 +559,30 @@
         var payload = { record_id: recordId, notes: notes };
         btn.disabled = true;
         btn.textContent = '…';
-        // Start button is the source of truth: ensure a session exists before we
-        // close+mark-done, so done_with_log can never hit "No open log found".
-        _ensureSession(recordId).then(function() {
-            fetch('/todo/done_with_log', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d.ok) {
-                    var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
-                    if (card) {
-                        card.style.opacity = '0.4';
-                        card.style.textDecoration = 'line-through';
-                        card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
-                    }
-                    btn.textContent = '✓ Done';
-                    btn.disabled = true;
-                } else {
-                    btn.disabled = false;
-                    btn.textContent = 'Done';
+        // Server-side done_with_log is self-sufficient (closes the open log or
+        // inserts a completed one) — no pre-call, no double popup.
+        fetch('/todo/done_with_log', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) {
+                var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
+                if (card) {
+                    card.style.opacity = '0.4';
+                    card.style.textDecoration = 'line-through';
+                    card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
                 }
-            }).catch(function() {
+                btn.textContent = '✓ Done';
+                btn.disabled = true;
+            } else {
                 btn.disabled = false;
                 btn.textContent = 'Done';
-            });
+            }
+        }).catch(function() {
+            btn.disabled = false;
+            btn.textContent = 'Done';
         });
     }
 
