@@ -492,11 +492,10 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     }
     
     my $project_id = $params->{project_id} || 1;
+    my $project;
     eval {
-        my $project = $schema->resultset('Project')->find($project_id);
-        unless ($project) {
-            die "Project $project_id not found";
-        }
+        $project = $schema->resultset('Project')->find($project_id);
+        die "Project $project_id not found" unless $project;
     };
     if ($@) {
         $c->res->status(400);
@@ -504,8 +503,8 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         $c->res->body(encode_json({ success => 0, error => "Invalid project_id: $@", code => 'invalid_project' }));
         $c->detach();
     }
-    
-    my $sitename = $params->{sitename} || $c->session->{SiteName} || 'CSC';
+
+    my $sitename = $self->_sitename_for_write($c, $params, $project);
 
     my $poster_user_id;
     if ($api_user) {
@@ -680,6 +679,14 @@ sub api_create_project :Path('project/create') :Args(0) {
     my $parent_id = $params->{parent_id} || undef;
     $parent_id    = undef if defined $parent_id && $parent_id eq '';
 
+    my $parent;
+    if ($parent_id) {
+        $parent = eval { $schema->resultset('Project')->find($parent_id) };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_create_project',
+            "parent_id $parent_id not found: $@") if $@;
+    }
+    my $sitename = $self->_sitename_for_write($c, $params, $parent);
+
     my $project;
     eval {
         $project = $schema->resultset('Project')->create({
@@ -692,8 +699,8 @@ sub api_create_project :Path('project/create') :Args(0) {
             project_size        => $params->{project_size}         || 3,
             estimated_man_hours => $params->{estimated_man_hours}  || 0,
             developer_name      => $params->{developer_name}       || $current_user,
-            client_name         => $params->{client_name}          || 'CSC',
-            sitename            => $params->{sitename}             || ($c->session->{SiteName} || 'CSC'),
+            client_name         => $params->{client_name}          || $sitename,
+            sitename            => $sitename,
             comments            => $params->{comments}             || '',
             username_of_poster  => $current_user,
             group_of_poster     => 'admin',
@@ -763,6 +770,7 @@ sub api_list_projects :Path('projects') :Args(0) {
     if ($search_term) {
         # Per-word OR matching so multi-word queries match rows containing ANY
         # of the words; relevance ranking (below) orders by how many matched.
+        # Numeric tokens also match id (exact or prefix).
         my @words = grep { length } split(/\s+/, $search_term);
         my @field_or;
         for my $w (@words) {
@@ -771,6 +779,10 @@ sub api_list_projects :Path('projects') :Args(0) {
                 { project_code => { 'like', "%$w%" } },
                 { description  => { 'like', "%$w%" } },
             );
+            if ($w =~ /^\d+$/) {
+                push @field_or, { id => $w };
+                push @field_or, { id => { 'like', "$w%" } };
+            }
         }
         $cond->{'-or'} = \@field_or if @field_or;
     }
@@ -785,7 +797,7 @@ sub api_list_projects :Path('projects') :Args(0) {
         my @scored;
         for my $p (@projects) {
             my %cols = $p->get_columns;
-            my $hay = lc(join(' ', $cols{name} // '', $cols{project_code} // '', $cols{description} // ''));
+            my $hay = lc(join(' ', $cols{id} // '', $cols{name} // '', $cols{project_code} // '', $cols{description} // ''));
             my $score = 0;
             my %seen;
             for my $w (@qwords) {
@@ -2071,6 +2083,29 @@ sub _focus_top5_plan_docs {
     $c->log->warn("api_focus_top5: could not scan on-disk plan docs: $@") if $@;
 
     return @docs;
+}
+
+# Owner sitename for a write: explicit param, else the related project's
+# sitename (3d work stays 3d even if the agent hit workstation/CSC), else
+# the request Host's SiteName, else CSC. CSC is the coder, not the default owner.
+sub _sitename_for_write {
+    my ($self, $c, $params, $related) = @_;
+    $params //= {};
+    my $given = $params->{sitename};
+    if (defined $given && $given ne '') {
+        return $given;
+    }
+    if ($related) {
+        my $from_proj = eval { $related->sitename };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                '_sitename_for_write', "related sitename read failed: $@");
+        }
+        return $from_proj if defined $from_proj && $from_proj ne '';
+    }
+    my $from_req = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    return $from_req if $from_req ne '';
+    return 'CSC';
 }
 
 1;

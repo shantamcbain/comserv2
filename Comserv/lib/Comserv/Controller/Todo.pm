@@ -12,7 +12,7 @@ use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
 use Comserv::Util::ProjectDependencies;
 use Comserv::Util::TodoRanking;
-use Comserv::Util::TodoTypes qw(recurring_matches_date);
+use Comserv::Util::TodoTypes qw(recurring_matches_date is_valid_todo_type);
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -294,7 +294,7 @@ sub begin :Private {
     # of relying on a brittle per-URL match list. Any Todo route that renders a
     # todo card sets this; the main /todo list + day/week/month were previously
     # missing from js_load.tt and had dead Start/Done buttons.
-    if ($c->req->path =~ m{^todo(?:/$|/details|/day|/week|/month|/edit)}) {
+    if ($c->req->path =~ m{^todo(?:/$|/details|/day|/week|/month|/edit|/delete)}) {
         $c->stash(needs_todo_card_js => 1);
     }
 }
@@ -499,6 +499,13 @@ sub details :Path('/todo/details') :Args {
 
     # Get the record_id from the request parameters
     my $record_id = $c->request->parameters->{record_id};
+
+    if ($c->req->param('delete')
+        && uc($c->req->method || '') eq 'POST'
+        && $c->req->param('confirm')) {
+        $self->_perform_todo_delete($c, $record_id);
+        return;
+    }
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -974,6 +981,19 @@ sub modify :Path('/todo/modify') :Args(1) {
     my $today          = DateTime->now->ymd;
     my $current_user   = $c->session->{username} || 'system';
 
+    my $old_type = eval { $todo->get_column('todo_type') } // 'task';
+    my $new_type = $form_data->{todo_type};
+    if (defined $new_type && $new_type ne '') {
+        $new_type = lc $new_type;
+        unless (is_valid_todo_type($new_type)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'modify.todo_type',
+                "Rejected invalid todo_type '$new_type' for record $record_id; keeping '$old_type'");
+            $new_type = $old_type || 'task';
+        }
+    } else {
+        $new_type = $old_type || 'task';
+    }
+
     # Attempt to update the todo record
     eval {
         $todo->update({
@@ -1000,7 +1020,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             user_id              => $todo->get_column('user_id'),
             project_id           => ($form_data->{project_id} && $form_data->{project_id} ne '') ? $form_data->{project_id} : $todo->get_column('project_id'),
             date_time_posted     => $form_data->{date_time_posted} || $todo->get_column('date_time_posted') || $today . ' 00:00:00',
-            todo_type        => $form_data->{todo_type}        || $todo->get_column('todo_type')        || 'task',
+            todo_type        => $new_type,
             is_recurring     => defined($form_data->{is_recurring}) ? ($form_data->{is_recurring} ? 1 : 0) : $todo->get_column('is_recurring'),
             recurrence_rule  => $form_data->{recurrence_rule}  || $todo->get_column('recurrence_rule')  || undef,
             creator_timezone => $form_data->{creator_timezone} || $todo->get_column('creator_timezone') || undef,
@@ -1111,6 +1131,81 @@ sub modify :Path('/todo/modify') :Args(1) {
     }
 
     $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+    $c->detach();
+}
+
+=head2 delete_todo
+
+GET  /todo/delete/:id  — confirm
+POST /todo/delete/:id  — delete (admin/editor)
+
+Named delete_todo (not delete): Catalyst treats an action named C<delete>
+as HTTP DELETE only, so GET /todo/delete/N 404s. Path is /todo/remove/:id
+(the word "delete" in the path also 404'd). Details also accepts
+?delete=1 on the existing /todo/details route.
+
+=cut
+
+sub delete_todo :Path('remove') :Args(1) {
+    my ($self, $c, $record_id) = @_;
+    if (uc($c->req->method || '') eq 'POST' && $c->req->param('confirm')) {
+        $self->_perform_todo_delete($c, $record_id);
+        return;
+    }
+    $c->response->redirect($c->uri_for('/todo/details', {
+        record_id => $record_id,
+        delete    => 1,
+    }));
+    $c->detach();
+}
+
+sub _perform_todo_delete {
+    my ($self, $c, $record_id) = @_;
+
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [$roles] unless ref $roles eq 'ARRAY';
+    my $can_delete = $c->stash->{is_admin}
+        || grep { lc($_) =~ /^(admin|developer|editor)$/ } @$roles;
+    unless ($can_delete) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
+            'Delete denied for ' . ($c->session->{username} || 'Guest'));
+        $c->flash->{error_msg} = 'You do not have permission to delete todos.';
+        $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+        $c->detach();
+    }
+
+    unless ($record_id && $record_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Record ID is required.';
+        $c->response->redirect($c->uri_for('/todo'));
+        $c->detach();
+    }
+
+    my $todo = eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete',
+            "Lookup failed for $record_id: $@");
+    }
+    unless ($todo) {
+        $c->flash->{error_msg} = "Todo #$record_id not found.";
+        $c->response->redirect($c->uri_for('/todo'));
+        $c->detach();
+    }
+
+    my $subject = eval { $todo->subject } // '';
+    eval { $todo->delete };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete',
+            "Failed to delete todo #$record_id: $err");
+        $c->flash->{error_msg} = "Could not delete todo #$record_id.";
+        $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+        $c->detach();
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete',
+        "Deleted todo #$record_id ($subject) by " . ($c->session->{username} || 'unknown'));
+    $c->flash->{success_msg} = "Deleted todo #$record_id.";
+    $c->response->redirect($c->uri_for('/todo'));
     $c->detach();
 }
 
