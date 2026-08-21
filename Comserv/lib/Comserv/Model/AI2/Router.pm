@@ -244,6 +244,14 @@ sub select_best_model {
 sub _credits_exhausted {
     my ($self, $error) = @_;
     return 0 unless defined $error && length $error;
+    # 429 / rate-limit counts too: a throttled :free model is just as
+    # unavailable as an empty balance — fall through to the next hop
+    # (todo #2233: gemma-4-31b-it:free 429'd and the chain never engaged).
+    return 1 if $error =~ /\b429\b|too many requests|rate.?limit/i;
+    # Connection failures / DNS / timeouts are also "this hop is down"
+    # (todo #2244: 500 Can't connect to openrouter.ai:443 — Name or service
+    # not known) — fall through rather than surfacing a dead provider.
+    return 1 if $error =~ /can'?t connect|connection (refused|reset|timed? ?out)|name or service not known|temporary failure in name resolution|\b500 can't connect|\btimed? ?out\b/i;
     return 1 if $error =~ /402\b|payment.?required|insufficient credit|out of credit|credit.?balance|can only afford|prepaid credit|usage limit|quota|weekly usage|limit_remaining|no auto-fill/i;
     return 0;
 }
