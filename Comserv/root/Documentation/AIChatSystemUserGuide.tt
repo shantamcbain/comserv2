@@ -4,7 +4,7 @@
    roles = "user,admin,developer,helpdesk"
    category = "AI Module"
    page_version = "1.0"
-   last_updated = "2026-05-09"
+   last_updated = "2026-08-20"
 %]
 [% PageVersion = 'Documentation/AIChatSystemUserGuide.tt,v 1.0 2026/05/09 shanta' %]
 [% IF c.session.debug_mode == 1 %]
@@ -71,6 +71,7 @@
     <a href="#agents">Agents</a> |
     <a href="#models">Model Selection</a> |
     <a href="#roles">Roles</a> |
+    <a href="#todos">Add a Todo</a> |
     <a href="#examples">Examples</a>
 </nav>
 
@@ -285,14 +286,16 @@
     </tr>
 </table>
 
-<h3>Ollama vs Grok</h3>
+<h3>Ollama vs SuperGrok vs xAI vs OpenRouter</h3>
 <ul>
-    <li><strong>Ollama</strong> — Runs locally on your own server. Private, no data leaves your network. Slower on CPU hardware; much faster if GPU is available. Has a 10-minute timeout for cold starts.</li>
-    <li><strong>Grok (xAI)</strong> — Cloud model. Fast response (seconds), supports large context windows and web search. Used automatically when Ollama is overloaded, or you can switch manually using the provider dropdown.</li>
+    <li><strong>Ollama</strong> — Runs locally on your own server. Private, no data leaves your network. Slower on CPU; faster with GPU. Has a long timeout for cold starts.</li>
+    <li><strong>SuperGrok (prepaid)</strong> — Same Grok models (grok-4.6 first) billed to the SuperGrok / X Premium+ subscription. A different provider group than xAI. Admin, developer, and editor only. Pick this group to spend the prepaid token. After send, the status line should stay SuperGrok (prepaid), not flip to Grok (xAI).</li>
+    <li><strong>xAI (Grok)</strong> — Pay-per-token cloud key. Same model names can appear here. Do not confuse this group with SuperGrok.</li>
+    <li><strong>OpenRouter</strong> — Cloud catalog (free and paid). Guests see free models only.</li>
 </ul>
 
 <h3>Manual Override</h3>
-<p>You can override the automatic selection at any time using the provider/model dropdown in the chat header. Select <em>Grok</em> for fast cloud responses, or pick a specific Ollama model if you need a particular capability.</p>
+<p>You can override the automatic selection at any time using the provider/model dropdown in the chat header. Select <em>SuperGrok (prepaid)</em> for the subscription, <em>xAI (Grok)</em> for a pay-per-token key, or a specific Ollama / OpenRouter model.</p>
 
 <h3>Timeout and Retry</h3>
 <p>If Ollama takes too long (over 11 minutes), the widget shows a <strong>Retry Ollama</strong> button and a <strong>Switch to Grok</strong> button. Clicking "Switch to Grok" immediately resends your question to the cloud model. A <strong>✕ Cancel</strong> button is also available during any request to abort it immediately.</p>
@@ -404,6 +407,10 @@
 <div class="prompt-example">[Paste the text of a bill or invoice] then: "Enter this invoice"</div>
 <p><strong>What happens:</strong> The Accounting agent parses the pasted bill (supplier name, invoice number, date, total amount), then opens the invoice entry form (<code>/Inventory/invoice/new</code>) pre-filled with the extracted values. The user verifies and saves.</p>
 
+<h3 id="todos">Adding a Todo</h3>
+<div class="prompt-example">"Add a todo to wire the bee-health graph" &nbsp;or&nbsp; click 📝 in the chat header</div>
+<p><strong>What happens:</strong> The same Chat-with-AI surface (floating widget or the editor chat) asks <code>Model::AI2::TodoCreate</code> to create the row on the <em>current SiteName</em>. It matches a project or sub-project by name/code/id. If several fit, you pick one. If none fit, it asks whether to create a new project first. Guests cannot write. The created todo links back from the chat card.</p>
+
 <h3>Asking for Support</h3>
 <div class="prompt-example">"The hive inspection report is not saving — what should I check?"</div>
 <p><strong>What happens:</strong> On a BMaster page, the BMaster agent responds with troubleshooting steps. On a HelpDesk page, the HelpDesk agent responds and may offer to create a support ticket. If the issue is unclear, the agent asks a clarifying question.</p>
@@ -414,6 +421,7 @@
 <div class="ai-doc-section">
 <h2>Tips for Better Results</h2>
 <ul>
+    <li><strong>Add a todo from chat</strong> — say “add a todo …” or use 📝. It lands on this SiteName; if no project matches, the chat asks whether to create one.</li>
     <li><strong>Be on the right page</strong> — The AI automatically reads the current page's data. If you're asking about herb #42, open that herb's page first.</li>
     <li><strong>Use ENCY section keywords</strong> for instant navigation: "herbs", "glossary", "diseases", "symptoms", "formula", "constituents".</li>
     <li><strong>For form fill</strong> — make sure you're on the form page before asking the AI to fill it, or say "open the add form for…" to navigate and fill in one step.</li>

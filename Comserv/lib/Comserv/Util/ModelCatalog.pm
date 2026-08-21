@@ -36,9 +36,12 @@ our $CACHE_JSON;
 our $CACHE_ARR;
 our $CACHE_AT = 0;
 our $TTL      = 600;   # seconds; providers change rarely
+our $CACHE_GEN = 3;    # bump when catalog shape/providers change
+our $CACHE_GEN_LOADED = 0;
 
 sub _expired {
     my ($class) = @_;
+    return 1 if ($CACHE_GEN_LOADED || 0) != $CACHE_GEN;
     return 1 unless defined $CACHE_JSON;
     return (time() - $CACHE_AT) > $TTL ? 1 : 0;
 }
@@ -108,7 +111,7 @@ sub _filter_for_role {
             push @out, $m if $free || $local;
         } else { # member
             # Free + cheap + mid. Skip premium (dearer side > $5 / 1M) and Grok.
-            next if $svc eq 'grok';
+            next if $svc eq 'grok' || $svc eq 'supergrok';
             my $pp = ($m->{price_prompt}     // 0) + 0;
             my $pc = ($m->{price_completion} // 0) + 0;
             my $max = ( $pp > $pc ) ? $pp : $pc;
@@ -210,6 +213,7 @@ sub prime {
     $CACHE_ARR  = $flat;
     $CACHE_JSON = try { JSON->new->utf8->canonical->encode($flat) } catch { undef };
     $CACHE_AT   = time();
+    $CACHE_GEN_LOADED = $CACHE_GEN;
     return scalar @$flat;
 }
 
@@ -242,7 +246,7 @@ sub _flatten {
             #   paid  : bills real money per token
             free     => ( $name =~ /:free$/ ? 1 : 0 ),
             local    => ( $svc eq 'ollama' ? 1 : 0 ),
-            paid     => ( $svc ne 'ollama' && $name !~ /:free$/ ? 1 : 0 ),
+            paid     => ( $svc ne 'ollama' && $svc ne 'supergrok' && $name !~ /:free$/ ? 1 : 0 ),
             # AIMPS-P1 (#253): real per-token cost from the provider feed.
             # price_prompt / price_completion are USD per 1M tokens; price_tier
             # is threshold-derived (never a hardcoded model list, see plan §3).
@@ -265,6 +269,7 @@ sub _price_tier {
     my $pp = ( $m->{price_prompt}     // 0 ) + 0;
     my $pc = ( $m->{price_completion} // 0 ) + 0;
     my $max = ( $pp > $pc ) ? $pp : $pc;   # rank by the dearer side
+    return 'prepaid' if ($m->{provider} || '') eq 'supergrok' || $m->{prepaid};
     return 'free'   if $max <= 0;
     return 'cheap'  if $max <= 1;
     return 'mid'    if $max <= 5;
@@ -288,6 +293,7 @@ sub _build {
         $CACHE_ARR  = $flat;
         $CACHE_JSON = try { JSON->new->utf8->canonical->encode($flat) } catch { '[]' };
         $CACHE_AT   = time();
+        $CACHE_GEN_LOADED = $CACHE_GEN;
     }
     else {
         # Keep any previous good cache rather than blanking the dropdown.

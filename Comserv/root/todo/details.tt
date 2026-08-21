@@ -8,6 +8,22 @@
 
 <h1>Todo: [% record.get_column('subject') | html %]</h1>
 
+[% IF (c.request.params.do_delete || c.request.params.delete) && is_editor %]
+<div class="mb-2">
+    <p>Delete this todo? This cannot be undone.</p>
+    <p><strong>[% record.get_column('subject') | html %]</strong>
+       (#[% record.get_column('record_id') %]
+        · [% record.get_column('sitename') | html %]
+        · [% record.get_column('todo_type') || 'task' %])</p>
+    <form method="post" action="/planning/todo_remove">
+        <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
+        <input type="hidden" name="confirm" value="1">
+        <button type="submit" class="btn btn-primary">Delete</button>
+        <a href="/todo/details?record_id=[% record.get_column('record_id') %]" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+[% END %]
+
 <div class="return-nav">
     <a href="/todo" class="return-button">Return to List View</a>
     <a href="/todo/day" class="return-button">Return to Day View</a>
@@ -17,6 +33,8 @@
     [% IF is_editor %]
     <a href="/todo/edit/[% record.get_column('record_id') %]"
        class="return-button">Edit</a>
+    <a href="/todo/details?record_id=[% record.get_column('record_id') %]&do_delete=1"
+       class="return-button">Delete</a>
     [% END %]
 </div>
 
@@ -84,6 +102,17 @@
             <td>
                 <select name="priority">
                     [% INCLUDE "todo/priority_select.tt" %]
+                </select>
+            </td></tr>
+        <tr><td><label>Type:</label></td>
+            <td>
+                [% SET _tt = record.get_column('todo_type') || 'task' %]
+                <select name="todo_type" id="todo_type">
+                    <option value="task"        [% IF _tt == 'task'        %]selected[% END %]>Task</option>
+                    <option value="appointment" [% IF _tt == 'appointment' %]selected[% END %]>Appointment</option>
+                    <option value="meeting"     [% IF _tt == 'meeting'     %]selected[% END %]>Meeting</option>
+                    <option value="event"       [% IF _tt == 'event'       %]selected[% END %]>Event</option>
+                    <option value="reminder"    [% IF _tt == 'reminder'    %]selected[% END %]>Reminder</option>
                 </select>
             </td></tr>
         <tr><td><label>Est. Hours:</label></td>
@@ -296,6 +325,7 @@
             💬 Chat about this task
         </button>
         <a href="/todo/edit/[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">✏️ Edit this task</a>
+        <a href="/todo/details?record_id=[% task_id %]&do_delete=1" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">Delete</a>
         <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all conversations</a>
     </div>
 </div>

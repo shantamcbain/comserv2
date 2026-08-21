@@ -64,7 +64,9 @@
         var model  = parts[1] || '';
         var suffix = model ? ': ' + model : '';
 
+        if (svc === 'supergrok') return 'SuperGrok (prepaid)' + suffix;
         if (svc === 'grok')       return 'Grok (xAI)' + suffix;
+        if (svc === 'supergrok')  return 'SuperGrok (prepaid)' + suffix;
         if (svc === 'openrouter') return 'OpenRouter' + suffix;
         // The chat backend reports the generic bucket name 'external' for any
         // OpenAI-compatible provider (OpenRouter today). Recover the real
@@ -225,7 +227,7 @@
         }
 
         // Group by provider, preserving a stable order: ollama, grok, openrouter.
-        var order = { ollama: 0, grok: 1, openrouter: 2 };
+        var order = { ollama: 0, supergrok: 1, grok: 2, openrouter: 3 };
         var groups = {};   // provider -> [models]
         models.forEach(function (m) {
             var svc = m.provider || (m.value.split('|')[0] || 'external');
@@ -247,7 +249,8 @@
 
             var grp = document.createElement('optgroup');
             if (svc === 'ollama')       grp.label = 'Ollama (Local)';
-            else if (svc === 'grok')    grp.label = 'xAI (Grok)';
+            else if (svc === 'supergrok') grp.label = 'SuperGrok (prepaid)';
+            else if (svc === 'grok')    grp.label = 'xAI Grok (auto-fill)';
             else if (svc === 'openrouter') grp.label = 'OpenRouter';
             else                        grp.label = svc;
 

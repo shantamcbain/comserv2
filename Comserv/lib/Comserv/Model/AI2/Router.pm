@@ -37,25 +37,26 @@ sub _detect_provider {
     my ($self, $requested_model) = @_;
     return ('ollama', $requested_model) unless $requested_model;
 
-    if ($requested_model =~ /^grok/i) {
-        return ('grok', $requested_model);
+    my $bare = $requested_model;
+    my $prefix = '';
+    if ($bare =~ s/^([^|]+)\|//) {
+        $prefix = lc($1);
     }
-    # Namespaced models (provider/slug, e.g. "anthropic/claude-3-haiku",
-    # "openai/gpt-4o", "meta-llama/llama-3.1-8b-instruct", "tencent/hy3")
-    # come from OpenRouter and must go to the external provider. Local Ollama
-    # tags are bare names ("qwen2.5:72b", "phi4:14b") with NO slash — so a
-    # slash is a reliable external signal. Without this, every OpenRouter
-    # model except a few prefix matches (tencent, gpt, ...) was wrongly
-    # routed to Ollama and failed with "model not found".
+    if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
+        return ('supergrok', $bare);
+    }
+    if ($prefix eq 'grok' || $bare =~ /^grok/i) {
+        return ('grok', $bare);
+    }
+    if ($prefix eq 'openrouter' || $prefix eq 'external' || $bare =~ m{/}) {
+        return ('external', $bare);
+    }
     if ($requested_model =~ m{/}) {
         return ('external', $requested_model);
     }
     if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-|tencent)/i) {
-        # External OpenAI-compatible / OpenRouter / x.AI model
-        # (tencent/hy3 etc. live on OpenRouter)
         return ('external', $requested_model);
     }
-    # Anything else (e.g. "llama3.1:latest", "phi4") is a local Ollama tag
     return ('ollama', $requested_model);
 }
 
@@ -141,7 +142,8 @@ sub _external_default_available {
     return 0 unless $external && $external =~ /^([^|]+)\|(.+)$/;
     my ($svc, $model) = ($1, $2);
 
-    my $cls = { grok => 'AI2::Provider::Grok', openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
+    my $cls = { grok => 'AI2::Provider::Grok', supergrok => 'AI2::Provider::Grok',
+                openrouter => 'AI2::Provider::OpenRouter' }->{$svc};
     return 0 unless $cls;
     my $prov = try { $c->model($cls) } catch { undef };
     return 0 unless $prov && $prov->can('_resolve_api_key');
@@ -235,6 +237,159 @@ sub select_best_model {
     return [$model, $prov];
 }
 
+# xAI (provider 'grok') auto-fills prepaid credits. SuperGrok (OAuth
+# subscription) and OpenRouter do NOT. Credit-exhaustion on SuperGrok or
+# OpenRouter must fall back to a free OpenRouter :free model, then Ollama.
+# Never treat grok and supergrok as the same provider.
+sub _credits_exhausted {
+    my ($self, $error) = @_;
+    return 0 unless defined $error && length $error;
+    return 1 if $error =~ /402\b|payment.?required|insufficient credit|out of credit|credit.?balance|can only afford|prepaid credit|usage limit|quota|weekly usage|limit_remaining|no auto-fill/i;
+    return 0;
+}
+
+sub _provider_needs_credit_fallback {
+    my ($self, $provider_name) = @_;
+    return ($provider_name // '') =~ /^(supergrok|openrouter|external)$/ ? 1 : 0;
+}
+
+# First live OpenRouter :free model, then first chat-capable Ollama tag.
+# No hardcoded model slugs — catalog is the source of truth.
+sub pick_free_fallback {
+    my ($self, $c, $skip_provider, $skip_model) = @_;
+    my $catalog = try { $self->get_available_models($c) } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'pick_free_fallback',
+            "Catalog for fallback failed: $_");
+        [];
+    };
+    $catalog = [] unless $catalog && ref($catalog) eq 'ARRAY';
+    my ($free, $local);
+    for my $m (@$catalog) {
+        next unless ref $m eq 'HASH';
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
+        my $name = $m->{name} // '';
+        my $svc  = $m->{provider} || '';
+        next unless length $name;
+        next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
+        my $is_free  = $m->{free} || ($name =~ /:free$/);
+        my $is_local = $m->{local} || ($svc eq 'ollama');
+        if (!$free && $is_free && $svc =~ /^(openrouter|external)$/) {
+            $free = { provider => 'openrouter', model => $name };
+        }
+        if (!$local && $is_local && $svc eq 'ollama' && $self->_is_chat_model($name)) {
+            $local = { provider => 'ollama', model => $name };
+        }
+        last if $free && $local;
+    }
+    return ($free, $local);
+}
+
+sub _chat_one {
+    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+
+    my $dispatch = {
+        ollama     => 'AI2::Provider::Ollama',
+        grok       => 'AI2::Provider::Grok',
+        supergrok  => 'AI2::Provider::Grok',
+        openrouter => 'AI2::Provider::OpenRouter',
+        external   => 'AI2::Provider::OpenRouter',
+    };
+    my $prov_class = $dispatch->{$provider_name} || 'AI2::Provider::Ollama';
+    my $provider = try { $c->model($prov_class) } catch { undef };
+    unless ($provider && $provider->can('chat')) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_chat_one',
+            "No client available for provider=$provider_name class=" . ($prov_class // 'undef'));
+        return { success => 0, error => "No client available for provider $provider_name", provider => $provider_name };
+    }
+
+    my ($host, $port);
+    if ($provider->can('resolve_host')) {
+        ($host, $port) = $provider->resolve_host($c);
+    }
+
+    my $resp = try {
+        $provider->chat($c,
+            messages => $messages,
+            model    => $self->_bare_model($use_model),
+            host     => $host,
+            port     => $port,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_chat_one',
+            "Provider $provider_name threw: $_");
+        undef;
+    };
+
+    unless ($resp && ref($resp) eq 'HASH') {
+        return { success => 0, error => "Provider $provider_name returned nothing", provider => $provider_name };
+    }
+    $resp->{provider} ||= $provider_name;
+    return $resp;
+}
+
+# Paid OpenRouter (no auto-fill) and SuperGrok (prepaid, no remaining-quota
+# API) fall back to free OpenRouter then Ollama. xAI grok auto-fills — do
+# not steal the turn away from grok on a credit error.
+sub chat_with_fallback {
+    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+
+    my $skip_paid = 0;
+    my $pre_err;
+    if ($self->_provider_needs_credit_fallback($provider_name)) {
+        if ($provider_name =~ /^(openrouter|external)$/) {
+            my $st = try { $c->model('AI')->usage->fetch_openrouter_status($c) } catch { undef };
+            if ($st && $st->{ok} && defined $st->{remaining} && $st->{remaining} <= 0) {
+                $skip_paid = 1;
+                $pre_err = 'OpenRouter remaining credits are 0 (no auto-fill)';
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+                    $pre_err);
+            }
+        }
+    }
+
+    my $resp;
+    unless ($skip_paid) {
+        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages);
+        if ($resp && $resp->{success}) {
+            return $resp;
+        }
+    }
+
+    my $err = $pre_err || ($resp && $resp->{error}) || 'AI provider error';
+    my $do_fallback = $self->_provider_needs_credit_fallback($provider_name)
+        && ($skip_paid || $self->_credits_exhausted($err));
+
+    unless ($do_fallback) {
+        $resp ||= { success => 0, error => $err, provider => $provider_name };
+        $resp->{provider} ||= $provider_name;
+        return $resp;
+    }
+
+    my ($free, $local) = $self->pick_free_fallback($c, $provider_name, $use_model);
+    for my $hop ($free, $local) {
+        next unless $hop;
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
+            "Paid $provider_name exhausted ($err); falling back to $hop->{provider} $hop->{model}");
+        my $retry = $self->_chat_one($c, $hop->{provider}, $hop->{model}, $messages);
+        if ($retry && $retry->{success}) {
+            $retry->{provider}       = $hop->{provider};
+            $retry->{fallback}       = 1;
+            $retry->{fallback_from}  = $provider_name;
+            $retry->{original_error} = $err;
+            $retry->{original_model} = $use_model;
+            return $retry;
+        }
+        my $hop_err = ($retry && $retry->{error}) || 'fallback hop failed';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chat_with_fallback',
+            "Fallback hop $hop->{provider}/$hop->{model} failed: $hop_err");
+    }
+
+    $resp ||= { success => 0, error => $err, provider => $provider_name };
+    $resp->{provider} ||= $provider_name;
+    $resp->{error} = $err;
+    return $resp;
+}
+
 # -------------------------------------------------------------------
 # dispatch_chat — SINGLE place that turns (model name + messages) into a
 # provider response for the v2 AI system. Used by BOTH the chat widget
@@ -250,41 +405,7 @@ sub dispatch_chat {
     my ($provider_name, $use_model) = $self->select_model($c,
         requested_model => $requested_model, can_select => $can_select);
 
-    my $dispatch = {
-        ollama     => 'AI2::Provider::Ollama',
-        grok       => 'AI2::Provider::Grok',
-        openrouter => 'AI2::Provider::OpenRouter',
-        external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
-    };
-    my $prov_class = $dispatch->{$provider_name} || 'AI2::Provider::Ollama';
-    my $provider = try { $c->model($prov_class) } catch { undef };
-    return { success => 0, error => "No client available for provider $provider_name" }
-        unless $provider && $provider->can('chat');
-
-    # For Ollama, resolve the first reachable workstation address (LAN vs
-    # ZeroTier vs OLLAMA_HOST). Non-Ollama providers ignore host/port.
-    my ($host, $port);
-    if ($provider->can('resolve_host')) {
-        ($host, $port) = $provider->resolve_host($c);
-    }
-
-    my $resp = try {
-        $provider->chat($c,
-            messages => $messages,
-            model    => $self->_bare_model($use_model),
-            host     => $host,
-            port     => $port,
-        );
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'router_dispatch_chat',
-            "Provider $provider_name threw: $_");
-        undef;
-    };
-
-    return { success => 0, error => "Provider $provider_name returned nothing" }
-        unless $resp && ref($resp) eq 'HASH';
-    $resp->{provider} = $provider_name;
-    return $resp;
+    return $self->chat_with_fallback($c, $provider_name, $use_model, $messages);
 }
 
 # -------------------------------------------------------------------
@@ -368,10 +489,11 @@ sub get_available_models {
     # We never emit a bare service-name id (e.g. "grok") as a selectable
     # model — that would be sent to chat and fail with "model not found".
     my %external = (
+        supergrok  => 'AI2::Provider::Grok',
         grok       => 'AI2::Provider::Grok',
         openrouter => 'AI2::Provider::OpenRouter',
     );
-    for my $svc (sort keys %external) {
+    for my $svc (qw(supergrok grok openrouter)) {
         my $cls  = $external{$svc};
         my $prov = try { $c->model($cls) } catch { undef };
         unless ($prov && $prov->can('list_models') && $prov->can('_resolve_api_key')) {
@@ -381,12 +503,24 @@ sub get_available_models {
             next;
         }
 
-        # Can we resolve a key? _resolve_api_key needs $c for session/DB; if it
-        # returns nothing, the provider is configured-but-no-key.
-        my $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
+        my $has_key;
+        my $listed;
+        if ($svc eq 'supergrok' && $prov->can('resolve_prepaid_key')) {
+            $has_key = try { $prov->resolve_prepaid_key($c) } catch { undef };
+            $listed  = try { $prov->list_models($c, undef, mode => 'prepaid') } catch { undef }
+                if $has_key;
+        }
+        elsif ($svc eq 'grok' && $prov->can('resolve_paid_key')) {
+            $has_key = try { $prov->resolve_paid_key($c) } catch { undef };
+            $listed  = try { $prov->list_models($c, undef, mode => 'paid') } catch { undef }
+                if $has_key;
+        }
+        else {
+            $has_key = try { $prov->_resolve_api_key($c) } catch { undef };
+            $listed  = try { $prov->list_models($c) } catch { undef } if $has_key;
+        }
 
         if ($has_key) {
-            my $listed = try { $prov->list_models($c) } catch { undef };
             if ($listed && $listed->{success} && $listed->{models} && @{$listed->{models}}) {
                 for my $m (@{$listed->{models}}) {
                     push @all, {
@@ -394,9 +528,7 @@ sub get_available_models {
                         provider => $svc,
                         label    => ($m->{label} || $m->{id}) . " ($svc)",
                         local    => 0,
-                        # AIMPS-P1 (#253): keep real per-token pricing so the
-                        # catalog can sort/filter/display by cost. Free ":free"
-                        # models carry a pricing hash of zeros.
+                        prepaid  => ($svc eq 'supergrok' || $m->{prepaid}) ? 1 : 0,
                         pricing          => $m->{pricing}        || {},
                         price_prompt     => $m->{price_prompt}     // 0,
                         price_completion => $m->{price_completion} // 0,
@@ -404,7 +536,6 @@ sub get_available_models {
                 }
                 next;
             }
-            # Key present but listing failed — surface the error rather than a stub.
             push @all, { name => $svc . '_error', provider => $svc,
                          label => ucfirst($svc) . ' (key set, list failed: '
                                  . ($listed->{error} // 'unknown') . ')',
@@ -465,7 +596,7 @@ sub _role_filter_models {
         if ($tier eq 'guest') {
             push @out, $m if $free || $local;
         } else { # member
-            next if $svc eq 'grok';
+            next if $svc eq 'grok' || $svc eq 'supergrok';
             my $pp = ($m->{price_prompt}     // 0) + 0;
             my $pc = ($m->{price_completion} // 0) + 0;
             my $max = ( $pp > $pc ) ? $pp : $pc;

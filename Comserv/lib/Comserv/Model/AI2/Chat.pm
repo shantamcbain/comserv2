@@ -85,6 +85,22 @@ sub build_system_prompt {
     push @parts, $args{page_context}        if $args{page_context};
     push @parts, $args{navigation_hint}     if $args{navigation_hint};
 
+    # Logged-in users can create todos from this same chat (widget + editor).
+    my $uname = eval { $c->session->{username} } || '';
+    if ($uname && lc($uname) ne 'guest') {
+        my $contract = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "TodoCreate chat_contract failed: $@");
+        }
+        push @parts, $contract if $contract;
+    }
+
     return join("\n\n", grep { defined && length } @parts);
 }
 
@@ -151,37 +167,12 @@ sub process {
         "AI2 chat dispatch: user=$username provider=$provider_name model="
         . ($use_model // '(router-default)') . " can_select=$can_select");
 
-    # Dispatch to the correct self-contained v2 provider client.
-    my $dispatch = {
-        ollama     => 'AI2::Provider::Ollama',
-        grok       => 'AI2::Provider::Grok',
-        openrouter => 'AI2::Provider::OpenRouter',
-        external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
-    };
-    my $prov_class = $dispatch->{$provider_name} || 'AI2::Provider::Ollama';
-    my $provider = try { $c->model($prov_class) } catch { undef };
-
-    unless ($provider && $provider->can('chat')) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
-            "No client available for provider=$provider_name (class="
-            . ($prov_class // 'undef') . ")");
-        return { success => 0, error => "No client available for provider $provider_name" };
-    }
-
-    # For Ollama, resolve the first reachable workstation address (LAN vs
-    # ZeroTier vs OLLAMA_HOST). Non-Ollama providers ignore host/port.
-    my ($ollama_host, $ollama_port);
-    if ($provider->can('resolve_host')) {
-        ($ollama_host, $ollama_port) = $provider->resolve_host($c);
-    }
-
+    # One dispatch+fallback path (chat widget and FocusTune share Router).
+    # SuperGrok / OpenRouter (no auto-fill) fall back to :free then Ollama.
+    # xAI grok auto-fills — not the same provider as SuperGrok.
+    my $router = $c->model('AI2::Router');
     my $resp = try {
-        $provider->chat($c,
-            messages => $messages,
-            model    => $self->_bare_model($use_model),
-            host     => $ollama_host,
-            port     => $ollama_port,
-        );
+        $router->chat_with_fallback($c, $provider_name, $use_model, $messages);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
@@ -192,7 +183,34 @@ sub process {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name failed: " . ($resp->{error} // 'AI provider error')
             . " (model=" . ($use_model // '?') . ", user=$username)");
+        eval {
+            $c->model('AI')->log_usage($c,
+                provider          => $provider_name,
+                model             => $use_model || 'unknown',
+                status            => 'error',
+                error_message     => $resp->{error} // 'AI provider error',
+                request_type      => 'chat',
+            );
+        };
         return { success => 0, error => $resp->{error} // 'AI provider error' };
+    }
+
+    if ($resp->{fallback}) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            "Fell back from $resp->{fallback_from} ($resp->{original_error}) to "
+            . ($resp->{provider} // '') . '/' . ($resp->{model} // ''));
+        eval {
+            $c->model('AI')->log_usage($c,
+                provider          => $resp->{fallback_from} || $provider_name,
+                model             => $resp->{original_model} || $use_model || 'unknown',
+                status            => 'error',
+                error_message     => $resp->{original_error} || 'credits exhausted, fell back',
+                request_type      => 'chat',
+                metadata          => { fallback_to => $resp->{provider} },
+            );
+        };
+        $provider_name = $resp->{provider} if $resp->{provider};
+        $use_model     = $resp->{model}     if $resp->{model};
     }
 
     # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
@@ -262,6 +280,36 @@ sub process {
             "Failed to persist v2 conversation: $_");
         # Non-fatal: still return the AI response to the user.
     };
+
+    eval {
+        my $usage_info = $resp->{usage} || {};
+        $c->model('AI')->log_usage($c,
+            provider          => $provider_name,
+            model             => $resp->{model} || $use_model || 'unknown',
+            prompt_tokens     => $usage_info->{prompt_tokens} || 0,
+            completion_tokens => $usage_info->{completion_tokens} || 0,
+            total_tokens      => $usage_info->{total_tokens} || 0,
+            request_type      => 'chat',
+            conversation_id   => $conversation_id,
+            status            => 'success',
+            metadata          => {
+                agent_id      => $args{agent_id},
+                ($resp->{fallback} ? (
+                    fallback      => 1,
+                    fallback_from => $resp->{fallback_from},
+                ) : ()),
+            },
+        );
+        # SuperGrok ≠ xAI grok. Only SuperGrok (prepaid, no auto-fill) trips the 80% alert.
+        my $from = $resp->{fallback_from} || $provider_name || '';
+        if ($from eq 'supergrok' || $provider_name eq 'supergrok') {
+            $c->model('AI')->usage->maybe_alert_supergrok($c);
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "Failed to record AI usage: $@");
+    }
 
     return {
         success         => 1,
