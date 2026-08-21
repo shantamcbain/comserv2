@@ -881,6 +881,29 @@ sub auto :Private {
                 $c->stash->{app_version}{branch} = $c->stash->{app_workflow};
             }
         }
+
+        # Overlay the LIVE branch/commit onto the build-time stamp so the global
+        # header always reflects the checkout the app is actually running from
+        # (e.g. a git-dev worktree serving on 4004 must not report "main" from an
+        # out-of-date version.json and trick a developer into committing to main).
+        # build_date / build_host keep their baked values; only branch + commit
+        # are corrected. The "+local" suffix is preserved when the live short sha
+        # differs from the baked one (or absent) so the "locally modified" signal
+        # survives the overlay.
+        if ($c->stash->{app_version}) {
+            my $live = eval {
+                Comserv::Util::Git->new(logging => $self->logging)
+                    ->current_branch_and_commit($c);
+            };
+            if ($live && $live->{branch}) {
+                my $av   = $c->stash->{app_version};
+                my $baked = $av->{commit} // '';
+                $baked =~ s/\+local$//;
+                my $suffix = ($live->{commit} ne $baked) ? '+local' : '';
+                $av->{branch} = $live->{branch};
+                $av->{commit} = $live->{commit} . $suffix;
+            }
+        }
         
         # Validate system_info returned valid data, add defaults if needed
         if (!$system_info || !ref($system_info)) {
