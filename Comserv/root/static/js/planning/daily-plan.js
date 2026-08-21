@@ -274,11 +274,23 @@
         if (!list) return;
         var cards = Array.from(list.querySelectorAll('[data-priority]'));
         cards.sort(function(a, b) {
+            var aAct = a.dataset.active === '1' ? 0 : 1;
+            var bAct = b.dataset.active === '1' ? 0 : 1;
+            if (aAct !== bAct) return aAct - bAct;
+            var aBr = a.dataset.branch === '1' ? 0 : 1;
+            var bBr = b.dataset.branch === '1' ? 0 : 1;
+            if (aBr !== bBr) return aBr - bBr;
+            var aBlk = a.dataset.blocked === '1' ? 1 : 0;
+            var bBlk = b.dataset.blocked === '1' ? 1 : 0;
+            if (aBlk !== bBlk) return aBlk - bBlk;
+            if (by === 'queue') {
+                return parseInt(a.dataset.queueRank || 0, 10) - parseInt(b.dataset.queueRank || 0, 10);
+            }
             if (by === 'priority') {
-                var pa = parseInt(a.dataset.priority || 99);
-                var pb = parseInt(b.dataset.priority || 99);
+                var pa = parseInt(a.dataset.priority || 99, 10);
+                var pb = parseInt(b.dataset.priority || 99, 10);
                 if (pa !== pb) return pa - pb;
-                return parseInt(a.dataset.score || 9999) - parseInt(b.dataset.score || 9999);
+                return parseInt(a.dataset.score || 9999, 10) - parseInt(b.dataset.score || 9999, 10);
             } else if (by === 'project') {
                 var na = (a.dataset.project || '').toLowerCase();
                 var nb = (b.dataset.project || '').toLowerCase();
@@ -295,12 +307,12 @@
             if (badge) badge.textContent = i + 1;
             list.appendChild(card);
         });
-        ['priority', 'project', 'due'].forEach(function(s) {
+        ['queue', 'priority', 'project', 'due'].forEach(function(s) {
             var btn = document.getElementById('sort-' + s);
             if (!btn) return;
             var active = (s === by);
             btn.style.background     = active ? 'var(--primary-color)' : 'transparent';
-            btn.style.color          = active ? '#fff' : 'var(--text-color)';
+            btn.style.color          = active ? 'var(--button-text, #fff)' : 'var(--text-color)';
             btn.style.borderColor    = active ? 'var(--primary-color)' : 'var(--border-color)';
         });
     };
