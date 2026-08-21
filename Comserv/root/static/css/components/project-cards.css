@@ -260,3 +260,7 @@
         margin-bottom: 0.5rem;
     }
 }
+
+#project_search_results[hidden] {
+    display: none !important;
+}

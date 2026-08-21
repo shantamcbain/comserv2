@@ -136,7 +136,7 @@
                     [% IF branch_focus_filter %]
                     <span class="FocusStats">
                         Branch <code>[% branch_focus_filter.branch | html %]</code>
-                        — Active (any) + blockers + this project's todos
+                        — Active first, then this branch's todos
                         <a href="/planning/daily?filter_project=all" class="BacklogLink">Show all</a>
                     </span>
                     [% END %]
@@ -249,8 +249,10 @@
 
                     [%# Sort buttons %]
                     <span class="SortLabel">Sort:</span>
+                    <button data-action="sort-queue" id="sort-queue"
+                        class="SortBtn SortBtn--active">Queue</button>
                     <button data-action="sort-priority" id="sort-priority"
-                        class="SortBtn SortBtn--active">Priority</button>
+                        class="SortBtn">Priority</button>
                     <button data-action="sort-project" id="sort-project"
                         class="SortBtn">Project</button>
                     <button data-action="sort-due" id="sort-due"
@@ -290,7 +292,7 @@
                 [% INCLUDE 'todo/todo_card.tt'
                     tc                   = ap
                     tc_wrapper_id        = 'ap-row-' _ ap.record_id
-                    tc_wrapper_extra_data = 'data-priority="' _ (ap.priority || 99) _ '" data-score="' _ (ap.ap_score || 9999) _ '" data-project="' _ (ap.project_name || '') _ '" data-project-id="' _ (ap.project_id || '') _ '" data-due="' _ (ap.due_date || '9999-12-31') _ '" data-site="' _ (ap.sitename || '') _ '" data-role-cats="' _ (ap.role_cats || 'general') _ '"'
+                    tc_wrapper_extra_data = 'data-priority="' _ (ap.priority || 99) _ '" data-score="' _ (ap.ap_score || 9999) _ '" data-project="' _ (ap.project_name || '') _ '" data-project-id="' _ (ap.project_id || '') _ '" data-due="' _ (ap.due_date || '9999-12-31') _ '" data-site="' _ (ap.sitename || '') _ '" data-role-cats="' _ (ap.role_cats || 'general') _ '" data-active="' _ (ap.is_active_work || 0) _ '" data-branch="' _ (ap.is_branch_todo || 0) _ '" data-blocked="' _ (is_blocked ? 1 : 0) _ '" data-queue-rank="' _ rank _ '"'
                     tc_rank              = rank
                     tc_is_stale          = ap.is_stale
                     tc_stale_days        = ap.stale_days

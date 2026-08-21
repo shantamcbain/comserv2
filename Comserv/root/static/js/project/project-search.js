@@ -59,6 +59,79 @@
         return (s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
     }
 
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+
+    // Own-card score only (not subtree). Used for the results LIST so a parent
+    // is listed only when IT matches, not merely because a child did.
+    function ownCardMeta(card) {
+        var id = card.getAttribute('data-project-id')
+            || (card.id || '').replace(/^(project|subproject)-/, '');
+        return {
+            id: id,
+            name: card.getAttribute('data-project-name') || '',
+            code: card.getAttribute('data-project-code') || '',
+            site: card.getAttribute('data-project-sitename') || ''
+        };
+    }
+
+    function renderResultsList(qWords, searching) {
+        var box = document.getElementById('project_search_results');
+        var body = document.getElementById('project_search_results_body');
+        var heading = document.getElementById('project_search_results_heading');
+        if (!box || !body) return;
+
+        if (!searching) {
+            box.hidden = true;
+            body.innerHTML = '';
+            if (heading) heading.textContent = '';
+            return;
+        }
+
+        var rows = [];
+        q('.collapsible-card').forEach(function (card) {
+            var score = cardScore(card, qWords);
+            if (score <= 0) return;
+            var meta = ownCardMeta(card);
+            if (!meta.id) return;
+            rows.push({
+                score: score,
+                idx: originalIndex.get(cardId(card)) || 0,
+                id: meta.id,
+                name: meta.name,
+                code: meta.code,
+                site: meta.site
+            });
+        });
+        rows.sort(function (a, b) {
+            if (b.score !== a.score) return b.score - a.score;
+            return a.idx - b.idx;
+        });
+
+        var html = '';
+        rows.forEach(function (r) {
+            var href = '/project/details?project_id=' + encodeURIComponent(r.id);
+            var title = esc(r.name);
+            html += '<tr>'
+                + '<td>' + esc(r.id) + '</td>'
+                + '<td><a href="' + href + '" title="' + title + '">' + title + '</a></td>'
+                + '<td>' + esc(r.code) + '</td>'
+                + '<td>' + esc(r.site) + '</td>'
+                + '<td><a class="btn btn-sm btn-primary" href="' + href + '" title="' + title + '">Open</a></td>'
+                + '</tr>';
+        });
+        body.innerHTML = html || '<tr><td colspan="5">No projects match.</td></tr>';
+        if (heading) {
+            heading.textContent = rows.length
+                ? (rows.length + ' project' + (rows.length === 1 ? '' : 's') + ' found')
+                : 'No projects match';
+        }
+        box.hidden = false;
+    }
+
     // Cached state, built once at init.
     var cardTokens = new Map();   // cardId -> string[] (tokenized data-search)
     var cardPriority = new Map(); // cardId -> int
@@ -95,8 +168,8 @@
     }
 
     // ---- scoring ----
-    // Returns 0..N. Matches the whole token highest (exact), then prefix, then
-    // substring. Each query word contributes its best match across the card's tokens.
+    // Returns 0..N. Whole-token match > prefix. Every query word must hit (AND).
+    // No substring (that made "td" match "standard").
     function cardScore(card, qWords) {
         if (!qWords.length) return 0;
         var tokens = cardTokens.get(cardId(card)) || [];
@@ -109,8 +182,8 @@
                 var t = tokens[j];
                 if (t === qw) { best = 3; break; }
                 if (t.indexOf(qw) === 0) { if (2 > best) best = 2; }
-                else if (t.indexOf(qw) !== -1) { if (1 > best) best = 1; }
             }
+            if (!best) return 0;
             total += best;
         }
         return total;
@@ -273,6 +346,8 @@
                     expandMatchingBranches(card, qWords);
                 });
             }
+
+            renderResultsList(qWords, searching);
 
             var countEl = document.getElementById('project_search_count');
             if (countEl) {

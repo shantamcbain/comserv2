@@ -1095,6 +1095,7 @@
             if (action === 'reschedule')    { if (typeof window.rescheduleTodos === 'function') { window.rescheduleTodos(da); return; } }
             if (action === 'refresh-audit') { if (typeof window.refreshAudit === 'function') { window.refreshAudit(e); return; } }
             if (action === 'refresh-page')  { if (typeof window.refreshPage === 'function') { window.refreshPage(e); return; } }
+            if (action === 'sort-queue')    { if (typeof window.sortTodos === 'function') { window.sortTodos('queue'); return; } }
             if (action === 'sort-priority') { if (typeof window.sortTodos === 'function') { window.sortTodos('priority'); return; } }
             if (action === 'sort-project')  { if (typeof window.sortTodos === 'function') { window.sortTodos('project'); return; } }
             if (action === 'sort-due')      { if (typeof window.sortTodos === 'function') { window.sortTodos('due'); return; } }
