@@ -826,30 +826,44 @@
         var statusEl = document.getElementById('ai-tune-status');
         var resultEl = document.getElementById('ai-tune-result');
         var targets = _aiTuneTargets();
-        if (targets.length === 1) {
-            resultEl.innerHTML = '';
-            _aiTuneCall(targets[0], statusEl, resultEl, null);
-        } else {
-            // Run models ONE AT A TIME (not in parallel). Each compare request
-            // drives a full local-model generation that pegs CPU; firing them
-            // concurrently only multiplies contention (Ollama serializes at
-            // -np 1 anyway) and saturates the box. Sequential keeps CPU bounded
-            // to a single generation and still shows the side-by-side result.
-            var collected = [];
-            var i = 0;
-            function nextOne() {
-                if (i >= targets.length) {
-                    _aiTuneRenderBatch(targets, collected, resultEl);
-                    return;
+        // Split by execution class: remote providers (openrouter/grok/supergrok)
+        // are network-bound and run IN PARALLEL; Ollama models are CPU-bound on
+        // the workstation (Ollama serializes at -np 1 anyway), so they still run
+        // ONE AT A TIME. Both groups render into the same side-by-side batch.
+        var isLocal = function(t) { return /^(ollama\b|.*localhost)/i.test((t.host || '') + ' ' + (t.name || '')) && !/openrouter|grok|supergrok/i.test(t.name || ''); };
+        var remote = [], local = [];
+        targets.forEach(function(t) { (isLocal(t) ? local : remote).push(t); });
+        var all = remote.concat(local);
+        var collected = new Array(all.length);
+        var pending = all.length;
+        if (!pending) return;
+        resultEl.innerHTML = '';
+        function launch(t, idx) {
+            _aiTuneCall(t, statusEl, resultEl, function(target, d) {
+                collected[idx] = { target: target, data: d };
+                pending--;
+                if (!pending) {
+                    _aiTuneRenderBatch(all, collected.map(function(c) { return c ? c.data : {}; }), resultEl);
                 }
-                var t = targets[i++];
-                _aiTuneCall(t, statusEl, resultEl, function(target, d) {
-                    collected.push(d);
-                    nextOne();
-                });
-            }
-            nextOne();
+            });
         }
+        // Remote first, all at once; local models launched sequentially as each
+        // previous one finishes (chained after remote launches).
+        remote.forEach(function(t, i) { launch(t, i); });
+        var li = remote.length;
+        function nextLocal() {
+            if (li >= all.length) return;
+            var idx = li++;
+            _aiTuneCall(all[idx], statusEl, resultEl, function(target, d) {
+                collected[idx] = { target: target, data: d };
+                pending--;
+                if (!pending) {
+                    _aiTuneRenderBatch(all, collected.map(function(c) { return c ? c.data : {}; }), resultEl);
+                }
+                nextLocal();
+            });
+        }
+        nextLocal();
     }
 
     function aiTuneCompare() {
@@ -879,6 +893,27 @@
                         _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
                     }
                 }
+                // Provider order: Ollama (local) first, then SuperGrok, xAI Grok,
+                // everything else; within OpenRouter free models first, then
+                // lowest per-token price ascending.
+                var svcOrder = { ollama: 0, supergrok: 1, grok: 2 };
+                function svcOf(m) {
+                    return m.provider || String(m.name || '').split('|')[0] || 'external';
+                }
+                function costOf(m) {
+                    return Math.max(Number(m.price_prompt) || 0, Number(m.price_completion) || 0);
+                }
+                list.sort(function(a, b) {
+                    var sa = svcOf(a), sb = svcOf(b);
+                    var ra = svcOrder[sa] != null ? svcOrder[sa] : 3;
+                    var rb = svcOrder[sb] != null ? svcOrder[sb] : 3;
+                    if (ra !== rb) return ra - rb;
+                    var la = !!a.local, lb = !!b.local;
+                    if (la !== lb) return la ? -1 : 1;
+                    var ca = costOf(a), cb2 = costOf(b);
+                    if (ca !== cb2) return ca - cb2;
+                    return String(a.name).localeCompare(String(b.name));
+                });
                 var html = '<div class="AITuneModelPopInner">';
                 list.forEach(function(m) {
                     var checked = _aiTuneSelected.some(function(s) { return s.name === m.name; }) ? 'checked' : '';
@@ -887,7 +922,10 @@
                     var pp = Number(m.price_prompt) || 0, pc = Number(m.price_completion) || 0;
                     if (m.local) {
                         label += ' — local';
-                    } else if (m.free || (m.provider === 'openrouter' && /(^|:)(free)$/i.test(m.name || ''))) {
+                    } else if (m.free || (m.provider === 'openrouter' && /(^|:)(free)$/i.test(m.name || ''))
+                              || (!m.local && pp === 0 && pc === 0 && !m.price_tier)) {
+                        // Free + zero-priced external entries (stealth/ox-alpha,
+                        // openrouter/auto, ...) — cost nothing, say so.
                         label += ' — free';
                     } else if (pp > 0 || pc > 0 || m.price_tier) {
                         var fmt = function(n) { return (Math.round(n * 100) / 100).toFixed(2); };
@@ -939,6 +977,67 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
     }
+
+    /* ── Floating Done button ─────────────────────────────────────────────
+       On long todo lists the per-card Done button can sit below the fold.
+       This tracks the LAST todo card the user interacted with (click or
+       expand) and shows a fixed "✓ Done" button that fires the SAME
+       delegated data-done-btn path — no scrolling to reach the card. */
+    var _lastTodoCard = null;
+
+    function ensureFloatDoneBtn() {
+        if (document.getElementById('float-done-btn')) return;
+        // Only build it on pages that actually render todo cards.
+        if (!document.querySelector('.todo-card-list [data-todo-id]')) return;
+        var b = document.createElement('button');
+        b.id = 'float-done-btn';
+        b.type = 'button';
+        b.className = 'btn btn-sm btn-outline-success';
+        b.textContent = '✓ Done';
+        b.title = 'Mark the last todo you clicked as done';
+        b.style.cssText = 'position:fixed;bottom:5.5rem;left:50%;transform:translateX(-50%);'
+            + 'z-index:1050;display:none;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+        document.body.appendChild(b);
+        b.addEventListener('click', function() {
+            if (!_lastTodoCard || !document.contains(_lastTodoCard)) { hideFloatDoneBtn(); return; }
+            var doneBtn = _lastTodoCard.querySelector('button[data-done-btn]');
+            if (doneBtn && !doneBtn.disabled) {
+                doneBtn.click();   // reuses the delegated doneWithLogTodoCard path
+            } else {
+                hideFloatDoneBtn();
+            }
+        });
+    }
+
+    function showFloatDoneBtn(card) {
+        ensureFloatDoneBtn();
+        _lastTodoCard = card;
+        var b = document.getElementById('float-done-btn');
+        if (!b) return;
+        var subject = card.querySelector('.todo-card-subject, .todo-card-title, .card-title, h4, h3, strong');
+        var label = '✓ Done';
+        if (subject && subject.textContent.trim().length) {
+            var t = subject.textContent.trim();
+            label += ': ' + (t.length > 40 ? t.slice(0, 40) + '…' : t);
+        }
+        b.textContent = label;
+        b.style.display = 'block';
+    }
+
+    function hideFloatDoneBtn() {
+        _lastTodoCard = null;
+        var b = document.getElementById('float-done-btn');
+        if (b) b.style.display = 'none';
+    }
+
+    document.addEventListener('click', function(e) {
+        // Track the last-touched todo card for the floating Done button.
+        var touchedCard = e.target.closest('[data-todo-id]');
+        if (touchedCard && !touchedCard.closest('#float-done-btn')) {
+            var stillOpen = touchedCard.querySelector('button[data-done-btn]:not([disabled])');
+            if (stillOpen) { showFloatDoneBtn(touchedCard); } else { hideFloatDoneBtn(); }
+        }
+    }, true);   // capture phase: runs even when other handlers stopPropagation
 
     /* ── Event delegation — replaces all onclick= in template ──────────── */
 

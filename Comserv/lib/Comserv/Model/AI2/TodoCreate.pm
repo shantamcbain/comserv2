@@ -299,6 +299,80 @@ sub detect_create_intent {
     };
 }
 
+# Fill planning-queue fields the user usually omits or has forgotten.
+# Two layers:
+#   inferred  — we pick a value from intent + how Focus Queue works
+#   pending   — LOOKUP_TODOS / LOOKUP_PROJECTS / READ_DOCS may refine later
+# Ask the user only for blockers (no subject, no project at all). Do not quiz
+# them on ap_score / scheduled_date.
+sub enrich_parse {
+    my ($self, $intent) = @_;
+    return $intent unless $intent && ref $intent eq 'HASH';
+    my $raw = $intent->{description} // $intent->{subject} // '';
+    my $today = $self->_today;
+    my @inferred;
+    my @pending = qw(LOOKUP_TODOS LOOKUP_PROJECTS READ_DOCS);
+
+    my $pri = $intent->{priority};
+    if (!defined $pri || $pri eq '') {
+        if ($raw =~ /\b(urgent|asap|critical|p\s*1|priority\s*1)\b/i) {
+            $pri = 1; push @inferred, 'priority=1 from urgent/asap language';
+        }
+        elsif ($raw =~ /\b(p\s*2|priority\s*2|high priority)\b/i) {
+            $pri = 2; push @inferred, 'priority=2 from high-priority language';
+        }
+        else {
+            $pri = 3; push @inferred, 'priority=3 default (not specified; Focus Queue still sees NEW below in-progress work)';
+        }
+        $intent->{priority} = $pri;
+    }
+
+    my $due = $intent->{due_date} // '';
+    if ($due !~ /^\d{4}-\d{2}-\d{2}$/) {
+        if ($raw =~ /\btoday\b/i) {
+            $due = $today; push @inferred, "due_date=$due from 'today'";
+        }
+        elsif ($raw =~ /\btomorrow\b/i) {
+            $due = DateTime->now->add(days => 1)->ymd; push @inferred, "due_date=$due from 'tomorrow'";
+        }
+        elsif ($raw =~ /\bthis week\b/i) {
+            $due = DateTime->now->add(days => 7)->ymd; push @inferred, "due_date=$due from 'this week'";
+        }
+        else {
+            $due = DateTime->now->add(days => 7)->ymd;
+            push @inferred, "due_date=$due default (+7 days; not specified)";
+        }
+        $intent->{due_date} = $due;
+    }
+
+    # scheduled_date is what Daily Plan / Focus Queue uses. Users almost never
+    # remember this field. Default today so the todo is eligible; status NEW
+    # so it does not jump ahead of in-progress rows.
+    $intent->{scheduled_date} = $today;
+    push @inferred, "scheduled_date=$today so it can appear in the planning queue (user did not set this)";
+    $intent->{status} = 1 unless defined $intent->{status} && $intent->{status} ne '';
+    push @inferred, 'status=NEW — will not outrank in-progress todos in the Focus Queue';
+
+    $intent->{_inferred} = \@inferred;
+    $intent->{_pending_agents} = \@pending;
+    my $note = "Inferred by Todo-create parse:\n- " . join("\n- ", @inferred)
+             . "\nPending agent fill-in: " . join(', ', @pending);
+    if ($intent->{comments}) {
+        $intent->{comments} .= "\n$note";
+    }
+    else {
+        $intent->{comments} = $note;
+    }
+    return $intent;
+}
+
+sub subject_needs_clarify {
+    my ($self, $subject) = @_;
+    return 1 unless defined $subject && length $subject >= 3;
+    return 1 if $subject =~ /^(this|that|it|something|stuff|one|a thing)\b/i;
+    return 0;
+}
+
 # Short-circuit /ai2/chat when the user asked to create a todo.
 # Returns a chat-shaped hash (handled=>1) or undef to fall through to the LLM.
 sub try_chat_create {
@@ -314,6 +388,23 @@ sub try_chat_create {
             todo_action => { success => JSON::false, error => 'Login required' },
         };
     }
+    if ($self->subject_needs_clarify($intent->{subject})) {
+        return {
+            handled     => 1,
+            success     => 1,
+            response    => 'I can create the todo, but I need a short subject. What should it be called?',
+            model       => '(todo-create)',
+            provider    => 'ai2-todo',
+            todo_action => {
+                success       => JSON::false,
+                need_clarify  => JSON::true,
+                field         => 'subject',
+                draft         => $intent,
+                message       => 'Subject is too vague.',
+            },
+        };
+    }
+    $self->enrich_parse($intent);
     my $created = eval {
         $self->create_from_params($c, {
             %$intent,
@@ -328,6 +419,11 @@ sub try_chat_create {
     my $msg = $created->{message} || $created->{error} || 'Todo request processed.';
     if ($created->{success} && $created->{todo_url}) {
         $msg .= ' ' . $created->{todo_url};
+        my $inf = $intent->{_inferred} || [];
+        if (@$inf) {
+            $msg .= "\nI filled in planning fields you did not give (you can change them; other agents can refine): "
+                 . join('; ', @$inf);
+        }
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'try_chat_create',
         'Chat todo intent: ' . ($created->{success} ? "created #$created->{todo_id}" : ($created->{need_project} ? 'need_project' : ($created->{need_pick} ? 'need_pick' : ($created->{error} || 'no-create')))));
@@ -470,8 +566,41 @@ sub _insert_todo {
             group_of_poster     => $group,
             project_id          => $project->{id},
             date_time_posted    => $today,
+            scheduled_date      => $today,
+            sort_order          => 0,
         });
     };
+    if (($@ || !$row) && $@ && $@ =~ /scheduled_date|Unknown column/i) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'insert_todo', "Retry without scheduled_date: $@");
+        eval {
+            $row = $schema->resultset('Todo')->create({
+                sitename            => $sitename,
+                start_date          => $today,
+                parent_todo         => '',
+                due_date            => $due,
+                subject             => $subject,
+                description         => $args{description} // '',
+                estimated_man_hours => 0,
+                comments            => $args{comments} // '',
+                reporter            => $user,
+                company_code        => 'default',
+                owner               => $user,
+                project_code        => $code,
+                developer           => $user,
+                username_of_poster  => $user,
+                status              => _status_text($args{status}),
+                priority            => ((defined $args{priority} && $args{priority} =~ /^\d+$/) ? $args{priority} : 3),
+                share               => 0,
+                last_mod_by         => $user,
+                last_mod_date       => $today,
+                user_id             => $user_id,
+                group_of_poster     => $group,
+                project_id          => $project->{id},
+                date_time_posted    => $today,
+            });
+        };
+    }
     if ($@ || !$row) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             'insert_todo', "create_todo failed sitename=$sitename subject='$subject': $@");
