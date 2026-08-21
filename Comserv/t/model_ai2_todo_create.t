@@ -41,4 +41,14 @@ ok($m->detect_create_intent('add a todo Test new Chat-with-AI todo creation'),
 ok(!$m->detect_create_intent('how do I add a todo'), 'ignores how-to questions');
 ok(!$m->detect_create_intent('what are my top 5 todos'), 'ignores focus-tune questions');
 
+my $enr = $m->enrich_parse({
+    subject => 'wire the hive graph',
+    description => 'add a todo to wire the hive graph urgent',
+});
+is($enr->{priority}, 1, 'urgent language → P1');
+ok($enr->{scheduled_date}, 'scheduled_date inferred for planning queue');
+ok($enr->{comments} =~ /Inferred by Todo-create parse/, 'inferred note stored for later agents');
+ok($m->subject_needs_clarify('it'), 'vague subject asks the user');
+ok(!$m->subject_needs_clarify('wire the hive graph'), 'real subject is enough');
+
 done_testing();

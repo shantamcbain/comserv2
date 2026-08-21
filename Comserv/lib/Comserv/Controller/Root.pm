@@ -2505,7 +2505,9 @@ sub _port_label {
         4003 => 'HA',   # InfrastructureHA
         4004 => 'WS',   # WorkShops
         4005 => 'Us',   # Users
-        4006 => 'FM',   # FileManagement
+        # 4006 is the aisystem worktree (AI system use) — show the AI robot
+        # glyph instead of the stale 'FM' FileManagement label.
+        4006 => "\x{1F916}",   # aisystem — AI robot
         4007 => 'Ma',   # UnifiedMail
         4008 => 'Mb',   # Membership
         4009 => 'Pt',   # PointSystem
