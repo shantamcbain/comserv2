@@ -85,6 +85,22 @@ sub build_system_prompt {
     push @parts, $args{page_context}        if $args{page_context};
     push @parts, $args{navigation_hint}     if $args{navigation_hint};
 
+    # Logged-in users can create todos from this same chat (widget + editor).
+    my $uname = eval { $c->session->{username} } || '';
+    if ($uname && lc($uname) ne 'guest') {
+        my $contract = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "TodoCreate chat_contract failed: $@");
+        }
+        push @parts, $contract if $contract;
+    }
+
     return join("\n\n", grep { defined && length } @parts);
 }
 

@@ -2962,6 +2962,14 @@
 
                 persistMessages();
 
+                // Server already created (or asked about) a todo — skip the LLM ACTION path.
+                if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+                    && typeof ComservChat.featureTodo.handleServerResult === 'function') {
+                    ComservChat.featureTodo.handleServerResult(data.todo_action, {
+                        host: document.getElementById('chat-messages')
+                    });
+                }
+
                 // Coding agent: intercept [READ_FILE: path] requests automatically
                 if (state.pageContext && state.pageContext.agent_id === 'coding') {
                     var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
@@ -4778,6 +4786,22 @@
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // Shared todo brain (widget + editor): sitename match / ask-to-create-project.
+        if (actionObj && (actionObj.action === 'create_todo' || actionObj.action === 'create_project')
+            && window.ComservChat && ComservChat.featureTodo && typeof ComservChat.featureTodo.handleAction === 'function') {
+            ComservChat.featureTodo.handleAction(actionObj, {
+                host: chatMessages,
+                status: function (msg, isErr) {
+                    var si = document.getElementById('chat-status');
+                    if (si) {
+                        si.textContent = msg || '';
+                        si.className = isErr ? 'chat-status error' : 'chat-status connected';
+                    }
+                }
+            });
+            return;
+        }
 
         // fill_form is handled entirely client-side — no server round-trip needed.
         if (actionObj.action === 'fill_form') {
