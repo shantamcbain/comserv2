@@ -634,6 +634,9 @@ sub daily :Path('/planning/daily') :Args {
         # first, then this branch's projects, blocking above blocked. main
         # keeps the global score order. Escape hatch: ?filter_project=all.
         my $cur_branch = $c->stash->{app_workflow} || 'main';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+            "Branch focus check: cur_branch='" . ($cur_branch // '')
+            . "' filter_project='" . ($filter_project // '') . "'");
         my $show_all_projects = ($filter_project eq 'all');
         my @branch_pids;
         my %branch_scope;
@@ -730,9 +733,14 @@ sub daily :Path('/planning/daily') :Args {
         # Keep the complete eligible backlog available separately from the
         # limited Focus Queue. It uses the same server-side filters and score
         # ordering, but is never truncated to FOCUS_QUEUE_LIMIT.
+        # Sort: priority first, then subject alphabetically — so a todo is
+        # findable by name instead of buried in score order.
         my %focus_ids = map { $_->{record_id} => 1 } @active_priorities;
         $c->stash->{remaining_open_todos} = [
-            grep { !$focus_ids{$_->{record_id}} } @all_sorted
+            sort {
+                ($a->{priority} // 9) <=> ($b->{priority} // 9)
+                || lc($a->{subject} // '') cmp lc($b->{subject} // '')
+            } grep { !$focus_ids{$_->{record_id}} } @all_sorted
         ];
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
@@ -1355,11 +1363,47 @@ sub daily_impl :Private {
         my %row_by_id = map { $_->record_id => { $_->get_columns } } @_focus_all;
         my $now_epoch = time();
         my @scored;
+        # Branch scope — SAME resolution as sub daily's Focus Queue. On a
+        # worktree server the Priorities tab must show this branch's project
+        # tree (+ active-any-branch + blockers), not the global top-20.
+        my $cur_branch = $c->stash->{app_workflow} || 'main';
+        my @branch_pids;
+        if ($cur_branch ne 'main') {
+            my $hint = $c->req->param('filter_project') || '';
+            if (!$hint || $hint !~ /^\d+$/) {
+                $hint = '';
+                my $list = eval { _build_worktree_list($c) } || [];
+                my ($wt) = grep { ($_->{name} || '') eq $cur_branch } @$list;
+                $hint = $wt->{project_id} if $wt && $wt->{project_id};
+            }
+            @branch_pids = eval {
+                Comserv::Util::ProjectDependencies::resolve_branch_project_ids(
+                    $c, $cur_branch, ($hint =~ /^\d+$/ ? $hint : undef)
+                );
+            };
+            if (@branch_pids) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                    "daily_impl branch focus '$cur_branch': projects "
+                    . join(',', @branch_pids));
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
+                    "daily_impl branch focus '$cur_branch': no project resolved — unfiltered");
+            }
+        }
+        my %scope = map { $_ => 1 } @branch_pids;
+
         for my $t (@_focus_all) {
             my $h = $row_by_id{ $t->record_id };
             next if Comserv::Util::TodoTypes::is_calendar_fixture($h);
             next if ($h->{is_recurring} // 0);
             Comserv::Util::TodoRanking::score_todo($h, { now_epoch => $now_epoch });
+            # Branch filter AFTER scoring so in-progress-any-branch still shows.
+            if (%scope) {
+                my $in_scope = ($scope{ $h->{project_id} // '' } ? 1 : 0)
+                    || (($h->{status} // '') eq '5')
+                    || ($h->{in_progress} ? 1 : 0);
+                next unless $in_scope;
+            }
             # Pass the decorated column hash (has every real column PLUS ap_score /
             # project_name / blocking_names / etc. set by score_todo) to the template,
             # exactly like Controller/Todo.pm. Passing the bare DBIx row left those
@@ -1376,19 +1420,38 @@ sub daily_impl :Private {
             };
         }
         # Priorities are work only — lunch/breaks/appointments stay on the calendar.
+        # Sort mirrors sub daily's branch queue: Active (any branch) first,
+        # then this branch's projects, blockers directly above the todo they
+        # block, then score, then priority.
         @scored = sort {
-            ($a->{score} // 0) <=> ($b->{score} // 0)
-            || ($a->{pri} // 5) <=> ($b->{pri} // 5)
+            my $a_act = ((($a->{todo}{status} // '') eq '5') || $a->{in_progress}) ? 1 : 0;
+            my $b_act = ((($b->{todo}{status} // '') eq '5') || $b->{in_progress}) ? 1 : 0;
+            my $a_br  = $scope{ $a->{todo}{project_id} // '' } ? 1 : 0;
+            my $b_br  = $scope{ $b->{todo}{project_id} // '' } ? 1 : 0;
+            my $a_blocked = ($a->{todo}{blocked_by_todo_id} && !$a->{todo}{blocker_done}) ? 1 : 0;
+            my $b_blocked = ($b->{todo}{blocked_by_todo_id} && !$b->{todo}{blocker_done}) ? 1 : 0;
+            $b_act <=> $a_act
+                || $b_br <=> $a_br
+                || $a_blocked <=> $b_blocked
+                || ($a->{score} // 0) <=> ($b->{score} // 0)
+                || ($a->{pri} // 5) <=> ($b->{pri} // 5)
         } @scored;
         @active_priorities = map { $_->{todo} } @scored[0..($#scored > 19 ? 19 : $#scored)];
 
-        # Remaining (eligible but not in top 20) — also pass the decorated hash.
+        # Remaining (eligible but not in top 20) — same branch scope as the
+        # queue (branch projects + active-any-branch). Sort: priority first,
+        # then subject alphabetically — findable by name.
         my %top_ids = map { $_->{record_id} => 1 } @active_priorities;
-        for my $t (@_focus_all) {
-            my $h = $row_by_id{ $t->record_id };
-            next if $top_ids{ $h->{record_id} };
-            push @remaining_open_todos, $h;
-        }
+        @remaining_open_todos = sort {
+            ($a->{priority} // 9) <=> ($b->{priority} // 9)
+            || lc($a->{subject} // '') cmp lc($b->{subject} // '')
+        } grep {
+            !$top_ids{ $_->{record_id} }
+            && (!%scope
+                || ($scope{ $_->{project_id} // '' } ? 1 : 0)
+                || (($_->{status} // '') eq '5')
+                || ($_->{in_progress} ? 1 : 0))
+        } @_focus_all;
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',

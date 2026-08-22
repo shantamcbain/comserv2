@@ -108,9 +108,11 @@
 </p>
 <div class="todo-card-list">
 [% FOREACH task IN todos %]
+    [% SET tcard_wrap = "data-todo-id='" _ task.record_id _ "'" %]
     [% INCLUDE 'todo/todo_card.tt'
         tc          = task
         tc_show_done = 1
+        tc_wrapper_extra = tcard_wrap
     %]
 [% END %]
 </div>

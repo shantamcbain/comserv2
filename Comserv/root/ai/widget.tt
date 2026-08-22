@@ -278,6 +278,8 @@
     <script src="/static/js/ai-chat/page-context.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/ai-chat/wizards.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/ai-chat/audio-backup.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/feature-todo.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/tooltips.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/local-chat.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/ai-chat/index.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <!-- Keep header visible forever in popup mode (overrides any 7-10s timeout in JS) -->

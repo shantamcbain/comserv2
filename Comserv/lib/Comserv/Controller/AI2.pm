@@ -890,6 +890,37 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    # Code-read: "can you read the files" must not reach Hy3.
+    if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+        my $read_hit = eval {
+            require Comserv::Model::AI2::CodeRead;
+            my $brain = eval { $c->model('AI2::CodeRead') };
+            $brain = Comserv::Model::AI2::CodeRead->new if !$brain || !ref $brain;
+            $brain->try_chat_read($c,
+                prompt       => $prompt,
+                page_path    => $page_path,
+                page_content => $page_content,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'ai2_chat', "CodeRead try_chat_read threw: $@");
+        }
+        if ($read_hit && $read_hit->{handled}) {
+            $c->res->body(encode_json({
+                success          => $read_hit->{success} ? 1 : 0,
+                response         => $read_hit->{response} // '',
+                model            => $read_hit->{model} // '(code-read)',
+                provider         => $read_hit->{provider} // 'ai2-coderead',
+                needs_web_search => 0,
+                files_read       => $read_hit->{files_read} || [],
+                conversation_id  => $conversation_id,
+                thinking         => [],
+            }));
+            return;
+        }
+    }
+
     # ── Focus-Tune agent: "what are my top 5 todos by function?" ──
     # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
     # UI button uses) so the question is answerable from Chat-with-AI too.
@@ -964,6 +995,8 @@ sub chat :Local :Args(0) {
         title            => $result->{title},
         created_at       => $result->{created_at},
         thinking         => $result->{thinking} // [],
+        todo_action      => $result->{todo_action},
+        files_read       => $result->{files_read} || [],
     }));
 }
 
