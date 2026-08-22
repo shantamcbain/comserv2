@@ -553,11 +553,16 @@
     }
 
     function doneWithLogTodoCard(btn, recordId) {
+        // Re-entrancy guard: a second Done trigger (e.g. the floating Done
+        // button) must not fire another done_with_log while one is in flight
+        // or already completed for this card.
+        if (btn.disabled || btn.getAttribute('data-done-inflight') === '1') return;
         var isActive = btn.getAttribute('data-is-active') === '1';
         var notes = prompt('Mark todo DONE — resolution / notes (optional):');
         if (notes === null) return;
         notes = notes || '';
         var payload = { record_id: recordId, notes: notes };
+        btn.setAttribute('data-done-inflight', '1');
         btn.disabled = true;
         btn.textContent = '…';
         // Server-side done_with_log is self-sufficient (closes the open log or
@@ -578,10 +583,12 @@
                 btn.textContent = '✓ Done';
                 btn.disabled = true;
             } else {
+                btn.removeAttribute('data-done-inflight');
                 btn.disabled = false;
                 btn.textContent = 'Done';
             }
         }).catch(function() {
+            btn.removeAttribute('data-done-inflight');
             btn.disabled = false;
             btn.textContent = 'Done';
         });
@@ -1021,8 +1028,15 @@
 
     document.addEventListener('click', function(e) {
         // Track the last-touched todo card for the floating Done button.
+        // Ignore clicks ON action buttons (Done/Start/Chat) — otherwise clicking
+        // the card's Done ALSO summons the floating Done, inviting a second
+        // done_with_log submission (double dialog / double log insert).
+        if (e.target.closest('[data-done-btn],[data-start-btn],[data-chat-todo],#float-done-btn')) {
+            hideFloatDoneBtn();
+            return;
+        }
         var touchedCard = e.target.closest('[data-todo-id]');
-        if (touchedCard && !touchedCard.closest('#float-done-btn')) {
+        if (touchedCard) {
             var stillOpen = touchedCard.querySelector('button[data-done-btn]:not([disabled])');
             if (stillOpen) { showFloatDoneBtn(touchedCard); } else { hideFloatDoneBtn(); }
         }
