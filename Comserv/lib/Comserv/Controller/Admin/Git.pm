@@ -843,7 +843,14 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     # Check if this is a POST request (user confirmed the git pull)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         
-        my $selected_branch = $c->req->param('branch') || 'main';
+        # Default to THIS checkout's branch, never bare 'main'. A worktree
+        # server cannot `git checkout main` — already used by the primary
+        # (exit 128 + ERROR audit todo).
+        my $selected_branch = $c->req->param('branch');
+        if (!defined $selected_branch || $selected_branch !~ /\S/) {
+            $selected_branch = $self->get_current_branch($c);
+            $selected_branch = 'main' if !$selected_branch || $selected_branch eq 'unknown';
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
             "Git pull confirmed for branch '$selected_branch', executing");
@@ -939,7 +946,11 @@ sub safe_git_pull :Path('/admin/safe_git_pull') :Args(0) {
     # Check if this is a POST request (user confirmed the operation)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         
-        my $selected_branch = $c->req->param('branch') || 'main';
+        my $selected_branch = $c->req->param('branch');
+        if (!defined $selected_branch || $selected_branch !~ /\S/) {
+            $selected_branch = $self->get_current_branch($c);
+            $selected_branch = 'main' if !$selected_branch || $selected_branch eq 'unknown';
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'safe_git_pull', 
             "Safe git pull confirmed for branch '$selected_branch', executing");
@@ -1758,6 +1769,7 @@ sub test_gate :Path('/admin/git/test_gate') :Args(1) {
     $c->response->body(encode_json({
         success => $res->{success} ? 1 : 0,
         branch  => $branch,
+        stale   => $res->{stale} ? 1 : 0,
         output  => $res->{output},
         error   => $res->{error_msg},
     }));
@@ -1786,28 +1798,38 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
         return;
     }
 
-    # Ensure we are on main before merging.
-    my $cur = $self->get_current_branch($c);
-    if ($cur ne 'main') {
-        my $sw = $self->git_service->switch_branch($c, 'main');
-        unless ($sw->{success}) {
-            $c->response->body(encode_json({ success => 0, error => "Could not switch to main: $sw->{error_msg}" }));
-            return;
-        }
+    # Land the merge in the PRIMARY checkout (where main is checked out).
+    # Never switch_branch('main') from a linked worktree — git refuses
+    # ("already checked out at <primary>") and merging inside the worktree
+    # is a no-op ("Already up to date"). main is already checked out in the
+    # primary, so no branch switch is required or attempted.
+    my $main_repo = $self->git_service->main_repo_path($c);
+    unless ($main_repo) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+            'merge_to_main: could not resolve the primary repo (main checkout)');
+        $c->response->body(encode_json({ success => 0, error => 'Could not resolve the primary repo (main checkout).' }));
+        return;
     }
 
-    # Gate: tests must be green in the worktree before merge.
-    my $gate = $self->git_service->run_test_gate($c, $branch);
+    my $gate = $self->git_service->run_test_gate($c, $branch, $main_repo);
     unless ($gate->{success}) {
+        # Prefer the gate's own diagnostic (e.g. a stale worktree with no test
+        # suite) over the generic "fix tests" message, which is misleading when
+        # no test actually ran.
+        my $msg = $gate->{error_msg}
+            || "Test gate FAILED for '$branch' — merge blocked. Fix tests in the worktree first.";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
+            "merge_to_main: test gate FAILED for '$branch'");
         $c->response->body(encode_json({
             success => 0,
-            error   => "Test gate FAILED for '$branch' — merge blocked. Fix tests in the worktree first.",
+            stale   => $gate->{stale} ? 1 : 0,
+            error   => $msg,
             detail  => $gate->{output},
         }));
         return;
     }
 
-    my $res = $self->git_service->merge_branch($c, $branch);
+    my $res = $self->git_service->merge_branch($c, $branch, { repo => $main_repo });
     if ($res->{conflict}) {
         $c->response->body(encode_json({
             success  => 0,
@@ -1896,33 +1918,44 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     my $wt_path = $self->git_service->worktree_checkout_path_for_branch($c, $target);
 
     if ($source eq 'main' && $target ne 'main') {
-        # main -> branch: pull main's current state down into the target branch.
-        # The branch is already checked out in its worktree, so we just merge
-        # the local 'main' ref into it there. We merge the LOCAL main (the code
-        # the user is actually looking at on the dashboard), NOT origin/main —
-        # origin is frequently stale (unpushed commits), and "merge main" must
-        # mean "the main I see", not "whatever is on origin". No test gate (we
-        # are updating a worktree, not main).
         $direction = 'main->branch';
-        unless (defined $wt_path) {
+        my $current = $self->get_current_branch($c) // '';
+        # Prefer THIS checkout when we are already on the target (the 3d
+        # worktree server). Do not require a worktree-list lookup, and never
+        # treat the dropdown defaulting to main as the destination.
+        my $dest = ($current eq $target)
+            ? $self->git_service->repo_path($c)
+            : $wt_path;
+        unless (defined $dest && length $dest) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+                "main->branch: no checkout path for '$target'");
             $c->response->body(encode_json({
                 success => 0,
                 error   => "Branch '$target' is not checked out in any worktree; cannot merge main into it from the dashboard.",
             }));
             return;
         }
-        # Bring the worktree's view of main up to date so 'main' resolves to the
-        # local main tip, then merge local main into the branch.
-        my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
-        # Ensure the worktree has a 'main' ref tracking origin/main so the local
-        # main ref is present; then merge the literal local 'main' ref.
-        my $up = $self->git_service->_run($c, 'merge', '--no-ff', 'main',
-            { repo => $wt_path });
+        my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
+        # --autostash: the worktree routinely has uncommitted WIP; a plain merge
+        # refuses ("Your local changes would be overwritten"). Autostash stashes
+        # the WIP, merges, then reapplies. If reapplying conflicts, git KEEPS the
+        # stash entry (recoverable via the dashboard's Stash Pop) — nothing lost.
+        my $up = $self->git_service->_run($c, 'merge', '--no-ff', '--autostash', 'main',
+            { repo => $dest });
+        my $combined = join("\n", grep { defined && length }
+            $fetch->{output}, $fetch->{error}, $up->{output}, $up->{error});
+        my $autostash_used = ($combined // '') =~ /Created autostash|Applied autostash/ ? 1 : 0;
+        # WIP could not be reapplied cleanly: git saved it as stash@{0}. Surface
+        # that distinctly so the user knows to recover via Stash Pop.
+        my $autostash_conflict = ($combined // '') =~ /Cannot store stash|Please commit or stash|stash.*conflict/i
+            && $autostash_used ? 1 : 0;
         $res = {
             success   => $up->{success} ? 1 : 0,
-            output    => ($fetch->{output} // '') . "\n" . ($up->{output} // ''),
-            error_msg => $up->{success} ? undef : ($up->{error} || 'merge failed'),
-            conflict  => ($up->{output} // '') =~ /CONFLICT|Automatic merge failed/ ? 1 : 0,
+            output    => $combined,
+            autostash => $autostash_used,
+            autostash_conflict => $autostash_conflict,
+            error_msg => $up->{success} ? undef : ($up->{error} || $up->{output} || 'merge failed'),
+            conflict  => ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0,
         };
     }
     elsif ($source ne 'main' && $target eq 'main') {
@@ -1932,25 +1965,31 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         #     We merge the branch by NAME, which is visible from the main repo
         #     (refs/heads/<branch>), so no worktree checkout is needed here.
         $direction = 'branch->main';
-        my $gate = $self->git_service->run_test_gate($c, $source);
+        my $main_repo = $self->git_service->main_repo_path($c);
+        unless ($main_repo) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+                "merge: could not resolve primary repo for '$source' -> main");
+            $c->response->body(encode_json({
+                success => 0,
+                error   => 'Could not resolve the primary repo (main checkout).',
+            }));
+            return;
+        }
+        my $gate = $self->git_service->run_test_gate($c, $source, $main_repo);
         unless ($gate->{success}) {
+            my $msg = $gate->{error_msg}
+                || "Test gate FAILED for '$source' — merge blocked. Fix tests in the worktree first.";
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
                 "test gate FAILED for '$source' — merge blocked");
             $c->response->body(encode_json({
                 success => 0,
-                error   => "Test gate FAILED for '$source' — merge blocked. Fix tests in the worktree first.",
+                stale   => $gate->{stale} ? 1 : 0,
+                error   => $msg,
                 detail  => $gate->{output},
             }));
             return;
         }
-        # If the branch has its own worktree, first bring it up to latest main
-        # so the worktree stays consistent (optional, best-effort).
-        if (defined $wt_path) {
-            $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
-            $self->git_service->_run($c, 'merge', '--no-ff', 'main',
-                { repo => $wt_path });
-        }
-        my $mr = $self->git_service->merge_branch($c, $source);
+        my $mr = $self->git_service->merge_branch($c, $source, { repo => $main_repo });
         $res = {
             success   => $mr->{success} ? 1 : 0,
             output    => $mr->{output} // '',
@@ -1988,6 +2027,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         target    => $target,
         direction => $direction,
         conflict  => 0,
+        autostash => $res->{autostash} ? 1 : 0,
+        autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         error     => $res->{error_msg},
         output    => $res->{output},
     }));

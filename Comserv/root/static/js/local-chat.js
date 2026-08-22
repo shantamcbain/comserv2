@@ -1847,6 +1847,11 @@
                         chatButton.classList.remove('popup-active');
                         chatButton.title = 'Open AI assistant';
                     }
+                    // The popup window is gone — drop the persistent flag so a later
+                    // session does not inherit a stale "popup active" marker and render
+                    // a dead zombie button. (beforeunload also clears it, but this covers
+                    // close paths that don't fire beforeunload reliably.)
+                    try { localStorage.removeItem('ai_popup_active'); } catch (e) {}
                     // Resume the conversation the user had in the popup
                     try {
                         const popupConvId = localStorage.getItem('ai_popup_conv_id');
@@ -2255,7 +2260,11 @@
         // Update loading message to show which tier is being used
         if (autoTier) {
             const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
-            const displayName = providerName === 'grok' ? ('Grok: ' + (providerParts[1] || 'auto')) : ('Ollama/' + tierLabel);
+            const displayName = providerName === 'supergrok'
+                ? ('SuperGrok: ' + (providerParts[1] || 'auto'))
+                : providerName === 'grok'
+                    ? ('Grok: ' + (providerParts[1] || 'auto'))
+                    : ('Ollama/' + tierLabel);
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
         }
 
@@ -2897,7 +2906,12 @@
                 // treated every non-Grok response as Ollama, which is why an
                 // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
                 const providerParts2 = (state.selectedProvider || '').split('|');
-                const provName = data.provider || providerParts2[0] || '';
+                // Prefer the user's selected prefix when the backend collapses
+                // SuperGrok onto the Grok client (same API, different billing).
+                let provName = data.provider || providerParts2[0] || '';
+                if ((providerParts2[0] || '') === 'supergrok' && (provName === 'grok' || !provName)) {
+                    provName = 'supergrok';
+                }
                 const rawModel = data.model || providerParts2[1] || '';
                 const modelLabel = describeModel(
                     provName + (rawModel ? '|' + rawModel : ''),
@@ -2947,6 +2961,14 @@
                 }
 
                 persistMessages();
+
+                // Server already created (or asked about) a todo — skip the LLM ACTION path.
+                if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+                    && typeof ComservChat.featureTodo.handleServerResult === 'function') {
+                    ComservChat.featureTodo.handleServerResult(data.todo_action, {
+                        host: document.getElementById('chat-messages')
+                    });
+                }
 
                 // Coding agent: intercept [READ_FILE: path] requests automatically
                 if (state.pageContext && state.pageContext.agent_id === 'coding') {
@@ -4765,6 +4787,22 @@
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
 
+        // Shared todo brain (widget + editor): sitename match / ask-to-create-project.
+        if (actionObj && (actionObj.action === 'create_todo' || actionObj.action === 'create_project')
+            && window.ComservChat && ComservChat.featureTodo && typeof ComservChat.featureTodo.handleAction === 'function') {
+            ComservChat.featureTodo.handleAction(actionObj, {
+                host: chatMessages,
+                status: function (msg, isErr) {
+                    var si = document.getElementById('chat-status');
+                    if (si) {
+                        si.textContent = msg || '';
+                        si.className = isErr ? 'chat-status error' : 'chat-status connected';
+                    }
+                }
+            });
+            return;
+        }
+
         // fill_form is handled entirely client-side — no server round-trip needed.
         if (actionObj.action === 'fill_form') {
             _executeFillForm(actionObj);
@@ -5743,17 +5781,26 @@
                 }
             });
 
-            // Restore last mode: popup window (default on desktop) or inline dock (if no active popup)
-            const isPopupActive = localStorage.getItem('ai_popup_active') === '1';
+            // Restore last mode: popup window (default on desktop) or inline dock (if no active popup).
+            //
+            // A detached popup is a LIVE window object that does NOT survive a page reload
+            // — on every fresh load state._popupWindow is null. So a stale
+            // 'ai_popup_active' flag inherited from a previous session is a ZOMBIE: the
+            // button would render popup-active (title "click to bring to front") but
+            // clicking does nothing because the window no longer exists. Honor the flag
+            // only when a real popup window is open in THIS JS session (set by
+            // detachToPopup / cleared by its close-poll and the click handler). On load,
+            // clear any stale flag so the button falls back to its default behavior
+            // (click → open the preferred mode) instead of becoming a dead stub.
+            try {
+                const _popupStillOpen = state._popupWindow && !state._popupWindow.closed;
+                if (!_popupStillOpen) {
+                    localStorage.removeItem('ai_popup_active');
+                }
+            } catch (e) {}
+
             if (window.AI_WIDGET_POPUP) {
                 openChat();
-            } else if (isPopupActive) {
-                // If a popup is active, ensure the chat button is visually marked as popup-active
-                const chatButton = document.getElementById('chat-button');
-                if (chatButton) {
-                    chatButton.classList.add('popup-active');
-                    chatButton.title = 'AI chat is open in a separate window — click to bring to front';
-                }
             } else if (sessionStorage.getItem('ai_chat_open') === 'inline') {
                 openChat();
             } else if (sessionStorage.getItem('ai_chat_open') === 'popup'

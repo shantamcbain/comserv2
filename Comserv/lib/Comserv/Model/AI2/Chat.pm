@@ -65,7 +65,8 @@ sub build_agent_prompt {
         ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",
         bmaster  => "You are a business master / project assistant. Be professional and concise.",
         planning => "You are a planning assistant. Focus on daily logs, tasks, and clear next steps.",
-        code     => "You are a coding assistant. Help write, explain, and debug code. Prefer concise examples.",
+        todo     => "You are the Comserv todo agent. When the user wants a todo created, the server already performs that job — confirm the result, do not invent a form.",
+        code     => "You are a coding assistant for the Comserv2 Catalyst app. The server already loads source into [FILE:] blocks. NEVER say you lack filesystem access or ask the user to paste files. Load other sources with [READ_FILE: lib/...] (optional :START-END). Prefer concise examples and one fenced code block so Approve can apply it.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
     );
     return $agent{$aid} if exists $agent{$aid};
@@ -84,6 +85,22 @@ sub build_system_prompt {
     push @parts, $args{shared_history}      if $args{shared_history};
     push @parts, $args{page_context}        if $args{page_context};
     push @parts, $args{navigation_hint}     if $args{navigation_hint};
+
+    # Logged-in users can create todos from this same chat (widget + editor).
+    my $uname = eval { $c->session->{username} } || '';
+    if ($uname && lc($uname) ne 'guest') {
+        my $contract = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "TodoCreate chat_contract failed: $@");
+        }
+        push @parts, $contract if $contract;
+    }
 
     return join("\n\n", grep { defined && length } @parts);
 }
@@ -120,12 +137,110 @@ sub process {
     my $prompt = $args{prompt} // '';
     return { success => 0, error => 'Prompt is required' } unless $prompt && length $prompt;
 
+    # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
+    # picker model. Free models invent a fake "Add" box; this runs first.
+    my $todo_hit = eval {
+        require Comserv::Model::AI2::TodoCreate;
+        Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
+            prompt    => $prompt,
+            page_path => $args{page_path} || '',
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "TodoCreate try_chat_create threw: $@");
+    }
+    if ($todo_hit && $todo_hit->{handled}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            'Todo-create agent handled chat (no LLM)');
+        return {
+            success     => 1,
+            response    => $todo_hit->{response} // '',
+            model       => $todo_hit->{model} // '(todo-create)',
+            provider    => $todo_hit->{provider} // 'ai2-todo',
+            todo_action => $todo_hit->{todo_action},
+            thinking    => [],
+        };
+    }
+
+    # Code-read AGENT. Hy3 invents "I have no filesystem access" — do not
+    # send "can you read the files" to the picker model.
+    my $read_hit = eval {
+        require Comserv::Model::AI2::CodeRead;
+        my $brain = eval { $c->model('AI2::CodeRead') };
+        $brain = Comserv::Model::AI2::CodeRead->new if !$brain || !ref $brain;
+        $brain->try_chat_read($c,
+            prompt       => $prompt,
+            page_path    => $args{page_path} || '',
+            page_content => $args{page_content} || '',
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "CodeRead try_chat_read threw: $@");
+    }
+    if ($read_hit && $read_hit->{handled}) {
+        return {
+            success    => 1,
+            response   => $read_hit->{response} // '',
+            model      => $read_hit->{model} // '(code-read)',
+            provider   => $read_hit->{provider} // 'ai2-coderead',
+            files_read => $read_hit->{files_read} || [],
+            thinking   => [],
+        };
+    }
+
     my $username  = $c->session->{username}  || 'Guest';
     my $roles     = $c->session->{roles}     || [];
     my $can_select = $self->_can_select_model($c);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat from $username: " . substr($prompt, 0, 80));
+
+    # Editor coding agent: inject the open buffer INTO THE USER MESSAGE.
+    # Hy3 ignores system-only context and says "paste the code".
+    my @files_read;
+    my $code_read;
+    my $code_skip;
+    my $uname = $c->session->{username} || '';
+    my $code_ok = (lc($args{agent_id} // '') eq 'code')
+        && $uname && lc($uname) ne 'guest';
+    if ($code_ok) {
+        $code_read = eval {
+            require Comserv::Model::AI2::CodeRead;
+            my $brain = eval { $c->model('AI2::CodeRead') };
+            $brain = Comserv::Model::AI2::CodeRead->new if !$brain || !ref $brain;
+            $brain;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                "CodeRead init failed: $@");
+            $code_read = undef;
+        }
+        if ($code_read) {
+            my $prep = eval {
+                $code_read->prepare_turn($c,
+                    prompt       => $prompt,
+                    page_path    => $args{page_path} || '',
+                    page_content => $args{page_content} || '',
+                );
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                    "CodeRead prepare_turn threw: $@");
+            }
+            elsif ($prep) {
+                $args{page_context} = $prep->{page_context} if $prep->{page_context};
+                push @files_read, @{ $prep->{files_read} || [] };
+                $code_skip = $prep->{skip};
+                if ($prep->{user_files} && length $prep->{user_files}) {
+                    $prompt .= "\n\n---\nThe server already loaded these files from disk. "
+                        . "They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n"
+                        . $prep->{user_files};
+                }
+            }
+        }
+    }
 
     my $messages = $self->build_messages($args{history}, $prompt);
 
@@ -151,37 +266,12 @@ sub process {
         "AI2 chat dispatch: user=$username provider=$provider_name model="
         . ($use_model // '(router-default)') . " can_select=$can_select");
 
-    # Dispatch to the correct self-contained v2 provider client.
-    my $dispatch = {
-        ollama     => 'AI2::Provider::Ollama',
-        grok       => 'AI2::Provider::Grok',
-        openrouter => 'AI2::Provider::OpenRouter',
-        external   => 'AI2::Provider::OpenRouter',   # openrouter-prefixed models
-    };
-    my $prov_class = $dispatch->{$provider_name} || 'AI2::Provider::Ollama';
-    my $provider = try { $c->model($prov_class) } catch { undef };
-
-    unless ($provider && $provider->can('chat')) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
-            "No client available for provider=$provider_name (class="
-            . ($prov_class // 'undef') . ")");
-        return { success => 0, error => "No client available for provider $provider_name" };
-    }
-
-    # For Ollama, resolve the first reachable workstation address (LAN vs
-    # ZeroTier vs OLLAMA_HOST). Non-Ollama providers ignore host/port.
-    my ($ollama_host, $ollama_port);
-    if ($provider->can('resolve_host')) {
-        ($ollama_host, $ollama_port) = $provider->resolve_host($c);
-    }
-
+    # One dispatch+fallback path (chat widget and FocusTune share Router).
+    # SuperGrok / OpenRouter (no auto-fill) fall back to :free then Ollama.
+    # xAI grok auto-fills — not the same provider as SuperGrok.
+    my $router = $c->model('AI2::Router');
     my $resp = try {
-        $provider->chat($c,
-            messages => $messages,
-            model    => $self->_bare_model($use_model),
-            host     => $ollama_host,
-            port     => $ollama_port,
-        );
+        $router->chat_with_fallback($c, $provider_name, $use_model, $messages);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
@@ -192,7 +282,67 @@ sub process {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name failed: " . ($resp->{error} // 'AI provider error')
             . " (model=" . ($use_model // '?') . ", user=$username)");
+        eval {
+            $c->model('AI')->log_usage($c,
+                provider          => $provider_name,
+                model             => $use_model || 'unknown',
+                status            => 'error',
+                error_message     => $resp->{error} // 'AI provider error',
+                request_type      => 'chat',
+            );
+        };
         return { success => 0, error => $resp->{error} // 'AI provider error' };
+    }
+
+    if ($resp->{fallback}) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            "Fell back from $resp->{fallback_from} ($resp->{original_error}) to "
+            . ($resp->{provider} // '') . '/' . ($resp->{model} // ''));
+        eval {
+            $c->model('AI')->log_usage($c,
+                provider          => $resp->{fallback_from} || $provider_name,
+                model             => $resp->{original_model} || $use_model || 'unknown',
+                status            => 'error',
+                error_message     => $resp->{original_error} || 'credits exhausted, fell back',
+                request_type      => 'chat',
+                metadata          => { fallback_to => $resp->{provider} },
+            );
+        };
+        $provider_name = $resp->{provider} if $resp->{provider};
+        $use_model     = $resp->{model}     if $resp->{model};
+    }
+
+    # Coding agent: if the model asked [READ_FILE:], load and continue (bounded).
+    if ($code_read && $resp && $resp->{success}) {
+        my $loop = 0;
+        my $max_fu = eval { $code_read->max_followups } || 2;
+        while ($loop < $max_fu) {
+            my $fu = eval { $code_read->follow_up_context($c, $resp->{response}, $code_skip) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                    "CodeRead follow_up_context threw: $@");
+                last;
+            }
+            last unless $fu && $fu->{user_message};
+            push @$messages, { role => 'assistant', content => $resp->{response} // '' };
+            push @$messages, { role => 'user',      content => $fu->{user_message} };
+            push @files_read, @{ $fu->{files_read} || [] };
+            $code_skip = $fu->{skip} || $code_skip;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                'CodeRead follow-up loaded: ' . join(', ', @{ $fu->{files_read} || [] }));
+            my $again = try {
+                $router->chat_with_fallback($c, $provider_name, $use_model, $messages);
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                    "CodeRead follow-up provider threw: $_");
+                undef;
+            };
+            last unless $again && $again->{success};
+            $resp = $again;
+            if ($resp->{provider}) { $provider_name = $resp->{provider}; }
+            if ($resp->{model})     { $use_model     = $resp->{model}; }
+            $loop++;
+        }
     }
 
     # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
@@ -263,6 +413,36 @@ sub process {
         # Non-fatal: still return the AI response to the user.
     };
 
+    eval {
+        my $usage_info = $resp->{usage} || {};
+        $c->model('AI')->log_usage($c,
+            provider          => $provider_name,
+            model             => $resp->{model} || $use_model || 'unknown',
+            prompt_tokens     => $usage_info->{prompt_tokens} || 0,
+            completion_tokens => $usage_info->{completion_tokens} || 0,
+            total_tokens      => $usage_info->{total_tokens} || 0,
+            request_type      => 'chat',
+            conversation_id   => $conversation_id,
+            status            => 'success',
+            metadata          => {
+                agent_id      => $args{agent_id},
+                ($resp->{fallback} ? (
+                    fallback      => 1,
+                    fallback_from => $resp->{fallback_from},
+                ) : ()),
+            },
+        );
+        # SuperGrok ≠ xAI grok. Only SuperGrok (prepaid, no auto-fill) trips the 80% alert.
+        my $from = $resp->{fallback_from} || $provider_name || '';
+        if ($from eq 'supergrok' || $provider_name eq 'supergrok') {
+            $c->model('AI')->usage->maybe_alert_supergrok($c);
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+            "Failed to record AI usage: $@");
+    }
+
     return {
         success         => 1,
         response        => $resp->{response} // '',
@@ -273,6 +453,7 @@ sub process {
         title           => $saved_title,
         created_at      => $created_at,
         thinking        => [],
+        files_read      => \@files_read,
     };
 }
 

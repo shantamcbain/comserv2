@@ -28,7 +28,8 @@
 <div class="app-container">
     <div class="content-container">
         <div class="content-primary">
-            <h1><i class="fas fa-code-branch"></i> Git Dashboard</h1>
+            <h1><i class="fas fa-code-branch"></i> Git Dashboard <span class="git-current-branch git-current-branch--head" title="Branch this dashboard is operating on">
+                <i class="fas fa-code-branch"></i> <strong>[% current_branch | html %]</strong></span></h1>
 
             <div class="admin-panel" data-create-worktree-panel="1">
                 <div class="admin-panel-header"><h3><i class="fas fa-plus"></i> New Branch + Worktree</h3></div>
@@ -91,9 +92,12 @@
 
                 [%# ---- Repository + branch selector (replaces the old Branches card) ---- %]
                 <div class="git-card git-card--grow">
-                    <h4>Repository</h4>
+                    <h4>Repository <span class="git-current-branch git-current-branch--head" title="Branch this dashboard is operating on">
+                        <i class="fas fa-code-branch"></i> <strong>[% current_branch | html %]</strong></span></h4>
                     <div class="git-inline">
-                        [%# Switch branch by selecting from the dropdown %]
+                        [% IF current_branch && current_branch != 'main' && current_branch != 'master' %]
+                        <span class="section-info"><i class="fas fa-lock"></i> Worktree checkout — stays on <code class="code-inline">[% current_branch | html %]</code>. Cannot switch to main (already checked out in the primary repo). Merge main into this branch below.</span>
+                        [% ELSE %]
                         <form method="post" action="[% c.uri_for('/admin/git/action') %]"
                               class="inline-form" data-git-switch-form="1">
                             <input type="hidden" name="op" value="switch">
@@ -101,39 +105,48 @@
                             <select name="branch" class="form-control git-select"
                                     data-git-switch-select="1" title="Switch branch">
                                 [% FOREACH b IN branch_details %]
+                                [% IF b.name != 'git' %]
+                                [% SET skip_wt = 0 %]
+                                [% UNLESS b.is_current %]
+                                    [% FOREACH w IN worktree_list %]
+                                        [% IF w.name == b.name && w.name != 'main' %][% SET skip_wt = 1 %][% END %]
+                                    [% END %]
+                                [% END %]
+                                [% UNLESS skip_wt %]
                                 <option value="[% b.name | html %]"
                                     [% IF b.is_current %]selected[% END %]>
                                     [% b.name | html %][% IF b.last_commit_relative %] · [% b.last_commit_relative | html %][% END %]
                                 </option>
                                 [% END %]
+                                [% END %]
+                                [% END %]
                             </select>
                         </form>
+                        [% END %]
 
+                        [%# -- Relationship to the integration base (main) = the PRIMARY signal -- %]
                         [% IF tracking.upstream %]
                             [% IF tracking.ahead == 0 && tracking.behind == 0 %]
-                                <span class="section-info"><i class="fas fa-check"></i> up to date</span>
+                                <span class="section-info"><i class="fas fa-check"></i> up to date with upstream</span>
                             [% ELSE %]
                                 [% IF tracking.ahead > 0 %]
-                                <span class="section-info-warn"><i class="fas fa-upload"></i> [% tracking.ahead %] to push</span>
+                                <span class="section-info"><i class="fas fa-upload"></i> [% tracking.ahead %] to push</span>
                                 [% END %]
                                 [% IF tracking.behind > 0 %]
-                                <span class="section-info-warn"><i class="fas fa-download"></i> [% tracking.behind %] behind</span>
+                                <span class="section-info-warn"><i class="fas fa-download"></i> [% tracking.behind %] behind upstream</span>
                                 [% END %]
                             [% END %]
                         [% ELSIF tracking.base %]
-                            [# This branch has no GitHub upstream (local-merge workflow).
-                               Show its relationship to the integration base (main), so the
-                               user can see if the branch is stale before starting work. #]
+                            [% IF tracking.base_behind > 0 %]
+                                <span class="section-info-danger"><i class="fas fa-arrow-down"></i> <strong>[% tracking.base_behind %] behind [% tracking.base | html %]</strong> — update this branch before working</span>
+                            [% END %]
+                            [% IF tracking.base_ahead > 0 %]
+                                <span class="section-info"><i class="fas fa-code-branch"></i> <strong>[% tracking.base_ahead %] ahead of [% tracking.base | html %]</strong> — ready to merge into [% tracking.base | html %]</span>
+                            [% END %]
                             [% IF tracking.base_ahead == 0 && tracking.base_behind == 0 %]
                                 <span class="section-info"><i class="fas fa-check"></i> in sync with [% tracking.base | html %]</span>
-                            [% ELSE %]
-                                [% IF tracking.base_ahead > 0 %]
-                                <span class="section-info"><i class="fas fa-code-branch"></i> [% tracking.base_ahead %] unmerged on [% tracking.base | html %]</span>
-                                [% END %]
-                                [% IF tracking.base_behind > 0 %]
-                                <span class="section-info-warn"><i class="fas fa-arrow-down"></i> [% tracking.base_behind %] behind [% tracking.base | html %] — update before working</span>
-                                [% END %]
                             [% END %]
+                            <span class="section-info-muted">no GitHub upstream — local-merge workflow (merge into main, don't push per-branch)</span>
                         [% ELSE %]
                             <span class="section-info-warn">no upstream</span>
                         [% END %]
@@ -143,7 +156,8 @@
                     [% END %]
                 </div>
 
-                [%# ---- Remote actions (fit width) ---- %]
+                [%# ---- Remote actions: ONLY relevant for branches with a GitHub upstream ---- %]
+                [% IF tracking.upstream %]
                 <div class="git-card git-card--fit">
                     <h4>Remote</h4>
                     <div class="git-inline">
@@ -173,6 +187,7 @@
                         </form>
                     </div>
                 </div>
+                [% END %]
 
             </div>
 
@@ -364,9 +379,14 @@
                             <select name="merge_branch" class="form-control git-select"
                                     id="git-merge-branch" data-git-merge-select="1"
                                     title="Branch to merge with main">
+                                [% IF current_branch && current_branch != 'main' && current_branch != 'master' %]
+                                <option value="[% current_branch | html %]" selected>[% current_branch | html %] (this checkout)</option>
+                                [% ELSE %]
+                                [% SET merge_sel = 0 %]
                                 [% FOREACH b IN branch_details %]
-                                [% IF b.name != 'git' %]
-                                <option value="[% b.name | html %]"[% IF b.is_current %] selected[% END %]>[% b.name | html %][% IF b.is_current %] (active)[% END %]</option>
+                                [% IF b.name != 'git' && b.name != 'main' && b.name != 'master' %]
+                                <option value="[% b.name | html %]"[% UNLESS merge_sel %] selected[% SET merge_sel = 1 %][% END %]>[% b.name | html %][% IF b.is_current %] (this checkout)[% END %]</option>
+                                [% END %]
                                 [% END %]
                                 [% END %]
                             </select>
@@ -375,8 +395,22 @@
 
                     <p class="git-merge-hint">
                         <i class="fas fa-info-circle"></i>
-                        Active branch: <code class="code-inline" data-git-current-branch="1">[% current_branch | html %]</code>
+                        This checkout: <code class="code-inline" data-git-current-branch="1">[% current_branch | html %]</code>
                     </p>
+                    [% IF current_branch && current_branch != 'main' %]
+                    <p class="git-merge-guideline">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        You are on worktree <code class="code-inline">[% current_branch | html %]</code>.
+                        <em>Merge main &rarr; this branch</em> updates <strong>this</strong> checkout from local main.
+                        Do not switch to main. To land this branch on main, use the main dashboard (port 3001).
+                    </p>
+                    [% ELSE %]
+                    <p class="git-merge-guideline">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Only <code class="code-inline">main</code> receives inbound merges.</strong>
+                        Pick a worktree branch, then <em>Merge this branch &rarr; main</em>.
+                    </p>
+                    [% END %]
 
                     <div class="git-actions">
                         <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"

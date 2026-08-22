@@ -215,7 +215,7 @@
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
             <div class="chat-input" style="padding:6px; border-top:1px solid #555; display:flex; gap:6px;">
-                <input id="ai-chat-input" type="text" style="flex:1" placeholder="Ask AI about this file...">
+                <input id="ai-chat-input" type="text" style="flex:1" placeholder="Ask about this file, or name another lib/… path to read">
                 <button id="ai-chat-send" type="button" style="background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">Send</button>
             </div>
         </div>
