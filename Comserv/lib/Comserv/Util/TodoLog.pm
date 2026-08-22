@@ -164,7 +164,16 @@ sub close_log {
     my $now_hms = $now_dt->strftime('%H:%M:%S');
 
     my $result = try {
-        my ($dbh, $todo, undef) = _todo_ctx($c, $record_id);
+        my ($dbh, $todo, undef) = eval { _todo_ctx($c, $record_id) };
+        if ($@ && $@ =~ /Todo not found/) {
+            # Bad record_id from the caller — a client error, not a server
+            # fault. Graceful so it warns instead of creating an error-audit
+            # todo (todo 2249: probe with record_id 999999).
+            return { success => 0, graceful => 1,
+                     message => "Todo $record_id not found" };
+        }
+        die $@ if $@;
+        $todo or die "Todo not found\n";
 
         my $open_row = $dbh->selectrow_hashref(
             "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
