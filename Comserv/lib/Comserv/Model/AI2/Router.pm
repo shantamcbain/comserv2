@@ -600,6 +600,15 @@ sub _role_filter_models {
         next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
         my $svc  = $m->{provider} || '';
         my $free = $m->{free} || ( ($m->{name} // '') =~ /:free$/ ? 1 : 0 );
+        # Zero-priced external entries (e.g. stealth/ox-alpha, openrouter/auto)
+        # cost nothing — treat them as free so the guest/member tiers keep them
+        # (mirrors the JS cost logic in daily-plan-utils.js / model-select.js).
+        unless ($free) {
+            my $pp = ($m->{price_prompt}     // 0) + 0;
+            my $pc = ($m->{price_completion} // 0) + 0;
+            $free = 1 if !$m->{local} && $pp == 0 && $pc == 0 && !($m->{pricing} && %{$m->{pricing}}
+                          && (($m->{pricing}{prompt} // 1) + 0) > 0);
+        }
         my $local = $m->{local} || ( $svc eq 'ollama' ? 1 : 0 );
         if ($tier eq 'guest') {
             push @out, $m if $free || $local;
