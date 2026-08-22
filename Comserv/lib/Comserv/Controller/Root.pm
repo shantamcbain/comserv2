@@ -881,6 +881,29 @@ sub auto :Private {
                 $c->stash->{app_version}{branch} = $c->stash->{app_workflow};
             }
         }
+
+        # Overlay the LIVE branch/commit onto the build-time stamp so the global
+        # header always reflects the checkout the app is actually running from
+        # (e.g. a git-dev worktree serving on 4004 must not report "main" from an
+        # out-of-date version.json and trick a developer into committing to main).
+        # build_date / build_host keep their baked values; only branch + commit
+        # are corrected. The "+local" suffix is preserved when the live short sha
+        # differs from the baked one (or absent) so the "locally modified" signal
+        # survives the overlay.
+        if ($c->stash->{app_version}) {
+            my $live = eval {
+                Comserv::Util::Git->new(logging => $self->logging)
+                    ->current_branch_and_commit($c);
+            };
+            if ($live && $live->{branch}) {
+                my $av   = $c->stash->{app_version};
+                my $baked = $av->{commit} // '';
+                $baked =~ s/\+local$//;
+                my $suffix = ($live->{commit} ne $baked) ? '+local' : '';
+                $av->{branch} = $live->{branch};
+                $av->{commit} = $live->{commit} . $suffix;
+            }
+        }
         
         # Validate system_info returned valid data, add defaults if needed
         if (!$system_info || !ref($system_info)) {
@@ -1435,17 +1458,42 @@ sub fetch_and_set {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Checking query parameter '$param'");
 
+    # Validate a candidate SiteName against the site table before trusting it.
+    # Hostnames (e.g. 'workstation'), bot garbage or typos must NOT be written
+    # into stash/session — an unresolved SiteName poisons the session and makes
+    # every later site_setup fail (see error-audit todo 2243).
+    my $_validate_site = sub {
+        my ($name) = @_;
+        return 0 unless defined $name && length $name;
+        my $s = eval { $c->model('Site')->get_site_details_by_name($c, $name) };
+        return defined $s ? 1 : 0;
+    };
+
     if (defined $value) {
-        $c->stash->{SiteName} = $value;
-        $c->session->{SiteName} = $value;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Query parameter '$param' found: $value");
+        if ($_validate_site->($value)) {
+            $c->stash->{SiteName} = $value;
+            $c->session->{SiteName} = $value;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Query parameter '$param' found: $value");
+        } else {
+            # Reject unresolvable value; leave SiteName unset so domain/default
+            # resolution below still runs. Do not persist to session.
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_and_set',
+                "Query parameter '$param' value '$value' does not resolve to a site - ignoring (falling through)");
+            $value = undef;
+        }
     } elsif (my $hdr_site = $c->req->header('X-Sitename')) {
         $hdr_site =~ s/[^a-zA-Z0-9._-]//g;
         if ($hdr_site) {
-            $value = $hdr_site;
-            $c->stash->{SiteName} = $value;
-            $c->session->{SiteName} = $value;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "X-Sitename header found: $value");
+            if ($_validate_site->($hdr_site)) {
+                $value = $hdr_site;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "X-Sitename header found: $value");
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_and_set',
+                    "X-Sitename header '$hdr_site' does not resolve to a site - ignoring (falling through)");
+                $value = undef;
+            }
         }
     }
 
@@ -2191,7 +2239,13 @@ sub site_setup {
     }
 
     unless (defined $site) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site could be resolved. SiteName='" . ($SiteName//'UNDEF') . "', Domain='" . ($domain//'UNDEF') . "'");
+        # Downgrade to 'warn' for local/script (bot) callers: a bad X-Sitename
+        # from a curl script is a caller mistake, not a server fault — it must
+        # not page helpdesk / create an error-audit todo every time (todo 2243).
+        my $_remote = $c->req->address // '';
+        my $_is_local = ($_remote eq '127.0.0.1' || $_remote eq '::1' || $_remote =~ /^192\.168\.1\./);
+        my $_level = $_is_local ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $_level, __FILE__, __LINE__, 'site_setup', "No site could be resolved. SiteName='" . ($SiteName//'UNDEF') . "', Domain='" . ($domain//'UNDEF') . "'");
 
         # Ensure site_display_name is never missing in stash/session, even on failure
         my $fallback_display = $c->stash->{SiteName} || $c->session->{SiteName} || 'Site';
@@ -2517,7 +2571,9 @@ sub _port_label {
         4003 => 'HA',   # InfrastructureHA
         4004 => 'WS',   # WorkShops
         4005 => 'Us',   # Users
-        4006 => 'FM',   # FileManagement
+        # 4006 is the aisystem worktree (AI system use) — show the AI robot
+        # glyph instead of the stale 'FM' FileManagement label.
+        4006 => "\x{1F916}",   # aisystem — AI robot
         4007 => 'Ma',   # UnifiedMail
         4008 => 'Mb',   # Membership
         4009 => 'Pt',   # PointSystem

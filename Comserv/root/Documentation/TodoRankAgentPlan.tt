@@ -1,0 +1,97 @@
+[% META
+   title       = "TodoRank Agent Plan"
+   description = "Autonomous AI agent that routinely re-ranks every open/active todo by real programming importance, per branch, with sub-agents."
+   doc_project_id   = "287"
+   project_code     = "TODOAGENT"
+%]
+[%# ============================================================================
+   Documentation/TodoRankAgentPlan.tt — proj TODOAGENT (child of #114 AIC-ENH)
+
+   PLAN (no code yet). Ratified plan-first rule: this doc + its Project/Todo
+   rows are reviewed BEFORE implementation starts.
+
+   THE PROBLEM (user, 2026-08-21)
+   - The todo list order does not reflect real programming importance.
+   - Morning/lunch/afternoon EVENT todos pollute the priority list because the
+     edit path never fixes the todo_type field.
+   - Overdue todos keep stale start/due dates instead of being rescheduled to
+     current dev/admin availability.
+   - Duplicates accumulate; non-tasks appear in the priority list.
+
+   THE FIX (one agent, routine pass)
+   An AI agent walks every open/active todo and SETS the row right:
+     priority (by function + project importance), todo_type (event vs task),
+     start/due dates (reschedule overdue to availability), duplicate detection,
+     and removal of non-tasks from the priority surface. Branch-scoped first
+     (smaller bite), main last (global coordination). Spawns sub-agents in
+     parallel; remote models concurrently, Ollama sequentially. Learns which
+     model ranks best (vs grok-4.6 baseline) and defaults to it.
+   ============================================================================ %]
+[% SET doc_title    = 'TodoRank Agent Plan' %]
+[% SET doc_project_id = 287 %]
+<html data-debug-mode="0">
+<head><title>[% doc_title %]</title></head>
+<body class="doc-body-wrap">
+<div class="doc-container">
+
+<h1>TodoRank Agent Plan <small class="doc-code">(TODOAGENT)</small></h1>
+<p class="last-updated">
+  Status: DRAFT for review · Parent: <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link">#280 AISYSTEM</a> (reparented from #114 so the branch daily-plan filter sees it)
+  · Attached project: <a href="[% c.uri_for('/project/details') %]?project_id=287" class="doc-link">#287 TODOAGENT</a>
+</p>
+
+<h2 id="goal">1. Goal</h2>
+<div class="doc-body">
+<p>One autonomous agent that routinely evaluates EVERY open/active todo and writes
+the correct values back, so the priority list is ordered by programming importance
+without manual triage:</p>
+<ul>
+  <li><strong>Priority by function + project importance</strong> — what the todo is actually about ("users can't login" ≫ "fix text colour"), weighted by how important its attached project is.</li>
+  <li><strong>Branch-scoped passes first</strong> — each worktree branch's todos are a smaller bite; main is global coordination and runs last.</li>
+  <li><strong>Sub-agents</strong> — the coordinator spawns one worker per batch; remote models run in parallel, Ollama sequentially (CPU-bound).</li>
+  <li><strong>Fix todo_type</strong> — morning/lunch/afternoon events must be typed as events so they leave the task priority list (requires API field unlock, §3).</li>
+  <li><strong>Reschedule overdue</strong> — set start/due to current dev/admin availability instead of leaving stale dates.</li>
+  <li><strong>Dedupe + filter</strong> — flag duplicate todos; keep only real tasks on the priority surface.</li>
+  <li><strong>Model learning</strong> — use the existing Focus-Tune compare per model; default to whichever model ranks best over time.</li>
+</ul>
+</div>
+
+<h2 id="phases">2. Phases</h2>
+<div class="doc-body">
+<h3>Phase 1 — API field unlock</h3>
+Extend <code>/api/todo/update</code> allowed fields with <code>subject, start_date, due_date, todo_type</code> (validated; audit-logged via log_with_details). Without this the agent cannot fix types or dates. Also add a read-only <code>GET /api/todo/duplicates?sitename=CSC</code> helper (normalized-subject grouping) for Phase 4.
+<h3>Phase 2 — Ranker endpoint</h3>
+<code>Model::AI2::TodoRank</code>: given a batch of todos (with descriptions — the FocusTune desc fix already proved substance matters), return per-record {priority, todo_type, reason}. Reuses Router-&gt;dispatch_chat; JSON-only contract like FocusTune's prompt.
+<h3>Phase 3 — Coordinator + sub-agents</h3>
+Endpoint that lists open/active todos scoped to a branch/sitename/project, batches them (~15/batch), spawns workers (remote parallel / local sequential), applies writes ONLY when the proposed value differs, and logs every change (record_id, field, old→new, model, reason).
+<h3>Phase 4 — Hygiene rules</h3>
+todo_type correction (events out of the task list), overdue rescheduling to availability windows, duplicate flagging (never auto-delete — propose merge), non-task filtering from the priority surface.
+<h3>Phase 5 — Model learning</h3>
+Run the same batch through N models (existing compare UI pattern), score agreement/confidence, persist a per-model quality history, default the picker to the best performer (grok-4.6 expected baseline).
+<h3>Phase 6 — Routine scheduling</h3>
+Cron-driven regular pass + incremental re-rank on every todo touch (create/edit), so order stays correct without long batch runs.
+</div>
+
+<h2 id="safety">3. Safety rails</h2>
+<div class="doc-body">
+<ul>
+  <li>Advisory-first rollout: Phase 3 ships with a dry-run mode showing proposed changes; writes enabled after user reviews output.</li>
+  <li>Never auto-close or delete todos; duplicates are flagged for human merge.</li>
+  <li>Never touch status=5 (active log session) rows' dates while a session is open.</li>
+  <li>All writes carry last_mod_by='ai-todorank' so every change is attributable and revertible.</li>
+  <li>Priority bands stay inside Priority.pm's 1–10 ladder (blocker…recurring); the agent retunes values, not the scale.</li>
+</ul>
+</div>
+
+<h2 id="links">4. Links</h2>
+<div class="doc-body">
+<ul>
+  <li><a href="[% c.uri_for('/project/details') %]?project_id=287" class="doc-link">Project #287 TODOAGENT</a> — one todo per phase above (record_ids 2234–2239).</li>
+  <!-- ai-plan-sync created todo_ids: 2234,2235,2236,2237,2238,2239 under project_id=287 -->
+  <li>Sibling plans: AISYSTEM #280 (this agent is W2+ scope), AutonomousAgentsPlan (orchestration patterns).</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>

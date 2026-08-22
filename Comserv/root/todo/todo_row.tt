@@ -56,7 +56,7 @@
         <!-- Start / Done (only show if admin) -->
         [% IF c.session.roles.grep('admin').size %]
             [% IF st != 3 AND st != 4 AND st != 'DONE' AND st != 'Completed' %]
-                <button data-start-btn="1" data-record-id="[% tc.record_id %]"
+                <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0"
                         class="btn btn-sm btn-outline-primary py-0 px-2"
                         style="font-size:0.75em;">▶ Start</button>
                 <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0"

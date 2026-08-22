@@ -465,16 +465,16 @@
 
     function _todoCardSetActive(btn, recordId) {
         btn.textContent = '⏸ Active';
-        btn.style.background = '#fd7e14';
-        btn.style.color = '#fff';
-        btn.style.border = '1px solid #fd7e14';
-        btn.style.borderColor = '#fd7e14';
-        btn.title = 'Session active — click to close';
+        btn.style.border = '';
+        btn.style.background = '#ffc107';
+        btn.style.color = '#000';
+        btn.title = 'Session active — click to close session';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
-        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+        btn.setAttribute('data-is-active', '1');
+        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
         if (card) {
-            card.style.background = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color,#fff))';
+            card.style.background = 'rgba(255, 193, 7, 0.08)';
             var doneBtn = card.querySelector('button[data-done-btn]');
             if (doneBtn) doneBtn.setAttribute('data-is-active', '1');
         }
@@ -488,7 +488,8 @@
         btn.title = 'Start working — creates a log entry, marks todo active';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
-        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+        btn.setAttribute('data-is-active', '0');
+        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
         if (card) {
             card.style.background = '';
             var doneBtn = card.querySelector('button[data-done-btn]');
@@ -496,19 +497,11 @@
         }
     }
 
-    // Ensure a work-log session exists for this todo before a close/done op,
-    // so close_log/done_with_log can never fail with "No open log found".
-    // The server's open_log is idempotent (returns already_open if a session
-    // is live), so calling it unconditionally is safe. The Start button is the
-    // source of truth for session state; close/done build on top of it.
-    function _ensureSession(recordId) {
-        return fetch('/todo/open_log', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ record_id: recordId })
-        }).then(function(r) { return r.json(); }).catch(function() { return { ok: false }; });
-    }
+    // NOTE: no _ensureSession pre-call. Server-side close_log / done_with_log
+    // (Comserv::Util::TodoLog) are self-sufficient: close is graceful when no
+    // log is open, and done inserts a completed log if none was open. Calling
+    // open_log first would now TOGGLE-stop an active session (open_log is a
+    // start/stop toggle), which is not what Close/Done mean.
 
     function startWorkTodoCard(btn, recordId) {
         btn.disabled = true;
@@ -539,10 +532,9 @@
         notes = notes || '';
         btn.disabled = true;
         btn.textContent = '…';
-        // Start button is the source of truth: guarantee a session exists so the
-        // close can never hit "No open log found" (see _ensureSession).
-        _ensureSession(recordId).then(function() {
-            fetch('/todo/close_log', {
+        // Server-side close_log is self-sufficient and graceful (no open log
+        // is a warn, not an error) — no pre-call needed.
+        fetch('/todo/close_log', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
@@ -558,43 +550,47 @@
                 btn.disabled = false;
                 btn.textContent = '⏸ Active';
             });
-        });
     }
 
     function doneWithLogTodoCard(btn, recordId) {
+        // Re-entrancy guard: a second Done trigger (e.g. the floating Done
+        // button) must not fire another done_with_log while one is in flight
+        // or already completed for this card.
+        if (btn.disabled || btn.getAttribute('data-done-inflight') === '1') return;
         var isActive = btn.getAttribute('data-is-active') === '1';
         var notes = prompt('Mark todo DONE — resolution / notes (optional):');
         if (notes === null) return;
         notes = notes || '';
         var payload = { record_id: recordId, notes: notes };
+        btn.setAttribute('data-done-inflight', '1');
         btn.disabled = true;
         btn.textContent = '…';
-        // Start button is the source of truth: ensure a session exists before we
-        // close+mark-done, so done_with_log can never hit "No open log found".
-        _ensureSession(recordId).then(function() {
-            fetch('/todo/done_with_log', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d.ok) {
-                    var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
-                    if (card) {
-                        card.style.opacity = '0.4';
-                        card.style.textDecoration = 'line-through';
-                        card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
-                    }
-                    btn.textContent = '✓ Done';
-                    btn.disabled = true;
-                } else {
-                    btn.disabled = false;
-                    btn.textContent = 'Done';
+        // Server-side done_with_log is self-sufficient (closes the open log or
+        // inserts a completed one) — no pre-call, no double popup.
+        fetch('/todo/done_with_log', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) {
+                var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
+                if (card) {
+                    card.style.opacity = '0.4';
+                    card.style.textDecoration = 'line-through';
+                    card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
                 }
-            }).catch(function() {
+                btn.textContent = '✓ Done';
+                btn.disabled = true;
+            } else {
+                btn.removeAttribute('data-done-inflight');
                 btn.disabled = false;
                 btn.textContent = 'Done';
-            });
+            }
+        }).catch(function() {
+            btn.removeAttribute('data-done-inflight');
+            btn.disabled = false;
+            btn.textContent = 'Done';
         });
     }
 
@@ -826,30 +822,44 @@
         var statusEl = document.getElementById('ai-tune-status');
         var resultEl = document.getElementById('ai-tune-result');
         var targets = _aiTuneTargets();
-        if (targets.length === 1) {
-            resultEl.innerHTML = '';
-            _aiTuneCall(targets[0], statusEl, resultEl, null);
-        } else {
-            // Run models ONE AT A TIME (not in parallel). Each compare request
-            // drives a full local-model generation that pegs CPU; firing them
-            // concurrently only multiplies contention (Ollama serializes at
-            // -np 1 anyway) and saturates the box. Sequential keeps CPU bounded
-            // to a single generation and still shows the side-by-side result.
-            var collected = [];
-            var i = 0;
-            function nextOne() {
-                if (i >= targets.length) {
-                    _aiTuneRenderBatch(targets, collected, resultEl);
-                    return;
+        // Split by execution class: remote providers (openrouter/grok/supergrok)
+        // are network-bound and run IN PARALLEL; Ollama models are CPU-bound on
+        // the workstation (Ollama serializes at -np 1 anyway), so they still run
+        // ONE AT A TIME. Both groups render into the same side-by-side batch.
+        var isLocal = function(t) { return /^(ollama\b|.*localhost)/i.test((t.host || '') + ' ' + (t.name || '')) && !/openrouter|grok|supergrok/i.test(t.name || ''); };
+        var remote = [], local = [];
+        targets.forEach(function(t) { (isLocal(t) ? local : remote).push(t); });
+        var all = remote.concat(local);
+        var collected = new Array(all.length);
+        var pending = all.length;
+        if (!pending) return;
+        resultEl.innerHTML = '';
+        function launch(t, idx) {
+            _aiTuneCall(t, statusEl, resultEl, function(target, d) {
+                collected[idx] = { target: target, data: d };
+                pending--;
+                if (!pending) {
+                    _aiTuneRenderBatch(all, collected.map(function(c) { return c ? c.data : {}; }), resultEl);
                 }
-                var t = targets[i++];
-                _aiTuneCall(t, statusEl, resultEl, function(target, d) {
-                    collected.push(d);
-                    nextOne();
-                });
-            }
-            nextOne();
+            });
         }
+        // Remote first, all at once; local models launched sequentially as each
+        // previous one finishes (chained after remote launches).
+        remote.forEach(function(t, i) { launch(t, i); });
+        var li = remote.length;
+        function nextLocal() {
+            if (li >= all.length) return;
+            var idx = li++;
+            _aiTuneCall(all[idx], statusEl, resultEl, function(target, d) {
+                collected[idx] = { target: target, data: d };
+                pending--;
+                if (!pending) {
+                    _aiTuneRenderBatch(all, collected.map(function(c) { return c ? c.data : {}; }), resultEl);
+                }
+                nextLocal();
+            });
+        }
+        nextLocal();
     }
 
     function aiTuneCompare() {
@@ -879,6 +889,27 @@
                         _aiTuneSelected = [ { name: list[0].name, host: list[0].host || '' } ];
                     }
                 }
+                // Provider order: Ollama (local) first, then SuperGrok, xAI Grok,
+                // everything else; within OpenRouter free models first, then
+                // lowest per-token price ascending.
+                var svcOrder = { ollama: 0, supergrok: 1, grok: 2 };
+                function svcOf(m) {
+                    return m.provider || String(m.name || '').split('|')[0] || 'external';
+                }
+                function costOf(m) {
+                    return Math.max(Number(m.price_prompt) || 0, Number(m.price_completion) || 0);
+                }
+                list.sort(function(a, b) {
+                    var sa = svcOf(a), sb = svcOf(b);
+                    var ra = svcOrder[sa] != null ? svcOrder[sa] : 3;
+                    var rb = svcOrder[sb] != null ? svcOrder[sb] : 3;
+                    if (ra !== rb) return ra - rb;
+                    var la = !!a.local, lb = !!b.local;
+                    if (la !== lb) return la ? -1 : 1;
+                    var ca = costOf(a), cb2 = costOf(b);
+                    if (ca !== cb2) return ca - cb2;
+                    return String(a.name).localeCompare(String(b.name));
+                });
                 var html = '<div class="AITuneModelPopInner">';
                 list.forEach(function(m) {
                     var checked = _aiTuneSelected.some(function(s) { return s.name === m.name; }) ? 'checked' : '';
@@ -887,7 +918,10 @@
                     var pp = Number(m.price_prompt) || 0, pc = Number(m.price_completion) || 0;
                     if (m.local) {
                         label += ' — local';
-                    } else if (m.free || (m.provider === 'openrouter' && /(^|:)(free)$/i.test(m.name || ''))) {
+                    } else if (m.free || (m.provider === 'openrouter' && /(^|:)(free)$/i.test(m.name || ''))
+                              || (!m.local && pp === 0 && pc === 0 && !m.price_tier)) {
+                        // Free + zero-priced external entries (stealth/ox-alpha,
+                        // openrouter/auto, ...) — cost nothing, say so.
                         label += ' — free';
                     } else if (pp > 0 || pc > 0 || m.price_tier) {
                         var fmt = function(n) { return (Math.round(n * 100) / 100).toFixed(2); };
@@ -939,6 +973,74 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
     }
+
+    /* ── Floating Done button ─────────────────────────────────────────────
+       On long todo lists the per-card Done button can sit below the fold.
+       This tracks the LAST todo card the user interacted with (click or
+       expand) and shows a fixed "✓ Done" button that fires the SAME
+       delegated data-done-btn path — no scrolling to reach the card. */
+    var _lastTodoCard = null;
+
+    function ensureFloatDoneBtn() {
+        if (document.getElementById('float-done-btn')) return;
+        // Only build it on pages that actually render todo cards.
+        if (!document.querySelector('.todo-card-list [data-todo-id]')) return;
+        var b = document.createElement('button');
+        b.id = 'float-done-btn';
+        b.type = 'button';
+        b.className = 'btn btn-sm btn-outline-success';
+        b.textContent = '✓ Done';
+        b.title = 'Mark the last todo you clicked as done';
+        b.style.cssText = 'position:fixed;bottom:5.5rem;left:50%;transform:translateX(-50%);'
+            + 'z-index:1050;display:none;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+        document.body.appendChild(b);
+        b.addEventListener('click', function() {
+            if (!_lastTodoCard || !document.contains(_lastTodoCard)) { hideFloatDoneBtn(); return; }
+            var doneBtn = _lastTodoCard.querySelector('button[data-done-btn]');
+            if (doneBtn && !doneBtn.disabled) {
+                doneBtn.click();   // reuses the delegated doneWithLogTodoCard path
+            } else {
+                hideFloatDoneBtn();
+            }
+        });
+    }
+
+    function showFloatDoneBtn(card) {
+        ensureFloatDoneBtn();
+        _lastTodoCard = card;
+        var b = document.getElementById('float-done-btn');
+        if (!b) return;
+        var subject = card.querySelector('.todo-card-subject, .todo-card-title, .card-title, h4, h3, strong');
+        var label = '✓ Done';
+        if (subject && subject.textContent.trim().length) {
+            var t = subject.textContent.trim();
+            label += ': ' + (t.length > 40 ? t.slice(0, 40) + '…' : t);
+        }
+        b.textContent = label;
+        b.style.display = 'block';
+    }
+
+    function hideFloatDoneBtn() {
+        _lastTodoCard = null;
+        var b = document.getElementById('float-done-btn');
+        if (b) b.style.display = 'none';
+    }
+
+    document.addEventListener('click', function(e) {
+        // Track the last-touched todo card for the floating Done button.
+        // Ignore clicks ON action buttons (Done/Start/Chat) — otherwise clicking
+        // the card's Done ALSO summons the floating Done, inviting a second
+        // done_with_log submission (double dialog / double log insert).
+        if (e.target.closest('[data-done-btn],[data-start-btn],[data-chat-todo],#float-done-btn')) {
+            hideFloatDoneBtn();
+            return;
+        }
+        var touchedCard = e.target.closest('[data-todo-id]');
+        if (touchedCard) {
+            var stillOpen = touchedCard.querySelector('button[data-done-btn]:not([disabled])');
+            if (stillOpen) { showFloatDoneBtn(touchedCard); } else { hideFloatDoneBtn(); }
+        }
+    }, true);   // capture phase: runs even when other handlers stopPropagation
 
     /* ── Event delegation — replaces all onclick= in template ──────────── */
 
@@ -1008,15 +1110,19 @@
             if (action === 'ai-tune-models-done')  { aiTuneModelsDone();       return; }
         }
         // Todo card: Start/Active button <button data-start-btn="1" data-record-id="N">
+        // Decide open-vs-close from the button's data-is-active attribute
+        // (rendered from the todo's DB status), NOT the button label text —
+        // text matching broke when the label was "⏸ Active" (no 'Start' in it).
         var startBtn = e.target.closest('[data-start-btn]');
         if (startBtn) {
             e.preventDefault();
             var recordId = startBtn.getAttribute('data-record-id');
             if (recordId) {
-                if (startBtn.textContent === '▶ Start' || startBtn.textContent.indexOf('Start') !== -1) {
-                    startWorkTodoCard(startBtn, parseInt(recordId, 10));
-                } else {
+                var isActive = startBtn.getAttribute('data-is-active') === '1';
+                if (isActive) {
                     closeLogTodoCard(startBtn, parseInt(recordId, 10));
+                } else {
+                    startWorkTodoCard(startBtn, parseInt(recordId, 10));
                 }
             }
             return;
