@@ -32,13 +32,24 @@
         <meta name="description" content="[% http_header_description %]">
     [% END %]
     [%- SET site_favicon = c.stash.site_favicon || '' -%]
+    [%- SET page_favicon  = c.stash.page_favicon || '' -%]
+    [%- SET git_branch    = c.stash.git_branch || '' -%]
     [%- SET req_port      = c.stash.req_port || 0 -%]
     [%- SET fav_bg        = c.stash.favicon_bg_color || '' -%]
     [%- SET site_name_enc = SiteName | uri -%]
     [%- SET fallback_icon = site_favicon
             ? site_favicon
             : '/favicon/site/' _ site_name_enc -%]
-    [% IF site_favicon %]
+    [%- branch_enc = git_branch | uri -%]
+    [%- SET branch_icon_url = git_branch
+            ? '/favicon/branch/' _ branch_enc
+            : '' -%]
+    [% IF page_favicon %]
+    <link rel="icon" type="image/svg+xml" href="[% page_favicon %]">
+    [% ELSIF branch_icon_url %]
+    <link rel="icon" type="image/svg+xml" href="[% branch_icon_url %]">
+    <link rel="alternate icon" sizes="32x32" href="[% fallback_icon %]">
+    [% ELSIF site_favicon %]
     <link rel="icon" type="image/svg+xml" href="[% site_favicon %]">
     [% IF req_port %]
     [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
