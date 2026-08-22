@@ -1,0 +1,51 @@
+<div id="2025-10-01-documentation-migration-to-tt" class="cl-entry">
+<h3>Documentation Migration to Template Toolkit (.tt) Files</h3>
+<div class="doc-page">
+    <h1>Documentation Migration to Template Toolkit (.tt) Files</h1>
+    
+    <div class="doc-section">
+        <h2>Overview</h2>
+        <p>
+            <strong>Date:</strong> October 1, 2025<br>
+            <strong>Type:</strong> Enhancement<br>
+            <strong>Status:</strong> In Progress
+        </p>
+        
+        <p>
+            The documentation system is being enhanced by transitioning from Markdown (.md) files to 
+            Template Toolkit (.tt) files. This change improves browser navigation and user interaction 
+            with documentation, making it more accessible and user-friendly.
+        </p>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Changes</h2>
+        <ul>
+            <li>Created comprehensive guide explaining the transition from .md to .tt files</li>
+            <li>Added template for creating new documentation using Template Toolkit format</li>
+            <li>Updated documentation index to inform users about the transition</li>
+            <li>Updated documentation configuration to support .tt files</li>
+            <li>Started converting existing documentation to .tt format</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Benefits</h2>
+        <ul>
+            <li>Improved navigation between documentation pages</li>
+            <li>Better integration with the application's theme system</li>
+            <li>Support for dynamic content and interactive elements</li>
+            <li>Enhanced role-based access control for documentation</li>
+            <li>More consistent styling and user experience</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Related Documentation</h2>
+        <ul>
+            <li><a href="&#91;% c.uri_for('/Documentation/documentation_migration_to_tt') %&#93;">Documentation Migration to Template Toolkit (.tt) Files</a> - Comprehensive guide</li>
+            <li><a href="&#91;% c.uri_for('/Documentation/documentation_tt_template') %&#93;">Documentation Template Toolkit (.tt) Template</a> - Template for new documentation</li>
+        </ul>
+    </div>
+</div>
+</div>

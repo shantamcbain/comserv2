@@ -141,8 +141,9 @@
     <link rel="stylesheet" type="text/css" href="/static/css/themes/api_credentials.css">
     [% END %]
 
-    [% IF c.stash.template.match('todo/') %]
+    [% IF c.stash.template.match('todo/') OR c.stash.template.match('planning/') OR c.stash.needs_todo_card_js %]
     <link rel="stylesheet" type="text/css" href="/static/css/todo.css?v=[% cv %]">
+    <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css?v=[% cv %]">
     [% END %]
 
     [% IF c.stash.template.match('HardwareMonitor/') %]

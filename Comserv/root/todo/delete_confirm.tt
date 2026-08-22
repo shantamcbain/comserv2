@@ -1,0 +1,17 @@
+[% PageVersion = 'todo/delete_confirm.tt,v 0.1 2026/08/20' %]
+[% SET rid = record.get_column('record_id') %]
+[% SET subj = record.get_column('subject') || '(No subject)' %]
+
+<h1>Delete todo #[% rid %]?</h1>
+
+<p>This cannot be undone.</p>
+<p><strong>[% subj | html %]</strong>
+   ([% record.get_column('sitename') | html %]
+    · [% record.get_column('todo_type') || 'task' %]
+    · [% record.get_column('start_date') %])</p>
+
+<form method="post" action="/todo/delete/[% rid %]">
+    <input type="hidden" name="confirm" value="1">
+    <button type="submit" class="btn btn-primary">Delete</button>
+    <a href="/todo/details?record_id=[% rid %]" class="btn btn-secondary">Cancel</a>
+</form>

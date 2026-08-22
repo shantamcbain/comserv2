@@ -220,9 +220,10 @@
                 }
                 // "Hermes" button: copy the branch's Hermes launch command to the
                 // clipboard. cwd = the worktree git-root, so Hermes auto-loads the
-                // branch .hermes.md (global rules + domain expertise). -w = worktree
-                // mode (parallel agents, no git conflicts). The dev console also
-                // shows it for manual copy.
+                // branch .hermes.md (global rules + domain expertise). Do NOT add
+                // -w here: Comserv worktrees already isolate; -w nests a
+                // hermes/hermes-* scratch branch. The dev console also shows the
+                // command for manual copy.
                 var hermesBranch = el.getAttribute('data-hermes-branch');
                 if (hermesBranch) {
                     var hcmd = el.getAttribute('data-hermes-cmd') || '';
@@ -259,7 +260,36 @@
         var mergeOutput = document.querySelector('[data-git-merge-output]');
         var mergeAbortBtn = document.querySelector('[data-git-merge-abort]');
 
-        function showMergeResult(success, conflict, title, output) {
+        var MERGE_RESULT_KEY = 'comserv-git-merge-result';
+
+        function persistMergeResult(payload) {
+            try {
+                sessionStorage.setItem(MERGE_RESULT_KEY, JSON.stringify(payload));
+            } catch (e) {
+                // sessionStorage can be blocked; reload still proceeds.
+            }
+        }
+
+        function restorePersistedMergeResult() {
+            try {
+                var raw = sessionStorage.getItem(MERGE_RESULT_KEY);
+                if (!raw) { return; }
+                sessionStorage.removeItem(MERGE_RESULT_KEY);
+                var p = JSON.parse(raw);
+                if (!p || !p.title) { return; }
+                showMergeResult(!!p.success, !!p.conflict, p.title, p.output || '');
+            } catch (e) {
+                try { sessionStorage.removeItem(MERGE_RESULT_KEY); } catch (e2) {}
+            }
+        }
+
+        function reloadGitDashboardSoon() {
+            window.setTimeout(function () {
+                window.location.reload();
+            }, 1500);
+        }
+
+        function showMergeResult(success, conflict, title, output, autostashNote) {
             if (!mergeStatus) { return; }
             mergeStatus.innerHTML = '';
             var badge = document.createElement('span');
@@ -267,6 +297,13 @@
                 : (success ? 'status-badge-ok' : 'status-badge-err'));
             badge.textContent = title;
             mergeStatus.appendChild(badge);
+            if (autostashNote) {
+                var note = document.createElement('span');
+                note.className = 'status-badge status-badge-warn';
+                note.style.marginLeft = '6px';
+                note.textContent = autostashNote;
+                mergeStatus.appendChild(note);
+            }
             if (mergeOutput) {
                 mergeOutput.style.display = (output && output.length) ? 'block' : 'none';
                 mergeOutput.textContent = output || '';
@@ -276,6 +313,8 @@
             }
         }
 
+        restorePersistedMergeResult();
+
         function runMerge(btn) {
             if (!mergeSelect) { return; }
             var direction = btn.getAttribute('data-merge-direction');
@@ -283,6 +322,18 @@
             var source, target;
             if (direction === 'main-to-branch') { source = 'main'; target = selBranch; }
             else { source = selBranch; target = 'main'; }
+
+            var curEl = document.querySelector('[data-git-current-branch]');
+            var current = (curEl && curEl.textContent) ? curEl.textContent.trim() : '';
+            if (current && current !== 'main' && current !== 'master') {
+                if (direction === 'main-to-branch') { target = current; }
+                else { source = current; }
+            }
+            if (source === target || !target || target === 'main' && direction === 'main-to-branch') {
+                showMergeResult(false, false, 'failed',
+                    'Pick the worktree branch. main cannot merge into itself.');
+                return;
+            }
 
             if (btn.getAttribute('data-git-confirm')) {
                 var prompt = btn.getAttribute('data-git-confirm');
@@ -312,16 +363,25 @@
                       showMergeResult(false, true, 'conflict', res.output || res.error || '');
                       return;
                   }
-                  if (res.success) {
-                      showMergeResult(true, false, 'merged', res.output || '');
-                  } else {
-                      showMergeResult(false, false, 'failed', res.output || res.error || res.detail || '');
+                  var stashNote = '';
+                  if (res.autostash_conflict) {
+                      stashNote = 'WIP not cleanly reapplied \u2014 safe in stash@{0} (use Stash Pop)';
+                  } else if (res.autostash) {
+                      stashNote = 'uncommitted changes preserved & reapplied';
                   }
-                  // NOTE: intentionally do NOT auto-refresh/reload on success.
-                  // refreshGitDashboard() / location.reload() re-renders the Merge
-                  // card and wipes the result before the user can read it (the
-                  // "vanishing result" bug). The result stays visible until a
-                  // manual hard-refresh.
+                  if (res.success) {
+                      showMergeResult(true, false, 'merged \u2014 reloading\u2026', res.output || '', stashNote);
+                      persistMergeResult({
+                          success: true,
+                          conflict: false,
+                          title: 'merged',
+                          output: res.output || ''
+                      });
+                      reloadGitDashboardSoon();
+                  } else {
+                      var failText = (res.error || '') + (res.output && res.output.replace(/\s/g,'') ? ('\n' + res.output) : '') + (res.detail ? ('\n' + res.detail) : '');
+                      showMergeResult(false, false, 'failed', failText || 'merge failed', stashNote);
+                  }
               })
               .catch(function (err) {
                   showMergeResult(false, false, 'error', String(err));

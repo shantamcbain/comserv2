@@ -159,6 +159,8 @@ Automator design rather than re-deriving it.</p>
 <table class="data-table">
     <thead><tr><th>Agent</th><th>Job</th><th>Tools (allow-list)</th><th>Trigger</th></tr></thead>
     <tbody>
+        <tr><td>Todo Create (in-chat)</td><td><strong>Code now</strong> (<code>Model::AI2::TodoCreate</code> + <code>Chat::process</code> intercept). Clear “add a todo …” does not use the picker. Absorb into Runner when #268 exists — do not rewrite. Tracking <a href="[% c.uri_for('/todo/details') %]?record_id=2217" title="Todo #2217 on #280.">#2217</a>.</td><td>todo_write, project_write</td><td>Chat widget / /ai/widget / editor chat</td></tr>
+        <tr><td>Scheduler (queue order)</td><td><strong>Specified, not built</strong> (<a href="[% c.uri_for('/todo/details') %]?record_id=2218" title="Opens todo #2218 on project #280 AISYSTEM.">#2218</a>). Blocker predecessor todos + start_date after remaining queue. Never bulk-rewrite every todo.</td><td>todo_write, todo_read, project_read</td><td>After Todo-create WRITE; Daily Plan; manual</td></tr>
         <tr><td>Daily Plan Automator</td><td>The existing 4-step pipeline (Audit &rarr; DocsSync &rarr; MasterPlanUpdater &rarr; DailyPlansGenerator), wired as one multi-step job.</td><td>todo_read, doc_read, doc_update, project_update, git_whitelisted</td><td>Schedule (early UTC)</td></tr>
         <tr><td>Docs Sync</td><td>Map recent code/doc changes to <code>/Documentation/*.tt</code> and flag stale docs (ties to Doc Standard S1–S7).</td><td>doc_read, doc_update, git_whitelisted</td><td>Event (deploy finished) / schedule</td></tr>
         <tr><td>DB Drift Guard</td><td>Report-only schema drift vs Result classes; one-click repair via schema-compare. Ties to W0.1 (Schema System Plan).</td><td>schema_compare</td><td>Schedule (daily)</td></tr>
@@ -215,6 +217,7 @@ as soon as #268 Runner exists.</p>
     <li>Reuses: <a href="[% c.uri_for('/Documentation/ai_workflows/DailyPlanAutomatorDesign') %]">Daily Plan Automator Design</a> (flagship job agent) · <a href="[% c.uri_for('/Documentation/ai_workflows/docker-agent-guide') %]">Docker Agent guide</a> (agent-spec pattern)</li>
     <li>Depends on: <a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">Schema System Plan (W0.1)</a> (for <code>agent_jobs</code> / <code>agent_runs</code> tables) · AI2 Router (<code>lib/Comserv/Model/AI2/Router.pm</code>)</li>
     <li>Coordinates with: <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan</a> · <a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]">V2 Migration Plan</a> (theme compliance for the <code>/admin/agents</code> view)</li>
+    <li>Child plan: <a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]">AI Agent Orchestration + Notification Recovery</a> — operational agents (Email + Secretary/VoIP-call) and the notification-regression fix; sub-project of #267.</li>
 </ul>
 </div>
 </details></div>
