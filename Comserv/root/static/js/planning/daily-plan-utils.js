@@ -465,16 +465,16 @@
 
     function _todoCardSetActive(btn, recordId) {
         btn.textContent = '⏸ Active';
-        btn.style.background = '#fd7e14';
-        btn.style.color = '#fff';
-        btn.style.border = '1px solid #fd7e14';
-        btn.style.borderColor = '#fd7e14';
-        btn.title = 'Session active — click to close';
+        btn.style.border = '';
+        btn.style.background = '#ffc107';
+        btn.style.color = '#000';
+        btn.title = 'Session active — click to close session';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
-        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+        btn.setAttribute('data-is-active', '1');
+        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
         if (card) {
-            card.style.background = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color,#fff))';
+            card.style.background = 'rgba(255, 193, 7, 0.08)';
             var doneBtn = card.querySelector('button[data-done-btn]');
             if (doneBtn) doneBtn.setAttribute('data-is-active', '1');
         }
@@ -488,7 +488,8 @@
         btn.title = 'Start working — creates a log entry, marks todo active';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
-        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+        btn.setAttribute('data-is-active', '0');
+        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
         if (card) {
             card.style.background = '';
             var doneBtn = card.querySelector('button[data-done-btn]');
@@ -1095,15 +1096,19 @@
             if (action === 'ai-tune-models-done')  { aiTuneModelsDone();       return; }
         }
         // Todo card: Start/Active button <button data-start-btn="1" data-record-id="N">
+        // Decide open-vs-close from the button's data-is-active attribute
+        // (rendered from the todo's DB status), NOT the button label text —
+        // text matching broke when the label was "⏸ Active" (no 'Start' in it).
         var startBtn = e.target.closest('[data-start-btn]');
         if (startBtn) {
             e.preventDefault();
             var recordId = startBtn.getAttribute('data-record-id');
             if (recordId) {
-                if (startBtn.textContent === '▶ Start' || startBtn.textContent.indexOf('Start') !== -1) {
-                    startWorkTodoCard(startBtn, parseInt(recordId, 10));
-                } else {
+                var isActive = startBtn.getAttribute('data-is-active') === '1';
+                if (isActive) {
                     closeLogTodoCard(startBtn, parseInt(recordId, 10));
+                } else {
+                    startWorkTodoCard(startBtn, parseInt(recordId, 10));
                 }
             }
             return;
