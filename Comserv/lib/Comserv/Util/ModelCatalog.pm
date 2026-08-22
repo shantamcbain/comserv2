@@ -139,6 +139,7 @@ Returns a "provider|model" string, or '' when the catalog is empty.
 
 # Preference order for the free guest default: small, fast, general-purpose.
 our @FREE_PREFERENCE = (
+    'openrouter|stealth/ox-alpha',   # zero-priced; user-designated default
     'openrouter|nvidia/nemotron-3-nano-30b-a3b:free',
     'openrouter|google/gemma-4-31b-it:free',
     'openrouter|google/gemma-4-26b-a4b-it:free',
