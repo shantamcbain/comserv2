@@ -10,6 +10,10 @@ use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
 
 use Comserv::Util::Logging;
+
+# Cache-buster epoch for asset URLs (?v=...): set once per server start so
+# browsers refetch CSS/JS after every restart/deploy (see Root::auto).
+our $ASSET_EPOCH = 0;
 use Comserv::Util::Git;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::SystemInfo;
@@ -240,6 +244,16 @@ sub auto :Private {
     eval { require Comserv::Util::DevPreview; Comserv::Util::DevPreview::maybe_apply_preview_session($c) };
 
     $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
+
+    # Cache-busting version for CSS/JS asset URLs (?v=... in js_load.tt).
+    # Set on EVERY request here — previously it was only set inside the
+    # site-setup failure branch, so normal pages served ?v=20260712 forever and
+    # browsers cached stale JS (fixed Start/Done handlers looked "not applied"
+    # on pages that weren't hard-refreshed). Server start time keeps the URL
+    # stable across requests (good for caching) but changes on every app
+    # restart/deploy, which is exactly when assets change.
+    $c->stash->{css_v} = ($Comserv::Controller::Root::ASSET_EPOCH ||= time());
+
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip setup redirect for setup pages themselves and static assets
