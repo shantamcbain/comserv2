@@ -262,6 +262,23 @@
                     .sort(function (a, b) {
                         return modelSizeScore(a.value) - modelSizeScore(b.value);
                     });
+            } else if (svc === 'openrouter') {
+                // Lowest cost first: free models at the very top, then by prompt
+                // price ascending (completion as tie-breaker), alphabetical last
+                // resort when prices are equal/missing.
+                var priceOf = function (m) {
+                    return Math.max(Number(m.price_prompt) || 0, Number(m.price_completion) || 0);
+                };
+                list.sort(function (a, b) {
+                    var fa = m_free(a), fb = m_free(b);
+                    if (fa !== fb) return fa ? -1 : 1;
+                    var pa = priceOf(a), pb = priceOf(b);
+                    if (pa !== pb) return pa - pb;
+                    return String(a.value).localeCompare(String(b.value));
+                });
+                function m_free(m) {
+                    return !!(m.free || /(^|:)(free)$/i.test(m.value));
+                }
             }
 
             list.forEach(function (m) {
@@ -283,7 +300,10 @@
                 var pc = Number(m.price_completion) || 0;
                 if (m.local) {
                     text += ' — local';
-                } else if (m.free || (svc === 'openrouter' && /(^|:)(free)$/i.test(m.value))) {
+                } else if (m.free || (svc === 'openrouter' && /(^|:)(free)$/i.test(m.value))
+                          || (!m.local && !m.pricing && pp === 0 && pc === 0)) {
+                    // Zero-priced external entries (stealth/ox-alpha,
+                    // openrouter/auto, ...) cost nothing — mark them free.
                     text += ' — free';
                 } else if (pp > 0 || pc > 0 || m.pricing) {
                     var fmt = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
