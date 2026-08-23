@@ -40,8 +40,23 @@ structural — scripts cannot fully prevent them because nothing enforces the ru
         </tr>
         <tr>
             <td>Healthcheck storms (9,000 hung curls) take the host down</td>
-            <td>Healthchecks had no timeout and routed /health through slow app code</td>
-            <td>Bounded health gates with --max-time; rollback + notify on failure</td>
+            <td>Healthchecks had no timeout and <code>Root.pm</code> skipped <code>/health</code> with a leading slash Catalyst never uses</td>
+            <td>Bounded health gates; <code>start_period</code> 60s; <code>auto</code>/<code>begin</code> skip <code>^/?health</code></td>
+        </tr>
+        <tr>
+            <td>Workstation Rebuild claimed prod was updated</td>
+            <td>Every Rebuild ran <code>--deploy-to-node</code> and printed &quot;Multi-node deploy complete&quot; after a local-only run</td>
+            <td>Workstation Rebuild is <code>--local-rebuild</code>. Log says Production was NOT updated. Prod needs Pull &amp; Deploy.</td>
+        </tr>
+        <tr>
+            <td>Deploy window showed nothing for minutes</td>
+            <td>Backticks held all output; JS only painted new newline-delimited lines (docker uses <code>\\r</code>)</td>
+            <td><code>script -f -a</code> into <code>/tmp/comserv_deploy.log</code>; poller paints the full log</td>
+        </tr>
+        <tr>
+            <td>Volumes panel listed ~20 when the live set is ~12</td>
+            <td>UI suffix-matched compose-prefixed leftovers</td>
+            <td>Exact-name filter; leftover volumes removed on workstation and production1</td>
         </tr>
     </tbody>
 </table>

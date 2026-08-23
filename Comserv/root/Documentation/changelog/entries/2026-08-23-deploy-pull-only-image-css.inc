@@ -14,7 +14,7 @@
                         <li><em>Production only:</em> rename live container &rarr; <code>bk-&lt;name&gt;-&lt;ts&gt;</code>, <code>docker pull</code>, stop backup, <code>docker run</code> the pulled image (NO compose, NO host source tree, NO /opt/comserv/Comserv cd), health-gate, then on failure restart the backup and notify admin via POST /api/todo/create with mail fallback.</li>
                     </ul>
                 </li>
-                <li>New mode flags: <code>--pull-deploy</code> (pull+run on target only), <code>--build-push</code> (workstation build/run/push, prod untouched). Docker.pm and DockerDeploy.pm pass the UI's <code>mode=pull-deploy</code> through instead of always doing a full rebuild.</li>
+                <li>New mode flags: <code>--pull-deploy</code> (pull+run on target only), <code>--build-push</code> (workstation build+push, running container not started). Later the same day: <code>--local-rebuild</code> for workstation Rebuild (no push, no prod).</li>
                 <li>CSS: all static assets come from the image. Only two override volumes (<code>comserv2_theme_css</code>, <code>comserv2_theme_config</code>) overlay mutable subdirs, and they are seeded from the image when empty so they can never shadow baked CSS. No host bind over <code>/root/static</code>.</li>
             </ul>
 
