@@ -19,6 +19,7 @@
     'use strict';
 
     const NS = 'AI2EditorChat';
+    let _activeFile = '';
 
     function getEditor() {
         if (typeof ace === 'undefined') return null;
@@ -32,12 +33,19 @@
     }
 
     function currentFilePath() {
+        if (window.AI2_FILE_TO_LOAD) return window.AI2_FILE_TO_LOAD;
+        if (_activeFile) return _activeFile;
         // The popup is opened with ?file=<rel_path>; that is the editable path.
         try {
             const p = new URLSearchParams(window.location.search).get('file');
             if (p) return p;
         } catch (e) { /* ignore */ }
         return '';
+    }
+
+    function setActiveFile(path) {
+        _activeFile = path || '';
+        if (path) window.AI2_FILE_TO_LOAD = path;
     }
 
     function escapeHtml(s) {
@@ -347,11 +355,117 @@
     }
 
     function loadCurrentFileContent() {
+        const ed = getEditor();
+        if (ed) {
+            try {
+                const v = ed.getValue();
+                if (v && v.length) return Promise.resolve(v);
+            } catch (e) { /* Ace not ready */ }
+        }
         const path = currentFilePath();
-        if (!path) return Promise.resolve('');
+        if (!path || !window.AI2EditorCore || typeof window.AI2EditorCore.loadFileContent !== 'function') {
+            return Promise.resolve('');
+        }
         return window.AI2EditorCore.loadFileContent(path)
             .then(function (data) { return data && data.content ? data.content : ''; })
             .catch(function () { return ''; });
+    }
+
+    const DEFAULT_APP_PATHS = [
+        'lib/Comserv/Controller/AI2.pm',
+        'lib/Comserv/Model/AI2/Chat.pm',
+        'lib/Comserv/Model/AI2/CodeRead.pm',
+        'lib/Comserv/Model/AI2/Router.pm'
+    ];
+
+    function isEvaluatePrompt(text) {
+        const p = String(text || '').toLowerCase();
+        if (/\bevaluat/.test(p)) return true;
+        if (/\bread.{0,30}\bevaluat/.test(p)) return true;
+        if (/\b(look at|look over|review|inspect)\b/.test(p) && /\b(code|file|source)\b/.test(p)) return true;
+        return false;
+    }
+
+    function fetchLoadFile(path) {
+        return fetch('/ai2/load_file?path=' + encodeURIComponent(path), { credentials: 'include' })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data && data.content) return { path: path, content: data.content };
+                return null;
+            })
+            .catch(function () { return null; });
+    }
+
+    function loadFilesForEval(openPath, openContent) {
+        const paths = DEFAULT_APP_PATHS.slice();
+        if (openPath && /^(lib|root\/static|sql|script|t)\//.test(openPath)
+            && paths.indexOf(openPath) === -1) {
+            paths.unshift(openPath);
+        }
+        return Promise.all(paths.map(fetchLoadFile)).then(function (rows) {
+            return rows.filter(Boolean);
+        });
+    }
+
+    function filesToPromptBlob(files) {
+        if (!files || !files.length) return '';
+        return files.map(function (f) {
+            const body = String(f.content || '').slice(0, 48000);
+            return '[FILE: ' + f.path + '] (live /ai2/load_file)\n```\n' + body + '\n```';
+        }).join('\n\n');
+    }
+
+    function isDiskCapabilityPrompt(text) {
+        const p = String(text || '').toLowerCase();
+        if (/\b(how do i|please fix|refactor|implement)\b/.test(p)) return false;
+        if (/\b(what|which)\s+files\b/.test(p)) return true;
+        if (/\bon disk\b/.test(p) && /\b(read|able|access|see|open)\b/.test(p)) return true;
+        if (/\bable(?:\s+to)?\s+read\b/.test(p)) return true;
+        if (/\b(can|could|do)\s+you\b/.test(p) && /\b(read|access|see)\b/.test(p)
+            && /\b(file|files|code|disk|source)\b/.test(p)) return true;
+        return false;
+    }
+
+    function flattenTree(nodes, depth, acc) {
+        if (!nodes || !nodes.length) return acc;
+        depth = depth || 0;
+        acc = acc || [];
+        for (let i = 0; i < nodes.length && acc.length < 80; i++) {
+            const n = nodes[i];
+            if (!n) continue;
+            const pad = new Array(depth + 1).join('  ');
+            acc.push(pad + (n.type === 'dir' ? n.name + '/' : n.name));
+            if (n.type === 'dir' && n.children && depth < 1) {
+                flattenTree(n.children.slice(0, 14), depth + 1, acc);
+            }
+        }
+        return acc;
+    }
+
+    function finishSend(target, sendBtn, msg, status, isError) {
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+        recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[live-read]</span> '
+            + escapeHtml(msg).replace(/\n/g, '<br>'));
+        if (target.status) target.status(status || 'Live read', isError);
+    }
+
+    function liveAnswerDiskQuestion(prompt, target, sendBtn) {
+        const open = currentFilePath() || '(none open)';
+        return fetch('/ai2/file_tree', { credentials: 'include' })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                const lines = flattenTree((data && data.tree) || []);
+                const msg = 'Yes. Live read from this app via GET /ai2/file_tree (not Hy3).\n'
+                    + 'Allowed tops: lib/, root/, sql/, script/, t/. Secrets (.env, keys) refused.\n'
+                    + 'Currently open: ' + open + '\n\n'
+                    + (lines.length ? lines.join('\n') : '(tree empty or not authorized)')
+                    + '\n\nOpen a file in Project, or name a path such as lib/Comserv/Model/AI2/Chat.pm';
+                finishSend(target, sendBtn, msg, 'Live file-tree read');
+            })
+            .catch(function (err) {
+                finishSend(target, sendBtn, 'Live read failed: ' + (err && err.message ? err.message : err),
+                    'Live read failed', true);
+            });
     }
 
     function sendPrompt(prompt, target) {
@@ -369,6 +483,14 @@
         recordMessage('You', escapeHtml(prompt));
 
         if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '...'; }
+
+        // Disk-capability questions must NEVER reach Hy3.
+        if (isDiskCapabilityPrompt(prompt)) {
+            if (target.status) target.status('Live reading project tree...');
+            liveAnswerDiskQuestion(prompt, target, sendBtn);
+            return;
+        }
+
         if (target.status) target.status('Asking AI...');
 
         // The editor is a coding context. The model is chosen from the shared
@@ -381,17 +503,31 @@
         const filePath = currentFilePath();
 
         loadCurrentFileContent().then(function (fileContent) {
-            return fetch('/ai2/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    model: model,
-                    agent_id: 'code',
-                    page_path: filePath,
-                    page_title: filePath ? filePath.split('/').pop() : '',
-                    page_content: fileContent
-                })
+            const wantEval = isEvaluatePrompt(prompt);
+            const filesP = wantEval
+                ? loadFilesForEval(filePath, fileContent)
+                : Promise.resolve(fileContent && fileContent.length
+                    ? [{ path: filePath, content: fileContent }] : []);
+            return filesP.then(function (files) {
+                const blob = filesToPromptBlob(files);
+                const fullPrompt = blob
+                    ? (prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
+                    : prompt;
+                if (target.status && files.length) {
+                    target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
+                }
+                return fetch('/ai2/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: fullPrompt,
+                        model: model,
+                        agent_id: 'code',
+                        page_path: filePath || (files[0] && files[0].path) || '',
+                        page_title: filePath ? filePath.split('/').pop() : '',
+                        page_content: (files[0] && files[0].content) || fileContent || ''
+                    })
+                });
             });
         }).then(function (res) { return res.json(); })
           .then(function (data) {
@@ -404,10 +540,39 @@
               }
               const usedModel = (data.model ? data.model + (data.provider ? ' (' + data.provider + ')' : '') : EDITOR_MODEL);
               const resp = data.response || '';
+              if (data.files_read && data.files_read.length) {
+                  recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[read ' + escapeHtml(data.files_read.join(', ')) + ']</span>');
+                  if (target.status) target.status('Read ' + data.files_read.join(', '));
+              }
+              const extracted = (window.ComservChat && ComservChat.featureTodo && ComservChat.featureTodo.extractActions)
+                  ? ComservChat.featureTodo.extractActions(resp)
+                  : { cleanText: resp, actions: [] };
+              const display = extracted.cleanText || resp;
               // Prefix the reply with the model actually used, for transparency.
-              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(resp).replace(/\n/g, '<br>'));
+              recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
 
-              const block = extractCodeBlock(resp);
+              if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+                  && typeof ComservChat.featureTodo.handleServerResult === 'function') {
+                  ComservChat.featureTodo.handleServerResult(data.todo_action, {
+                      host: document.getElementById('chat-messages'),
+                      status: target.status,
+                      pagePath: currentFilePath() || window.location.pathname
+                  });
+              }
+
+              if (extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
+                  extracted.actions.forEach(function (a) {
+                      if (a.action === 'create_todo' || a.action === 'create_project') {
+                          ComservChat.featureTodo.handleAction(a, {
+                              host: document.getElementById('chat-messages'),
+                              status: target.status,
+                              pagePath: currentFilePath() || window.location.pathname
+                          });
+                      }
+                  });
+              }
+
+              const block = (data.provider === 'ai2-coderead') ? null : extractCodeBlock(display);
               if (block) {
                   // A suggestion is always applied to the MAIN editor window,
                   // even when chat is detached into its own window.
@@ -605,4 +770,6 @@
     }
 
     console.log('%c[AI2] chat module ready', 'color:#0a0');
+    window.AI2Chat = { setActiveFile: setActiveFile };
+    window[NS] = window.AI2Chat;
 })();

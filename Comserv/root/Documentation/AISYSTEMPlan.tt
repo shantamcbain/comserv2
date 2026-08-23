@@ -1,0 +1,437 @@
+[% META
+   title = "AI System Use — coordinator plan"
+   description = "Audit of AI plans/docs/todos and the ordered waves that systematically improve AI use on Comserv. Sequences AIMPS, V2MIG-on-touch, AGENTS, and Hermes focus settings without stealing those plans."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning,ai"
+   page_version = "1.02"
+   last_updated = "Thu Aug 20 2026"
+   site_specific = "false"
+   project_id = "280"
+   project_code = "AISYSTEM"
+%]
+[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.02 2026/08/20 hermes-agent Exp - Todo-create code vs Scheduler parked' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'AI System Use — coordinator plan'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#audit" class="doc-navlink">Audit</a>
+                <a href="#order" class="doc-navlink">Wave order</a>
+                <a href="#chat-todo-agent" class="doc-navlink" title="In-chat agent that writes a todo to the database.">Todo agent</a>
+                <a href="#scheduler-agent" class="doc-navlink" title="Separate agent: create blocker todos and queue-aware start dates. Not bulk reschedule.">Scheduler agent</a>
+                <a href="#hermes" class="doc-navlink">Hermes settings</a>
+                <a href="#providers" class="doc-navlink">In-app providers</a>
+                <a href="#park" class="doc-navlink">Parked work</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">Comserv already has several AI plans. They do not agree on what to do next. This coordinator does not replace AIMPS, V2MIG, or AGENTS. It <strong>orders</strong> their remaining todos so AI use on the system improves in one sequence: focus the agents and models first, then the in-app picker, then the agent runtime, then operational agents.</p>
+            <div class="doc-info">
+                <p class="doc-body"><strong>Assumptions (correct in-app if wrong):</strong> parent is <a href="[% c.uri_for('/project/details') %]?project_id=114" class="doc-link">#114 AIC-ENH</a>. AGENTS #267 and V2MIG #259 stay top-level owners of their work. Cross-plan items are raised on the owning plan, never absorbed here.</p>
+            </div>
+            <p class="doc-body">Open this plan standalone: <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" class="doc-link" target="_blank" rel="noopener">/Documentation/AISYSTEMPlan</a>.</p>
+            <div class="doc-success">
+                <p class="doc-body"><strong>Open the attached project and tracking todo</strong> (hover a link for what it is):</p>
+                <div class="doc-navrow">
+                    <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-navlink" title="Opens project #280 AISYSTEM — the database project this plan is attached to. Parent is #114 AIC-ENH.">Project #280 AISYSTEM (attached project)</a>
+                    <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-navlink" title="Lists every todo whose project_id is 280 (AISYSTEM waves plus the Todo-create agent).">Todos on #280 (work list)</a>
+                    <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-navlink" title="Opens todo #2217. Tracks the in-chat job that WRITES a todo into the database (code now). Not a form page.">Todo #2217 (Todo-create — code now)</a>
+                    <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-navlink" title="Opens todo #2218. Scheduler agent: blockers and queue-aware start dates. Specified, not built. Not bulk reschedule.">Todo #2218 (Scheduler — specified)</a>
+                    <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-navlink" title="Returns to the Master Plan coordinator, which indexes every active plan including this one.">Master Plan (index of all plans)</a>
+                </div>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="audit" class="doc-h2">2. Audit (measured 2026-08-19)</h2>
+            <h3 class="doc-h3">2.1 Plans and docs</h3>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Doc</th>
+                    <th class="doc-th">Project</th>
+                    <th class="doc-th">Verdict</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]" class="doc-link">AIModelPresentationPlan</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=252" class="doc-link">#252 AIMPS</a></td>
+                    <td class="doc-td">Live. P1 done. P2–P4 open. This is the in-app model-focus work.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]" class="doc-link">V2MigrationPlan</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=259" class="doc-link">#259 V2MIG</a></td>
+                    <td class="doc-td">Plan exists. Phase projects #260–264 have <strong>zero todos</strong>. Standing on-touch rules live as #2033/#2034 under AIMPS-P5.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]" class="doc-link">AutonomousAgentsPlan</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=267" class="doc-link">#267 AGENTS</a></td>
+                    <td class="doc-td">Framework design. Sub-projects #268–270 exist. <strong>Zero todos.</strong> Cannot start.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-link">AIAgentOrchestrationPlan</a></td>
+                    <td class="doc-td">#267</td>
+                    <td class="doc-td">Email + Secretary + notification regression. SECRETARY-AGENT child never created. Draft.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/AI_Chat_System_Master_Audit') %]" class="doc-link">AI_Chat_System_Master_Audit</a></td>
+                    <td class="doc-td">none</td>
+                    <td class="doc-td">Jan 2026 index. Stale vs live Router/ModelCatalog. Keep as archive index, not the plan.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/AIChatSystemUserGuide') %]" class="doc-link">AIChatSystemUserGuide</a></td>
+                    <td class="doc-td">none</td>
+                    <td class="doc-td">How chat picks models today. Still useful; must track AIMPS after W1.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/E1_Grok_AI_Integration_Plan') %]" class="doc-link">E1_Grok_AI_Integration_Plan</a></td>
+                    <td class="doc-td">historical</td>
+                    <td class="doc-td">Grok already in the provider layer. Do not reopen as a track.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">aisystem worktree <code>.hermes.md</code></td>
+                    <td class="doc-td">this wave</td>
+                    <td class="doc-td">Was missing (worktree is its own git root). Written 2026-08-19.</td>
+                </tr>
+            </table>
+
+            <h3 class="doc-h3">2.2 Project tree that matters</h3>
+            <ul class="doc-body">
+                <li><a href="[% c.uri_for('/project/details') %]?project_id=63" class="doc-link">#63 AiIntegration</a> → <a href="[% c.uri_for('/project/details') %]?project_id=114" class="doc-link">#114 AIC-ENH</a> → AIMPS #252 / GITWT #238 / this coordinator #280</li>
+                <li>Ollama children #105–132 still hold leftover install / fine-tune / chain_query todos</li>
+                <li>AIC-DEV #115 still holds 2010-era phase leftovers (AIC-007..011)</li>
+                <li>V2MIG #259 and AGENTS #267 are orphaned at the top level (fine — do not reparent)</li>
+            </ul>
+            <p class="doc-warning">The Jan 2026 Master Audit and the live AIMPS/AGENTS plans describe different systems. Trust the live projects + this wave table, not the audit’s phase list.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="order" class="doc-h2">3. Wave order (do not skip ahead)</h2>
+            <p class="doc-body">Each wave is a <strong>sub-project</strong>. Coordinator todos below point at owning-plan record_ids. Work those ids; do not clone the work here.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Wave</th>
+                    <th class="doc-th">Why this next</th>
+                    <th class="doc-th">Gate</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><strong>W0</strong> Hermes + context</td>
+                    <td class="doc-td">Agents without settings and a worktree <code>.hermes.md</code> ignore Comserv rules (this session started that way).</td>
+                    <td class="doc-td"><code>.hermes.md</code> exists; aliases <code>code</code>/<code>cheap</code>/<code>local</code>/<code>delegate</code> resolve; default coding model unchanged.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><strong>W1</strong> Right model on the right page</td>
+                    <td class="doc-td">Users still see an unfocused catalog. AIMPS P3/P2/P4 are the in-app equivalent of Hermes aliases.</td>
+                    <td class="doc-td">#2026–2029, #2036, then #2024/#2025, then #2030 done on their AIMPS projects.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><strong>W2</strong> Agent runtime ready</td>
+                    <td class="doc-td">AGENTS has projects and no todos. Notifications are email-only. Fine-tune leftovers compete with Router work.</td>
+                    <td class="doc-td">#268–270 have real todos; notification regression has a todo; stale AIC/OFT parked at P9.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><strong>W3</strong> Operational agents</td>
+                    <td class="doc-td">Email agent then Secretary. In-app HelpDesk/Beekeeping/Ency stay blocked until their domain todos exist.</td>
+                    <td class="doc-td">Mail feeds DailyPlan/error-audit; Secretary can call via VoIP page. Not started before W2 gate.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="chat-todo-agent" class="doc-h2">3b. In-chat Todo-create job (code now; runner later)</h2>
+            <p class="doc-body">This is <strong>code</strong> in <code>Model::AI2::TodoCreate</code>, called at the start of <code>AI2::Chat::process</code>. It is not a spawned LLM agent and it does not skip AISYSTEM W2 (the AGENTS runner). Chat-with-AI is the first caller; other agents should call the same Perl job later.</p>
+            <p class="doc-body">Tracking: <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-link" title="Opens todo #2217 — the work item that tracks this Todo-create agent (write a todo from chat, not navigate to a form).">todo #2217</a> on <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link" title="Opens project #280 AISYSTEM, the project todo #2217 is attached to.">#280 AISYSTEM</a>.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Step (agent settings)</th>
+                    <th class="doc-th">Job</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Parse</td>
+                    <td class="doc-td">Read intent. Ask only for missing subject or project. Infer priority/due/scheduled_date (queue eligibility). Do NOT invent blockers or a queue-aware start_date here — that is the Scheduler agent (<a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" title="Opens todo #2218: Scheduler agent for blockers and start dates that respect the existing queue.">#2218</a>). LOOKUP/READ_DOCS may refine later.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">LOOKUP_TODOS (sub-agent)</td>
+                    <td class="doc-td">Similar open todos on this SiteName — do not duplicate.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">LOOKUP_PROJECTS (sub-agent)</td>
+                    <td class="doc-td">Match project/sub-project on current SiteName. If none, ask to create a project.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">READ_DOCS (sub-agent)</td>
+                    <td class="doc-td">Skim /Documentation for the topic so the todo is grounded in what the app already has.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">WRITE</td>
+                    <td class="doc-td">Create the row in code (TodoCreate), not by asking the chat model to invent a form. If the request is unclear, a cheap already-warm model may extract subject/project JSON only.</td>
+                </tr>
+            </table>
+            <ul class="doc-body">
+                <li><strong>Trigger:</strong> user says “add/create a todo …” in the widget, <code>/ai/widget</code>, or the editor chat.</li>
+                <li><strong>Model:</strong> none for a clear “add a todo …” (fastest, $0 — no LLM). The dropdown model must not own the write. If phrasing is unclear, extract subject/project with a <em>free already-warm</em> OpenRouter model (Nemotron nano is fine for that — no Ollama cold load). Use local Ollama only if it is already resident. The model returns JSON; <code>TodoCreate</code> writes the row. Nemotron’s failure was inventing a fake Add box, not being too dumb to parse a title.</li>
+                <li><strong>Job:</strong> SiteName of the current site → match project/sub-project → ask to create a project if none fit → write a todo with <code>project_id</code>, <code>scheduled_date</code> (today), developer = logged-in user, so it shows in planning.</li>
+                <li><strong>Code:</strong> <code>Model::AI2::TodoCreate</code> + intercept at the start of <code>AI2::Chat::process</code> (the path <code>/ai2/chat</code> always takes). Shared JS: <code>ai-chat/feature-todo.js</code>.</li>
+            </ul>
+            <div class="doc-success">
+                <p class="doc-body"><strong>Built (2026-08-20):</strong> clear “add a todo …” never reaches the picker model. Parse infers scheduled_date / NEW / priority / due; asks only if subject is vague or no project matches; WRITE uses current SiteName. <code>/ai/widget</code> loads <code>feature-todo.js</code>.</p>
+            </div>
+            <div class="doc-warning">
+                <p class="doc-body"><strong>Not built:</strong> LOOKUP_TODOS / READ_DOCS as separate callable agents; Nemotron-JSON extract for messy phrasing; other agents calling this job via the W2 runner; blockers and queue-aware start_date (that is <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" title="Scheduler agent tracking todo.">#2218</a>).</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="scheduler-agent" class="doc-h2">3c. Scheduler agent (specified — not built)</h2>
+            <p class="doc-body">This is <strong>not</strong> Parse and not bulk Reschedule. Tracking: <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" title="Opens todo #2218 on project #280 — Scheduler agent that creates predecessor blocker todos and sets start_date after the current queue, without rewriting every todo.">todo #2218</a> on <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link" title="Project #280 AISYSTEM, the project this scheduler work is attached to.">#280 AISYSTEM</a>.</p>
+            <p class="doc-body">Today, creating a todo does <em>not</em> create its blockers. If the work cannot start until an inventory item exists, that inventory-create work should be a <strong>blocking predecessor</strong> (<code>is_blocking</code> / <code>blocked_by_todo_id</code>). Start dates also ignore the queue: if open work may take a month, the new todo should not start today. The old <code>/todo/reschedule</code> path rewrote <code>start_date</code>/<code>time_of_day</code> on every row and produced noise — do not revive that.</p>
+            <ul class="doc-body">
+                <li><strong>Job:</strong> one agent that only makes schedule order: propose (then write, after compare) blocker chains and capacity-aware start dates.</li>
+                <li><strong>Callers:</strong> Todo-create after WRITE; Daily Plan; later the AGENTS runner. Cross-plan: scoring lives in planning (#138 / TodoRanking); this agent uses it, does not replace it.</li>
+                <li><strong>Safety:</strong> advisory preview first (same lesson as FocusTune weights). Never bulk-mutate the queue.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="hermes" class="doc-h2">4. Hermes focus settings (W0 — applied 2026-08-19)</h2>
+            <p class="doc-body">Settings live in <code>~/.hermes/config.yaml</code> via <code>hermes config set</code> (never hand-edit). Secrets stay in <code>~/.hermes/.env</code>.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Role</th>
+                    <th class="doc-th">Alias</th>
+                    <th class="doc-th">Resolved</th>
+                    <th class="doc-th">When</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Coding (this agent)</td>
+                    <td class="doc-td"><code>code</code></td>
+                    <td class="doc-td"><code>xai-oauth/grok-4.6</code> (also the session default)</td>
+                    <td class="doc-td">Comserv edits, plans, audits</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Cheap / local / delegate</td>
+                    <td class="doc-td"><code>cheap</code> <code>local</code> <code>delegate</code></td>
+                    <td class="doc-td">Ollama <code>qwen2.5-coder:14b</code></td>
+                    <td class="doc-td">Subagents, triage, summaries. <code>delegation.model</code> already this.</td>
+                </tr>
+            </table>
+            <p class="doc-body">Also on this machine (not aliased): <code>qwen2.5:72b</code>, <code>gemma4-64k</code>, <code>phi4:14b</code>. Use 72b only when a local deep-read beats a paid call. In-session: <code>/model code</code> or <code>/model cheap</code>.</p>
+            <p class="doc-body">Remaining worktree <code>.hermes.md</code> files are owned by <a href="[% c.uri_for('/todo/details') %]?record_id=2142" class="doc-link">todo #2142</a> on GITWT-NEW — raised, not absorbed.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="providers" class="doc-h2">4b. In-app providers (current)</h2>
+            <p class="doc-body">The /ai and /ai2 model dropdown (and the floating Chat with AI widget) has <strong>four groups</strong>. SuperGrok is not a nickname for xAI.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Group</th>
+                    <th class="doc-th">Wire prefix</th>
+                    <th class="doc-th">Who sees it</th>
+                    <th class="doc-th">Credential (any container)</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">Ollama (Local)</td>
+                    <td class="doc-td"><code>ollama|…</code></td>
+                    <td class="doc-td">All roles (local models)</td>
+                    <td class="doc-td">Live Ollama on the host</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">SuperGrok (prepaid)</td>
+                    <td class="doc-td"><code>supergrok|grok-4.6</code> first</td>
+                    <td class="doc-td">admin / developer / editor only</td>
+                    <td class="doc-td"><code>/run/secrets/supergrok_oauth</code>, mounted <code>/home/comserv/.comserv/secrets/supergrok_oauth</code>, env <code>SUPERGROK_OAUTH_TOKEN</code>, or Ency <code>UserApiKeys</code> service <code>supergrok</code>. Sync from Hermes: <code>perl script/sync_supergrok_token.pl</code>. Host <code>~/.hermes/auth.json</code> is last-resort workstation-only.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">xAI (Grok)</td>
+                    <td class="doc-td"><code>grok|…</code></td>
+                    <td class="doc-td">admin / developer / editor only</td>
+                    <td class="doc-td">Pay-per-token <code>GROK_API_KEY</code> / <code>/run/secrets/grok_api_key</code> / DB service <code>grok</code></td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">OpenRouter</td>
+                    <td class="doc-td"><code>openrouter|…</code></td>
+                    <td class="doc-td">Role-filtered (guests: :free only)</td>
+                    <td class="doc-td">OpenRouter key (k8s / env / DB)</td>
+                </tr>
+            </table>
+            <p class="doc-warning">The same slug <code>grok-4.6</code> can appear under SuperGrok and under xAI. Pick the SuperGrok (prepaid) group to spend the subscription. After send, the status line must stay SuperGrok — if it flips to Grok (xAI) that was a label bug (fixed: Router keeps prefix <code>supergrok</code>; Chat.pm dispatches it to the Grok client; JS does not relabel).</p>
+            <p class="doc-body">W1.0 (<a href="[% c.uri_for('/todo/details') %]?record_id=2202" class="doc-link">#2202</a>) delivered this source. Remaining W1 is AIMPS shortlists/sort, not another provider.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="park" class="doc-h2">5. Parked until W1 gate (do not cancel)</h2>
+            <p class="doc-body">These stay in the DB at priority 9 so they stop winning the daily queue:</p>
+            <ul class="doc-body">
+                <li>AIC leftover phases #242–246 (AIC-007..011) — predates Router/AIMPS</li>
+                <li>Ollama fine-tune / Modelfile OFT #266–278</li>
+                <li>chain_query multi-model #262–265 — after shortlists exist</li>
+            </ul>
+            <p class="doc-body">Keep live: <a href="[% c.uri_for('/todo/details') %]?record_id=562" class="doc-link" title="Older live todo: AI create todos.">#562</a>, <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-link" title="Todo-create job (code).">#2217</a>, <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" title="Scheduler agent (specified).">#2218</a>, #778 (document adding a project), GITWT Hermes context #2142–2146, AIMPS #2024–2036.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">6. Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link">#280 (AISYSTEM)</a>
+                — parent:
+                <a href="[% c.uri_for('/project/details') %]?project_id=114" class="doc-link">#114 AIC-ENH</a>
+                — grandparent:
+                <a href="[% c.uri_for('/project/details') %]?project_id=63" class="doc-link">#63 AiIntegration</a>.
+                Todos:
+                <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-link">under #280</a>.
+                Each wave is a sub-project.
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase / Sub-project</th>
+                    <th class="doc-th">Tracking item</th>
+                    <th class="doc-th">Gate / Done when</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">W0.0 ROLE EVAL — <a href="[% c.uri_for('/project/details') %]?project_id=281" class="doc-link">#281 AISYS-W0</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2191" class="doc-link">#2191</a></td>
+                    <td class="doc-td">This audit section is current</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">W0.1 aisystem .hermes.md</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2192" class="doc-link">#2192</a></td>
+                    <td class="doc-td">File exists at worktree git root and points at global rules</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">W0.2 Hermes aliases</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2193" class="doc-link">#2193</a></td>
+                    <td class="doc-td"><code>hermes config get model.aliases</code> shows code/cheap/local/delegate</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">W1.0 SuperGrok prepaid source — <a href="[% c.uri_for('/project/details') %]?project_id=282" class="doc-link">#282 AISYS-W1</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2202" class="doc-link">#2202</a></td>
+                    <td class="doc-td">Delivered 2026-08-19: four-group picker; portable secrets; status line keeps SuperGrok</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">W1.1 AIMPS shortlists</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2194" class="doc-link">#2194</a> → #2026 #2027 #2028 #2029 #2036</td>
+                    <td class="doc-td">Those AIMPS todos done on #255</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">W1.2 sort + telemetry</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2195" class="doc-link">#2195</a> → #2024 #2025 #2030</td>
+                    <td class="doc-td">Premium collapsed; cost sort; model used is logged</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">W2.1 AGENTS todos — <a href="[% c.uri_for('/project/details') %]?project_id=283" class="doc-link">#283 AISYS-W2</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2196" class="doc-link">#2196</a></td>
+                    <td class="doc-td">#268/#269/#270 have step todos</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">W2.2 notification regression</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2197" class="doc-link">#2197</a></td>
+                    <td class="doc-td">In-app + system notify work again</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">W2.3 park stale AIC/OFT</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2198" class="doc-link">#2198</a></td>
+                    <td class="doc-td">Those record_ids at priority 9, not cancelled</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">W3.1 Email agent — <a href="[% c.uri_for('/project/details') %]?project_id=284" class="doc-link">#284 AISYS-W3</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2199" class="doc-link">#2199</a></td>
+                    <td class="doc-td">Mail in DailyPlan/error-audit. Blocked on W2.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">W3.2 Secretary + VoIP page</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2200" class="doc-link">#2200</a></td>
+                    <td class="doc-td">Critical items call the user. Blocked on W3.1.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">In-chat Todo agent (create in DB)</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-link" title="Opens todo #2217: in-chat agent that writes todos to the database. Related live todo #562.">#2217</a> (related <a href="[% c.uri_for('/todo/details') %]?record_id=562" class="doc-link" title="Opens older live todo #562 (AI create todos).">#562</a>)</td>
+                    <td class="doc-td">Admin chat WRITE path is code. Remaining: sub-agent lookups, other-agent callers, Scheduler #2218.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Scheduler agent (blockers + start dates)</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" title="Opens todo #2218: Scheduler agent. Creates blocking predecessor todos and sets start_date after existing queue work. Must not bulk-reschedule every row.">#2218</a></td>
+                    <td class="doc-td">Specified 2026-08-20. Not implemented. Must not bulk-reschedule. Planning #138 owns scoring.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2201" class="doc-link">#2201</a> (quarterly)</td>
+                    <td class="doc-td">Wave table still matches live todos</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">7. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">Master Plan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]" class="doc-link">AIMPS</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]" class="doc-link">Autonomous Agents</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-link">Agent Orchestration</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]" class="doc-link">V2 Migration</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/HermesBranchContextPlan') %]" class="doc-link">Hermes Branch Context</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AIChatSystemUserGuide') %]" class="doc-link">AI Chat User Guide</a></li>
+                    <li><a href="[% c.uri_for('/project') %]" class="doc-link">All projects</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Coordinator for AI use on Comserv. Owned by project <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link">#280 AISYSTEM</a>.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+[%# ai-plan-sync created todo_ids: 2191,2192,2193,2194,2195,2196,2197,2198,2199,2200,2201 under project_id=280 %]

@@ -56,6 +56,10 @@
   A plan with no project is untrackable. No suitable project? CREATE one.
   Phases are SUB-PROJECTS, not single todos. Do not invent numbers:
   GET /api/projects and /api/todos and use real ids.
+  META project_id + project_code are required. Pass them into
+  _doc_header.tt as doc_project_id / doc_project_code — the shared header
+  then renders Open project + View todos at the TOP of every plan so the
+  user can jump to tracking without scrolling.
   RULE P2 — EVERY PLAN NEEDS A ROUTINE-UPDATE TODO (recurring re-audit).
   RULE P3 — .tt ONLY, NOT .md.
 %]
@@ -67,10 +71,11 @@
     here — add shared classes to documentation.css instead. #%]
 
 <div class="container">
-    [%# Shared, META-driven page header (title + site/role/updated/project links +
-        Documentation Home / Suggest Edit). Mirrors the .md viewer header so every
-        doc page renders identically. Data comes from the Documentation controller
-        stash (META block + request context). See admin/documentation/_doc_header.tt. %]
+    [%# Shared, META-driven page header (title + Open project / View todos +
+        site/role/updated + Documentation Home / Suggest Edit). Mirrors the .md
+        viewer header so every plan page jumps to its project from the top.
+        Data comes from the Documentation controller stash (META project_id).
+        See admin/documentation/_doc_header.tt. %]
     [% INCLUDE 'admin/documentation/_doc_header.tt'
         page_title   = 'Documentation Page Title'
         site_name    = site_name

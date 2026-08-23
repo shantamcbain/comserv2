@@ -33,6 +33,11 @@
     font-size: 2em;
 }
 
+.doc-page-header .doc-navrow {
+    justify-content: center;
+    margin: 0 0 var(--spacing-small, 10px) 0;
+}
+
 .doc-header-meta {
     display: flex;
     flex-wrap: wrap;

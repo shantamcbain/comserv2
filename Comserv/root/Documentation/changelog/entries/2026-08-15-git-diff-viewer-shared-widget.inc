@@ -1,0 +1,114 @@
+<div id="2026-08-15-git-diff-viewer-shared-widget" class="cl-entry">
+<h3>Git diff system — canonical shared widget built (git-diff-viewer.js)</h3>
+<div class="container">
+
+    <h1 class="doc-h1">Git diff system — canonical shared widget built</h1>
+
+    <div class="last-updated" doc-muted>
+        Last Updated: 2026-08-15 | Version: 1.00 | Author: hermes | Status: Implemented (linked to project #238 GITWT-NEW, todo #1991)
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#summary" class="doc-navlink">Summary</a>
+                <a href="#why" class="doc-navlink">Why</a>
+                <a href="#files" class="doc-navlink">Files Changed</a>
+                <a href="#endpoints" class="doc-navlink">Endpoints</a>
+                <a href="#verify" class="doc-navlink">Verification</a>
+                <a href="#related" class="doc-navlink">Related</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="summary" class="doc-h2">1. Summary</h2>
+            <p class="doc-body">The <a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a> &sect;3.5 decision — exactly ONE diff renderer, reused by every surface — had been documented but never built. Two bespoke inline renderers existed instead (one in <code>git-dashboard.js</code>, one in <code>ai2editor/file-diff.js</code>). This change implements the decision: a real canonical widget <code>root/static/js/git-diff-viewer.js</code> (namespace <code>ComservGitDiff</code>) now owns all diff rendering, and both surfaces were refactored to call it. No second diff renderer remains.</p>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="why" class="doc-h2">2. Why (reconciliation)</h2>
+            <ul class="doc-body">
+                <li><strong>Plan said:</strong> build <code>git-diff-viewer.js</code> with API <code>renderDiff(targetEl, diffText, { scope, editable, onApprove, onReject })</code>; all surfaces consume it; no per-surface renderer.</li>
+                <li><strong>Code had:</strong> no <code>git-diff-viewer.js</code>. Instead <code>git-dashboard.js</code> rendered an inline <code>&lt;pre&gt;</code> into <code>#git-file-diff</code> (via <code>GET /admin/git/file_diff</code>), and <code>ai2editor/file-diff.js</code> rendered its own inline <code>&lt;pre&gt;</code> into <code>#git-diff-pane</code> (via <code>GET /ai2/file_diff</code>). Two renderers, two copies of load/error/pre logic.</li>
+                <li><strong>Also a doc error:</strong> the 2026-08-13 changelog claimed the widget was "seeded in the AI2 editor <code>git-review.js</code>" — that file never existed. Corrected in place.</li>
+                <li><strong>Resolution (Path A — follow the plan):</strong> build the shared widget, route both surfaces through it, keep the two working read-only endpoints, and fix the docs to describe reality.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" class="doc-h2">3. Files changed</h2>
+            <ul class="doc-body">
+                <li><code>root/static/js/git-diff-viewer.js</code> — <strong>NEW</strong>. Canonical shared renderer. Exposes <code>ComservGitDiff.render(targetEl, diffText, { scope, editable, onApprove, onReject, title, onClose })</code> plus <code>showLoading</code>/<code>showError</code>/<code>showMessage</code> helpers. Unified layout with line numbers, add/remove/hunk tinting, all colours via CSS custom properties (no inline hex). <code>textContent</code> for every line — no HTML injection from diff text.</li>
+                <li><code>root/static/css/components/git-diff-viewer.css</code> — <strong>NEW</strong>. Theme-token styles for the widget (pre, line numbers, add/del/hunk tint, load/error/message). Loaded via <code>js_load.tt</code>.</li>
+                <li><code>root/static/js/git-dashboard.js</code> — <code>bindFileDiff()</code> now calls <code>ComservGitDiff.showLoading/render/showError</code> into <code>#git-file-diff</code>. Removed the inline <code>&lt;pre&gt;</code>/<code>style.color</code> diff code and the <code>#git-file-diff-content</code> / <code>#git-file-diff-title</code> dependencies (panel container retained; widget fills it).</li>
+                <li><code>root/static/js/ai2editor/file-diff.js</code> — <code>renderDiff()</code>/<code>loadDiff()</code> now call <code>ComservGitDiff.render/showLoading/showError</code> into <code>#git-diff-pane</code>. Removed the bespoke inline pre + close-button builder; <code>ensureDiffPane()</code> now uses a <code>.git-diff-pane</code> class instead of hardcoded colors.</li>
+                <li><code>root/js_load.tt</code> — added the widget <code>&lt;script&gt;</code> + CSS <code>&lt;link&gt;</code> (both <code>?v=&#91;% cv %&#93;</code>) immediately <em>before</em> <code>git-dashboard.js</code> (on <code>/admin/git</code>) and before <code>ai2editor/file-diff.js</code> (on <code>/ai2/editing_widget_popup</code>), so <code>ComservGitDiff</code> exists when consumers run.</li>
+                <li><code>root/Documentation/system/git_worktree_merge_plan.tt</code> — &sect;3.5 retitled "DECIDED &amp; BUILT": names the real widget + API, lists the actual endpoints that feed it, and records that the two bespoke renderers were removed. &sect;7 links here.</li>
+                <li><code>root/Documentation/changelog/2026-08-13-git-merge-plan-shared-diff-view.tt</code> — corrected the false <code>git-review.js</code> claim and the &sect;2 decision table; added a cross-link to this entry.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="endpoints" class="doc-h2">4. Endpoints that feed the widget</h2>
+            <p class="doc-body">The widget is a pure renderer — it does not care which endpoint supplies the text. As implemented, each surface reuses the read-only endpoint it already had:</p>
+            <ul class="doc-body">
+                <li><code>GET /admin/git/file_diff?path=&lt;repo-relative&gt;</code> — admin-gated, path confined to repo root; handles tracked <code>git diff HEAD</code> + untracked <code>git diff --no-index /dev/null</code>. Used by the Git Dashboard working-tree Diff button.</li>
+                <li><code>GET /ai2/file_diff?path=&lt;editor path&gt;</code> — editor-role gated. Used by the AI2 editor "Changed Files / Diff" action.</li>
+                <li><code>GET /admin/git/review/&lt;branch&gt;</code> — the planned branch-wide review endpoint (still pending build under &sect;3.2/&sect;3.3). When it lands, merge-review will reuse the same widget with no renderer change.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verify" class="doc-h2">5. Verification</h2>
+            <ul class="doc-body">
+                <li><code>node --check root/static/js/git-diff-viewer.js</code> — clean.</li>
+                <li><code>node --check root/static/js/git-dashboard.js</code> — clean (no remaining inline diff <code>pre</code>/<code>style.color</code>).</li>
+                <li><code>node --check root/static/js/ai2editor/file-diff.js</code> — clean (no remaining inline render builder).</li>
+                <li>Confirmed exactly one diff renderer file exists; both the dashboard Diff button and the AI2 editor Diff button route through <code>ComservGitDiff</code>.</li>
+                <li>Backend endpoints untouched (working, admin/role-gated) — no controller edits.</li>
+                <li>Live browser render not captured this session (auth-gated); verify the two Diff buttons in a browser when an admin session is available. Both static JS files are served directly and templates auto-reload on the running <code>:3001</code> process.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="related" class="doc-h2">6. Related</h2>
+            <ul class="doc-body">
+                <li><a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a> (&sect;3.5 DECIDED &amp; BUILT — the owning plan, project #238).</li>
+                <li><a href="/Documentation/changelog#2026-08-13-git-merge-plan-shared-diff-view" class="doc-link">2026-08-13 — shared diff view + mandatory human approve</a> (decision record; corrected 2026-08-15).</li>
+                <li><a href="/Documentation/changelog#2026-08-15-git-file-diff-no-index-fix" class="doc-link">2026-08-15 — file_diff '--no-index' refused fix</a> (popup showed "Diff failed: Refused" for new files; root-cause fix in Util::Git).</li>
+                <li><a href="/project/details?project_id=238" class="doc-link">Project #238 (GITWT-NEW)</a> — tracking todos <a href="/todo/details?record_id=1991" class="doc-link">#1991</a> (diff view+edit), <a href="/todo/details?record_id=1993" class="doc-link">#1993</a> (approve gate), <a href="/todo/details?record_id=1992" class="doc-link">#1992</a> (provenance).</li>
+                <li><a href="/Documentation/MASTER_PLAN" class="doc-link">MASTER_PLAN.tt</a> — GITWT-NEW (#238) row links here.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Owning project: <a href="/project/details?project_id=238" class="doc-link">#238 (GITWT-NEW)</a>. Implements the &sect;3.5 decision in <a href="/Documentation/system/git_worktree_merge_plan" class="doc-link">git_worktree_merge_plan.tt</a>. Cross-linked from MASTER_PLAN and the plan's &sect;7.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>

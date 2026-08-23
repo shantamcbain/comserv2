@@ -78,16 +78,29 @@ sub build_prompt {
     my ($self, $c, $top, $plan_docs, $cap) = @_;
     $cap //= PROMPT_CAP;
     my @send = @$top;
-    if (@send > $cap) { @send = @send[0 .. ($cap - 1)]; }
+    # Shuffle BEFORE capping. gather_candidates returns the pool already sorted
+    # by ap_score, so taking the first $cap entries both (a) biases the pool to
+    # the code's own ranking and (b) presents them in rank order — which small
+    # models anchor on and echo back ("all others agree with the script").
+    # A deterministic shuffle (seeded by record_id sum) spreads the cap across
+    # the whole pool and destroys the presentation-order signal while staying
+    # reproducible run-to-run.
+    my @shuffled = sort { (($a->{record_id} // 0) * 2654435761 % 1000)
+                       <=> (($b->{record_id} // 0) * 2654435761 % 1000) } @send;
+    @send = @shuffled[0 .. ($#shuffled < $cap - 1 ? $#shuffled : $cap - 1)];
 
     my @lines;
     for my $h (@send) {
         push @lines, sprintf(
-            "rec=%s | pri=%s | due=%s | proj=%s | subj=%s",
+            "rec=%s | pri=%s | due=%s | proj=%s | subj=%s | desc=%s",
             $h->{record_id}, $h->{priority},
             substr($h->{due_date} // '', 0, 10),
             $h->{project_code} // $h->{project_id} // '',
-            ($h->{subject} // '') =~ s/\n/ /gr
+            ($h->{subject} // '') =~ s/\n/ /gr,
+            # Description gives the model the actual TASK substance ("users
+            # can't login" vs "fix text colour") — subject alone is too terse
+            # to judge function. Truncated to keep prompt size bounded.
+            substr((($h->{description} // '') =~ s/\s+/ /gr), 0, 200)
         );
     }
     my $todo_block = join("\n", @lines);

@@ -253,7 +253,7 @@ sub index :Path :Args(0) {
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
         next unless $name;
-        push @_catalog, { value => "ollama|$name", label => $name, provider => 'ollama' };
+        push @_catalog, { value => "ollama|$name", label => $name, provider => 'ollama', local => 1, free => 0 };
     }
     # Live external models (Grok/xAI, OpenRouter, ...) — same dynamic source the
     # chat dropdown uses. Flatten the Router catalog into the {value,label,provider}
@@ -268,9 +268,14 @@ sub index :Path :Args(0) {
             my $name = $m->{name} // $m->{id} // '';
             next unless $name;
             push @_catalog, {
-                value    => "$prov|$name",
-                label    => $m->{label} // $name,
-                provider => $prov,
+                value             => "$prov|$name",
+                label             => $m->{label} // $name,
+                provider          => $prov,
+                free              => $m->{free} ? 1 : 0,
+                local             => $m->{local} ? 1 : 0,
+                price_prompt      => $m->{price_prompt} // 0,
+                price_completion  => $m->{price_completion} // 0,
+                price_tier        => $m->{price_tier},
             };
         }
     }
@@ -279,7 +284,7 @@ sub index :Path :Args(0) {
     # Pre-serialized JSON string for direct emission into the page (no TT filter,
     # which the template engine rejects).
     my $json = '[]';
-    eval { require JSON; $json = JSON->new->utf8->encode(\@_catalog); };
+    eval { require JSON; $json = JSON->new->ascii(1)->encode(\@_catalog); };
     $c->stash(ai_model_catalog      => \@_catalog);
     $c->stash(ai_model_catalog_json => $json);
     $c->stash(
@@ -12498,8 +12503,16 @@ sub usage :Local :Args(0) {
         $summary{total_cost} = sprintf('%.4f', $summary{total_cost});
     }
 
+    my $usage_m = eval { $c->model('AI')->usage };
+    my $daily_models = [];
+    my $provider_status = {};
+    if ($usage_m) {
+        $daily_models = $usage_m->daily_model_summary($c, $days) || [];
+        $provider_status = $usage_m->snapshot_provider_status($c) || {};
+    }
+
     # For filter dropdowns: recent distinct providers/sites (lightweight)
-    my @providers = qw(ollama grok openai anthropic);
+    my @providers = qw(ollama grok supergrok openrouter openai);
     my @sites;
     if ($is_admin && $schema) {
         eval {
@@ -12513,6 +12526,8 @@ sub usage :Local :Args(0) {
         page_title  => 'AI Usage & Billing Monitor',
         logs        => \@logs,
         summary     => \%summary,
+        daily_models=> $daily_models,
+        provider_status => $provider_status,
         filters     => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
         providers   => \@providers,
         sites       => \@sites,
@@ -12711,7 +12726,14 @@ sub grok_balance :Local :Args(0) {
         my $alert = 0;
         my $alert_msg = '';
         my $spend_for_alert = $internal{real_grok_cost} || $internal{total_grok_cost_usd};
-        if (defined $internal{declared_balance}) {
+        my $sg = eval { $c->model('AI')->usage->maybe_alert_supergrok($c) } || {};
+        if ($sg->{over_threshold}) {
+            $alert = 1;
+            $alert_msg = $sg->{alert_msg} || sprintf(
+                'SuperGrok at %s%% of monthly allowance ($%s / $%s, %s requests).',
+                $sg->{pct}, $sg->{spend_usd}, $sg->{limit_usd}, $sg->{calls}
+            );
+        } elsif (defined $internal{declared_balance}) {
             my $est_remaining = sprintf('%.4f', $internal{declared_balance} - $internal{estimated_spend_since_declared});
             $alert_msg = "You declared \$$internal{declared_balance} balance on $internal{declared_at}. Estimated tracked spend since: \$$internal{estimated_spend_since_declared}. Approx remaining: \$$est_remaining. (Check console.x.ai for exact.)";
             if ($est_remaining < 5) {
@@ -12733,6 +12755,7 @@ sub grok_balance :Local :Args(0) {
             internal    => \%internal,
             alert       => $alert ? JSON::true : JSON::false,
             alert_msg   => $alert_msg,
+            supergrok   => $sg,
             checked_at  => DateTime->now->iso8601,
             note        => "Live balance not available via this key's API (xAI console is authoritative). Use the declare input on the page to tell us your known balance from console.x.ai so we can estimate remaining."
         };

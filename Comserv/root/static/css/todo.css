@@ -20,16 +20,16 @@
 .todo-card.opacity-60 { opacity: 0.6; }
 
 /* ── Card text / layout classes (replace the old inline styles) ── */
-.todo-card { position: relative; }
+.todo-card { position: relative; color: var(--text-color, #000); }
 .todo-card-subject {
-    color: var(--text-color, #333);
+    color: var(--text-color, #000);
     font-weight: 600;
     max-width: 360px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.todo-card-subject:visited { color: var(--text-color, #333); }
+.todo-card-subject:visited { color: var(--text-color, #000); }
 .todo-card-badges .todo-card-subject { margin-left: 4px; }
 .todo-card-actions { gap: 4px; }
 .todo-card-pre {

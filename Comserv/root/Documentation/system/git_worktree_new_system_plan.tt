@@ -241,7 +241,7 @@
             </ul>
             <p class="doc-body"><strong>Regression test:</strong> new <code>t/util_git_next_free_port.t</code> (7 cases) — collision (4001–4004 taken → 4005), stale-cache (out-of-band claim of 4002 → returns 4003), and confirms the existing owner keeps its port. Existing <code>t/util_git_create_worktree.t</code> (13 cases) stays green. Both pass.</p>
             <p class="doc-body"><strong>Registry correction applied same day:</strong> <code>worktrees.json</code> was out of sync with the running servers — the <code>git</code> worktree (branch <code>git-dev</code>) was serving on <strong>4004</strong> but had no JSON entry, while <code>planning</code> wrongly claimed 4004. Fixed the registry to match reality: added <code>git</code> → <strong>4004</strong> (the port actually bound) and moved <code>planning</code> → <strong>4005</strong> (free). Final map: 4001 InventoryAccounting, 4002 DockerHA, 4003 3d, 4004 git, 4005 planning. No two entries share a port.</p>
-            <p class="doc-body"><strong>Cross-reference:</strong> <a href="/Documentation/changelog/2026-08-18-git-worktree-port-collision-fix" class="doc-link">2026-08-18 git-worktree port collision fix</a> (dated changelog).</p>
+            <p class="doc-body"><strong>Cross-reference:</strong> <a href="/Documentation/CHANGELOG#2026-08-18-git-worktree-port-collision-fix" class="doc-link">2026-08-18 git-worktree port collision fix</a> (CHANGELOG).</p>
             <p class="doc-backtop"><a href="#toc" class="doc-link">↑ Back to Top</a></p>
         </div>
     </div>

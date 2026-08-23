@@ -133,6 +133,13 @@
                         <span>(showing top [% focus_queue_limit %])</span>
                         [% END %]
                     </span>
+                    [% IF branch_focus_filter %]
+                    <span class="FocusStats">
+                        Branch <code>[% branch_focus_filter.branch | html %]</code>
+                        — Active first, then this branch's todos
+                        <a href="/planning/daily?filter_project=all" class="BacklogLink">Show all</a>
+                    </span>
+                    [% END %]
                     [% IF active_priorities_backlog %]
                     <a href="/todo" class="BacklogLink">+ [% active_priorities_backlog %] more in backlog →</a>
                     [% END %]
@@ -242,8 +249,10 @@
 
                     [%# Sort buttons %]
                     <span class="SortLabel">Sort:</span>
+                    <button data-action="sort-queue" id="sort-queue"
+                        class="SortBtn SortBtn--active">Queue</button>
                     <button data-action="sort-priority" id="sort-priority"
-                        class="SortBtn SortBtn--active">Priority</button>
+                        class="SortBtn">Priority</button>
                     <button data-action="sort-project" id="sort-project"
                         class="SortBtn">Project</button>
                     <button data-action="sort-due" id="sort-due"
@@ -253,22 +262,25 @@
                 </div>
 
                 [% IF cross_blocker_count %]
-                <div id="cross-blocker-banner" class="BlockerBanner">
-                    <div class="BlockerBannerHeader">
+                <details id="cross-blocker-banner" class="BlockerBanner" open>
+                    <summary class="BlockerBannerHeader">
                         <span>🚨</span>
                         <span>[% cross_blocker_count %] Cross-Project Blocker[% IF cross_blocker_count != 1 %]s[% END %] — Resolve first to unblock other projects</span>
-                    </div>
-                    [% FOREACH ap IN active_priorities %]
-                    [% IF ap.is_cross_blocker %]
+                    </summary>
+                    [% SET xb_list = cross_blocker_todos || [] %]
+                    [% IF xb_list.size %]
+                    [% FOREACH ap IN xb_list %]
                     <div class="BlockerItem">
                         <span class="BlockerItemArrow">↳</span>
                         <a href="/todo/details?record_id=[% ap.record_id %]" class="BlockerItemLink">[% ap.subject | html %]</a>
                         <span class="BlockerItemProject">([% ap.project_name || ap.project_code || 'No project' %])</span>
-                        <span class="BlockerItemBlocks">blocks: [% ap.blocking_names %]</span>
+                        [% IF ap.blocking_names %]<span class="BlockerItemBlocks">blocks: [% ap.blocking_names | html %]</span>[% END %]
                     </div>
                     [% END %]
+                    [% ELSE %]
+                    <p class="BlockerItem">[% cross_blocker_count %] blocker[% IF cross_blocker_count != 1 %]s[% END %] counted but not listed. Use Remaining eligible todos below.</p>
                     [% END %]
-                </div>
+                </details>
                 [% END %]
 
                 [% IF active_priorities && active_priorities.size %]
@@ -280,7 +292,7 @@
                 [% INCLUDE 'todo/todo_card.tt'
                     tc                   = ap
                     tc_wrapper_id        = 'ap-row-' _ ap.record_id
-                    tc_wrapper_extra_data = 'data-priority="' _ (ap.priority || 99) _ '" data-score="' _ (ap.ap_score || 9999) _ '" data-project="' _ (ap.project_name || '') _ '" data-project-id="' _ (ap.project_id || '') _ '" data-due="' _ (ap.due_date || '9999-12-31') _ '" data-site="' _ (ap.sitename || '') _ '" data-role-cats="' _ (ap.role_cats || 'general') _ '"'
+                    tc_wrapper_extra_data = 'data-priority="' _ (ap.priority || 99) _ '" data-score="' _ (ap.ap_score || 9999) _ '" data-project="' _ (ap.project_name || '') _ '" data-project-id="' _ (ap.project_id || '') _ '" data-due="' _ (ap.due_date || '9999-12-31') _ '" data-site="' _ (ap.sitename || '') _ '" data-role-cats="' _ (ap.role_cats || 'general') _ '" data-active="' _ (ap.is_active_work || 0) _ '" data-branch="' _ (ap.is_branch_todo || 0) _ '" data-blocked="' _ (is_blocked ? 1 : 0) _ '" data-queue-rank="' _ rank _ '"'
                     tc_rank              = rank
                     tc_is_stale          = ap.is_stale
                     tc_stale_days        = ap.stale_days

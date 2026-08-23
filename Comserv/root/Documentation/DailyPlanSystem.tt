@@ -154,6 +154,7 @@
                 <li><strong>Plan Management</strong>: Create, edit, delete, and organize plans by project</li>
                 <li><strong>Task Linking</strong>: Associate todos with plans for tracking work items</li>
                 <li><strong>Task Dependencies</strong>: Block tasks and prevent circular dependencies</li>
+                <li><strong>Branch Focus Queue</strong>: On a worktree server, Today's Focus Queue shows Active todos (any branch, so nobody starts work already in a log), then todos that block this project, then this branch's project todos by priority. <code>main</code> still shows the full queue. Escape hatch: <code>?filter_project=all</code>. Todo cards use theme text on a light card background (priority colour is badge-only).</li>
                 <li><strong>Project Integration</strong>: Link plans to projects for organizational context</li>
                 <li><strong>Admin-Only Access</strong>: Restricted to CSC admins and SiteName admins</li>
                 <li><strong>Code Reuse</strong>: Leverages existing Todo, Project, and Calendar systems</li>

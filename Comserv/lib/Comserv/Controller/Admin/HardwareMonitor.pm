@@ -68,6 +68,9 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
     my $filter_metric = $c->req->param('filter_metric')  // '';
     my $filter_level  = $c->req->param('filter_level')   // '';
     my $filter_hours  = $c->req->param('filter_hours')   || 2;
+    $filter_hours = 2 unless looks_like_number($filter_hours);
+    $filter_hours = int($filter_hours);
+    $filter_hours = 2 if $filter_hours <= 0 || $filter_hours > 168;
 
     my @metrics;
     my @hosts;
@@ -75,15 +78,30 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
     my %chart_data;
     my $db_error = '';
 
-    eval {
+    # mariadb_auto_reconnect only repairs the NEXT statement, not the in-flight
+    # one that failed. index() had no retry (run() did) so a stale handle after
+    # an idle gap logged "hardware_metrics query failed: Lost connection".
+    # Caller logs final failure below; helper logs the transient retry (warning).
+    my ($ok, $err) = $self->_attempt_with_reconnect($c, 'index', sub {
         my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
 
         my %search = ();
         $search{hostname}    = $filter_host   if $filter_host;
         $search{metric_name} = $filter_metric if $filter_metric;
         $search{level}       = $filter_level  if $filter_level;
-        $search{timestamp}   = { '>=' => \"DATE_SUB(NOW(), INTERVAL $filter_hours HOUR)" }
-            if $filter_hours;
+        my $ts_sql = "DATE_SUB(NOW(), INTERVAL $filter_hours HOUR)";
+        $search{timestamp} = { '>=' => \$ts_sql };
+
+        # hardware_metrics is ~2M rows with PK on id only (no timestamp index).
+        # A bare timestamp WHERE full-scans + filesorts and trips
+        # net_read_timeout=30 ("Lost connection during query"). Rows are
+        # insert-only so id tracks recency: bound by PRIMARY first.
+        my $max_id = $rs->get_column('id')->max;
+        if (defined $max_id) {
+            my $id_floor = $max_id - int(50_000 * $filter_hours);
+            $id_floor = 0 if $id_floor < 0;
+            $search{id} = { '>=' => $id_floor };
+        }
 
         # Table: most recent rows in window (newest first), no arbitrary row cap
         my @rows = $rs->search(
@@ -140,20 +158,17 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
             }
         }
 
-        my @host_rs = $rs->search(
-            {},
-            { columns => ['hostname'], distinct => 1, order_by => 'hostname' }
-        );
-        @hosts = map { $_->hostname } @host_rs;
-
-        my @name_rs = $rs->search(
-            {},
-            { columns => ['metric_name'], distinct => 1, order_by => 'metric_name' }
-        );
-        @metric_names = map { $_->metric_name } @name_rs;
-    };
-    if ($@) {
-        $db_error = "$@";
+        # Derive filter dropdowns from the window we already loaded. DISTINCT
+        # hostname/metric_name over the whole 2M-row table was a second full
+        # scan and another Lost-connection trigger.
+        my %host_seen;
+        my %name_seen;
+        @hosts = sort grep { defined && !$host_seen{$_}++ } map { $_->{hostname} } @metrics;
+        @metric_names = sort grep { defined && !$name_seen{$_}++ } map { $_->{metric_name} } @metrics;
+        1;
+    });
+    if (!$ok) {
+        $db_error = $err;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
             "hardware_metrics query failed: $db_error");
     }
@@ -535,6 +550,34 @@ sub watchdog :Path('/admin/hardware_monitor/watchdog') :Args(0) {
         ok => ($missed ? 0 : 1), node => $hostname,
         last_run => $last_epoch, age_sec => $age, timeout => $MONITOR_TIMEOUT, missed => $missed,
     }));
+}
+
+# Retry a DBIx op once after a dropped MySQL handle. mariadb_auto_reconnect
+# only repairs the NEXT statement, not the in-flight one that failed, so we
+# disconnect, grab a fresh handle, and retry once. Transient retry is logged
+# as warning here; CALLER logs the final failure via log_with_details
+# (.ai-policy.md §7 exception (a): retried op, retry logs on final failure).
+sub _attempt_with_reconnect {
+    my ($self, $c, $area, $op) = @_;
+    my $ok = eval { $op->(); 1 };
+    return (1, '') if $ok;
+    my $err = "$@";
+    if ($err =~ /Lost connection|server has gone away/i) {
+        eval {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                $area,
+                "db handle stale; disconnect+retry once: $err");
+        };
+        my $schema = eval { $c->model('DBEncy') };
+        eval { $schema->storage->disconnect } if $schema;
+        my $fresh = $schema ? eval { $schema->storage->dbh } : undef;
+        if ($fresh) {
+            $ok = eval { $op->(); 1 };
+            return (1, '') if $ok;
+            $err = "$@";
+        }
+    }
+    return (0, $err);
 }
 
 # Canonical, deterministic node identity shared by `run` (writes the heartbeat)

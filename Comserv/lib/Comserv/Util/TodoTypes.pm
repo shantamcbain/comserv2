@@ -11,6 +11,7 @@ our @EXPORT_OK = qw(
     is_valid_todo_type is_valid_recurrence_rule
     todo_type_icon todo_type_label
     recurrence_label recurring_matches_date
+    is_calendar_fixture
 );
 
 # All valid todo types — add new types here, never in the DB schema.
@@ -75,6 +76,18 @@ sub todo_type_label {
     my ($type) = @_;
     return 'Task' unless defined $type && length $type;
     return TODO_TYPE_LABELS->{ lc $type } // ucfirst(lc $type);
+}
+
+# Lunch, breaks, appointments, meetings — calendar fixtures, not work.
+# Daily Plan priorities must never surface these.
+sub is_calendar_fixture {
+    my ($h) = @_;
+    return 0 unless $h && ref($h) eq 'HASH';
+    my $type = lc($h->{todo_type} // '');
+    return 1 if $type =~ /^(appointment|meeting|event|reminder)$/;
+    my $subj = $h->{subject} // '';
+    return 1 if $subj =~ /\b(lunch|break|standup|daily\.?standup|morning\s*break|afternoon\s*break)\b/i;
+    return 0;
 }
 
 sub recurrence_label {

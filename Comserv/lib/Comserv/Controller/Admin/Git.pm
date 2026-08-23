@@ -843,7 +843,14 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     # Check if this is a POST request (user confirmed the git pull)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         
-        my $selected_branch = $c->req->param('branch') || 'main';
+        # Default to THIS checkout's branch, never bare 'main'. A worktree
+        # server cannot `git checkout main` — already used by the primary
+        # (exit 128 + ERROR audit todo).
+        my $selected_branch = $c->req->param('branch');
+        if (!defined $selected_branch || $selected_branch !~ /\S/) {
+            $selected_branch = $self->get_current_branch($c);
+            $selected_branch = 'main' if !$selected_branch || $selected_branch eq 'unknown';
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
             "Git pull confirmed for branch '$selected_branch', executing");
@@ -939,7 +946,11 @@ sub safe_git_pull :Path('/admin/safe_git_pull') :Args(0) {
     # Check if this is a POST request (user confirmed the operation)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
         
-        my $selected_branch = $c->req->param('branch') || 'main';
+        my $selected_branch = $c->req->param('branch');
+        if (!defined $selected_branch || $selected_branch !~ /\S/) {
+            $selected_branch = $self->get_current_branch($c);
+            $selected_branch = 'main' if !$selected_branch || $selected_branch eq 'unknown';
+        }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'safe_git_pull', 
             "Safe git pull confirmed for branch '$selected_branch', executing");
@@ -1907,33 +1918,44 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     my $wt_path = $self->git_service->worktree_checkout_path_for_branch($c, $target);
 
     if ($source eq 'main' && $target ne 'main') {
-        # main -> branch: pull main's current state down into the target branch.
-        # The branch is already checked out in its worktree, so we just merge
-        # the local 'main' ref into it there. We merge the LOCAL main (the code
-        # the user is actually looking at on the dashboard), NOT origin/main —
-        # origin is frequently stale (unpushed commits), and "merge main" must
-        # mean "the main I see", not "whatever is on origin". No test gate (we
-        # are updating a worktree, not main).
         $direction = 'main->branch';
-        unless (defined $wt_path) {
+        my $current = $self->get_current_branch($c) // '';
+        # Prefer THIS checkout when we are already on the target (the 3d
+        # worktree server). Do not require a worktree-list lookup, and never
+        # treat the dropdown defaulting to main as the destination.
+        my $dest = ($current eq $target)
+            ? $self->git_service->repo_path($c)
+            : $wt_path;
+        unless (defined $dest && length $dest) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
+                "main->branch: no checkout path for '$target'");
             $c->response->body(encode_json({
                 success => 0,
                 error   => "Branch '$target' is not checked out in any worktree; cannot merge main into it from the dashboard.",
             }));
             return;
         }
-        # Bring the worktree's view of main up to date so 'main' resolves to the
-        # local main tip, then merge local main into the branch.
-        my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $wt_path });
-        # Ensure the worktree has a 'main' ref tracking origin/main so the local
-        # main ref is present; then merge the literal local 'main' ref.
-        my $up = $self->git_service->_run($c, 'merge', '--no-ff', 'main',
-            { repo => $wt_path });
+        my $fetch = $self->git_service->_run($c, 'fetch', 'origin', { repo => $dest });
+        # --autostash: the worktree routinely has uncommitted WIP; a plain merge
+        # refuses ("Your local changes would be overwritten"). Autostash stashes
+        # the WIP, merges, then reapplies. If reapplying conflicts, git KEEPS the
+        # stash entry (recoverable via the dashboard's Stash Pop) — nothing lost.
+        my $up = $self->git_service->_run($c, 'merge', '--no-ff', '--autostash', 'main',
+            { repo => $dest });
+        my $combined = join("\n", grep { defined && length }
+            $fetch->{output}, $fetch->{error}, $up->{output}, $up->{error});
+        my $autostash_used = ($combined // '') =~ /Created autostash|Applied autostash/ ? 1 : 0;
+        # WIP could not be reapplied cleanly: git saved it as stash@{0}. Surface
+        # that distinctly so the user knows to recover via Stash Pop.
+        my $autostash_conflict = ($combined // '') =~ /Cannot store stash|Please commit or stash|stash.*conflict/i
+            && $autostash_used ? 1 : 0;
         $res = {
             success   => $up->{success} ? 1 : 0,
-            output    => ($fetch->{output} // '') . "\n" . ($up->{output} // ''),
-            error_msg => $up->{success} ? undef : ($up->{error} || 'merge failed'),
-            conflict  => ($up->{output} // '') =~ /CONFLICT|Automatic merge failed/ ? 1 : 0,
+            output    => $combined,
+            autostash => $autostash_used,
+            autostash_conflict => $autostash_conflict,
+            error_msg => $up->{success} ? undef : ($up->{error} || $up->{output} || 'merge failed'),
+            conflict  => ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0,
         };
     }
     elsif ($source ne 'main' && $target eq 'main') {
@@ -1986,12 +2008,17 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     if ($res->{conflict}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             "merge conflict: direction=$direction source=$source target=$target");
+        # Name the conflicting files (and the uncommitted-changes case) in the
+        # error itself — the raw output <pre> stays as supporting detail.
+        my $why = $res->{error_msg} // "Merge conflict. Resolve in the worktree, then retry (or abort).";
         $c->response->body(encode_json({
             success  => 0,
             conflict => 1,
             target   => $target,
             direction => $direction,
-            error    => "Merge conflict. Resolve in the worktree, then retry (or abort).",
+            conflict_files => $res->{conflict_files} || [],
+            uncommitted    => $res->{uncommitted} ? 1 : 0,
+            error    => $why,
             output   => $res->{output},
         }));
         return;
@@ -2005,6 +2032,8 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         target    => $target,
         direction => $direction,
         conflict  => 0,
+        autostash => $res->{autostash} ? 1 : 0,
+        autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         error     => $res->{error_msg},
         output    => $res->{output},
     }));

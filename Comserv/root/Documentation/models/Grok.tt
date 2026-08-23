@@ -170,6 +170,8 @@ volumes:
                 </li>
                 <li><strong>Module automatically loads from</strong> /run/secrets/grok_api_key</li>
             </ol>
+            <h3>4.5 SuperGrok prepaid (distinct from this pay-per-token key)</h3>
+            <p>SuperGrok is a separate in-app provider from xAI (Grok). Tokens live in the portable secrets dir so every container that already mounts <code>~/.comserv/secrets</code> can use them: <code>supergrok_oauth</code> file, <code>SUPERGROK_OAUTH_TOKEN</code>, or Ency UserApiKeys service <code>supergrok</code>. Sync from a workstation Hermes login with <code>perl script/sync_supergrok_token.pl</code>. Do not point containers at host <code>~/.hermes/auth.json</code>. See <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]">AISYSTEMPlan</a> section 4b.</p>
 
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
         </div>

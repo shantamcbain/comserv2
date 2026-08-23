@@ -11,8 +11,9 @@ use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
 use Comserv::Util::ProjectDependencies;
+use Comserv::Util::TodoLog;
 use Comserv::Util::TodoRanking;
-use Comserv::Util::TodoTypes qw(recurring_matches_date);
+use Comserv::Util::TodoTypes qw(recurring_matches_date is_valid_todo_type);
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -294,7 +295,7 @@ sub begin :Private {
     # of relying on a brittle per-URL match list. Any Todo route that renders a
     # todo card sets this; the main /todo list + day/week/month were previously
     # missing from js_load.tt and had dead Start/Done buttons.
-    if ($c->req->path =~ m{^todo(?:/$|/details|/day|/week|/month|/edit)}) {
+    if ($c->req->path =~ m{^todo(?:/$|/details|/day|/week|/month|/edit|/delete)}) {
         $c->stash(needs_todo_card_js => 1);
     }
 }
@@ -499,6 +500,13 @@ sub details :Path('/todo/details') :Args {
 
     # Get the record_id from the request parameters
     my $record_id = $c->request->parameters->{record_id};
+
+    if ($c->req->param('delete')
+        && uc($c->req->method || '') eq 'POST'
+        && $c->req->param('confirm')) {
+        $self->_perform_todo_delete($c, $record_id);
+        return;
+    }
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -974,6 +982,19 @@ sub modify :Path('/todo/modify') :Args(1) {
     my $today          = DateTime->now->ymd;
     my $current_user   = $c->session->{username} || 'system';
 
+    my $old_type = eval { $todo->get_column('todo_type') } // 'task';
+    my $new_type = $form_data->{todo_type};
+    if (defined $new_type && $new_type ne '') {
+        $new_type = lc $new_type;
+        unless (is_valid_todo_type($new_type)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'modify.todo_type',
+                "Rejected invalid todo_type '$new_type' for record $record_id; keeping '$old_type'");
+            $new_type = $old_type || 'task';
+        }
+    } else {
+        $new_type = $old_type || 'task';
+    }
+
     # Attempt to update the todo record
     eval {
         $todo->update({
@@ -1000,7 +1021,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             user_id              => $todo->get_column('user_id'),
             project_id           => ($form_data->{project_id} && $form_data->{project_id} ne '') ? $form_data->{project_id} : $todo->get_column('project_id'),
             date_time_posted     => $form_data->{date_time_posted} || $todo->get_column('date_time_posted') || $today . ' 00:00:00',
-            todo_type        => $form_data->{todo_type}        || $todo->get_column('todo_type')        || 'task',
+            todo_type        => $new_type,
             is_recurring     => defined($form_data->{is_recurring}) ? ($form_data->{is_recurring} ? 1 : 0) : $todo->get_column('is_recurring'),
             recurrence_rule  => $form_data->{recurrence_rule}  || $todo->get_column('recurrence_rule')  || undef,
             creator_timezone => $form_data->{creator_timezone} || $todo->get_column('creator_timezone') || undef,
@@ -1111,6 +1132,81 @@ sub modify :Path('/todo/modify') :Args(1) {
     }
 
     $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+    $c->detach();
+}
+
+=head2 delete_todo
+
+GET  /todo/delete/:id  — confirm
+POST /todo/delete/:id  — delete (admin/editor)
+
+Named delete_todo (not delete): Catalyst treats an action named C<delete>
+as HTTP DELETE only, so GET /todo/delete/N 404s. Path is /todo/remove/:id
+(the word "delete" in the path also 404'd). Details also accepts
+?delete=1 on the existing /todo/details route.
+
+=cut
+
+sub delete_todo :Path('remove') :Args(1) {
+    my ($self, $c, $record_id) = @_;
+    if (uc($c->req->method || '') eq 'POST' && $c->req->param('confirm')) {
+        $self->_perform_todo_delete($c, $record_id);
+        return;
+    }
+    $c->response->redirect($c->uri_for('/todo/details', {
+        record_id => $record_id,
+        delete    => 1,
+    }));
+    $c->detach();
+}
+
+sub _perform_todo_delete {
+    my ($self, $c, $record_id) = @_;
+
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [$roles] unless ref $roles eq 'ARRAY';
+    my $can_delete = $c->stash->{is_admin}
+        || grep { lc($_) =~ /^(admin|developer|editor)$/ } @$roles;
+    unless ($can_delete) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
+            'Delete denied for ' . ($c->session->{username} || 'Guest'));
+        $c->flash->{error_msg} = 'You do not have permission to delete todos.';
+        $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+        $c->detach();
+    }
+
+    unless ($record_id && $record_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Record ID is required.';
+        $c->response->redirect($c->uri_for('/todo'));
+        $c->detach();
+    }
+
+    my $todo = eval { $c->model('DBEncy')->resultset('Todo')->find($record_id) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete',
+            "Lookup failed for $record_id: $@");
+    }
+    unless ($todo) {
+        $c->flash->{error_msg} = "Todo #$record_id not found.";
+        $c->response->redirect($c->uri_for('/todo'));
+        $c->detach();
+    }
+
+    my $subject = eval { $todo->subject } // '';
+    eval { $todo->delete };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete',
+            "Failed to delete todo #$record_id: $err");
+        $c->flash->{error_msg} = "Could not delete todo #$record_id.";
+        $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+        $c->detach();
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete',
+        "Deleted todo #$record_id ($subject) by " . ($c->session->{username} || 'unknown'));
+    $c->flash->{success_msg} = "Deleted todo #$record_id.";
+    $c->response->redirect($c->uri_for('/todo'));
     $c->detach();
 }
 
@@ -3488,65 +3584,37 @@ sub open_log :Path('open_log') :Args(0) {
 
     my $now   = DateTime->now(time_zone => 'local');
     my $today = $now->ymd;
-    my $time  = $now->hms;
 
-    eval {
-        my $dbh  = $c->model('DBEncy')->storage->dbh;
-        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
-        die "Todo not found\n" unless $todo;
-
-        # Use raw SQL to check for existing open log — avoids TIME inflator bug
-        my $existing_open = $dbh->selectrow_hashref(
-            "SELECT record_id FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 LIMIT 1",
-            undef, $record_id
+    # ONE shared implementation (also used by /api/todo/open_log). Start is a
+    # TOGGLE: if the todo is already active it stops instead (todo -> 2).
+    my $res = eval {
+        Comserv::Util::TodoLog->toggle_start($c,
+            record_id => $record_id,
+            username  => ($username || $data->{actor} // 'api'),
+            summary   => ($data->{summary} // ''),
         );
-        if ($existing_open) {
-            my $cur_status = $dbh->selectrow_array("SELECT status FROM todo WHERE record_id=?", undef, $record_id) // 0;
-            $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
-                undef, $username, $today, $record_id) if $cur_status != 5;
-            $c->response->body('{"ok":1,"already_open":1,"log_id":' . $existing_open->{record_id} . '}');
-            return;
-        }
-
-        my $proj_code = '';
-        if ($todo->project_id) {
-            my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
-            $proj_code = $proj ? ($proj->project_code || '') : '';
-        }
-
-        my $sitename_val = eval { $todo->sitename } || $c->session->{SiteName} || '';
-        my $due_date_val = eval {
-            my $dd = $todo->due_date;
-            $dd ? (ref($dd) ? $dd->ymd : substr("$dd", 0, 10)) : $today;
-        } // $today;
-        my $priority_val = eval { $todo->priority } // 5;
-        my $comments_val = eval { $todo->comments } // '';
-        my $group_val    = $c->session->{group} || '';
-
-        # Use raw SQL INSERT to avoid DBIx::Class TIME column inflator
-        $dbh->do(
-            'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,"00:00:00","00:00:00",2,?,?,?,?,?)',
-            undef,
-            $record_id, $username, $sitename_val, $proj_code,
-            'Started: ' . ($todo->subject // ''),
-            'Work begun on this step by ' . $username,
-            $today, $due_date_val, $time,
-            $priority_val, $username, $today, $group_val, $comments_val
-        );
-        my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
-
-        $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
-            undef, $username, $today, $record_id);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
-            "Log opened for todo $record_id by $username (log_id=$new_log_id) via raw SQL");
-        $c->response->body('{"ok":1,"log_id":' . ($new_log_id // 0) . '}');
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'open_log',
-            "Failed open_log for todo $record_id: $@");
-        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+    if ($@ || !$res || !$res->{success}) {
+        my $err = $@ || ($res && $res->{message}) || 'unknown error';
+        unless ($res && $res->{graceful}) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'open_log',
+                "Failed open_log for todo $record_id: $err");
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'open_log',
+                "open_log graceful for todo $record_id: $err");
+        }
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$err")) . '}');
+        return;
     }
+    if ($res->{action} eq 'stopped') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
+            "Start toggle stopped active log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+        $c->response->body('{"ok":1,"stopped":1,"log_id":' . ($res->{log_id}//0) . ',"duration_mins":' . ($res->{duration_mins}//0) . '}');
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
+        "Log opened for todo $record_id by $username (log_id=$res->{log_id})");
+    $c->response->body('{"ok":1,"log_id":' . ($res->{log_id} // 0) . '}');
 }
 
 sub close_log :Path('close_log') :Args(0) {
@@ -3575,45 +3643,34 @@ sub close_log :Path('close_log') :Args(0) {
 
     my $now_dt  = DateTime->now(time_zone => 'local');
     my $today   = $now_dt->ymd;
-    my $now_hms = $now_dt->strftime('%H:%M:%S');
 
-    eval {
-        my $dbh = $c->model('DBEncy')->storage->dbh;
-
-        my $open_row = $dbh->selectrow_hashref(
-            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
-            undef, $record_id
+    # ONE shared implementation (also used by /api/todo/close_log).
+    my $res = eval {
+        Comserv::Util::TodoLog->close_log($c,
+            record_id => $record_id,
+            username  => ($username || $data->{actor} // 'api'),
+            summary   => ($data->{notes} // $data->{summary} // ''),
         );
-        die "No open log found for todo $record_id\n" unless $open_row;
-
-        my $raw_start = $open_row->{start_time} // '09:00:00';
-        $raw_start = "$raw_start";
-        my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
-        my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
-        my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
-        my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
-        $dur_mins = 1 if $dur_mins <= 0;
-        my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
-
-        my $notes = $data->{notes} // '';
-
-        $dbh->do(
-            'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
-            undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
-        );
-
-        $dbh->do("UPDATE todo SET status=2, last_mod_by=?, last_mod_date=? WHERE record_id=? AND status=5",
-            undef, $username, $today, $record_id);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
-            "Closed log ${\$open_row->{record_id}} for todo $record_id ($dur_mins min)");
-        $c->response->body('{"ok":1,"duration_mins":' . $dur_mins . '}');
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'close_log',
-            "Failed close_log for todo $record_id: $@");
-        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+    if ($@ || !$res || !$res->{success}) {
+        my $err = $@ || ($res && $res->{message}) || 'unknown error';
+        if ($res && $res->{graceful}) {
+            # Nothing open to close — caller mistake, not a server fault.
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'close_log',
+                "close_log graceful for todo $record_id: $err");
+            $c->response->status(200);
+            $c->response->body('{"ok":0,"graceful":1,"error":' . (JSON::encode_json("$err")) . '}');
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'close_log',
+                "Failed close_log for todo $record_id: $err");
+            $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$err")) . '}');
+        }
+        return;
     }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
+        "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+    $c->response->body('{"ok":1,"duration_mins":' . ($res->{duration_mins} // 0) . '}');
 }
 
 sub done_with_log :Path('done_with_log') :Args(0) {
@@ -3643,73 +3700,26 @@ sub done_with_log :Path('done_with_log') :Args(0) {
     my $notes    = $data->{notes} // '';
     my $now_dt   = DateTime->now(time_zone => 'local');
     my $today    = $now_dt->ymd;
-    my $now_hms  = $now_dt->strftime('%H:%M:%S');
 
-    eval {
-        my $dbh  = $c->model('DBEncy')->storage->dbh;
-        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
-        die "Todo not found\n" unless $todo;
-
-        my $open_row = $dbh->selectrow_hashref(
-            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
-            undef, $record_id
+    # ONE shared implementation (also used by /api/todo/done_with_log).
+    my $res = eval {
+        Comserv::Util::TodoLog->done_with_log($c,
+            record_id => $record_id,
+            username  => ($username || $data->{actor} // 'api'),
+            summary   => ($notes // ''),
         );
-
-        if ($open_row) {
-            my $raw_start = $open_row->{start_time} // '09:00:00';
-            $raw_start = "$raw_start";
-            my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
-            my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
-            my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
-            my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
-            $dur_mins = 1 if $dur_mins <= 0;
-            my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
-
-            $dbh->do(
-                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
-                undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
-            );
-        } else {
-            my $proj_code    = '';
-            if ($todo->project_id) {
-                my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
-                $proj_code = $proj ? ($proj->project_code || '') : '';
-            }
-            my $sitename_val = eval { $todo->sitename } || $c->session->{SiteName} || '';
-            my $due_date_val = eval {
-                my $dd = $todo->due_date;
-                $dd ? (ref($dd) ? $dd->ymd : substr("$dd", 0, 10)) : $today;
-            } // $today;
-            my $priority_val = eval { $todo->priority } // 5;
-            my $group_val    = $c->session->{group} || '';
-            my $est_mins     = $data->{duration_mins}
-                               // eval { $todo->estimated_man_hours * 60 } // 15;
-            $est_mins = 15 if $est_mins < 1;
-            my $dur_hms      = sprintf('%02d:%02d:00', int($est_mins / 60), $est_mins % 60);
-
-            $dbh->do(
-                'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,?)',
-                undef,
-                $record_id, $username, $sitename_val, $proj_code,
-                'Completed: ' . ($todo->subject // ''),
-                'Marked done by ' . $username,
-                $today, $due_date_val, $now_hms, $now_hms, $dur_hms,
-                $priority_val, $username, $today, $group_val, $notes
-            );
-        }
-
-        $dbh->do("UPDATE todo SET status=3, last_mod_by=?, last_mod_date=? WHERE record_id=?",
-            undef, $username, $today, $record_id);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
-            "Todo $record_id marked done by $username");
-        $c->response->body('{"ok":1}');
     };
-    if ($@) {
+    if ($@ || !$res || !$res->{success}) {
+        my $err = $@ || ($res && $res->{message}) || 'unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'done_with_log',
-            "Failed done_with_log for todo $record_id: $@");
-        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+            "Failed done_with_log for todo $record_id: $err");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$err")) . '}');
+        return;
     }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
+        "Todo $record_id marked done by $username" . ($res->{log_closed} ? " (log closed)" : " (completed log inserted)"));
+    $c->response->body('{"ok":1}');
 }
 
 sub next_step :Path('next_step') :Args(0) {

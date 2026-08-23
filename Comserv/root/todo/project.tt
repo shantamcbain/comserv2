@@ -52,8 +52,10 @@
 <div class="filter-panel mb-4">
     <form id="projectFilterForm" class="form-inline" style="flex-wrap:wrap;gap:6px;align-items:center;" method="GET" action="/project/project">
         <label for="project_search" style="white-space:nowrap;margin:0;">🔍</label>
-        <input type="text" id="project_search" placeholder="Search name / code / description…"
+        <input type="text" id="project_search" name="search" autocomplete="off"
+               placeholder="Search name / code / id…"
                class="form-control" style="width:260px;"
+               value="[% project_search | html %]"
                oninput="if(window.ComservProjectSearch) ComservProjectSearch.onSearch(this.value)">
         <span id="project_search_count" style="font-size:0.82em;color:var(--text-muted-color,#6c757d);white-space:nowrap;min-width:80px;"></span>
         <label for="project_filter" class="mr-2" style="white-space:nowrap;margin:0;">Project:</label>
@@ -103,6 +105,39 @@
         <button type="submit" class="btn btn-primary btn-sm">Apply</button>
         <button type="button" id="clearFilters" class="btn btn-outline-secondary btn-sm">Clear</button>
     </form>
+    <div id="project_search_results" class="card mt-3"[% UNLESS search_hits && search_hits.size %] hidden[% END %]>
+        <div class="card-header">
+            <strong id="project_search_results_heading">
+                [% IF search_hits && search_hits.size %]
+                    [% search_hits.size %] project[% IF search_hits.size != 1 %]s[% END %] found
+                [% END %]
+            </strong>
+        </div>
+        <div class="card-body">
+            <table class="data-table" id="project_search_results_table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Code</th>
+                        <th>Site</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="project_search_results_body">
+                    [% FOREACH hit IN search_hits %]
+                    <tr>
+                        <td>[% hit.id %]</td>
+                        <td><a href="/project/details?project_id=[% hit.id %]" title="[% hit.name | html %]">[% hit.name | html %]</a></td>
+                        <td>[% hit.project_code | html %]</td>
+                        <td>[% hit.sitename | html %]</td>
+                        <td><a class="btn btn-sm btn-primary" href="/project/details?project_id=[% hit.id %]" title="[% hit.name | html %]">Open</a></td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <!-- Recursive macro to display projects and sub-projects as vertical cards -->
@@ -114,10 +149,14 @@
         <!-- Skip this project if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != project.priority %]
         
-        [% SET proj_search_text = project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '') %]
+        [% SET proj_search_text = project.id _ ' ' _ project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '') %]
         <div class="collapsible-card" id="project-[% project.id %]"
-             data-search="[% proj_search_text.lower %]"
-             data-priority="[% project.priority || 2 %]">
+             data-search="[% proj_search_text.lower | html %]"
+             data-priority="[% project.priority || 2 %]"
+             data-project-id="[% project.id %]"
+             data-project-name="[% project.name | html %]"
+             data-project-code="[% project.project_code | html %]"
+             data-project-sitename="[% project.sitename | html %]">
             <div class="card">
                 <!-- Card header with priority badge, project summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
@@ -390,10 +429,14 @@
         <!-- Skip this subproject if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != subproject.priority %]
         
-        [% SET sub_search_text = subproject.name _ ' ' _ (subproject.project_code || '') _ ' ' _ (subproject.description || '') _ ' ' _ (subproject.sitename || '') %]
+        [% SET sub_search_text = subproject.id _ ' ' _ subproject.name _ ' ' _ (subproject.project_code || '') _ ' ' _ (subproject.description || '') _ ' ' _ (subproject.sitename || '') %]
         <div class="collapsible-card mb-3" id="subproject-[% subproject.id %]"
-             data-search="[% sub_search_text.lower %]"
-             data-priority="[% subproject.priority || 2 %]">
+             data-search="[% sub_search_text.lower | html %]"
+             data-priority="[% subproject.priority || 2 %]"
+             data-project-id="[% subproject.id %]"
+             data-project-name="[% subproject.name | html %]"
+             data-project-code="[% subproject.project_code | html %]"
+             data-project-sitename="[% subproject.sitename | html %]">
             <div class="card">
                 <!-- Card header with priority badge, subproject summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('subproject-body-[% subproject.id %]')" aria-expanded="false">

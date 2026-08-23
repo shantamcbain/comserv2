@@ -7,8 +7,8 @@
 %]
 [% cat = catalog || [];
    hy3 = 'openrouter|tencent/hy3';
-   svc_order  = [ 'ollama', 'grok', 'openrouter' ];
-   svc_labels = { ollama = 'Ollama (Local)', grok = 'xAI (Grok)', openrouter = 'OpenRouter' };
+   svc_order  = [ 'ollama', 'supergrok', 'grok', 'openrouter' ];
+   svc_labels = { ollama = 'Ollama (Local)', supergrok = 'SuperGrok (prepaid)', grok = 'xAI Grok (auto-fill)', openrouter = 'OpenRouter' };
 
    # Collect the provider keys actually present, known ones first (in order),
    # then any unknown providers alphabetically.
@@ -45,12 +45,31 @@
            NEXT IF m.value.search('(?i)(embed|rerank|bge-|nomic|clip|whisper|tts|imagine|/image|-image|audio|video|moderation)');
            items.push(m);
        END;
-       # Free models first within a provider group, then alphabetical. This puts
-       # the no-cost options in front of the long paid OpenRouter list instead of
-       # burying them under "AI21: ..." alphabetical order.
+       # Free models first within a provider group; OpenRouter then sorts by
+       # lowest per-token price (prompt+completion max) ascending — cheapest at
+       # the top instead of alphabetical. Other providers stay alphabetical.
        free_items = []; paid_items = [];
        FOREACH m IN items.sort('value');
            IF m.free; free_items.push(m); ELSE; paid_items.push(m); END;
+       END;
+       IF svc == 'openrouter';
+           # Sort paid models by cost ascending: build "0000.5000|value" keys,
+           # plain string .sort, then map back via a value->model hash.
+           by_value = {};
+           keyed = [];
+           FOREACH m IN paid_items;
+               c_max = (m.price_prompt + 0 > m.price_completion + 0) ? m.price_prompt : m.price_completion;
+               c_num = c_max + 0;   # undef/empty normalizes to 0
+               prefix = c_num.format('%.4f');
+               WHILE prefix.length < 10; prefix = '0' _ prefix; END;
+               k = prefix _ '|' _ m.value;
+               keyed.push(k);
+               by_value.$k = m;
+           END;
+           paid_items = [];
+           FOREACH k IN keyed.sort;
+               paid_items.push(by_value.$k);
+           END;
        END;
        items = free_items.merge(paid_items);
     %]
@@ -62,6 +81,10 @@
          # Cost marker so the user can see what a choice costs before picking it.
          IF m.free;      text = text _ ' — free';
          ELSIF m.local;  text = text _ ' — local';
+         ELSIF (m.price_prompt || 0) + 0 == 0 && (m.price_completion || 0) + 0 == 0 && ! m.price_tier;
+            # Zero-priced external entries (stealth/ox-alpha, openrouter/auto,
+            # ...) cost nothing — mark them free so they sort/label with free.
+            text = text _ ' — free';
          ELSIF m.paid || (m.price_prompt && m.price_prompt + 0 > 0) || (m.price_completion && m.price_completion + 0 > 0);
             # Real per-token cost (AIMPS-P1/#253): prompt + completion USD per 1M.
             pp_str = (m.price_prompt + 0) | format('%.2f');

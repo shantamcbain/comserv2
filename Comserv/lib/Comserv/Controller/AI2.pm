@@ -114,6 +114,12 @@ sub providers :Local :Args(0) {
                 $h;
             };
         }
+        elsif ($p->{service} eq 'supergrok') {
+            $p->{name} = 'SuperGrok (prepaid)';
+        }
+        elsif ($p->{service} eq 'grok') {
+            $p->{name} = 'xAI (Grok)';
+        }
     }
 
     # Prime the shared catalog cache from the catalog we just built, so every
@@ -851,6 +857,70 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    # ── Create-todo intent: do this BEFORE the LLM. Free/small models invent
+    # a fake "Add" box instead of emitting [ACTION: create_todo]. One brain:
+    # Model::AI2::TodoCreate (same as /ai2/action and the 📝 button).
+    # Use ->new not $c->model: a newly added Model::* is not in Catalyst's
+    # component registry until the next process start (we must not restart).
+    my $todo_hit = eval {
+        require Comserv::Model::AI2::TodoCreate;
+        my $brain = eval { $c->model('AI2::TodoCreate') };
+        $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+        $brain->try_chat_create($c,
+            prompt    => $prompt,
+            page_path => $page_path,
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "TodoCreate try_chat_create threw: $@");
+    }
+    if ($todo_hit && $todo_hit->{handled}) {
+        $c->res->body(encode_json({
+            success         => $todo_hit->{success} ? 1 : 0,
+            response        => $todo_hit->{response} // '',
+            model           => $todo_hit->{model} // '(todo-create)',
+            provider        => $todo_hit->{provider} // 'ai2-todo',
+            needs_web_search=> 0,
+            error           => $todo_hit->{error},
+            todo_action     => $todo_hit->{todo_action},
+            conversation_id => $conversation_id,
+            thinking        => [],
+        }));
+        return;
+    }
+
+    # Code-read: "can you read the files" must not reach Hy3.
+    if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+        my $read_hit = eval {
+            require Comserv::Model::AI2::CodeRead;
+            my $brain = eval { $c->model('AI2::CodeRead') };
+            $brain = Comserv::Model::AI2::CodeRead->new if !$brain || !ref $brain;
+            $brain->try_chat_read($c,
+                prompt       => $prompt,
+                page_path    => $page_path,
+                page_content => $page_content,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'ai2_chat', "CodeRead try_chat_read threw: $@");
+        }
+        if ($read_hit && $read_hit->{handled}) {
+            $c->res->body(encode_json({
+                success          => $read_hit->{success} ? 1 : 0,
+                response         => $read_hit->{response} // '',
+                model            => $read_hit->{model} // '(code-read)',
+                provider         => $read_hit->{provider} // 'ai2-coderead',
+                needs_web_search => 0,
+                files_read       => $read_hit->{files_read} || [],
+                conversation_id  => $conversation_id,
+                thinking         => [],
+            }));
+            return;
+        }
+    }
+
     # ── Focus-Tune agent: "what are my top 5 todos by function?" ──
     # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
     # UI button uses) so the question is answerable from Chat-with-AI too.
@@ -925,6 +995,8 @@ sub chat :Local :Args(0) {
         title            => $result->{title},
         created_at       => $result->{created_at},
         thinking         => $result->{thinking} // [],
+        todo_action      => $result->{todo_action},
+        files_read       => $result->{files_read} || [],
     }));
 }
 
