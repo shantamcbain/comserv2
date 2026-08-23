@@ -768,10 +768,23 @@ start_prod_container_from_image() {
     local name="${2:-$CONTAINER}"
     local secrets ident
     secrets="${COMSERV_SECRETS_DIR:-}"
-    [ -z "$secrets" ] && [ -d /home/ubuntu/.comserv/secrets ] && secrets="/home/ubuntu/.comserv/secrets"
-    [ -z "$secrets" ] && [ -d "$HOME/.comserv/secrets" ] && secrets="$HOME/.comserv/secrets"
-    [ -z "$secrets" ] && secrets="/opt/comserv/secrets"
+    # Prefer a secrets dir that actually has dbi/*.json. On the workstation
+    # /home/ubuntu/.comserv/secrets often exists empty (2026-08-23: that empty
+    # bind produced Application Initialization Error / RemoteDB MISSING).
+    _secrets_has_dbi() { [ -d "$1/dbi" ] && [ "$(ls -A "$1/dbi" 2>/dev/null | wc -l)" -gt 0 ]; }
+    if [ -z "$secrets" ] || ! _secrets_has_dbi "$secrets"; then
+        if _secrets_has_dbi "$HOME/.comserv/secrets"; then
+            secrets="$HOME/.comserv/secrets"
+        elif _secrets_has_dbi /home/shanta/.comserv/secrets; then
+            secrets="/home/shanta/.comserv/secrets"
+        elif _secrets_has_dbi /home/ubuntu/.comserv/secrets; then
+            secrets="/home/ubuntu/.comserv/secrets"
+        elif [ -d /opt/comserv/secrets ]; then
+            secrets="/opt/comserv/secrets"
+        fi
+    fi
     ident="${SYSTEM_IDENTIFIER:-production1}"
+    echo "    secrets dir: ${secrets:-NONE}"
 
     docker network inspect comserv_default >/dev/null 2>&1 \
         || docker network create comserv_default >/dev/null
@@ -799,9 +812,13 @@ start_prod_container_from_image() {
     [ -d "$secrets/dbi" ] && dbi_src="$secrets/dbi"
     [ -z "$dbi_src" ] && [ -d "$HOME/.comserv/secrets/dbi" ] && dbi_src="$HOME/.comserv/secrets/dbi"
     if [ -n "$dbi_src" ] && [ "$(ls -A "$dbi_src" 2>/dev/null | wc -l)" -gt 0 ]; then
+        # Copy via a source bind. Do not interpolate a host path into the
+        # container command — that path does not exist inside the image.
         docker run --rm --entrypoint sh \
+            -v "$dbi_src:/src:ro" \
             -v "$secrets:/dest" "$img" \
-            -c "mkdir -p /dest/dbi && cp -a $dbi_src/. /dest/dbi/ 2>/dev/null || true"
+            -c 'mkdir -p /dest/dbi && cp -a /src/. /dest/dbi/ || true' \
+            || echo "⚠ secrets seed into $secrets failed (will still bind-mount it)"
     fi
 
     local extra=()
