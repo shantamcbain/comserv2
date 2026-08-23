@@ -1084,14 +1084,19 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
             $repo_path = "/opt/comserv/Comserv";
         }
-        # Deploy ALWAYS runs from the WORKSTATION. SSH there to run the single
-        # canonical pipeline; it builds/pushes then SSHes to the target node.
+        # Deploy ALWAYS runs from the WORKSTATION.
+        # pull-deploy = pull+run on the target only (image already built+tested+pushed).
+        # build-push  = workstation build/test/push, production untouched.
+        # anything else = full build+push then pull-deploy.
         my $node = ($deploy_target eq "production1") ? "192.168.1.126"
                  : ($deploy_target eq "production2") ? "192.168.1.127"
                  : $deploy_target;
-        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild' script/deploy.sh --deploy-to-node $node 2>&1";
+        my $flag = ($mode eq 'pull-deploy') ? '--pull-deploy'
+                 : ($mode eq 'build-push')  ? '--build-push'
+                 : '--deploy-to-node';
+        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild:$mode' script/deploy.sh $flag $node 2>&1";
         my $cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
-        print $log "[" . scalar(localtime) . "] Delegating Rebuild to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh --deploy-to-node $node ...\n";
+        print $log "[".scalar(localtime)."] Delegating Rebuild to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh $flag $node (mode=$mode) ...\n";
         $log->flush();
         my $out = `$cmd`;
         my $rc = $? >> 8;
