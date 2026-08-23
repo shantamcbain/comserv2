@@ -1,0 +1,266 @@
+[% META
+   title = "Manual inventory: assemblies, parts, and BOM"
+   description = "Step-by-step: create two master units (base and add-on), every printed part and hardware item, and attach them on the BOM so an order can explode to prints and purchases."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "inventory,3d-printing,bom"
+   page_version = "0.1"
+   last_updated = "Sat Aug 22 2026"
+   site_specific = "false"
+   project_id = "42"
+   project_code = "Inventory"
+%]
+[% PageVersion = 'Documentation/InventoryInternalBuildBom.tt,v 0.1 2026/08/22 hermes-agent Exp - manual assembly BOM entry' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Manual inventory: assemblies, parts, and BOM'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#prep" class="doc-navlink">Prepare</a>
+                <a href="#masters" class="doc-navlink">Master units</a>
+                <a href="#parts" class="doc-navlink">Printed parts</a>
+                <a href="#hardware" class="doc-navlink">Hardware</a>
+                <a href="#bom" class="doc-navlink">Attach BOM</a>
+                <a href="#options" class="doc-navlink">Options</a>
+                <a href="#check" class="doc-navlink">Check</a>
+                <a href="#hdry" class="doc-navlink">HDRY example</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">This is the <strong>manual Inventory path</strong> for an internal
+            3D build (not for sale, or later for sale). You type every item in the UI.
+            Do not treat one downloaded 3MF as one product. The assembly PDF is the BOM.</p>
+            <p class="doc-body">Two <strong>master</strong> items (assemblable):</p>
+            <ul class="doc-body">
+                <li><strong>Base unit</strong> — structure + bottom + top + wheels.</li>
+                <li><strong>Add-on module</strong> — structure only (no bottom or top).</li>
+            </ul>
+            <p class="doc-body">Each master’s BOM lists printed parts (qty often &gt; 1)
+            and purchased hardware. When a unit is ordered, that BOM is what you
+            buy and what you queue to print.</p>
+            <div class="doc-info">
+                <p class="doc-body">Routes below are from
+                <code>Controller::Inventory</code>:
+                <code>/Inventory/item/add</code>,
+                <code>/Inventory/item/view/&lt;id&gt;</code>,
+                <code>/Inventory/item/edit/&lt;id&gt;</code>,
+                <code>/Inventory/bom/&lt;parent_id&gt;</code>,
+                <code>/Inventory/bom/add/&lt;parent_id&gt;</code> (POST),
+                <code>/Inventory/bom/list</code>.</p>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prep" class="doc-h2">2. Prepare (before any Add Item)</h2>
+            <ol class="doc-body">
+                <li>Open the assembly PDF. List every printed label (FLS01, BLS01, …)
+                    and every hardware line (screws, bearings, magnets, gasket, Polydryer).
+                    Note qty <em>per base</em> vs <em>per add-on</em>.</li>
+                <li>Decide sitename (3d site owns 3d builds). Stay logged in on that Host.</li>
+                <li>Have File Manager rows for the 3MF/STL/PDF if you will link models later
+                    (<a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">Dryer playbook</a>).</li>
+                <li>Confirm filament spools already exist (e.g. PETG White). Create those
+                    first if missing:
+                    <a href="[% c.uri_for('/Inventory/item/add') %]" class="doc-link">/Inventory/item/add</a>,
+                    category <code>3d_filament</code> or Filament, origin purchased, unit <code>g</code>.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="masters" class="doc-h2">3. Create the two master items</h2>
+            <p class="doc-body">Do this twice — once for Base, once for Add-on.</p>
+            <ol class="doc-body">
+                <li>Go to
+                    <a href="[% c.uri_for('/Inventory/item/add') %]" class="doc-link">/Inventory/item/add</a>.</li>
+                <li>SKU examples: <code>INT-HDRY-BASE</code> and <code>INT-HDRY-MOD</code>.</li>
+                <li>Name: e.g. “HDRY Base unit (bottom, top, wheels)” and
+                    “HDRY Add-on module (no bottom/top)”.</li>
+                <li>Category: <code>3dStock</code> or similar. Origin: <code>3d_printed</code>
+                    (the assembly is made in-house even though some lines are purchased).</li>
+                <li>Unit: <code>each</code>.</li>
+                <li>Tick <strong>Has BOM / Recipe?</strong> (<code>is_assemblable</code>).
+                    Without this, BOM add will refuse the item.</li>
+                <li>Leave shop flags off. The add form does not expose
+                    <code>show_in_shop</code>; default is hidden. Do not list in marketplace.</li>
+                <li>Save. You land on the item list or the item view. Write down the new
+                    <code>id</code> from
+                    <a href="[% c.uri_for('/Inventory/item/view') %]" class="doc-link">/Inventory/item/view/&lt;id&gt;</a>.</li>
+                <li>Open
+                    <a href="[% c.uri_for('/Inventory/bom') %]" class="doc-link">/Inventory/bom/&lt;id&gt;</a>
+                    for that master. It will be empty until you add components.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="parts" class="doc-h2">4. Create each printed part (one item per PDF label)</h2>
+            <p class="doc-body">One inventory item per distinct printed piece. If the PDF
+            needs four of FLS01, that is <strong>qty 4 on the BOM</strong>, not four items.</p>
+            <ol class="doc-body">
+                <li><a href="[% c.uri_for('/Inventory/item/add') %]" class="doc-link">Add item</a>.</li>
+                <li>SKU: include the label, e.g. <code>INT-HDRY-FLS01</code>.</li>
+                <li>Name: the label plus a short English name from the manual.</li>
+                <li>Category: <code>3d_printed_item</code> or <code>3dStock</code>.</li>
+                <li>Origin: <code>3d_printed</code>. Unit: <code>each</code>.</li>
+                <li>Tick <strong>Print on Demand</strong> if the form shows it
+                    (<code>requires_printing</code>). If save ignores that field
+                    (add handler may not persist 3D-only columns), note it on the item
+                    and set filament type PETG in notes until Inventory edit grows those fields.</li>
+                <li>Do <strong>not</strong> tick Has BOM on a single printed part unless
+                    that part itself is an assembly.</li>
+                <li>Save. Record id + SKU + which master(s) need it + qty.</li>
+                <li>Later (3D side): upload/extract the STL for that label on
+                    the model library and set <code>item_id</code> to this part.
+                    That is
+                    <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3dPrintingPlan</a>
+                    work, not this page.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="hardware" class="doc-h2">5. Create hardware (purchased) items</h2>
+            <p class="doc-body">Same add form. Origin <code>purchased</code>.
+            Category <code>Hardware</code> or <code>3d_supply</code>. Not assemblable.
+            Not print-on-demand.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Example SKU</th><th class="doc-th">Name</th><th class="doc-th">Unit</th><th class="doc-th">Notes (HDRY per module)</th></tr>
+                <tr><td class="doc-td">HW-M4-14</td><td class="doc-td">Screw M4 14 mm</td><td class="doc-td">each</td><td class="doc-td">180</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td">HW-M3-20</td><td class="doc-td">Screw M3 20 mm</td><td class="doc-td">each</td><td class="doc-td">16</td></tr>
+                <tr><td class="doc-td">HW-608ZZ</td><td class="doc-td">Bearing 608zz</td><td class="doc-td">each</td><td class="doc-td">16</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td">HW-MAG-8X2</td><td class="doc-td">Magnet 8×2 mm</td><td class="doc-td">each</td><td class="doc-td">20</td></tr>
+                <tr><td class="doc-td">HW-GASKET-6X3</td><td class="doc-td">Adhesive gasket 6×3 mm</td><td class="doc-td">m</td><td class="doc-td">6 m</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td">HW-POLYDRYER</td><td class="doc-td">Polydryer</td><td class="doc-td">each</td><td class="doc-td">1</td></tr>
+                <tr><td class="doc-td">HW-WHEEL-KIT</td><td class="doc-td">Wheel washer/bolt/nut/spacer</td><td class="doc-td">each</td><td class="doc-td">base unit only</td></tr>
+            </table>
+            <p class="doc-body">Receive stock later at
+            <a href="[% c.uri_for('/Inventory/stock/receive') %]" class="doc-link">/Inventory/stock/receive</a>
+            when the box of screws arrives.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="bom" class="doc-h2">6. Attach every component to a master</h2>
+            <ol class="doc-body">
+                <li>Open
+                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="doc-link">/Inventory/bom/list</a>
+                    and click the Base master (must show as assemblable).</li>
+                <li>On
+                    <a href="[% c.uri_for('/Inventory/bom') %]" class="doc-link">/Inventory/bom/&lt;base_id&gt;</a>
+                    use the add-component form. That POSTs to
+                    <code>/Inventory/bom/add/&lt;base_id&gt;</code>.</li>
+                <li>For each printed part and hardware line: pick the component item,
+                    set <strong>quantity</strong> from the PDF, unit <code>each</code>
+                    (or <code>m</code> / <code>g</code> as appropriate).</li>
+                <li>Tick <strong>optional</strong> only for true options
+                    (AMS support, rollers, dryer gadget, doors, drawer). Those can
+                    live on the master as optional BOM lines, or on a third
+                    “option kit” master — pick one convention and keep it.</li>
+                <li>Repeat the whole BOM attach on the Add-on master.
+                    Omit bottom, top, wheels, and wheel hardware.</li>
+                <li>If add fails with “not marked as assemblable”, edit the master
+                    and tick Has BOM, then retry.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="options" class="doc-h2">7. Option kits (optional third master)</h2>
+            <p class="doc-body">If AMS/Hydra, rollers, or dryer extras should be
+            ordered on their own, create another assemblable item
+            (e.g. <code>INT-HDRY-AMS</code>) and BOM only those parts.
+            An order for “base + AMS” then explodes two masters.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="check" class="doc-h2">8. Check before you queue prints</h2>
+            <ul class="doc-body">
+                <li>Both masters appear on
+                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="doc-link">/Inventory/bom/list</a>.</li>
+                <li>Base BOM has structure + bottom + top + wheels + hardware.</li>
+                <li>Add-on BOM has structure + hardware, no bottom/top/wheels.</li>
+                <li>Printed part qty matches the PDF (not “1 per 3MF file”).</li>
+                <li>Each printed part will get an STL and a
+                    <code>printing_3d_models</code> row later; do not queue a job
+                    named “Module 1.3mf”.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="hdry" class="doc-h2">9. HDRY numbers from the manual (starting list)</h2>
+            <p class="doc-body">Source: assembly manual 1 Feb 2025. Complete the
+            printed-label table from the PDF; 29 codes are already visible
+            (FLS01/02, BLS01/02, BBL01/02, …). Hardware per module is in
+            <a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a>
+            §1b.</p>
+            <p class="doc-body">Do not reuse inventory item 51
+            <code>INT-HDRY-001</code> as a master if it still means “one row per 3MF”.
+            Either retarget that SKU or create BASE/MOD and leave 51 as a file-catalog
+            leftover.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/Inventory') %]" class="doc-link">Inventory (module overview)</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing coordinator plan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">Dryer import playbook</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing operator KB</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Inventory how-to (project #42). 3D planning links here; it does not replace 3dPrintingPlan.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
