@@ -337,13 +337,12 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         # entry point: clean build -> push -> pull exact digest -> run --no-build
         # -> health -> post. We no longer run raw `docker compose build/up` here,
         # which previously diverged from the node-deploy path.
-        # Deploy ALWAYS runs from the WORKSTATION (single execution point), never
-        # from the container being replaced. SSH to the workstation to run the
-        # single canonical pipeline there; it builds/pushes then SSHes to prod.
-        push @lines, "[${\scalar localtime}] === Delegating canonical deploy to WORKSTATION (shanta\@192.168.1.199) ===";
+        # This button already runs on the workstation app. Do NOT SSH to
+        # 192.168.1.199 — that hop was the 2026-08-23 failed path (self-ssh,
+        # then deploy.sh --deploy-to-node workstation).
+        push @lines, "[${\scalar localtime}] === Running deploy.sh locally (no SSH hop) ===";
         my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' PROD_TARGET_HOST=192.168.1.126 script/deploy.sh --prod 2>&1";
-        my $ws_ssh = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
-        my $canon_out = `$ws_ssh`;
+        my $canon_out = `$ws_cmd`;
         push @lines, $canon_out;
         if ($? >> 8) { $success = 0; }
         push @lines, "[${\scalar localtime}] Canonical deploy sequence complete.";
@@ -489,6 +488,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         };
         $| = 1;
         select((select($log), $|=1)[0]);
+        eval { open STDOUT, '>>', $log_file; open STDERR, '>>', $log_file; 1 };
 
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger, target=$target) ===\n";
         $log->flush();
@@ -510,14 +510,12 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
             $repo_path = "/opt/comserv/Comserv";
         }
-        # Deploy ALWAYS runs from the WORKSTATION. SSH there to run the single
-        # canonical pipeline; it builds/pushes then SSHes to the target node.
+        # Already on the workstation app. Run deploy.sh here — no self-SSH.
         my $node = ($target eq "production1") ? "192.168.1.126"
                  : ($target eq "production2") ? "192.168.1.127"
                  : $target;
-        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node 2>&1";
-        my $cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
-        print $log "[".scalar(localtime)."] Delegating to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh --deploy-to-node $node ...\n";
+        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node 2>&1";
+        print $log "[".scalar(localtime)."] Running deploy.sh locally --deploy-to-node $node (no SSH hop)\n";
         $log->flush();
         my $out = `$cmd`;
         my $rc = $? >> 8;
@@ -530,9 +528,16 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     sub close_std_fds {
-        # Child process inherits parent's DB handles. They're harmless — the
-        # child exits after the deploy finishes, and the OS reclaims them.
-        # Explicit disconnect is unreliable across DBI versions, so skip it.
+        # Detach so the child cannot keep the Twiggy listen socket. A
+        # leftover inherited :3001 fd + comserv_server.pl -r reload is
+        # what left 3001 as a zombie (NetworkError storm, 2026-08-23).
+        eval { require POSIX; POSIX::setsid(); 1 };
+        eval { open STDIN, '<', '/dev/null'; 1 };
+        eval {
+            require POSIX;
+            POSIX::close($_) for 3 .. 255;
+            1;
+        };
     }
 
     # PARENT
@@ -1040,6 +1045,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         };
         $| = 1;
         select((select($log), $|=1)[0]);
+        eval { open STDOUT, '>>', $log_file; open STDERR, '>>', $log_file; 1 };
 
         print $log "[" . scalar(localtime) . "] === REBUILD STARTED (service=$service, target=$deploy_target, no_cache=" . ($no_cache ? 'yes' : 'no') . ", mode=$mode) ===\n";
         $log->flush();
@@ -1084,14 +1090,19 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
             $repo_path = "/opt/comserv/Comserv";
         }
-        # Deploy ALWAYS runs from the WORKSTATION. SSH there to run the single
-        # canonical pipeline; it builds/pushes then SSHes to the target node.
+        # Already on the workstation. The 2026-08-23 SSH-to-self hop
+        # (shanta@192.168.1.199) is the path that failed; do not use it.
+        # pull-deploy = pull+run on the target only (image already built+pushed).
+        # build-push  = workstation build/push, running container untouched.
+        # anything else = full build+push then local-or-remote run.
         my $node = ($deploy_target eq "production1") ? "192.168.1.126"
                  : ($deploy_target eq "production2") ? "192.168.1.127"
                  : $deploy_target;
-        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild' script/deploy.sh --deploy-to-node $node 2>&1";
-        my $cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
-        print $log "[" . scalar(localtime) . "] Delegating Rebuild to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh --deploy-to-node $node ...\n";
+        my $flag = ($mode eq 'pull-deploy') ? '--pull-deploy'
+                 : ($mode eq 'build-push')  ? '--build-push'
+                 : '--deploy-to-node';
+        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild:$mode' script/deploy.sh $flag $node 2>&1";
+        print $log "[".scalar(localtime)."] Running deploy.sh locally $flag $node (mode=$mode, no SSH hop)\n";
         $log->flush();
         my $out = `$cmd`;
         my $rc = $? >> 8;
