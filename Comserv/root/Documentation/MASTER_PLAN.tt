@@ -415,6 +415,7 @@ DailyPlanSystem.tt ────────────────────�
     <li><a href="[% c.uri_for('/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE') %]">K3s Production DB Migration Guide</a></li>
     <li><a href="[% c.uri_for('/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]">Infrastructure Migration Amendment</a></li>
     <li><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">Docker &amp; Kubernetes Migration Strategy</a></li>
+    <li><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">Docker &amp; Kubernetes Plans — Coordinator</a> (project #271 DOCKER-SYS — indexes every Docker/K8s plan below)</li>
     <li><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">Credentials Audit &amp; Unified Management Plan</a></li>
     <li><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">CSC Gateway Plan</a></li>
     <li><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">Schema Naming Standardization Plan</a></li>
@@ -492,7 +493,7 @@ DailyPlanSystem.tt ────────────────────�
     <li><strong>3D Printing System</strong> — proj <a href="/project/details?project_id=206">#206 3DPRINT</a> (phases: Inv&amp;Accounting #207, File Mgmt #208, Sales #209).</li>
     <li><strong>Buy &amp; Sell Marketplace</strong> — proj <a href="/project/details?project_id=210">#210</a> (7 phases #211–217).</li>
     <li><strong>Git Worktree System (new backend)</strong> — <a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]\">/Documentation/git_worktree_new_system_plan</a> (proj <a href="/project/details?project_id=238">#238 GITWT-NEW</a>).</li>
-    <li><strong>Docker Image Credential Leak Remediation</strong> — proj <a href="/project/details?project_id=239">#239 IMGSEC</a> (child of #201 SECURITY).</li>
+    <li><strong>Docker &amp; Kubernetes Plans (coordinator)</strong> — <a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">/Documentation/DockerMasterPlan</a> (project <a href="/project/details?project_id=271">#271 DOCKER-SYS</a>; indexes the Docker/K8s strategy, K3S_APP_HA_PLAN, DB→K8s migration, deploy/secrets, container diagnostics, dev env, and agent docs).</li>
     <li><strong>Production Server Health</strong> — proj <a href="/project/details?project_id=200">#200 PROD-HEALTH</a>.</li>
 </ul>
 <p><strong>Still intentionally excluded from the curated index:</strong> ~180 mostly legacy/duplicate/Requested rows (e.g. multiple <code>HelpDesk</code>/<code>UI/UX</code>/<code>Happygnome</code> duplicates, per-site equipment rows, <code>test</code>). These are real but not strategic; the DB is the place to see them all.</p>

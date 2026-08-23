@@ -134,6 +134,9 @@ case "${1:-}" in
     --build-push|build-push)
         DEPLOY_MODE_DETECTED="build-push"
         ;;
+    --local-rebuild|local-rebuild)
+        DEPLOY_MODE_DETECTED="local-rebuild"
+        ;;
 esac
 
 # If a mode flag was passed, export it so the rest of the script can see it
@@ -617,7 +620,7 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             exit $?
             ;;
 
-        "deploy-to-node"|"pull-deploy"|"build-push")
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild")
             # Functions are defined below; late dispatch after canonical_deploy*.
             ;;
 
@@ -883,7 +886,7 @@ canonical_deploy() {
             return 1
         fi
         echo "--- [1/6] CLEAN BUILD (workstation) ---"
-        if ! docker compose $COMPOSE_ARGS build --pull "$SVC"; then
+        if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull "$SVC"; then
             echo "❌ Build failed — aborting. Running container untouched."
             return 1
         fi
@@ -897,6 +900,9 @@ canonical_deploy() {
             return 1
         fi
         echo "✅ Pushed $IMAGE"
+        echo "✅ Image is on the registry. This step did not start or replace any container."
+        echo "    Production is unchanged until Pull & Deploy runs on that host."
+        return 0
     else
         echo "--- [1-2/6] SKIP BUILD/PUSH (remote target=$TARGET_HOST) ---"
         echo "    No source tree on production. Image was built+pushed on the workstation."
@@ -959,19 +965,55 @@ EOF
         return 0
     fi
 
-    # Workstation local: after build+push, start local web-prod only (never extras).
-    echo "--- [3/6] LOCAL PULL + RUN web-prod only ---"
-    if ! docker compose $COMPOSE_ARGS pull "$SVC"; then
-        echo "❌ Local pull failed."
-        return 1
-    fi
-    if ! docker compose $COMPOSE_ARGS up -d --no-build --no-deps "$SVC"; then
-        echo "❌ Local run failed."
-        return 1
-    fi
-    echo "✅ $CONTAINER running the freshly-built digest (no extras)"
+    echo "❌ canonical_deploy($TARGET_HOST): unreachable (local returns after push; remote handled above)"
+    return 1
+}
 
-    echo "--- [5/6] HEALTH GATE ---"
+# Recreate the workstation's local web-prod from the image just built/pushed.
+# Rename the live container FIRST (same class as the 2026-08-11 / 2026-08-23
+# "name already in use" false-fail). Compose is not used: a leftover
+# container from a different project name is invisible to compose and
+# causes a create-conflict, and compose would also reclaim a renamed
+# backup via leftover compose labels.
+recreate_local_web_prod() {
+    local TS BK
+    TS=$(date +%Y%m%d-%H%M%S)
+    BK="bk-${CONTAINER}-${TS}"
+    echo "--- LOCAL RECREATE $CONTAINER (rename live first) ---"
+    if docker inspect "$CONTAINER" >/dev/null 2>&1; then
+        if ! docker rename "$CONTAINER" "$BK"; then
+            echo "❌ Could not rename live $CONTAINER — aborting before start."
+            return 1
+        fi
+        echo "    renamed live → $BK (stopping so :5000 is free)"
+        docker stop "$BK" || true
+    else
+        echo "    no live $CONTAINER — starting fresh"
+        BK=""
+    fi
+    if [ "${SKIP_PULL:-0}" = "1" ]; then
+        echo "    using local image $IMAGE (no registry pull — this is not a production update)"
+    elif ! docker pull "$IMAGE"; then
+        echo "❌ Local pull failed."
+        if [ -n "$BK" ]; then
+            docker start "$BK" 2>/dev/null || true
+            docker rename "$BK" "$CONTAINER" 2>/dev/null || true
+        fi
+        return 1
+    fi
+    # Workstation prod-mirror identity — never brand this box production1.
+    SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-workstation-prod-local}" \
+        start_prod_container_from_image "$IMAGE" "$CONTAINER" || {
+            echo "❌ Local start failed. Restoring ${BK:-<none>}"
+            docker rm -f "$CONTAINER" 2>/dev/null || true
+            if [ -n "$BK" ]; then
+                docker start "$BK" 2>/dev/null || true
+                docker rename "$BK" "$CONTAINER" 2>/dev/null || true
+            fi
+            return 1
+        }
+
+    echo "--- LOCAL HEALTH GATE ---"
     local HEALTHY=0 i OK
     for i in $(seq 1 30); do
         OK=0
@@ -981,14 +1023,17 @@ EOF
         sleep 5
     done
     if [ "$HEALTHY" != "1" ]; then
-        echo "❌ LOCAL HEALTH FAILED after 30 attempts."
+        echo "❌ LOCAL HEALTH FAILED. Restoring ${BK:-<none>}"
+        docker stop "$CONTAINER" 2>/dev/null || true
+        docker rename "$CONTAINER" "failed-${CONTAINER}-${TS}" 2>/dev/null \
+            || docker rm -f "$CONTAINER" 2>/dev/null || true
+        if [ -n "$BK" ]; then
+            docker start "$BK" 2>/dev/null || true
+            docker rename "$BK" "$CONTAINER" 2>/dev/null || true
+        fi
         return 1
     fi
-
-    echo "--- [6/6] POST-DEPLOY ---"
-    local POST_CMD="perl -pi -e 's/USE_DB_MENU.*/USE_DB_MENU=1/' /opt/comserv/comserv.conf 2>/dev/null; rm -rf /tmp/comserv/cache/* /cache/* 2>/dev/null; echo done"
-    docker exec "$CONTAINER" bash -c "$POST_CMD" 2>/dev/null || true
-    echo "✅ Canonical deploy complete: $CONTAINER healthy on $TARGET_HOST"
+    echo "✅ $CONTAINER running the freshly-built digest on workstation"
     return 0
 }
 
@@ -998,15 +1043,31 @@ EOF
 canonical_deploy_to_nodes() {
     local HOSTS=("$@")
     [ ${#HOSTS[@]} -eq 0 ] && HOSTS=("production1")
-    # Build+push once locally (canonical_deploy with local target does both).
+    # Build+push once locally (canonical_deploy local is image-only).
     echo "=== Building + pushing once (image is the unit) ==="
     canonical_deploy "local" || { echo "❌ build+push failed"; return 1; }
     # Now pull+run the SAME digest on every node (never rebuild).
+    # workstation/local is NOT a remote SSH target — recreate in place.
+    local H NH did_remote=0 did_local=0
     for H in "${HOSTS[@]}"; do
-        echo "=== Deploying identical image to $H ==="
-        canonical_deploy "$H" || echo "⚠ deploy to $H failed (continuing)"
+        NH="$(_normalize_deploy_node "$H")"
+        if [ "$NH" = "local" ]; then
+            echo "=== Recreating local workstation web-prod from the image just built ==="
+            recreate_local_web_prod || echo "⚠ local recreate failed"
+            did_local=1
+        else
+            echo "=== Deploying identical image to $NH (production pull+run) ==="
+            canonical_deploy "$NH" || echo "⚠ deploy to $NH failed (continuing)"
+            did_remote=1
+        fi
     done
-    echo "✅ Multi-node deploy complete"
+    if [ "$did_remote" = "1" ] && [ "$did_local" = "1" ]; then
+        echo "✅ Done: local workstation recreated AND remote node(s) pull-deployed."
+    elif [ "$did_remote" = "1" ]; then
+        echo "✅ Done: remote production pull-deploy finished. Workstation container was not started by this step."
+    else
+        echo "✅ Done: workstation local recreate only. Production was NOT updated."
+    fi
     return 0
 }
 
@@ -1015,7 +1076,7 @@ _normalize_deploy_node() {
     case "${1:-}" in
         production1|prod1) echo "192.168.1.126" ;;
         production2|prod2) echo "192.168.1.127" ;;
-        workstation|local|"") echo "local" ;;
+        workstation|local|192.168.1.199|"") echo "local" ;;
         *) echo "$1" ;;
     esac
 }
@@ -1038,13 +1099,34 @@ if [ "${DEPLOY_MODE:-}" = "deploy-to-node" ]; then
 fi
 
 if [ "${DEPLOY_MODE:-}" = "build-push" ]; then
-    echo "=== WORKSTATION BUILD + RUN + PUSH (no production pull) ==="
+    echo "=== WORKSTATION BUILD + PUSH (running container untouched) ==="
     if is_production_host; then
         echo "❌ REFUSING to build on production. Build on the workstation."
         exit 1
     fi
     canonical_deploy "local"
     exit $?
+fi
+
+if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
+    echo "=== WORKSTATION LOCAL REBUILD ==="
+    echo "    This builds on THIS machine and replaces local $CONTAINER."
+    echo "    It does NOT push to the registry."
+    echo "    It does NOT update production1."
+    if is_production_host; then
+        echo "❌ REFUSING to build on production. Build on the workstation."
+        exit 1
+    fi
+    if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull web-prod; then
+        echo "❌ Local build failed — running container untouched."
+        exit 1
+    fi
+    SKIP_PULL=1 recreate_local_web_prod
+    rc=$?
+    if [ $rc -eq 0 ]; then
+        echo "✅ Local workstation rebuild complete. Production was NOT updated."
+    fi
+    exit $rc
 fi
 
 # ── Non-interactive Deploy Mode (legacy modes) ─────────────────────────────────
