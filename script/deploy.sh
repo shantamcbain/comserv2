@@ -788,6 +788,19 @@ start_prod_container_from_image() {
         -v comserv2_theme_config:/dest "$img" \
         -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
 
+    # Seed DB connection secrets (K8s-secret style) into the secrets volume so
+    # RemoteDB.pm finds them. Source = the secure store on this host (same place
+    # ssh_credentials.json lives). NEVER a file in the repo, never committed.
+    # The app reads /home/comserv/.comserv/secrets/dbi/*.json at runtime.
+    local dbi_src=""
+    [ -d "$secrets/dbi" ] && dbi_src="$secrets/dbi"
+    [ -z "$dbi_src" ] && [ -d "$HOME/.comserv/secrets/dbi" ] && dbi_src="$HOME/.comserv/secrets/dbi"
+    if [ -n "$dbi_src" ] && [ "$(ls -A "$dbi_src" 2>/dev/null | wc -l)" -gt 0 ]; then
+        docker run --rm --entrypoint sh \
+            -v "$secrets:/dest" "$img" \
+            -c "mkdir -p /dest/dbi && cp -a $dbi_src/. /dest/dbi/ 2>/dev/null || true"
+    fi
+
     local extra=()
     if [ -d /root/LegacyStaticPages ] && [ "$(ls -A /root/LegacyStaticPages 2>/dev/null | wc -l)" -gt 0 ]; then
         extra+=(-v /root/LegacyStaticPages:/opt/comserv/root/LegacyStaticPages:ro)
