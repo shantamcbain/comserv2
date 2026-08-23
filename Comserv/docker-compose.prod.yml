@@ -1,3 +1,10 @@
+# docker-compose.prod.yml — WORKSTATION BUILD overlay only.
+# Production never runs compose from a host checkout. There is no current
+# source tree on prod (and other nodes do not have /opt/comserv/Comserv).
+# Prod starts via `docker pull` + `docker run` of this image (deploy.sh
+# start_prod_container_from_image). CSS/JS are baked into the image.
+# Only theme override volumes overlay two mutable static subdirs.
+
 services:
   config-db:
     image: mariadb:10.11
@@ -84,16 +91,27 @@ services:
       # (Workstation dev can re-enable via STATIC_SRC if live-editing is needed.)
       - ${LEGACY_STATIC_SRC:-/root/LegacyStaticPages}:/opt/comserv/root/LegacyStaticPages
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
+      test: ["CMD-SHELL", "curl -fs --max-time 3 http://127.0.0.1:5000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 60s
+      start_period: 10s
     logging:
       driver: "json-file"
       options:
         max-size: "20m"
         max-file: "5"
+
+  # Workstation siblings from docker-compose.yml. A bare `compose up -d` with
+  # this overlay used to start all three on production (same image, ports
+  # 3000/4000/5000) and steal :5000 from web-prod. The profile keeps them off
+  # any host that uses this overlay unless COMPOSE_PROFILES=workstation-only.
+  web:
+    profiles: ["workstation-only"]
+  web-dev:
+    profiles: ["workstation-only"]
+  web-staging:
+    profiles: ["workstation-only"]
 
 # NOTE: Volumes are defined in docker-compose.yml (base compose) only.
 # No volume definitions here to avoid conflicting parameters

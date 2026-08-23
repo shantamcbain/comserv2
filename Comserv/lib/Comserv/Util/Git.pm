@@ -72,8 +72,10 @@ my %ALLOWED_FLAGS = (
     rm       => { map { $_ => 1 } qw(--cached -r) },
     # Merge is human-gated (admin-only in the controller). Allowed flags keep it safe:
     # --no-ff (always create a merge commit), --no-commit (review then commit),
-    # --abort (cancel a conflicted merge), --squash (optional single-commit merge).
-    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash) },
+    # --abort (cancel a conflicted merge), --squash (optional single-commit merge),
+    # --autostash (stash uncommitted WIP before the merge and reapply it after —
+    # keeps the stash entry if reapplying conflicts, so WIP is never lost).
+    merge    => { map { $_ => 1 } qw(--no-ff --no-commit --abort --squash --autostash) },
     # Worktree is used by the isolation primitive (create_worktree / remove_worktree):
     # allow add, remove (with --force to clear a dirty checkout), list, prune.
     worktree => { map { $_ => 1 } qw(add remove list prune --porcelain --force) },
@@ -462,8 +464,15 @@ sub _run {
     # silently stops working after a git upgrade.
     my $combined   = ($result->{output} // '') . "\n" . ($result->{error} // '');
     my $asks_upstream = grep { defined $_ && /\@\{u(pstream)?\}/ } @argv;
+    # Linked worktrees cannot check out a branch already used elsewhere
+    # (typical: `git checkout main` from planning/aisystem → exit 128,
+    # "already used by worktree"). Callers must refuse first; if one still
+    # hits git, do not spawn an ERROR audit todo — the refusal is expected.
+    my $checkout_collision = ($subcmd eq 'checkout')
+        && $combined =~ /already used by worktree|already checked out/i;
     my $benign   = !$result->{success}
                 && ( $asks_upstream
+                  || $checkout_collision
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
     my $level    = $result->{success} ? 'info'
                  : $benign            ? 'info'
@@ -490,6 +499,29 @@ sub get_current_branch {
     my $branch = $r->{output};
     chomp $branch if defined $branch;
     return ($r->{success} && length $branch) ? $branch : 'unknown';
+}
+
+=head2 current_branch_and_commit($c)
+
+Returns a hashref C<{ branch => $branch, commit => $short_sha }> for the
+LIVE checkout of the resolved repo. Unlike the build-time stamp in
+C<version.json>, this always reflects the branch/worktree the app is actually
+running from, so the global header can't lie about which branch a developer is
+on. Returns C<undef> on any failure so callers can fall back to the build stamp.
+
+=cut
+
+sub current_branch_and_commit {
+    my ($self, $c) = @_;
+    my $branch = $self->get_current_branch($c);
+    return undef if !defined $branch || $branch eq '' || $branch eq 'unknown';
+
+    my $r = $self->_run($c, 'rev-parse', '--short', 'HEAD');
+    my $commit = $r->{success} ? $r->{output} : '';
+    chomp $commit if defined $commit;
+    $commit = '' unless defined $commit;
+
+    return { branch => $branch, commit => $commit };
 }
 
 =head2 get_available_branches($c)
@@ -879,12 +911,24 @@ match the legacy execute_git_pull contract used by callers.
 
 sub pull {
     my ($self, $c, $branch) = @_;
-    $branch ||= 'main';
     my $output  = '';
     my $success = 0;
     my $warning;
 
     my $app_dir = $self->repo_path($c);
+    my $current = $self->get_current_branch($c);
+    $branch ||= $current;
+    $branch = 'main' if !$branch || $branch eq 'unknown';
+
+    # Refuse BEFORE stash/fetch/checkout. `git checkout main` from a linked
+    # worktree is exit 128 and used to spawn an ERROR audit todo.
+    if ($current ne $branch) {
+        if (my $why = $self->_checkout_collision_reason($c, $branch)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull',
+                "refused pull of '$branch' from checkout $current: $why");
+            return (0, "Error: $why\n", undef);
+        }
+    }
 
     my $theme_file = "$app_dir/Comserv/root/static/config/theme_mappings.json";
     my $has_theme_changes = 0;
@@ -909,7 +953,7 @@ sub pull {
     $output .= "Fetching latest changes...\n";
     $output .= $self->_run($c, 'fetch', 'origin')->{output};
 
-    my $current = $self->get_current_branch($c);
+    $current = $self->get_current_branch($c);
     if ($current ne $branch) {
         $output .= "Switching to branch '$branch'...\n";
         my $co = $self->_run($c, 'checkout', $branch);
@@ -1016,6 +1060,12 @@ sub delete_branch {
 
     my $current = $self->get_current_branch($c);
     if ($current eq $branch_name) {
+        if (my $why = $self->_checkout_collision_reason($c, 'main')) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_delete_branch',
+                "refused checkout of main before deleting '$branch_name': $why");
+            $result->{error_msg} = "Cannot delete the currently checked-out worktree branch (would need to switch to main). Remove the worktree first.";
+            return $result;
+        }
         $result->{output} .= "Switching to main branch before deletion...\n";
         my $co = $self->_run($c, 'checkout', 'main');
         $result->{output} .= $co->{output};
@@ -1053,6 +1103,36 @@ sub delete_branch {
     return $result;
 }
 
+=head2 _checkout_collision_reason($c, $branch_name)
+
+Return an error string if this checkout cannot C<git checkout $branch_name>
+because another linked worktree already has that branch (including C<main>
+in the primary). Undef means checkout is allowed. Used by switch/pull/delete
+so a doomed checkout never runs (and never logs ERROR at git_run).
+
+=cut
+
+sub _checkout_collision_reason {
+    my ($self, $c, $branch_name) = @_;
+    return unless defined $branch_name && length $branch_name;
+
+    my $here = $self->repo_path($c) // '';
+    my $base = $self->worktree_base_dir // '';
+    if (($branch_name eq 'main' || $branch_name eq 'master')
+            && $base && $here =~ /\Q$base\E/) {
+        return "Cannot switch to '$branch_name' in a worktree: it is already checked out in the primary repo. Stay on this worktree's branch.";
+    }
+    my $other = $self->worktree_checkout_path_for_branch($c, $branch_name);
+    if (defined $other && length $other) {
+        my $here_abs  = eval { Cwd::abs_path($here) }  || $here;
+        my $other_abs = eval { Cwd::abs_path($other) } || $other;
+        if ($other_abs ne $here_abs) {
+            return "Branch '$branch_name' is already checked out at $other. Open that worktree's server — do not switch this checkout.";
+        }
+    }
+    return;
+}
+
 =head2 switch_branch($c, $branch_name)
 
 Switch to $branch_name, auto-stashing uncommitted changes, creating the local
@@ -1066,6 +1146,16 @@ sub switch_branch {
 
     if (!$branch_name) {
         $result->{error_msg} = "Branch name is required.";
+        return $result;
+    }
+
+    # Linked worktrees cannot steal each other's branch, and cannot check out
+    # main (already checked out in the primary). Refuse BEFORE stashing so a
+    # doomed switch never hides the user's dirty files.
+    if (my $why = $self->_checkout_collision_reason($c, $branch_name)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_switch',
+            "refused switch to '$branch_name': $why");
+        $result->{error_msg} = $why;
         return $result;
     }
 
@@ -1284,10 +1374,11 @@ sub build_worktree_list {
         label => 'MAIN',
         url   => '/planning/daily',
         cmd   => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl --twiggy -p 3001 -r',
-        # Hermes CLI for THIS checkout. Running from the worktree git-root makes Hermes
-        # auto-load the branch .hermes.md (which pulls in the global rules + domain
-        # expertise). -w = worktree-safe mode (parallel agents, no git conflicts).
-        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat -w',
+        # Hermes CLI for THIS checkout. cwd = checkout so Hermes loads .hermes.md.
+        # Do NOT pass -w: Comserv worktrees ARE the isolation. `hermes chat -w`
+        # creates a nested hermes/hermes-* branch (often from origin/main) and
+        # the agent then edits the wrong tree.
+        hermes_cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && hermes chat',
     };
 
     my $cfg = eval { _worktree_config() } // { branches => {} };
@@ -1301,8 +1392,15 @@ sub build_worktree_list {
             url   => $b->{url}   // '/planning/daily',
             cmd   => "cd $base/$name/Comserv/Comserv && CATALYST_DEBUG=1 COMSERV_NO_HEALTH_LOG=1 perl script/comserv_server.pl -p "
                    . ($b->{port} // 0) . ' -r',
-            # Branch Hermes: cwd = the worktree's own git root so its .hermes.md loads.
-            hermes_cmd => "cd $base/$name/Comserv && hermes chat -w",
+            # Branch Hermes: cwd = the worktree git root so its .hermes.md loads.
+            # No -w — see main hermes_cmd comment above.
+            hermes_cmd => "cd $base/$name/Comserv && hermes chat",
+            project_id => $b->{project_id} // undef,
+            host       => $b->{host} // undef,
+            sitename   => $b->{sitename} // undef,
+            origin     => ($b->{host} && $b->{port})
+                ? ("http://" . $b->{host} . ":" . $b->{port})
+                : undef,
         };
     }
     return \@list;
@@ -1572,15 +1670,40 @@ sub merge_branch {
             "merge_branch: merged '$branch' into " . ($repo // 'current checkout') . " (success)");
     }
     else {
-        # Detect conflict so the UI can offer --abort.
-        if ($r->{output} =~ /CONFLICT|Automatic merge failed/) {
+        # Detect conflict so the UI can offer --abort, and build a SPECIFIC
+        # failure message. "Merge failed (see output)" forced the user to read
+        # raw git spew; now we say WHY it failed: which files conflict, or that
+        # uncommitted changes are blocking the merge.
+        my $out = $r->{output} // '';
+        if ($out =~ /CONFLICT|Automatic merge failed/) {
             $result->{conflict} = 1;
+            # Collect every file git named: "CONFLICT (content): Merge conflict in <path>"
+            my @files = $out =~ /Merge conflict in ([^\s]+)/g;
+            # de-dup, keep order
+            my %seenf; @files = grep { !$seenf{$_}++ } @files;
+            $result->{conflict_files} = \@files if @files;
+            $result->{error_msg} = @files
+                ? "Merge conflict — these files have conflicting edits: "
+                  . join(', ', @files)
+                  . ". Resolve them in the worktree, then commit the result."
+                : "Merge conflict. Resolve in the worktree, then commit (or abort).";
         }
-        $result->{error_msg} = "Merge of '$branch' failed (see output).";
+        elsif ($out =~ /Please commit or stash|local changes.*would be overwritten|untracked working tree files.*would be overwritten/i) {
+            # Uncommitted WIP is the other classic blocker — name it plainly.
+            $result->{uncommitted} = 1;
+            $result->{error_msg} = "Merge blocked by uncommitted changes in "
+                . ($repo // 'this checkout')
+                . ". Commit or stash your work first (the dashboard's Stash / autostash handles this).";
+        }
+        else {
+            $result->{error_msg} = "Merge of '$branch' failed"
+                . ($out =~ /\S/ ? ': ' . (split(/\n/, $out))[0] : '.');
+        }
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
             "merge_branch: merge of '$branch' failed"
             . ($result->{conflict} ? ' (conflict)' : '')
-            . ': ' . ($r->{output} // ''));
+            . ($result->{uncommitted} ? ' (uncommitted changes)' : '')
+            . ': ' . $out);
     }
     return $result;
 }
@@ -1648,6 +1771,27 @@ sub run_test_gate {
     }
     $checkout = $app_dir_for->($repo) unless $checkout && -d $checkout;
     my $wt_dir = $checkout;
+
+    # DIRTY-CHECKOUT GUARD: a merge gate run against a checkout with uncommitted
+    # changes tests code the branch ref does NOT contain — the merge would land
+    # different code than the gate approved. Fail EARLY with an explicit message
+    # instead of a confusing downstream error (real 2026-08-22 case: uncommitted
+    # changes in main's tree made the gate fail with a misleading script-path
+    # error, and nothing pointed at the dirty tree as the cause).
+    {
+        my $st = $self->_run($c, 'status', '--porcelain', { repo => $wt_dir });
+        my @dirty = grep { length } split /\n/, ($st->{output} // '');
+        if (@dirty) {
+            my $n = scalar @dirty;
+            my $preview = join('; ', map { s/^\S+\s+//r } @dirty[0 .. ($n > 3 ? 2 : $n - 1)]);
+            my $msg = "Test gate REFUSED: checkout '$wt_dir' has $n uncommitted change(s) "
+                    . "($preview...). The gate would test code that is not committed to "
+                    . "the branch being merged. Commit (or stash) the changes first, then re-run the gate.";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+                "run_test_gate: dirty checkout for '$branch' — $n uncommitted changes");
+            return { success => 0, dirty => 1, output => $msg };
+        }
+    }
 
     # The gate MUST run the canonical script shipped with the RUNNING app (the
     # one with this fix), NOT a per-worktree copy. Worktree copies are divergent

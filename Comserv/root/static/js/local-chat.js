@@ -2260,7 +2260,11 @@
         // Update loading message to show which tier is being used
         if (autoTier) {
             const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
-            const displayName = providerName === 'grok' ? ('Grok: ' + (providerParts[1] || 'auto')) : ('Ollama/' + tierLabel);
+            const displayName = providerName === 'supergrok'
+                ? ('SuperGrok: ' + (providerParts[1] || 'auto'))
+                : providerName === 'grok'
+                    ? ('Grok: ' + (providerParts[1] || 'auto'))
+                    : ('Ollama/' + tierLabel);
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
         }
 
@@ -2902,7 +2906,12 @@
                 // treated every non-Grok response as Ollama, which is why an
                 // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
                 const providerParts2 = (state.selectedProvider || '').split('|');
-                const provName = data.provider || providerParts2[0] || '';
+                // Prefer the user's selected prefix when the backend collapses
+                // SuperGrok onto the Grok client (same API, different billing).
+                let provName = data.provider || providerParts2[0] || '';
+                if ((providerParts2[0] || '') === 'supergrok' && (provName === 'grok' || !provName)) {
+                    provName = 'supergrok';
+                }
                 const rawModel = data.model || providerParts2[1] || '';
                 const modelLabel = describeModel(
                     provName + (rawModel ? '|' + rawModel : ''),
@@ -2952,6 +2961,14 @@
                 }
 
                 persistMessages();
+
+                // Server already created (or asked about) a todo — skip the LLM ACTION path.
+                if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+                    && typeof ComservChat.featureTodo.handleServerResult === 'function') {
+                    ComservChat.featureTodo.handleServerResult(data.todo_action, {
+                        host: document.getElementById('chat-messages')
+                    });
+                }
 
                 // Coding agent: intercept [READ_FILE: path] requests automatically
                 if (state.pageContext && state.pageContext.agent_id === 'coding') {
@@ -4769,6 +4786,22 @@
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // Shared todo brain (widget + editor): sitename match / ask-to-create-project.
+        if (actionObj && (actionObj.action === 'create_todo' || actionObj.action === 'create_project')
+            && window.ComservChat && ComservChat.featureTodo && typeof ComservChat.featureTodo.handleAction === 'function') {
+            ComservChat.featureTodo.handleAction(actionObj, {
+                host: chatMessages,
+                status: function (msg, isErr) {
+                    var si = document.getElementById('chat-status');
+                    if (si) {
+                        si.textContent = msg || '';
+                        si.className = isErr ? 'chat-status error' : 'chat-status connected';
+                    }
+                }
+            });
+            return;
+        }
 
         // fill_form is handled entirely client-side — no server round-trip needed.
         if (actionObj.action === 'fill_form') {
