@@ -92,10 +92,7 @@ sub index :Path :Args(0) {
         # If roles is a string, convert it to array
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
-    my $can_select_model = 0;
-    if (ref($user_roles) eq 'ARRAY') {
-        $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
-    }
+    my $can_select_model = Comserv::Util::ModelCatalog->can_select_model($c);
     
     # Get or set the current Ollama configuration
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
@@ -256,8 +253,8 @@ sub index :Path :Args(0) {
         push @_catalog, { value => "ollama|$name", label => $name, provider => 'ollama', local => 1, free => 0 };
     }
     # Live external models (Grok/xAI, OpenRouter, ...) — same dynamic source the
-    # chat dropdown uses. Flatten the Router catalog into the {value,label,provider}
-    # shape ai/model_select.tt expects. Skip Ollama (already added) and stubs.
+    # chat dropdown uses. De-dupe by value, then role-filter so a guest sees
+    # only the free/open tier (never the full admin list).
     my $live = try { $c->model('AI2::Router')->get_available_models($c) } catch { undef };
     if ($live && ref($live) eq 'ARRAY') {
         for my $m (@$live) {
@@ -281,6 +278,10 @@ sub index :Path :Args(0) {
     }
     # De-dupe by value.
     my %seen; @_catalog = grep { !$seen{ $_->{value} }++ } @_catalog;
+    # NOTE: /ai page stashes the role-filtered catalog from Root.pm (which reads
+    # the role-filtered ModelCatalog). The Router already role-filters, so do NOT
+    # layer filter_catalog_for_role here — it would double-filter. Admins must
+    # still see everything; guests/members already get the filtered set upstream.
     # Pre-serialized JSON string for direct emission into the page (no TT filter,
     # which the template engine rejects).
     my $json = '[]';
