@@ -1944,6 +1944,14 @@ sub api_focus_models :Path('focus/models') :Args(0) {
     if ($cat_def && $cat_def =~ /\|/) {
         my (undef, $cn) = split(/\|/, $cat_def, 2);
         if (grep { $_->{name} eq $cn } @models) { $default = $cat_def; }
+        elsif ($cn && $cat_def =~ /^openrouter\|/) {
+            # Guest default must be selectable even if the OpenRouter list
+            # fetch timed out this request. Model is a live :free slug.
+            unshift @models, {
+                name => $cn, provider => 'openrouter', label => $cn, free => 1,
+            };
+            $default = $cat_def;
+        }
     }
     unless ($default) {
         $default = (@models && $models[0]{provider})

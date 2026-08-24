@@ -514,15 +514,16 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         my $node = ($target eq "production1") ? "192.168.1.126"
                  : ($target eq "production2") ? "192.168.1.127"
                  : $target;
-        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node 2>&1";
-        print $log "[".scalar(localtime)."] Running deploy.sh locally --deploy-to-node $node (no SSH hop)\n";
-        $log->flush();
-        my $out = `$cmd`;
-        my $rc = $? >> 8;
-        print $log $out;
-        print $log "[".scalar(localtime)."] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node";
+        print $log "[".scalar(localtime)."] Running deploy.sh locally --deploy-to-node $node. Output streams below.\n";
         $log->flush();
         close($log);
+        my $rc = system('script', '-q', '-f', '-a', '-e', '-c', $cmd, $log_file);
+        $rc = $rc >> 8;
+        if (open my $lf, '>>', $log_file) {
+            print $lf "[".scalar(localtime)."] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+            close $lf;
+        }
         unlink($pid_file);
         exit(0);
     }
@@ -838,20 +839,13 @@ sub list :Path('/admin/docker/list') :Args(0) {
         comserv2_config_db_data comserv2_redis_data comserv2_logs
         comserv2_sessions comserv2_nfs_data comserv2_whisper_venv
         comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
+        comserv2_theme_config comserv2_theme_css
     );
     foreach my $vname (split /\n/, $vol_out) {
         chomp $vname;
-        # Match canonical names exactly OR compose-prefixed variants
-        # (e.g. comserv-deploy_comserv2_logs on production hosts) so the
-        # Volumes panel doesn't appear empty on servers where compose
-        # prefixes the project name.
-        my $matches = $canonical{$vname};
-        unless ($matches) {
-            foreach my $canon (keys %canonical) {
-                if ($vname =~ /_\Q$canon\E$/) { $matches = 1; last; }
-            }
-        }
-        next unless $matches;
+        # Exact canonical names only. Suffix-matching prefixed leftovers
+        # (comserv_comserv2_logs) made the panel show ~20 when the live set is 12.
+        next unless $canonical{$vname};
         my $inspect_cmd = ($host eq 'workstation' || $host eq 'localhost')
             ? "docker volume inspect $vname 2>/dev/null"
             : qq{$ssh_prefix "docker volume inspect $vname 2>/dev/null"};
@@ -1098,18 +1092,25 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         my $node = ($deploy_target eq "production1") ? "192.168.1.126"
                  : ($deploy_target eq "production2") ? "192.168.1.127"
                  : $deploy_target;
+        my $is_local = ($node eq 'workstation' || $node eq 'local' || $node eq '192.168.1.199');
         my $flag = ($mode eq 'pull-deploy') ? '--pull-deploy'
                  : ($mode eq 'build-push')  ? '--build-push'
+                 : $is_local                ? '--local-rebuild'
                  : '--deploy-to-node';
-        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild:$mode' script/deploy.sh $flag $node 2>&1";
-        print $log "[".scalar(localtime)."] Running deploy.sh locally $flag $node (mode=$mode, no SSH hop)\n";
-        $log->flush();
-        my $out = `$cmd`;
-        my $rc = $? >> 8;
-        print $log $out;
-        print $log "[" . scalar(localtime) . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+        my $node_arg = ($flag eq '--local-rebuild') ? '' : " $node";
+        print $log "[".scalar(localtime)."] Running deploy.sh locally $flag$node_arg (mode=$mode). Output streams below.\n";
+        if ($is_local && $mode ne 'build-push' && $mode ne 'pull-deploy') {
+            print $log "[".scalar(localtime)."] This is a WORKSTATION-only rebuild. Production will NOT be updated.\n";
+        }
         $log->flush();
         close($log);
+        my $inner = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild:$mode' BUILDKIT_PROGRESS=plain script/deploy.sh $flag$node_arg";
+        my $rc = system('script', '-q', '-f', '-a', '-e', '-c', $inner, $log_file);
+        $rc = $rc >> 8;
+        if (open my $lf, '>>', $log_file) {
+            print $lf "[" . scalar(localtime) . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+            close $lf;
+        }
         unlink($pid_file);
         exit(0);
     }
