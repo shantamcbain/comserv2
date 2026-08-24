@@ -267,10 +267,13 @@ sub deploy {
     elsif ($target eq 'local-test' || $target eq 'web-dev')         { $node = 'local'; }
     else                                 { $node = '192.168.1.126'; }
 
-    $log_line->("=== DEPLOY STARTED (target=$target -> node=$node, trigger=$self->{trigger}) ===");
-    $log_line->("Delegating to single engine: script/deploy.sh --deploy-to-node $node");
+    $log_line->("=== DEPLOY STARTED (target=$target -> node=$node, trigger=$self->{trigger}, mode=$self->{mode}) ===");
+    my $flag = ($self->{mode} && $self->{mode} eq 'pull-deploy') ? '--pull-deploy'
+             : ($self->{mode} && $self->{mode} eq 'build-push')  ? '--build-push'
+             : '--deploy-to-node';
+    $log_line->("Delegating to single engine: script/deploy.sh $flag $node");
 
-    my $cmd = "cd '$repo' && TRIGGER_SOURCE='$self->{trigger}' script/deploy.sh --deploy-to-node $node 2>&1";
+    my $cmd = "cd '$repo' && TRIGGER_SOURCE='$self->{trigger}' script/deploy.sh $flag $node 2>&1";
     my $out = `$cmd`;
     my $rc  = $? >> 8;
     if ($log_fh) { print $log_fh $out; $log_fh->flush(); }

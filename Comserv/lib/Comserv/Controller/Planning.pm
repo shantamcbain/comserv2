@@ -1487,11 +1487,15 @@ sub daily_impl :Private {
 
     my $ai_default_model = '';
     eval {
-        my $cfg = $c->model('DBEncy')->resultset('AIModelCatalog')->search(
-            { is_default => 1, is_active => 1 }, { rows => 1 }
-        )->first;
-        $ai_default_model = $cfg->model_name if $cfg;
+        # Single source of truth (S2): the shared ModelCatalog, NOT a DB
+        # resultset — the old AIModelCatalog resultset class does not exist,
+        # so this eval silently died and left the default empty.
+        $ai_default_model = Comserv::Util::ModelCatalog->default_for($c, page => 'chat') || '';
     };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
+            "Could not resolve AI default model: $@");
+    }
 
     my $prev_date_calc = $prev_date;
     my $next_date_calc = $next_date;

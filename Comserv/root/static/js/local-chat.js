@@ -37,6 +37,9 @@
         activeModel: null,
         isGuest: true,
         isAdmin: false,
+        canSelectModel: false,
+        roleTier: 'guest',
+        roleRank: 0,
         isDevMode: false,           // true only on local development machine
         userModelOverride: false,   // true when user manually picks a model
         modelTiers: {
@@ -228,6 +231,80 @@
             });
     }
     
+    // Role-scoped agent + model picker. Ranks:
+    //   0 guest          — AI Assistant + Support Specialist; hide model field
+    //   1 member/editor  — guest agents + Encyclopedia Expert; hide model field
+    //   2 admin/developer — all agents and all models
+    function _roleRankFromName(name) {
+        var n = String(name || '').toLowerCase();
+        if (n === 'admin' || n === 'developer' || n === 'priv') return 2;
+        if (n === 'member' || n === 'user' || n === 'editor') return 1;
+        return 0;
+    }
+    function _userRoleRank() {
+        if (typeof state.roleRank === 'number') return state.roleRank;
+        return state.canSelectModel || state.isAdmin ? 2 : (state.isGuest ? 0 : 1);
+    }
+    function _agentAllowed(agent) {
+        if (!agent) return false;
+        if (agent.local_only && !state.isDevMode) return false;
+        if (agent.admin_only && _userRoleRank() < 2) return false;
+        var min = agent.min_role;
+        if (!min) {
+            min = (agent.public_access === false) ? 'developer' : 'guest';
+        }
+        return _userRoleRank() >= _roleRankFromName(min);
+    }
+    function _applyRoleFromGlobals(extra) {
+        extra = extra || {};
+        var cfg = window.ComservConfig || {};
+        var ucfg = window.AI_CHAT_USER_CONFIG || {};
+        if (cfg.username) state.username = cfg.username;
+        if (cfg.siteName) state.siteName = cfg.siteName;
+        if (ucfg.username) state.username = ucfg.username;
+        if (ucfg.siteName) state.siteName = ucfg.siteName;
+        if (extra.username) state.username = extra.username;
+        var tier = extra.role_tier || extra.roleTier || ucfg.roleTier || cfg.roleTier;
+        if (tier) {
+            state.roleTier = tier;
+            state.roleRank = _roleRankFromName(tier);
+        }
+        var canSel = extra.can_select_model;
+        if (canSel === undefined) canSel = extra.canSelectModel;
+        if (canSel === undefined) canSel = ucfg.canSelectModel;
+        if (canSel === undefined) canSel = cfg.canSelectModel;
+        if (canSel !== undefined) state.canSelectModel = !!canSel;
+        if (extra.is_guest !== undefined) state.isGuest = !!extra.is_guest;
+        else if (ucfg.isGuest !== undefined) state.isGuest = !!ucfg.isGuest;
+        else if (cfg.isGuest !== undefined) state.isGuest = !!cfg.isGuest;
+        if (extra.is_admin !== undefined) state.isAdmin = !!extra.is_admin;
+        else if (ucfg.isAdmin !== undefined) state.isAdmin = !!ucfg.isAdmin;
+        else if (cfg.isAdmin !== undefined) state.isAdmin = !!cfg.isAdmin;
+        // Site-admin flag is authoritative: never leave a real admin on the
+        // guest rank just because roleTier/canSelectModel lagged.
+        if (state.isAdmin || state.canSelectModel) {
+            state.roleRank = 2;
+            state.canSelectModel = true;
+        } else if (typeof state.roleRank !== 'number') {
+            state.roleRank = state.isGuest ? 0 : 1;
+        }
+    }
+    function _applyModelPickerVisibility() {
+        var show = !!(state.canSelectModel || state.isAdmin);
+        var mount = document.getElementById('ai-provider-mount');
+        if (mount) mount.style.display = show ? '' : 'none';
+        ['ai-provider', 'model-select'].forEach(function(id) {
+            var sel = document.getElementById(id);
+            if (sel) sel.style.display = show ? '' : 'none';
+            var lab = document.querySelector('label[for="' + id + '"]');
+            if (lab) lab.style.display = show ? '' : 'none';
+        });
+        var keys = document.querySelector('.manage-keys-link');
+        if (keys) keys.style.display = show ? '' : 'none';
+        var web = document.getElementById('web-search-toggle');
+        if (web && !show) web.style.display = 'none';
+    }
+
     // Populate the agent picker dropdown from agentsConfig, respecting local_only + isDevMode
     function populateAgentPicker() {
         var sel = document.getElementById('ai-agent-select');
@@ -236,8 +313,7 @@
         // Keep the Auto option, then add one per eligible agent
         sel.innerHTML = '<option value="auto">⚡ Auto</option>';
         Object.entries(agents).forEach(function([key, agent]) {
-            if (agent.local_only  && !state.isDevMode) return;
-            if (agent.admin_only  && !state.isAdmin)   return;
+            if (!_agentAllowed(agent)) return;
             var opt = document.createElement('option');
             opt.value = key;
             opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
@@ -287,6 +363,7 @@
         if (!state.agentsConfig || !state.agentsConfig.agents) return;
         var agent = state.agentsConfig.agents[agentKey];
         if (!agent) return;
+        if (!_agentAllowed(agent)) return;
         state.agentOverride = agentKey;
         state.currentAgent = agent;
         var ctx = detectPageContext() || {};
@@ -441,33 +518,40 @@
                 .toUpperCase();
 
             if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(candidateText) && agents.ency) {
+                if (!_agentAllowed(agents.ency)) return null;
                 console.debug('Agent selected from todo content: ency');
                 return agents.ency;
             }
             if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.beemaster) {
+                if (!_agentAllowed(agents.beemaster)) return null;
                 console.debug('Agent selected from todo content: beemaster');
                 return agents.beemaster;
             }
             if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
+                if (!_agentAllowed(agents.inventory)) return null;
                 console.debug('Agent selected from todo content: inventory');
                 return agents.inventory;
             }
             if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
+                if (!_agentAllowed(agents.helpdesk)) return null;
                 console.debug('Agent selected from todo content: helpdesk');
                 return agents.helpdesk;
             }
             // Todo/project detail with no domain match → use planning agent
             if (agents.planning) {
+                if (!_agentAllowed(agents.planning)) return null;
                 console.debug('Agent selected for todo/project detail: planning');
                 return agents.planning;
             }
         }
         
-        // Check each agent's URL patterns
+        // Check each agent's URL patterns. A guest must never be auto-routed to
+        // an admin-only / non-public agent (that lands on Access denied).
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
             if (agent.local_only && !state.isDevMode) continue;
-            
+            if (!_agentAllowed(agent)) continue;
+
             // Check if any URL pattern matches the current pathname (case-insensitive)
             const pathLower = pathname.toLowerCase();
             for (const pattern of agent.url_patterns) {
@@ -646,6 +730,7 @@
     
     // Create chat widget elements
     function createChatWidget() {
+        _applyRoleFromGlobals();
         // ── Floating chat button ──────────────────────────────────────────────
         const chatContainer = document.createElement('div');
         chatContainer.id = 'local-chat-widget';
@@ -813,6 +898,7 @@
                 } else {
                     loadAgentsConfig().then(function() { populateAgentPicker(); });
                 }
+                _applyModelPickerVisibility();
 
                 // Show/hide image attach based on admin role
                 var attachBtn = document.getElementById('attach-image-btn');
@@ -1466,7 +1552,8 @@
             }, true);
         })();
 
-        document.getElementById('ai-provider').addEventListener('change', function(e) {
+        var _providerSel = document.getElementById('ai-provider');
+        if (_providerSel) _providerSel.addEventListener('change', function(e) {
             const selectedVal = e.target.value;
             const parts = selectedVal.split('|');
             const isGrok         = parts[0] === 'grok';
@@ -1685,18 +1772,13 @@
             if (!data.success) return;
 
             if (data.username)              state.username   = data.username;
-            if (data.is_admin !== undefined) state.isAdmin   = !!data.is_admin;
-            if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+            _applyRoleFromGlobals(data);
             if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
-            // True guests (not logged in): hide the provider selector + history
-            // chrome, but still derive model tiers from local Ollama so query
-            // auto-tier routing works. Skip the visible dropdown population
-            // (it's hidden anyway).
-            const isTrueGuest = !!data.is_guest;
+            // Guests keep the agent picker (AI Assistant + Support Specialist)
+            // but never the model field. History chrome stays hidden.
+            const isTrueGuest = !!state.isGuest;
             if (isTrueGuest) {
-                const selectorBar = document.querySelector('.provider-selector');
-                if (selectorBar) selectorBar.style.display = 'none';
                 const histBtn = document.getElementById('toggle-history-btn');
                 if (histBtn) histBtn.style.display = 'none';
                 const convLink = document.getElementById('conversations-link');
@@ -1704,6 +1786,8 @@
                 // Clear any stale conversation ID left from a previous login session
                 state.currentConversationId = null;
                 sessionStorage.removeItem('currentConversationId');
+                _applyModelPickerVisibility();
+                if (state.agentsConfig) populateAgentPicker();
                 // Still populate modelTiers from available Ollama models so query
                 // auto-tier selection works correctly.
                 if (data.providers) {
@@ -1723,13 +1807,15 @@
                         }
                     });
                 }
+                _applyModelPickerVisibility();
+                if (state.agentsConfig) populateAgentPicker();
                 return;
             }
 
-            // Logged-in users (admin OR regular user): always populate the model
-            // dropdown via the SHARED module so Ollama + Grok + external all
-            // appear. Previously a role-gate here skipped population for
-            // non-admins, leaving an empty selector.
+            // Logged-in users: refresh picker visibility first. Members/editors
+            // have no model field, so #ai-provider may be absent — that is OK.
+            _applyModelPickerVisibility();
+            if (state.agentsConfig) populateAgentPicker();
             if (!data.providers || !data.providers.length) return;
 
             const providerSelect = document.getElementById('ai-provider');
@@ -5002,13 +5088,8 @@
         }
 
         // Apply user config injected by the template
-        if (window.AI_CHAT_USER_CONFIG) {
-            const cfg = window.AI_CHAT_USER_CONFIG;
-            if (cfg.username) state.username = cfg.username;
-            if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
-            if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
-            if (cfg.siteName) state.siteName = cfg.siteName;
-        }
+        _applyRoleFromGlobals();
+        _applyModelPickerVisibility();
 
         // If this /ai page was opened by detaching the widget, honour the original
         // page path and title so the same agent context is used.
@@ -5054,6 +5135,7 @@
                 else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
                 else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
                 else if (agents.planning) picked = agents.planning;
+                if (picked && !_agentAllowed(picked)) picked = null;
                 if (picked) {
                     state.currentAgent = picked;
                     console.debug('[AI] Task-context agent selected:', picked.id);
@@ -5943,6 +6025,7 @@
                 else if (/\bINVENTORY\b|STOCK\b|\bSKU\b/.test(subj) && agents.inventory)               picked = agents.inventory;
                 else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)              picked = agents.helpdesk;
                 else if (agents.planning) picked = agents.planning;
+                if (picked && !_agentAllowed(picked)) picked = null;
                 if (picked) {
                     state.currentAgent = picked;
                     state.pageContext.agent_id   = picked.id;

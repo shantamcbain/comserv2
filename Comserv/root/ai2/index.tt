@@ -31,7 +31,7 @@
             </span>
         </div>
         <div class="ai-topbar-center">
-            [% IF (can_select_model || (ai_model_catalog && ai_model_catalog.size > 0)) && (username && !username.match('^Guest-')) %]
+            [% IF can_select_model || is_admin %]
             [%# SINGLE SOURCE OF TRUTH: server-rendered dropdown from the catalog
                in stash (Root.pm auto -> ai_model_catalog). Sorted by role + page. #]
             [% PROCESS 'ai/model_select.tt'
@@ -41,8 +41,6 @@
                 current = current_model || ai_default_model,
                 css_class = 'ai-model-select',
                 catalog = ai_model_catalog %]
-            [% ELSE %]
-            <span class="ai-model-name">[% current_model || 'AI' %]</span>
             [% END %]
 
             [% IF can_select_model %]
@@ -546,8 +544,10 @@
 window.AI_CHAT_PAGE_MODE = true;
 window.AI_CHAT_USER_CONFIG = {
     username: '[% username || 'Guest' %]',
-    isGuest:  [% (username && !username.match('^Guest-')) ? 'false' : 'true' %],
-    isAdmin:  [% can_select_model ? 'true' : 'false' %]
+    isGuest:  [% (can_select_model || (username && !username.match('^Guest-'))) ? 'false' : 'true' %],
+    isAdmin:  [% (can_select_model || is_admin) ? 'true' : 'false' %],
+    roleTier: '[% ai_role_tier || (can_select_model || is_admin ? 'priv' : 'guest') %]',
+    canSelectModel: [% (can_select_model || is_admin) ? 'true' : 'false' %]
 };
 [% IF task_todo %]
 window.AI_TASK_CONTEXT = {

@@ -833,7 +833,18 @@
 }
 .AITuneModelPopInner { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
 .AITuneModelOpt { display: flex; align-items: center; gap: 6px; font-size: 0.85em; padding: 2px 0; cursor: pointer; }
-.AITuneModelPopFoot { margin-top: 6px; text-align: right; }
+/* Done button FLOATS above the scrolling model list: sticky bottom inside the
+   scroll container, so it stays visible no matter how far down the user scrolled. */
+.AITuneModelPopFoot {
+    position: sticky;
+    bottom: -8px;            /* cancel the inner padding so it hugs the pop edge */
+    margin: 6px -10px -8px;  /* stretch full width of the pop */
+    padding: 6px 10px;
+    text-align: right;
+    background: var(--bg-color);
+    border-top: 1px solid var(--border-color);
+    z-index: 2;
+}
 
 
 .DepSummary {

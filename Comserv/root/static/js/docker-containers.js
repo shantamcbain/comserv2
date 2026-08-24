@@ -20,7 +20,7 @@
     var targetSelect = document.getElementById('docker-target-select');
     var showAllCheckbox = document.getElementById('show-all-containers');
     var rebuildPollingTimer = null;
-    var lastKnownLineCount = 0;
+    var lastKnownChars = 0;
     var pollingElapsedTimer = null;
     var pollingStartTime = null;
     var deployFormVisible = false;
@@ -39,6 +39,15 @@
         var d = new Date(isoStr);
         if (isNaN(d.getTime())) return isoStr.substring(0, 10);
         return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+    }
+
+    function paintDeployLog(raw) {
+        if (!outputBox) return;
+        var text = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        if (outputBox.dataset.painted === String(text.length)) return;
+        outputBox.dataset.painted = String(text.length);
+        outputBox.textContent = text;
+        outputBox.scrollTop = outputBox.scrollHeight;
     }
 
     function log(msg, cls) {
@@ -89,8 +98,12 @@
     function startRebuildPolling(target) {
         if (rebuildPollingTimer) clearInterval(rebuildPollingTimer);
         if (pollingElapsedTimer) clearInterval(pollingElapsedTimer);
-        lastKnownLineCount = 0;
+        lastKnownChars = 0;
         pollingStartTime = Date.now();
+        if (outputBox) {
+            outputBox.textContent = '';
+            outputBox.dataset.painted = '';
+        }
         setStatus('check', 'Deploying ' + target + '…');
 
         // Update elapsed time every second
@@ -120,16 +133,10 @@
             apiPost('/admin/docker-deploy-status')
                 .then(function(data) {
                     if (data.success) {
-                        // Line-based diffing: only log lines we haven't seen yet
-                        var newOutput = data.output || '';
-                        var lines = newOutput.split('\n');
-                        if (lines.length > lastKnownLineCount) {
-                            var delta = lines.slice(lastKnownLineCount);
-                            delta.forEach(function(line) {
-                                if (line.trim()) log(line, null);
-                            });
-                            lastKnownLineCount = lines.length;
-                        }
+                        // Paint the whole log each poll. Line-diff missed docker
+                        // \r progress and showed nothing for minutes.
+                        paintDeployLog(data.output || '');
+                        var lines = String(data.output || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
                         if (!data.is_running) {
                             clearInterval(rebuildPollingTimer);
@@ -299,7 +306,14 @@
 
         // Confirm
         var confirmMsg = 'Deploy ' + containerName + ' to ' + target + '?';
-        if (mode === 'full') confirmMsg = 'Full rebuild + deploy ' + containerName + ' on ' + target + '? This builds, pushes to Docker Hub, and deploys with zero-downtime handover.';
+        if (mode === 'full') {
+            var t = (target || '').toLowerCase();
+            if (t === 'workstation' || t === 'local' || t === '') {
+                confirmMsg = 'Rebuild ' + containerName + ' on this workstation only? Builds locally and replaces the local container. Does NOT push. Does NOT update production.';
+            } else {
+                confirmMsg = 'Build+push on the workstation, then pull-deploy ' + containerName + ' on ' + target + '?';
+            }
+        }
         if (mode === 'build-push') confirmMsg = 'Build and push ' + containerName + ' to Docker Hub (no deploy)?';
         if (registryUrl) confirmMsg += '\n\nRegistry: ' + registryUrl;
         if (!confirm(confirmMsg)) return;
@@ -622,7 +636,11 @@
                 })
                 .catch(function(e) { log('Deploy log error: ' + e.message, 'err'); });
         } else if (act === 'rebuild') {
-            if (!confirm('Rebuild container ' + cid + ' on ' + currentTarget + '? This runs the full deploy pipeline: volume check, build, backup, health check, and zero-downtime handover.')) return;
+            var isWs = !currentTarget || currentTarget === 'workstation' || currentTarget === 'local';
+            var rebuildConfirm = isWs
+                ? ('Rebuild ' + cid + ' on this workstation only?\n\nBuilds locally and replaces the local container.\nDoes NOT push.\nDoes NOT update production1.')
+                : ('Rebuild ' + cid + ' on ' + currentTarget + '?\n\nBuilds+pushes on the workstation, then pull-deploys on ' + currentTarget + '.');
+            if (!confirm(rebuildConfirm)) return;
             // Stop any previous polling that might still be running
             stopRebuildPolling();
             log('=== REBUILD STARTED: ' + cid + ' ===', 'info');

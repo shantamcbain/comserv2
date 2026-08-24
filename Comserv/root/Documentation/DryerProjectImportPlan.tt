@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "3d-printing,planning,import,internal-build"
-   page_version = "0.21"
-   last_updated = "Thu Aug 20 2026"
+   page_version = "0.22"
+   last_updated = "Sat Aug 22 2026"
    site_specific = "false"
    project_id   = "272"
    project_code = "DRYER-INT"
@@ -26,14 +26,14 @@
         doc_project_code = project_code %]
 
     <div class="doc-warning">
-        <p class="doc-body"><strong>Correction (2026-08-19):</strong> v0.1 of this plan cited projects
-        <code>#14–#18</code> as DRYER-INT. Those IDs are <em>not</em> the dryer — live
-        <code>/api/projects</code> shows #14 HelpDesk, #15 Site Setup, #16 User, #17 File Management.
-        The dryer project was never created on the primary Ency. This v0.2 uses the real rows created
-        via the API: parent
-        <a href="[% c.uri_for('/project/details') %]?project_id=272" class="doc-link">#272 DRYER-INT</a>
-        under
-        <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">#206 3DPRINT</a>.</p>
+        <p class="doc-body"><strong>Correction (2026-08-22):</strong> P3 treated each
+        downloaded <code>.3mf</code> as one inventory item. That is wrong.
+        The assembly manual is the BOM. Each 3MF is a <em>print plate</em> of
+        labeled parts (FLS01, BLS01, &hellip;). Hardware (screws, bearings,
+        magnets, gasket, Polydryer) is also in the BOM. Two build SKUs exist:
+        a <strong>base unit</strong> (bottom + top + wheels) and an
+        <strong>add-on module</strong> (no bottom/top). See
+        <a href="#pdf-bom" class="doc-link">PDF BOM</a>.</p>
     </div>
 
     <div id="toc" class="row doc-toc">
@@ -42,6 +42,7 @@
             <p class="doc-muted">Jump to section:</p>
             <div class="doc-navrow">
                 <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#pdf-bom" class="doc-navlink">PDF BOM (missing)</a>
                 <a href="#playbook" class="doc-navlink">Playbook</a>
                 <a href="#pack" class="doc-navlink">Downloads pack</a>
                 <a href="#what-exists" class="doc-navlink">What exists</a>
@@ -77,6 +78,53 @@
                 first print is a subset of the pack, not every 3MF at once;
                 work runs on the 3d worktree (:4003) for printing_3d code and uses live Ency via the app API.</p>
             </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="pdf-bom" class="doc-h2">1b. What the assembly PDF actually requires</h2>
+            <p class="doc-body">Source: <code>192244_HDRY_System__Assembly_Manual.pdf</code>
+            (1 Feb 2025, Enrico Mazzarol). Read 2026-08-22. This section replaces the
+            P3 idea that six 3MF files = six inventory children.</p>
+            <p class="doc-body"><strong>Print material is PETG</strong> (plus TPU 0.2 kg
+            for magnets/gaskets), not PLA. Example build (2 modules + 2 AMS + drawer
+            support + wheels) is listed as <strong>6.4 kg PETG + 0.2 kg TPU</strong>.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Build SKU</th><th class="doc-th">What it is</th><th class="doc-th">Printed extras</th></tr>
+                <tr>
+                    <td class="doc-td">Base unit</td>
+                    <td class="doc-td">Module structure + <strong>bottom + top + 4 wheels</strong></td>
+                    <td class="doc-td">Bottom &amp; top ~1 kg PETG; wheels ~1 kg PETG</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Add-on module</td>
+                    <td class="doc-td">Module 2 file — holes on the bottom; <strong>no bottom or top</strong></td>
+                    <td class="doc-td">Structure ~2 kg PETG per module</td>
+                </tr>
+            </table>
+            <p class="doc-body">Optional / config lines (each is its own BOM, not one 3MF row):
+            AMS/Hydra support, free spool rollers, dryer support &amp; gadget, doors,
+            drawer/HPV support, rear caps, Upgrade 2 zip.</p>
+            <p class="doc-body"><strong>Hardware per module</strong> (buy, not print):
+            M4&times;14 screw &times;180; M3&times;20 screw &times;16; 608zz bearing &times;16;
+            8&times;2 mm magnet &times;20; adhesive gasket 6 m; Polydryer &times;1.
+            Wheels also need washers, bolt+nut, 50 mm spacer (4–8 ea).</p>
+            <p class="doc-body"><strong>Printed part labels already in the manual</strong>
+            (29 codes, not complete): FLS01/02, BLS01/02, BBL01/02, BBR01/02,
+            FL/FR/BL/BR 01–02, FRS/BRS 01–02, FFL/FFR 01–02, SRC01, SRL01, SRR01,
+            SBR02/03. Each label is one inventory item; qty comes from the PDF
+            (often more than one print of the same STL). 3MF objects must be
+            extracted to STL and linked to those SKUs.</p>
+            <p class="doc-body"><strong>Process when a unit is ordered:</strong>
+            pick config (base vs add-on + options) → explode that assembly BOM →
+            buy missing hardware → queue a print job per printed BOM line
+            (qty = BOM qty) → staff-prep STL → complete → receive that part.
+            Change filament is per job, any item, PETG White or otherwise.</p>
+            <p class="doc-body">Live P3 rows (parent 51 + children 52–57 = one row
+            per 3MF) are a <em>file catalog</em>, not this BOM. Do not print
+            “Module 1” as a single job.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -450,6 +498,8 @@
             <div id="see-also" class="doc-success">
                 <h2 class="doc-h3">11. See Also</h2>
                 <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing coordinator plan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/InventoryInternalBuildBom') %]" class="doc-link">Manual inventory BOM (two masters)</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3D Printing System (operator KB)</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3dBrowseGalleryPlan') %]" class="doc-link">3D Browse Gallery Plan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">Master Plan (W3.3)</a></li>

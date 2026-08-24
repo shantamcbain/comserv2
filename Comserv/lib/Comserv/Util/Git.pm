@@ -1670,15 +1670,40 @@ sub merge_branch {
             "merge_branch: merged '$branch' into " . ($repo // 'current checkout') . " (success)");
     }
     else {
-        # Detect conflict so the UI can offer --abort.
-        if ($r->{output} =~ /CONFLICT|Automatic merge failed/) {
+        # Detect conflict so the UI can offer --abort, and build a SPECIFIC
+        # failure message. "Merge failed (see output)" forced the user to read
+        # raw git spew; now we say WHY it failed: which files conflict, or that
+        # uncommitted changes are blocking the merge.
+        my $out = $r->{output} // '';
+        if ($out =~ /CONFLICT|Automatic merge failed/) {
             $result->{conflict} = 1;
+            # Collect every file git named: "CONFLICT (content): Merge conflict in <path>"
+            my @files = $out =~ /Merge conflict in ([^\s]+)/g;
+            # de-dup, keep order
+            my %seenf; @files = grep { !$seenf{$_}++ } @files;
+            $result->{conflict_files} = \@files if @files;
+            $result->{error_msg} = @files
+                ? "Merge conflict — these files have conflicting edits: "
+                  . join(', ', @files)
+                  . ". Resolve them in the worktree, then commit the result."
+                : "Merge conflict. Resolve in the worktree, then commit (or abort).";
         }
-        $result->{error_msg} = "Merge of '$branch' failed (see output).";
+        elsif ($out =~ /Please commit or stash|local changes.*would be overwritten|untracked working tree files.*would be overwritten/i) {
+            # Uncommitted WIP is the other classic blocker — name it plainly.
+            $result->{uncommitted} = 1;
+            $result->{error_msg} = "Merge blocked by uncommitted changes in "
+                . ($repo // 'this checkout')
+                . ". Commit or stash your work first (the dashboard's Stash / autostash handles this).";
+        }
+        else {
+            $result->{error_msg} = "Merge of '$branch' failed"
+                . ($out =~ /\S/ ? ': ' . (split(/\n/, $out))[0] : '.');
+        }
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
             "merge_branch: merge of '$branch' failed"
             . ($result->{conflict} ? ' (conflict)' : '')
-            . ': ' . ($r->{output} // ''));
+            . ($result->{uncommitted} ? ' (uncommitted changes)' : '')
+            . ': ' . $out);
     }
     return $result;
 }
@@ -1746,6 +1771,27 @@ sub run_test_gate {
     }
     $checkout = $app_dir_for->($repo) unless $checkout && -d $checkout;
     my $wt_dir = $checkout;
+
+    # DIRTY-CHECKOUT GUARD: a merge gate run against a checkout with uncommitted
+    # changes tests code the branch ref does NOT contain — the merge would land
+    # different code than the gate approved. Fail EARLY with an explicit message
+    # instead of a confusing downstream error (real 2026-08-22 case: uncommitted
+    # changes in main's tree made the gate fail with a misleading script-path
+    # error, and nothing pointed at the dirty tree as the cause).
+    {
+        my $st = $self->_run($c, 'status', '--porcelain', { repo => $wt_dir });
+        my @dirty = grep { length } split /\n/, ($st->{output} // '');
+        if (@dirty) {
+            my $n = scalar @dirty;
+            my $preview = join('; ', map { s/^\S+\s+//r } @dirty[0 .. ($n > 3 ? 2 : $n - 1)]);
+            my $msg = "Test gate REFUSED: checkout '$wt_dir' has $n uncommitted change(s) "
+                    . "($preview...). The gate would test code that is not committed to "
+                    . "the branch being merged. Commit (or stash) the changes first, then re-run the gate.";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_gate',
+                "run_test_gate: dirty checkout for '$branch' — $n uncommitted changes");
+            return { success => 0, dirty => 1, output => $msg };
+        }
+    }
 
     # The gate MUST run the canonical script shipped with the RUNNING app (the
     # one with this fix), NOT a per-worktree copy. Worktree copies are divergent

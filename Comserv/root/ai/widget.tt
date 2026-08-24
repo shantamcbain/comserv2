@@ -265,6 +265,10 @@
         window.ComservConfig = window.ComservConfig || {};
         window.ComservConfig.models = [% ai_model_catalog_json || '[]' %];
         window.ComservConfig.cv     = '[% c.stash.css_v || css_v || '1' %]';
+        window.ComservConfig.isGuest = [% ai_is_guest ? 'true' : 'false' %];
+        window.ComservConfig.roleTier = '[% ai_role_tier || 'guest' %]';
+        window.ComservConfig.canSelectModel = [% (ai_can_select_model || ai_is_priv || is_admin) ? 'true' : 'false' %];
+        window.ComservConfig.isAdmin = [% (ai_is_priv || is_admin) ? 'true' : 'false' %];
     </script>
     <script src="/static/js/ai-common.js?v=[% c.stash.css_v || css_v || '1' %]"></script>
     <!-- AI Chat V2 modular suite (popup mode): load the same modules as js_load.tt

@@ -337,13 +337,12 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         # entry point: clean build -> push -> pull exact digest -> run --no-build
         # -> health -> post. We no longer run raw `docker compose build/up` here,
         # which previously diverged from the node-deploy path.
-        # Deploy ALWAYS runs from the WORKSTATION (single execution point), never
-        # from the container being replaced. SSH to the workstation to run the
-        # single canonical pipeline there; it builds/pushes then SSHes to prod.
-        push @lines, "[${\scalar localtime}] === Delegating canonical deploy to WORKSTATION (shanta\@192.168.1.199) ===";
+        # This button already runs on the workstation app. Do NOT SSH to
+        # 192.168.1.199 — that hop was the 2026-08-23 failed path (self-ssh,
+        # then deploy.sh --deploy-to-node workstation).
+        push @lines, "[${\scalar localtime}] === Running deploy.sh locally (no SSH hop) ===";
         my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' PROD_TARGET_HOST=192.168.1.126 script/deploy.sh --prod 2>&1";
-        my $ws_ssh = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
-        my $canon_out = `$ws_ssh`;
+        my $canon_out = `$ws_cmd`;
         push @lines, $canon_out;
         if ($? >> 8) { $success = 0; }
         push @lines, "[${\scalar localtime}] Canonical deploy sequence complete.";
@@ -489,6 +488,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         };
         $| = 1;
         select((select($log), $|=1)[0]);
+        eval { open STDOUT, '>>', $log_file; open STDERR, '>>', $log_file; 1 };
 
         print $log "[".scalar(localtime)."] === DOCKER DEPLOY STARTED (trigger=$trigger, target=$target) ===\n";
         $log->flush();
@@ -510,29 +510,35 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
             $repo_path = "/opt/comserv/Comserv";
         }
-        # Deploy ALWAYS runs from the WORKSTATION. SSH there to run the single
-        # canonical pipeline; it builds/pushes then SSHes to the target node.
+        # Already on the workstation app. Run deploy.sh here — no self-SSH.
         my $node = ($target eq "production1") ? "192.168.1.126"
                  : ($target eq "production2") ? "192.168.1.127"
                  : $target;
-        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node 2>&1";
-        my $cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
-        print $log "[".scalar(localtime)."] Delegating to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh --deploy-to-node $node ...\n";
-        $log->flush();
-        my $out = `$cmd`;
-        my $rc = $? >> 8;
-        print $log $out;
-        print $log "[".scalar(localtime)."] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger' script/deploy.sh --deploy-to-node $node";
+        print $log "[".scalar(localtime)."] Running deploy.sh locally --deploy-to-node $node. Output streams below.\n";
         $log->flush();
         close($log);
+        my $rc = system('script', '-q', '-f', '-a', '-e', '-c', $cmd, $log_file);
+        $rc = $rc >> 8;
+        if (open my $lf, '>>', $log_file) {
+            print $lf "[".scalar(localtime)."] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+            close $lf;
+        }
         unlink($pid_file);
         exit(0);
     }
 
     sub close_std_fds {
-        # Child process inherits parent's DB handles. They're harmless — the
-        # child exits after the deploy finishes, and the OS reclaims them.
-        # Explicit disconnect is unreliable across DBI versions, so skip it.
+        # Detach so the child cannot keep the Twiggy listen socket. A
+        # leftover inherited :3001 fd + comserv_server.pl -r reload is
+        # what left 3001 as a zombie (NetworkError storm, 2026-08-23).
+        eval { require POSIX; POSIX::setsid(); 1 };
+        eval { open STDIN, '<', '/dev/null'; 1 };
+        eval {
+            require POSIX;
+            POSIX::close($_) for 3 .. 255;
+            1;
+        };
     }
 
     # PARENT
@@ -833,20 +839,13 @@ sub list :Path('/admin/docker/list') :Args(0) {
         comserv2_config_db_data comserv2_redis_data comserv2_logs
         comserv2_sessions comserv2_nfs_data comserv2_whisper_venv
         comserv2_cpan_cache comserv2_temp comserv2_themes comserv2_cache
+        comserv2_theme_config comserv2_theme_css
     );
     foreach my $vname (split /\n/, $vol_out) {
         chomp $vname;
-        # Match canonical names exactly OR compose-prefixed variants
-        # (e.g. comserv-deploy_comserv2_logs on production hosts) so the
-        # Volumes panel doesn't appear empty on servers where compose
-        # prefixes the project name.
-        my $matches = $canonical{$vname};
-        unless ($matches) {
-            foreach my $canon (keys %canonical) {
-                if ($vname =~ /_\Q$canon\E$/) { $matches = 1; last; }
-            }
-        }
-        next unless $matches;
+        # Exact canonical names only. Suffix-matching prefixed leftovers
+        # (comserv_comserv2_logs) made the panel show ~20 when the live set is 12.
+        next unless $canonical{$vname};
         my $inspect_cmd = ($host eq 'workstation' || $host eq 'localhost')
             ? "docker volume inspect $vname 2>/dev/null"
             : qq{$ssh_prefix "docker volume inspect $vname 2>/dev/null"};
@@ -1040,6 +1039,7 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         };
         $| = 1;
         select((select($log), $|=1)[0]);
+        eval { open STDOUT, '>>', $log_file; open STDERR, '>>', $log_file; 1 };
 
         print $log "[" . scalar(localtime) . "] === REBUILD STARTED (service=$service, target=$deploy_target, no_cache=" . ($no_cache ? 'yes' : 'no') . ", mode=$mode) ===\n";
         $log->flush();
@@ -1084,21 +1084,33 @@ sub rebuild :Path('/admin/docker/rebuild') :Args(1) {
         if (!-d "$repo_path/script" && -d "/opt/comserv/Comserv/script") {
             $repo_path = "/opt/comserv/Comserv";
         }
-        # Deploy ALWAYS runs from the WORKSTATION. SSH there to run the single
-        # canonical pipeline; it builds/pushes then SSHes to the target node.
+        # Already on the workstation. The 2026-08-23 SSH-to-self hop
+        # (shanta@192.168.1.199) is the path that failed; do not use it.
+        # pull-deploy = pull+run on the target only (image already built+pushed).
+        # build-push  = workstation build/push, running container untouched.
+        # anything else = full build+push then local-or-remote run.
         my $node = ($deploy_target eq "production1") ? "192.168.1.126"
                  : ($deploy_target eq "production2") ? "192.168.1.127"
                  : $deploy_target;
-        my $ws_cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild' script/deploy.sh --deploy-to-node $node 2>&1";
-        my $cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@192.168.1.199 \"$ws_cmd\"";
-        print $log "[" . scalar(localtime) . "] Delegating Rebuild to WORKSTATION (shanta\@192.168.1.199) -> deploy.sh --deploy-to-node $node ...\n";
-        $log->flush();
-        my $out = `$cmd`;
-        my $rc = $? >> 8;
-        print $log $out;
-        print $log "[" . scalar(localtime) . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+        my $is_local = ($node eq 'workstation' || $node eq 'local' || $node eq '192.168.1.199');
+        my $flag = ($mode eq 'pull-deploy') ? '--pull-deploy'
+                 : ($mode eq 'build-push')  ? '--build-push'
+                 : $is_local                ? '--local-rebuild'
+                 : '--deploy-to-node';
+        my $node_arg = ($flag eq '--local-rebuild') ? '' : " $node";
+        print $log "[".scalar(localtime)."] Running deploy.sh locally $flag$node_arg (mode=$mode). Output streams below.\n";
+        if ($is_local && $mode ne 'build-push' && $mode ne 'pull-deploy') {
+            print $log "[".scalar(localtime)."] This is a WORKSTATION-only rebuild. Production will NOT be updated.\n";
+        }
         $log->flush();
         close($log);
+        my $inner = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='rebuild:$mode' BUILDKIT_PROGRESS=plain script/deploy.sh $flag$node_arg";
+        my $rc = system('script', '-q', '-f', '-a', '-e', '-c', $inner, $log_file);
+        $rc = $rc >> 8;
+        if (open my $lf, '>>', $log_file) {
+            print $lf "[" . scalar(localtime) . "] deploy.sh finished (rc=$rc): " . ($rc == 0 ? "SUCCESS\n" : "FAIL\n");
+            close $lf;
+        }
         unlink($pid_file);
         exit(0);
     }

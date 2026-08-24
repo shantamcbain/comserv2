@@ -6,6 +6,7 @@ use JSON qw(encode_json);
 use Try::Tiny;
 use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
+use Comserv::Util::Printing3d;
 
 has 'logging' => (
     is      => 'ro',
@@ -740,7 +741,7 @@ sub queue :Path('/3d/queue') :Args(0) {
                     my $fil  = eval { $job->filament_item };
                     my $fsl  = eval { ($fil->stock_levels->all)[0] } if $fil;
                     my $fil_uom   = $fil ? lc($fil->unit_of_measure || 'g') : 'g';
-                    my $issue_qty = ($fil_uom eq 'g') ? $grams_used : $grams_used / 1000;
+                    my $issue_qty = Comserv::Util::Printing3d->new->stock_qty_from_grams($fil, $grams_used);
                     eval {
                         $self->_inventory_transaction($c,
                             schema           => $schema,
@@ -1238,6 +1239,66 @@ sub search_deeper :Path('/3d/search_deeper') :Args(0) {
         pending_message => 'AI-powered web search for 3D models is coming soon. '
             . 'This feature is pending the AIChatSystem web-search extension.',
         template => '3d/browse.tt',
+    );
+}
+
+# Change filament / grams on an open job. Logic in Util::Printing3d.
+# Lives here (not Controller::3d::Job) so Catalyst -r registers the Path
+# without a process restart.
+sub job_filament :Path('/3d/job/filament') :Args(1) {
+    my ($self, $c, $job_id) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $util     = Comserv::Util::Printing3d->new;
+    my $job;
+    eval { $job = $schema->resultset('Printing3dJob')->find($job_id) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'job_filament', "job find $job_id failed: $@");
+    }
+    unless ($job && ($job->sitename || '') eq $sitename) {
+        $c->flash->{error_msg} = 'Print job not found.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $res = $util->change_filament(
+            $c, $job,
+            $c->req->params->{filament_item_id},
+            $c->req->params->{filament_grams},
+            $self,
+        );
+        if ($res->{ok}) {
+            my $gmsg = $res->{grams}
+                ? sprintf(' (~%sg reserved)', $res->{grams})
+                : ' (no grams — enter grams so stock issues on complete)';
+            $c->flash->{success_msg} = 'Job #' . $job->id . ' filament updated.' . $gmsg;
+        } else {
+            $c->flash->{error_msg} = $res->{error} || 'Could not change filament.';
+        }
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $model = $util->resolve_model_for_job($schema, $job);
+    my @filaments = $util->list_filaments($schema, $sitename);
+    my $sel_id    = $job->filament_item_id || 0;
+    my $sel_type  = $job->filament_type || '';
+    unless ($sel_type) {
+        my ($match) = grep { $_->{id} == $sel_id } @filaments;
+        $sel_type = $match->{type} if $match;
+    }
+    $c->stash(
+        template  => '3d/job_filament.tt',
+        job       => $job,
+        model     => $model,
+        filaments => \@filaments,
+        estimate  => $util->estimate_grams($model, $sel_type),
+        sitename  => $sitename,
     );
 }
 
