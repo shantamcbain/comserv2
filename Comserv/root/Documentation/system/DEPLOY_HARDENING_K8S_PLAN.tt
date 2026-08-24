@@ -1,0 +1,126 @@
+[% PageVersion = 'Documentation/system/DEPLOY_HARDENING_K8S_PLAN.tt,v 1.0 2026/08/23 Shanta Exp ' %]
+
+<h1 id="top">Deploy Hardening Plan — From Docker Scripts to Kubernetes (MicroK8s)</h1>
+
+<div class="container warning">
+    <div class="container-header">Plan Status</div>
+    <div class="container-content"><div class="container-content-inner">
+        <p><strong>Status:</strong> DRAFT — needs approval. Owner project: DockerHA / INFRA-HA (#202).
+        Related todo: #2266 (remove unused redis/config-db containers + Rebuild button from production).</p>
+    </div></div>
+</div>
+
+<h2 id="problem">1. Why we keep having deploy failures</h2>
+<p>Every outage in the last month traces to the same five root causes. The 2026-08-23 fixes
+(changelog entry <em>deploy-pull-only-image-css</em>) closed them at the script level, but they are
+structural — scripts cannot fully prevent them because nothing enforces the rules, they only ask nicely.</p>
+
+<table class="diagnostic-table">
+    <tbody>
+        <tr><th>Recurring failure</th><th>Root cause</th><th>Script fix (done 2026-08-23)</th></tr>
+        <tr>
+            <td>Workstation containers appear on production</td>
+            <td>The base compose file defines web / web-dev / web-staging; a bare <code>up -d</code> starts all of them anywhere</td>
+            <td>Compose profiles gate them off prod; deploy.sh names <code>web-prod</code> explicitly</td>
+        </tr>
+        <tr>
+            <td>CSS breaks after every deploy incident</td>
+            <td>Host bind mounts and empty named volumes shadow image-baked static assets</td>
+            <td>No host binds; override volumes seeded from the image when empty</td>
+        </tr>
+        <tr>
+            <td>"Pull &amp; Deploy" rebuilds instead of pulling</td>
+            <td>UI mode was ignored; every path did build+push first</td>
+            <td><code>--pull-deploy</code>/<code>--build-push</code> flags threaded through Docker.pm → deploy.sh</td>
+        </tr>
+        <tr>
+            <td>Production builds from a source tree that does not exist there</td>
+            <td>Deploy logic assumed /opt/comserv/Comserv on every node</td>
+            <td>Production is pull-only via <code>docker run</code>; build refuses to run on a prod host</td>
+        </tr>
+        <tr>
+            <td>Healthcheck storms (9,000 hung curls) take the host down</td>
+            <td>Healthchecks had no timeout and <code>Root.pm</code> skipped <code>/health</code> with a leading slash Catalyst never uses</td>
+            <td>Bounded health gates; <code>start_period</code> 60s; <code>auto</code>/<code>begin</code> skip <code>^/?health</code></td>
+        </tr>
+        <tr>
+            <td>Workstation Rebuild claimed prod was updated</td>
+            <td>Every Rebuild ran <code>--deploy-to-node</code> and printed &quot;Multi-node deploy complete&quot; after a local-only run</td>
+            <td>Workstation Rebuild is <code>--local-rebuild</code>. Log says Production was NOT updated. Prod needs Pull &amp; Deploy.</td>
+        </tr>
+        <tr>
+            <td>Deploy window showed nothing for minutes</td>
+            <td>Backticks held all output; JS only painted new newline-delimited lines (docker uses <code>\\r</code>)</td>
+            <td><code>script -f -a</code> into <code>/tmp/comserv_deploy.log</code>; poller paints the full log</td>
+        </tr>
+        <tr>
+            <td>Volumes panel listed ~20 when the live set is ~12</td>
+            <td>UI suffix-matched compose-prefixed leftovers</td>
+            <td>Exact-name filter; leftover volumes removed on workstation and production1</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="doc-body"><strong>The pattern:</strong> each fix lives in a bash script or compose flag.
+One typo, one manual command, one new service definition and the same failure returns. What is missing
+is an enforcement layer that makes these mistakes <em>impossible</em>, not just unlikely.</p>
+
+<h2 id="recommendation">2. Recommendation — MicroK8s on the existing nodes</h2>
+<p class="doc-body">Move production container management to a small Kubernetes cluster using
+<strong>MicroK8s</strong>. This directly matches the direction already documented in
+<code>K3S_APP_HA_PLAN.tt</code> (k3s on .126/.199); MicroK8s is the alternative implementation of the
+same idea and is worth choosing deliberately rather than by default:</p>
+
+<table class="diagnostic-table">
+    <tbody>
+        <tr><th></th><th>k3s (current plan)</th><th>MicroK8s (recommended evaluation)</th></tr>
+        <tr><td>Install</td><td>curl script, manual token join</td><td><code>snap install microk8s --classic</code>; <code>microk8s add-node</code> gives a join command</td></tr>
+        <tr><td>Security posture</td><td>Manual hardening</td><td>Strictly confined snap by default; Ubuntu backs CSPM/edge-security updates (see ubuntu.com/engage/secure-kubernetes-at-the-edge). Expanded Security Maintenance for Applications (esm-apps) covers the snaps and addon images on the workstation/prod Ubuntu hosts.</td></tr>
+        <tr><td>Cluster ops</td><td>Embedded etcd, manual certs</td><td><code>microk8s enable ha-cluster</code> handles 3-node quorum; dqlite for small clusters</td></tr>
+        <tr><td>Addons we need</td><td>manual manifests</td><td>One-liners: dns, registry, ingress, metrics-server, community addons</td></tr>
+        <tr><td>Fit</td><td>Tiny footprint, very popular</td><td>Same footprint plus built-in local registry addon — replaces comserv-registry.lan</td></tr>
+    </tbody>
+</table>
+
+<p class="doc-body">Either engine works; pick ONE. The value below comes from Kubernetes semantics,
+not the distribution.</p>
+
+<h3>How k8s eliminates each failure class permanently</h3>
+<ul>
+    <li><strong>Wrong containers on a node.</strong> Deployments declare exactly what runs where. There is no "bare up -d" equivalent — you cannot accidentally start web-dev on production because no such workload exists in the prod namespace. Node labels/selectors enforce placement.</li>
+    <li><strong>Port theft between siblings.</strong> A Service has one selector; two Deployments cannot silently bind the same port. Conflicts fail at scheduling time with a visible event instead of a silent crash-loop.</li>
+    <li><strong>CSS shadowing.</strong> Images are immutable. ConfigMaps mount theme overrides read-only at specific paths; a host directory can never leak into the container's static tree. Rolling updates replace pods atomically — no half-updated bind mounts.</li>
+    <li><strong>Pull vs build confusion.</strong> Nodes never build. The pipeline is: CI/workstation builds → pushes to registry (MicroK8s registry addon or existing LAN registry) → <code>kubectl set image</code> / GitOps pulls by digest. Production literally has no code path that can compile anything.</li>
+    <li><strong>Healthcheck storms.</strong> Liveness/readiness probes have explicit timeouts, initial delays, and failure thresholds enforced by the control plane — not by our shell loops. A bad pod is restarted by kubelet; it cannot pin 4 workers and starve the box.</li>
+    <li><strong>Crash-looping with no visibility.</strong> <code>kubectl rollout status</code>, events, and probe history replace grepping docker inspect counters. Rollback is <code>kubectl rollout undo</code> — one command, uses the previous ReplicaSet, no backup-rename choreography.</li>
+</ul>
+
+<h2 id="phases">3. Phased migration (gated, non-destructive first)</h2>
+<table class="diagnostic-table">
+    <tbody>
+        <tr><th>Phase</th><th>Scope</th><th>Gate to pass</th></tr>
+        <tr><td>Phase 0 — Decide engine</td><td>Evaluate MicroK8s vs k3s against K3S_APP_HA_PLAN.tt topology (.126 + .199, DB stays on .20). Confirm esm-apps coverage of snap packages.</td><td>Written decision recorded here + #202 updated</td></tr>
+        <tr><td>Phase 1 — Cluster up</td><td>Install MicroK8s on .199 (control) and .126 (worker). Enable dns, registry, ingress, ha-cluster. Join nodes.</td><td><code>kubectl get nodes</code> shows both Ready; registry push/pull works from workstation</td></tr>
+        <tr><td>Phase 2 — Image &amp; manifest</td><td>Push current image to cluster registry. Write Deployment + Service + ConfigMap (theme overrides) + Ingress manifests in repo under <code>k8s/</code>. Probes mirror the fixed healthcheck (timeout, startPeriod ≥60s).</td><td>Test pod runs alongside Docker prod on :5001 without touching :5000</td></tr>
+        <tr><td>Phase 3 — Parallel run</td><td>Serve a test vhost through ingress to the k8s pod. Verify CSS, sessions (Redis), DB reachability, whisper NFS worker.</td><td>Full symptom probe passes against the k8s endpoint</td></tr>
+        <tr><td>Phase 4 — Cutover</td><td>Point production DNS/port at ingress; stop the Docker container (kept as instant fallback for one week). Decommission extras per todo #2266.</td><td>7 days stable; rollback = re-point port to old container</td></tr>
+        <tr><td>Phase 5 — Retire scripts</td><td>deploy.sh keeps ONLY the build+push step. Pull/rename/backup logic deleted — replaced by rollouts.</td><td>Docs updated; DEPLOY_WORKFLOW.tt rewritten</td></tr>
+    </tbody>
+</table>
+
+<h2 id="risks">4. Risks / open questions</h2>
+<ul>
+    <li>Two engines already exist in docs (k3s plans). Consolidate to one before installing anything.</li>
+    <li>NFS volume for /data/nfs becomes a PersistentVolume (nfs-csi driver) — verify whisper worker contract survives.</li>
+    <li>Sessions currently on a shared volume → need sticky sessions at ingress or Redis-backed sessions before cutover.</li>
+    <li>Prod1 is 30 GB disk / 2 cores — confirm MicroK8s system overhead fits alongside the retained Docker runtime during Phase 3 parallel run.</li>
+    <li>Expanded Security Maintenance for Applications must be active on BOTH nodes so snap/containerd CVEs are patched; verify with <code>pro status</code>.</li>
+</ul>
+
+<div style="margin-top: 40px; padding: 20px; background-color: var(--bg-secondary, #f5f5f5); border-radius: 4px;">
+    <p style="font-size: 12px; color: var(--text-muted-color, #666);">
+        <strong>Document Version:</strong> 1.0<br>
+        <strong>Created:</strong> 2026-08-23<br>
+        <strong>Status:</strong> DRAFT plan — supersedes nothing yet; complements K3S_APP_HA_PLAN.tt pending Phase 0 decision
+    </p>
+</div>

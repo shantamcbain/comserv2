@@ -328,9 +328,17 @@
                                     <code class="git-dev-cmd" title="[% b.cmd | html %]">[% b.cmd | html %]</code>
                                 </td>
                                 <td class="git-dev-actions">
+                                    [%# Build the branch's own absolute URL. Do NOT use
+                                       c.req.uri.scheme here: on some setups it comes
+                                       back empty and the URL turns into a relative
+                                       "://host:port/..." which window.open resolves
+                                       against THIS page's origin, producing a broken
+                                       hybrid link. Branches carry their own host in
+                                       worktrees.json; default scheme is http (LAN). %]
+                                    [% SET bh = b.host || host %]
                                     <button type="button" class="admin-btn admin-btn-sm admin-btn-primary"
                                             data-open-branch="[% b.name | html %]" data-port="[% b.port %]"
-                                            data-url="[% scheme %]://[% host %]:[% b.port %][% b.url | html %]"
+                                            data-url="http://[% bh | html %]:[% b.port %][% b.url | html %]"
                                             data-cmd="[% b.cmd | html %]">Open</button>
                                     <button type="button" class="admin-btn admin-btn-sm"
                                             data-hermes-branch="[% b.name | html %]"

@@ -10,6 +10,10 @@ use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
 
 use Comserv::Util::Logging;
+
+# Cache-buster epoch for asset URLs (?v=...): set once per server start so
+# browsers refetch CSS/JS after every restart/deploy (see Root::auto).
+our $ASSET_EPOCH = 0;
 use Comserv::Util::Git;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::SystemInfo;
@@ -218,7 +222,9 @@ sub auto :Private {
 
     # Skip everything for health checks and monitoring endpoints immediately
     # This prevents creating session files for Docker health checks
-    if ($c->req->path =~ m{^/health(?:/|$)}) {
+    # Catalyst req->path has NO leading slash (cf. admin/hardware_monitor above).
+    # A '^/health' match never fired, so Docker healthchecks ran the rest of auto().
+    if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return 1;
     }
 
@@ -240,6 +246,16 @@ sub auto :Private {
     eval { require Comserv::Util::DevPreview; Comserv::Util::DevPreview::maybe_apply_preview_session($c) };
 
     $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
+
+    # Cache-busting version for CSS/JS asset URLs (?v=... in js_load.tt).
+    # Set on EVERY request here — previously it was only set inside the
+    # site-setup failure branch, so normal pages served ?v=20260712 forever and
+    # browsers cached stale JS (fixed Start/Done handlers looked "not applied"
+    # on pages that weren't hard-refreshed). Server start time keeps the URL
+    # stable across requests (good for caching) but changes on every app
+    # restart/deploy, which is exactly when assets change.
+    $c->stash->{css_v} = ($Comserv::Controller::Root::ASSET_EPOCH ||= time());
+
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip setup redirect for setup pages themselves and static assets
@@ -1187,7 +1203,10 @@ sub auto :Private {
         # Role + page context used by the .tt to SORT/order the dropdown.
         my $roles = $c->session->{roles} || [];
         $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
-        $c->stash->{ai_is_priv} = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles) ? 1 : 0;
+        $c->stash->{ai_is_priv} = Comserv::Util::ModelCatalog->can_select_model($c) ? 1 : 0;
+        $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
+        $c->stash->{ai_is_guest} = Comserv::Util::ModelCatalog->is_guest_tier($c) ? 1 : 0;
+        $c->stash->{ai_can_select_model} = $c->stash->{ai_is_priv};
         $c->stash->{ai_chat_page} ||= $c->request->path;
         # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
         # and no load on the already-saturated workstation GPU); privileged users
@@ -1458,17 +1477,42 @@ sub fetch_and_set {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Checking query parameter '$param'");
 
+    # Validate a candidate SiteName against the site table before trusting it.
+    # Hostnames (e.g. 'workstation'), bot garbage or typos must NOT be written
+    # into stash/session — an unresolved SiteName poisons the session and makes
+    # every later site_setup fail (see error-audit todo 2243).
+    my $_validate_site = sub {
+        my ($name) = @_;
+        return 0 unless defined $name && length $name;
+        my $s = eval { $c->model('Site')->get_site_details_by_name($c, $name) };
+        return defined $s ? 1 : 0;
+    };
+
     if (defined $value) {
-        $c->stash->{SiteName} = $value;
-        $c->session->{SiteName} = $value;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Query parameter '$param' found: $value");
+        if ($_validate_site->($value)) {
+            $c->stash->{SiteName} = $value;
+            $c->session->{SiteName} = $value;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Query parameter '$param' found: $value");
+        } else {
+            # Reject unresolvable value; leave SiteName unset so domain/default
+            # resolution below still runs. Do not persist to session.
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_and_set',
+                "Query parameter '$param' value '$value' does not resolve to a site - ignoring (falling through)");
+            $value = undef;
+        }
     } elsif (my $hdr_site = $c->req->header('X-Sitename')) {
         $hdr_site =~ s/[^a-zA-Z0-9._-]//g;
         if ($hdr_site) {
-            $value = $hdr_site;
-            $c->stash->{SiteName} = $value;
-            $c->session->{SiteName} = $value;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "X-Sitename header found: $value");
+            if ($_validate_site->($hdr_site)) {
+                $value = $hdr_site;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "X-Sitename header found: $value");
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fetch_and_set',
+                    "X-Sitename header '$hdr_site' does not resolve to a site - ignoring (falling through)");
+                $value = undef;
+            }
         }
     }
 
@@ -2214,7 +2258,13 @@ sub site_setup {
     }
 
     unless (defined $site) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site could be resolved. SiteName='" . ($SiteName//'UNDEF') . "', Domain='" . ($domain//'UNDEF') . "'");
+        # Downgrade to 'warn' for local/script (bot) callers: a bad X-Sitename
+        # from a curl script is a caller mistake, not a server fault — it must
+        # not page helpdesk / create an error-audit todo every time (todo 2243).
+        my $_remote = $c->req->address // '';
+        my $_is_local = ($_remote eq '127.0.0.1' || $_remote eq '::1' || $_remote =~ /^192\.168\.1\./);
+        my $_level = $_is_local ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $_level, __FILE__, __LINE__, 'site_setup', "No site could be resolved. SiteName='" . ($SiteName//'UNDEF') . "', Domain='" . ($domain//'UNDEF') . "'");
 
         # Ensure site_display_name is never missing in stash/session, even on failure
         my $fallback_display = $c->stash->{SiteName} || $c->session->{SiteName} || 'Site';
@@ -2423,7 +2473,7 @@ sub begin :Private {
     
     # Skip all site/session setup for health check endpoints.
     # Health checks run every 30s from Docker — no DB, no session, no logging needed.
-    if ($c->req->path =~ m{^/health(?:/|$)}) {
+    if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return;
     }
 
@@ -2540,7 +2590,9 @@ sub _port_label {
         4003 => 'HA',   # InfrastructureHA
         4004 => 'WS',   # WorkShops
         4005 => 'Us',   # Users
-        4006 => 'FM',   # FileManagement
+        # 4006 is the aisystem worktree (AI system use) — show the AI robot
+        # glyph instead of the stale 'FM' FileManagement label.
+        4006 => "\x{1F916}",   # aisystem — AI robot
         4007 => 'Ma',   # UnifiedMail
         4008 => 'Mb',   # Membership
         4009 => 'Pt',   # PointSystem

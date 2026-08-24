@@ -67,8 +67,20 @@ sub providers :Local :Args(0) {
 
     my $roles = $c->session->{roles} || [];
     $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
-    my $is_admin = grep { $_ =~ /^(admin|developer|editor)$/i } @$roles;
+    my $is_admin = Comserv::Util::ModelCatalog->can_select_model($c);
+    my $is_guest = Comserv::Util::ModelCatalog->is_guest_tier($c);
+    my $role_tier = Comserv::Util::ModelCatalog->_role_tier($c);
 
+    # Role-scoped: guests/members see only their tier (free OpenRouter +
+    # Ollama for guests; +cheap/mid for members). Admin sees everything.
+    # The shared ModelCatalog is the single source of truth for the tier
+    # filter, so this endpoint can never leak the full list to a guest.
+    # The Router (Model::AI2::Router::get_available_models) already applies
+    # the role filter at line 587 — guests get free OpenRouter + local Ollama,
+    # members get +cheap/mid, admins get everything. Do NOT re-filter here:
+    # filter_catalog_for_role would double-filter and, worse, prime() the
+    # ModelCatalog cache with the filtered list, breaking /api/focus/models
+    # for admins who then only see the guest set. Single source of truth = Router.
     my $catalog = try { $c->model('AI2')->get_available_models($c) } || [];
 
     # Group v2 catalog (each: name, provider, label, local) into providers[].
@@ -133,8 +145,10 @@ sub providers :Local :Args(0) {
         success           => 1,
         providers         => \@providers,
         is_admin          => $is_admin ? 1 : 0,
+        can_select_model  => $is_admin ? 1 : 0,
         can_access_history=> $is_admin ? 1 : 0,
-        is_guest          => 0,
+        is_guest          => $is_guest ? 1 : 0,
+        role_tier         => $role_tier,
         username          => $c->session->{username} || 'Guest',
     }));
 }
@@ -832,6 +846,12 @@ sub chat :Local :Args(0) {
     my $model   = $json_data->{model}  // '';
     my $history = $json_data->{history} // [];
     my $agent_id= $json_data->{agent_id} // '';
+    unless (Comserv::Util::ModelCatalog->agent_allowed($c, $agent_id)) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'ai2_chat', "Clamped disallowed agent_id='$agent_id' to general");
+        $agent_id = 'general';
+        $json_data->{agent_id} = 'general';
+    }
     my $system  = $json_data->{system} // '';
     my $page_path   = $json_data->{page_path} // '';
     my $page_title  = $json_data->{page_title} // '';
@@ -888,6 +908,37 @@ sub chat :Local :Args(0) {
             thinking        => [],
         }));
         return;
+    }
+
+    # Code-read: "can you read the files" must not reach Hy3.
+    if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+        my $read_hit = eval {
+            require Comserv::Model::AI2::CodeRead;
+            my $brain = eval { $c->model('AI2::CodeRead') };
+            $brain = Comserv::Model::AI2::CodeRead->new if !$brain || !ref $brain;
+            $brain->try_chat_read($c,
+                prompt       => $prompt,
+                page_path    => $page_path,
+                page_content => $page_content,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'ai2_chat', "CodeRead try_chat_read threw: $@");
+        }
+        if ($read_hit && $read_hit->{handled}) {
+            $c->res->body(encode_json({
+                success          => $read_hit->{success} ? 1 : 0,
+                response         => $read_hit->{response} // '',
+                model            => $read_hit->{model} // '(code-read)',
+                provider         => $read_hit->{provider} // 'ai2-coderead',
+                needs_web_search => 0,
+                files_read       => $read_hit->{files_read} || [],
+                conversation_id  => $conversation_id,
+                thinking         => [],
+            }));
+            return;
+        }
     }
 
     # ── Focus-Tune agent: "what are my top 5 todos by function?" ──
@@ -964,6 +1015,8 @@ sub chat :Local :Args(0) {
         title            => $result->{title},
         created_at       => $result->{created_at},
         thinking         => $result->{thinking} // [],
+        todo_action      => $result->{todo_action},
+        files_read       => $result->{files_read} || [],
     }));
 }
 
