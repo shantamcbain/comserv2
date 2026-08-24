@@ -128,7 +128,8 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" target="_blank" rel="noopener" title="Opens the AISYSTEM coordinator plan document (waves for in-app AI).">AISYSTEM plan (the document)</a>
         <a class="doc-navlink" href="[% c.uri_for('/project/details') %]?project_id=280" target="_blank" rel="noopener" title="Opens project #280 AISYSTEM — the database project this plan is attached to.">#280 project (attached)</a>
         <a class="doc-navlink" href="[% c.uri_for('/todo/details') %]?record_id=2217" target="_blank" rel="noopener" title="Opens todo #2217: tracks the in-chat agent that creates todos in the database (not a form page).">todo #2217 (Todo-create agent)</a>
-        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
+        <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
+        <a href="[% c.uri_for('/Documentation/AIModernAgentEvolutionPlan') %]" title="Modern agent evolution masterplan: personas vs independent agents, migration map, verdict table.">Modern Agent Evolution</a>
         <a class="doc-navlink" href="#wave3">3 · 3D/Sign</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" target="_blank" rel="noopener" title="Opens the 3D printing coordinator plan (overall view + child plans).">3dPrintingPlan</a>
         <a class="doc-navlink" href="#wave4">4 · Inventory</a>
@@ -165,7 +166,8 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/TodoListPageDisplayTuningPlan') %]">Todo List Ranking</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Language Standard</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]">Autonomous Agents</a>
-        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]">AI Agent Orchestration</a>
+        <a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-navlink">AI Agent Orchestration</a>
+        <a href="[% c.uri_for('/Documentation/AIModernAgentEvolutionPlan') %]" class="doc-navlink" title="Modern agent evolution: personas vs independent agents, migration map, and verdict table.">Modern Agent Evolution</a>
     </div>
 </div>
 
