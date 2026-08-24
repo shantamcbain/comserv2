@@ -2008,12 +2008,17 @@ sub merge :Path('/admin/git/merge') :Args(0) {
     if ($res->{conflict}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             "merge conflict: direction=$direction source=$source target=$target");
+        # Name the conflicting files (and the uncommitted-changes case) in the
+        # error itself — the raw output <pre> stays as supporting detail.
+        my $why = $res->{error_msg} // "Merge conflict. Resolve in the worktree, then retry (or abort).";
         $c->response->body(encode_json({
             success  => 0,
             conflict => 1,
             target   => $target,
             direction => $direction,
-            error    => "Merge conflict. Resolve in the worktree, then retry (or abort).",
+            conflict_files => $res->{conflict_files} || [],
+            uncommitted    => $res->{uncommitted} ? 1 : 0,
+            error    => $why,
             output   => $res->{output},
         }));
         return;

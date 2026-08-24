@@ -465,16 +465,16 @@
 
     function _todoCardSetActive(btn, recordId) {
         btn.textContent = '⏸ Active';
-        btn.style.background = '#fd7e14';
-        btn.style.color = '#fff';
-        btn.style.border = '1px solid #fd7e14';
-        btn.style.borderColor = '#fd7e14';
-        btn.title = 'Session active — click to close';
+        btn.style.border = '';
+        btn.style.background = '#ffc107';
+        btn.style.color = '#000';
+        btn.title = 'Session active — click to close session';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
-        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+        btn.setAttribute('data-is-active', '1');
+        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
         if (card) {
-            card.style.background = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color,#fff))';
+            card.style.background = 'rgba(255, 193, 7, 0.08)';
             var doneBtn = card.querySelector('button[data-done-btn]');
             if (doneBtn) doneBtn.setAttribute('data-is-active', '1');
         }
@@ -488,7 +488,8 @@
         btn.title = 'Start working — creates a log entry, marks todo active';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
-        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+        btn.setAttribute('data-is-active', '0');
+        var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
         if (card) {
             card.style.background = '';
             var doneBtn = card.querySelector('button[data-done-btn]');
@@ -496,19 +497,11 @@
         }
     }
 
-    // Ensure a work-log session exists for this todo before a close/done op,
-    // so close_log/done_with_log can never fail with "No open log found".
-    // The server's open_log is idempotent (returns already_open if a session
-    // is live), so calling it unconditionally is safe. The Start button is the
-    // source of truth for session state; close/done build on top of it.
-    function _ensureSession(recordId) {
-        return fetch('/todo/open_log', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ record_id: recordId })
-        }).then(function(r) { return r.json(); }).catch(function() { return { ok: false }; });
-    }
+    // NOTE: no _ensureSession pre-call. Server-side close_log / done_with_log
+    // (Comserv::Util::TodoLog) are self-sufficient: close is graceful when no
+    // log is open, and done inserts a completed log if none was open. Calling
+    // open_log first would now TOGGLE-stop an active session (open_log is a
+    // start/stop toggle), which is not what Close/Done mean.
 
     function startWorkTodoCard(btn, recordId) {
         btn.disabled = true;
@@ -539,10 +532,9 @@
         notes = notes || '';
         btn.disabled = true;
         btn.textContent = '…';
-        // Start button is the source of truth: guarantee a session exists so the
-        // close can never hit "No open log found" (see _ensureSession).
-        _ensureSession(recordId).then(function() {
-            fetch('/todo/close_log', {
+        // Server-side close_log is self-sufficient and graceful (no open log
+        // is a warn, not an error) — no pre-call needed.
+        fetch('/todo/close_log', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
@@ -558,43 +550,47 @@
                 btn.disabled = false;
                 btn.textContent = '⏸ Active';
             });
-        });
     }
 
     function doneWithLogTodoCard(btn, recordId) {
+        // Re-entrancy guard: a second Done trigger (e.g. the floating Done
+        // button) must not fire another done_with_log while one is in flight
+        // or already completed for this card.
+        if (btn.disabled || btn.getAttribute('data-done-inflight') === '1') return;
         var isActive = btn.getAttribute('data-is-active') === '1';
         var notes = prompt('Mark todo DONE — resolution / notes (optional):');
         if (notes === null) return;
         notes = notes || '';
         var payload = { record_id: recordId, notes: notes };
+        btn.setAttribute('data-done-inflight', '1');
         btn.disabled = true;
         btn.textContent = '…';
-        // Start button is the source of truth: ensure a session exists before we
-        // close+mark-done, so done_with_log can never hit "No open log found".
-        _ensureSession(recordId).then(function() {
-            fetch('/todo/done_with_log', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d.ok) {
-                    var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
-                    if (card) {
-                        card.style.opacity = '0.4';
-                        card.style.textDecoration = 'line-through';
-                        card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
-                    }
-                    btn.textContent = '✓ Done';
-                    btn.disabled = true;
-                } else {
-                    btn.disabled = false;
-                    btn.textContent = 'Done';
+        // Server-side done_with_log is self-sufficient (closes the open log or
+        // inserts a completed one) — no pre-call, no double popup.
+        fetch('/todo/done_with_log', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) {
+                var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
+                if (card) {
+                    card.style.opacity = '0.4';
+                    card.style.textDecoration = 'line-through';
+                    card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
                 }
-            }).catch(function() {
+                btn.textContent = '✓ Done';
+                btn.disabled = true;
+            } else {
+                btn.removeAttribute('data-done-inflight');
                 btn.disabled = false;
                 btn.textContent = 'Done';
-            });
+            }
+        }).catch(function() {
+            btn.removeAttribute('data-done-inflight');
+            btn.disabled = false;
+            btn.textContent = 'Done';
         });
     }
 
@@ -1032,8 +1028,15 @@
 
     document.addEventListener('click', function(e) {
         // Track the last-touched todo card for the floating Done button.
+        // Ignore clicks ON action buttons (Done/Start/Chat) — otherwise clicking
+        // the card's Done ALSO summons the floating Done, inviting a second
+        // done_with_log submission (double dialog / double log insert).
+        if (e.target.closest('[data-done-btn],[data-start-btn],[data-chat-todo],#float-done-btn')) {
+            hideFloatDoneBtn();
+            return;
+        }
         var touchedCard = e.target.closest('[data-todo-id]');
-        if (touchedCard && !touchedCard.closest('#float-done-btn')) {
+        if (touchedCard) {
             var stillOpen = touchedCard.querySelector('button[data-done-btn]:not([disabled])');
             if (stillOpen) { showFloatDoneBtn(touchedCard); } else { hideFloatDoneBtn(); }
         }
@@ -1107,15 +1110,19 @@
             if (action === 'ai-tune-models-done')  { aiTuneModelsDone();       return; }
         }
         // Todo card: Start/Active button <button data-start-btn="1" data-record-id="N">
+        // Decide open-vs-close from the button's data-is-active attribute
+        // (rendered from the todo's DB status), NOT the button label text —
+        // text matching broke when the label was "⏸ Active" (no 'Start' in it).
         var startBtn = e.target.closest('[data-start-btn]');
         if (startBtn) {
             e.preventDefault();
             var recordId = startBtn.getAttribute('data-record-id');
             if (recordId) {
-                if (startBtn.textContent === '▶ Start' || startBtn.textContent.indexOf('Start') !== -1) {
-                    startWorkTodoCard(startBtn, parseInt(recordId, 10));
-                } else {
+                var isActive = startBtn.getAttribute('data-is-active') === '1';
+                if (isActive) {
                     closeLogTodoCard(startBtn, parseInt(recordId, 10));
+                } else {
+                    startWorkTodoCard(startBtn, parseInt(recordId, 10));
                 }
             }
             return;

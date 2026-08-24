@@ -10,6 +10,10 @@ use FindBin '$Bin';
 use Time::HiRes qw(gettimeofday);
 
 use Comserv::Util::Logging;
+
+# Cache-buster epoch for asset URLs (?v=...): set once per server start so
+# browsers refetch CSS/JS after every restart/deploy (see Root::auto).
+our $ASSET_EPOCH = 0;
 use Comserv::Util::Git;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::SystemInfo;
@@ -218,7 +222,9 @@ sub auto :Private {
 
     # Skip everything for health checks and monitoring endpoints immediately
     # This prevents creating session files for Docker health checks
-    if ($c->req->path =~ m{^/health(?:/|$)}) {
+    # Catalyst req->path has NO leading slash (cf. admin/hardware_monitor above).
+    # A '^/health' match never fired, so Docker healthchecks ran the rest of auto().
+    if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return 1;
     }
 
@@ -240,6 +246,16 @@ sub auto :Private {
     eval { require Comserv::Util::DevPreview; Comserv::Util::DevPreview::maybe_apply_preview_session($c) };
 
     $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
+
+    # Cache-busting version for CSS/JS asset URLs (?v=... in js_load.tt).
+    # Set on EVERY request here — previously it was only set inside the
+    # site-setup failure branch, so normal pages served ?v=20260712 forever and
+    # browsers cached stale JS (fixed Start/Done handlers looked "not applied"
+    # on pages that weren't hard-refreshed). Server start time keeps the URL
+    # stable across requests (good for caching) but changes on every app
+    # restart/deploy, which is exactly when assets change.
+    $c->stash->{css_v} = ($Comserv::Controller::Root::ASSET_EPOCH ||= time());
+
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip setup redirect for setup pages themselves and static assets
@@ -1187,7 +1203,10 @@ sub auto :Private {
         # Role + page context used by the .tt to SORT/order the dropdown.
         my $roles = $c->session->{roles} || [];
         $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
-        $c->stash->{ai_is_priv} = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles) ? 1 : 0;
+        $c->stash->{ai_is_priv} = Comserv::Util::ModelCatalog->can_select_model($c) ? 1 : 0;
+        $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
+        $c->stash->{ai_is_guest} = Comserv::Util::ModelCatalog->is_guest_tier($c) ? 1 : 0;
+        $c->stash->{ai_can_select_model} = $c->stash->{ai_is_priv};
         $c->stash->{ai_chat_page} ||= $c->request->path;
         # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
         # and no load on the already-saturated workstation GPU); privileged users
@@ -2454,7 +2473,7 @@ sub begin :Private {
     
     # Skip all site/session setup for health check endpoints.
     # Health checks run every 30s from Docker — no DB, no session, no logging needed.
-    if ($c->req->path =~ m{^/health(?:/|$)}) {
+    if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return;
     }
 
