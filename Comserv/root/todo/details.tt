@@ -258,14 +258,14 @@
       [% IF det_is_active %]
       <button type="button"
               class="btn btn-warning btn-sm"
-              data-start-btn="1" data-record-id="[% det_rid %]"
+              data-start-btn="1" data-record-id="[% det_rid %]" data-is-active="1"
               title="Close the current work session">
           ⏸ Active
       </button>
       [% ELSE %]
       <button type="button"
               class="btn btn-primary btn-sm"
-              data-start-btn="1" data-record-id="[% det_rid %]"
+              data-start-btn="1" data-record-id="[% det_rid %]" data-is-active="0"
               title="Start working on this task">
           ▶ Start
       </button>
