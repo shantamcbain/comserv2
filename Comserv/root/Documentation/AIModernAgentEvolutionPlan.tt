@@ -1,0 +1,269 @@
+[% META
+   title = "AI Modern Agent Evolution — masterplan"
+   description = "Evolves Comserv2's current in-app AI personas into a modern mixed architecture: lightweight in-app personas plus independent autonomous agents where they earn their keep. Shows current inventory, target state, migration path, and links to existing plans."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning,ai"
+   page_version = "0.1"
+   last_updated = "Mon Aug 24 2026"
+   site_specific = "false"
+   project_id = "280"
+   project_code = "AISYSTEM"
+%]
+[% PageVersion = 'Documentation/AIModernAgentEvolutionPlan.tt,v 0.1 2026/08/24 hermes-agent Exp - Initial modern agent evolution masterplan' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'AI Modern Agent Evolution — masterplan'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#definitions" class="doc-navlink">Definitions</a>
+                <a href="#current" class="doc-navlink">Current inventory</a>
+                <a href="#target" class="doc-navlink">Target architecture</a>
+                <a href="#verdict" class="doc-navlink">Agent verdict table</a>
+                <a href="#migration" class="doc-navlink">Migration path</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">Comserv2's "agents" were created as in-app AI personas: prompt bundles + URL routing + role gates inside one Catalyst process. The industry has moved on. Modern agents are independent services or processes that can run on different machines, keep their own state, call each other, and work asynchronously.</p>
+            <p class="doc-body">This plan maps our current registry onto that modern model. It does not scrap what already works. It classifies each current agent as <strong>stay</strong>, <strong>evolve</strong>, or <strong>drop</strong>, and defines the registry/runtime changes needed to support both personas and independent agents from one control plane.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="definitions" class="doc-h2">2. Definitions</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Term</th>
+                    <th class="doc-th">Meaning in Comserv2</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><strong>Persona agent</strong></td>
+                    <td class="doc-td">A prompt bundle in <code>root/static/config/agents.json</code>, auto-selected by URL/task context, executed inside <code>Controller::AI</code> or <code>Controller::AI2</code>. No persistent state; no independent lifecycle; same process as the web app.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><strong>Independent agent</strong></td>
+                    <td class="doc-td">A separate service/process, possibly on another host, with its own queue, state, credentials, and model choice. It exposes an endpoint or message contract and can call other agents. Examples: Email agent, Secretary agent, Scheduler agent.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><strong>Hybrid agent</strong></td>
+                    <td class="doc-td">Starts as a persona for chat UX, but gains an independent backend when it needs durable state, scheduled runs, or cross-system actions.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="current" class="doc-h2">3. Current inventory</h2>
+            <p class="doc-body">Source of truth today: <code>root/static/config/agents.json</code>. The live registry view is <a href="[% c.uri_for('/ai/admin/agents') %]" class="doc-link">/ai/admin/agents</a>. Legacy aliases also accepted by <code>Controller::AI</code> are not counted as separate agents; they are normalization debt.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="target" class="doc-h2">4. Target architecture</h2>
+            <p class="doc-body">The chat widget keeps using the <strong>same selector UX</strong>. Behind it, a new dispatcher decides:</p>
+            <ul class="doc-body">
+                <li><strong>Persona path:</strong> route to <code>Controller::AI2::Chat</code> with the existing <code>agents.json</code> prompt bundle.</li>
+                <li><strong>Independent-agent path:</strong> route to an external agent service by <code>agent_id</code>, using a manifest that declares <code>endpoint</code>, <code>auth</code>, <code>model</code>, and <code>capabilities</code>.</li>
+                <li><strong>Hybrid path:</strong> persona UX in the widget, but writes/actions go through an agent service with DB/queue access.</li>
+            </ul>
+            <p class="doc-body"><code>agents.json</code> becomes a <strong>unified manifest</strong>: one entry per agent, with an optional <code>runtime</code> block. Missing <code>runtime</code> means persona. This avoids two registries.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verdict" class="doc-h2">5. Agent verdict table</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Current agent</th>
+                    <th class="doc-th">Verdict</th>
+                    <th class="doc-th">Reason</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">general</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Catch-all concierge. No state, no external action. Keep as lightweight persona.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">coding</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Editor-bound, dev-mode gated, file-read tooling lives in-app. Independent runtime adds latency and host-binding pain for no benefit.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">template_editor</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Admin-only TT2 rewriter. Tightly coupled to current template tree and theme rules. Keep as persona.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">planning</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Needs live injected project/todo data from the app. The persona model is the right place for that context injection.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">documentation</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Navigation/doc-citation helper. Benefits from server-injected URL allowlists. Persona is sufficient.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">helpdesk</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Support triage and form guidance. No durable workflow state required.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">beemaster</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Domain-specific persona for apiary/ENCY/BMaster routes. URL-bound, context-injected.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">csc</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Site concierge. Module links and site-aware routing belong in the app.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">ency</td>
+                    <td class="doc-td"><strong>Stay</strong></td>
+                    <td class="doc-td">Herb/plant lookup assistant. Already gets live ENCY data injected. Persona works.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">inventory</td>
+                    <td class="doc-td"><strong>Hybrid</strong></td>
+                    <td class="doc-td">Chat-time form-fill stays as persona. Inventory automation, supplier lookups, and GL linkage may become an independent Inventory Automation agent later when the workflow is bounded and repeatable.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">accounting</td>
+                    <td class="doc-td"><strong>Evolve to independent agent</strong></td>
+                    <td class="doc-td">Double-entry rules, invoice processing, and GL linking need durable workflow state, retries, and possibly external ERP/tax endpoints. This is the first candidate for an independent service after W2.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">projects</td>
+                    <td class="doc-td"><strong>Drop as separate agent</strong></td>
+                    <td class="doc-td">Duplicate of planning/project context. Remove from <code>agents.json</code>; route those URLs/prompts to the planning persona.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">todo</td>
+                    <td class="doc-td"><strong>Drop as separate agent</strong></td>
+                    <td class="doc-td">Task guidance is already covered by planning + TodoCreate/Scheduler jobs. Separate persona adds confusion and no unique capability.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">legacy aliases<br><code class="doc-muted">documentation-agent, documentation-sync, main, MainAgent, 3dprint, beekeeping, hamradio, chat, cleanup, docker, master-plan-updater, daily-audit, daily-plan-automator, master-plan-manager, daily-plans-generator, daily-plans, prompt-logging</code></td>
+                    <td class="doc-td"><strong>Drop / retire</strong></td>
+                    <td class="doc-td">Accepted by <code>Controller::AI</code> normalization but not defined in <code>agents.json</code>. They drift into “general” today. Remove them from the normalizer; migrate any still-needed behavior into explicit agents above.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="migration" class="doc-h2">6. Migration path</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase</th>
+                    <th class="doc-th">Work</th>
+                    <th class="doc-th">Owner / existing plan</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">M0</td>
+                    <td class="doc-td">Consolidate <code>agents.json</code>: remove <code>projects</code>, <code>todo</code>, and unused aliases; add <code>runtime</code> manifest schema.</td>
+                    <td class="doc-td">AISYSTEM W2 cleanup</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">M1</td>
+                    <td class="doc-td">Build unified agent dispatcher in <code>Controller::AI2</code>: persona path vs external-agent path.</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-link">AIAgentOrchestrationPlan</a> / #267 AGENTS</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">M2</td>
+                    <td class="doc-td">Convert <strong>accounting</strong> to first independent agent: queue, state, retry, GL-aware prompts, DB writes without chat round-trip.</td>
+                    <td class="doc-td">AISYSTEM W3+; new child under #267 or #280</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">M3</td>
+                    <td class="doc-td">Pilot <strong>inventory hybrid</strong>: keep chat persona, add backend automation for stock/reorder/supplier lookups when bounded.</td>
+                    <td class="doc-td">Inventory/Order/Fulfillment plan</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">M4</td>
+                    <td class="doc-td">Agent-to-agent calls: let Todo-create, Scheduler, and Daily Plan invoke the Accounting/Inventory agents directly, not via chat.</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]" class="doc-link">AutonomousAgentsPlan</a></td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">M5</td>
+                    <td class="doc-td">Deprecate old normalizer aliases in <code>Controller::AI</code>; retire the legacy routing table.</td>
+                    <td class="doc-td">V2MIG on-touch / AISYSTEM</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">7. Project Tracking</h2>
+            <p class="doc-body">This document is owned by <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link">#280 AISYSTEM</a>. It links the following existing tracks:</p>
+            <ul class="doc-body">
+                <li><a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" class="doc-link">AISYSTEMPlan</a> — wave order for in-app AI work</li>
+                <li><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]" class="doc-link">AIModelPresentationPlan</a> — model catalog/shortlists</li>
+                <li><a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]" class="doc-link">V2MigrationPlan</a> — template/JS modernization</li>
+                <li><a href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]" class="doc-link">AutonomousAgentsPlan</a> — agent framework (#267)</li>
+                <li><a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-link">AIAgentOrchestrationPlan</a> — Email + Secretary + notifications</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">8. See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">Master Plan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" class="doc-link">AISYSTEMPlan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]" class="doc-link">AIMPS</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]" class="doc-link">Autonomous Agents Plan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-link">AI Agent Orchestration</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]" class="doc-link">V2 Migration</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AIChatSystemUserGuide') %]" class="doc-link">AI Chat User Guide</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Coordinator for modern agent evolution. Owned by project <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link">#280 AISYSTEM</a>.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

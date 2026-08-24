@@ -415,6 +415,7 @@
                     <li><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]" class="doc-link">AIMPS</a></li>
                     <li><a href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]" class="doc-link">Autonomous Agents</a></li>
                     <li><a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-link">Agent Orchestration</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/AIModernAgentEvolutionPlan') %]" class="doc-link">Modern Agent Evolution</a></li>
                     <li><a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]" class="doc-link">V2 Migration</a></li>
                     <li><a href="[% c.uri_for('/Documentation/HermesBranchContextPlan') %]" class="doc-link">Hermes Branch Context</a></li>
                     <li><a href="[% c.uri_for('/Documentation/AIChatSystemUserGuide') %]" class="doc-link">AI Chat User Guide</a></li>

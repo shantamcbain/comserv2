@@ -281,8 +281,11 @@
     window.ComservConfig = {
         debug: [% c.session.debug_mode || 0 %],
         username: '[% c.session.username | html %]',
-        isAdmin: [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
+        isAdmin: [% (c.stash.ai_is_priv || c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
         isEditor: [% c.stash.is_editor ? 'true' : 'false' %],
+        isGuest: [% c.stash.ai_is_guest ? 'true' : 'false' %],
+        roleTier: '[% c.stash.ai_role_tier || 'guest' %]',
+        canSelectModel: [% (c.stash.ai_can_select_model || c.stash.ai_is_priv || c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
         siteName: '[% c.stash.SiteName || c.session.SiteName | html %]',
         cv: '[% cv %]',
         // Canonical model catalog — THE single source of truth for every chat

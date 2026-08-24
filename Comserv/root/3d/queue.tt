@@ -139,6 +139,8 @@
                     [% END %]
                 </td>
                 <td>
+                    <a href="/3d/job/filament/[% job.id %]"
+                       class="btn-action btn-assign">Change filament</a>
                     <form method="post" action="/3d/queue" style="display:inline;">
                         <input type="hidden" name="job_id" value="[% job.id %]">
                         <input type="hidden" name="action" value="cancel">
@@ -219,6 +221,8 @@
                         <button type="submit" class="btn-action btn-cancel"
                             onclick="return confirm('Cancel this job?')">Cancel</button>
                     </form>
+                    <a href="/3d/job/filament/[% job.id %]"
+                       class="btn-action btn-assign">Change filament</a>
                 </td>
             </tr>
             [% END %]

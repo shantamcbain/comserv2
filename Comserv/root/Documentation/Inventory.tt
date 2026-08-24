@@ -56,3 +56,9 @@
 </ul>
 
 <p>For more detailed instructions on how to use these features, please refer to the specific documentation for each aspect of inventory management as we continue to develop and refine our strategies.</p>
+<p>
+    Manual assembly / BOM entry (two master units, printed parts, hardware):
+    <a href="[% c.uri_for('/Documentation/InventoryInternalBuildBom') %]">InventoryInternalBuildBom</a>.
+    3D planning:
+    <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]">3dPrintingPlan</a>.
+</p>

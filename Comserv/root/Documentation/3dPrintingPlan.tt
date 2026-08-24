@@ -1,0 +1,234 @@
+[% META
+   title = "3D Printing System — coordinator plan"
+   description = "Overall planning view of printing_3d: what the system is, how child plans fit, and the project tree. Does not replace Dryer, Sign, or Browse plans — it orders them."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "planning,3d-printing"
+   page_version = "0.1"
+   last_updated = "Sat Aug 22 2026"
+   site_specific = "false"
+   project_id = "206"
+   project_code = "3DPRINT"
+%]
+[% PageVersion = 'Documentation/3dPrintingPlan.tt,v 0.1 2026/08/22 hermes-agent Exp - coordinator for all 3d plans' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = '3D Printing System — coordinator plan'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#overview" class="doc-navlink">Overview</a>
+                <a href="#what" class="doc-navlink">What it is</a>
+                <a href="#plans" class="doc-navlink">Child plans</a>
+                <a href="#order" class="doc-navlink">Work order</a>
+                <a href="#cross" class="doc-navlink">Cross-plan</a>
+                <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" class="doc-h2">1. Overview</h2>
+            <p class="doc-body">This is the <strong>3D printing master plan</strong>.
+            The site-wide
+            <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a>
+            only indexes it. Child plans stay the spec for their own work.
+            This page is the overall view: what <code>printing_3d</code> is,
+            which plans exist, and in what order they should move.</p>
+            <div class="doc-info">
+                <p class="doc-body"><strong>Not this document:</strong>
+                <a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing</a>
+                is the operator knowledge base (how to use the live module).
+                App URLs such as <code>/3d</code> belong there, not on MASTER_PLAN.</p>
+            </div>
+            <div class="doc-success">
+                <p class="doc-body">Open the attached project and this plan standalone:</p>
+                <div class="doc-navrow">
+                    <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" title="Project #206 3DPRINT — parent of INV, File Mgmt, Sales, DRYER-INT.">Project #206 3DPRINT</a>
+                    <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-navlink" title="Todos attached to #206.">Todos on #206</a>
+                    <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-navlink" title="Site-wide coordinator. This 3D plan is one entry there.">MASTER_PLAN</a>
+                </div>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="what" class="doc-h2">2. What the 3D printing system is</h2>
+            <p class="doc-body">A <strong>production provider</strong> for a site that
+            has the <code>printing_3d</code> module on. Inventory/Accounting is the
+            commerce and stock source of truth. 3D owns printers, STL/3MF models,
+            the print queue, and filament reserve/issue refs
+            <code>3D-JOB-{id}</code> / <code>3D-SALE-{id}</code>.</p>
+            <ul class="doc-body">
+                <li><strong>Farm</strong> — printers, queue, staff-prep before print, complete with grams so stock is issued.</li>
+                <li><strong>Library</strong> — models linked to inventory items; geometry for grams (STL; 3MF must be extracted).</li>
+                <li><strong>Project import</strong> — a downloaded pack becomes assemblies + BOM + hardware + print jobs, not one row per zip/3MF plate.</li>
+                <li><strong>Signs</strong> — herb/sign STL via the OpenSCAD service; same model/job tables.</li>
+                <li><strong>Storefront</strong> — browse/shop consume inventory; <code>/3d/store</code> redirects to Shop/Cart (Inventory-owned).</li>
+            </ul>
+            <p class="doc-body">Tree:
+            <a href="[% c.uri_for('/project/details') %]?project_id=38" class="doc-link">#38 3dPrinting</a>
+            →
+            <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">#206 3DPRINT</a>
+            → #207 INV, #208 File Mgmt, #209 Sales,
+            <a href="[% c.uri_for('/project/details') %]?project_id=272" class="doc-link">#272 DRYER-INT</a>.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="plans" class="doc-h2">3. Child plans (this coordinator links them)</h2>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Plan</th>
+                    <th class="doc-th">Project</th>
+                    <th class="doc-th">Role</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=272" class="doc-link">#272 DRYER-INT</a></td>
+                    <td class="doc-td">Test scenario: PDF is the BOM; 3MF files are plates of labeled parts; base unit vs add-on module; hardware lines.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/SignGenerator') %]" class="doc-link">SignGenerator</a>
+                    (MASTER_PLAN also cites HerbSignGeneratorPlan — that filename is not on this tree)</td>
+                    <td class="doc-td">#206 / signs</td>
+                    <td class="doc-td">Herb/sign STL via OpenSCAD service; same <code>printing_3d_models</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">3dBrowseGalleryPlan
+                    (cited on MASTER_PLAN; file not on this tree)</td>
+                    <td class="doc-td">#206</td>
+                    <td class="doc-td">Public browse vs farm console; STL thumbnails. Restore or rewrite before treating as live spec.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing</a> (operator KB, not a plan)</td>
+                    <td class="doc-td">#206</td>
+                    <td class="doc-td">How to use the running module. Not a substitute for this coordinator.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="order" class="doc-h2">4. Work order</h2>
+            <ol class="doc-body">
+                <li><strong>Domain model</strong> — assemblies, BOM qty, hardware vs printed, filament type. Dryer PDF is the current proof that plate-level import is not a BOM.</li>
+                <li><strong>Import playbook</strong> — DryerProjectImportPlan v0.22+: scan manual → part SKUs → extract STL → items + BOM → order a config → explode to jobs.</li>
+                <li><strong>Farm</strong> — queue any item, change filament, grams from STL or manual, issue on complete.</li>
+                <li><strong>Signs / browse</strong> — after import+queue are honest; do not rebuild tables.</li>
+                <li><strong>Commerce</strong> — shop/cart/order stay on Inventory; 3d is the production provider.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="cross" class="doc-h2">5. Cross-plan (raise, do not absorb)</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">Req</th><th class="doc-th">Need</th><th class="doc-th">Raised on</th></tr>
+                <tr>
+                    <td class="doc-td">INV-R1</td>
+                    <td class="doc-td">Recurring supplier subscription + payment source</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2190" class="doc-link">#2190</a> / #207 — InventoryAccounting</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">FM-R1</td>
+                    <td class="doc-td">Batch folder ingest into File Manager</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2251" class="doc-link">#2251</a> / #208 — File.pm owner</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project Tracking</h2>
+            <p class="doc-body">
+                Owning project:
+                <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">#206 (3DPRINT)</a>
+                — parent:
+                <a href="[% c.uri_for('/project/details') %]?project_id=38" class="doc-link">#38 (3dPrinting)</a>.
+                Todos:
+                <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-link">filter by #206</a>.
+                All projects:
+                <a href="[% c.uri_for('/project') %]" class="doc-link">/project</a>.
+            </p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Phase / child</th>
+                    <th class="doc-th">Plan / todos</th>
+                    <th class="doc-th">Gate</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=207" class="doc-link">#207 INV</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2190" class="doc-link">#2190 INV-R1</a></td>
+                    <td class="doc-td">Recurring AP exists or honest workaround</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=208" class="doc-link">#208 File Mgmt</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2251" class="doc-link">#2251 FM-R1</a></td>
+                    <td class="doc-td">Batch ingest or documented per-file path</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=209" class="doc-link">#209 Sales</a></td>
+                    <td class="doc-td">Shop/Cart — Inventory-owned</td>
+                    <td class="doc-td">Order line → staff prep → queue</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=272" class="doc-link">#272 DRYER-INT</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a></td>
+                    <td class="doc-td">PDF BOM exploded; configs orderable</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/InventoryInternalBuildBom') %]" class="doc-link">InventoryInternalBuildBom</a> (manual: two masters + BOM)</li>
+                    <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/SignGenerator') %]" class="doc-link">SignGenerator</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing (operator KB)</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Tracked as project #206 3DPRINT. Rescan Documentation admin after this file is new on a host.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+[%# 3d printing coordinator; child plans remain owners of their todos %]

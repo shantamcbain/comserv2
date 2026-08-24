@@ -7,6 +7,7 @@ use Try::Tiny;
 use JSON qw(encode_json decode_json);
 
 use Comserv::Util::Logging;
+use Comserv::Util::ModelCatalog;
 
 extends 'Catalyst::Model';
 
@@ -192,7 +193,14 @@ sub process {
 
     my $username  = $c->session->{username}  || 'Guest';
     my $roles     = $c->session->{roles}     || [];
-    my $can_select = $self->_can_select_model($c);
+    my $can_select = Comserv::Util::ModelCatalog->can_select_model($c);
+
+    my $req_agent = $args{agent_id} // '';
+    unless (Comserv::Util::ModelCatalog->agent_allowed($c, $req_agent)) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            "Clamped disallowed agent_id='$req_agent' to general");
+        $args{agent_id} = 'general';
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat from $username: " . substr($prompt, 0, 80));
@@ -459,9 +467,7 @@ sub process {
 
 sub _can_select_model {
     my ($self, $c) = @_;
-    my $roles = $c->session->{roles} || [];
-    $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
-    return grep { $_ =~ /^(admin|developer|editor)$/i } @$roles ? 1 : 0;
+    return Comserv::Util::ModelCatalog->can_select_model($c);
 }
 
 # The Router identifies external models as "provider|slug" (e.g.

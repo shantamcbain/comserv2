@@ -1,0 +1,62 @@
+[% PageVersion = '3d/job_filament.tt,v 1.00 2026/08/22 hermes-agent Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1>Change filament</h1>
+    <p class="doc-muted">
+        Works for any queued or printing job.
+        This row:
+        [% IF job.item_name %][% job.item_name | html %][% ELSIF model %][% model.name | html %][% ELSE %]job #[% job.id %][% END %]
+        (job #[% job.id %], [% job.status | html %][% IF job.source_type %], [% job.source_type | html %][% END %]).
+    </p>
+
+    [% IF estimate.source == '3mf_needs_stl' %]
+    <p>
+        This model is 3MF (no STL volume yet). Estimate is empty until you
+        <a href="[% c.uri_for('/3d/models') %]">upload or create an STL</a>
+        for this part, or type grams by hand below. Completing the job uses
+        the grams field so inventory is issued correctly.
+    </p>
+    [% ELSIF estimate.source == 'no_geometry' || estimate.source == 'none' %]
+    <p>
+        No STL geometry on file. Upload an STL on
+        <a href="[% c.uri_for('/3d/models') %]">/3d/models</a>
+        or enter grams manually.
+    </p>
+    [% ELSIF estimate.grams %]
+    <p>
+        STL estimate: <strong>[% estimate.grams %] g</strong>
+        [% IF estimate.volume_cm3 %]([% estimate.volume_cm3 | format('%.2f') %] cm³)[% END %]
+        at density [% estimate.density %] g/cm³.
+        You can override the grams.
+    </p>
+    [% END %]
+
+    <form method="post" action="/3d/job/filament/[% job.id %]" class="card">
+        <div class="form-group">
+            <label for="filament_item_id">Filament spool</label>
+            <select id="filament_item_id" name="filament_item_id" required>
+                <option value="">— select —</option>
+                [% FOREACH f IN filaments %]
+                <option value="[% f.id %]"
+                    [% IF job.filament_item_id && job.filament_item_id == f.id %]selected[% END %]>
+                    [% f.name | html %]
+                    [% IF f.type || f.color %] ([% f.type | html %][% IF f.color %] [% f.color | html %][% END %])[% END %]
+                    — [% f.on_hand | format('%.0f') %] g on hand
+                </option>
+                [% END %]
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="filament_grams">Grams to reserve / issue on complete</label>
+            <input id="filament_grams" type="number" name="filament_grams"
+                   step="0.01" min="0" max="9999"
+                   value="[% job.filament_quantity || estimate.grams || '' %]"
+                   placeholder="e.g. 100">
+        </div>
+        <p>
+            <button type="submit" class="btn btn-primary">Save filament</button>
+            <a href="[% c.uri_for('/3d/queue') %]" class="btn">Back to queue</a>
+        </p>
+    </form>
+</div>

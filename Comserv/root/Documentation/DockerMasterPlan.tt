@@ -1,0 +1,225 @@
+[% META
+        title = "Docker & Kubernetes Plans — Coordinator"
+   description = "Single coordinator for every Docker and Kubernetes plan in Comserv2: strategy, orchestration/HA, DB-to-K8s migration, deployment & secrets, container diagnostics, dev environment, and agent setup. Sequences them, names the overlaps with INFRA-HA / IMGSEC / DEPLOY_WORKFLOW, and links each sub-plan by its verified route."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "infrastructure,deployment,kubernetes,docker,coordination"
+   page_version = "1.0"
+   last_updated = "Sun Aug 23 2026"
+   site_specific = "false"
+   project_id = "271"
+   project_code = "DOCKER-SYS"
+%]
+[% PageVersion = 'Documentation/DockerMasterPlan.tt,v 1.0 2026/08/23 hermes-agent Exp shanta - Coordinator linking all Docker/Kubernetes plans' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<nav class="doc-toc">
+    <h2 class="doc-h2">Quick Navigation</h2>
+    <div class="doc-navrow">
+        <a href="#purpose" class="doc-navlink">0. Purpose</a>
+        <a href="#index" class="doc-navlink">1. Plan index</a>
+        <a href="#sequencing" class="doc-navlink">2. Sequencing</a>
+        <a href="#overlaps" class="doc-navlink">3. Overlaps &amp; supersession</a>
+        <a href="#decisions" class="doc-navlink">4. Open decisions</a>
+        <a href="#track" class="doc-navlink">5. Project tracking</a>
+        <a href="#see-also" class="doc-navlink">6. See also</a>
+    </div>
+    <p class="doc-backtop"><a href="#purpose">&#8593; Back to Top</a></p>
+</nav>
+
+<div class="doc-info">
+    <h3 class="doc-h3">What this is</h3>
+    <p class="doc-body">This is the <strong>Docker &amp; Kubernetes coordinator</strong> — the entry point for every plan that touches
+    containers, images, orchestration, and the path to Kubernetes. It does <strong>not</strong> replace the app-wide
+    <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan</a>; it is the Docker/K8s slice of it, so the container
+    work has one navigable artifact instead of a dozen disconnected docs. Each linked plan remains the authoritative spec for its own work.</p>
+</div>
+
+<div id="purpose">
+    <h2 class="doc-h2">0. Purpose &amp; scope</h2>
+    <p class="doc-body">Group the container-related plans by function and make their dependencies explicit:</p>
+    <ul>
+        <li><strong>Strategy / architecture</strong> — the long-range Docker→K8s direction.</li>
+        <li><strong>Orchestration / HA</strong> — Kubernetes clusters, app deployment manifests, failover, DB HA.</li>
+        <li><strong>Deployment &amp; secrets</strong> — production deploy flow, DB-config fallback, image/secret hygiene.</li>
+        <li><strong>Diagnostics</strong> — container build / port failure reports.</li>
+        <li><strong>Dev environment</strong> — running Comserv in Docker for development.</li>
+        <li><strong>Agents</strong> — the Docker coding-agent spec.</li>
+    </ul>
+    <p class="doc-backtop"><a href="#purpose">&#8593; Back to Top</a></p>
+</div>
+
+<div id="index">
+    <h2 class="doc-h2">1. Plan index (verified routes)</h2>
+    <p class="doc-muted">Every link below was confirmed against <code>lib/Comserv/Controller/Documentation.pm</code>
+    (<code>sub view :Path('/Documentation') :Args(1)</code> + flat basename match). Routes are
+    <code>/Documentation/&lt;Key&gt;</code> — no subdirectory, no <code>.tt</code> extension.</p>
+
+    <h3 class="doc-h3">A. Strategy &amp; architecture</h3>
+    <table class="doc-table">
+        <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
+        <tr><td class="doc-td">Docker &amp; Kubernetes Migration Strategy</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY</a></td>
+            <td class="doc-td">v1.32 — long-range strategy; partly superseded by K3S_APP_HA_PLAN on orchestration specifics.</td></tr>
+    </table>
+
+    <h3 class="doc-h3">B. Orchestration &amp; HA</h3>
+    <table class="doc-table">
+        <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
+        <tr><td class="doc-td">Availability &amp; Load Balancing (K3S_APP_HA_PLAN)</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/K3S_APP_HA_PLAN') %]">/Documentation/K3S_APP_HA_PLAN</a></td>
+            <td class="doc-td">#202 INFRA-HA — Kubernetes PRIMARY orchestration path; the live HA authority.</td></tr>
+        <tr><td class="doc-td">Phase 0 Kubernetes Readiness Plan</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/Phase0KubernetesReadinessPlan') %]">/Documentation/Phase0KubernetesReadinessPlan</a></td>
+            <td class="doc-td">Prerequisites / readiness gate for the K8s move.</td></tr>
+        <tr><td class="doc-td">Production DB → Kubernetes Migration Plan</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN') %]">/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN</a></td>
+            <td class="doc-td">DB migration onto the K8s cluster.</td></tr>
+        <tr><td class="doc-td">K3s Production DB Migration Guide</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE') %]">/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE</a></td>
+            <td class="doc-td">Step-by-step K3s DB cutover.</td></tr>
+        <tr><td class="doc-td">Infrastructure Migration Amendment</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]">/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT</a></td>
+            <td class="doc-td">Corrections/amendments to the migration family.</td></tr>
+    </table>
+
+    <h3 class="doc-h3">C. Deployment &amp; secrets</h3>
+    <table class="doc-table">
+        <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
+        <tr><td class="doc-td">Canonical Deploy Workflow (production)</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">/Documentation/DEPLOY_WORKFLOW</a></td>
+            <td class="doc-td">Authoritative button map (updated 2026-08-23). Workstation Rebuild is local-only; production is a separate Pull &amp; Deploy.</td></tr>
+        <tr><td class="doc-td">Deploy Hardening &rarr; K8s Plan</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_HARDENING_K8S_PLAN') %]">/Documentation/DEPLOY_HARDENING_K8S_PLAN</a></td>
+            <td class="doc-td">DRAFT. Records 2026-08-23 script-level hardening plus the later false-success / streaming / volume-count defects.</td></tr>
+        <tr><td class="doc-td">Production Deployment Guide</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/ProductionDeployment') %]">/Documentation/ProductionDeployment</a></td>
+            <td class="doc-td">Operator-facing production deployment guide.</td></tr>
+        <tr><td class="doc-td">Docker Secrets / DB Config Fallback Debugging Plan</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/DockerSecretsFallbackDebuggingPlan') %]">/Documentation/DockerSecretsFallbackDebuggingPlan</a></td>
+            <td class="doc-td">How DB config / secrets resolve inside containers (docker-compose secret mounts, db_config.json).</td></tr>
+        <tr><td class="doc-td">Dev DB Isolation, Automated Backups &amp; Availability</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/dev_isolation_and_backups_plan') %]">/Documentation/dev_isolation_and_backups_plan</a></td>
+            <td class="doc-td">Throwaway dev DB per instance, scheduled backups, availability via the K3s path.</td></tr>
+    </table>
+
+    <h3 class="doc-h3">D. Diagnostics</h3>
+    <table class="doc-table">
+        <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
+        <tr><td class="doc-td">Docker Production Container Build Failure Diagnostics</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/docker_container_prod_build_failure_diagnostics') %]">/Documentation/docker_container_prod_build_failure_diagnostics</a></td>
+            <td class="doc-td">Why prod image builds fail and how to recover.</td></tr>
+        <tr><td class="doc-td">Docker Container Port 3000 Diagnostics</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/docker_container_port_3000_diagnostics') %]">/Documentation/docker_container_port_3000_diagnostics</a></td>
+            <td class="doc-td">Port-binding / conflict diagnostics for the app container.</td></tr>
+    </table>
+
+    <h3 class="doc-h3">E. Dev environment &amp; agents</h3>
+    <table class="doc-table">
+        <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
+        <tr><td class="doc-td">Docker + PyCharm Setup Guide</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/docker_pycharm_setup_guide') %]">/Documentation/docker_pycharm_setup_guide</a></td>
+            <td class="doc-td">Dev container setup with PyCharm.</td></tr>
+        <tr><td class="doc-td">Docker Agent: Role &amp; Configuration</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/docker-agent-guide') %]">/Documentation/docker-agent-guide</a></td>
+            <td class="doc-td">Zencoder Docker agent spec / IDE workflow.</td></tr>
+    </table>
+
+    <h3 class="doc-h3">F. Cross-cutting (overlaps)</h3>
+    <table class="doc-table">
+        <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
+        <tr><td class="doc-td">CSC Gateway Plan</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td>
+            <td class="doc-td">Edge / ingress — relevant where containers are exposed.</td></tr>
+        <tr><td class="doc-td">Credentials Audit &amp; Unified Management Plan</td>
+            <td class="doc-td"><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">/Documentation/CREDENTIALS_AUDIT_AND_PLAN</a></td>
+            <td class="doc-td">Includes #239 IMGSEC (Docker image credential leak remediation).</td></tr>
+    </table>
+    <p class="doc-backtop"><a href="#index">&#8593; Back to Top</a></p>
+</div>
+
+<div id="sequencing">
+    <h2 class="doc-h2">2. Sequencing at a glance</h2>
+    <div class="doc-codebox"><pre>
+STRATEGY  DOCKER_KUBERNETES_MIGRATION_STRATEGY ─┐
+                                                │
+READINESS Phase0KubernetesReadinessPlan ────────┤
+                                                │
+ORCH      K3S_APP_HA_PLAN (#202) ───────────────┤  (Kubernetes PRIMARY)
+           ├─ PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN
+           ├─ K3S_PRODUCTION_MIGRATION_GUIDE
+           └─ COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT
+                                                │
+DEPLOY     DEPLOY_WORKFLOW ─────────────────────┤  (authoritative; supersedes REBUILD_AND_DEPLOY_INSTRUCTIONS)
+           ProductionDeployment
+           DockerSecretsFallbackDebuggingPlan
+           dev_isolation_and_backups_plan
+                                                │
+OPS        docker_container_prod_build_failure_diagnostics
+           docker_container_port_3000_diagnostics
+           docker_pycharm_setup_guide
+           docker-agent-guide
+                                                │
+EDGE       GatewayPlan · CREDENTIALS_AUDIT_AND_PLAN (#239 IMGSEC)
+</pre></div>
+    <p class="doc-muted">Note: this is a <em>view</em> of the work, not a fresh scheduling wave. The migration family is large and partly
+    superseded by the canonical Deploy Workflow — confirm which are still live before investing.</p>
+    <p class="doc-backtop"><a href="#sequencing">&#8593; Back to Top</a></p>
+</div>
+
+<div id="overlaps">
+    <h2 class="doc-h2">3. Overlaps &amp; supersession</h2>
+    <ul>
+        <li><strong>K3S_APP_HA_PLAN (#202 INFRA-HA)</strong> is the live HA authority. Where its orchestration steps
+            conflict with <code>DOCKER_KUBERNETES_MIGRATION_STRATEGY</code>, follow K3S_APP_HA_PLAN.</li>
+        <li><strong>DEPLOY_WORKFLOW</strong> supersedes <code>REBUILD_AND_DEPLOY_INSTRUCTIONS</code> (the latter is
+            marked superseded on disk — not linked as active above).</li>
+        <li><strong>CREDENTIALS_AUDIT_AND_PLAN</strong> carries <strong>#239 IMGSEC</strong> (Docker image credential leak
+            remediation) — coordinate Docker secret work there, not in a standalone doc.</li>
+        <li><strong>GatewayPlan</strong> overlaps where containers are edge-exposed; keep ingress decisions consistent with
+            K3S_APP_HA_PLAN's "OPNsense = edge only if configured" stance.</li>
+    </ul>
+    <p class="doc-backtop"><a href="#overlaps">&#8593; Back to Top</a></p>
+</div>
+
+<div id="decisions">
+    <h2 class="doc-h2">4. Open decisions</h2>
+    <table class="doc-table">
+        <tr><th class="doc-th">#</th><th class="doc-th">Decision</th><th class="doc-th">Resolution</th></tr>
+        <tr><td class="doc-td">D1</td><td class="doc-td">Should this coordinator replace the Docker bullets already in the app-wide MASTER_PLAN (W5.4)?</td>
+            <td class="doc-td"><span style="color: var(--warning-color);">DEFERRED</span> — both link the same docs today; collapse W5.4's Docker lines into this coordinator once users confirm navigation works.</td></tr>
+        <tr><td class="doc-td">D2</td><td class="doc-td">Recurring re-audit todo for this coordinator (RULE P2)?</td>
+            <td class="doc-td"><span style="color: var(--warning-color);">DEFERRED</span> — to be created under #271 once the doc renders (api/projects was timing out at authoring time).</td></tr>
+    </table>
+    <p class="doc-backtop"><a href="#decisions">&#8593; Back to Top</a></p>
+</div>
+
+<div id="track">
+    <h2 class="doc-h2">5. Project tracking</h2>
+    <div class="doc-success">
+        <p class="doc-body">This coordinator belongs to <strong>project #271 (DOCKER-SYS)</strong>. Navigate the tracking rows directly:</p>
+        <ul>
+            <li><a href="[% c.uri_for('/project/details') %]?project_id=271">Open project #271 (DOCKER-SYS)</a></li>
+            <li><a href="[% c.uri_for('/todo') %]?project_id=271">View DOCKER-SYS todos</a></li>
+            <li><a href="[% c.uri_for('/project') %]">All projects</a></li>
+        </ul>
+    </div>
+    <p class="doc-backtop"><a href="#track">&#8593; Back to Top</a></p>
+</div>
+
+<div id="see-also">
+    <h2 class="doc-h2">6. See also</h2>
+    <ul>
+        <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan (app-wide coordinator)</a></li>
+        <li><a href="[% c.uri_for('/Documentation/K3S_APP_HA_PLAN') %]">K3S_APP_HA_PLAN</a> — the live HA authority this coordinator defers to.</li>
+        <li><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">DEPLOY_WORKFLOW</a> — authoritative production deploy.</li>
+    </ul>
+    <p class="doc-backtop"><a href="#see-also">&#8593; Back to Top</a></p>
+</div>
+
+<div class="doc-footer">
+    <p class="doc-muted">Docker &amp; Kubernetes Plans — Coordinator · project #271 (DOCKER-SYS) · last updated 2026-08-23 ·
+    routes verified against <code>Documentation.pm</code>.</p>
+</div>
