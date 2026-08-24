@@ -7,6 +7,7 @@ use Try::Tiny;
 use JSON qw(encode_json decode_json);
 
 use Comserv::Util::Logging;
+use Comserv::Util::ModelCatalog;
 
 extends 'Catalyst::Model';
 
@@ -583,7 +584,7 @@ sub get_available_models {
     # is role-filtered without each list re-implementing it. Tiers:
     #   guest  : free OpenRouter + Ollama local only (no paid, no Grok)
     #   member : free + cheap + mid (premium > $5 / 1M excluded, no Grok)
-    #   priv   : everything (admin / developer / editor)
+    #   priv   : everything (admin / developer)
     @all = $self->_role_filter_models($c, \@all);
 
     return \@all;
@@ -626,18 +627,7 @@ sub _role_filter_models {
 
 sub _role_tier {
     my ($self, $c) = @_;
-    my $roles = eval { $c->session->{roles} } || [];
-    $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
-    my $is_guest = 1;
-    my $is_priv  = 0;
-    for my $r (@$roles) {
-        next unless defined $r && length $r;
-        $is_guest = 0 if $r =~ /^(admin|developer|editor|member|user)$/i;
-        $is_priv  = 1 if $r =~ /^(admin|developer|editor)$/i;
-    }
-    return 'priv'  if $is_priv;
-    return 'guest' if $is_guest;
-    return 'member';
+    return Comserv::Util::ModelCatalog->_role_tier($c);
 }
 
 # -------------------------------------------------------------------
