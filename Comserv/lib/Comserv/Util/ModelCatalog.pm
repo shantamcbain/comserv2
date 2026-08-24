@@ -36,7 +36,7 @@ our $CACHE_JSON;
 our $CACHE_ARR;
 our $CACHE_AT = 0;
 our $TTL      = 600;   # seconds; providers change rarely
-our $CACHE_GEN = 3;    # bump when catalog shape/providers change
+our $CACHE_GEN = 5;    # bump when catalog shape/providers/guest-default change
 our $CACHE_GEN_LOADED = 0;
 
 sub _expired {
@@ -50,8 +50,9 @@ sub _expired {
 
 Returns an arrayref of model hashrefs, ROLE-FILTERED. Guests/anonymous users
 see only the free tier (free OpenRouter + Ollama local); logged-in non-privileged
-members see free + cheap + mid; privileged users (admin/developer/editor) see
-everything. Never dies; returns [] on total failure. The unfiltered list is the
+members see free + cheap + mid; privileged users (admin/developer) see
+everything. Editors share the member catalog (they do not get the model picker).
+Never dies; returns [] on total failure. The unfiltered list is the
 process cache; filtering is cheap and done per request so each role sees its own
 shortlist (AIMPS Phase 3 — role-scoped shortlists).
 
@@ -78,8 +79,49 @@ sub catalog_json {
 }
 
 # Resolve the caller's role tier from the session. Cached per call (cheap).
+# Filter a RAW Router catalog (array of {provider,name,...}) down to what a
+# given role tier may see. Used by endpoints that hand the raw catalog to the
+# client (/ai2/providers, /ai) so guests never receive the full model list.
+# Guest  : free OpenRouter + Ollama local (no paid, no Grok/SuperGrok).
+# Member : free + cheap + mid (omit premium > $5/1M, omit Grok/SuperGrok).
+# Priv   : everything.
+sub filter_catalog_for_role {
+    my ($class, $raw, $tier) = @_;
+    return [] unless $raw && ref($raw) eq 'ARRAY';
+    return [ @$raw ] if $tier eq 'priv';
+    my @out;
+    for my $m (@$raw) {
+        next unless $m && ref($m) eq 'HASH';
+        my $svc  = $m->{provider} || '';
+        my $name = $m->{name} // $m->{id} // '';
+        my $free = $m->{free} || ( $name =~ /:free$/ ) ? 1 : 0;
+        my $local = $m->{local} || ( $svc eq 'ollama' ) ? 1 : 0;
+        if ($tier eq 'guest') {
+            push @out, $m if $free || $local;
+        } else { # member
+            next if $svc eq 'grok' || $svc eq 'supergrok';
+            my $pp = ($m->{price_prompt}     // 0) + 0;
+            my $pc = ($m->{price_completion} // 0) + 0;
+            my $max = ( $pp > $pc ) ? $pp : $pc;
+            next if $max > 5;
+            push @out, $m;
+        }
+    }
+    return \@out;
+}
+
 sub _role_tier {
     my ($class, $c) = @_;
+    # Site-admin flag is set in Root->auto from UserSiteRole even when the
+    # session roles list is still "user". Treat that as priv so admins keep
+    # the full model list.
+    my $flag_admin = 0;
+    eval {
+        $flag_admin = 1 if $c->session && $c->session->{is_admin};
+        $flag_admin = 1 if $c->stash && $c->stash->{is_admin};
+    };
+    return 'priv' if $flag_admin;
+
     my $roles = eval { $c->session->{roles} } || [];
     $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
     my $is_guest = 1;
@@ -87,11 +129,99 @@ sub _role_tier {
     for my $r (@$roles) {
         next unless defined $r && length $r;
         $is_guest = 0 if $r =~ /^(admin|developer|editor|member|user)$/i;
-        $is_priv  = 1 if $r =~ /^(admin|developer|editor)$/i;
+        # Editor shares the member catalog + picker rules (not full priv).
+        $is_priv  = 1 if $r =~ /^(admin|developer)$/i;
     }
     return 'priv'  if $is_priv;
     return 'guest' if $is_guest;
     return 'member';
+}
+
+# Display rank used by the agent picker and the model-field visibility:
+#   0 guest          — AI Assistant + Support Specialist; no model field
+#   1 member/editor  — guest agents + Encyclopedia Expert; no model field
+#   2 admin/developer — all agents and all models
+sub display_rank {
+    my ($class, $c) = @_;
+    my $tier = $class->_role_tier($c);
+    return 2 if $tier eq 'priv';
+    return 1 if $tier eq 'member';
+    return 0;
+}
+
+sub can_select_model {
+    my ($class, $c) = @_;
+    return $class->display_rank($c) >= 2 ? 1 : 0;
+}
+
+sub is_guest_tier {
+    my ($class, $c) = @_;
+    return $class->_role_tier($c) eq 'guest' ? 1 : 0;
+}
+
+sub _display_rank_for {
+    my ($class, $name) = @_;
+    my $n = lc($name // '');
+    return 2 if $n =~ /^(admin|developer)$/;
+    return 1 if $n =~ /^(member|user|editor)$/;
+    return 0;
+}
+
+# Load root/static/config/agents.json once per process.
+{
+    my $_AGENTS;
+    sub _agents_config {
+        my ($class, $c) = @_;
+        return $_AGENTS if $_AGENTS;
+        my $path = eval { $c->path_to('root', 'static', 'config', 'agents.json') };
+        return {} unless $path && -f $path;
+        my $raw = do {
+            open my $fh, '<:encoding(UTF-8)', $path or return {};
+            local $/;
+            <$fh>;
+        };
+        my $data = eval { JSON->new->decode($raw) } || {};
+        if ($@) {
+            eval {
+                require Comserv::Util::Logging;
+                Comserv::Util::Logging->instance->log_with_details(
+                    $c, 'error', __FILE__, __LINE__,
+                    'agents_config', "Failed to parse agents.json: $@");
+            };
+            return {};
+        }
+        $_AGENTS = (ref($data) eq 'HASH' && $data->{agents}) ? $data->{agents} : {};
+        return $_AGENTS;
+    }
+}
+
+# True when this session may use $agent_id. Unknown ids are treated as
+# developer-only so a crafted agent_id cannot escalate.
+sub agent_allowed {
+    my ($class, $c, $agent_id) = @_;
+    $agent_id = lc($agent_id // '');
+    return 1 if $agent_id eq '' || $agent_id eq 'auto' || $agent_id eq 'general';
+    my $cfg = $class->_agents_config($c);
+    my $agent = ($cfg && ref($cfg) eq 'HASH') ? $cfg->{$agent_id} : undef;
+    unless ($agent && ref($agent) eq 'HASH') {
+        return $class->display_rank($c) >= 2 ? 1 : 0;
+    }
+    my $min = $agent->{min_role};
+    if (!defined $min || !length $min) {
+        $min = (exists $agent->{public_access} && !$agent->{public_access})
+            ? 'developer' : 'guest';
+    }
+    return $class->display_rank($c) >= $class->_display_rank_for($min) ? 1 : 0;
+}
+
+# catalog_json filtered to the caller's role tier — used by endpoints that
+# serialize the raw Router catalog to the client (so guests get only their
+# tier, not the full list).
+sub json_for_role {
+    my ($class, $c) = @_;
+    $class->_build($c) if $class->_expired;
+    my $flat = $class->_filter_for_role($CACHE_ARR || [], $class->_role_tier($c));
+    return try { JSON->new->utf8->canonical->encode($flat) } catch { '[]' };
 }
 
 # Keep only the models a given tier may see.
@@ -137,14 +267,17 @@ Returns a "provider|model" string, or '' when the catalog is empty.
 
 =cut
 
-# Preference order for the free guest default: small, fast, general-purpose.
+# Guest / anonymous default: a LIVE OpenRouter :free instruction model
+# good for navigation, helpdesk, and general questions. Verified present
+# on openrouter.ai/api/v1/models (2026-08-23). Never default guests to
+# Ollama — that burns workstation GPU. First entry is the startup default.
 our @FREE_PREFERENCE = (
-    'openrouter|stealth/ox-alpha',   # zero-priced; user-designated default
-    'openrouter|nvidia/nemotron-3-nano-30b-a3b:free',
-    'openrouter|google/gemma-4-31b-it:free',
+    'openrouter|google/gemma-4-31b-it:free',           # 31B IT, 256k ctx, free
     'openrouter|google/gemma-4-26b-a4b-it:free',
+    'openrouter|nvidia/nemotron-3-nano-30b-a3b:free',
     'openrouter|nvidia/nemotron-nano-9b-v2:free',
-    'openrouter|openai/gpt-oss-20b:free',
+    'openrouter|nvidia/nemotron-3.5-lightning:free',
+    'openrouter|stealth/ox-alpha',                     # 0/0 priced, no :free suffix
 );
 
 our $CODING_DEFAULT = 'openrouter|tencent/hy3';
@@ -157,21 +290,31 @@ sub default_for {
 
     my %have = map { $_->{value} => 1 } @$cat;
 
+    my $tier = $class->_role_tier($c);
+
     # Coding surfaces get the designated coding model when the user may use it.
     if ($page eq 'editor' && $have{$CODING_DEFAULT} && $class->_is_priv($c)) {
         return $CODING_DEFAULT;
     }
 
-    # Everyone else: first available free model, in preference order.
+    # Guests and members: first available FREE OpenRouter model. Never Ollama —
+    # local models consume the workstation GPU (user: guest default must be a
+    # free, available OpenRouter agent for nav / helpdesk / general questions).
     for my $v (@FREE_PREFERENCE) {
         return $v if $have{$v};
     }
-    # Any other free model.
+    for my $m (@$cat) {
+        next if $m->{local} || ($m->{provider} || '') eq 'ollama';
+        return $m->{value} if $m->{free};
+    }
+    if ($tier eq 'guest' || $tier eq 'member') {
+        return $FREE_PREFERENCE[0];
+    }
+
+    # Privileged: any remaining free, then coding default, then local.
     for my $m (@$cat) {
         return $m->{value} if $m->{free};
     }
-    # No free model at all — privileged users may fall through to the coding
-    # default; otherwise take the first local model rather than billing anyone.
     return $CODING_DEFAULT if $have{$CODING_DEFAULT} && $class->_is_priv($c);
     for my $m (@$cat) {
         return $m->{value} if $m->{local};
@@ -183,7 +326,7 @@ sub _is_priv {
     my ($class, $c) = @_;
     my $roles = eval { $c->session->{roles} } || [];
     $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
-    return ( grep { $_ =~ /^(admin|developer|editor)$/i } @$roles ) ? 1 : 0;
+    return ( grep { $_ =~ /^(admin|developer)$/i } @$roles ) ? 1 : 0;
 }
 
 =head2 invalidate
