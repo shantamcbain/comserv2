@@ -222,7 +222,9 @@ sub auto :Private {
 
     # Skip everything for health checks and monitoring endpoints immediately
     # This prevents creating session files for Docker health checks
-    if ($c->req->path =~ m{^/health(?:/|$)}) {
+    # Catalyst req->path has NO leading slash (cf. admin/hardware_monitor above).
+    # A '^/health' match never fired, so Docker healthchecks ran the rest of auto().
+    if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return 1;
     }
 
@@ -1210,7 +1212,10 @@ sub auto :Private {
         # Role + page context used by the .tt to SORT/order the dropdown.
         my $roles = $c->session->{roles} || [];
         $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
-        $c->stash->{ai_is_priv} = (grep { $_ =~ /^(admin|developer|editor)$/i } @$roles) ? 1 : 0;
+        $c->stash->{ai_is_priv} = Comserv::Util::ModelCatalog->can_select_model($c) ? 1 : 0;
+        $c->stash->{ai_role_tier} = Comserv::Util::ModelCatalog->_role_tier($c);
+        $c->stash->{ai_is_guest} = Comserv::Util::ModelCatalog->is_guest_tier($c) ? 1 : 0;
+        $c->stash->{ai_can_select_model} = $c->stash->{ai_is_priv};
         $c->stash->{ai_chat_page} ||= $c->request->path;
         # Pre-selected model. Guests/members get a FREE OpenRouter model (no cost,
         # and no load on the already-saturated workstation GPU); privileged users
@@ -2477,7 +2482,7 @@ sub begin :Private {
     
     # Skip all site/session setup for health check endpoints.
     # Health checks run every 30s from Docker — no DB, no session, no logging needed.
-    if ($c->req->path =~ m{^/health(?:/|$)}) {
+    if ($c->req->path =~ m{^/?health(?:/|$)}) {
         return;
     }
 
