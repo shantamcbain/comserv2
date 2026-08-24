@@ -80,30 +80,45 @@ identity pulled from <code>version.json</code>:</p>
 </ul>
 <p>This single check is what catches the "old server" problem before customers hit it.</p>
 
-<h2 id="current_state">Current operational state (2026-08-15 fixes)</h2>
-<p>All deploy paths now flow through one canonical engine — <code>Comserv/script/deploy.sh::canonical_deploy</code> —
-invoked by the dashboard <em>Rebuild</em> / <em>Pull &amp; Deploy</em> buttons (via <code>lib/Comserv/Controller/Admin/Docker.pm</code>
-&rarr; <code>deploy.sh --deploy-to-node 192.168.1.126</code>). The sequence is: <strong>build on the workstation &rarr; push to
-Docker Hub &rarr; rename live container to a <code>bk-</code> backup &rarr; pull the exact digest on production1 &rarr;
-<code>compose up -d --no-build --force-recreate</code> &rarr; health gate (rollback on failure)</strong>. Key invariants now enforced:</p>
+<h2 id="current_state">Current operational state (2026-08-23)</h2>
+<p>All dashboard buttons run <code>Comserv/script/deploy.sh</code> from the workstation app.
+They do <strong>not</strong> SSH to the workstation (that hop was a 2026-08-23 failure).
+They do <strong>not</strong> all do the same thing. The button you click is the contract:</p>
+<table class="diagnostic-table">
+    <tbody>
+        <tr><th>UI action</th><th>What actually runs</th><th>Production1</th></tr>
+        <tr>
+            <td>Rebuild, target = workstation</td>
+            <td><code>deploy.sh --local-rebuild</code>: build on this machine, rename live to <code>bk-*</code>, start the new local image. <strong>No push. No remote hop.</strong></td>
+            <td>Not touched. Log must say &quot;Production was NOT updated.&quot;</td>
+        </tr>
+        <tr>
+            <td>Build &amp; Push</td>
+            <td><code>deploy.sh --build-push</code>: build + push <code>shantamcsbain/comserv-web-prod:latest</code>. Running container is not started or replaced.</td>
+            <td>Not touched. Pushing <code>:latest</code> does not move prod.</td>
+        </tr>
+        <tr>
+            <td>Pull &amp; Deploy, target = Production 1</td>
+            <td><code>deploy.sh --pull-deploy 192.168.1.126</code>: rename live on .126, <code>docker pull</code>, <code>docker run</code> the image (no compose, no host source tree), health gate, rollback on fail.</td>
+            <td>This is the only step that updates prod.</td>
+        </tr>
+        <tr>
+            <td>Rebuild, target = Production 1</td>
+            <td><code>deploy.sh --deploy-to-node 192.168.1.126</code>: workstation build+push, then the production pull-run above.</td>
+            <td>Updated only if the remote pull-run succeeds.</td>
+        </tr>
+    </tbody>
+</table>
+<p>Key invariants:</p>
 <ul>
-    <li><strong>Never build on production1.</strong> <code>canonical_deploy</code> runs <code>docker compose build</code>/<code>push</code> only when
-        <code>TARGET_HOST == local</code>. Remote targets skip straight to pull+run; the workstation already built and pushed. (Production1 has no source tree to build from.)</li>
-    <li><strong>Compose is merged.</strong> The script invokes <code>docker compose -f docker-compose.yml -f docker-compose.prod.yml</code>
-        so the <code>comserv2_*</code> volume declarations in the base file are available — running <code>-f docker-compose.prod.yml</code>
-        alone aborts with <code>undefined volume comserv2_cache</code>.</li>
-    <li><strong>SSH to production1 is authenticated.</strong> <code>load_ssh_password()</code> exports <code>SSHPASS</code> from
-        <code>~/.comserv/secrets/ssh_credentials.json</code> before the remote <code>sshpass -e</code> hop, so the pull step can reach 192.168.1.126.</li>
-    <li><strong>Static assets come from the image.</strong> <code>docker-compose.prod.yml</code> does NOT bind a host <code>/root/static</code>
-        over the container; CSS/JS serve from the baked <code>/opt/comserv/root/static</code> tree. A stale container with the old
-        empty-bind still shows no CSS until it is recreated from the fixed image.</li>
-    <li><strong>No auto-commit.</strong> The script no longer git-commits; all code ships inside the image.</li>
+    <li><strong>Never build on production1.</strong> <code>is_production_host()</code> refuses compose build there.</li>
+    <li><strong>Never claim multi-node success after a local rebuild.</strong> That lie (2026-08-23) made a workstation Rebuild look like prod had been pulled. It had not.</li>
+    <li><strong>Streaming:</strong> the child writes live to <code>/tmp/comserv_deploy.log</code> via <code>script -f -a</code>. The Docker page paints the whole log every 1.5s. Hard-refresh the page so the JS loads.</li>
+    <li><strong>Health:</strong> <code>/health</code> is a cheap JSON liveness check. Catalyst path has no leading slash; <code>Root.pm</code> skips <code>auto</code>/<code>begin</code> on <code>health</code>. Compose <code>start_period</code> is 60s (not 10s).</li>
+    <li><strong>Volumes:</strong> live set is the 12 <code>comserv2_*</code> names (including <code>theme_config</code>/<code>theme_css</code> and <code>nfs_data</code>). The Volumes panel lists those exact names only. Prefixed leftovers were removed 2026-08-23.</li>
+    <li><strong>No auto-commit.</strong> Code ships inside the image.</li>
 </ul>
-<p><strong>Single-click path that works today:</strong> from the workstation <code>/admin/docker-containers</code> page, use the
-<em>Rebuild</em> control (mode <code>pull-deploy</code> or Full Rebuild). It builds on the workstation, pushes, then pulls+recreates
-on production1. The first full build (no cache) can take 20–40 min — the dashboard poll timeout is 60 min, and progress streams to
-<code>/tmp/comserv_deploy.log</code> on the workstation even if the UI poll is briefly slow.</p>
-<p><em>See <a href="/Documentation/changelog">Changelog (2026-08-15: Dashboard pull/deploy to prod now works end-to-end)</a> for the full root-cause list.</em></p>
+<p><em>See changelog entries <code>2026-08-23-deploy-pull-only-image-css</code> and <code>2026-08-23-workstation-rebuild-honest</code>.</em></p>
 
 <h2 id="trouble">Troubleshooting</h2>
 <table class="diagnostic-table">
@@ -126,9 +141,17 @@ on production1. The first full build (no cache) can take 20–40 min — the das
         <tr><td><strong>Production site has no CSS / unstyled</strong></td>
             <td>The running container is stale (old empty <code>/root/static</code> bind). Pull + recreate from the fixed image
                 (Step 3 / Rebuild) so the baked <code>root/static/css</code> tree is used. Do not bind a host <code>/root/static</code>.</td></tr>
+        <tr><td><strong>Rebuild said SUCCESS but production1 is still the old image</strong></td>
+            <td>Target was workstation. Local rebuild does not pull prod. Use Target = Production 1 and Pull &amp; Deploy. Ignore any old log line that said &quot;Multi-node deploy complete&quot;.</td></tr>
+        <tr><td><strong>No streaming / window frozen for minutes</strong></td>
+            <td>Hard-refresh the Docker page. Output is <code>/tmp/comserv_deploy.log</code>; the poller paints the full file. If :3001 is down (NetworkError), the poll cannot run — the build may still be writing the log.</td></tr>
+        <tr><td><strong>Volumes panel shows ~20 instead of ~12</strong></td>
+            <td>Old compose-prefixed leftovers. The panel now lists only exact <code>comserv2_*</code> names. Prefixed copies were removed 2026-08-23.</td></tr>
         <tr><td><strong>Deploy aborts with <code>command not found</code> / <code>... not found. Aborting.</code></strong></td>
             <td>Stale <code>deploy.sh</code> on the server. Ensure <code>/opt/comserv/Comserv/script/deploy.sh</code> (and
                 <code>/opt/comserv/Comserv/deploy.sh</code>) is the current copy; the dashboard self-updates it on each run.</td></tr>
+    </tbody>
+</table>
 
 <h2 id="future">Reserved / Future</h2>
 <p>The code retains an internal path that triggers a deploy from inside a production container (it SSHes back to
@@ -138,8 +161,9 @@ remotely from the Docker UI may become desirable. Until then, follow Steps 1–3
 
 <div style="margin-top: 40px; padding: 20px; background-color: var(--bg-secondary, #f5f5f5); border-radius: 4px;">
     <p style="font-size: 12px; color: var(--text-muted-color, #666);">
-        <strong>Document Version:</strong> 1.0<br>
+        <strong>Document Version:</strong> 1.1<br>
         <strong>Created:</strong> 2026-07-31<br>
+        <strong>Updated:</strong> 2026-08-23 — button map, honest logs, streaming, volumes<br>
         <strong>Status:</strong> Canonical — supersedes REBUILD_AND_DEPLOY_INSTRUCTIONS.tt
     </p>
 </div>

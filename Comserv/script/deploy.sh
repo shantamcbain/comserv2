@@ -113,6 +113,8 @@ sync_deploy_artifacts() {
 #   --deploy-only / DEPLOY_MODE=deploy-only : Deploy without build/push (pull + recreate)
 
 DEPLOY_MODE_DETECTED=""
+CLI_ARG1="${1:-}"
+CLI_ARG2="${2:-}"
 case "${1:-}" in
     --prod|prod)
         DEPLOY_MODE_DETECTED="prod"
@@ -122,6 +124,18 @@ case "${1:-}" in
         ;;
     --deploy-only|deploy-only)
         DEPLOY_MODE_DETECTED="deploy-only"
+        ;;
+    --deploy-to-node|deploy-to-node)
+        DEPLOY_MODE_DETECTED="deploy-to-node"
+        ;;
+    --pull-deploy|pull-deploy)
+        DEPLOY_MODE_DETECTED="pull-deploy"
+        ;;
+    --build-push|build-push)
+        DEPLOY_MODE_DETECTED="build-push"
+        ;;
+    --local-rebuild|local-rebuild)
+        DEPLOY_MODE_DETECTED="local-rebuild"
         ;;
 esac
 
@@ -167,6 +181,10 @@ if [ -n "$BASE_CAND" ] && [ "$BASE_CAND" != "$COMPOSE_FILE" ]; then
 else
     COMPOSE_ARGS="-f $COMPOSE_FILE"
 fi
+# The base compose file also defines web, web-dev, and web-staging. A bare
+# `compose up -d` on the merged prod files starts those on production and
+# steals :5000 from web-prod. Always name the prod service.
+PROD_UP_SERVICES="web-prod"
 [ -z "$COMPOSE_FILE" ] && COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.prod.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
 # Standard container name is "comserv2-web-prod" (matches comserv2-config-db,
@@ -602,12 +620,12 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             exit $?
             ;;
 
-        "deploy-to-node")
-            # Multi-host deploy: build+push once, then canonical_deploy to each node.
-            # Kept here so `deploy.sh --deploy-to-node 192.168.1.126` works too.
-            shift
-            canonical_deploy_to_nodes "$@"
-            exit $?
+        "deploy-to-node"|"pull-deploy"|"build-push"|"local-rebuild")
+            # Functions are defined below; late dispatch after canonical_deploy*.
+            ;;
+
+        "monitor"|"full"|"quick"|"pull_only"|"stop_all"|"git_pull"|"lib_sync"|"manual_server")
+            # These are handled by the existing non-interactive block below
             ;;
 
         "local")
@@ -636,14 +654,14 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             
             # Just pull and deploy - skip all build/push logic
             echo "Pulling latest image from Docker Hub..."
-            docker compose $COMPOSE_ARGS pull || echo "Pull failed!"
+            docker compose $COMPOSE_ARGS pull $PROD_UP_SERVICES || echo "Pull failed!"
             
             echo "Stopping old container..."
             docker stop "$CONTAINER" 2>/dev/null || true
             docker rm -f "$CONTAINER" 2>/dev/null || true
             
             echo "Starting new container..."
-            docker compose $COMPOSE_ARGS up -d --force-recreate
+            docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $PROD_UP_SERVICES
             
             echo "✅ Deploy-only complete"
             exit 0
@@ -663,24 +681,23 @@ fi
 # ════════════════════════════════════════════════════════════════════════════
 # canonical_deploy() — SINGLE SOURCE OF TRUTH for the deploy pipeline.
 #
-# EVERY entry point (deploy.sh CLI, deploy-to-node.sh, deploy-to-production1.sh,
-# and the dashboard Docker.pm buttons) MUST route through this function so the
-# result is IDENTICAL regardless of which "button" is pressed:
+# Workstation (target=local) ONLY:
+#    1. build from the working tree
+#    2. push :latest to the registry
 #
-#    1. clean build   (from working tree, no stale context)
-#    2. clean push    (one :latest to the registry — image is the unit)
-#    3. clean pull    (pull the EXACT pushed digest on the target)
-#    4. run --no-build (compose runs the pulled digest; no local rebuild)
-#    5. health gate    (curl /health; rollback on failure)
-#    6. post-deploy     (force DB menu + clear caches)
+# Production (any remote / .126) NEVER builds. There is no current source tree
+# on production. The image is the unit. Sequence on the target:
+#    1. rename the running web-prod container to bk-<name>-<ts> (still serving)
+#    2. docker pull the pushed image
+#    3. stop the renamed (backup) container
+#    4. start ONLY web-prod from the pulled image (--no-build --no-deps)
+#    5. wait until /health is ok
+#    6. if unhealthy: start the backup; notify admin via API
+#    7. if the API notify fails: email admin that the freshly renamed
+#       backup container is now running and they must investigate
 #
-# Key invariant: the RUN step uses `compose up -d --no-build` so it can NEVER
-# rebuild stale host code — it always executes the digest that was just pushed.
-# All paths also use the SAME compose file ($COMPOSE_FILE), which is the one
-# with the corrected static mount (no empty host /root/static shadowing CSS).
-#
-# Args: (target_host) (optional). Default: local build+push+run on this host.
-#       For remote, the function SSHes the same steps so the sequence is uniform.
+# NEVER `compose up -d` without the web-prod service name — the base compose
+# file also defines web/web-dev/web-staging.
 # ════════════════════════════════════════════════════════════════════════════
 # Load the production SSH password and export it so `sshpass -e` has a password
 # on EVERY hop. The password set by the Catalyst caller (Docker.pm) lives in the
@@ -706,6 +723,150 @@ load_ssh_password() {
     return 1
 }
 
+# Notify admin that a deploy rolled back to the renamed backup container.
+# Primary: POST /api/todo/create on the workstation app (LAN bypass).
+# Fallback: local `mail` if the API is unreachable.
+ADMIN_API_URL="${ADMIN_API_URL:-http://192.168.1.199:3001}"
+
+notify_admin_deploy() {
+    local subject="${1:-Production deploy rollback}"
+    local body="${2:-Investigate production deploy rollback.}"
+    local today due payload http
+    today=$(date +%Y-%m-%d)
+    due=$(date -d '+2 days' +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
+    payload=$(SUBJECT="$subject" BODY="$body" TODAY="$today" DUE="$due" perl -MJSON::PP -e 'print encode_json({subject=>$ENV{SUBJECT},description=>$ENV{BODY},start_date=>$ENV{TODAY},due_date=>$ENV{DUE},priority=>"High",status=>"Not-Started",assigned_to=>"Shanta"})')
+    http=$(curl -sS -o /tmp/comserv_deploy_notify.out -w '%{http_code}' --max-time 12 \
+        -H 'Content-Type: application/json' -H 'X-Sitename: CSC' \
+        -d "$payload" "${ADMIN_API_URL}/api/todo/create" 2>/tmp/comserv_deploy_notify.err || echo 000)
+    if [ "$http" = "200" ] || [ "$http" = "201" ]; then
+        echo "✅ Admin API notified (http=$http)"
+        return 0
+    fi
+    echo "⚠ Admin API notify failed (http=$http) — emailing $EMAIL"
+    if command -v mail >/dev/null 2>&1; then
+        echo -e "$body" | mail -s "$subject" "$EMAIL" && return 0
+    fi
+    echo "⚠ mail also unavailable; notify dropped"
+    return 1
+}
+
+# True if this machine is production1 — must NEVER docker-build here.
+is_production_host() {
+    local hn ip
+    hn=$(hostname 2>/dev/null || true)
+    ip=$(hostname -I 2>/dev/null || true)
+    echo "$hn $ip" | grep -Eqi 'comservproduction1|192\.168\.1\.126'
+}
+
+# Start comserv2-web-prod from a PULLED image. No compose files, no host git
+# tree, no /opt/comserv/Comserv. Other servers do not have that path.
+# CSS/JS come from the image. Only theme override volumes are mounted over
+# the two mutable static subdirs; empty volumes are seeded from the image
+# so they cannot hide baked CSS.
+start_prod_container_from_image() {
+    local img="${1:-$IMAGE}"
+    local name="${2:-$CONTAINER}"
+    local secrets ident
+    secrets="${COMSERV_SECRETS_DIR:-}"
+    # Prefer a secrets dir that actually has dbi/*.json. On the workstation
+    # /home/ubuntu/.comserv/secrets often exists empty (2026-08-23: that empty
+    # bind produced Application Initialization Error / RemoteDB MISSING).
+    _secrets_has_dbi() { [ -d "$1/dbi" ] && [ "$(ls -A "$1/dbi" 2>/dev/null | wc -l)" -gt 0 ]; }
+    if [ -z "$secrets" ] || ! _secrets_has_dbi "$secrets"; then
+        if _secrets_has_dbi "$HOME/.comserv/secrets"; then
+            secrets="$HOME/.comserv/secrets"
+        elif _secrets_has_dbi /home/shanta/.comserv/secrets; then
+            secrets="/home/shanta/.comserv/secrets"
+        elif _secrets_has_dbi /home/ubuntu/.comserv/secrets; then
+            secrets="/home/ubuntu/.comserv/secrets"
+        elif [ -d /opt/comserv/secrets ]; then
+            secrets="/opt/comserv/secrets"
+        fi
+    fi
+    ident="${SYSTEM_IDENTIFIER:-production1}"
+    echo "    secrets dir: ${secrets:-NONE}"
+
+    docker network inspect comserv_default >/dev/null 2>&1 \
+        || docker network create comserv_default >/dev/null
+
+    local v
+    for v in comserv2_cache comserv2_logs comserv2_nfs_data comserv2_sessions \
+             comserv2_temp comserv2_themes comserv2_whisper_venv comserv2_cpan_cache \
+             comserv2_theme_config comserv2_theme_css; do
+        docker volume create "$v" >/dev/null 2>&1 || true
+    done
+
+    # Seed override volumes FROM THE IMAGE if they are empty (volume-shadow trap).
+    docker run --rm --entrypoint sh \
+        -v comserv2_theme_css:/dest "$img" \
+        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/css/themes/. /dest/ 2>/dev/null || true; fi'
+    docker run --rm --entrypoint sh \
+        -v comserv2_theme_config:/dest "$img" \
+        -c 'if [ -z "$(ls -A /dest 2>/dev/null)" ]; then cp -a /opt/comserv/root/static/config/. /dest/ 2>/dev/null || true; fi'
+
+    # Seed DB connection secrets (K8s-secret style) into the secrets volume so
+    # RemoteDB.pm finds them. Source = the secure store on this host (same place
+    # ssh_credentials.json lives). NEVER a file in the repo, never committed.
+    # The app reads /home/comserv/.comserv/secrets/dbi/*.json at runtime.
+    local dbi_src=""
+    [ -d "$secrets/dbi" ] && dbi_src="$secrets/dbi"
+    [ -z "$dbi_src" ] && [ -d "$HOME/.comserv/secrets/dbi" ] && dbi_src="$HOME/.comserv/secrets/dbi"
+    if [ -n "$dbi_src" ] && [ "$(ls -A "$dbi_src" 2>/dev/null | wc -l)" -gt 0 ]; then
+        # Copy via a source bind. Do not interpolate a host path into the
+        # container command — that path does not exist inside the image.
+        docker run --rm --entrypoint sh \
+            -v "$dbi_src:/src:ro" \
+            -v "$secrets:/dest" "$img" \
+            -c 'mkdir -p /dest/dbi && cp -a /src/. /dest/dbi/ || true' \
+            || echo "⚠ secrets seed into $secrets failed (will still bind-mount it)"
+    fi
+
+    local extra=()
+    if [ -d /root/LegacyStaticPages ] && [ "$(ls -A /root/LegacyStaticPages 2>/dev/null | wc -l)" -gt 0 ]; then
+        extra+=(-v /root/LegacyStaticPages:/opt/comserv/root/LegacyStaticPages:ro)
+    fi
+    # Never bind-mount /root/static or a host lib/ tree. Those hide image CSS/code.
+
+    docker run -d \
+        --name "$name" \
+        --restart unless-stopped \
+        --network comserv_default \
+        -p 5000:5000 \
+        --log-driver json-file --log-opt max-size=20m --log-opt max-file=5 \
+        -e ENVIRONMENT=production \
+        -e PORT=5000 \
+        -e CATALYST_ENV=production \
+        -e CATALYST_DEBUG=0 \
+        -e WEB_PORT=5000 \
+        -e TZ=UTC \
+        -e COMSERV_NO_HEALTH_LOG=1 \
+        -e NFS_DATA_PATH=/data/nfs \
+        -e COMSERV_LOG_DIR=/opt/comserv/root/log \
+        -e DISABLE_FILE_LOGGING=1 \
+        -e COMSERV_LOG_MIN_LEVEL=WARN \
+        -e DB_LOG_MIN_LEVEL=WARN \
+        -e COMSERV_SESSION_DIR=/tmp/comserv/session \
+        -e COMSERV_SESSION_COOKIE=comserv_session \
+        -e SYSTEM_IDENTIFIER="$ident" \
+        -e RUNNING_IN_DOCKER=docker \
+        -v "$secrets:/home/comserv/.comserv/secrets:ro" \
+        -v comserv2_cache:/cache \
+        -v comserv2_logs:/opt/comserv/root/log \
+        -v comserv2_nfs_data:/data/nfs \
+        -v comserv2_sessions:/tmp/comserv/session \
+        -v comserv2_cache:/tmp/comserv/cache \
+        -v comserv2_temp:/tmp/comserv/temp \
+        -v comserv2_themes:/opt/comserv/root/themes \
+        -v comserv2_theme_config:/opt/comserv/root/static/config \
+        -v comserv2_theme_css:/opt/comserv/root/static/css/themes \
+        -v comserv2_whisper_venv:/opt/comserv/whisper_venv \
+        -v comserv2_cpan_cache:/root/.cpan \
+        "${extra[@]}" \
+        --health-cmd 'curl -fs --max-time 5 http://127.0.0.1:5000/health || exit 1' \
+        --health-interval 30s --health-timeout 8s --health-retries 3 --health-start-period 60s \
+        "$img"
+}
+
 canonical_deploy() {
     local TARGET_HOST="${1:-local}"
     local SVC="web-prod"
@@ -728,17 +889,21 @@ canonical_deploy() {
 
     echo "═══════════════════════════════════════════════════════════════════"
     echo " CANONICAL DEPLOY — target=$TARGET_HOST  compose=$COMPOSE_FILE"
-    echo " sequence: build -> push -> pull -> run(--no-build) -> health -> post"
+    if [ -n "$REMOTE_SSH" ]; then
+        echo " sequence: rename-to-backup -> pull -> stop backup -> start web-prod -> health -> rollback/notify"
+    else
+        echo " sequence: build -> push (workstation only; never on production)"
+    fi
     echo "═══════════════════════════════════════════════════════════════════"
 
-    # ── 1. clean build (local working tree) ──
-    # Only build when deploying to the LOCAL host. For a remote target the
-    # build+pull already happened on the workstation (via canonical_deploy_to_nodes
-    # or the --prod path), so the remote node must ONLY pull+run the pushed
-    # digest — never build from a (non-existent) source tree on prod.
+    # ── 1. clean build (workstation working tree ONLY) ──
     if [ "$TARGET_HOST" = "local" ]; then
-        echo "--- [1/6] CLEAN BUILD (local) ---"
-        if ! docker compose $COMPOSE_ARGS build --pull "$SVC"; then
+        if is_production_host; then
+            echo "❌ REFUSING to build on production host $(hostname). Build on the workstation, push, then pull here."
+            return 1
+        fi
+        echo "--- [1/6] CLEAN BUILD (workstation) ---"
+        if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull "$SVC"; then
             echo "❌ Build failed — aborting. Running container untouched."
             return 1
         fi
@@ -746,94 +911,146 @@ canonical_deploy() {
         LOCAL_ID=$(docker inspect --format='{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)
         echo "✅ Built $IMAGE (id ${LOCAL_ID:-unknown})"
 
-        # ── 2. clean push (one :latest; image is the unit) ──
         echo "--- [2/6] CLEAN PUSH ---"
         if ! docker compose $COMPOSE_ARGS push "$SVC"; then
             echo "❌ Push failed — aborting."
             return 1
         fi
         echo "✅ Pushed $IMAGE"
+        echo "✅ Image is on the registry. This step did not start or replace any container."
+        echo "    Production is unchanged until Pull & Deploy runs on that host."
+        return 0
     else
         echo "--- [1-2/6] SKIP BUILD/PUSH (remote target=$TARGET_HOST) ---"
-        echo "    Image was built+pushed on the workstation; this node only pulls+runs."
+        echo "    No source tree on production. Image was built+pushed on the workstation."
     fi
 
-    # ── 3+4. clean pull + run --no-build on the target (local or remote) ──
-    echo "--- [3/6] CLEAN PULL + [4/6] RUN (--no-build) ---"
-    local RUN_CMD
-    RUN_CMD="cd /opt/comserv/Comserv && docker compose $COMPOSE_ARGS pull $SVC && docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $SVC"
+    # Remote production path: rename → pull → stop backup → docker run from image.
+    # The target has NO app source tree. Do not cd /opt/comserv/Comserv.
     if [ -n "$REMOTE_SSH" ]; then
-        # Pre-create standardized volumes on the remote (idempotent, never rm).
-        $REMOTE_SSH "bash -s" <<'EOF' || true
-        for v in comserv2_cache comserv2_logs comserv2_nfs_data comserv2_sessions \
-                 comserv2_temp comserv2_themes comserv2_whisper_venv comserv2_cpan_cache; do
-            docker volume create "$v" >/dev/null 2>&1 || true
-        done
-EOF
-        # Stop+rename current container for rollback BEFORE pull/run.
-        # Use a single stable timestamp so the rename and the later stop refer
-        # to exactly the same backup name (two $(date) calls could differ).
-        local REMOTE_TS
+        local REMOTE_TS BK
         REMOTE_TS=$(date +%Y%m%d-%H%M%S)
-        $REMOTE_SSH "bash -s" <<EOF || true
         BK="bk-${CONTAINER}-${REMOTE_TS}"
-        if docker ps -q -f name=${CONTAINER} | grep -q .; then
-            docker rename ${CONTAINER} "\$BK" 2>/dev/null || true
-            docker stop "\$BK" 2>/dev/null || true
-        fi
-EOF
-        if ! $REMOTE_SSH "cd /opt/comserv/Comserv && docker compose $COMPOSE_ARGS pull $SVC && docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $SVC"; then
-            echo "❌ Remote pull/run failed — check container logs on $TARGET_HOST."
-            return 1
-        fi
-    else
-        if ! bash -c "$RUN_CMD"; then
-            echo "❌ Local pull/run failed."
-            return 1
-        fi
-    fi
-    echo "✅ $CONTAINER running the freshly-pulled digest (no local rebuild)"
+        echo "--- [3/6] RENAME running $CONTAINER → $BK (keep serving during pull) ---"
+        $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else echo no-live-container; fi"
 
-    # ── 5. health gate ──
-    echo "--- [5/6] HEALTH GATE ---"
-    local HEALTHY=0
-    local i
-    for i in $(seq 1 30); do
-        local OK=0
-        if [ -n "$REMOTE_SSH" ]; then
-            $REMOTE_SSH "curl -fs http://localhost:5000/health" >/dev/null 2>&1 && OK=1
-        else
-            curl -fs http://localhost:5000/health >/dev/null 2>&1 && OK=1
+        echo "--- [4/6] PULL $IMAGE (no build, no host source) ---"
+        if ! $REMOTE_SSH "docker pull ${IMAGE}"; then
+            echo "❌ Remote pull failed. Restarting backup if we renamed."
+            $REMOTE_SSH "if docker inspect ${BK} >/dev/null 2>&1; then docker start ${BK} 2>/dev/null || true; docker rename ${BK} ${CONTAINER} 2>/dev/null || true; fi" || true
+            return 1
         fi
+
+        echo "--- [5/6] STOP renamed backup, docker run $IMAGE as $CONTAINER ---"
+        $REMOTE_SSH "if docker inspect ${BK} >/dev/null 2>&1; then docker stop ${BK}; fi"
+        if ! $REMOTE_SSH bash -s <<EOF
+$(declare -f start_prod_container_from_image)
+export SYSTEM_IDENTIFIER=production1
+start_prod_container_from_image ${IMAGE} ${CONTAINER}
+EOF
+        then
+            echo "❌ Remote start failed — restarting backup $BK"
+            $REMOTE_SSH "docker start ${BK} 2>/dev/null || true" || true
+            notify_admin_deploy \
+                "Production deploy start failed — backup ${BK} running" \
+                "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew container failed to start from image. Freshly renamed backup is (or should be) running. Investigate." || true
+            return 1
+        fi
+
+        echo "--- [6/6] HEALTH GATE ---"
+        local HEALTHY=0 i OK
+        for i in $(seq 1 45); do
+            OK=0
+            $REMOTE_SSH "curl -fs --max-time 8 http://127.0.0.1:5000/health" >/dev/null 2>&1 && OK=1
+            if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
+            echo "  health attempt $i failed, waiting 2s..."
+            sleep 2
+        done
+        if [ "$HEALTHY" != "1" ]; then
+            echo "❌ HEALTH FAILED. Stopping new container and restarting backup $BK"
+            $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null || true"
+            notify_admin_deploy \
+                "Production deploy unhealthy — backup ${BK} running" \
+                "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew ${CONTAINER} failed /health. Freshly renamed backup container is now running. Investigate the failed deploy." || true
+            return 1
+        fi
+
+        echo "--- POST-DEPLOY ---"
+        local POST_CMD="perl -pi -e 's/USE_DB_MENU.*/USE_DB_MENU=1/' /opt/comserv/comserv.conf 2>/dev/null; rm -rf /tmp/comserv/cache/* /cache/* 2>/dev/null; echo done"
+        $REMOTE_SSH "docker exec $CONTAINER bash -c '$POST_CMD'" 2>/dev/null || true
+        echo "✅ Canonical deploy complete: $CONTAINER healthy on $TARGET_HOST"
+        return 0
+    fi
+
+    echo "❌ canonical_deploy($TARGET_HOST): unreachable (local returns after push; remote handled above)"
+    return 1
+}
+
+# Recreate the workstation's local web-prod from the image just built/pushed.
+# Rename the live container FIRST (same class as the 2026-08-11 / 2026-08-23
+# "name already in use" false-fail). Compose is not used: a leftover
+# container from a different project name is invisible to compose and
+# causes a create-conflict, and compose would also reclaim a renamed
+# backup via leftover compose labels.
+recreate_local_web_prod() {
+    local TS BK
+    TS=$(date +%Y%m%d-%H%M%S)
+    BK="bk-${CONTAINER}-${TS}"
+    echo "--- LOCAL RECREATE $CONTAINER (rename live first) ---"
+    if docker inspect "$CONTAINER" >/dev/null 2>&1; then
+        if ! docker rename "$CONTAINER" "$BK"; then
+            echo "❌ Could not rename live $CONTAINER — aborting before start."
+            return 1
+        fi
+        echo "    renamed live → $BK (stopping so :5000 is free)"
+        docker stop "$BK" || true
+    else
+        echo "    no live $CONTAINER — starting fresh"
+        BK=""
+    fi
+    if [ "${SKIP_PULL:-0}" = "1" ]; then
+        echo "    using local image $IMAGE (no registry pull — this is not a production update)"
+    elif ! docker pull "$IMAGE"; then
+        echo "❌ Local pull failed."
+        if [ -n "$BK" ]; then
+            docker start "$BK" 2>/dev/null || true
+            docker rename "$BK" "$CONTAINER" 2>/dev/null || true
+        fi
+        return 1
+    fi
+    # Workstation prod-mirror identity — never brand this box production1.
+    SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-workstation-prod-local}" \
+        start_prod_container_from_image "$IMAGE" "$CONTAINER" || {
+            echo "❌ Local start failed. Restoring ${BK:-<none>}"
+            docker rm -f "$CONTAINER" 2>/dev/null || true
+            if [ -n "$BK" ]; then
+                docker start "$BK" 2>/dev/null || true
+                docker rename "$BK" "$CONTAINER" 2>/dev/null || true
+            fi
+            return 1
+        }
+
+    echo "--- LOCAL HEALTH GATE ---"
+    local HEALTHY=0 i OK
+    for i in $(seq 1 30); do
+        OK=0
+        curl -fs --max-time 8 http://127.0.0.1:5000/health >/dev/null 2>&1 && OK=1
         if [ "$OK" = "1" ]; then HEALTHY=1; echo "✅ healthy (attempt $i)"; break; fi
         echo "  health attempt $i failed, waiting 5s..."
         sleep 5
     done
     if [ "$HEALTHY" != "1" ]; then
-        echo "❌ HEALTH FAILED after 30 attempts."
-        if [ -n "$REMOTE_SSH" ]; then
-            $REMOTE_SSH "bash -s" <<EOF || true
-            docker stop $CONTAINER 2>/dev/null || true
-            docker rm -f $CONTAINER 2>/dev/null || true
-            BK="bk-$CONTAINER-$REMOTE_TS"
-            if docker ps -aq -f name="\$BK" | grep -q .; then
-                docker start "\$BK" 2>/dev/null || true
-                docker rename "\$BK" $CONTAINER 2>/dev/null || true
-            fi
-EOF
+        echo "❌ LOCAL HEALTH FAILED. Restoring ${BK:-<none>}"
+        docker stop "$CONTAINER" 2>/dev/null || true
+        docker rename "$CONTAINER" "failed-${CONTAINER}-${TS}" 2>/dev/null \
+            || docker rm -f "$CONTAINER" 2>/dev/null || true
+        if [ -n "$BK" ]; then
+            docker start "$BK" 2>/dev/null || true
+            docker rename "$BK" "$CONTAINER" 2>/dev/null || true
         fi
         return 1
     fi
-
-    # ── 6. post-deploy ──
-    echo "--- [6/6] POST-DEPLOY ---"
-    local POST_CMD="perl -pi -e 's/USE_DB_MENU.*/USE_DB_MENU=1/' /opt/comserv/comserv.conf 2>/dev/null; rm -rf /tmp/comserv/cache/* /cache/* 2>/dev/null; echo done"
-    if [ -n "$REMOTE_SSH" ]; then
-        $REMOTE_SSH "docker exec $CONTAINER bash -c '$POST_CMD'" 2>/dev/null || true
-    else
-        docker exec "$CONTAINER" bash -c "$POST_CMD" 2>/dev/null || true
-    fi
-    echo "✅ Canonical deploy complete: $CONTAINER healthy on $TARGET_HOST"
+    echo "✅ $CONTAINER running the freshly-built digest on workstation"
     return 0
 }
 
@@ -843,17 +1060,91 @@ EOF
 canonical_deploy_to_nodes() {
     local HOSTS=("$@")
     [ ${#HOSTS[@]} -eq 0 ] && HOSTS=("production1")
-    # Build+push once locally (canonical_deploy with local target does both).
+    # Build+push once locally (canonical_deploy local is image-only).
     echo "=== Building + pushing once (image is the unit) ==="
     canonical_deploy "local" || { echo "❌ build+push failed"; return 1; }
     # Now pull+run the SAME digest on every node (never rebuild).
+    # workstation/local is NOT a remote SSH target — recreate in place.
+    local H NH did_remote=0 did_local=0
     for H in "${HOSTS[@]}"; do
-        echo "=== Deploying identical image to $H ==="
-        canonical_deploy "$H" || echo "⚠ deploy to $H failed (continuing)"
+        NH="$(_normalize_deploy_node "$H")"
+        if [ "$NH" = "local" ]; then
+            echo "=== Recreating local workstation web-prod from the image just built ==="
+            recreate_local_web_prod || echo "⚠ local recreate failed"
+            did_local=1
+        else
+            echo "=== Deploying identical image to $NH (production pull+run) ==="
+            canonical_deploy "$NH" || echo "⚠ deploy to $NH failed (continuing)"
+            did_remote=1
+        fi
     done
-    echo "✅ Multi-node deploy complete"
+    if [ "$did_remote" = "1" ] && [ "$did_local" = "1" ]; then
+        echo "✅ Done: local workstation recreated AND remote node(s) pull-deployed."
+    elif [ "$did_remote" = "1" ]; then
+        echo "✅ Done: remote production pull-deploy finished. Workstation container was not started by this step."
+    else
+        echo "✅ Done: workstation local recreate only. Production was NOT updated."
+    fi
     return 0
 }
+
+# Late dispatch — canonical_deploy* exist now. Pull & Deploy must NEVER build.
+_normalize_deploy_node() {
+    case "${1:-}" in
+        production1|prod1) echo "192.168.1.126" ;;
+        production2|prod2) echo "192.168.1.127" ;;
+        workstation|local|192.168.1.199|"") echo "local" ;;
+        *) echo "$1" ;;
+    esac
+}
+
+if [ "${DEPLOY_MODE:-}" = "pull-deploy" ]; then
+    _pd_node="$(_normalize_deploy_node "${CLI_ARG2:-192.168.1.126}")"
+    echo "=== PULL & DEPLOY ONLY (no workstation build) → ${_pd_node} ==="
+    if [ "$_pd_node" = "local" ]; then
+        echo "❌ pull-deploy is for a remote production node, not local build."
+        exit 1
+    fi
+    canonical_deploy "$_pd_node"
+    exit $?
+fi
+
+if [ "${DEPLOY_MODE:-}" = "deploy-to-node" ]; then
+    shift
+    canonical_deploy_to_nodes "$@"
+    exit $?
+fi
+
+if [ "${DEPLOY_MODE:-}" = "build-push" ]; then
+    echo "=== WORKSTATION BUILD + PUSH (running container untouched) ==="
+    if is_production_host; then
+        echo "❌ REFUSING to build on production. Build on the workstation."
+        exit 1
+    fi
+    canonical_deploy "local"
+    exit $?
+fi
+
+if [ "${DEPLOY_MODE:-}" = "local-rebuild" ]; then
+    echo "=== WORKSTATION LOCAL REBUILD ==="
+    echo "    This builds on THIS machine and replaces local $CONTAINER."
+    echo "    It does NOT push to the registry."
+    echo "    It does NOT update production1."
+    if is_production_host; then
+        echo "❌ REFUSING to build on production. Build on the workstation."
+        exit 1
+    fi
+    if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull web-prod; then
+        echo "❌ Local build failed — running container untouched."
+        exit 1
+    fi
+    SKIP_PULL=1 recreate_local_web_prod
+    rc=$?
+    if [ $rc -eq 0 ]; then
+        echo "✅ Local workstation rebuild complete. Production was NOT updated."
+    fi
+    exit $rc
+fi
 
 # ── Non-interactive Deploy Mode (legacy modes) ─────────────────────────────────
 if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
@@ -1333,13 +1624,13 @@ if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
     ensure_required_volumes
     protect_prod_resources
     if ! docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
-        echo "MONITOR: container $CONTAINER absent — pulling latest then recreating (--no-build)..."
+        echo "MONITOR: container $CONTAINER absent — pull image and docker run (no compose, no host source)..."
         docker pull "$IMAGE" 2>&1 | grep -v "^$" || true
-        docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
+        start_prod_container_from_image "$IMAGE" "$CONTAINER" 2>&1 | grep -v "^$" || true
     elif [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then
         echo "MONITOR: container $CONTAINER present but not running — starting..."
         docker start "$CONTAINER" 2>&1 | grep -v "^$" || \
-            docker compose $COMPOSE_ARGS up -d --force-recreate --no-build web-prod 2>&1 | grep -v "^$" || true
+            start_prod_container_from_image "$IMAGE" "$CONTAINER" 2>&1 | grep -v "^$" || true
     fi
 fi
 
@@ -1614,7 +1905,7 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                 docker tag "$B_IMAGE" shantamcsbain/comserv-web-prod:latest
                 
                 echo "   [Fallback] Launching container with rolled-back image..."
-                docker compose $COMPOSE_ARGS up -d --force-recreate
+                docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $PROD_UP_SERVICES
                 
                 echo "   [Fallback] Checking health of the backup container $B_TAG (up to 60s)..."
                 B_HEALTHY=0
@@ -1763,14 +2054,14 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                         cat "$STARMAN_LOG" || true
                         echo "   [Emergency] Host fallback failed — restarting the container so SOMETHING serves port 5000."
                         docker start "$CONTAINER" 2>/dev/null \
-                            || docker compose $COMPOSE_ARGS up -d 2>/dev/null \
+                            || docker compose $COMPOSE_ARGS up -d --no-build $PROD_UP_SERVICES 2>/dev/null \
                             || echo "   ❌ [Emergency] Could not bring the container back up. Manual intervention required."
                     fi
                 else
                     echo "   ❌ [Emergency] Could not find host Catalyst PSGI file on host."
                     echo "   [Emergency] No fallback available — leaving the container in place and retrying it."
                     docker start "$CONTAINER" 2>/dev/null \
-                        || docker compose $COMPOSE_ARGS up -d 2>/dev/null \
+                        || docker compose $COMPOSE_ARGS up -d --no-build $PROD_UP_SERVICES 2>/dev/null \
                         || echo "   ❌ [Emergency] Container could not be started. Manual intervention required."
                 fi
             fi
@@ -2093,7 +2384,7 @@ else
         docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest
         
         echo "   [Fallback] Launching container with rolled-back image..."
-        COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose $COMPOSE_ARGS up -d --force-recreate
+        COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $PROD_UP_SERVICES
         
         echo "   [Fallback] Checking health of the backup container (up to 60s)..."
         FALLBACK_ATTEMPT=0
@@ -2207,7 +2498,7 @@ else
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}To manually roll back to the previous stable version (backup-1):\n"
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}  docker stop comserv2-web-prod && docker rm comserv2-web-prod\n"
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}  docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest\n"
-    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}  COMSERV_LOGS_DIR=\"$COMSERV_LOGS_DIR\" WORKSHOP_LOCAL_DIR=\"$NFS_LOCAL_DIR\" docker compose -f \"$COMPOSE_FILE\" up -d --force-recreate\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}  COMSERV_LOGS_DIR=\"$COMSERV_LOGS_DIR\" WORKSHOP_LOCAL_DIR=\"$NFS_LOCAL_DIR\" docker compose $COMPOSE_ARGS up -d --force-recreate --no-build $PROD_UP_SERVICES\\n"
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}-----------------------------------------------------------\n"
     
     echo -e "$DIAGNOSTICS_REPORT"

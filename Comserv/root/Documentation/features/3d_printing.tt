@@ -6,6 +6,13 @@
 [% META roles = 'admin developer editor' %]
 
 <h1>3D Printing System</h1>
+<p>
+    <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing coordinator plan</a>
+    ·
+    <a href="[% c.uri_for('/Documentation/InventoryInternalBuildBom') %]" class="doc-link">Manual inventory BOM steps</a>
+    ·
+    <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a>
+</p>
 <p><em>Last updated: April 28, 2026</em></p>
 
 <h2>Overview</h2>
