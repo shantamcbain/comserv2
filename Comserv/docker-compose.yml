@@ -27,7 +27,11 @@
 # Usage:
 #   Workstation: docker compose up -d
 #   Production:  docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-#                -f docker-compose.prod.nfs.yml up -d
+#                up -d --no-build web-prod
+#   NEVER run a bare `up -d` against the merged prod files. This base file
+#   also defines web, web-dev, and web-staging (same image, ports 5000/3000/4000).
+#   The prod overlay assigns those the "workstation-only" profile so they do
+#   not start unless that profile is explicitly enabled.
 # =============================================================================
 
 services:

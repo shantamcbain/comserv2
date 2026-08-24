@@ -360,7 +360,11 @@
               .then(function (res) {
                   console.log('[git-dashboard] merge response:', res);
                   if (res.conflict) {
-                      showMergeResult(false, true, 'conflict', res.output || res.error || '');
+                      // Lead with WHY: the server now names the conflicting
+                      // files (or the uncommitted-changes blocker) in res.error;
+                      // raw git output stays in the <pre> as detail.
+                      var why = res.error || 'Merge conflict';
+                      showMergeResult(false, true, 'conflict', why + '\n\n' + (res.output || ''));
                       return;
                   }
                   var stashNote = '';

@@ -8,6 +8,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::DocumentationConfig;
 use Comserv::Util::ModelCatalog;
+use Comserv::Util::TodoLog;
 
 # Resolve the default model for the AI Focus-Tune picker from the SAME shared
 # catalog every other AI surface uses (ModelCatalog::default_for) — NEVER a
@@ -1597,58 +1598,38 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
 
     my $now   = DateTime->now(time_zone => 'local');
     my $today = $now->ymd;
-    my $time  = $now->hms;
 
-    eval {
-        my $dbh  = $c->model('DBEncy')->storage->dbh;
-        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
-        die "Todo not found\n" unless $todo;
-
-        my $existing = $dbh->selectrow_hashref(
-            "SELECT record_id FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 LIMIT 1",
-            undef, $record_id
+    # ONE shared implementation with the UI Start button. Start is a TOGGLE:
+    # if the todo is already active it stops instead (todo -> 2).
+    my $res = eval {
+        Comserv::Util::TodoLog->toggle_start($c,
+            record_id => $record_id,
+            username  => $username,
+            summary   => ($data->{summary} // ''),
         );
-        if ($existing) {
-            my $cur = $dbh->selectrow_array("SELECT status FROM todo WHERE record_id=?", undef, $record_id) // 0;
-            $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
-                undef, $username, $today, $record_id) if $cur != 5;
-            $c->res->body(encode_json({ success => 1, already_open => 1, log_id => $existing->{record_id} }));
-            return;
-        }
-
-        my $proj_code = '';
-        if ($todo->project_id) {
-            my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
-            $proj_code = $proj ? ($proj->project_code || '') : '';
-        }
-        my $sitename_val = eval { $todo->sitename } || 'CSC';
-        my $due_date_val = eval { my $dd = $todo->due_date; $dd ? (ref($dd) ? $dd->ymd : substr("$dd",0,10)) : $today } // $today;
-        my $priority_val = eval { $todo->priority } // 5;
-        my $comments_val = eval { $todo->comments } // '';
-        my $group_val    = '';
-
-        $dbh->do(
-            'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,"00:00:00","00:00:00",2,?,?,?,?,?)',
-            undef,
-            $record_id, $username, $sitename_val, $proj_code,
-            'Started: ' . ($todo->subject // ''),
-            'Work begun on this step by ' . $username,
-            $today, $due_date_val, $time,
-            $priority_val, $username, $today, $group_val, $comments_val
-        );
-        my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
-        $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
-            undef, $username, $today, $record_id);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_open_log',
-            "Log opened for todo $record_id by $username (log_id=$new_log_id)");
-        $c->res->body(encode_json({ success => 1, log_id => ($new_log_id // 0) }));
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_open_log',
-            "Failed open_log for todo $record_id: $@");
-        $c->res->body(encode_json({ success => 0, error => "$@" }));
+    if ($@ || !$res || !$res->{success}) {
+        my $err = $@ || ($res && $res->{message}) || 'unknown error';
+        unless ($res && $res->{graceful}) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_open_log',
+                "Failed open_log for todo $record_id: $err");
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_todo_open_log',
+                "open_log graceful for todo $record_id: $err");
+        }
+        $c->res->body(encode_json({ success => 0, error => "$err" }));
+        return;
     }
+    if ($res->{action} eq 'stopped') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_open_log',
+            "Start toggle stopped active log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+        $c->res->body(encode_json({ success => 1, stopped => 1, log_id => ($res->{log_id}//0),
+                                    duration_mins => ($res->{duration_mins}//0) }));
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_open_log',
+        "Log opened for todo $record_id by $username (log_id=$res->{log_id})");
+    $c->res->body(encode_json({ success => 1, log_id => ($res->{log_id} // 0) }));
 }
 
 =head2 api_todo_close_log
@@ -1676,40 +1657,34 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
 
     my $now_dt   = DateTime->now(time_zone => 'local');
     my $today    = $now_dt->ymd;
-    my $now_hms  = $now_dt->strftime('%H:%M:%S');
 
-    eval {
-        my $dbh = $c->model('DBEncy')->storage->dbh;
-        my $open_row = $dbh->selectrow_hashref(
-            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
-            undef, $record_id
+    # ONE shared implementation with the UI close_log. Graceful when no log
+    # is open (caller mistake -> warn, never an ERROR audit todo).
+    my $res = eval {
+        Comserv::Util::TodoLog->close_log($c,
+            record_id => $record_id,
+            username  => $username,
+            summary   => ($notes // ''),
         );
-        die "No open log found for todo $record_id\n" unless $open_row;
-
-        my $raw_start  = $open_row->{start_time} // '09:00:00';
-        my $start_hms  = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
-        my ($sh, $sm)  = ($start_hms =~ /^(\d+):(\d+)/);
-        my ($eh, $em)  = ($now_hms   =~ /^(\d{2}):(\d{2})/);
-        my $dur_mins   = ($eh * 60 + $em) - ($sh * 60 + $sm);
-        $dur_mins = 1 if $dur_mins <= 0;
-        my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
-
-        $dbh->do(
-            'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
-            undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
-        );
-        $dbh->do("UPDATE todo SET status=2, last_mod_by=?, last_mod_date=? WHERE record_id=? AND status=5",
-            undef, $username, $today, $record_id);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_close_log',
-            "Closed log $open_row->{record_id} for todo $record_id ($dur_mins min)");
-        $c->res->body(encode_json({ success => 1, duration_mins => $dur_mins }));
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_close_log',
-            "Failed close_log for todo $record_id: $@");
-        $c->res->body(encode_json({ success => 0, error => "$@" }));
+    if ($@ || !$res || !$res->{success}) {
+        my $err = $@ || ($res && $res->{message}) || 'unknown error';
+        if ($res && $res->{graceful}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_todo_close_log',
+                "close_log graceful for todo $record_id: $err");
+            $c->res->status(200);
+            $c->res->body(encode_json({ success => 0, graceful => 1, error => "$err" }));
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_close_log',
+                "Failed close_log for todo $record_id: $err");
+            $c->res->body(encode_json({ success => 0, error => "$err" }));
+        }
+        return;
     }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_close_log',
+        "Closed log $res->{log_id} for todo $record_id ($res->{duration_mins} min)");
+    $c->res->body(encode_json({ success => 1, duration_mins => ($res->{duration_mins} // 0) }));
 }
 
 =head2 api_todo_done_with_log
@@ -1737,43 +1712,26 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
 
     my $now_dt   = DateTime->now(time_zone => 'local');
     my $today    = $now_dt->ymd;
-    my $now_hms  = $now_dt->strftime('%H:%M:%S');
 
-    eval {
-        my $dbh  = $c->model('DBEncy')->storage->dbh;
-        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
-        die "Todo not found\n" unless $todo;
-
-        my $open_row = $dbh->selectrow_hashref(
-            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
-            undef, $record_id
+    # ONE shared implementation with the UI done_with_log.
+    my $res = eval {
+        Comserv::Util::TodoLog->done_with_log($c,
+            record_id => $record_id,
+            username  => $username,
+            summary   => ($notes // ''),
         );
-        if ($open_row) {
-            my $raw_start  = $open_row->{start_time} // '09:00:00';
-            my $start_hms  = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
-            my ($sh, $sm)  = ($start_hms =~ /^(\d+):(\d+)/);
-            my ($eh, $em)  = ($now_hms   =~ /^(\d{2}):(\d{2})/);
-            my $dur_mins   = ($eh * 60 + $em) - ($sh * 60 + $sm);
-            $dur_mins = 1 if $dur_mins <= 0;
-            my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
-            $dbh->do(
-                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
-                undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
-            );
-        }
-
-        $dbh->do("UPDATE todo SET status=3, last_mod_by=?, last_mod_date=? WHERE record_id=?",
-            undef, $username, $today, $record_id);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_done_with_log',
-            "Todo $record_id marked done (log closed if open)");
-        $c->res->body(encode_json({ success => 1, log_closed => ($open_row ? 1 : 0) }));
     };
-    if ($@) {
+    if ($@ || !$res || !$res->{success}) {
+        my $err = $@ || ($res && $res->{message}) || 'unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_todo_done_with_log',
-            "Failed done_with_log for todo $record_id: $@");
-        $c->res->body(encode_json({ success => 0, error => "$@" }));
+            "Failed done_with_log for todo $record_id: $err");
+        $c->res->body(encode_json({ success => 0, error => "$err" }));
+        return;
     }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_done_with_log',
+        "Todo $record_id marked done (log closed if open)");
+    $c->res->body(encode_json({ success => 1, log_closed => ($res->{log_closed} ? 1 : 0) }));
 }
 
 =head2 _api_json_body
@@ -1986,6 +1944,14 @@ sub api_focus_models :Path('focus/models') :Args(0) {
     if ($cat_def && $cat_def =~ /\|/) {
         my (undef, $cn) = split(/\|/, $cat_def, 2);
         if (grep { $_->{name} eq $cn } @models) { $default = $cat_def; }
+        elsif ($cn && $cat_def =~ /^openrouter\|/) {
+            # Guest default must be selectable even if the OpenRouter list
+            # fetch timed out this request. Model is a live :free slug.
+            unshift @models, {
+                name => $cn, provider => 'openrouter', label => $cn, free => 1,
+            };
+            $default = $cat_def;
+        }
     }
     unless ($default) {
         $default = (@models && $models[0]{provider})

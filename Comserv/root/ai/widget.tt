@@ -265,6 +265,10 @@
         window.ComservConfig = window.ComservConfig || {};
         window.ComservConfig.models = [% ai_model_catalog_json || '[]' %];
         window.ComservConfig.cv     = '[% c.stash.css_v || css_v || '1' %]';
+        window.ComservConfig.isGuest = [% ai_is_guest ? 'true' : 'false' %];
+        window.ComservConfig.roleTier = '[% ai_role_tier || 'guest' %]';
+        window.ComservConfig.canSelectModel = [% (ai_can_select_model || ai_is_priv || is_admin) ? 'true' : 'false' %];
+        window.ComservConfig.isAdmin = [% (ai_is_priv || is_admin) ? 'true' : 'false' %];
     </script>
     <script src="/static/js/ai-common.js?v=[% c.stash.css_v || css_v || '1' %]"></script>
     <!-- AI Chat V2 modular suite (popup mode): load the same modules as js_load.tt
@@ -278,6 +282,8 @@
     <script src="/static/js/ai-chat/page-context.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/ai-chat/wizards.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/ai-chat/audio-backup.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/feature-todo.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
+    <script src="/static/js/ai-chat/tooltips.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/local-chat.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <script src="/static/js/ai-chat/index.js?v=[% c.stash.css_v || css_v || '1' %]" defer></script>
     <!-- Keep header visible forever in popup mode (overrides any 7-10s timeout in JS) -->

@@ -7,6 +7,7 @@ use Try::Tiny;
 use JSON qw(encode_json decode_json);
 
 use Comserv::Util::Logging;
+use Comserv::Util::ModelCatalog;
 
 extends 'Catalyst::Model';
 
@@ -65,7 +66,8 @@ sub build_agent_prompt {
         ency     => "You are an encyclopedia assistant. Provide clear, factual answers.",
         bmaster  => "You are a business master / project assistant. Be professional and concise.",
         planning => "You are a planning assistant. Focus on daily logs, tasks, and clear next steps.",
-        code     => "You are a coding assistant. Help write, explain, and debug code. Prefer concise examples.",
+        todo     => "You are the Comserv todo agent. When the user wants a todo created, the server already performs that job — confirm the result, do not invent a form.",
+        code     => "You are a coding assistant for the Comserv2 Catalyst app. The server already loads source into [FILE:] blocks. NEVER say you lack filesystem access or ask the user to paste files. Load other sources with [READ_FILE: lib/...] (optional :START-END). Prefer concise examples and one fenced code block so Approve can apply it.",
         nav      => "You are a navigation assistant. Help the user find the right page or feature in Comserv.",
     );
     return $agent{$aid} if exists $agent{$aid};
@@ -136,12 +138,117 @@ sub process {
     my $prompt = $args{prompt} // '';
     return { success => 0, error => 'Prompt is required' } unless $prompt && length $prompt;
 
+    # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
+    # picker model. Free models invent a fake "Add" box; this runs first.
+    my $todo_hit = eval {
+        require Comserv::Model::AI2::TodoCreate;
+        Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
+            prompt    => $prompt,
+            page_path => $args{page_path} || '',
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "TodoCreate try_chat_create threw: $@");
+    }
+    if ($todo_hit && $todo_hit->{handled}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            'Todo-create agent handled chat (no LLM)');
+        return {
+            success     => 1,
+            response    => $todo_hit->{response} // '',
+            model       => $todo_hit->{model} // '(todo-create)',
+            provider    => $todo_hit->{provider} // 'ai2-todo',
+            todo_action => $todo_hit->{todo_action},
+            thinking    => [],
+        };
+    }
+
+    # Code-read AGENT. Hy3 invents "I have no filesystem access" — do not
+    # send "can you read the files" to the picker model.
+    my $read_hit = eval {
+        require Comserv::Model::AI2::CodeRead;
+        my $brain = eval { $c->model('AI2::CodeRead') };
+        $brain = Comserv::Model::AI2::CodeRead->new if !$brain || !ref $brain;
+        $brain->try_chat_read($c,
+            prompt       => $prompt,
+            page_path    => $args{page_path} || '',
+            page_content => $args{page_content} || '',
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "CodeRead try_chat_read threw: $@");
+    }
+    if ($read_hit && $read_hit->{handled}) {
+        return {
+            success    => 1,
+            response   => $read_hit->{response} // '',
+            model      => $read_hit->{model} // '(code-read)',
+            provider   => $read_hit->{provider} // 'ai2-coderead',
+            files_read => $read_hit->{files_read} || [],
+            thinking   => [],
+        };
+    }
+
     my $username  = $c->session->{username}  || 'Guest';
     my $roles     = $c->session->{roles}     || [];
-    my $can_select = $self->_can_select_model($c);
+    my $can_select = Comserv::Util::ModelCatalog->can_select_model($c);
+
+    my $req_agent = $args{agent_id} // '';
+    unless (Comserv::Util::ModelCatalog->agent_allowed($c, $req_agent)) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'process',
+            "Clamped disallowed agent_id='$req_agent' to general");
+        $args{agent_id} = 'general';
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
         "AI2 chat from $username: " . substr($prompt, 0, 80));
+
+    # Editor coding agent: inject the open buffer INTO THE USER MESSAGE.
+    # Hy3 ignores system-only context and says "paste the code".
+    my @files_read;
+    my $code_read;
+    my $code_skip;
+    my $uname = $c->session->{username} || '';
+    my $code_ok = (lc($args{agent_id} // '') eq 'code')
+        && $uname && lc($uname) ne 'guest';
+    if ($code_ok) {
+        $code_read = eval {
+            require Comserv::Model::AI2::CodeRead;
+            my $brain = eval { $c->model('AI2::CodeRead') };
+            $brain = Comserv::Model::AI2::CodeRead->new if !$brain || !ref $brain;
+            $brain;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                "CodeRead init failed: $@");
+            $code_read = undef;
+        }
+        if ($code_read) {
+            my $prep = eval {
+                $code_read->prepare_turn($c,
+                    prompt       => $prompt,
+                    page_path    => $args{page_path} || '',
+                    page_content => $args{page_content} || '',
+                );
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                    "CodeRead prepare_turn threw: $@");
+            }
+            elsif ($prep) {
+                $args{page_context} = $prep->{page_context} if $prep->{page_context};
+                push @files_read, @{ $prep->{files_read} || [] };
+                $code_skip = $prep->{skip};
+                if ($prep->{user_files} && length $prep->{user_files}) {
+                    $prompt .= "\n\n---\nThe server already loaded these files from disk. "
+                        . "They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n"
+                        . $prep->{user_files};
+                }
+            }
+        }
+    }
 
     my $messages = $self->build_messages($args{history}, $prompt);
 
@@ -211,6 +318,39 @@ sub process {
         };
         $provider_name = $resp->{provider} if $resp->{provider};
         $use_model     = $resp->{model}     if $resp->{model};
+    }
+
+    # Coding agent: if the model asked [READ_FILE:], load and continue (bounded).
+    if ($code_read && $resp && $resp->{success}) {
+        my $loop = 0;
+        my $max_fu = eval { $code_read->max_followups } || 2;
+        while ($loop < $max_fu) {
+            my $fu = eval { $code_read->follow_up_context($c, $resp->{response}, $code_skip) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                    "CodeRead follow_up_context threw: $@");
+                last;
+            }
+            last unless $fu && $fu->{user_message};
+            push @$messages, { role => 'assistant', content => $resp->{response} // '' };
+            push @$messages, { role => 'user',      content => $fu->{user_message} };
+            push @files_read, @{ $fu->{files_read} || [] };
+            $code_skip = $fu->{skip} || $code_skip;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                'CodeRead follow-up loaded: ' . join(', ', @{ $fu->{files_read} || [] }));
+            my $again = try {
+                $router->chat_with_fallback($c, $provider_name, $use_model, $messages);
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                    "CodeRead follow-up provider threw: $_");
+                undef;
+            };
+            last unless $again && $again->{success};
+            $resp = $again;
+            if ($resp->{provider}) { $provider_name = $resp->{provider}; }
+            if ($resp->{model})     { $use_model     = $resp->{model}; }
+            $loop++;
+        }
     }
 
     # ── Persist conversation + messages (v2 parity with v1 /ai/chat) ──
@@ -321,14 +461,13 @@ sub process {
         title           => $saved_title,
         created_at      => $created_at,
         thinking        => [],
+        files_read      => \@files_read,
     };
 }
 
 sub _can_select_model {
     my ($self, $c) = @_;
-    my $roles = $c->session->{roles} || [];
-    $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
-    return grep { $_ =~ /^(admin|developer|editor)$/i } @$roles ? 1 : 0;
+    return Comserv::Util::ModelCatalog->can_select_model($c);
 }
 
 # The Router identifies external models as "provider|slug" (e.g.

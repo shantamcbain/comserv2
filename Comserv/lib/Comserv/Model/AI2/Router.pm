@@ -7,6 +7,7 @@ use Try::Tiny;
 use JSON qw(encode_json decode_json);
 
 use Comserv::Util::Logging;
+use Comserv::Util::ModelCatalog;
 
 extends 'Catalyst::Model';
 
@@ -244,6 +245,14 @@ sub select_best_model {
 sub _credits_exhausted {
     my ($self, $error) = @_;
     return 0 unless defined $error && length $error;
+    # 429 / rate-limit counts too: a throttled :free model is just as
+    # unavailable as an empty balance — fall through to the next hop
+    # (todo #2233: gemma-4-31b-it:free 429'd and the chain never engaged).
+    return 1 if $error =~ /\b429\b|too many requests|rate.?limit/i;
+    # Connection failures / DNS / timeouts are also "this hop is down"
+    # (todo #2244: 500 Can't connect to openrouter.ai:443 — Name or service
+    # not known) — fall through rather than surfacing a dead provider.
+    return 1 if $error =~ /can'?t connect|connection (refused|reset|timed? ?out)|name or service not known|temporary failure in name resolution|\b500 can't connect|\btimed? ?out\b/i;
     return 1 if $error =~ /402\b|payment.?required|insufficient credit|out of credit|credit.?balance|can only afford|prepaid credit|usage limit|quota|weekly usage|limit_remaining|no auto-fill/i;
     return 0;
 }
@@ -575,7 +584,7 @@ sub get_available_models {
     # is role-filtered without each list re-implementing it. Tiers:
     #   guest  : free OpenRouter + Ollama local only (no paid, no Grok)
     #   member : free + cheap + mid (premium > $5 / 1M excluded, no Grok)
-    #   priv   : everything (admin / developer / editor)
+    #   priv   : everything (admin / developer)
     @all = $self->_role_filter_models($c, \@all);
 
     return \@all;
@@ -592,6 +601,15 @@ sub _role_filter_models {
         next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
         my $svc  = $m->{provider} || '';
         my $free = $m->{free} || ( ($m->{name} // '') =~ /:free$/ ? 1 : 0 );
+        # Zero-priced external entries (e.g. stealth/ox-alpha, openrouter/auto)
+        # cost nothing — treat them as free so the guest/member tiers keep them
+        # (mirrors the JS cost logic in daily-plan-utils.js / model-select.js).
+        unless ($free) {
+            my $pp = ($m->{price_prompt}     // 0) + 0;
+            my $pc = ($m->{price_completion} // 0) + 0;
+            $free = 1 if !$m->{local} && $pp == 0 && $pc == 0 && !($m->{pricing} && %{$m->{pricing}}
+                          && (($m->{pricing}{prompt} // 1) + 0) > 0);
+        }
         my $local = $m->{local} || ( $svc eq 'ollama' ? 1 : 0 );
         if ($tier eq 'guest') {
             push @out, $m if $free || $local;
@@ -609,18 +627,7 @@ sub _role_filter_models {
 
 sub _role_tier {
     my ($self, $c) = @_;
-    my $roles = eval { $c->session->{roles} } || [];
-    $roles = [ split(/\s*,\s*/, $roles) ] unless ref $roles;
-    my $is_guest = 1;
-    my $is_priv  = 0;
-    for my $r (@$roles) {
-        next unless defined $r && length $r;
-        $is_guest = 0 if $r =~ /^(admin|developer|editor|member|user)$/i;
-        $is_priv  = 1 if $r =~ /^(admin|developer|editor)$/i;
-    }
-    return 'priv'  if $is_priv;
-    return 'guest' if $is_guest;
-    return 'member';
+    return Comserv::Util::ModelCatalog->_role_tier($c);
 }
 
 # -------------------------------------------------------------------

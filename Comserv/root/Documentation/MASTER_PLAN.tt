@@ -67,12 +67,25 @@ sub-plan remains the authoritative spec for its own work.</p>
             <a href="#index" class="doc-navlink">Index</a>
             <a href="#w6" class="doc-navlink">Infra/Security</a>
             <a href="#wv2" class="doc-navlink">V2 Migration</a>
+            <a href="#aisystem-jump" class="doc-navlink" title="Scroll to the AISYSTEM jump: plan document, project #280, and todo #2217 (in-chat Todo-create agent).">AISYSTEM</a>
         </div>
         <p>
             <a href="/Documentation/MASTER_PLAN" target="_blank" rel="noopener" class="doc-navlink">↗ Open this plan in its own browser tab</a>
             <span class="doc-muted"> — use this while in-tab navigation is being fixed (todo #2107); it keeps the planning tab intact.</span>
         </p>
         <p class="doc-backtop"><a href="#top">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+<div class="doc-success" id="aisystem-jump">
+    <h2 class="doc-h3">AI System Use — plan, project, and tracking todo</h2>
+    <p class="doc-body">Hover a link to see what it opens. New tab, so Daily Plan stays intact.</p>
+    <div class="doc-navrow">
+        <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Opens the AISYSTEM coordinator plan: ordered waves for in-app AI (models, chat, agents). Readable spec, not the database row.">AISYSTEM plan (the document)</a>
+        <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-navlink" target="_blank" rel="noopener" title="Opens project #280 AISYSTEM in the project system. This is the database project the plan is attached to (parent #114 AIC-ENH).">Project #280 (attached project)</a>
+        <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-navlink" target="_blank" rel="noopener" title="Lists every todo whose project_id is 280 — the work items under AISYSTEM, including waves and the Todo-create agent.">Todos on #280 (work list)</a>
+        <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-navlink" target="_blank" rel="noopener" title="Opens todo #2217. Todo-create WRITE path is code now (Chat intercept). Not a form page.">Todo #2217 (Todo-create — code now)</a>
+        <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-navlink" target="_blank" rel="noopener" title="Opens todo #2218. Scheduler agent: blockers and queue-aware start dates. Specified, not built. Do not bulk-reschedule.">Todo #2218 (Scheduler — specified)</a>
     </div>
 </div>
 
@@ -100,7 +113,11 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a class="doc-navlink" href="#wave0">0 · Source-of-truth</a>
         <a class="doc-navlink" href="#wave1">1 · Defects</a>
         <a class="doc-navlink" href="#wave2">2 · Chat/AI</a>
-        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" target="_blank" rel="noopener" title="Opens the AISYSTEM coordinator plan document (waves for in-app AI).">AISYSTEM plan (the document)</a>
+        <a class="doc-navlink" href="[% c.uri_for('/project/details') %]?project_id=280" target="_blank" rel="noopener" title="Opens project #280 AISYSTEM — the database project this plan is attached to.">#280 project (attached)</a>
+        <a class="doc-navlink" href="[% c.uri_for('/todo/details') %]?record_id=2217" target="_blank" rel="noopener" title="Opens todo #2217: tracks the in-chat agent that creates todos in the database (not a form page).">todo #2217 (Todo-create agent)</a>
+        <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
+        <a href="[% c.uri_for('/Documentation/AIModernAgentEvolutionPlan') %]" title="Modern agent evolution masterplan: personas vs independent agents, migration map, verdict table.">Modern Agent Evolution</a>
         <a class="doc-navlink" href="#wave3">3 · 3D/Sign</a>
         <a class="doc-navlink" href="#wave4">4 · Inventory</a>
         <a class="doc-navlink" href="#wave5">5 · Polish</a>
@@ -136,7 +153,8 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/TodoListPageDisplayTuningPlan') %]">Todo List Ranking</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Language Standard</a>
         <a class="doc-navlink" href="[% c.uri_for('/Documentation/AutonomousAgentsPlan') %]">Autonomous Agents</a>
-        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]">AI Agent Orchestration</a>
+        <a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-navlink">AI Agent Orchestration</a>
+        <a href="[% c.uri_for('/Documentation/AIModernAgentEvolutionPlan') %]" class="doc-navlink" title="Modern agent evolution: personas vs independent agents, migration map, and verdict table.">Modern Agent Evolution</a>
     </div>
 </div>
 
@@ -399,6 +417,7 @@ DailyPlanSystem.tt ────────────────────�
     <li><a href="[% c.uri_for('/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE') %]">K3s Production DB Migration Guide</a></li>
     <li><a href="[% c.uri_for('/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]">Infrastructure Migration Amendment</a></li>
     <li><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">Docker &amp; Kubernetes Migration Strategy</a></li>
+    <li><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">Docker &amp; Kubernetes Plans — Coordinator</a> (project #271 DOCKER-SYS — indexes every Docker/K8s plan below)</li>
     <li><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">Credentials Audit &amp; Unified Management Plan</a></li>
     <li><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">CSC Gateway Plan</a></li>
     <li><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">Schema Naming Standardization Plan</a></li>
@@ -455,23 +474,30 @@ DailyPlanSystem.tt ────────────────────�
 <div class="card" id="w6"><details><summary class="card-header">GROUP 6 — Infrastructure, Security & active product tracks (reconciled from DB)</summary>
 <div class="card-body">
 <p><strong>Coverage note:</strong> the DB <code>projects</code> table holds <strong>237</strong> project rows (primary Ency, 192.168.1.20:3307). This master plan previously indexed only a hand-picked subset (~54). The projects below are <em>active, strategic projects that were missing or buried</em> in the earlier version, surfaced by reconciling against the DB. The DB (<code>/api/projects</code>) remains the source of truth; this plan is a curated view of the important active work, not the full 237.</p>
+<p class="doc-muted"><em>Ordered by importance to the live application — availability / Docker first, because production reliability is currently far below acceptable.</em></p>
 <ul>
+    <li><strong>Docker &amp; Kubernetes Plans (coordinator)</strong> — <a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]\">/Documentation/DockerMasterPlan</a> (project <a href="/project/details?project_id=271">#271 DOCKER-SYS</a>; indexes the Docker/K8s strategy, K3S_APP_HA_PLAN, DB→K8s migration, deploy/secrets, container diagnostics, dev env, and agent docs).</li>
     <li><strong>Infrastructure HA</strong> — <a href="[% c.uri_for('/Documentation/K3S_APP_HA_PLAN') %]\">/Documentation/K3S_APP_HA_PLAN</a> (proj <a href="/project/details?project_id=202">#202 INFRA-HA</a>; phases A–H = #244–251). Previously buried in the infra-cluster bullet; now its own track. <em>HA for the whole app — foundational, not "polish".</em></li>
+    <li><strong>Production Server Health</strong> — proj <a href="/project/details?project_id=200">#200 PROD-HEALTH</a>.</li>
     <li><strong>Security System</strong> — proj <a href="/project/details?project_id=201">#201 SECURITY</a>. Parent of AUTH-EVO.</li>
     <li><strong>Authentication &amp; Credential Architecture</strong> — <a href="[% c.uri_for('/Documentation/AuthenticationEvolutionPlan') %]\">/Documentation/AuthenticationEvolutionPlan</a> (proj <a href="/project/details?project_id=243">#243 AUTH-EVO</a>, child of #201).</li>
-    <li><strong>Theme Compliance Audit</strong> — proj <a href="/project/details?project_id=221">#221 THEME-AUDIT</a> (phases P1–P5 = #222–226). Cross-cutting; affects every template. Admin authoring guide: <a href="[% c.uri_for('/Documentation/CssThemes') %]">/Documentation/CssThemes</a>. Theme Management System (proj <a href="/project/details?project_id=77">#77</a>) tracks the theme roadmap — DB-backed themes + more built-in themes from professional sources (todos #2133 / #2134).
+    <li><strong>Theme Compliance Audit</strong> — proj <a href="/project/details?project_id=221">#221 THEME-AUDIT</a> (phases P1–P5 = #222–226). Cross-cutting; affects every template. Admin authoring guide: <a href="[% c.uri_for('/Documentation/CssThemes') %]\">/Documentation/CssThemes</a>. Theme Management System (proj <a href="/project/details?project_id=77">#77</a>) tracks the theme roadmap — DB-backed themes + more built-in themes from professional sources (todos #2133 / #2134).
         <ul>
             <li><strong>Floating-button theme respect (todo <a href="/todo/details?record_id=2160">#2160</a>)</strong> — the floating <em>Chat with AI</em> (<code>.chat-button</code>) and <code>#back-to-top</code> buttons use hardcoded <code>position:fixed</code> offsets/z-index/colors (not theme <code>var(--*)</code> tokens), so AI-authored edits repeatedly break their placement and they collide with the AI2 float button (<code>bottom:90px;left:24px</code>). Forward fix lives in this audit: drive offsets/z-index/colors from theme variables and guarantee no collision. Shared with <a href="/project/details?project_id=259">#259 V2MIG</a> (V2 JS/CSS migration). NOTE: distinct from the c6bd92b6 zombie-button / duplicate-arrow fix — that was a stale <code>localStorage</code> flag, not placement.</li>
         </ul>
     </li>
-    <li><strong>AI System Use (coordinator)</strong> — <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]">/Documentation/AISYSTEMPlan</a> (proj <a href="/project/details?project_id=280">#280 AISYSTEM</a>, child of #114; waves #281–284). Orders AIMPS + Hermes focus + AGENTS. W1.0 delivered: SuperGrok is its own prepaid provider (not xAI). Do not start W3 agents before the W2 gate.</li>
-    <li><strong>AI Model Presentation &amp; Selection</strong> — <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">/Documentation/AIModelPresentationPlan</a> (proj <a href="/project/details?project_id=252">#252 AIMPS</a>; phases P1–P5 = #253–257, P5 = v2 migration sync). Next execution is AISYSTEM W1.</li>
+    <li><strong>AI System Use (coordinator)</strong> —
+        Plan: <a href="[% c.uri_for('/Documentation/AISYSTEMPlan') %]" class="doc-link" target="_blank" rel="noopener" title="Opens the AISYSTEM coordinator plan document (how in-app AI work is ordered).">AISYSTEMPlan</a>
+        · Project: <a href="[% c.uri_for('/project/details') %]?project_id=280" class="doc-link" target="_blank" rel="noopener" title="Opens project #280 AISYSTEM — the database project the plan is attached to (parent #114).">#280 AISYSTEM</a>
+        · Todos: <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-link" target="_blank" rel="noopener" title="Lists every todo attached to project #280.">under #280</a>
+        · In-chat Todo-create: <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-link" target="_blank" rel="noopener" title="Todo #2217 — WRITE path is code now.">#2217 code</a>
+        · Scheduler: <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" target="_blank" rel="noopener" title="Todo #2218 — Scheduler specified, not built.">#2218 specified</a>
+        (child of #114; waves #281–284). Orders AIMPS + Hermes focus + AGENTS. W1.0 delivered: SuperGrok is its own prepaid provider (not xAI). Do not start W3 agents before the W2 gate.</li>
+    <li><strong>AI Model Presentation &amp; Selection</strong> — <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a> (proj <a href="/project/details?project_id=252">#252 AIMPS</a>; phases P1–P5 = #253–257, P5 = v2 migration sync). Next execution is AISYSTEM W1.</li>
     <li><strong>Point System</strong> — proj <a href="/project/details?project_id=193">#193 PointSystem</a> (phases: Ledger #194, Currency #195, PayPal #196, Spend #197, Crypto #198).</li>
     <li><strong>3D Printing System</strong> — proj <a href="/project/details?project_id=206">#206 3DPRINT</a> (phases: Inv&amp;Accounting #207, File Mgmt #208, Sales #209).</li>
     <li><strong>Buy &amp; Sell Marketplace</strong> — proj <a href="/project/details?project_id=210">#210</a> (7 phases #211–217).</li>
     <li><strong>Git Worktree System (new backend)</strong> — <a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]\">/Documentation/git_worktree_new_system_plan</a> (proj <a href="/project/details?project_id=238">#238 GITWT-NEW</a>).</li>
-    <li><strong>Docker Image Credential Leak Remediation</strong> — proj <a href="/project/details?project_id=239">#239 IMGSEC</a> (child of #201 SECURITY).</li>
-    <li><strong>Production Server Health</strong> — proj <a href="/project/details?project_id=200">#200 PROD-HEALTH</a>.</li>
 </ul>
 <p><strong>Still intentionally excluded from the curated index:</strong> ~180 mostly legacy/duplicate/Requested rows (e.g. multiple <code>HelpDesk</code>/<code>UI/UX</code>/<code>Happygnome</code> duplicates, per-site equipment rows, <code>test</code>). These are real but not strategic; the DB is the place to see them all.</p>
 
@@ -583,6 +609,7 @@ V2 MIG   V2MIG (#259) + P1-P5 (#260-264) ─ own top-level project; P4 = Plannin
         <tr><td class="doc-td">K3s Production DB Migration Guide</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE') %]">/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Infrastructure Migration Amendment</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]">/Documentation/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Docker &amp; K8s Migration Strategy</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY') %]">/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td"><strong>Docker &amp; Kubernetes Plans — Coordinator</strong> (proj #271 DOCKER-SYS)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">/Documentation/DockerMasterPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Credentials Audit &amp; Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">/Documentation/CREDENTIALS_AUDIT_AND_PLAN</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Gateway Plan</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">/Documentation/GatewayPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Schema Naming Standardization</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">/Documentation/SchemaNamingStandardizationPlan</a></td><td class="doc-td">—</td></tr>
