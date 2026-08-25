@@ -501,6 +501,9 @@
                 (!running && !c.is_backup_container
                     ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" title="Permanently remove this container from the host (cannot be undone; volumes are not deleted)" style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Delete</button>'
                     : '') +
+                (running && !c.is_backup_container && c.name && /^(comserv2-web|comserv-web-dev|comserv-web-staging)$/.test(c.name)
+                    ? '  <button class="btn btn-sm" data-action="container-act" data-cid="' + esc(c.name) + '" data-act="rm" title="Workstation sibling — must not run on production. Force-remove it." style="background:#8b0000;color:#fff;padding:2px 8px;font-size:0.78em;">Remove from prod</button>'
+                    : '') +
                 '</div>' +
             '</div>';
         });
