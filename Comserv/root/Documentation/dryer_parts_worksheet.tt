@@ -1,0 +1,314 @@
+    <div class="row">
+        <div class="col-100">
+            <h2 id="parts-worksheet" class="doc-h2">5b. Printable parts worksheet (manual build)</h2>
+            <p class="doc-body">All 29 printed-part codes extracted from the assembly manual
+            (192244_HDRY_System__Assembly_Manual.pdf, 1 Feb 2025). Each row maps the code to its
+            source 3MF and a preview pulled from that 3MF's own plate renders (no external render
+            needed). Work the checklist top-to-bottom: create the <code>printing_3d_models</code>
+            row + child <code>inventory_items</code> + BOM line, then push a <code>printing_3d_jobs</code>
+            entry to <a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>.
+            Pictures are served from <code>/static/images/3d/hdry/parts/</code>.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Code</th><th class="doc-th">Name</th><th class="doc-th">Preview</th>
+                    <th class="doc-th">Source 3MF</th><th class="doc-th">SKU</th><th class="doc-th">Qty (mentions)</th>
+                    <th class="doc-th">Model+Item</th><th class="doc-th">Queued</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BBL01</code></td>
+                    <td class="doc-td">Bottom Back Left L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_1.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_1.png" alt="BBL01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BBL01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BBL02</code></td>
+                    <td class="doc-td">Bottom Back Left L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_1.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_1.png" alt="BBL02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BBL02</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BBR01</code></td>
+                    <td class="doc-td">Bottom Back Right L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_2.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_2.png" alt="BBR01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BBR01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BBR02</code></td>
+                    <td class="doc-td">Bottom Back Right L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_2.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_2.png" alt="BBR02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BBR02</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BL01</code></td>
+                    <td class="doc-td">Back Left corner L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_3.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_3.png" alt="BL01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BL01</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BL02</code></td>
+                    <td class="doc-td">Back Left corner L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_3.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_3.png" alt="BL02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BL02</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BLS01</code></td>
+                    <td class="doc-td">Back Left Side panel L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_4.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_4.png" alt="BLS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BLS01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BLS02</code></td>
+                    <td class="doc-td">Back Left Side panel L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_4.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_4.png" alt="BLS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BLS02</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BR01</code></td>
+                    <td class="doc-td">Back Right corner L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_5.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_5.png" alt="BR01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BR01</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BR02</code></td>
+                    <td class="doc-td">Back Right corner L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_5.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_5.png" alt="BR02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BR02</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BRS01</code></td>
+                    <td class="doc-td">Back Right Side L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_6.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_6.png" alt="BRS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BRS01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>BRS02</code></td>
+                    <td class="doc-td">Back Right Side L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_6.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_6.png" alt="BRS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-BRS02</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FFL01</code></td>
+                    <td class="doc-td">Front Door Left (up)</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_1.png" target="_blank"><img src="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_1.png" alt="FFL01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Doors</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FFL01</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FFL02</code></td>
+                    <td class="doc-td">Front Door Left (low)</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_2.png" target="_blank"><img src="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_2.png" alt="FFL02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Doors</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FFL02</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FFR01</code></td>
+                    <td class="doc-td">Front Door Right (up)</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_3.png" target="_blank"><img src="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_3.png" alt="FFR01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Doors</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FFR01</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FFR02</code></td>
+                    <td class="doc-td">Front Door Right (low)</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_4.png" target="_blank"><img src="/static/images/3d/hdry/parts/023037_HDRY_System_V3__Doors/top_4.png" alt="FFR02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Doors</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FFR02</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FL01</code></td>
+                    <td class="doc-td">Front Left corner L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_7.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_7.png" alt="FL01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FL01</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FL02</code></td>
+                    <td class="doc-td">Front Left corner L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_7.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_7.png" alt="FL02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FL02</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FLS01</code></td>
+                    <td class="doc-td">Front Left Side panel L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_8.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_8.png" alt="FLS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FLS01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FLS02</code></td>
+                    <td class="doc-td">Front Left Side panel L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_8.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_8.png" alt="FLS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FLS02</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FR01</code></td>
+                    <td class="doc-td">Front Right corner L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_9.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_9.png" alt="FR01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FR01</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FR02</code></td>
+                    <td class="doc-td">Front Right corner L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_9.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_9.png" alt="FR02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FR02</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FRS01</code></td>
+                    <td class="doc-td">Front Right Side L1</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_10.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_10.png" alt="FRS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 1</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FRS01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>FRS02</code></td>
+                    <td class="doc-td">Front Right Side L2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_10.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_10.png" alt="FRS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Module 2</code></td>
+                    <td class="doc-td"><code>INT-HDRY-FRS02</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>SBR02</code></td>
+                    <td class="doc-td">Spool bracket R2</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023113_HDRY_System_V3__Dryer__Extras/top_1.png" target="_blank"><img src="/static/images/3d/hdry/parts/023113_HDRY_System_V3__Dryer__Extras/top_1.png" alt="SBR02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Dryer Extras</code></td>
+                    <td class="doc-td"><code>INT-HDRY-SBR02</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>SBR03</code></td>
+                    <td class="doc-td">Spool bracket R3</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/023113_HDRY_System_V3__Dryer__Extras/top_2.png" target="_blank"><img src="/static/images/3d/hdry/parts/023113_HDRY_System_V3__Dryer__Extras/top_2.png" alt="SBR03" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>Dryer Extras</code></td>
+                    <td class="doc-td"><code>INT-HDRY-SBR03</code></td>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>SRC01</code></td>
+                    <td class="doc-td">Spool roller center</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/110520_HDRY_System_V3__AMS__Hydra__Rollers/top_1.png" target="_blank"><img src="/static/images/3d/hdry/parts/110520_HDRY_System_V3__AMS__Hydra__Rollers/top_1.png" alt="SRC01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>AMS/Hydra Rollers</code></td>
+                    <td class="doc-td"><code>INT-HDRY-SRC01</code></td>
+                    <td class="doc-td">4</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>SRL01</code></td>
+                    <td class="doc-td">Spool roller left</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/110520_HDRY_System_V3__AMS__Hydra__Rollers/top_2.png" target="_blank"><img src="/static/images/3d/hdry/parts/110520_HDRY_System_V3__AMS__Hydra__Rollers/top_2.png" alt="SRL01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>AMS/Hydra Rollers</code></td>
+                    <td class="doc-td"><code>INT-HDRY-SRL01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>SRR01</code></td>
+                    <td class="doc-td">Spool roller right</td>
+                    <td class="doc-td"><a href="/static/images/3d/hdry/parts/110520_HDRY_System_V3__AMS__Hydra__Rollers/top_3.png" target="_blank"><img src="/static/images/3d/hdry/parts/110520_HDRY_System_V3__AMS__Hydra__Rollers/top_3.png" alt="SRR01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
+                    <td class="doc-td"><code>AMS/Hydra Rollers</code></td>
+                    <td class="doc-td"><code>INT-HDRY-SRR01</code></td>
+                    <td class="doc-td">2</td>
+                    <td class="doc-td"><input type="checkbox"> model+item</td>
+                    <td class="doc-td"><input type="checkbox"> queued</td>
+                </tr>
+            </table>
+            <p class="doc-body"><strong>Note:</strong> qty shown is the count of manual mentions, not final
+            print qty — confirm against the BOM when creating items. Door/spool parts use their own 3MF.
+            Preview images are distinct per source file (top_N.png); they are plate thumbnails, not the
+            individual part mesh — match the code to the manual page before printing.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>

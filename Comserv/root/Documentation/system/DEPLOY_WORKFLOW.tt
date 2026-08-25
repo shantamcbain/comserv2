@@ -12,6 +12,14 @@
             <p>The previous document <code>REBUILD_AND_DEPLOY_INSTRUCTIONS.tt</code> described a different,
             outdated flow (building inside the production container, <code>docker-compose.server.yml</code>)
             and is <strong>superseded</strong> — do not follow it.</p>
+            <p><strong>Production1 is image-only (2026-08-24).</strong> There is no application source on
+            .126 that may be used. <strong>No git pull. No docker build. No host Starman.
+            No workstation containers</strong> (<code>comserv2-web</code>, <code>comserv-web-dev</code>,
+            <code>comserv-web-staging</code>). The only web process is <code>comserv2-web-prod</code>
+            (plus redis and config-db). Monitor skips git and lib-sync; it only health-checks and
+            purges siblings. Build scripts on the host were moved to
+            <code>/opt/comserv/REMOVED-DO-NOT-RUN/</code>. The git <code>origin</code> remote was
+            removed so a pull cannot overwrite this.</p>
         </div>
     </div>
 </div>
@@ -49,7 +57,10 @@ explicit, required final step, and verification (below) catches any mismatch bef
 <p>Use <strong>Build &amp; Push only</strong> mode (or the Full Rebuild which includes this). This tags the
 image as <code>shantamcsbain/comserv-web-prod:latest</code> and pushes it to Docker Hub.</p>
 <ul>
-    <li>Confirm the push completes (watch the streaming log for the push success line).</li>
+    <li>The build explicitly targets the Dockerfile <code>production</code> stage and regenerates
+        <code>version.json</code> immediately before building.</li>
+    <li>Do not trust a generic push-success line. The deploy engine compares the newly built local image ID
+        with Docker Hub's manifest <em>config digest</em>. It reports success only when they are identical.</li>
     <li>Do NOT consider the deploy done at this point — production1 still runs the old image.</li>
 </ul>
 
@@ -59,6 +70,7 @@ image as <code>shantamcsbain/comserv-web-prod:latest</code> and pushes it to Doc
 <strong>Pull &amp; Deploy (from registry)</strong>, and start it. This:</p>
 <ol>
     <li>Pulls <code>shantamcsbain/comserv-web-prod:latest</code> from Docker Hub onto production1.</li>
+    <li>Verifies production1's pulled image ID equals Docker Hub's config digest; a mismatch leaves production untouched.</li>
     <li>Backs up the current container image (rollback point).</li>
     <li>Recreates the <code>comserv2-web-prod</code> container from the fresh image.</li>
     <li>Runs the health-check loop (up to 90s). On failure it auto-rolls back to the backup.</li>
@@ -129,6 +141,12 @@ They do <strong>not</strong> all do the same thing. The button you click is the 
         <tr><td><strong>Container "unhealthy" after deploy</strong></td>
             <td>New code failed the health check &rarr; auto-rolled back to the previous image. Read the container
                 logs (<code>docker logs comserv2-web-prod</code>) for the boot error. Fix, then redeploy.</td></tr>
+        <tr><td><strong>web / web-dev / web-staging keep coming back on production1</strong></td>
+            <td>Workstation siblings, same image as prod. A bare <code>compose up -d</code> creates them and
+                <code>web</code> steals :5000. Do not keep deleting them by hand. Monitor runs
+                <code>purge_workstation_web_siblings</code> every 10 min on .126 (removes those three names only,
+                restarts web-prod). From the workstation Docker page, target Production 1 — running siblings have
+                <strong>Remove from prod</strong>. Keep redis and config-db. An image rebuild alone does not stop this.</td></tr>
         <tr><td><strong>"Built but nothing changed"</strong></td>
             <td>Stale Docker layer. No Cache is default-on now; if you unchecked it, re-run with it checked.</td></tr>
         <tr><td><strong>Cannot deploy from inside production1</strong></td>

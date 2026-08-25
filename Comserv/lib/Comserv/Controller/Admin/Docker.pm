@@ -708,7 +708,7 @@ sub list :Path('/admin/docker/list') :Args(0) {
             next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports, $created, $running_for, $state, $mounts, $networks) = split /\|/, $line, 10;
             $id = substr($id, 0, 12) if $id;
-            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /^failed-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
+            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /^failed-/i) ? 1 : 0;
 
             # Get image creation date
             my $img_created = '';
@@ -759,12 +759,23 @@ sub list :Path('/admin/docker/list') :Args(0) {
         my $cmd = "$ssh_prefix \"docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}|{{.RunningFor}}|{{.State}}|{{.Mounts}}|{{.Networks}}' 2>/dev/null || echo ''\"";
         my $output = `$cmd 2>/dev/null` || '';
 
+        # Only report containers that belong to the app on this host.
+        # Support services (redis, config-db) and unrelated workloads are not
+        # part of the deploy and must not appear as backup/app entries.
+        my %WANT = map { $_ => 1 } qw(
+            comserv2-web-prod comserv-web-prod comserv2-web
+            comserv-web-dev comserv-web-staging
+            bk-comserv2-web-prod
+        );
+        my $HOST = $ssh_host || '';
+        my $is_prod1 = ($HOST =~ /192\.168\.1\.126/ || $HOST =~ /comservproduction1/);
+
         foreach my $line (split /\n/, $output) {
             next unless $line =~ /\|/;
             my ($id, $name, $image, $status, $ports, $created, $running_for, $state, $mounts, $networks) = split /\|/, $line, 10;
             $id = substr($id, 0, 12) if $id;
             # Detect dated backup containers
-            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /^failed-/i || $name =~ /backup/i || $name =~ /\.backup\./i) ? 1 : 0;
+            my $is_backup_container = ($name =~ /^bk-/i || $name =~ /^failed-/i) ? 1 : 0;
 
             # Get image creation date via remote SSH
             my $img_created = '';
@@ -928,10 +939,11 @@ sub _run_docker_action {
         }
         local $ENV{SSHPASS} = $ssh_pass;
 
-        my $remote_cmd = "docker $action $container 2>&1";
-        my $cmd = $action eq 'rm'
-            ? "sshpass -e ssh -o StrictHostKeyChecking=no $resolved_user\@$resolved_host \"$remote_cmd\""
-            : "sshpass -e ssh -o StrictHostKeyChecking=no $resolved_user\@$resolved_host \"$remote_cmd\"";
+        # Running workstation siblings on prod1 cannot be `docker rm`'d without -f.
+        my $remote_cmd = ($action eq 'rm')
+            ? "docker rm -f \"$container\" 2>&1"
+            : "docker $action $container 2>&1";
+        my $cmd = "sshpass -e ssh -o StrictHostKeyChecking=no $resolved_user\@$resolved_host \"$remote_cmd\"";
         $output = `$cmd 2>/dev/null` || '';
         $success = $? == 0;
     }
@@ -1441,6 +1453,13 @@ sub delete :Path('/admin/docker/delete') :Args(1) {
 
     unless ($self->_can_access_docker_widget($c)) {
         $c->stash->{json} = { success => 0, error => 'CSC admin only' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    # Never delete the live prod web container or its support services.
+    if ($name =~ /^(comserv2-web-prod|comserv-web-prod|comserv2-redis|comserv2-config-db)$/) {
+        $c->stash->{json} = { success => 0, error => "Refusing to delete protected container $name" };
         $c->forward('View::JSON');
         return;
     }

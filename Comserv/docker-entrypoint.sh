@@ -3,7 +3,8 @@ set -e
 
 # Default values
 PORT="${PORT:-3000}"
-WORKERS="${WORKERS:-4}"
+WORKERS="${WORKERS:-8}"
+MAX_REQUESTS="${MAX_REQUESTS:-1000}"
 ENVIRONMENT="${ENVIRONMENT:-development}"
 
 echo "=== Comserv Starting ==="
@@ -32,6 +33,7 @@ if [ "$ENVIRONMENT" = "production" ] || [ "$ENVIRONMENT" = "staging" ]; then
 
     exec plackup -s Starman \
         --workers "$WORKERS" \
+        --max-requests "$MAX_REQUESTS" \
         --port "$PORT" \
         --access-log /dev/stdout \
         --error-log /dev/stderr \

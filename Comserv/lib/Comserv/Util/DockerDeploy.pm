@@ -378,7 +378,7 @@ sub ensure_all_required_volumes_remote {
 # ─────────────────────────────────────────────────────────────────────────────
 sub _prune_backups {
     my ($self, $base_name, $max_keep, $is_remote, $ssh_prefix) = @_;
-    $max_keep ||= 5;
+    $max_keep ||= 3;
 
     # List backup image tags (bk-<base>:<ts>) sorted oldest→newest by tag.
     my $repo_tag = "bk-$base_name";
@@ -408,14 +408,14 @@ sub _prune_backups {
     }
     $self->_log("Pruned " . scalar(@to_remove) . " old backup(s) (container+image), keeping $max_keep.");
 
-    # Also prune old failed-* containers (preserved failed deploys) — keep 2.
+    # Also prune old failed-* containers (preserved failed deploys) — keep 3.
     my $failed_list_cmd = $is_remote
         ? "$ssh_prefix \"docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^failed-$base_name-' | sort\""
         : "docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^failed-$base_name-' | sort";
     my $failed_out = `$failed_list_cmd` || '';
     my @failed = grep { /\S/ } split /\n/, $failed_out;
-    if (@failed > 2) {
-        my @rm_failed = splice @failed, 0, (@failed - 2);
+    if (@failed > 3) {
+        my @rm_failed = splice @failed, 0, (@failed - 3);
         foreach my $fc (@rm_failed) {
             chomp $fc;
             $self->_log("Pruning old failed-deploy container: $fc");
