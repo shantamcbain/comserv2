@@ -7,6 +7,7 @@ use Try::Tiny;
 use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
 use Comserv::Util::Printing3d;
+use Comserv::Util::NfsPath;
 
 has 'logging' => (
     is      => 'ro',
@@ -379,13 +380,14 @@ sub model_download :Path('/3d/model_download') :Args(1) {
         $c->detach;
     }
 
-    my $path = $model->nfs_path;
-    unless (-f $path && -r $path) {
-        my $nfs_root = $ENV{NFS_DATA_PATH} || $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
-        (my $alt = $path) =~ s{^/data/nfs}{$nfs_root};
-        $path = $alt if -f $alt && -r $alt;
-    }
-    unless (-f $path && -r $path) {
+    # Resolve through NfsPath so workstation and every Docker node use the same
+    # /data/nfs tree. A raw -f on the stored path fails when the container's
+    # /data/nfs is not the shared NFS volume.
+    my $path = eval { Comserv::Util::NfsPath->new->resolve_path($model->nfs_path) } || '';
+    unless ($path && -f $path && -r $path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'model_download',
+            "STL not visible at stored nfs_path=" . ($model->nfs_path // '') .
+            " resolved=" . ($path || '<empty>'));
         $c->flash->{error_msg} = 'File not found on server: ' . $model->nfs_path;
         $c->res->redirect($c->uri_for('/3d/model', [$id]));
         $c->detach;
