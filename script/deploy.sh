@@ -326,10 +326,15 @@ if [ -n "$GLOBAL_HOST_APP_DIR" ]; then
     sync_deploy_artifacts
 fi
 
-# Run an early git pull to ensure we have the absolute latest code immediately.
-# This guarantees that if the container fails and we have to restart Starman on the host,
-# it is already running the current software from this synchronized state.
-if [ -n "$GLOBAL_HOST_APP_DIR" ] && command -v git &>/dev/null; then
+# Production1 is IMAGE-ONLY. Never fetch/pull git here — that overwrite
+# brought workstation compose siblings back and used host code as if it
+# were the app. Workstation builds; this host only pulls/runs an image.
+_PROD_HOST=0
+echo "$(hostname 2>/dev/null) $(hostname -I 2>/dev/null)" | grep -Eqi 'comservproduction1|192\.168\.1\.126' && _PROD_HOST=1
+
+if [ "$_PROD_HOST" -eq 1 ]; then
+    echo "--- Production host: skipping ALL git fetch/pull (image-only, no host code) ---"
+elif [ -n "$GLOBAL_HOST_APP_DIR" ] && command -v git &>/dev/null; then
     echo "--- Early Git Repository Synchronization ---"
     echo "Updating local host repository at $GLOBAL_HOST_APP_DIR..."
     safe_git "$GLOBAL_HOST_APP_DIR" fetch origin main 2>/dev/null || safe_git "$GLOBAL_HOST_APP_DIR" fetch 2>/dev/null || true
@@ -544,6 +549,10 @@ resolve_starman_log() {
 # Sync host git checkout lib/ into the running prod container and restart so
 # Starman workers reload Perl modules (Docker image alone does not include git pull).
 sync_host_app_lib() {
+    if is_production_host; then
+        echo "   Production host: refusing lib sync from host git. The image is the only code."
+        return 0
+    fi
     local HOST_LIB="${GLOBAL_HOST_APP_DIR:-/opt/comserv/Comserv}/lib"
     if [ ! -d "$HOST_LIB" ]; then
         echo "   ⚠ lib sync skipped: $HOST_LIB not found"
@@ -758,11 +767,94 @@ is_production_host() {
     echo "$hn $ip" | grep -Eqi 'comservproduction1|192\.168\.1\.126'
 }
 
+# Workstation-only web services (same image as prod). A bare `compose up` on
+# the merged yml+prod files creates them on .126; they steal :5000/:3000/:4000
+# and web-prod restart-loops with empty ports. Profiles in the overlay are a
+# first gate; this is the second: on production, they are always removed.
+# NEVER include comserv2-web-prod, redis, or config-db here.
+WORKSTATION_WEB_SIBLINGS="comserv2-web comserv-web-dev comserv-web-staging"
+
+# Keep at most 3 dated backup containers (bk-*) and 3 numbered backup images.
+# Older ones eat the 30G prod disk (~2.8G each).
+KEEP_BACKUPS=3
+prune_old_backups() {
+    local keep="${1:-$KEEP_BACKUPS}"
+    echo "Pruning backups (keep $keep)..."
+    local n i=0
+    # Oldest first (name contains sortable YYYYMMDD-HHMMSS).
+    while IFS= read -r n; do
+        [ -z "$n" ] && continue
+        i=$((i + 1))
+        if [ "$i" -gt "$keep" ]; then
+            echo "   removing old backup container $n"
+            docker rm -f "$n" >/dev/null 2>&1 || true
+        fi
+    done < <(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^bk-comserv2?-web-prod-' | sort -r)
+
+    # Numbered Hub-style tags: only backup-1..backup-3 may remain.
+    docker rmi shantamcsbain/comserv-web-prod:backup-5 2>/dev/null || true
+    docker rmi shantamcsbain/comserv-web-prod:backup-4 2>/dev/null || true
+    i=0
+    while IFS= read -r n; do
+        [ -z "$n" ] && continue
+        i=$((i + 1))
+        if [ "$i" -gt "$keep" ]; then
+            echo "   removing old backup image $n"
+            docker rmi "$n" >/dev/null 2>&1 || true
+        fi
+    done < <(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E '^bk-comserv2?-web-prod:' | sort -r)
+}
+
+purge_workstation_web_siblings() {
+    is_production_host || return 0
+    unset COMPOSE_PROFILES
+    export COMPOSE_PROFILES=
+    local n removed=0
+    for n in $WORKSTATION_WEB_SIBLINGS; do
+        if docker inspect "$n" >/dev/null 2>&1; then
+            echo "⚠️  Production host: removing workstation sibling $n (must never run here)"
+            docker stop "$n" >/dev/null 2>&1 || true
+            docker rm -f "$n" >/dev/null 2>&1 || true
+            removed=1
+        fi
+    done
+    if [ "$removed" = 1 ] && docker inspect "${CONTAINER:-comserv2-web-prod}" >/dev/null 2>&1; then
+        echo "   Restarting ${CONTAINER:-comserv2-web-prod} so it can bind :5000"
+        docker restart "${CONTAINER:-comserv2-web-prod}" >/dev/null 2>&1 || true
+    fi
+}
+
 # Start comserv2-web-prod from a PULLED image. No compose files, no host git
 # tree, no /opt/comserv/Comserv. Other servers do not have that path.
 # CSS/JS come from the image. Only theme override volumes are mounted over
 # the two mutable static subdirs; empty volumes are seeded from the image
 # so they cannot hide baked CSS.
+NFS_VOLUME_NAME="${NFS_VOLUME_NAME:-comserv2_nfs_data_nfs}"
+
+ensure_nfs_volume() {
+    local img="${1:-$IMAGE}" volume_name="${NFS_VOLUME_NAME:-comserv2_nfs_data_nfs}" opts
+    if ! docker volume inspect "$volume_name" >/dev/null 2>&1; then
+        echo "    creating Docker NFS volume $volume_name"
+        docker volume create --driver local \
+            --opt type=nfs \
+            --opt 'o=addr=192.168.1.175,rw,nfsvers=3,hard,timeo=600,retrans=2' \
+            --opt 'device=:/mnt/data' \
+            "$volume_name" >/dev/null || return 1
+    fi
+    opts=$(docker volume inspect "$volume_name" \
+        --format '{{index .Options "type"}}|{{index .Options "o"}}|{{index .Options "device"}}' 2>/dev/null || true)
+    if ! echo "$opts" | grep -Eq '^nfs\|.*addr=192\.168\.1\.175.*\|:/mnt/data$'; then
+        echo "❌ $volume_name is not the required NFS volume: ${opts:-no options}"
+        return 1
+    fi
+    if ! docker run --rm --entrypoint sh -v "$volume_name:/data/nfs:ro" "$img" \
+        -c 'find /data/nfs -type f -iname "*.stl" -print -quit | grep -q .' ; then
+        echo "❌ $volume_name mounted but no STL file is visible"
+        return 1
+    fi
+    echo "    NFS volume verified: $volume_name -> 192.168.1.175:/mnt/data"
+}
+
 start_prod_container_from_image() {
     local img="${1:-$IMAGE}"
     local name="${2:-$CONTAINER}"
@@ -785,12 +877,24 @@ start_prod_container_from_image() {
     fi
     ident="${SYSTEM_IDENTIFIER:-production1}"
     echo "    secrets dir: ${secrets:-NONE}"
+    purge_workstation_web_siblings
+
+    ensure_nfs_volume "$img" || return 1
+
+    # Name must be free. A mid-pull monitor recreate leaves a leftover
+    # comserv2-web-prod and `docker run --name` then false-fails (2026-08-24).
+    if docker inspect "$name" >/dev/null 2>&1; then
+        local leftover="failed-${name}-nameclash-$(date +%Y%m%d-%H%M%S)"
+        echo "   name $name still exists — moving aside to $leftover"
+        docker rename "$name" "$leftover" 2>/dev/null || docker rm -f "$name" >/dev/null 2>&1 || true
+        docker stop "$leftover" >/dev/null 2>&1 || true
+    fi
 
     docker network inspect comserv_default >/dev/null 2>&1 \
         || docker network create comserv_default >/dev/null
 
     local v
-    for v in comserv2_cache comserv2_logs comserv2_nfs_data comserv2_sessions \
+    for v in comserv2_cache comserv2_logs comserv2_sessions \
              comserv2_temp comserv2_themes comserv2_whisper_venv comserv2_cpan_cache \
              comserv2_theme_config comserv2_theme_css; do
         docker volume create "$v" >/dev/null 2>&1 || true
@@ -812,6 +916,9 @@ start_prod_container_from_image() {
     [ -d "$secrets/dbi" ] && dbi_src="$secrets/dbi"
     [ -z "$dbi_src" ] && [ -d "$HOME/.comserv/secrets/dbi" ] && dbi_src="$HOME/.comserv/secrets/dbi"
     if [ -n "$dbi_src" ] && [ "$(ls -A "$dbi_src" 2>/dev/null | wc -l)" -gt 0 ]; then
+        if [ "$dbi_src" = "$secrets/dbi" ]; then
+            echo "    secrets already at $secrets/dbi — skip seed copy"
+        else
         # Copy via a source bind. Do not interpolate a host path into the
         # container command — that path does not exist inside the image.
         docker run --rm --entrypoint sh \
@@ -819,6 +926,7 @@ start_prod_container_from_image() {
             -v "$secrets:/dest" "$img" \
             -c 'mkdir -p /dest/dbi && cp -a /src/. /dest/dbi/ || true' \
             || echo "⚠ secrets seed into $secrets failed (will still bind-mount it)"
+        fi
     fi
 
     local extra=()
@@ -838,6 +946,8 @@ start_prod_container_from_image() {
         -e CATALYST_ENV=production \
         -e CATALYST_DEBUG=0 \
         -e WEB_PORT=5000 \
+        -e WORKERS="${WORKERS:-8}" \
+        -e MAX_REQUESTS="${MAX_REQUESTS:-1000}" \
         -e TZ=UTC \
         -e COMSERV_NO_HEALTH_LOG=1 \
         -e NFS_DATA_PATH=/data/nfs \
@@ -852,7 +962,7 @@ start_prod_container_from_image() {
         -v "$secrets:/home/comserv/.comserv/secrets:ro" \
         -v comserv2_cache:/cache \
         -v comserv2_logs:/opt/comserv/root/log \
-        -v comserv2_nfs_data:/data/nfs \
+        -v "$NFS_VOLUME_NAME:/data/nfs:rw" \
         -v comserv2_sessions:/tmp/comserv/session \
         -v comserv2_cache:/tmp/comserv/cache \
         -v comserv2_temp:/tmp/comserv/temp \
@@ -865,6 +975,48 @@ start_prod_container_from_image() {
         --health-cmd 'curl -fs --max-time 5 http://127.0.0.1:5000/health || exit 1' \
         --health-interval 30s --health-timeout 8s --health-retries 3 --health-start-period 60s \
         "$img"
+}
+
+stamp_build_version() {
+    local branch commit dirty build_date build_host
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+    commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+    dirty=""
+    git diff --quiet --ignore-submodules HEAD -- 2>/dev/null || dirty="+local"
+    build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    build_host=$(hostname -f 2>/dev/null || hostname)
+    python3 - "$branch" "${commit}${dirty}" "$build_date" "$build_host" <<'PY'
+import json, sys
+payload = {
+    "branch": sys.argv[1],
+    "commit": sys.argv[2],
+    "build_date": sys.argv[3],
+    "build_host": sys.argv[4],
+}
+with open("version.json", "w", encoding="utf-8") as fh:
+    json.dump(payload, fh, separators=(",", ":"))
+    fh.write("\n")
+PY
+    echo "Build stamp: branch=$branch commit=${commit}${dirty} date=$build_date host=$build_host"
+}
+
+registry_config_digest() {
+    local image_ref="${1:-$IMAGE}" manifest_file rc
+    manifest_file=$(mktemp)
+    if ! docker manifest inspect --verbose "$image_ref" >"$manifest_file" 2>/dev/null; then
+        rm -f "$manifest_file"
+        return 1
+    fi
+    python3 - "$manifest_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    data = json.load(fh)
+print(data.get("SchemaV2Manifest", {}).get("config", {}).get("digest")
+      or data.get("config", {}).get("digest") or "")
+PY
+    rc=$?
+    rm -f "$manifest_file"
+    return $rc
 }
 
 canonical_deploy() {
@@ -903,20 +1055,37 @@ canonical_deploy() {
             return 1
         fi
         echo "--- [1/6] CLEAN BUILD (workstation) ---"
+        stamp_build_version || {
+            echo "❌ Could not generate version.json — aborting before build."
+            return 1
+        }
         if ! BUILDKIT_PROGRESS=plain docker compose $COMPOSE_ARGS build --pull "$SVC"; then
             echo "❌ Build failed — aborting. Running container untouched."
             return 1
         fi
-        local LOCAL_ID
-        LOCAL_ID=$(docker inspect --format='{{.Id}}' "$IMAGE" 2>/dev/null | cut -c1-19)
-        echo "✅ Built $IMAGE (id ${LOCAL_ID:-unknown})"
+        local LOCAL_ID REGISTRY_ID
+        LOCAL_ID=$(docker inspect --format='{{.Id}}' "$IMAGE" 2>/dev/null)
+        if [ -z "$LOCAL_ID" ]; then
+            echo "❌ Build did not create $IMAGE — aborting before push."
+            return 1
+        fi
+        echo "✅ Built production-stage $IMAGE (id $LOCAL_ID)"
 
         echo "--- [2/6] CLEAN PUSH ---"
-        if ! docker compose $COMPOSE_ARGS push "$SVC"; then
+        if ! docker push "$IMAGE"; then
             echo "❌ Push failed — aborting."
             return 1
         fi
-        echo "✅ Pushed $IMAGE"
+        REGISTRY_ID=$(registry_config_digest "$IMAGE" || true)
+        if [ -z "$REGISTRY_ID" ] || [ "$REGISTRY_ID" != "$LOCAL_ID" ]; then
+            echo "❌ REGISTRY VERIFY FAILED"
+            echo "   local image id : ${LOCAL_ID:-missing}"
+            echo "   registry config: ${REGISTRY_ID:-missing}"
+            echo "   Refusing success: Pull & Deploy would receive the wrong image."
+            return 1
+        fi
+        echo "✅ Pushed and verified $IMAGE"
+        echo "   registry config digest = $REGISTRY_ID"
         echo "✅ Image is on the registry. This step did not start or replace any container."
         echo "    Production is unchanged until Pull & Deploy runs on that host."
         return 0
@@ -928,29 +1097,62 @@ canonical_deploy() {
     # Remote production path: rename → pull → stop backup → docker run from image.
     # The target has NO app source tree. Do not cd /opt/comserv/Comserv.
     if [ -n "$REMOTE_SSH" ]; then
-        local REMOTE_TS BK
+        local REMOTE_TS BK EXPECTED_ID PULLED_ID
+        EXPECTED_ID=$(registry_config_digest "$IMAGE" || true)
+        if [ -z "$EXPECTED_ID" ]; then
+            echo "❌ Cannot resolve registry config digest for $IMAGE — production untouched."
+            return 1
+        fi
+        if ! $REMOTE_SSH bash -s <<EOF
+$(declare -f ensure_nfs_volume)
+IMAGE=${IMAGE}
+NFS_VOLUME_NAME=${NFS_VOLUME_NAME}
+ensure_nfs_volume "${IMAGE}"
+EOF
+        then
+            echo "❌ Production Docker NFS volume preflight failed — current container left untouched."
+            return 1
+        fi
         REMOTE_TS=$(date +%Y%m%d-%H%M%S)
         BK="bk-${CONTAINER}-${REMOTE_TS}"
+        $REMOTE_SSH "date +%s > /tmp/comserv-deploy.lock"
         echo "--- [3/6] RENAME running $CONTAINER → $BK (keep serving during pull) ---"
         $REMOTE_SSH "if docker inspect ${CONTAINER} >/dev/null 2>&1; then docker rename ${CONTAINER} ${BK}; echo renamed; else echo no-live-container; fi"
+        $REMOTE_SSH bash -s <<EOF
+$(declare -f prune_old_backups)
+KEEP_BACKUPS=3
+prune_old_backups
+EOF
 
         echo "--- [4/6] PULL $IMAGE (no build, no host source) ---"
         if ! $REMOTE_SSH "docker pull ${IMAGE}"; then
             echo "❌ Remote pull failed. Restarting backup if we renamed."
             $REMOTE_SSH "if docker inspect ${BK} >/dev/null 2>&1; then docker start ${BK} 2>/dev/null || true; docker rename ${BK} ${CONTAINER} 2>/dev/null || true; fi" || true
+            $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             return 1
         fi
+        PULLED_ID=$($REMOTE_SSH "docker image inspect --format='{{.Id}}' ${IMAGE}" 2>/dev/null || true)
+        if [ "$PULLED_ID" != "$EXPECTED_ID" ]; then
+            echo "❌ PULLED IMAGE VERIFY FAILED — production container not replaced"
+            echo "   registry config: $EXPECTED_ID"
+            echo "   production id : ${PULLED_ID:-missing}"
+            $REMOTE_SSH "if docker inspect ${BK} >/dev/null 2>&1; then docker start ${BK} 2>/dev/null || true; docker rename ${BK} ${CONTAINER} 2>/dev/null || true; fi; rm -f /tmp/comserv-deploy.lock" || true
+            return 1
+        fi
+        echo "✅ Production pulled verified image id $PULLED_ID"
 
         echo "--- [5/6] STOP renamed backup, docker run $IMAGE as $CONTAINER ---"
         $REMOTE_SSH "if docker inspect ${BK} >/dev/null 2>&1; then docker stop ${BK}; fi"
         if ! $REMOTE_SSH bash -s <<EOF
-$(declare -f start_prod_container_from_image)
+$(declare -f is_production_host purge_workstation_web_siblings ensure_nfs_volume start_prod_container_from_image)
+NFS_VOLUME_NAME=${NFS_VOLUME_NAME}
 export SYSTEM_IDENTIFIER=production1
 start_prod_container_from_image ${IMAGE} ${CONTAINER}
 EOF
         then
             echo "❌ Remote start failed — restarting backup $BK"
             $REMOTE_SSH "docker start ${BK} 2>/dev/null || true" || true
+            $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
                 "Production deploy start failed — backup ${BK} running" \
                 "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew container failed to start from image. Freshly renamed backup is (or should be) running. Investigate." || true
@@ -969,6 +1171,7 @@ EOF
         if [ "$HEALTHY" != "1" ]; then
             echo "❌ HEALTH FAILED. Stopping new container and restarting backup $BK"
             $REMOTE_SSH "docker stop ${CONTAINER} 2>/dev/null || true; docker rename ${CONTAINER} failed-${CONTAINER}-${REMOTE_TS} 2>/dev/null || docker rm -f ${CONTAINER} 2>/dev/null || true; docker start ${BK} 2>/dev/null || true"
+            $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
             notify_admin_deploy \
                 "Production deploy unhealthy — backup ${BK} running" \
                 "Host: ${TARGET_HOST}\nBackup: ${BK}\nNew ${CONTAINER} failed /health. Freshly renamed backup container is now running. Investigate the failed deploy." || true
@@ -978,6 +1181,7 @@ EOF
         echo "--- POST-DEPLOY ---"
         local POST_CMD="perl -pi -e 's/USE_DB_MENU.*/USE_DB_MENU=1/' /opt/comserv/comserv.conf 2>/dev/null; rm -rf /tmp/comserv/cache/* /cache/* 2>/dev/null; echo done"
         $REMOTE_SSH "docker exec $CONTAINER bash -c '$POST_CMD'" 2>/dev/null || true
+        $REMOTE_SSH "rm -f /tmp/comserv-deploy.lock" || true
         echo "✅ Canonical deploy complete: $CONTAINER healthy on $TARGET_HOST"
         return 0
     fi
@@ -1004,6 +1208,7 @@ recreate_local_web_prod() {
         fi
         echo "    renamed live → $BK (stopping so :5000 is free)"
         docker stop "$BK" || true
+        prune_old_backups
     else
         echo "    no live $CONTAINER — starting fresh"
         BK=""
@@ -1755,8 +1960,20 @@ cd "$(dirname "$COMPOSE_FILE")"
 # If restarts fail, we roll back to backup-1. If rollback fails, we fall back to host Starman.
 if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
     echo "Checking container viability for $CONTAINER..."
-    CONTAINER_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
-    CONTAINER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unhealthy")
+    LOCK_AGE=9999
+    if [ -f /tmp/comserv-deploy.lock ]; then
+        LOCK_AGE=$(( $(date +%s) - $(cat /tmp/comserv-deploy.lock 2>/dev/null || echo 0) ))
+    fi
+    if [ "$LOCK_AGE" -ge 0 ] && [ "$LOCK_AGE" -lt 1800 ]; then
+        echo "   Deploy lock present (${LOCK_AGE}s old) — skipping recreate so Pull & Deploy can finish."
+        CONTAINER_RUNNING=true
+        CONTAINER_HEALTH=healthy
+    else
+        purge_workstation_web_siblings
+        prune_old_backups
+        CONTAINER_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
+        CONTAINER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unhealthy")
+    fi
 
     # ── Loop-proofing (2026-07) ───────────────────────────────────────────────
     # A container that was just (re)started reports health "starting" and low
@@ -2103,13 +2320,14 @@ else
 
     echo "New version detected. Starting deployment..."
 
-    # ── Rotate rollback/backup images (Keep 5 backups) ───────────────────────────
-    echo "Rotating rollback/backup images (keeping up to 5 backups)..."
-    # Remove oldest backup (backup-5) if it exists
+    # ── Rotate rollback/backup images (keep 3 backups) ───────────────────────────
+    echo "Rotating rollback/backup images (keeping up to 3 backups)..."
     docker rmi shantamcsbain/comserv-web-prod:backup-5 2>/dev/null || true
-    
-    # Shift existing backups down the line: 4 -> 5, 3 -> 4, 2 -> 3, 1 -> 2
-    for i in 4 3 2 1; do
+    docker rmi shantamcsbain/comserv-web-prod:backup-4 2>/dev/null || true
+    docker rmi shantamcsbain/comserv-web-prod:backup-3 2>/dev/null || true
+
+    # Shift existing backups: 2 -> 3, 1 -> 2
+    for i in 2 1; do
         NEXT=$((i + 1))
         if docker image inspect shantamcsbain/comserv-web-prod:backup-$i >/dev/null 2>&1; then
             docker tag shantamcsbain/comserv-web-prod:backup-$i shantamcsbain/comserv-web-prod:backup-$NEXT
@@ -2437,7 +2655,12 @@ else
             fi
         fi
 
-        if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
+        if is_production_host; then
+            echo "   [Emergency] Production host: NO git, NO host Starman. Recreating web-prod from the pulled image."
+            start_prod_container_from_image "$IMAGE" "$CONTAINER" || true
+            STATUS_MSG="EMERGENCY_IMAGE_RECREATE (no host code)"
+            SUBJECT="⚠ Emergency: recreated comserv2-web-prod from image"
+        elif [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
             echo "   [Emergency] Found host git repository at $HOST_APP_DIR"
             cd "$HOST_APP_DIR"
             

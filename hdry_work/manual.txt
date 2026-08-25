@@ -1,0 +1,2153 @@
+2d 13h
+
+
+
+
+                                                                            All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+5h
+
+
+
+
+                  HDRY System IT'S A MODULAR SYSTEM DESIGNED TO
+                  STORE FILAMENT WHILE MAINTAINING OPTIMAL HUMIDITY
+                  LEVELS.
+
+                  KEY FEATURES:
+                  • AIR DUCT ASSEMBLY WITH MAGNETIC OR ADHESIVE
+                    MOUNTING FOR EASY INSTALLATION AND MAINTENANCE.
+                  • TOP SUPPORT FOR ADDING A DRAWER, GIVING YOU EXTRA
+                    STORAGE AND ORGANIZATION.
+                  • WHEELS FOR SMOOTH AND EASY MOBILITY.
+                  • VERSATILE REAR CAPS FOR ROUTING POWER AND
+                    SENSOR CABLES.FLEXIBLE DESIGN THAT SUPPORTS BOTH
+                    STATIC AND MODULAR UPGRADES.
+
+                  ADDITIONAL HIGHLIGHTS:
+                  • COMPATIBLE WITH AMS AND HYDRA MODULES, AS WELL
+                    AS FREE FILAMENT ROLLERS.
+                  • PERFECTLY SUITED FOR BAMBU PRINTERS, WHILE ALSO
+                    ADAPTABLE FOR SINGLE-FILAMENT PRINTERS.
+                  • ONE MODULE CAN EFFICIENTLY MANAGE UP TO 4 SINGLE-
+                    FILAMENT PRINTERS SIMULTANEOUSLY.
+                  • BUILT FOR HIGH PERFORMANCE, FLEXIBILITY, AND
+                    EXPANDABILITY, THIS SYSTEM IS DESIGNED TO MEET A
+                    WIDE RANGE OF 3D PRINTING NEEDS WITH EASE AND
+
+         HDRY                           RELIABILITY.
+
+
+         System
+                                          1 February 2025               1
+REQUIRED FILAMENT:                                         REQUIRED SPARE PARTS:
+
+
+
+
+                                                                                                                      All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                    SCREW M4 14 mm                  180 units
+                MAIN MODULE STRUCTURE
+                                                                                                    x Module
+                FILAMENT:   PETG                  2.0 KG
+
+
+                                                                                                                  *
+                                                                    SCREW M3 20 mm                   16 units
+                BOTTOM & TOP                                                                        x Module
+                FILAMENT:   PETG                  1.0 KG
+
+                                                                                                                  *
+                                                                    BERING 608zz                    16 units
+                                                                                                   x Module
+                4 WHEELS
+                FILAMENT:   PETG                  1.0 KG
+                                                                    MAGNET 8X2 mm                    20 units
+                FILAMENT:   TPU                   0.2 KG                                            x Module
+
+                SUPPORT AMS -HYDRA                                       Adhesive GASKET                   6m
+                FILAMENT:   PETG                  0.2 KG
+
+                SUPPORT ROLLERS
+                FILAMENT:   PETG                  0.4 KG
+
+                DRYER SUPPORT & GADGET
+                FILAMENT:   PETG                  0.2 KG
+
+
+                                                                                    POLYDRYER            1 unit
+    HOW MUCH FILAMENT IS NEEDED FOR A 2-MODULE                                                        x Module
+    CONFIGURATION WITH 2 AMS UNITS, SUPPORT
+    FOR HPV DRAWER AND WHEELS?
+                        PETG
+                        TPU
+                                         6.4 KG
+                                         0.2 KG               *   THIS HARDWARE IS ONLY NEEDED IF YOU PLAN TO
+                                                                  PRINT AND INSTALL A SUPPORT FOR THE SPOOL
+                                                                  ROLLERS.
+
+                                                                                                1 February 2025   2
+                                                                                                                  8 units
+                                                                                                                            WASHERS
+                                                                                                                                           REQUIRED SPARE PARTS FOR WHEELS:
+
+
+
+
+                                                                                                                  4 units
+
+
+
+
+                                             50 mm
+                                                                                                                            BOLT AND NUT
+                                                                                                                 4 units
+                                                                                                                           SPACER
+
+
+
+
+1 February 2025
+3
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                                                                                           HDRY System Dimensions
+
+
+
+
+1 February 2025
+4
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System       MANUAL CHAPTERS
+
+
+
+
+                                                                            All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              ❖ MODULE 1
+              ✓   CONSTRUCTION OF LEVEL 1   PAGE 6
+              ✓   CONSTRUCTION OF LEVEL 2   PAGE 11
+              ✓   CONSTRUCTION OF BOTTOM    PAGE 19
+              ✓   CONSTRUCTION OF TOP       PAGE 21
+
+              ❖ MODULE 2
+              ✓ CONSTRUCTION OF LEVEL 1     PAGE 29
+              ✓ CONSTRUCTION OF LEVEL 2     PAGE 11
+
+              ❖ ADDITIONAL ASSEMBLIES
+              ✓ MULTI-MODULE ASSEMBLY       PAGE 32
+
+              ✓ WHEEL ASSEMBLY              PAGE 39
+              ✓ DRAWER SUPPORT ASSEMBLY     PAGE 47
+
+              ✓ DOOR ASSEMBLY               PAGE 50
+
+              ✓   INTERNAL CONFIGURATION    PAGE 63
+              ✓   AMS OR HYDRA ASSEMBLY     PAGE 64
+              ✓   SPOOL ROLLERS ASSEMBLY    PAGE 73
+              ✓   DRYER ASSEMBLY            PAGE 83
+
+              ✓ REAR CAP ASSEMBLY           PAGE 97
+
+                                                      1 February 2025   5
+HDRY System                              MODULE 1 – LEVEL 1
+
+                                           INSTALL THE 6X3MM GASKET ALONG THE SIDES OF THE PIECES AS
+                                           INDICATED BY THE ARROWS.
+
+
+
+
+                                                                                                                           All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                           IN MOST CASES, A SINGLE GASKET BETWEEN THE PIECES WILL BE ENOUGH.
+
+
+
+
+ FLS01
+         BLS01
+                 BBL01
+                         BBR01
+                                 BRS01
+                                         FRS01
+                                                                                                     1 February 2025   6
+                                                                                                                                                                                                                      HDRY System
+                                                                                                                                                                                                                    MODULE 1 – LEVEL 1
+
+                                                                                                                                           HERE’S A PRACTICAL EXAMPLE OF THE CHANNEL AND HOW TO APPLY THE GASKET.
+
+
+
+
+1 February 2025
+7
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                                           MODULE 1 – LEVEL 1
+SCREWS   20                                            BL01
+                                      BLS01                        BBL01
+
+
+
+
+                                                                                                         All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                           BBR01
+              FLS01
+                                                                                           BR01
+ FL01
+
+
+
+
+                                                                                   BRS01
+
+
+                      INSERT ONE SCREW INTO EACH HIGHLIGHTED
+                      HOLE (OR SIMILAR ONES) TO CONNECT THE SIDE
+                      PANELS INTO A SINGLE PIECE.                          FRS01
+
+
+                                                                   FR01
+                                                                                   1 February 2025   8
+HDRY System   MODULE 1 – LEVEL 1
+
+
+
+
+                                                                                       All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                           WHEN ATTACHING THE FRONT CORNERS, PAY CLOSE
+                           ATTENTION TO THE HIGHLIGHTED NOTCH, WHICH
+                           NEEDS TO BE POSITIONED AT THE BOTTOM OF EACH
+                           SIDE.
+
+                           OF COURSE, IF YOU PAY ATTENTION TO THE PIECE
+                           LABELS, YOU SHOULDN’T RUN INTO ANY TROUBLE.
+
+
+
+
+                                                                 1 February 2025   9
+HDRY System                                        MODULE 1 – LEVEL 1
+
+
+
+
+                                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              NOW, INSTALL GASKETS ON BOTH THE TOP AND
+              BOTTOM SIDES USING THE HIGHLIGHTED
+              CHANNELS.
+
+
+
+                                                                        1 February 2025   10
+HDRY System                              MODULE 1 – LEVEL 2
+
+                                                INSTALL THE 6X3MM GASKET ALONG THE SIDES OF THE
+                                                PIECES     AS      INDICATED    BY    THE     ARROWS.
+
+
+
+
+                                                                                                                        All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                IN MOST CASES, A SINGLE GASKET BETWEEN THE PIECES WILL
+                                                BE ENOUGH.
+
+
+
+
+FLS02
+        BLS02
+                BBL02
+                        BBR02
+                                BRS02
+                                        FRS02                                                    1 February 2025   11
+                                                                                                                                                                                                                      HDRY System
+                                                                                                                                                                                                                    MODULE 1 – LEVEL 2
+
+                                                                                                                                           HERE’S A PRACTICAL EXAMPLE OF THE CHANNEL AND HOW TO APPLY THE GASKET.
+
+
+
+
+1 February 2025
+12
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                                   MODULE 1 – LEVEL 2
+SCREWS   20                                        BL02
+                               BLS02                           BBL02
+
+
+
+
+                                                                                                      All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                       BBR02
+              FLS02
+      FL02                                                                               BR02
+
+
+
+
+                                                                                     BRS02
+
+
+
+               INSERT ONE SCREW INTO EACH HIGHLIGHTED
+                                                                        FRS02
+               HOLE (OR SIMILAR ONES) TO CONNECT THE SIDE
+               PANELS INTO A SINGLE PIECE.
+                                                            FR02               1 February 2025   13
+HDRY System                            MODULE 1 – LEVEL 2
+
+
+
+
+                                                                                   All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+ WHEN ATTACHING THE FRONT CORNERS,
+ PAY CLOSE ATTENTION TO THE
+ HIGHLIGHTED NOTCH, WHICH NEEDS TO
+ BE POSITIONED AT THE TOP OF EACH
+ SIDE.
+
+ OF COURSE, IF YOU PAY ATTENTION TO
+ THE PIECE LABELS, YOU SHOULDN’T RUN
+ INTO ANY TROUBLE.
+
+
+
+
+                                                            1 February 2025   14
+HDRY System                                        MODULE 1 – LEVEL 2
+
+
+
+
+                                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              NOW, INSTALL GASKETS ON BOTH THE TOP AND
+              BOTTOM SIDES USING THE HIGHLIGHTED CHANNELS.
+
+
+                                                                        1 February 2025   15
+HDRY System                                            MODULE 1
+SCREWS   12
+
+
+
+
+                                                                                         All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+LEVEL 2
+
+
+
+
+LEVEL 1
+
+
+
+
+  IT'S TIME TO JOIN LEVEL 1 WITH LEVEL 2!
+  USE THE HIGHLIGHTED HOLES ON ALL SIDES TO INSERT A
+  STURDY SCREW AND TIGHTEN THOSE TWO LEVELS
+  TOGETHER.
+
+                                                                  1 February 2025   16
+HDRY System                               TRUCTURAL REINFORCEMENTS
+SCREWS    6
+
+
+
+
+                                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  CONNECT THE TWO REINFORCEMENTS
+  AS SHOWN IN THE IMAGES.
+
+                                                                MAKE EVERYTHING SOLID BY INSERTING AND
+                                                                TIGHTENING THE SCREWS IN THE AREAS
+                                                                INDICATED BY THE ARROWS.
+
+
+
+
+       IMPORTANT: IF YOU'RE BUILDING A MULTI-MODULE HDRY SYSTEM, DO NOT ASSEMBLE THE TOP BAR FOR NOW.
+                                                                                                         1 February 2025   17
+HDRY System                                TRUCTURAL REINFORCEMENTS
+SCREWS   8
+                              INSTALL THE REINFORCEMENTS ON THE STRUCTURE NOW. IN ADDITION TO THE MAIN
+                              BARS, YOU'LL NOTICE TWO SMALL TWO-HOLE REINFORCEMENTS AS WELL. USE THE
+
+
+
+
+                                                                                                                                      All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                              HIGHLIGHTED HOLES TO SECURELY AND SEAMLESSLY ATTACH THE CABINET.
+                   SBR03
+
+
+
+
+                    ]
+               SBR02
+              IMPORTANT: IF YOU'RE BUILDING A MULTI-MODULE HDRY SYSTEM, DO NOT ASSEMBLE THE TOP BAR FOR NOW.
+                                                                                                               1 February 2025   18
+                                                                                                                                                        HDRY System
+                                                                                                                                                       BOTTOM ASSEMBLY
+
+
+
+
+                                                                                                               PIECES INDICATED BY THE ARROWS.
+                                                                                                               APPLY THE GASKET TO THE SIDES AND THE
+
+
+
+
+1 February 2025
+19
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System   BOTTOM ASSEMBLY
+SCREWS   8
+                BEGIN ASSEMBLING THE PARTS, SKIPPING THE ONE LABELED 03.
+
+
+
+
+                                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                HOLD THE PIECES TOGETHER, FLIP THE ENTIRE ASSEMBLY OVER, AND
+                SECURE THE PARTS USING THE HIGHLIGHTED CENTRAL HOLES.
+
+                ONCE THE FIRST THREE PIECES ARE ASSEMBLED, IT’S TIME TO
+                INSTALL PANEL 03. POSITION IT AND TIGHTEN THE SCREWS TO
+                SECURE IT IN PLACE.
+
+
+
+
+                                                                        1 February 2025   20
+                                                                                                                                                        HDRY System
+                                                                                                                                                       TOP ASSEMBLY
+
+
+
+
+                                                                                                               PIECES INDICATED BY THE ARROWS.
+                                                                                                               APPLY THE GASKET TO THE SIDES AND THE
+
+
+
+
+1 February 2025
+21
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System   TOP ASSEMBLY
+SCREWS   8
+              BEGIN ASSEMBLING THE PARTS, SKIPPING THE ONE LABELED 03.
+
+
+
+
+                                                                                            All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              HOLD THE PIECES TOGETHER, FLIP THE ENTIRE ASSEMBLY OVER,
+              AND SECURE THE PARTS USING THE HIGHLIGHTED CENTRAL HOLES.
+
+              ONCE THE FIRST THREE PIECES ARE ASSEMBLED, IT’S TIME TO
+              INSTALL PANEL 03. POSITION IT AND TIGHTEN THE SCREWS TO
+              SECURE IT IN PLACE.
+
+
+
+
+                                                                     1 February 2025   22
+                                                                                                                                            HDRY System
+                                                                                                                                           TOP ASSEMBLY
+
+
+
+
+                     AND SCREW IT IN PLACE.
+
+
+
+
+1 February 2025
+                     FINALLY, INSERT THE STEAM EXHAUST CAP
+
+
+
+
+23
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System      BOTTOM TO STRUCTURE
+
+
+              FLIP THE STRUCTURE UPSIDE DOWN.PLACE THE BOTTOM PANEL, MAKING
+
+
+
+
+                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              SURE THAT THE 'FRONT' LABEL FACES THE FRONT OR THAT THE TWO
+              CORNER HOLES ARE POSITIONED ON THE FRONT SIDE.
+
+
+
+
+                                                                              1 February 2025   24
+HDRY System                        BOTTOM TO STRUCTURE
+SCREWS   16
+
+
+
+
+                                                                                                                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              INSERT A SCREW INTO EACH HIGHLIGHTED HOLE AND TIGHTEN EVERYTHING SECURELY.
+
+
+
+
+                                                                                           1 February 2025   25
+HDRY System         TOP TO STRUCTURE
+
+
+              FLIP THE STRUCTURE UPSIDE DOWN.PLACE THE BOTTOM PANEL, MAKING
+
+
+
+
+                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              SURE THAT THE 'FRONT' LABEL FACES THE FRONT OR THAT THE TWO
+              CORNER HOLES ARE POSITIONED ON THE FRONT SIDE.
+
+
+
+
+                                                                              1 February 2025   26
+HDRY System                             TOP TO STRUCTURE
+SCREWS   16
+
+
+
+
+                                                                                                                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              INSERT A SCREW INTO EACH HIGHLIGHTED HOLE AND TIGHTEN EVERYTHING SECURELY.
+
+
+
+
+                                                                                           1 February 2025   27
+                                                                                                                                           HDRY System
+
+
+
+
+                                                          MULTIPLE MODULES?
+                                                         THE HDRY SYSTEM WITH
+                                                        WHAT IF I WANT TO BUILD
+
+
+
+
+1 February 2025
+28
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                                 MODULE 2 – LEVEL 1
+
+
+
+
+                                                                                                          All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              REPEAT THE STEPS FROM PAGES 5 TO 9, BUT THIS TIME USING THE PARTS
+              FROM THE ‘MODULE 2' FILE.
+
+
+
+
+                   HERE ARE THE KEY DIFFERENCES BETWEEN THESE PARTS AND LEVEL 1:
+                   • ALL PIECES HAVE HOLES ON THE BOTTOM SIDE.
+                   • THE PART CODES ALL END WITH THE LETTER ‘B.
+
+
+
+              NEXT, REPEAT THE STEPS FROM PAGES 11 TO FOR LEVEL 2 PARTS
+                               FROM THE ‘MODULE 2' FILE                            1 February 2025   29
+HDRY System                                                 MODULE 2
+SCREWS   12
+
+
+
+
+                                                                                              All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+LEVEL 2
+
+
+
+
+LEVEL 1 B
+
+
+
+
+         PLACE LEVEL 2 ON TOP OF LEVEL 3 AND, USING THE
+         HIGHLIGHTED HOLES AT THE BASE OF LEVEL 2, FASTEN
+         THEM TOGETHER.
+
+
+
+                                                                       1 February 2025   30
+HDRY System                           TRUCTURAL REINFORCEMENTS
+SCREWS     5
+
+
+
+
+                                                                                                                 All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  CONNECT THE REINFORCEMENTS' PARTS
+  AS SHOWN IN THE IMAGES.
+
+
+
+
+                                                 MAKE EVERYTHING SOLID BY INSERTING AND
+                                                 TIGHTENING THE SCREWS IN THE AREAS
+                                                 INDICATED BY THE ARROWS.
+
+
+
+
+                                                                                          1 February 2025   31
+                                                                                                                                             HDRY System
+
+
+
+
+                              LEVEL 1
+                                                                                                                      LEVEL 2
+
+
+
+
+                                                             LEVEL 2
+                                                                                         LEVEL 3
+                                                                                                                                           TWO MODULE ASSEMBLE
+
+
+
+
+                                                  Modulo 1
+                                                                                                          Modulo 2
+
+
+
+
+1 February 2025
+32
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System     TWO MODULE ASSEMBLE
+SCREWS     12
+
+
+
+
+                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                      JOIN THE LEVEL 3 SECTION OF
+                      MODULE 2 TO THE LEVEL 2 SECTION
+                      OF MODULE 1.INSERT SCREWS INTO
+                      THE HIGHLIGHTED HOLES AND
+                      TIGHTEN THEM TO SECURELY
+                      FASTEN THE CONNECTION.
+
+
+
+
+                   LEVEL 3
+
+
+
+
+ LEVEL 2
+
+
+
+                                                        1 February 2025   33
+HDRY System                               TWO MODULE ASSEMBLE
+SCREWS   10
+              NOW LET'S STABILIZE THE TWO-MODULE STRUCTURE USING THE CENTRAL REINFORCEMENT BARS
+
+
+
+
+                                                                                                                           All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              AND SIDE SUPPORTS.
+              USE THE DOUBLE BAR AT THE CENTER OF THE TWO STRUCTURES, AND PLACE THE SINGLE BAR AT
+              THE TOP, JUST LIKE YOU DID EARLIER WITH THE BOTTOM BAR.
+
+
+
+
+                                                                                                    1 February 2025   34
+HDRY System                                          THREE MODULE ASSEMBLE
+
+ TECHNICALLY, YOU CAN BUILD THE STRUCTURE AS TALL AS YOU
+ LIKE,  AS     LONG   AS    IT'S  PROPERLY   REINFORCED.
+
+
+
+
+                                                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+ HERE'S A QUICK RECAP OF WHEN AND HOW TO USE THE FRONT
+ REINFORCEMENTS FOR EACH MODULE:
+
+
+                TO SECURE THE TOP PANEL
+                                                                             MODULE 2
+
+
+
+
+          TO CONNECT TWO MODULES TOGETHER
+                                                                             MODULE 2
+
+
+
+
+              TO SECURE THE BOTTOM PANEL
+                                                                             MODULE 1
+
+
+
+
+         ADDITIONALLY, THERE ARE THE SMALLER TWO-
+         HOLE REINFORCEMENTS FOR EXTRA SUPPORT.
+                                                                                        1 February 2025   35
+HDRY System                                     WHEELS INSTALLATION
+
+
+                                 WOULD YOU LIKE TO ADD WHEELS ?
+
+
+
+
+                                                                                                                                        All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                              BEFORE ATTACHING THE BOTTOM PANEL, FOLLOW THESE STEPS:
+
+                            COMPLETELY DRILL THE MARKED HOLES USING A 2.5 MM DRILL BIT.
+              DO THIS ON BOTH THE RIGHT AND LEFT SIDES OF THE WALLS AT LEVEL 01. THIS IS THE FIRST LEVEL WHERE
+                                         YOU WILL LATER ATTACH THE BOTTOM PANEL.
+
+
+
+
+                                                                                                                 1 February 2025   36
+HDRY System                  WHEELS INSTALLATION
+
+              COMPLETELY DRILL THE MARKED HOLES USING A 2.5 MM DRILL BIT.
+                              DO THIS ON THE BOTTOM COVER.
+
+
+
+
+                                                                                                   All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                            1 February 2025   37
+HDRY System                               WHEELS INSTALLATION
+
+
+
+
+                                                                                       All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+ NOW, INSTALL THE BOTTOM PANEL. AFTER
+ THAT, INSTALL THE TOP PANEL—UNLESS YOU
+ PLAN TO ADD A DRAWER ABOVE THE
+ STRUCTURE.
+
+ IF YOU DO WANT TO ADD A DRAWER, DO NOT
+ INSTALL THE TOP PANEL YET.
+
+ INSTEAD, CONTINUE WITH THE ASSEMBLY
+ PROCESS FOR THE DRAWER INSTALLATION.
+
+
+
+
+                                                                1 February 2025   38
+                                                                                                                                             HDRY System
+
+
+
+
+                                                                    NUT
+
+
+
+
+                                          WASHER
+
+
+                      HALF WHEEL
+                                                                            TIRE
+                                                                                                       FOOT
+
+
+
+
+                  HALF WHEEL
+                                                                                                                                           WHEELS INSTALLATION
+
+
+
+
+                                                                                        SCREWS
+
+
+                                                                      SPACER
+
+
+
+
+                       WASHER
+                                   BOLT
+
+
+
+
+1 February 2025
+39
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                                                   WHEELS INSTALLATION
+SCREWS      3               JOIN THE TWO PARTS OF THE RIM, MAKING SURE TO
+                            FIT THE TIRE IN BETWEEN. THIS SHOULD BE EASY
+
+
+
+
+                                                                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                            THANKS TO THE ALIGNMENT NOTCHES.
+                                                                                           NEXT, INSERT THE THREE SCREWS INTO
+                                                                                           THE HOLES AND TIGHTEN THEM SECURELY.
+
+
+
+
+  LET’S TAKE A MOMENT TO TALK ABOUT THE TPU WHEELS.
+  AFTER SEVERAL TESTS, I FOUND THAT A SETUP WITH 3 WALLS AND 25% INFILL WORKS WELL TO
+  SUPPORT TWO MODULES, A DRAWER, AND AN X1C.
+
+  NOW, LET’S BE CLEAR—THERE’S ABOUT 1 CM OF SIDE-TO-SIDE SWAY IN THE STRUCTURE. BUT THIS
+  SWAY ACTUALLY HELPS ABSORB VIBRATIONS, PREVENTING THEM FROM SPREADING TO THE AMS.
+
+  IF YOU'RE LOOKING FOR SOMETHING MORE RIGID, YOU’LL DEFINITELY NEED TO EXPERIMENT BY
+  INCREASING THE INFILL PERCENTAGE OR THE WALLS NUMBER.
+
+  HERE’S MY RECOMMENDATIONS:
+  • IF YOU HAVE THE SAME CONFIGURATION AS MINE, INCREASE THE PERIMETER WALLS TO 4 AND
+    THE INFILL TO 35%.
+  • AS A GENERAL RULE, FOR EVERY ADDITIONAL MODULE YOU ADD, INCREASE THE INFILL BY
+    ABOUT 8%.
+                                                                                                                              1 February 2025   40
+                                                                                                                                             HDRY System
+                                                                                                                                           WHEELS INSTALLATION
+
+
+
+
+                                                                             INSERT THE SPACER INTO THE CENTRAL HOLE OF THE RIM.
+
+
+
+
+1 February 2025
+41
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System               WHEELS INSTALLATION
+
+              THERE ARE TWO SLOTS INSIDE THE FOOT DESIGNED TO
+              HOLD THE WASHERS.
+
+
+
+
+                                                                                       All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              YOU MAY FIND IT EASIER TO INSERT THE WASHERS
+              INTO THE SLOTS FIRST AND THEN SLIDE IN THE RIM
+              AFTERWARD. FEEL FREE TO USE THE METHOD THAT
+              WORKS BEST FOR YOU DURING THIS PART OF THE
+              INSTALLATION.
+
+
+
+
+                                                                1 February 2025   42
+HDRY System                                          WHEELS INSTALLATION
+
+
+
+
+                                                                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                INSERT THE BOLT AND TIGHTEN IT, BUT NOT ALL THE
+                                                                WAY. ADJUST THE WHEEL'S ROLLING RESISTANCE TO
+       PLACE THE NUT INTO ITS DESIGNATED SLOT. IDEALLY,
+                                                                YOUR PREFERENCE. SINCE THE WHEELS DON'T HAVE
+       USE A SELF-LOCKING NUT. IF YOU DON'T HAVE ONE,           BRAKES, A BIT OF FRICTION MIGHT BE HELPFUL.
+       YOU CAN TIGHTEN EVERYTHING AND ADD A FEW DROPS
+       OF QUICK-DRYING ADHESIVE TO SECURE THE NUT TO
+       THE BOLT.
+                                                                                                        1 February 2025   43
+HDRY System                                         WHEELS INSTALLATION
+SCREWS   16
+
+
+
+
+                                                                                                 All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  THE BOTTOM PANEL HAS GROOVES DESIGNED TO LOCK
+  THE BASE IN PLACE. ONCE IT'S FITTED, INSERT THE
+  TWO SCREWS AND TIGHTEN THEM.
+
+
+
+
+   ON THE SIDES OF THE BASE, YOU'LL FIND TWO
+   ADDITIONAL SCREWS. INSERT AND TIGHTEN THESE AS
+   WELL.
+
+
+
+
+                                                                          1 February 2025   44
+HDRY System                             WHEELS INSTALLATION
+
+
+
+
+                                                                                                                       All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              REPEAT THE PREVIOUS STEPS FOR THE OTHER WHEELS, ENSURING THAT THE BASE FEET ARE
+                                 POSITIONED AS SHOWN IN THE DIAGRAM BELOW.
+
+
+
+
+                                                                                                1 February 2025   45
+HDRY System                                         DRAWER ON TOP
+
+                         WOULD YOU LIKE TO ADD DRAWER ON TOP ?
+
+
+
+
+                                                                                                                                    All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                               BEFORE ATTACHING THE TOP PANEL, FOLLOW THESE STEPS:
+
+                           COMPLETELY DRILL THE MARKED HOLES USING A 2.5 MM DRILL BIT.
+              DO THIS ON BOTH THE RIGHT AND LEFT SIDES OF THE WALLS AT LEVEL 02, THE FINAL LEVEL WHERE YOU
+                                           WILL LATER ATTACH THE TOP PANEL.
+
+
+
+
+                                                                                                             1 February 2025   46
+HDRY System                                                DRAWER ON TOP
+
+
+         SUPPORT FOR DRAWER 2.0                                                 SUPPORT FOR DRAWER HPV
+
+
+
+
+                                                                                                                                              All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                    THESE TWO SUPPORTS HOLD THE DRAWERS WITHIN THE STRUCTURE BUT DO NOT LOCK THEM IN PLACE.
+
+              TIP: ATTACH SMALL SILICONE ADHESIVE FEET TO THE BOTTOM OF THE DRAWERS. I PERSONALLY USE SEMI-SPHERICAL
+                  FEET, MEASURING 8 MM X 2 MM. THIS HELPS IMPROVE STABILITY AND PREVENTS THE DRAWERS FROM SLIDING.
+                                                                                                                       1 February 2025   47
+HDRY System                                       DRAWER ON TOP
+
+
+
+                                                                                              12
+
+
+
+
+                                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              SCREWS     10                                                       SCREWS
+
+
+
+
+               BASED ON THE SELECTED SUPPORT MODEL, INSERT THE SCREWS INTO THE HIGHLIGHTED HOLES. MAKE
+                    SURE TO DO THIS ON BOTH SIDES OF THE MODULE, THEN TIGHTEN EVERYTHING SECURELY.
+
+
+                                                                                                         1 February 2025   48
+                                                                                                                                                                                           HDRY System
+
+
+
+
+                                                                              1
+                                                                                                  2
+                                                                                                                                     I WONDER HOW MANY MODULES YOU’ARE ASSEMBLED BY NOW!
+                                                                                                                              3
+
+
+
+
+1 February 2025
+49
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                                    FRONT PANELS OR DOORS
+
+
+                               WHAT TYPES OF FRONT PANELS ARE AVAILABLE?
+
+
+
+
+                                                                                                                         All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+   YOU’LL TURN THE DRYER ON    YOU’LL TURN THE DRYER ON     YOU WANT TO CONTROL THE   YOU WANT TO CONTROL THE
+   FROM THE INSIDE AND DON'T   FROM THE INSIDE, BUT YOU'D    DRYER FROM THE OUTSIDE    DRYER EXTERNALLY AND
+   NEED TO MONITOR HUMIDITY    LIKE A SENSOR TO KEEP AN        BUT DON'T NEED AN      HAVE AN EXTERNAL SENSOR
+            LEVELS.             EYE ON TEMPERATURE AND         EXTERNAL HUMIDITY           TO MONITOR BOTH
+                                        HUMIDITY.                   SENSOR.               TEMPERATURE AND
+                                                                                               HUMIDITY.
+
+
+
+
+                                                                                                  1 February 2025   50
+HDRY System                               DISCLAIMER
+
+
+                                                                    PLEASE NOTE THAT I DO NOT ENCOURAGE OR AUTHORIZE
+
+
+
+
+                                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              DISCLAIMER – PRODUCT MODIFICATIONS AND
+                                                                    UNSAFE OR UNCERTIFIED MODIFICATIONS. I URGE YOU TO
+              LIABILITY WAIVER                                      FOLLOW ALL SAFETY GUIDELINES DURING TECHNICAL
+                                                                    OPERATIONS.
+              BEFORE PROCEEDING WITH THE ASSEMBLY AND
+              SELECTION OF COMPONENTS, IT IS IMPORTANT TO LIABILITY                                   LIMITATION:
+              REVIEW THE FOLLOWING INFORMATION AND ACCEPT THE BY PROCEEDING WITH THESE MODIFICATIONS, YOU
+              TERMS REGARDING POTENTIAL PRODUCT MODIFICATIONS. ACCEPT FULL LEGAL AND FINANCIAL RESPONSIBILITY
+                                                               FOR ANY CONSEQUENCES, INCIDENTS, OR DAMAGES TO
+              INSTALLING THE POLYDRYER CONTROL PANEL ON THE PEOPLE, ANIMALS, OR PROPERTY THAT MAY RESULT
+              MODULE DOOR REQUIRS SUBSTANTIAL MODIFICATIONS FROM YOUR ACTIONS.
+              TO THE ELECTRICAL AND ELECTRONIC CONNECTIONS OF
+              THE DEVICE, WHICH MAY PRESENT SIGNIFICANT RISKS. I EXPRESSLY DISCLAIM ANY LIABILITY FOR:
+              ONE OF THE NECESSARY CHANGES INVOLVES EXTENDING •DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES,
+              THE CABLES BY APPROXIMATELY 60 CM.               •MALFUNCTIONS OR FAILURES OF THE MODIFIED
+                                                                    PRODUCT,
+              WHILE USING STANDARD CONNECTORS MAY ALLOW THE         •VIOLATIONS OF SAFETY REGULATIONS OR PRODUCT
+              MODIFICATION TO REMAIN REVERSIBLE, IT IS CRUCIAL TO   CERTIFICATIONS,
+              HAVE THE APPROPRIATE TECHNICAL KNOWLEDGE IN           •ACCIDENTS CAUSED BY NEGLIGENCE, RECKLESSNESS,
+              ELECTRICAL AND ELECTRONIC SYSTEMS TO PERFORM          OR LACK OF EXPERTISE DURING THE MODIFICATION
+              THIS OPERATION SAFELY. IF YOU LACK SUCH EXPERTISE,    PROCESS.
+              YOU MUST SEEK ASSISTANCE FROM A CERTIFIED
+              TECHNICIAN OR PROFESSIONAL.
+                                                                    LEGAL                                     NOTICE:
+                                                          PLEASE BE AWARE THAT MODIFYING THE PRODUCT MAY
+              RISK WARNING:                               VOID ANY WARRANTY AND/OR INVALIDATE PRODUCT
+              IMPROPER OR NON-COMPLIANT MODIFICATIONS MAY CERTIFICATIONS (E.G., CE MARKING, UL CERTIFICATIONS),
+              RESULT IN:                                  RENDERING THE PRODUCT NON-COMPLIANT WITH
+              •PRODUCT MALFUNCTIONS,                      APPLICABLE SAFETY AND QUALITY STANDARDS.
+              •SHORT CIRCUITS,
+              •SPARKS OR FIRE,                            BY PROCEEDING WITH THE MODIFICATIONS, YOU CONFIRM
+              •PERSONAL INJURY,                           THAT YOU HAVE READ, UNDERSTOOD, AND ACCEPTED
+              •PROPERTY DAMAGE.                           THIS DISCLAIMER IN ITS ENTIRETY.
+
+                                                                                                         1 February 2025   51
+HDRY System                                            DOOR ASSEMBLY
+
+               BASED ON THE CONFIGURATIONS MENTIONED EARLIER, THERE ARE DIFFERENT DOOR PANELS TO CHOOSE
+               FROM, BUT THEIR STRUCTURAL ASSEMBLY IS THE SAME. LET ME WALK YOU THROUGH THE INSTALLATION
+
+
+
+
+                                                                                                                                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                 PROCESS USING THE PANELS I INSTALLED ON MY HDRY SYSTEM.
+
+
+
+
+                                                                                            FFL02
+              FFR02
+
+
+                                                                                                  FFL01
+
+              FFR01
+
+
+
+
+                                       PLACE THE PANELS YOU SELECTED ON A FLAT SURFACE.
+
+
+
+
+                                                                                                           1 February 2025   52
+                                                                                                                                           SCREWS
+                                                                                                                                           4
+                                                                                                                                                     HDRY System
+                                                                                                                                                    DOOR ASSEMBLY
+
+
+
+
+                       INSERT THE SCREWS INTO THE HIGHLIGHTED HOLES AND TIGHTEN THEM.
+
+
+
+
+1 February 2025
+53
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                           DOOR ASSEMBLY
+
+   FOR THE GLASS, I USE A 0.6 MM
+
+
+
+
+                                                                                                         All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+   POLYCARBONATE SHEET.
+
+   ESSENTIALLY, I REPURPOSE THE
+   TRANSPARENT PANEL FROM AN
+   IKEA FRAMELESS PICTURE FRAME.
+   IT'S PERFECT AND EASY TO FIND
+   ANYWHERE.
+
+
+
+
+   USE THE TEMPLATE PROVIDED
+   ABOVE (WHICH YOU’VE PRINTED)
+   AND CUT THE TWO GLASS PIECES
+   WITH A UTILITY KNIFE.
+                                   APPLY BLACK CELL PHONE ADHESIVE TO THE DOOR
+                                   FRAMES, THEN GLUE THE GLASS PANELS IN PLACE.
+
+
+
+                                                                                  1 February 2025   54
+HDRY System                                  DOOR ASSEMBLY
+SCREWS   2
+               INSERT THE SCREWS INTO THE HIGHLIGHTED HANDLE HOLES AND TIGHTEN THEM.
+
+
+
+
+                                                                                                              All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+      HANDLE
+
+
+
+
+                                                                                       1 February 2025   55
+HDRY System                             DOOR ASSEMBLY
+SCREWS     8
+
+
+
+
+                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  NOW IT'S TIME TO ATTACH THE HINGES.
+   BE CAREFUL HERE—THERE ARE TWO
+  TYPES OF HINGES, ONE FOR THE RIGHT
+      SIDE AND ONE FOR THE LEFT.
+
+
+
+    FIX THEM TO THE CORRESPONDING
+    DOOR AS SHOWN IN THE DIAGRAM.
+
+
+
+
+                                                        1 February 2025   56
+HDRY System                                   DOOR ASSEMBLY
+SCREWS    8
+
+
+
+
+                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+    THE HINGES ON THE STRUCTURE ALSO COME
+     IN LEFT AND RIGHT VERSIONS. PAY CLOSE
+    ATTENTION AND INSTALL THEM AS SHOWN IN
+    THE FIGURE BY INSERTING SCREWS INTO THE
+    HIGHLIGHTED HOLES AND TIGHTENING THEM.
+
+
+
+
+                                                              1 February 2025   57
+HDRY System            DOOR ASSEMBLY
+SCREWS   8
+              FINALLY, ATTACH THE DOORS TO THE HINGES. AGAIN, YOU’LL HAVE TWO
+
+
+
+
+                                                                                                       All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              DIFFERENT HINGE PINS, ONE FOR EACH SIDE. INSERT THE SCREWS INTO
+                           THE MARKED HOLES AND TIGHTEN THEM.
+
+
+
+
+                                                                                1 February 2025   58
+HDRY System                                                DOOR ASSEMBLY
+MAGNETS   18              NOW, LET'S INSTALL THE MAGNETS!TO MAKE THIS STEP EASIER, YOU CAN USE THE MAGNET
+
+                                                                                                               A
+                            INSTALLERS, WHICH ARE AVAILABLE FOR FREE ON MY SHOP. I'LL GUIDE YOU ON WHICH
+
+
+
+
+                                                                                                                                             All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                       INSTALLER TO USE FOR EACH STEP TO SIMPLIFY THE PROCESS.
+
+
+      A                                            B                        B
+
+
+
+
+                                                                                                                    A
+
+      A                                                                                                           A
+                                                      B                B
+               APPLY A SMALL AMOUNT OF QUICK-DRYING ADHESIVE TO EACH MAGNET AND INSERT THEM INTO THE HIGHLIGHTED HOLES.
+                                                                                                                      1 February 2025   59
+HDRY System    DOOR ASSEMBLY
+MAGNETS   20   APPLY A SMALL AMOUNT OF QUICK-DRYING ADHESIVE TO EACH MAGNET AND
+                            INSERT THEM INTO THE HIGHLIGHTED HOLES.
+
+
+
+
+                                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                            B
+
+
+
+
+                                                                        1 February 2025   60
+HDRY System                                            DOOR ASSEMBLY
+
+              PLACE THE GASKETS AROUND THE PERIMETER OF THE MODULE’S OPENING, AS HIGHLIGHTED IN ORANGE.
+
+
+
+
+                                                                                                                                 All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                                                          1 February 2025   61
+HDRY System                             DOOR ASSEMBLY
+
+              INSERT THE TWO SIDE GASKETS INTO THEIR DESIGNATED SLOTS.
+
+
+
+
+                                                                                                                            All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                ATTACH ONE GASKET ON THE TOP AND ONE ON THE BOTTOM OF THE OPENING.
+
+                                                                                                     1 February 2025   62
+HDRY System                                      INTERNAL CUSTOMIZATION
+
+                                       INTERNAL MOUNTING OPTIONS FOR EACH MODULE.
+                           HERE'S A LOOK AT WHAT YOU CAN INSTALL INSIDE EACH INDIVIDUAL MODULE:
+
+
+
+
+                                                                                                                                                 All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+       INSTALL A RACKING SYSTEM WITH          A CUSTOM SUPPORT DESIGNED FOR                 A SUPPORT SPECIFICALLY
+        ROLLERS DESIGNED TO HOLD UP               THE HYDRA SYSTEM AMS.                 DESIGNED TO HOLD THE AMS IN ITS
+           TO 4 FILAMENT SPOOLS.                                                           STANDARD CONFIGURATION.
+
+
+
+
+                                                                                                                          1 February 2025   63
+HDRY System                  INSTALLING AMS/HYDRA SUPPORTS OR ROLLERS
+SCREWS   8
+              AT THIS POINT, YOU NEED TO DECIDE WHICH SUPPORT YOU WANT TO INSTALL.THERE ARE TWO TYPES OF
+
+
+
+
+                                                                                                                                         All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              SUPPORTS: ONE FOR AMS AND ONE FOR HYDRA.IF YOU'RE WORKING WITH ROLLERS, NO WORRIES—BOTH
+                SUPPORTS ARE COMPATIBLE WITH THEM. YOU'LL GET MORE DETAILS ON THIS LATER IN THE GUIDE.
+
+
+
+
+                                                         ONCE YOU'VE CHOSEN THE SUPPORT, ASSEMBLE THE PIECES AND SECURE
+                                                          THEM BY INSERTING THE SCREWS INTO THE HIGHLIGHTED HOLES AND
+                                                                                 TIGHTENING THEM.
+
+
+
+
+                                                                                                                  1 February 2025   64
+HDRY System            INSTALLING AMS/HYDRA SUPPORTS OR ROLLERS
+SCREWS   2
+
+
+
+
+                                                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              POSITION THE FRONT BAR, MAKING SURE TO SLOT IT INTO THE DESIGNATED NOTCHES ON THE SIDE WALLS.
+
+
+
+
+                      INSERT TWO SCREWS INTO THE HIGHLIGHTED HOLES AND TIGHTEN THEM SECURELY.
+                                                                                                              1 February 2025   65
+HDRY System           INSTALLING AMS/HYDRA SUPPORTS OR ROLLERS
+SCREWS   2
+
+
+
+
+                                                                                                                                    All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              POSITION THE BACK BAR, MAKING SURE TO SLOT IT INTO THE DESIGNATED NOTCHES ON THE SIDE WALLS.
+
+
+
+
+                INSERT TWO SCREWS INTO THE HIGHLIGHTED HOLES AND TIGHTEN THEM SECURELY.                      1 February 2025   66
+HDRY System                                       AMS/HYDRA INSTALLATION
+
+                          IN THIS CASE, WE'RE INSTALLING THE HYDRA, BUT THE STEPS ARE EXACTLY THE SAME FOR THE AMS STANDARD.
+
+
+
+
+                                                                                                                                              All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+      TILT THE AMS OR HYDRA SLIGHTLY AND SLOT THE FRONT EDGE
+              UNDER THE SUPPORT TABS I'VE HIGHLIGHTED.
+
+
+
+
+                                                                                                                       1 February 2025   67
+HDRY System                                       AMS/HYDRA INSTALLATION
+
+
+
+
+                                                                                                                           All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                 SLOWLY BRING IT BACK TO A HORIZONTAL POSITION
+                                                                   UNTIL IT RESTS ON THE REAR SUPPORT FEET.
+
+
+
+
+              SECURE THE UNIT BY INSERTING THE STANDARD
+                   AMS SCREWS TO LOCK IT IN PLACE.
+
+
+
+
+                                                                                                    1 February 2025   68
+HDRY System                                     AMS/HYDRA INSTALLATION
+
+
+
+
+                                                                                                                                            All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                    ATTACH THE GASKET TO THE DESIGNATED SLOT ON THE CAP.
+       NEXT, GRAB THE AMS CONNECTION CAP.
+
+
+
+
+                                  INSERT THE AMS CONNECTOR BOARD AND FASTEN IT
+                                         USING THE STANDARD AMS SCREWS.
+                                                                                                                     1 February 2025   69
+HDRY System                           AMS/HYDRA INSTALLATION
+SCREWS   2
+
+
+
+
+                                                                                                                          All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              FEED THE CAP THROUGH THE OPENING AND SNAP IT INTO PLACE FROM THE OUTSIDE. FINALLY,
+                 SECURE IT WITH TWO SCREWS IN THE HIGHLIGHTED HOLES, TIGHTENING THEM FIRMLY.
+
+
+
+
+                                                                                                   1 February 2025   70
+HDRY System                                AMS/HYDRA INSTALLATION
+
+
+
+
+                                                                                                                               All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+   NEXT, LET'S PREPARE THE REAR CAP THAT
+     WILL MANAGE THE FILAMENT TUBES.                                                    THEN, DRILL A 5 MM HOLE
+                                                                                      WHERE YOU WANT THE TUBE TO
+                                                                                                  EXIT.
+
+
+
+
+                                                 AFTER THAT, INSTALL THE TUBE
+                                                  FITTING. QUICK NOTE ON THIS.
+
+
+
+
+                                                    THE FITTING IS M10, WHICH ALLOWS THE
+  START BY APPLYING THE                             TUBE TO PASS THROUGH IT. YOU'LL NEED
+GASKET INTO ITS DESIGNATED
+                                                    TO GET NEW TUBING AND CREATE A
+          SLOT.
+                                                    SINGLE PIECE RUNNING FROM THE AMS
+                                                    TO THE PRINTER.
+
+
+
+                                                                                                        1 February 2025   71
+HDRY System                               AMS/HYDRA INSTALLATION
+SCREWS   2
+              STARTING FROM YOUR AMS OR HYDRA, INSERT THE TUBE AND RUN IT ALL THE WAY TO THE PRINTER.
+
+
+
+
+                                                                                                                                    All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                           SECURE THE REAR CAP WITH TWO SCREWS BY INSERTING THEM AND
+                                                                    TIGHTENING THEM IN THE HIGHLIGHTED HOLES.
+
+
+
+
+                                                                                                             1 February 2025   72
+HDRY System                                            ROLLER INSTALLATION
+SCREWS    16
+BERING   16
+
+
+
+
+                                                                                                    All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+         INSERT THE BEARINGS ON BOTH SIDES OF THE ROLLER.
+
+
+
+
+      NEXT, INSERT AND TIGHTEN A SCREW ON EACH SIDE AT THE CENTER
+      OF THE ROLLER.
+      THESE SCREWS SERVE PURELY TO REINFORCE THE CENTRAL AXLE.
+
+
+
+
+                                                                             1 February 2025   73
+HDRY System                                 ROLLER INSTALLATION
+
+                                         SRR01   SRC01   SRC01    SRC01   SRL01
+
+
+
+
+                                                                                                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  INSERT THE ROLLER SUPPORTS, ENSURING
+      YOU MATCH THE CORRECT CODES.
+
+
+
+        SRR01
+                               SRL01
+
+
+
+
+           SRC01
+
+    SIMPLY SLOT THE PIECES INTO THE
+   DESIGNATED NOTCHES ON THE BARS.
+
+
+
+
+                                                                           1 February 2025   74
+HDRY System   ROLLER INSTALLATION
+
+
+
+
+                                                                                           All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                  NORMAL SPOOL POSITION
+
+                                                         SMALL SPOOL POSITION
+
+
+
+
+                                  AS YOU CAN SEE, THE SUPPORTS HAVE THREE
+                                  DIFFERENT SLOTS FOR THE ROLLERS.THIS DESIGN
+                                  ALLOWS YOU TO ACCOMMODATE SMALLER SPOOLS BY
+                                  SIMPLY MOVING THE ROLLER TO THE DESIRED SLOT.
+
+
+
+                                                                    1 February 2025   75
+HDRY System                                           ROLLER INSTALLATION
+
+
+      NOW, LET'S BUILD AND INSTALL THE BAR THAT WILL HELP US MANAGE THE FILAMENT TUBES.
+
+
+
+
+                                                                                                                                             All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                                    WE'LL START BY ASSEMBLING THE BAR, CONNECTING
+                                                                                    THE TWO PIECES, AND SECURING THEM WITH SCREWS
+                                                                                    IN THE HIGHLIGHTED HOLES.
+
+
+
+
+                                                                                                                      1 February 2025   76
+HDRY System                             ROLLER INSTALLATION
+
+
+
+
+                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+ AT THIS POINT, HERE'S HOW THE ENTIRE
+ DRYER ASSEMBLY SHOULD LOOK WHEN
+ FULLY MOUNTED:
+
+
+
+
+                                                              1 February 2025   77
+HDRY System                             ROLLER INSTALLATION
+
+
+
+
+                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+ AT THIS POINT, HERE'S HOW THE ENTIRE
+ DRYER ASSEMBLY SHOULD LOOK WHEN
+ FULLY MOUNTED:
+
+
+
+
+                                                              1 February 2025   78
+HDRY System                                ROLLER INSTALLATION
+
+
+
+
+                                                                                                                              All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+   NEXT, LET'S PREPARE THE REAR CAP THAT
+     WILL MANAGE THE FILAMENT TUBES.
+                                                                                   THEN, DRILL A 5 MM HOLE WHERE
+                                                                                     YOU WANT THE TUBE TO EXIT.
+
+
+
+
+                                               AFTER THAT, INSTALL THE TUBE
+                                                FITTING. QUICK NOTE ON THIS.
+
+
+
+
+                                                  THE FITTING IS M10, WHICH ALLOWS THE
+  START BY APPLYING THE                           TUBE TO PASS THROUGH IT. YOU'LL NEED
+GASKET INTO ITS DESIGNATED
+                                                  TO GET NEW TUBING AND CREATE A
+          SLOT.
+                                                  SINGLE PIECE RUNNING FROM THE AMS
+                                                  TO THE PRINTER.
+
+
+
+                                                                                                       1 February 2025   79
+HDRY System         ROLLER INSTALLATION
+SCREWS   2
+
+
+
+
+                                                                                                 All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              SECURE THE REAR CAP WITH TWO SCREWS BY INSERTING THEM AND
+                       TIGHTENING THEM IN THE HIGHLIGHTED HOLES.
+
+
+
+
+                                                                          1 February 2025   80
+                                                                                                                                                                                              HDRY System
+                                                                                                                                                                                            ROLLER INSTALLATION
+
+
+
+
+                                                                                                                        RUN THE TUBES THROUGH AND GUIDE THEM ALL THE WAY TO THE PRINTERS.
+
+
+
+
+1 February 2025
+81
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                                      ROLLER INSTALLATION
+
+
+
+
+                                                                                              All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  AT THIS POINT, THE TUBES ARE IN PLACE, AND
+  YOU'LL JUST NEED TO INSTALL THE LABELS TO
+  IDENTIFY WHICH TUBE CONNECTS TO THE PRINTER.
+
+  THIS WILL HELP PREVENT LOADING FILAMENT INTO
+  THE WRONG TUBE.
+
+
+
+
+                                                                       1 February 2025   82
+HDRY System                                    DRYER INSTALLATION
+                WE'VE REACHED THE POINT OF INSTALLING THE POLYDRYER INSIDE THE MODULE.
+
+                               HOW DID YOU PLAN ON PROCEEDING?
+
+
+
+
+                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              SIMPLE INSTALLATION                              PRO-LEVEL INSTALLATION
+
+
+
+
+                                                                                         1 February 2025   83
+HDRY System    DRYER INSTALLATION - SIMPLE
+SCREWS   6
+
+
+
+
+                                                                                                          All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              ASSEMBLE THE DRYER SUPPORT BY INSERTING
+              AND TIGHTENING THE SCREWS INTO THE
+              HIGHLIGHTED HOLES.ONCE THAT’S DONE, ATTACH
+              THE SUPPORT TO THE BACK WALL OF THE
+              MODULE. THERE IS A PRE-CUT SLOT DESIGNED TO
+              FIT THE PIECE.
+
+
+
+
+                                                 SECURE IT IN PLACE USING THE TWO SCREWS
+                                                 INDICATED IN THE DETAIL VIEW.
+                                                                                   1 February 2025   84
+HDRY System                                  DRYER INSTALLATION - SIMPLE
+
+
+
+
+                                                                                                                       All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                           NOW FOR A SIMPLE STEP THAT’LL MAKE
+                                                           SENSE LATER ON…
+
+
+
+
+     REMOVE THE INDICATED STICKER FROM THE DRYER.
+     TRUST ME, THIS WILL COME IN HANDY SOON!
+
+
+
+
+                                                                                                1 February 2025   85
+HDRY System                                     DRYER INSTALLATION - SIMPLE
+
+INSERT THE DRYER INTO THE SUPPORT. THE SUPPORT HAS FLEXIBLE
+ARMS—PLACE THE DRYER ON THE LOWER PART OF THE SUPPORT AT
+
+
+
+
+                                                                                                                                                 All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+A 45-DEGREE ANGLE, THEN PUSH IT FULLY INTO PLACE.
+
+
+
+
+                                                                    FOR ADDED STABILITY, I RECOMMEND APPLYING TWO
+                                                                    RUBBER BANDS TO THE SUPPORT, ALIGNED WITH THE FRONT
+                                                                    HOOKS, AS SHOWN IN THE FIGURE.
+
+    YOU'RE PRACTICALLY DONE! JUST CONNECT THE POWER CABLE, AND YOU'RE ALL SET TO START COOKING   …OOPS,, DRYING YOUR FILAMENTS!
+                                                                                                                          1 February 2025   86
+HDRY System                        DRYER INSTALLATION - PRO
+               READY TO RAISE THE DIFFICULTY LEVEL? BUCKLE UP—IT'S TIME TO DISASSEMBLE
+               AND REBUILD THE DRYER LIKE NEVER BEFORE. LET’S GET STARTED!
+
+
+
+
+                                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              STEP 1: FULL DISASSEMBLY
+              •REMOVE THE FOUR SCREWS HOLDING THE DRYER TOGETHER ON THE
+              BACK PANEL. I'VE HIGHLIGHTED THE RELEVANT HOLES FOR YOU.
+              •CAREFULLY DETACH THE CONTROL PANEL. BE SURE TO GENTLY
+              DISCONNECT THE CONNECTORS—NO NEED TO DAMAGE THEM, RIGHT?
+
+
+              STEP 2: CABLE EXTENSIONS
+              •YOU’LL NEED TO EXTEND ALL THE CABLES BY 50-55 CM. USE HIGH-
+              QUALITY WIRES AND THE CORRECT CONNECTORS TO ENSURE A
+              RELIABLE CONNECTION.
+              •WHILE YOU COULD JUST CUT AND SPLICE THE CABLES, THIS WOULD
+              PREVENT YOU FROM RESTORING THE DRYER TO ITS ORIGINAL SETUP.
+              SO, I STRONGLY RECOMMEND MAKING EXTENSION CABLES INSTEAD,
+              WITHOUT CUTTING THE ORIGINALS.
+
+
+
+
+                                                    STEP 3: CHOOSING THE RIGHT CONNECTORS
+                                                    YOU'LL NEED JST CONNECTORS FOR THIS TASK. TO DETERMINE WHICH ONES
+                                                    YOU NEED:MEASURE THE PIN PITCH (DISTANCE BETWEEN THE PINS).COUNT
+                                                    THE NUMBER OF PINS.
+
+                                                    ONCE YOU HAVE THOSE DETAILS, YOU CAN ORDER THE APPROPRIATE
+                                                    CONNECTORS.TAKE YOUR TIME WITH THIS—IT’S ALL ABOUT PRECISION AND
+                                                    CARE.
+
+                                                    YOU'VE GOT THIS!
+
+                                                                                                         1 February 2025   87
+HDRY System                          DRYER INSTALLATION - PRO
+
+
+
+
+                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+   FEED THE CABLES THROUGH THE NEW                  ONCE EVERYTHING IS IN PLACE, REASSEMBLE
+   DRYER COVER THAT REPLACES THE                    THE DRYER BY SECURING IT WITH SCREWS IN
+   CONTROL PANEL.                                   THE HIGHLIGHTED HOLES. DOUBLE-CHECK THAT
+                                                    EVERYTHING IS PROPERLY ALIGNED AND
+                                                    TIGHTENED. YOU'RE ALMOST THERE!
+
+
+
+
+                                                                                         1 February 2025   88
+HDRY System                                     DRYER INSTALLATION - PRO
+
+
+
+
+                                                                                                                        All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                            NOW FOR A SIMPLE STEP THAT’LL MAKE
+                                                            SENSE LATER ON…
+
+
+
+
+     REMOVE THE INDICATED STICKER FROM THE DRYER.
+     TRUST ME, THIS WILL COME IN HANDY SOON!
+
+
+
+
+                                                                                                 1 February 2025   89
+HDRY System                                           DRYER INSTALLATION - PRO
+
+
+
+
+                                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  CONNECT THE EXTENSION CABLES TO THE PANEL’S
+  CONNECTORS—BE GENTLE TO AVOID ANY DAMAGE.
+
+  NEXT, CLOSE THE CASE BY FITTING THE PANEL INTO
+  PLACE. YOU'LL NOTICE THERE ARE SPECIFIC SLOTS
+  DESIGNED TO SECURE THE BLUE SECTION OF THE PANEL.
+  MAKE SURE IT’S ALIGNED AND CLICKS IN PROPERLY.
+
+
+
+
+                                                                      WHAT YOU SHOULD HAVE NOW IS A PERFECTLY MOUNTED
+                                                                      CONTROL PANEL IN ITS NEW HOME.    LOOKS GOOD,
+                                                                      DOESN'T IT?
+
+
+
+
+                                                                                                         1 February 2025   90
+HDRY System                                      DRYER INSTALLATION - PRO
+SCREWS     4         LET'S MOVE ON TO SECURING THE PANEL TO THE FRONT AND PROPERLY ROUTING THE CABLE INSIDE THE DRYER.
+
+   STEP 1: MOUNT THE PANEL                 STEP 2: MANAGE THE CABLE SLACK                STEP 3: SECURE THE CABLE
+
+
+
+
+                                                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+   • INSERT THE CONTROL PANEL INTO ITS     •OPEN THE DOOR AT A COMFORTABLE               • ONCE YOU’VE ADJUSTED FOR ENOUGH
+     SLOT ON THE FRONT DOOR.               ANGLE—THIS IS IMPORTANT.                        SLACK, ATTACH A ZIP TIE TO SECURE
+   • SECURE IT WITH 4 SCREWS, WHICH I’VE   •WE NEED TO LEAVE EXTRA CABLE SLACK TO
+                                                                                           THE CABLE ON THE FIRST SUPPORT.
+                                           ENSURE THE DOOR CAN OPEN AND CLOSE
+     HIGHLIGHTED IN RED.                                                                 • TEST THE DOOR BY OPENING AND
+                                           FREELY WITHOUT PULLING ON THE CABLE.
+                                                                                           CLOSING IT TO CONFIRM EVERYTHING
+                                                                                           MOVES SMOOTHLY.
+
+                                                                                         STEP 4: FINAL CABLE ROUTING
+                                                                                         • IF ALL IS GOOD, CONTINUE FASTENING
+                                                                                           THE CABLE WITH ZIP TIES ALONG THE
+                                                                                           SUPPORTS UNTIL YOU REACH THE
+                                                                                           AREA NEAR THE DRYER.
+
+
+                                                                                         THAT’S IT! STAY PRECISE, AND YOU'RE ALL
+                                                                                         SET FOR SMOOTH OPERATION.
+
+
+
+
+                                                                                                                         1 February 2025   91
+HDRY System                     DRYER INSTALLATION - PRO
+
+
+
+
+                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+              FOR ADDED STABILITY, I RECOMMEND APPLYING TWO RUBBER BANDS TO
+              THE SUPPORT, ALIGNED WITH THE FRONT HOOKS, AS SHOWN IN THE
+              FIGURE.
+
+
+
+                                                                              1 February 2025   92
+HDRY System                                      DRYER INSTALLATION - AIR DUCT
+MAGNETS      8
+ THE AIR DUCT IS ESSENTIAL TO REDISTRIBUTE HEAT EVENLY WITHIN THE MODULE. SINCE HOT
+
+
+
+
+                                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+ AIR NATURALLY RISES AND TENDS TO CONCENTRATE AT THE TOP OF THE MODULE(S), I'VE
+ OPTED FOR A STATIC BUT EFFECTIVE SOLUTION WITHOUT ADDING EXTRA FANS FOR NOW.
+
+ NOW, YOU GET TO DECIDE HOW YOU'D LIKE TO PROCEED:
+                                                                                                        B
+ OPTION 1: GLUE THE DUCT PORTIONS TOGETHER
+ • IF YOU CHOOSE THIS METHOD, YOU WON’T NEED ADDITIONAL
+   SUPPORT MAGNETS BEYOND THE REQUIRED ONES MARKED IN BLUE.
+                                                                                                      B
+                                           OPTION 2: USE MAGNETS FOR
+                                           FULL ASSEMBLY                          A           B
+                                        • ATTACH MAGNETS IN THE INDICATED
+                                          SLOTS. THE BLUE-MARKED MAGNETS
+                                          ARE REQUIRED, WHILE THE BLACK-
+                                          MARKED ONES ARE OPTIONAL IF                                      A
+                                                                                      B
+                                          YOU’RE GLUING.
+
+                                                                                          A
+                                        • FOR EASIER INSTALLATION, YOU CAN
+                                SUPPORT   USE THE MAGNET INSTALLERS TO
+                                          HELP    ALIGN    AND    POSITION
+ MAIN DUCT                                EVERYTHING CORRECTLY.
+
+
+
+
+               LOWER DUCKT
+                                                                                              A
+                                                                                              1 February 2025   93
+HDRY System                                  DRYER INSTALLATION - AIR DUCT
+
+  NOW IT'S TIME TO JOIN THE MAIN DUCT WITH THE LOWER
+  DUCT.
+
+
+
+
+                                                                                                    All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+  • IF YOU’VE INSTALLED THE MAGNETS, SIMPLY ALIGN THE
+    TWO PIECES AND SNAP THEM TOGETHER—EASY AS THAT!
+
+
+  • IF YOU OPTED TO GLUE THE PARTS EARLIER,
+    CONGRATULATIONS—YOU’VE ALREADY COMPLETED THIS
+    STEP!
+
+  EVERYTHING SHOULD NOW BE SECURELY IN PLACE,
+  ENSURING OPTIMAL AIRFLOW AND HEAT DISTRIBUTION
+  INSIDE THE MODULE. GREAT WORK!
+
+
+
+
+                                                                             1 February 2025   94
+HDRY System                         DRYER INSTALLATION - AIR DUCT
+               NOW IT’S TIME TO ATTACH THE AIR DUCT TO THE DRYER BODY. HERE'S HOW TO MAKE IT CLEAN AND EASY:
+
+               FOR A SMOOTHER WORKFLOW, REMOVE THE DRYER FROM ITS SUPPORT BEFORE STARTING THE PROCESS.
+
+
+
+
+                                                                                                                                      All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+               STEP 1: PREPARE THE SUPPORT
+               •ATTACH THE SUPPORT TO THE DUCT.
+               •APPLY QUICK-DRYING GLUE TO THE BACK OF THE SUPPORT.
+
+               STEP 2: MOUNT THE DUCT
+               •POSITION THE DUCT ON THE DRYER BODY AND PRESS IT FIRMLY INTO PLACE.
+               •WAIT A FEW MOMENTS FOR THE GLUE TO SET AND BOND SECURELY.
+
+
+
+
+              ONCE DONE, THE DUCT WILL STAY ATTACHED TO THE DRYER, ENSURING
+              LONG-TERM STABILITY AND PERFORMANCE.    GREAT PROGRESS!
+
+
+
+                                                                                                               1 February 2025   95
+HDRY System                                 DRYER INSTALLATION - AIR DUCT
+
+
+
+
+                                                                                                   All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+ AT THIS POINT, HERE'S HOW THE ENTIRE
+ DRYER ASSEMBLY SHOULD LOOK WHEN
+ FULLY MOUNTED:
+
+ 1.CONTROL PANEL: SECURELY IN PLACE
+ ON THE FRONT DOOR WITH CABLES NEATLY
+ ROUTED AND TIED ALONG THE SUPPORTS.
+
+ 2.AIR DUCT: FIRMLY ATTACHED TO THE
+ DRYER BODY, WITH PROPER ALIGNMENT TO
+ ENSURE EVEN HEAT DISTRIBUTION.
+
+ 3.DRYER SUPPORT: THE DRYER IS
+ MOUNTED BACK ON ITS SUPPORT, FITTING
+ SNUGLY WITHOUT LOOSE PARTS.
+
+ 4.CABLE MANAGEMENT: EXTRA SLACK
+ HAS BEEN PROVIDED NEAR THE DOOR HINGE
+ TO ALLOW SMOOTH OPENING AND CLOSING,
+ WITH ZIP TIES HOLDING CABLES IN POSITION
+ ALL THE WAY TO THE DRYER.
+
+ EVERYTHING    SHOULD     BE     CLEAN,
+ FUNCTIONAL, AND READY FOR USE. TIME TO
+ ENJOY YOUR UPGRADED, HEAT-EFFICIENT
+ MODULE!
+
+
+
+                                                                            1 February 2025   96
+HDRY System                                            CAPS
+
+
+              LET'S FINISH UP THE MODULE BY INSTALLING THE REMAINING REAR CAPS.
+
+
+
+
+                                                                                                                                All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                       THIS BLIND CAP IS USED TO SEAL OFF ANY UNUSED HOLES. SINCE
+                                                       WE DON'T KNOW WHICH SIDE YOU PLAN TO ROUTE THE TUBING,
+                                                       THIS PREVENTS AN OPEN HOLE THAT COULD IMPACT AIRFLOW OR
+                                                       ALLOW DEBRIS TO ENTER.
+
+
+
+
+                                                       THIS CAP IS DESIGNED TO ALLOW THE SAFE PASSAGE OF:
+                                                       • POWER CABLES FOR THE DRYER(S)
+                                                       • SENSOR(S) CABLES, IF YOU CHOOSE TO ADD SENSORS IN THE
+                                                          FUTURE,
+                                                       • LED WIRES FOR INTERIOR LIGHTING TO ENHANCE MODULE
+                                                                                 VISIBILITY.
+                                                          EXTRA FANS
+
+
+
+
+                                                                                                         1 February 2025   97
+                                                                                                                                                                              HDRY System
+
+
+
+
+                                                                                                                                             DONE!
+                                                                                                                                                                              CAPS
+
+
+
+
+                                                                                                                     START BY APPLYING THE GASKET INTO ITS DESIGNATED SLOT.
+
+
+
+
+1 February 2025
+98
+
+
+
+
+                  All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+HDRY System                                                            CAPS
+
+    YOU’LL NOTICE THIS CAP IS SLIGHTLY DIFFERENT FROM
+
+
+
+
+                                                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+    THE PREVIOUS ONES. IT HAS PRE-CUT HOLES.
+
+
+
+
+                                                   USE A UTILITY KNIFE TO OPEN THE SECTIONS YOU'LL NEED FOR
+                                                     THE CABLES TO PASS THROUGH. ONCE THE CABLES ARE IN
+                                                             PLACE, APPLY THE GASKET AFTERWARD.
+
+
+
+
+                                                                                                              1 February 2025   99
+HDRY System                             CAPS
+SCREWS   4
+              SECURE THE REAR CAPS WITH TWO SCREWS BY INSERTING THEM AND
+
+
+
+
+                                                                                                 All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                       TIGHTENING THEM IN THE HIGHLIGHTED HOLES.
+
+
+
+
+                                                                           1 February 2025 100
+HDRY System                      WHAT ABOUT LED STRIPE
+
+              HERE'S THE DIAGRAM SHOWING HOW I APPLIED THE 5-METER LED STRIP
+                       INTERNALLY. IT MIGHT COME IN HANDY AS A GUIDE.
+
+
+
+
+                                                                                                     All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                               1 February 2025 101
+1 February 2025 102
+
+
+
+
+                      All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+                                                                          All material produced and provided has been conceived, authored and produced by Enrico Mazzarol - All rights reserved.
+© 2025 CC3DPROJECTS. ALL RIGHTS RESERVED.
+
+THIS MANUAL IS PROTECTED BY COPYRIGHT LAW AND MAY NOT BE
+REPRODUCED, DISTRIBUTED, OR USED IN WHOLE OR IN PART
+WITHOUT THE WRITTEN PERMISSION OF THE AUTHOR OR PUBLISHER.
+ANY VIOLATION WILL BE PROSECUTED TO THE FULLEST EXTENT OF
+THE LAW.
+
+THE HDRY SYSTEM AND ALL ITS COMPONENTS, INCLUDING BUT NOT
+LIMITED TO DESIGNS, SCHEMATICS, ASSEMBLY INSTRUCTIONS, AND
+PHOTOGRAPHS, ARE THE EXCLUSIVE PROPERTY OF ENRICO
+MAZZAROL AND ARE PROTECTED BY COPYRIGHT LAW AND OTHER
+INTELLECTUAL PROPERTY LAWS.
+
+COPYING, DISTRIBUTING, MODIFYING, REPRODUCING, TRANSMITTING,
+OR USING THE HDRY SYSTEM IN ANY FORM WITHOUT THE WRITTEN
+PERMISSION OF CC3DPROJECTS IS PROHIBITED.
+
+FOR USAGE REQUESTS, PERMISSIONS, OR OTHER INQUIRIES, PLEASE
+CONTACT CC3DPROJECT@GMAIL.COM.
+
+
+
+
+                                                    1 February 2025 103
+

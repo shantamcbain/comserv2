@@ -430,11 +430,16 @@ sub get_available_models {
     my @all;
 
     # --- Local Ollama ---
-    # v2 parity with v1 get_user_providers: ALWAYS emit Ollama entries so the
-    # dropdown never collapses to just external providers. The controller
-    # groups these flat per-model entries by provider. If Ollama is
-    # unreachable at catalog time, emit a single unreachable sentinel (instead
-    # of nothing) so the widget can show a clear note rather than hiding local AI.
+    # Production1 is image-only and cannot reach the workstation Ollama host.
+    # Catalog discovery runs during ordinary page rendering, so probing Ollama
+    # there pins one Starman worker per request under crawler traffic. Do not
+    # probe, log an unreachable sentinel, or advertise Ollama on production1.
+    my $system_identifier = $ENV{SYSTEM_IDENTIFIER} // '';
+    my $skip_ollama = $system_identifier =~ /^(?:production1|comservproduction1)$/i;
+
+    unless ($skip_ollama) {
+    # v2 parity with v1 get_user_providers: emit Ollama entries on hosts where
+    # local AI is configured and reachable.
     try {
         my $ollama = $c->model('AI2::Provider::Ollama');
         my ($host, $port) = $ollama->resolve_host($c);
@@ -489,6 +494,7 @@ sub get_available_models {
             unreachable => 1,
         };
     };
+    }
 
     # --- External (x.AI / OpenRouter) ---
     # Driven by key *resolution*, not by the presence of a UserApiKeys row.
