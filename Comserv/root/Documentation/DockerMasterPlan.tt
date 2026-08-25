@@ -90,7 +90,7 @@
         <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
         <tr><td class="doc-td">Canonical Deploy Workflow (production)</td>
             <td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">/Documentation/DEPLOY_WORKFLOW</a></td>
-            <td class="doc-td">Authoritative button map (updated 2026-08-23). Workstation Rebuild is local-only; production is a separate Pull &amp; Deploy.</td></tr>
+            <td class="doc-td">Authoritative button map (updated 2026-08-23). Workstation Rebuild is local-only; production is a separate Pull &amp; Deploy. Supersedes REBUILD_AND_DEPLOY_INSTRUCTIONS.</td></tr>
         <tr><td class="doc-td">Deploy Hardening &rarr; K8s Plan</td>
             <td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_HARDENING_K8S_PLAN') %]">/Documentation/DEPLOY_HARDENING_K8S_PLAN</a></td>
             <td class="doc-td">DRAFT. Records 2026-08-23 script-level hardening plus the later false-success / streaming / volume-count defects.</td></tr>

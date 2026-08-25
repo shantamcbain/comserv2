@@ -7,6 +7,7 @@ use Try::Tiny;
 use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
 use Comserv::Util::Printing3d;
+use Comserv::Util::NfsPath;
 
 has 'logging' => (
     is      => 'ro',
@@ -379,13 +380,14 @@ sub model_download :Path('/3d/model_download') :Args(1) {
         $c->detach;
     }
 
-    my $path = $model->nfs_path;
-    unless (-f $path && -r $path) {
-        my $nfs_root = $ENV{NFS_DATA_PATH} || $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
-        (my $alt = $path) =~ s{^/data/nfs}{$nfs_root};
-        $path = $alt if -f $alt && -r $alt;
-    }
-    unless (-f $path && -r $path) {
+    # Resolve through NfsPath so workstation and every Docker node use the same
+    # /data/nfs tree. A raw -f on the stored path fails when the container's
+    # /data/nfs is not the shared NFS volume.
+    my $path = eval { Comserv::Util::NfsPath->new->resolve_path($model->nfs_path) } || '';
+    unless ($path && -f $path && -r $path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'model_download',
+            "STL not visible at stored nfs_path=" . ($model->nfs_path // '') .
+            " resolved=" . ($path || '<empty>'));
         $c->flash->{error_msg} = 'File not found on server: ' . $model->nfs_path;
         $c->res->redirect($c->uri_for('/3d/model', [$id]));
         $c->detach;
@@ -393,6 +395,22 @@ sub model_download :Path('/3d/model_download') :Args(1) {
 
     require File::Basename;
     my $filename = File::Basename::basename($path);
+    # Download name = SKU + human part name, e.g.
+    #   INT-HDRY-BBL01_Dryer_Bottom_Back_Left_L1.stl
+    # so the file identifies itself in the Downloads folder / slicer.
+    my $item_code = eval {
+        my $mi = $model->item_id or return undef;
+        my $it = $schema->resultset('Accounting::InventoryItem')->find($mi) or return undef;
+        $it->sku;
+    };
+    my $part_name = $model->name // '';
+    $part_name =~ s/\s*\([A-Za-z0-9]+\)\s*$//;          # strip trailing "(BBL01)"
+    $part_name =~ s/[^\w]+/_/g;                          # non-word -> underscore
+    $part_name =~ s/^_+|_+$//g;
+    $part_name = "Dryer_" . $part_name if $part_name && $part_name !~ /^Dryer/i;
+    my $dl_name = join("_", grep { $_ } ($item_code, $part_name));
+    $dl_name = $filename unless $dl_name;                # fallback: original basename
+    $dl_name .= ".stl" if $dl_name !~ /\.[A-Za-z0-9]+$/; # keep an extension
     my ($ext) = ($filename =~ /\.([^.]+)$/);
     my %mime_map = (
         stl   => 'application/vnd.ms-pki.stl',
@@ -410,7 +428,7 @@ sub model_download :Path('/3d/model_download') :Args(1) {
         $c->detach;
     };
     $c->response->content_type($mime);
-    $c->response->header('Content-Disposition' => "attachment; filename=\"$filename\"");
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$dl_name\"");
     $c->response->header('Content-Length' => -s $path);
     local $/ = undef;
     $c->response->body(<$fh>);
@@ -1544,6 +1562,131 @@ sub model_stl_info :Path('/3d/model_stl_info') :Args(1) {
         weight_petg_g => sprintf('%.2f', $w_petg),
         weight_abs_g  => sprintf('%.2f', $w_abs),
     }));
+    $c->detach;
+}
+
+# ============================================================
+# JSON API: create a printable part (model + inventory item + BOM + optional job)
+# Reuses Inventory::_create_item so inventory creation logic lives in ONE place.
+# Body (JSON or form): code, name, src, qty, parent (sku), queue (0/1)
+# ============================================================
+
+sub api_model_create :Path('/3d/api/model_create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $p = {};
+    # Accept either JSON body or form-encoded body parameters
+    my $raw_body = $c->request->body;
+    if ($raw_body) {
+        my $raw;
+        if (ref($raw_body) && $raw_body->can('seek')) {
+            seek($raw_body, 0, 0);
+            $raw = do { local $/; <$raw_body> };
+        } else {
+            $raw = $raw_body;
+        }
+        if ($raw && $raw =~ /^\s*[{\[]/) {
+            eval { $p = decode_json($raw); };
+        }
+    }
+    # form params (always available, fill any keys JSON didn't set)
+    my %form = %{ $c->req->body_parameters };
+    for my $k (keys %form) {
+        $p->{$k} = $form{$k} unless exists $p->{$k};
+    }
+
+    my $code   = $p->{code}   or return _json_err($c, 'code required');
+    my $name   = $p->{name}   or return _json_err($c, 'name required');
+    my $src    = $p->{src}    or return _json_err($c, 'src required');
+    my $qty    = $p->{qty}    or return _json_err($c, 'qty required');
+    my $parent = $p->{parent} || 'INT-HDRY-001';
+    my $queue  = $p->{queue}  || 0;
+
+    my $sku = "INT-HDRY-$code";
+
+    # parent assembly must exist
+    my $parent_item = $schema->resultset('Accounting::InventoryItem')->find(
+        { sitename => $sitename, sku => $parent }
+    );
+    unless ($parent_item) {
+        return _json_err($c, "parent assembly $parent not found");
+    }
+
+    # 1) inventory item — via Inventory's own create helper (no duplication)
+    my $inv_ctl = $c->controller('Inventory');
+    my $item;
+    eval {
+        $item = $inv_ctl->_create_item($c, {
+            sku           => $sku,
+            name          => "$name ($code)",
+            description   => "HDRY dryer printed part $code from $src.3mf",
+            unit_of_measure => 'each',
+            is_assemblable => 0,
+            status        => 'active',
+            notes         => "project:hdry src:$src",
+        });
+    };
+    if ($@) {
+        return _json_err($c, "item create failed: $@");
+    }
+
+    # 2) printing_3d_models row, linked to the inventory item
+    my $model = $schema->resultset('Printing3dModel')->create({
+        sitename     => $sitename,
+        name         => "$name ($code)",
+        description   => "HDRY dryer printable part $code from $src.3mf",
+        file_type    => '3mf',
+        tags         => 'project:hdry',
+        source       => 'project_import',
+        item_id      => $item->id,
+        added_by     => $c->session->{username} || 'system',
+        is_active    => 1,
+    });
+
+    # 3) BOM: component (this part) -> parent assembly
+    $schema->resultset('Accounting::InventoryItemBOM')->create({
+        parent_item_id    => $parent_item->id,
+        component_item_id => $item->id,
+        quantity          => $qty,
+    });
+
+    # 4) optional print job
+    my $job_id;
+    if ($queue) {
+        my $job = $schema->resultset('Printing3dJob')->create({
+            sitename       => $sitename,
+            model_id       => $model->id,
+            source_type    => 'project',
+            source_item_id => $parent_item->id,
+            quantity       => $qty,
+            status         => 'queued',
+            username       => $c->session->{username} || 'system',
+        });
+        $job_id = $job->id;
+    }
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success   => 1,
+        code      => $code,
+        sku       => $sku,
+        item_id   => $item->id,
+        model_id  => $model->id,
+        job_id    => $job_id,
+        queued    => $queue ? 1 : 0,
+    }));
+    $c->detach;
+}
+
+sub _json_err {
+    my ($c, $msg) = @_;
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 0, error => $msg }));
     $c->detach;
 }
 
