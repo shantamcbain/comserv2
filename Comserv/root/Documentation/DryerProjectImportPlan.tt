@@ -325,6 +325,15 @@
             customer to a print job / stock bin via inventory locations + the existing
             <code>consignment_id</code>/<code>consignment_line_id</code> columns on <code>printing_3d_jobs</code>.
             (c) Visible job status — surface printing/finished state on the queue UI.</p>
+            <p class="doc-body"><strong>Design gap found during first import (2026-08-25): variants.</strong> Some
+            parts ship in variants (e.g. <code>FFL01</code> = Sensor / no_Sensor;
+            <code>FFR01</code> = Dryer_Panel / no_panel). Current model treats each variant as its own model row,
+            which floods the queue with near-duplicates. Correct shape: a <em>variant option set</em> attached to
+            the logical part; the customer/project chooses the variant at creation time; the queue job resolves to
+            exactly one STL. To add: variant selection step in project creation (before queueing), variant storage
+            on the model/job (no schema change needed — <code>tags</code> or description JSON can carry it until
+            Result-first change is agreed), and cancel/variant UI already partially exists (Cancel button live on
+            assigned/printing jobs).</p>
             <table class="doc-table">
                 <tr><th class="doc-th">Phase</th><th class="doc-th">Project</th><th class="doc-th">GATE</th></tr>
                 <tr>
