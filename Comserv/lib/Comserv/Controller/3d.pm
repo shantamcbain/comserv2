@@ -1548,6 +1548,131 @@ sub model_stl_info :Path('/3d/model_stl_info') :Args(1) {
 }
 
 # ============================================================
+# JSON API: create a printable part (model + inventory item + BOM + optional job)
+# Reuses Inventory::_create_item so inventory creation logic lives in ONE place.
+# Body (JSON or form): code, name, src, qty, parent (sku), queue (0/1)
+# ============================================================
+
+sub api_model_create :Path('/3d/api/model_create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $p = {};
+    # Accept either JSON body or form-encoded body parameters
+    my $raw_body = $c->request->body;
+    if ($raw_body) {
+        my $raw;
+        if (ref($raw_body) && $raw_body->can('seek')) {
+            seek($raw_body, 0, 0);
+            $raw = do { local $/; <$raw_body> };
+        } else {
+            $raw = $raw_body;
+        }
+        if ($raw && $raw =~ /^\s*[{\[]/) {
+            eval { $p = decode_json($raw); };
+        }
+    }
+    # form params (always available, fill any keys JSON didn't set)
+    my %form = %{ $c->req->body_parameters };
+    for my $k (keys %form) {
+        $p->{$k} = $form{$k} unless exists $p->{$k};
+    }
+
+    my $code   = $p->{code}   or return _json_err($c, 'code required');
+    my $name   = $p->{name}   or return _json_err($c, 'name required');
+    my $src    = $p->{src}    or return _json_err($c, 'src required');
+    my $qty    = $p->{qty}    or return _json_err($c, 'qty required');
+    my $parent = $p->{parent} || 'INT-HDRY-001';
+    my $queue  = $p->{queue}  || 0;
+
+    my $sku = "INT-HDRY-$code";
+
+    # parent assembly must exist
+    my $parent_item = $schema->resultset('Accounting::InventoryItem')->find(
+        { sitename => $sitename, sku => $parent }
+    );
+    unless ($parent_item) {
+        return _json_err($c, "parent assembly $parent not found");
+    }
+
+    # 1) inventory item — via Inventory's own create helper (no duplication)
+    my $inv_ctl = $c->controller('Inventory');
+    my $item;
+    eval {
+        $item = $inv_ctl->_create_item($c, {
+            sku           => $sku,
+            name          => "$name ($code)",
+            description   => "HDRY dryer printed part $code from $src.3mf",
+            unit_of_measure => 'each',
+            is_assemblable => 0,
+            status        => 'active',
+            notes         => "project:hdry src:$src",
+        });
+    };
+    if ($@) {
+        return _json_err($c, "item create failed: $@");
+    }
+
+    # 2) printing_3d_models row, linked to the inventory item
+    my $model = $schema->resultset('Printing3dModel')->create({
+        sitename     => $sitename,
+        name         => "$name ($code)",
+        description   => "HDRY dryer printable part $code from $src.3mf",
+        file_type    => '3mf',
+        tags         => 'project:hdry',
+        source       => 'project_import',
+        item_id      => $item->id,
+        added_by     => $c->session->{username} || 'system',
+        is_active    => 1,
+    });
+
+    # 3) BOM: component (this part) -> parent assembly
+    $schema->resultset('Accounting::InventoryItemBOM')->create({
+        parent_item_id    => $parent_item->id,
+        component_item_id => $item->id,
+        quantity          => $qty,
+    });
+
+    # 4) optional print job
+    my $job_id;
+    if ($queue) {
+        my $job = $schema->resultset('Printing3dJob')->create({
+            sitename       => $sitename,
+            model_id       => $model->id,
+            source_type    => 'project',
+            source_item_id => $parent_item->id,
+            quantity       => $qty,
+            status         => 'queued',
+            username       => $c->session->{username} || 'system',
+        });
+        $job_id = $job->id;
+    }
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success   => 1,
+        code      => $code,
+        sku       => $sku,
+        item_id   => $item->id,
+        model_id  => $model->id,
+        job_id    => $job_id,
+        queued    => $queue ? 1 : 0,
+    }));
+    $c->detach;
+}
+
+sub _json_err {
+    my ($c, $msg) = @_;
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({ success => 0, error => $msg }));
+    $c->detach;
+}
+
+# ============================================================
 # Queue Sync — detect items needing printing from inventory
 # and consignments, then create queued print jobs
 # ============================================================
