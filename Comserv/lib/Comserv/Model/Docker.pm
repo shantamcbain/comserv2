@@ -80,6 +80,17 @@ sub create_dated_backup {
     my $stop = `docker stop "$container_name" 2>&1 || true`;
     my $rename = `docker rename "$container_name" "$backup_name" 2>&1 || true`;
 
+    # Keep at most 3 dated backups of this container name.
+    my $pat  = quotemeta($container_name);
+    my $list = `docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^${pat}-bk-' | sort -r`;
+    my @kept = grep { /\S/ } split /\n/, ($list || '');
+    if (@kept > 3) {
+        foreach my $old (@kept[3 .. $#kept]) {
+            chomp $old;
+            system("docker rm -f '$old' >/dev/null 2>&1");
+        }
+    }
+
     return {
         success => 1,
         backup_name => $backup_name,
