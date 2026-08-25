@@ -68,6 +68,7 @@ sub-plan remains the authoritative spec for its own work.</p>
             <a href="#w6" class="doc-navlink">Infra/Security</a>
             <a href="#wv2" class="doc-navlink">V2 Migration</a>
             <a href="#aisystem-jump" class="doc-navlink" title="Scroll to the AISYSTEM jump: plan document, project #280, and todo #2217 (in-chat Todo-create agent).">AISYSTEM</a>
+            <a href="#3dprint-jump" class="doc-navlink" title="Scroll to the 3D printing coordinator plan jump (3dPrintingPlan + project #206).">3D Printing</a>
         </div>
         <p>
             <a href="/Documentation/MASTER_PLAN" target="_blank" rel="noopener" class="doc-navlink">↗ Open this plan in its own browser tab</a>
@@ -86,6 +87,17 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-navlink" target="_blank" rel="noopener" title="Lists every todo whose project_id is 280 — the work items under AISYSTEM, including waves and the Todo-create agent.">Todos on #280 (work list)</a>
         <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-navlink" target="_blank" rel="noopener" title="Opens todo #2217. Todo-create WRITE path is code now (Chat intercept). Not a form page.">Todo #2217 (Todo-create — code now)</a>
         <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-navlink" target="_blank" rel="noopener" title="Opens todo #2218. Scheduler agent: blockers and queue-aware start dates. Specified, not built. Do not bulk-reschedule.">Todo #2218 (Scheduler — specified)</a>
+    </div>
+</div>
+
+<div class="doc-success" id="3dprint-jump">
+    <h2 class="doc-h3">3D Printing System — coordinator plan</h2>
+    <p class="doc-body">Planning only. The 3D master plan links every 3d child plan. New tab so Daily Plan stays intact.</p>
+    <div class="doc-navrow">
+        <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Opens the 3D printing coordinator plan: overall view and links to Dryer, Sign, Browse, operator KB.">3dPrintingPlan (the document)</a>
+        <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Opens project #206 3DPRINT — the database project that coordinator is attached to.">Project #206 3DPRINT</a>
+        <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Lists todos on project #206 3DPRINT.">Todos on #206</a>
+        <a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Child plan: HDRY dryer import playbook (PDF BOM).">Dryer playbook (child)</a>
     </div>
 </div>
 
@@ -119,6 +131,7 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]">AI Model Selection</a>
         <a href="[% c.uri_for('/Documentation/AIModernAgentEvolutionPlan') %]" title="Modern agent evolution masterplan: personas vs independent agents, migration map, verdict table.">Modern Agent Evolution</a>
         <a class="doc-navlink" href="#wave3">3 · 3D/Sign</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" target="_blank" rel="noopener" title="Opens the 3D printing coordinator plan (overall view + child plans).">3dPrintingPlan</a>
         <a class="doc-navlink" href="#wave4">4 · Inventory</a>
         <a class="doc-navlink" href="#wave5">5 · Polish</a>
     </div>
@@ -327,6 +340,11 @@ DailyPlanSystem.tt ────────────────────�
 </details></div>
 <div class="card" id="wave3"><details><summary class="card-header">GROUP 3 — 3D / Sign / Shop foundation (depends on Schema; enables Inventory)</summary>
 <div class="card-body">
+<div class="doc-navrow">
+    <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="3D printing coordinator plan.">3dPrintingPlan</a>
+    <a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="HDRY dryer import playbook.">Dryer playbook</a>
+    <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Project #206 3DPRINT.">#206 3DPRINT</a>
+</div>
 
 <div class="card" id="w3-1"><details><summary class="card-header">W3.1 — Herb Sign Generator (remaining)</summary>
 <div class="card-body">
@@ -495,7 +513,10 @@ DailyPlanSystem.tt ────────────────────�
         (child of #114; waves #281–284). Orders AIMPS + Hermes focus + AGENTS. W1.0 delivered: SuperGrok is its own prepaid provider (not xAI). Do not start W3 agents before the W2 gate.</li>
     <li><strong>AI Model Presentation &amp; Selection</strong> — <a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a> (proj <a href="/project/details?project_id=252">#252 AIMPS</a>; phases P1–P5 = #253–257, P5 = v2 migration sync). Next execution is AISYSTEM W1.</li>
     <li><strong>Point System</strong> — proj <a href="/project/details?project_id=193">#193 PointSystem</a> (phases: Ledger #194, Currency #195, PayPal #196, Spend #197, Crypto #198).</li>
-    <li><strong>3D Printing System</strong> — proj <a href="/project/details?project_id=206">#206 3DPRINT</a> (phases: Inv&amp;Accounting #207, File Mgmt #208, Sales #209).</li>
+    <li><strong>3D Printing System</strong> —
+        Coordinator: <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link" target="_blank" rel="noopener" title="3D printing master plan — overall view and child plans.">3dPrintingPlan</a>
+        · proj <a href="[% c.uri_for('/project/details') %]?project_id=206">#206 3DPRINT</a>
+        (phases: Inv&amp;Accounting #207, File Mgmt #208, Sales #209).</li>
     <li><strong>Buy &amp; Sell Marketplace</strong> — proj <a href="/project/details?project_id=210">#210</a> (7 phases #211–217).</li>
     <li><strong>Git Worktree System (new backend)</strong> — <a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]\">/Documentation/git_worktree_new_system_plan</a> (proj <a href="/project/details?project_id=238">#238 GITWT-NEW</a>).</li>
 </ul>
@@ -627,7 +648,8 @@ V2 MIG   V2MIG (#259) + P1-P5 (#260-264) ─ own top-level project; P4 = Plannin
         <tr><td class="doc-td">Theme Compliance Audit (proj #221, phases #222–226)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">AI Model Presentation &amp; Selection (proj #252 AIMPS, phases #253–257)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/AIModelPresentationPlan') %]\">/Documentation/AIModelPresentationPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Point System (proj #193, phases #194–198)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
-        <tr><td class="doc-td">3D Printing System (proj #206, phases #207–209)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/3d_printing') %]">/Documentation/3d_printing</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">3D Printing System coordinator (proj #206)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]">/Documentation/3dPrintingPlan</a></td><td class="doc-td">—</td></tr>
+        <tr><td class="doc-td">&nbsp;&nbsp;&nbsp;↳ operator KB</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/3d_printing') %]">/Documentation/3d_printing</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">&nbsp;&nbsp;&nbsp;↳ HDRY dryer import playbook (proj #272 DRYER-INT, phases #273–279)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]">/Documentation/DryerProjectImportPlan</a></td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Buy &amp; Sell Marketplace (proj #210, phases #211–217)</td><td class="doc-td">—</td><td class="doc-td">—</td></tr>
         <tr><td class="doc-td">Git Worktree System — new backend (proj #238 GITWT-NEW)</td><td class="doc-td"><a href="[% c.uri_for('/Documentation/git_worktree_new_system_plan') %]\">/Documentation/git_worktree_new_system_plan</a></td><td class="doc-td">—</td></tr>
