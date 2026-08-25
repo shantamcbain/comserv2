@@ -248,38 +248,9 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $params = $c->req->body_parameters;
-        my $schema = $self->_schema($c);
-        my $now    = $self->_now();
-
         my $new_item;
         eval {
-            $new_item = $schema->resultset('Accounting::InventoryItem')->create({
-                sitename            => $sitename,
-                sku                 => $params->{sku},
-                name                => $params->{name},
-                description         => $params->{description},
-                category            => $params->{category},
-                item_origin         => $params->{item_origin} || 'purchased',
-                is_assemblable      => $params->{is_assemblable} ? 1 : 0,
-                unit_of_measure     => $params->{unit_of_measure} || 'each',
-                unit_cost           => $params->{unit_cost}  || undef,
-                unit_price          => $params->{unit_price} || undef,
-                barcode             => $params->{barcode}    || undef,
-                reorder_point       => $params->{reorder_point} || 0,
-                reorder_quantity    => $params->{reorder_quantity} || 0,
-                status              => $params->{status} || 'active',
-                notes               => $params->{notes},
-                inventory_accno_id  => $params->{inventory_accno_id} || undef,
-                income_accno_id     => $params->{income_accno_id}    || undef,
-                expense_accno_id    => $params->{expense_accno_id}   || undef,
-                returns_accno_id    => $params->{returns_accno_id}   || undef,
-                show_in_shop        => 0,
-                hide_stock_count    => 0,
-                list_in_marketplace => 0,
-                created_by          => $c->session->{username} || 'system',
-                created_at          => $now,
-                updated_at          => $now,
-            });
+            $new_item = $self->_create_item($c, $params);
         };
         if ($@) {
             $c->stash->{error_msg} = "Failed to create item: $@";
@@ -304,6 +275,42 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
         is_popup     => $c->req->params->{popup} ? 1 : 0,
         template     => 'Inventory/items/add.tt',
     );
+}
+
+# Reusable inventory-item creation. Single source of truth shared by the
+# web form (item_add) and external callers (e.g. 3d API). Returns the new row.
+sub _create_item {
+    my ($self, $c, $p) = @_;
+    my $schema = $self->_schema($c);
+    my $now    = $self->_now();
+
+    return $schema->resultset('Accounting::InventoryItem')->create({
+        sitename            => $self->_sitename($c),
+        sku                 => $p->{sku},
+        name                => $p->{name},
+        description         => $p->{description},
+        category            => $p->{category},
+        item_origin         => $p->{item_origin} || 'purchased',
+        is_assemblable      => $p->{is_assemblable} ? 1 : 0,
+        unit_of_measure     => $p->{unit_of_measure} || 'each',
+        unit_cost           => $p->{unit_cost}  || undef,
+        unit_price          => $p->{unit_price} || undef,
+        barcode             => $p->{barcode}    || undef,
+        reorder_point       => $p->{reorder_point} || 0,
+        reorder_quantity    => $p->{reorder_quantity} || 0,
+        status              => $p->{status} || 'active',
+        notes               => $p->{notes},
+        inventory_accno_id  => $p->{inventory_accno_id} || undef,
+        income_accno_id     => $p->{income_accno_id}    || undef,
+        expense_accno_id    => $p->{expense_accno_id}   || undef,
+        returns_accno_id    => $p->{returns_accno_id}   || undef,
+        show_in_shop        => 0,
+        hide_stock_count    => 0,
+        list_in_marketplace => 0,
+        created_by          => $c->session->{username} || 'system',
+        created_at          => $now,
+        updated_at          => $now,
+    });
 }
 
 sub item_edit :Path('/Inventory/item/edit') :Args(1) {
