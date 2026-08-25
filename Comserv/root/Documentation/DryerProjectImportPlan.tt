@@ -47,6 +47,7 @@
                 <a href="#pack" class="doc-navlink">Downloads pack</a>
                 <a href="#what-exists" class="doc-navlink">What exists</a>
                 <a href="#data-model" class="doc-navlink">Data model</a>
+                <a href="#parts-worksheet" class="doc-navlink">Parts worksheet</a>
                 <a href="#invoice" class="doc-navlink">Invoice + subscription</a>
                 <a href="#queue" class="doc-navlink">Queue</a>
                 <a href="#deps" class="doc-navlink">Cross-plan deps</a>
@@ -258,6 +259,8 @@
         </div>
     </div>
 
+[% INCLUDE 'Documentation/dryer_parts_worksheet.tt' %]
+
     <div class="row">
         <div class="col-100">
             <h2 id="invoice" class="doc-h2">6. Invoice for the files + monthly support</h2>
@@ -316,6 +319,12 @@
             <h2 id="phases" class="doc-h2">9. Phases (sub-projects) and gates</h2>
             <p class="doc-body">Each phase is a sub-project of #272. Work todos live under that phase. Open the
             phase log before editing code that implements it.</p>
+            <p class="doc-body"><strong>Next-phase backlog (2026-08-24):</strong> (a) Build plans — read the parent
+            BOM, show parts &times;qty &times;(printed so far) with one-click queue creation for missing jobs
+            (<code>source_item_id</code> already links jobs to the assembly). (b) Per-customer tracking — map each
+            customer to a print job / stock bin via inventory locations + the existing
+            <code>consignment_id</code>/<code>consignment_line_id</code> columns on <code>printing_3d_jobs</code>.
+            (c) Visible job status — surface printing/finished state on the queue UI.</p>
             <table class="doc-table">
                 <tr><th class="doc-th">Phase</th><th class="doc-th">Project</th><th class="doc-th">GATE</th></tr>
                 <tr>
