@@ -393,6 +393,22 @@ sub model_download :Path('/3d/model_download') :Args(1) {
 
     require File::Basename;
     my $filename = File::Basename::basename($path);
+    # Download name = SKU + human part name, e.g.
+    #   INT-HDRY-BBL01_Dryer_Bottom_Back_Left_L1.stl
+    # so the file identifies itself in the Downloads folder / slicer.
+    my $item_code = eval {
+        my $mi = $model->item_id or return undef;
+        my $it = $schema->resultset('Accounting::InventoryItem')->find($mi) or return undef;
+        $it->sku;
+    };
+    my $part_name = $model->name // '';
+    $part_name =~ s/\s*\([A-Za-z0-9]+\)\s*$//;          # strip trailing "(BBL01)"
+    $part_name =~ s/[^\w]+/_/g;                          # non-word -> underscore
+    $part_name =~ s/^_+|_+$//g;
+    $part_name = "Dryer_" . $part_name if $part_name && $part_name !~ /^Dryer/i;
+    my $dl_name = join("_", grep { $_ } ($item_code, $part_name));
+    $dl_name = $filename unless $dl_name;                # fallback: original basename
+    $dl_name .= ".stl" if $dl_name !~ /\.[A-Za-z0-9]+$/; # keep an extension
     my ($ext) = ($filename =~ /\.([^.]+)$/);
     my %mime_map = (
         stl   => 'application/vnd.ms-pki.stl',
@@ -410,7 +426,7 @@ sub model_download :Path('/3d/model_download') :Args(1) {
         $c->detach;
     };
     $c->response->content_type($mime);
-    $c->response->header('Content-Disposition' => "attachment; filename=\"$filename\"");
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$dl_name\"");
     $c->response->header('Content-Length' => -s $path);
     local $/ = undef;
     $c->response->body(<$fh>);
