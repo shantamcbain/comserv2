@@ -312,3 +312,94 @@
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="hardware-worksheet" class="doc-h2">5c. Hardware (purchased) parts worksheet</h2>
+            <p class="doc-body">These are the <strong>BUY, not print</strong> components from the HDRY assembly
+            manual (DryerProjectImportPlan.tt section 1b / section 3). Each row becomes one
+            <code>inventory_items</code> row with <code>item_origin=purchased</code>, then a BOM line on the
+            base-unit parent (INT-HDRY-001). Wheel hardware is per wheel (4 wheels per base unit).
+            Multi-supplier: the PO / todo (#2310) must support an item mapping to several suppliers
+            (InventoryItemSupplier). Docs first — rows below are the source of truth for inventory creation.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">SKU</th><th class="doc-th">Name</th><th class="doc-th">Qty / unit</th>
+                    <th class="doc-th">UoM</th><th class="doc-th">Category</th>
+                    <th class="doc-th">Reorder min</th><th class="doc-th">Reorder qty (order unit)</th>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>INT-HDRY-HW-M4x14</code></td>
+                    <td class="doc-td">M4x14 screw</td>
+                    <td class="doc-td">180</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_fastener</td>
+                    <td class="doc-td">180</td><td class="doc-td">200 (box)</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>INT-HDRY-HW-M3x20</code></td>
+                    <td class="doc-td">M3x20 screw</td>
+                    <td class="doc-td">16</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_fastener</td>
+                    <td class="doc-td">16</td><td class="doc-td">100 (bag)</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>INT-HDRY-HW-608ZZ</code></td>
+                    <td class="doc-td">608zz bearing</td>
+                    <td class="doc-td">16</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_bearing</td>
+                    <td class="doc-td">16</td><td class="doc-td">20 (set)</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>INT-HDRY-HW-MAG8x2</code></td>
+                    <td class="doc-td">8x2 mm magnet</td>
+                    <td class="doc-td">20</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_magnet</td>
+                    <td class="doc-td">20</td><td class="doc-td">50 (pack)</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>INT-HDRY-HW-GASKET</code></td>
+                    <td class="doc-td">Adhesive gasket</td>
+                    <td class="doc-td">6</td><td class="doc-td">m</td>
+                    <td class="doc-td">hardware_gasket</td>
+                    <td class="doc-td">6</td><td class="doc-td">6 (roll) / 30 (roll)</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>INT-HDRY-HW-POLYDRYER</code></td>
+                    <td class="doc-td">Polydryer</td>
+                    <td class="doc-td">1</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_consumable</td>
+                    <td class="doc-td">1</td><td class="doc-td">1 (unit)</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>INT-HDRY-HW-WASHER</code></td>
+                    <td class="doc-td">Washer (wheel)</td>
+                    <td class="doc-td">8 (4-8/wheel x4)</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_fastener</td>
+                    <td class="doc-td">8</td><td class="doc-td">100 (bag)</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>INT-HDRY-HW-BOLTNUT</code></td>
+                    <td class="doc-td">Bolt + nut (wheel)</td>
+                    <td class="doc-td">8 (4-8/wheel x4)</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_fastener</td>
+                    <td class="doc-td">8</td><td class="doc-td">100 (bag)</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>INT-HDRY-HW-SPACER50</code></td>
+                    <td class="doc-td">50 mm spacer (wheel)</td>
+                    <td class="doc-td">8 (4-8/wheel x4)</td><td class="doc-td">each</td>
+                    <td class="doc-td">hardware_spacer</td>
+                    <td class="doc-td">8</td><td class="doc-td">50 (pack)</td>
+                </tr>
+            </table>
+            <p class="doc-body"><strong>Reorder rule (hardware rows):</strong>
+            <code>reorder_point</code> (min) = qty needed for one base unit; <code>reorder_quantity</code> =
+            common order unit (box / bag / set / roll shown). For the printed parts (section 5b) the rule
+            flips: <code>reorder_quantity</code> = qty needed per build config, not a wholesale unit.
+            All hardware rows: <code>show_in_shop=0</code>, <code>list_in_marketplace=0</code>.</p>
+            <p class="doc-body">Created via the live Inventory UI (/Inventory/item/add) under sitename=3d;
+            BOM lines added under INT-HDRY-001 (base unit) and the later add-on module parent. Tracked by
+            todo #2309; PO for these rows is blocking todo #2310 (multi-supplier aware).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
