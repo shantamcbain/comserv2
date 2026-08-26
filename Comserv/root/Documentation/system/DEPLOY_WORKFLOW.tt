@@ -71,8 +71,12 @@ image as <code>shantamcsbain/comserv-web-prod:latest</code> and pushes it to Doc
 <ol>
     <li>Pulls <code>shantamcsbain/comserv-web-prod:latest</code> from Docker Hub onto production1.</li>
     <li>Verifies production1's pulled image ID equals Docker Hub's config digest; a mismatch leaves production untouched.</li>
-    <li>Backs up the current container image (rollback point).</li>
-    <li>Recreates the <code>comserv2-web-prod</code> container from the fresh image.</li>
+    <li>Creates/verifies the portable Docker NFS volume
+        <code>comserv2_nfs_data_nfs</code> (<code>192.168.1.175:/mnt/data</code>, nfsvers=3)
+        and proves an STL is visible before renaming the live container.</li>
+    <li>Backs up the current container (keep 3 dated <code>bk-*</code>).</li>
+    <li>Recreates <code>comserv2-web-prod</code> from the verified image with 8 Starman workers
+        and <code>--max-requests 1000</code>.</li>
     <li>Runs the health-check loop (up to 90s). On failure it auto-rolls back to the backup.</li>
 </ol>
 <p><strong>Alternative:</strong> the <strong>Full Rebuild</strong> mode combines Steps 1–3 in one shot
@@ -127,10 +131,16 @@ They do <strong>not</strong> all do the same thing. The button you click is the 
     <li><strong>Never claim multi-node success after a local rebuild.</strong> That lie (2026-08-23) made a workstation Rebuild look like prod had been pulled. It had not.</li>
     <li><strong>Streaming:</strong> the child writes live to <code>/tmp/comserv_deploy.log</code> via <code>script -f -a</code>. The Docker page paints the whole log every 1.5s. Hard-refresh the page so the JS loads.</li>
     <li><strong>Health:</strong> <code>/health</code> is a cheap JSON liveness check. Catalyst path has no leading slash; <code>Root.pm</code> skips <code>auto</code>/<code>begin</code> on <code>health</code>. Compose <code>start_period</code> is 60s (not 10s).</li>
-    <li><strong>Volumes:</strong> live set is the 12 <code>comserv2_*</code> names (including <code>theme_config</code>/<code>theme_css</code> and <code>nfs_data</code>). The Volumes panel lists those exact names only. Prefixed leftovers were removed 2026-08-23.</li>
-    <li><strong>No auto-commit.</strong> Code ships inside the image.</li>
+    <li><strong>Volumes:</strong> theme/cache/logs stay named local volumes. Shared files are
+        <code>comserv2_nfs_data_nfs</code> — a Docker-managed NFS volume, not a host bind
+        and not the empty leftover <code>comserv2_nfs_data</code> local volume.</li>
+    <li><strong>Workers:</strong> production Starman default is 8, recycled after 1000 requests.</li>
+    <li><strong>No auto-commit.</strong> Code ships inside the image. Footer <code>+local</code> means uncommitted working-tree files were baked.</li>
 </ul>
-<p><em>See changelog entries <code>2026-08-23-deploy-pull-only-image-css</code> and <code>2026-08-23-workstation-rebuild-honest</code>.</em></p>
+<p><em>See changelog entries <code>2026-08-23-deploy-pull-only-image-css</code>,
+<code>2026-08-23-workstation-rebuild-honest</code>,
+<code>2026-08-25-prod-image-artifact-verification</code>,
+and <code>2026-08-25-nfs-docker-volume</code>.</em></p>
 
 <h2 id="trouble">Troubleshooting</h2>
 <table class="diagnostic-table">
@@ -160,7 +170,21 @@ They do <strong>not</strong> all do the same thing. The button you click is the 
             <td>The running container is stale (old empty <code>/root/static</code> bind). Pull + recreate from the fixed image
                 (Step 3 / Rebuild) so the baked <code>root/static/css</code> tree is used. Do not bind a host <code>/root/static</code>.</td></tr>
         <tr><td><strong>Rebuild said SUCCESS but production1 is still the old image</strong></td>
-            <td>Target was workstation. Local rebuild does not pull prod. Use Target = Production 1 and Pull &amp; Deploy. Ignore any old log line that said &quot;Multi-node deploy complete&quot;.</td></tr>
+            <td>Either the target was workstation (local rebuild never updates prod), or Build &amp; Push
+                did not publish the local image. The log must show
+                <code>Pushed and verified</code> with matching local ID and registry config digest.
+                A generic “Image is up to date” pull of yesterday’s digest is a failed publish, not a failed pull.</td></tr>
+        <tr><td><strong>Print-queue STL: File not found on server /data/nfs/...</strong></td>
+            <td>The file is on NFS; the container’s <code>/data/nfs</code> is the empty local
+                <code>comserv2_nfs_data</code> volume. Recreate that host’s
+                <code>comserv2-web-prod</code> so it mounts <code>comserv2_nfs_data_nfs</code>.
+                Confirm with <code>docker exec comserv2-web-prod df -T /data/nfs</code>
+                (must say <code>nfs</code>) and <code>ls</code> the stored path.
+                Do not bind <code>/home/ubuntu/nfs</code> — that is host-specific.</td></tr>
+        <tr><td><strong>Workstation Docker card shows an older image than production1</strong></td>
+            <td>Expected after Build &amp; Push / Pull &amp; Deploy. Those do not recreate the
+                workstation container. Switch the Docker page target to Production 1 to see prod.
+                Recreate workstation Docker separately if it must run the same image/volume.</td></tr>
         <tr><td><strong>No streaming / window frozen for minutes</strong></td>
             <td>Hard-refresh the Docker page. Output is <code>/tmp/comserv_deploy.log</code>; the poller paints the full file. If :3001 is down (NetworkError), the poll cannot run — the build may still be writing the log.</td></tr>
         <tr><td><strong>Volumes panel shows ~20 instead of ~12</strong></td>
@@ -181,7 +205,7 @@ remotely from the Docker UI may become desirable. Until then, follow Steps 1–3
     <p style="font-size: 12px; color: var(--text-muted-color, #666);">
         <strong>Document Version:</strong> 1.1<br>
         <strong>Created:</strong> 2026-07-31<br>
-        <strong>Updated:</strong> 2026-08-23 — button map, honest logs, streaming, volumes<br>
+        <strong>Updated:</strong> 2026-08-25 — digest verify, portable NFS volume, 8 workers<br>
         <strong>Status:</strong> Canonical — supersedes REBUILD_AND_DEPLOY_INSTRUCTIONS.tt
     </p>
 </div>
