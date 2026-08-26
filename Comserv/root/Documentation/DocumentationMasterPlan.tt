@@ -106,6 +106,7 @@ PROJECT = PLAN, PHASE = sub-project, STEP = todo. No abstract "Phase N".</p>
     <tr><td class="doc-td">Fix <code>README.tt</code>/<code>AGENTS.md</code> legacy <code>Comserv/docs/</code> refs</td><td class="doc-td">Dead pointers</td><td class="doc-td">S</td></tr>
     <tr><td class="doc-td">Add a docs lint to CI (META, PageVersion, theming, stray <code>.md</code>)</td><td class="doc-td">Prevent drift</td><td class="doc-td">M</td></tr>
     <tr><td class="doc-td">Stop AI misplacement: write only to <code>Comserv/root/Documentation/</code></td><td class="doc-td">Docs must be app-visible</td><td class="doc-td">S (rule + enforcement)</td></tr>
+    <tr><td class="doc-td"><a href="/Documentation/doc_config_db_move_plan" class="doc-link">Permanent DB move for doc catalog</a> — finish <code>load_from_db</code> + indexer + <code>save_config</code>→table (kills the JSON rewrite)</td><td class="doc-td">Cures the recurring merge-blocker at the architecture level; makes catalog per-site</td><td class="doc-td">M (schema owner for table write)</td></tr>
 </table>
 
 <h2 id="principles">Principles</h2>
