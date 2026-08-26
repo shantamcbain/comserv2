@@ -317,7 +317,7 @@
         <div class="col-100">
             <h2 id="hardware-worksheet" class="doc-h2">5c. Hardware (purchased) parts worksheet</h2>
             <p class="doc-body">These are the <strong>BUY, not print</strong> components from the HDRY assembly
-            manual (DryerProjectImportPlan.tt section 1b / section 3). Each row becomes one
+            manual (DryerProjectPlan section 1b / import pack). Each row becomes one
             <code>inventory_items</code> row with <code>item_origin=purchased</code>, then a BOM line on the
             base-unit parent (INT-HDRY-001). Wheel hardware is per wheel (4 wheels per base unit).
             Multi-supplier: the PO / todo (#2310) must support an item mapping to several suppliers
