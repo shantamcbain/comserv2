@@ -169,6 +169,14 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a href="[% c.uri_for('/Documentation/AIAgentOrchestrationPlan') %]" class="doc-navlink">AI Agent Orchestration</a>
         <a href="[% c.uri_for('/Documentation/AIModernAgentEvolutionPlan') %]" class="doc-navlink" title="Modern agent evolution: personas vs independent agents, migration map, and verdict table.">Modern Agent Evolution</a>
     </div>
+    <div class="doc-h3">Documentation</div>
+    <div class="doc-navrow">
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationMasterPlan') %]">Documentation Master Plan</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN') %]">Documentation System Audit (prior)</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_DEVELOPMENT_GUIDELINES') %]">AI Dev Guidelines</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/DevelopmentStandards') %]">Development Standards</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationTtTemplate') %]">TT Template</a>
+    </div>
 </div>
 
 <div class="card" id="principles"><details><summary class="card-header">0. Guiding principles (apply to every group)</summary>
