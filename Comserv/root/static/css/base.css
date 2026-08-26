@@ -184,3 +184,20 @@ select {
   border-radius: 8px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.4);
 }
+
+/* Documentation branch: notice shown when a PUBLIC doc is read on production */
+.doc-public-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: 0;
+  background-color: var(--primary-color, #004d5c);
+  color: #ffffff;
+  font-family: var(--body-font, Verdana, Helvetica, sans-serif);
+  font-size: var(--font-size-small, 14px);
+  border-bottom: 2px solid var(--warning-color, #cc3300);
+}
+.doc-public-notice__icon { font-size: 1.1rem; line-height: 1; }
+.doc-public-notice__text { line-height: 1.4; }
+.doc-public-notice__text strong { color: #fff; }
