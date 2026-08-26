@@ -5,7 +5,7 @@
    TemplateType = "Documentation"
    category = "infrastructure,deployment,kubernetes,docker,coordination"
    page_version = "1.0"
-   last_updated = "Sun Aug 23 2026"
+   last_updated = "Mon Aug 25 2026"
    site_specific = "false"
    project_id = "271"
    project_code = "DOCKER-SYS"
@@ -90,7 +90,7 @@
         <tr><th class="doc-th">Plan</th><th class="doc-th">Route</th><th class="doc-th">Status / note</th></tr>
         <tr><td class="doc-td">Canonical Deploy Workflow (production)</td>
             <td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">/Documentation/DEPLOY_WORKFLOW</a></td>
-            <td class="doc-td">Authoritative button map (updated 2026-08-23). Workstation Rebuild is local-only; production is a separate Pull &amp; Deploy. Supersedes REBUILD_AND_DEPLOY_INSTRUCTIONS.</td></tr>
+            <td class="doc-td">Authoritative (updated 2026-08-25): digest-verified Build &amp; Push, Pull &amp; Deploy, portable NFS volume <code>comserv2_nfs_data_nfs</code>, 8 workers. Workstation Rebuild is local-only.</td></tr>
         <tr><td class="doc-td">Deploy Hardening &rarr; K8s Plan</td>
             <td class="doc-td"><a href="[% c.uri_for('/Documentation/DEPLOY_HARDENING_K8S_PLAN') %]">/Documentation/DEPLOY_HARDENING_K8S_PLAN</a></td>
             <td class="doc-td">DRAFT. Records 2026-08-23 script-level hardening plus the later false-success / streaming / volume-count defects.</td></tr>
@@ -176,6 +176,10 @@ EDGE       GatewayPlan · CREDENTIALS_AUDIT_AND_PLAN (#239 IMGSEC)
             conflict with <code>DOCKER_KUBERNETES_MIGRATION_STRATEGY</code>, follow K3S_APP_HA_PLAN.</li>
         <li><strong>DEPLOY_WORKFLOW</strong> supersedes <code>REBUILD_AND_DEPLOY_INSTRUCTIONS</code> (the latter is
             marked superseded on disk — not linked as active above).</li>
+        <li><strong>2026-08-25 NFS</strong> — live shared files use Docker volume
+            <code>comserv2_nfs_data_nfs</code> (NFS to 192.168.1.175:/mnt/data). Do not bind
+            <code>/home/*/nfs</code>. The leftover local <code>comserv2_nfs_data</code> is empty
+            and must not be remounted. See changelog <code>2026-08-25-nfs-docker-volume</code>.</li>
         <li><strong>CREDENTIALS_AUDIT_AND_PLAN</strong> carries <strong>#239 IMGSEC</strong> (Docker image credential leak
             remediation) — coordinate Docker secret work there, not in a standalone doc.</li>
         <li><strong>GatewayPlan</strong> overlaps where containers are edge-exposed; keep ingress decisions consistent with
@@ -220,6 +224,6 @@ EDGE       GatewayPlan · CREDENTIALS_AUDIT_AND_PLAN (#239 IMGSEC)
 </div>
 
 <div class="doc-footer">
-    <p class="doc-muted">Docker &amp; Kubernetes Plans — Coordinator · project #271 (DOCKER-SYS) · last updated 2026-08-23 ·
+    <p class="doc-muted">Docker &amp; Kubernetes Plans — Coordinator · project #271 (DOCKER-SYS) · last updated 2026-08-25 ·
     routes verified against <code>Documentation.pm</code>.</p>
 </div>
