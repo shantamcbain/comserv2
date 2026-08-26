@@ -135,6 +135,9 @@ Comserv/script/test_load.pl
 !.github/*.md
 !.zencoder/rules/*.md
 !Comserv/root/Documentation/session_history/*.md
+# AI consolidated guidance (auto-loaded every Hermes session — must be tracked)
+!.hermes.md
+!.hermes/**/*.md
 !.github/workflows/
 AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
 *.md.new
