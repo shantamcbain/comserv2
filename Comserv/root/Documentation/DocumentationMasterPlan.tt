@@ -82,6 +82,7 @@ PROJECT = PLAN, PHASE = sub-project, STEP = todo. No abstract "Phase N".</p>
     <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_DEVELOPMENT_GUIDELINES') %]">AI Development Guidelines</a>
     <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_DOCUMENTATION_GUIDELINES') %]">AI Documentation Guidelines</a>
     <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_Guidelines') %]">AI Guidelines</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_Model_Selection_Guide') %]">AI Model Selection Guide for Documentation Tasks</a>
 </div>
 <div class="doc-h3">Prior system docs</div>
 <div class="doc-navrow">
