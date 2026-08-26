@@ -137,11 +137,12 @@ sub-plan remains the authoritative spec for its own work.</p>
     </div>
     <div class="doc-h3">Reference</div>
     <div class="doc-navrow">
-        <a class="doc-navlink" href="#principles">Principles</a>
-        <a class="doc-navlink" href="#deps">Deps</a>
-        <a class="doc-navlink" href="#glance">Glance</a>
-        <a class="doc-navlink" href="#decisions">Decisions</a>
-        <a class="doc-navlink" href="#index">Index</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/principles') %]">Principles</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/deps') %]">Deps</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/glance') %]">Glance</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/decisions') %]">Decisions</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/index') %]">Index</a>
+        <a class="doc-navlink" href="[% c.uri_for('/Documentation/SchemaMasterPlan') %]">Schema Master Plan</a>
     </div>
     <div class="doc-h3">Monitoring</div>
     <div class="doc-navrow">
@@ -234,12 +235,13 @@ DailyPlanSystem.tt ────────────────────�
 
 <div class="card" id="w0-1"><details><summary class="card-header">W0.1 — Schema System Plan</summary>
 <div class="card-body">
-<p>Route: <a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">/Documentation/SchemaSystemPlan</a> (ACTIVE)</p>
+<p>Coordinator (NEW): <a href="[% c.uri_for('/Documentation/SchemaMasterPlan') %]">/Documentation/SchemaMasterPlan</a> — consolidates every schema/doc plan: Result-file-first authority, the live Maria (Ency) vs clone-target Postgres split, the Maria→PG clone pipeline, naming standardization, accounting-entity structure, and connection config. Flags the referenced-but-missing plans (SchemaSystemPlan / ACCPG / ACCON).</p>
+<p>Route: <a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">/Documentation/SchemaSystemPlan</a> (W0.1 detail — G0–G5, this branch)</p>
 <ul>
-    <li>Done: problem framed; <code>Util::SchemaCompare</code> exists; <code>/admin</code> endpoints work via DDL-from-Result; <code>INFRA_NAMING.md</code> states .20 primary / .198 backup.</li>
+    <li>Done: problem framed; <code>Util::SchemaCompare</code> exists; <code>/admin</code> endpoints work via DDL-from-Result; live DB topology: active primary Ency = <strong>192.168.1.20:3307</strong>, <code>.198</code> / <code>.222</code> is the legacy host planned as a K8s DB node (LB/failover) — see K3S_APP_HA_PLAN; <code>INFRA_NAMING.md</code> is planned to be created.</li>
     <li>Remaining (blocks every other plan's schema work):
         <ul>
-            <li><strong>G0</strong> resolve primary/backup + renormalize <code>db_config.json</code> priority (.20 explicit primary). <em>Blocking — do first.</em></li>
+            <li><strong>G0</strong> document the real topology + the Docker first-run credential bootstrap (container detects missing secrets, prompts first admin user + primary Ency creds; <code>.198</code>/<code>.222</code> planned as K8s DB HA node; live primary <strong>.20:3307</strong>). <em>Blocking — do first.</em></li>
             <li><strong>G1</strong> extend <code>Util::SchemaCompare</code> with <code>create_table_from_result</code>, <code>sync_result_to_table</code>, <code>sync_to_backup</code>.</li>
             <li><strong>G2</strong> fold <code>/admin/backup</code> into the schema system.</li>
             <li><strong>G3</strong> strip ~42 raw-SQL lines from <code>Admin/SchemaComparison.pm</code>.</li>
@@ -446,6 +448,8 @@ DailyPlanSystem.tt ────────────────────�
     <li><a href="[% c.uri_for('/Documentation/DockerMasterPlan') %]">Docker &amp; Kubernetes Plans — Coordinator</a> (project #271 DOCKER-SYS — indexes every Docker/K8s plan below)</li>
     <li><a href="[% c.uri_for('/Documentation/CREDENTIALS_AUDIT_AND_PLAN') %]">Credentials Audit &amp; Unified Management Plan</a></li>
     <li><a href="[% c.uri_for('/Documentation/GatewayPlan') %]">CSC Gateway Plan</a></li>
+    <li><a href="[% c.uri_for('/Documentation/SchemaMasterPlan') %]">Schema Master Plan</a> (consolidates Result-file-first authority, Maria↔Postgres split, clone pipeline, naming, ACCENT, connections; flags missing ACCPG/ACCON)</li>
+    <li><a href="[% c.uri_for('/Documentation/SchemaSystemPlan') %]">Schema System Plan (W0.1)</a> — G0–G5 detail owned by the schema branch</li>
     <li><a href="[% c.uri_for('/Documentation/SchemaNamingStandardizationPlan') %]">Schema Naming Standardization Plan</a></li>
     <li><a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]">Canonical Deploy Workflow (production)</a></li>
     <li><a href="[% c.uri_for('/Documentation/DevelopmentPlans') %]">Development Plans initiative index</a> (links the older DOC-ROLE-001 etc.)</li>
