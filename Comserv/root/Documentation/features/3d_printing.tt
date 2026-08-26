@@ -179,7 +179,7 @@ Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts ma
 <p>
 Use this when a new 3D project arrives as a folder of 3MF/STL/PDF (the HDRY filament dryer is the
 worked example). Full tracking:
-<a href="/Documentation/DryerProjectImportPlan">/Documentation/DryerProjectImportPlan</a>
+<a href="/Documentation/DryerProjectPlan">/Documentation/DryerProjectPlan</a>
 (project <a href="/project/details?project_id=272">#272 DRYER-INT</a>).
 </p>
 <ol>

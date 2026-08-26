@@ -1880,7 +1880,15 @@ All git goes through git_service (_run whitelist). Logged via log_with_details.
 sub merge :Path('/admin/git/merge') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
-    return unless $self->admin_auth->require_admin_access($c, 'git_merge');
+    # JSON endpoints must never answer an auth failure with a 302 redirect to
+    # /user/login — the browser's fetch().json() would then throw
+    # "JSON.parse: unexpected character at line 1 column 1" on the HTML login
+    # page. Return a JSON 403 so the dashboard shows a readable message.
+    unless ($self->admin_auth->check_admin_access($c, 'git_merge')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => 0, error => 'Administrator access required.' }));
+        return;
+    }
     unless ($c->request->method eq 'POST') {
         $c->response->body(encode_json({ success => 0, error => 'POST required' }));
         return;
