@@ -94,7 +94,7 @@ AccountingOnboardingPlan / ACCON) are <strong>not</strong> authored here — the
         </tr>
         <tr>
             <td><strong>G1</strong></td>
-            <td>Extend <code>Util::SchemaCompare</code> with <code>create_table_from_result</code>, <code>sync_result_to_table</code>, <code>sync_to_backup</code> so either engine can be driven from a Result class.</td>
+            <td>Maria create/sync already live in <code>SchemaComparison.pm</code>. PG half: <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a> (SCHEMAPG #289) — compare cannot connect or CREATE a PG database yet. Do not rebuild the Maria endpoints.</td>
             <td>New columns on Maria OR Postgres via compare (no hand DDL).</td>
             <td>MED — core mechanism.</td>
         </tr>
