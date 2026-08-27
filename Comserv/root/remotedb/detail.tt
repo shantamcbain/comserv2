@@ -8,6 +8,7 @@
     <h1>[% conn_name | html %]</h1>
     <div class="form-actions">
         <a href="[% c.uri_for('/remotedb/edit') %]/[% conn_name | uri %]" class="btn btn-primary">Edit Settings</a>
+        <a href="[% c.uri_for('/remotedb/change_password') %]/[% conn_name | uri %]" class="btn btn-primary">Change password</a>
         <a href="[% c.uri_for('/remotedb/test') %]/[% conn_name | uri %]"
            class="btn btn-secondary"
            title="Test TCP connectivity to [% conn.config.host | html %]:[% conn.config.port | html %]">Test Connection</a>
