@@ -298,9 +298,23 @@ sub chat {
     my $res = try { $ua->request($req) } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             'grok_chat', "x.AI request failed: $_");
-        return undef;
+        # Pass the transport failure through VERBATIM so Router's
+        # _credits_exhausted can match it ("can't connect", "timed out")
+        # and fall through to the free-model chain instead of dead-ending.
+        return { success => 0, error => "Can't connect to api.x.ai:443: $_" };
     };
-    return { success => 0, error => 'Grok provider error' } unless $res && $res->is_success;
+    unless ($res && $res->is_success) {
+        my $code = $res ? $res->code : 599;
+        my $body = $res ? substr(($res->decoded_content // ''), 0, 200) : 'no response';
+        $body =~ s/\s+/ /g;
+        # Verbatim status + detail (429 rate limit, 401 bad key, 402/429
+        # quota...) so the Router fallback chain engages on this hop.
+        return {
+            success => 0,
+            error   => "$code $body",
+            ($code == 401 ? (auth_failed => 1) : ()),
+        };
+    }
 
     my $data = try { decode_json($res->decoded_content) } catch { undef };
     return { success => 0, error => 'Bad JSON from Grok' } unless $data;
