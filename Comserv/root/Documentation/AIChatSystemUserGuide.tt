@@ -3,10 +3,10 @@
    description = "How the AI Chat system reads prompts, selects agents and models, and handles different request types"
    roles = "user,admin,developer,helpdesk"
    category = "AI Module"
-   page_version = "1.0"
-   last_updated = "2026-08-20"
+   page_version = "1.1"
+   last_updated = "2026-08-26"
 %]
-[% PageVersion = 'Documentation/AIChatSystemUserGuide.tt,v 1.0 2026/05/09 shanta' %]
+[% PageVersion = 'Documentation/AIChatSystemUserGuide.tt,v 1.1 2026/08/26 shanta' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -198,7 +198,7 @@
     <tr>
         <td>💰 <strong>Accounting</strong></td>
         <td><code>/Inventory/</code>, <code>/accounting/</code></td>
-        <td>Invoices, bills, suppliers, purchase orders. Can parse a pasted bill and pre-fill the invoice entry form.</td>
+        <td>Invoices, bills, suppliers. Paste or describe a bill in chat to save a <em>draft</em> supplier (AP) or sales (AR) invoice on this SiteName. Chat never posts the GL — accounting reviews at /Inventory/invoice or /Inventory/sales.</td>
     </tr>
     <tr>
         <td>🎫 <strong>HelpDesk</strong></td>
@@ -405,8 +405,8 @@
 <p><strong>What happens:</strong> The ENCY agent reads the injected todo data, finds the term name and context, then opens the <em>Add Constituent</em> form (<code>/ENCY/Constituent/add</code>) with the name pre-filled. The user can then complete and save the record.</p>
 
 <h3>Filing an Invoice</h3>
-<div class="prompt-example">[Paste the text of a bill or invoice] then: "Enter this invoice"</div>
-<p><strong>What happens:</strong> The Accounting agent parses the pasted bill (supplier name, invoice number, date, total amount), then opens the invoice entry form (<code>/Inventory/invoice/new</code>) pre-filled with the extracted values. The user verifies and saves.</p>
+<div class="prompt-example">"Enter this invoice from Amazon for $45.20 dated 2026-08-26 invoice #INV-99" &nbsp;or&nbsp; "Create a sales invoice for Jane Doe for $50"</div>
+<p><strong>What happens:</strong> Code, not the chat model. <code>/ai2/chat</code> intercepts enter/record invoice language before the LLM. <code>Model::AI2::InvoiceCreate</code> writes a <em>draft</em> on the current SiteName: supplier bills go to <code>/Inventory/invoice/view/ID</code>, sales invoices to <code>/Inventory/sales/view/ID</code>. You need an admin or accounting role. The supplier must already exist (chat asks if the name is missing or ambiguous). Missing amount asks. Chat never Posts the GL — open the draft in Inventory and Post there after review.</p>
 
 <h3 id="todos">Adding a Todo</h3>
 <div class="prompt-example">"Add a todo to wire the bee-health graph" &nbsp;or&nbsp; click 📝 in the chat header</div>
@@ -427,6 +427,7 @@
 <h2>Tips for Better Results</h2>
 <ul>
     <li><strong>Add a todo from chat</strong> — say “add a todo …” or use 📝. It lands on this SiteName; if no project matches, the chat asks whether to create one.</li>
+    <li><strong>Enter an invoice from chat</strong> — say “enter this invoice from &lt;supplier&gt; for $X …”. It saves a draft only. Accounting Posts in Inventory.</li>
     <li><strong>AI Editor can read code</strong> — the open file is sent automatically. Name another <code>lib/…</code> / <code>root/…</code> path or use <code>[READ_FILE: path]</code>.</li>
     <li><strong>Be on the right page</strong> — The AI automatically reads the current page's data. If you're asking about herb #42, open that herb's page first.</li>
     <li><strong>Use ENCY section keywords</strong> for instant navigation: "herbs", "glossary", "diseases", "symptoms", "formula", "constituents".</li>
