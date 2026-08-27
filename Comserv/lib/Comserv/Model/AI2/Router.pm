@@ -69,7 +69,13 @@ sub _detect_provider {
     if ($requested_model =~ m{/}) {
         return ('external', $requested_model);
     }
-    if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-|tencent)/i) {
+    # Ollama tags are name:tag (llama3.1:8b, phi4:14b). OpenRouter ids use
+    # org/model. The old /^(llama3|...)/i match sent local llama3* tags to
+    # OpenRouter → 400 "is not a valid model ID" (audit todo 2308).
+    if ($prefix eq 'ollama' || ($bare =~ /:/ && $bare !~ m{/})) {
+        return ('ollama', $bare);
+    }
+    if ($requested_model =~ /^(gpt|claude|mixtral|groq|openrouter|or-|tencent)/i) {
         return ('external', $requested_model);
     }
     return ('ollama', $requested_model);

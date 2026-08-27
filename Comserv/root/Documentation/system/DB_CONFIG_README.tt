@@ -88,7 +88,7 @@ The system will look for <code>db_config.json</code> in:
 
 <ul><li><code>db_config.json</code> is a <strong>tracked, credential-free template</strong>. A copy is populated with the active primary Ency credentials at deploy (or via the Docker first-run setup prompt); once K8s secrets supply them, the inline credentials are removed and the tracked file stays blank-template only. It is gitignored at runtime; the template form is committed so a fresh server has a starting point.</li></ul>
 
-<ul><li>Live credentials must NOT remain inline in any committed/tracked file. <code>db_config.json.backup.*</code> are tracked <em>as templates</em> — keep them credential-free. Aikido scans every commit for leaked secrets and should flag any inline password (the currently tracked backups still contain a live password and must be scrubbed to template-only).</li></ul>
+<ul><li>Live credentials must NOT remain inline in any committed/tracked file. <code>db_config.json.backup.*</code> are tracked <em>as templates</em> — keep them credential-free. Change a live password in the app at <code>/remotedb/change_password/&lt;slot&gt;</code> (admin). That form updates <code>db_config.json</code> and <code>~/.comserv/secrets/dbi/*.json</code> and will not write timestamped backup dumps.</li></ul>
 
 <ul><li>Keep database credentials secure</li></ul>
 
