@@ -9,6 +9,7 @@
             <button type="button" class="refresh-btn" data-action="refresh-comparison">
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
+            <a href="[% c.uri_for('/remotedb') %]" class="refresh-btn">Change DB password</a>
         </div>
     </header>
     

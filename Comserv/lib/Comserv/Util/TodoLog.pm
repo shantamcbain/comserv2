@@ -67,6 +67,10 @@ sub _insert_completed_log {
     my $est_mins = $args{duration_mins}
                    // eval { $todo->estimated_man_hours * 60 } // 15;
     $est_mins = 15 if $est_mins < 1;
+    # MySQL TIME max is 838:59:59. estimated_man_hours of 840 (todo 2103)
+    # produced '840:00:00' and DBI rejected the INSERT (audit todo 2312).
+    my $mysql_time_max_mins = (838 * 60) + 59;
+    $est_mins = $mysql_time_max_mins if $est_mins > $mysql_time_max_mins;
     my ($dur_hms, undef) = _duration_hms('09:00', '00:' . sprintf('%02d', $est_mins % 60));
     $dur_hms = sprintf('%02d:%02d:00', int($est_mins / 60), $est_mins % 60);
 

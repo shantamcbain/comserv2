@@ -6,6 +6,8 @@ use JSON;
 use Try::Tiny;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
+use Comserv::Util::DbConfigPassword;
 use Catalyst::Utils;  # For path_to
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -15,15 +17,39 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+has 'admin_auth' => (
+    is => 'ro',
+    default => sub { Comserv::Util::AdminAuth->new }
+);
+
+has 'db_pw' => (
+    is => 'ro',
+    default => sub { Comserv::Util::DbConfigPassword->new }
+);
+
+# RemoteDB is a plain Moose class, not Catalyst::Model.
+# $c->model('RemoteDB') therefore returns the class NAME string; Moose
+# accessors then die: Can't use string ("Comserv::Model::RemoteDB") as a HASH ref.
+sub _remote_db {
+    my ($self, $c) = @_;
+    my $m = eval { $c->model('RemoteDB') };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_remote_db',
+            "model('RemoteDB') threw: $@ — instantiating Comserv::Model::RemoteDB->new");
+    }
+    return $m if ref $m;
+    require Comserv::Model::RemoteDB;
+    return Comserv::Model::RemoteDB->new();
+}
+
 # Main page for remote database management
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessing remote database management page");
     
-    # Get list of configured remote connections
-    my $remote_db = $c->model('RemoteDB');
-    my $connections = $remote_db->connections;
+    my $remote_db = $self->_remote_db($c);
+    my $connections = $remote_db->get_all_connections();
     
     $c->stash(
         template => 'remotedb/index.tt',
@@ -62,7 +88,7 @@ sub add_connection :Path('add') :Args(0) {
             };
             
             # Test the connection
-            my $remote_db = $c->model('RemoteDB');
+            my $remote_db = $self->_remote_db($c);
             $remote_db->add_connection($params->{conn_name}, $conn_config);
             
             my $dbh = $remote_db->get_connection($c, $params->{conn_name});
@@ -95,7 +121,7 @@ sub view :Path('view') :Args(1) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Viewing remote database: $conn_name");
     
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db($c);
     
     # Check if the connection exists
     unless (exists $remote_db->connections->{$conn_name}) {
@@ -127,7 +153,7 @@ sub table :Path('table') :Args(2) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'table', 
         "Viewing table '$table_name' in remote database: $conn_name");
     
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db($c);
     
     # Get the table schema
     my $schema = $remote_db->get_table_schema($c, $conn_name, $table_name);
@@ -154,7 +180,7 @@ sub table :Path('table') :Args(2) {
 sub query :Path('query') :Args(1) {
     my ($self, $c, $conn_name) = @_;
     
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db($c);
     
     # Check if the connection exists
     unless (exists $remote_db->connections->{$conn_name}) {
@@ -192,6 +218,158 @@ sub query :Path('query') :Args(1) {
     $c->stash(
         template => 'remotedb/query.tt',
         conn_name => $conn_name,
+    );
+}
+
+# Connection details (no password value shown)
+sub detail :Path('detail') :Args(1) {
+    my ($self, $c, $conn_name) = @_;
+    return unless $self->admin_auth->require_admin_access($c, 'remotedb_detail');
+
+    unless ($conn_name && $conn_name =~ /\A[A-Za-z0-9_]+\z/) {
+        $c->flash->{error_msg} = 'Invalid connection name';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $all = $self->_remote_db($c)->get_all_connections();
+    unless ($all && $all->{$conn_name}) {
+        $c->flash->{error_msg} = "Remote connection '$conn_name' does not exist";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    $c->stash(
+        template  => 'remotedb/detail.tt',
+        conn_name => $conn_name,
+        conn      => $all->{$conn_name},
+    );
+}
+
+# Change stored (and optionally server) password for one connection slot
+sub change_password :Path('change_password') :Args(1) {
+    my ($self, $c, $conn_name) = @_;
+    return unless $self->admin_auth->require_admin_access($c, 'remotedb_change_password');
+
+    unless ($conn_name && $conn_name =~ /\A[A-Za-z0-9_]+\z/) {
+        $c->flash->{error_msg} = 'Invalid connection name';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $remote_db = $self->_remote_db($c);
+    my $all = $remote_db->get_all_connections();
+    unless ($all && $all->{$conn_name}) {
+        $c->flash->{error_msg} = "Remote connection '$conn_name' does not exist";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    my $cfg = $all->{$conn_name}{config} || {};
+
+    my $home = $ENV{HOME} || '/tmp';
+    my @paths = $self->db_pw->collect_sources(
+        db_config_path => $c->path_to('db_config.json') . '',
+        secrets_dir    => "$home/.comserv/secrets/dbi",
+    );
+
+    my @siblings;
+    for my $path (@paths) {
+        try {
+            push @siblings, $self->db_pw->sibling_slot_names(
+                $self->db_pw->load_json_file($path), $conn_name
+            );
+        } catch {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'change_password',
+                "Could not inspect $path for sibling slots: $_");
+        };
+    }
+    my %seen;
+    @siblings = grep { !$seen{$_}++ } @siblings;
+
+    if ($c->req->method eq 'POST') {
+        my $current = $c->req->param('current_password') // '';
+        my $new     = $c->req->param('new_password') // '';
+        my $confirm = $c->req->param('new_password_confirm') // '';
+        my $rotate  = $c->req->param('rotate_server') ? 1 : 0;
+        my $sibs    = $c->req->param('apply_siblings') ? 1 : 0;
+
+        my $form_error;
+        if (!length $current) {
+            $form_error = 'Current password is required';
+        } elsif (length $new < 12) {
+            $form_error = 'New password must be at least 12 characters';
+        } elsif ($new ne $confirm) {
+            $form_error = 'New password and confirmation do not match';
+        } elsif ($new eq $current) {
+            $form_error = 'New password must be different from the current password';
+        } else {
+            my $stored;
+            for my $path (@paths) {
+                $stored = eval { $self->db_pw->stored_password_for($path, $conn_name) };
+                last if defined $stored && length $stored;
+            }
+            if (defined $stored && length $stored && $stored ne $current) {
+                $form_error = 'Current password does not match the stored value';
+            }
+        }
+
+        if ($form_error) {
+            $c->stash(error_msg => $form_error);
+        } else {
+            my $ok = 1;
+            try {
+                if ($rotate) {
+                    my $probe = $self->db_pw->test_login($cfg, $current);
+                    $self->db_pw->alter_current_user_password($probe->{dbh}, $new);
+                    $probe->{dbh}->disconnect if $probe->{dbh};
+                    my $verify = $self->db_pw->test_login($cfg, $new);
+                    $verify->{dbh}->disconnect if $verify->{dbh};
+                }
+                my $updated = $self->db_pw->apply_password(
+                    slot            => $conn_name,
+                    new_password    => $new,
+                    apply_siblings  => $sibs,
+                    paths           => \@paths,
+                );
+                # Refresh in-memory RemoteDB so this worker does not keep the old pw
+                try {
+                    my $live = $remote_db->config;
+                    if (ref $live eq 'HASH' && ref $live->{$conn_name} eq 'HASH') {
+                        $live->{$conn_name}{password} = $new;
+                    }
+                    if ($sibs) {
+                        for my $s (@siblings) {
+                            $live->{$s}{password} = $new if ref $live eq 'HASH' && ref $live->{$s} eq 'HASH';
+                        }
+                    }
+                } catch {
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'change_password',
+                        "Config files written but in-memory cache refresh failed: $_");
+                };
+                my $nfiles = scalar @$updated;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'change_password',
+                    "Password updated for slot $conn_name (files=$nfiles rotate_server=$rotate siblings=$sibs) — value not logged");
+                $c->flash->{success_msg} = $rotate
+                    ? "Password changed on the database server and stored for $conn_name."
+                    : "Stored password updated for $conn_name. Server user was not changed.";
+                $c->response->redirect($c->uri_for($self->action_for('detail'), [$conn_name]));
+                return;
+            } catch {
+                $ok = 0;
+                my $err = $_;
+                $err =~ s/\s+at \S+ line \d+.*//s;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'change_password',
+                    "Password change failed for $conn_name: $err");
+                $c->stash(error_msg => "Password change failed: $err");
+            };
+        }
+    }
+
+    $c->stash(
+        template       => 'remotedb/change_password.tt',
+        conn_name      => $conn_name,
+        conn           => $all->{$conn_name},
+        sibling_slots  => \@siblings,
     );
 }
 

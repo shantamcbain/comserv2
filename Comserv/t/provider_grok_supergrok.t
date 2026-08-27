@@ -72,6 +72,11 @@ subtest 'detect_provider routes SuperGrok wire format' => sub {
     my ($p, $m) = $r->_detect_provider('supergrok|grok-4.6');
     is($p, 'supergrok', 'supergrok|slug stays SuperGrok (not xAI)');
     is($m, 'grok-4.6', 'bare slug after prefix strip');
+    ($p, $m) = $r->_detect_provider('llama3.1:8b');
+    is($p, 'ollama', 'local llama3.1:8b is Ollama, not OpenRouter');
+    is($m, 'llama3.1:8b', 'ollama tag kept intact');
+    ($p, $m) = $r->_detect_provider('meta-llama/llama-3.1-8b-instruct');
+    is($p, 'external', 'org/model still OpenRouter');
 };
 
 done_testing();

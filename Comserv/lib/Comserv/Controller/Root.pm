@@ -907,10 +907,18 @@ sub auto :Private {
         # differs from the baked one (or absent) so the "locally modified" signal
         # survives the overlay.
         if ($c->stash->{app_version}) {
-            my $live = eval {
+            # Skip the live-git overlay when this tree has no .git (prod image).
+            # App home is Comserv/; the git root is usually one level up.
+            # Worktrees use a .git *file*. Without this guard every request
+            # spawned `git branch --show-current` → exit 128 → ERROR audit todo.
+            my $app_home = $c->config->{home} || '';
+            my $has_git  = $app_home && (
+                -e "$app_home/.git" || -e "$app_home/../.git"
+            );
+            my $live = ($has_git) ? eval {
                 Comserv::Util::Git->new(logging => $self->logging)
                     ->current_branch_and_commit($c);
-            };
+            } : undef;
             if ($live && $live->{branch}) {
                 my $av   = $c->stash->{app_version};
                 my $baked = $av->{commit} // '';
