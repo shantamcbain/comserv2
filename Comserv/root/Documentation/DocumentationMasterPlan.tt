@@ -28,13 +28,20 @@ sub-plan below remains the authoritative spec for its own area. This plan follow
 <a href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Planning Language Standard</a>:
 PROJECT = PLAN, PHASE = sub-project, STEP = todo. No abstract "Phase N".</p>
 
-<div class="notice">
+<div class="doc-info">
     <strong>Where docs live (the rule):</strong> the <em>only</em> documentation directory the
     application serves is <code>Comserv/root/Documentation/</code> (the app resolves it via
     <code>path_to('root','Documentation')</code>). Anything an AI or human writes to the
     repo-root <code>Documentation/</code> folder is <strong>invisible to the app</strong>
     (and is a duplicate of served files, or lost). Write documentation under
     <code>Comserv/root/Documentation/</code> only.
+</div>
+
+<div class="doc-success">
+    <strong>The one system (2026-08-26):</strong>
+    <a href="[% c.uri_for('/Documentation/STANDARD') %]" class="doc-link">Documentation System Standard</a>
+    — human-readable / navigable pages that match the code, SQL catalog, JSON abandoned.
+    This coordinator stays the audit + work-item list. Do not start a third “docs system” plan.
 </div>
 
 <h2 id="summary">Summary (read this first)</h2>
@@ -56,6 +63,7 @@ PROJECT = PLAN, PHASE = sub-project, STEP = todo. No abstract "Phase N".</p>
 
 <div class="doc-h3">Coordinators</div>
 <div class="doc-navrow">
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/STANDARD') %]">Documentation System Standard (the one system)</a>
     <a class="doc-navlink" href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan (all projects)</a>
     <a class="doc-navlink" href="[% c.uri_for('/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN') %]">Documentation System Audit &amp; Planning (prior audit)</a>
 </div>
