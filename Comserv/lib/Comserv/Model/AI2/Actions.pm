@@ -71,6 +71,127 @@ sub perform {
         return;
     }
 
+    # ── start_todo / stop_todo (time tracking, mirrors Start/Stop buttons) ───
+    # start_todo: opens a work log (status -> 5). stop_todo: closes the open
+    # log and returns the todo to IN PROGRESS (2). Same SQL shape as
+    # Controller::Api::api_todo_open_log / api_todo_close_log so chat-driven
+    # tracking is identical to button-driven tracking.
+    if ($action_name eq 'start_todo' || $action_name eq 'stop_todo') {
+        my $todo_id = $params->{todo_id} || $params->{record_id};
+        unless ($todo_id && $todo_id =~ /^\d+$/) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'todo_id required' }));
+            return;
+        }
+        my $user  = $current_user;
+        my $now   = DateTime->now(time_zone => 'local');
+        my $today = $now->ymd;
+        my $dbh   = eval { $schema->storage->dbh };
+        unless ($dbh) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'No DB handle' }));
+            return;
+        }
+
+        if ($action_name eq 'start_todo') {
+            my $existing = $dbh->selectrow_hashref(
+                "SELECT record_id FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 LIMIT 1",
+                undef, $todo_id);
+            if ($existing) {
+                $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=? AND status!=5",
+                    undef, $user, $today, $todo_id);
+                $c->response->body(encode_json({
+                    success => JSON::true, already_open => JSON::true,
+                    log_id => 0 + $existing->{record_id},
+                    message => "Todo #$todo_id already has an open work log — timer still running.",
+                }));
+                return;
+            }
+            my $todo = eval { $schema->resultset('Todo')->find($todo_id) };
+            unless ($todo) {
+                $c->response->status(404);
+                $c->response->body(encode_json({ success => JSON::false, error => "Todo #$todo_id not found" }));
+                return;
+            }
+            my $proj_code = '';
+            if ($todo->project_id) {
+                my $proj = eval { $schema->resultset('Project')->find($todo->project_id) };
+                $proj_code = $proj ? ($proj->project_code || '') : '';
+            }
+            my $sitename_val = eval { $todo->sitename } || 'CSC';
+            my $due_val = eval { my $dd = $todo->due_date; $dd ? (ref($dd) ? $dd->ymd : substr("$dd",0,10)) : $today } // $today;
+            my $pri_val = eval { $todo->priority } // 5;
+            my $comments_val = eval { $todo->comments } // '';
+            eval {
+                $dbh->do(
+                    'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,?,"00:00:00",2,?,?,?,?,?,?)',
+                    undef,
+                    $todo_id, $user, $sitename_val, $proj_code,
+                    'Started: ' . ($todo->subject // ''),
+                    'Work begun via Chat-with-AI by ' . $user,
+                    $today, $due_val, $now->hms,
+                    $pri_val, $user, $today, '', $comments_val);
+                $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+                    undef, $user, $today, $todo_id);
+                1;
+            } or do {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'action_start_todo', "open_log failed for $todo_id: $@");
+                $c->response->status(500);
+                $c->response->body(encode_json({ success => JSON::false, error => 'Failed to open work log' }));
+                return;
+            };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+                "AI action start_todo: todo=$todo_id by=$user");
+            $c->response->body(encode_json({
+                success => JSON::true,
+                message => "Started tracking on todo #$todo_id — status IN PROGRESS (timer running).",
+            }));
+            return;
+        }
+
+        # stop_todo
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $todo_id);
+        unless ($open_row) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "No open work log on todo #$todo_id — nothing to stop.",
+            }));
+            return;
+        }
+        my $raw_start = $open_row->{start_time} // '09:00:00';
+        $raw_start = substr($raw_start, 0, 8) if $raw_start =~ /^\d{1,2}:\d{2}/;
+        my ($sh, $sm) = ($raw_start =~ /^(\d+):(\d+)/);
+        my ($eh, $em) = ($now->hms =~ /^(\d{2}):(\d{2})/);
+        my $dur = ($eh * 60 + $em) - ($sh * 60 + $sm);
+        $dur = 1 if $dur <= 0;
+        my $dur_hms = sprintf('%02d:%02d:00', int($dur / 60), $dur % 60);
+        my $notes = $params->{notes} // '';
+        eval {
+            $dbh->do('UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
+                undef, $now->hms, $dur_hms, $user, $today, $notes, $open_row->{record_id});
+            $dbh->do("UPDATE todo SET status=2, last_mod_by=?, last_mod_date=? WHERE record_id=? AND status=5",
+                undef, $user, $today, $todo_id);
+            1;
+        } or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'action_stop_todo', "close_log failed for $todo_id: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Failed to close work log' }));
+            return;
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            sprintf('AI action stop_todo: todo=%d by=%s (%d min)', $todo_id, $user, $dur));
+        $c->response->body(encode_json({
+            success       => JSON::true,
+            duration_mins => $dur,
+            message       => "Stopped tracking on todo #$todo_id — $dur minutes logged.",
+        }));
+        return;
+    }
+
     # ── update_todo_status ────────────────────────────────────────────────────
     if ($action_name eq 'update_todo_status') {
         my $todo_id = $params->{todo_id} or do {

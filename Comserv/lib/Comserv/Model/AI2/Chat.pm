@@ -103,7 +103,52 @@ sub build_system_prompt {
         push @parts, $contract if $contract;
     }
 
+    # Positive-learning retrieval (proj #288): reuse what the app already knows
+    # (documentation / planning / KB) so the model stops re-deriving it. Role +
+    # branch gated; every snippet is labelled UNVERIFIED/INTERNAL by design —
+    # nothing here is yet authoritative. Public callers never see INTERNAL.
+    my $recall = eval {
+        require Comserv::Model::AI2::KnowledgeRecall;
+        my $brain = eval { $c->model('AI2::KnowledgeRecall') };
+        $brain = Comserv::Model::AI2::KnowledgeRecall->new if !$brain || !ref $brain;
+        my $q = defined $args{prompt} ? $args{prompt}
+              : (defined $args{agent_system} ? $args{agent_system} : '');
+        $brain->recall_block($c, query => $q, roles => $args{roles});
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            'build_system_prompt', "KnowledgeRecall failed: $@");
+    }
+    push @parts, $recall if $recall && length $recall;
+
+    # BRANCH/SITE CONTEXT (AISYSTEM §3d): the widget cannot see its own URL,
+    # so the SERVER states which branch instance and SiteName it serves
+    # (resolved from root/config/worktrees.json by port+sitename). Without
+    # this the model says "I can't detect the port" even though the answer is
+    # deterministic server-side.
+    my $site_ctx = eval { $self->branch_context_block($c) };
+    push @parts, $site_ctx if $site_ctx;
+
     return join("\n\n", grep { defined && length } @parts);
+}
+
+# Server-side branch context: "You are running on branch X (SiteName Y),
+# coordination project #N". Resolved from worktrees.json; never guesses.
+sub branch_context_block {
+    my ($self, $c) = @_;
+    my $rank = eval { $c->model('AI2::TodoRank') } or return '';
+    my $bctx = $rank->branch_context($c) or return '';
+    return '' unless $bctx->{branch};
+
+    my $block = "RUNTIME CONTEXT (from the server — authoritative):\n"
+             .  "- App instance / git branch: $bctx->{branch}\n"
+             .  "- SiteName: " . ($rank->_sitename($c)) . "\n";
+    $block .= "- Branch coordination project: #$bctx->{project_id}"
+           .  ($bctx->{project_name} ? " ($bctx->{project_name})" : '') . "\n"
+        if $bctx->{project_id};
+    $block .= "When the user asks about 'this branch', they mean the instance above. "
+           .  "Todos for this branch live under that project unless they say otherwise.";
+    return $block;
 }
 
 # Build the message array (history + new prompt).
