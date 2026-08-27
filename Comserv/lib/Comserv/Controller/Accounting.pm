@@ -1449,5 +1449,151 @@ sub my_database :Path('/Accounting/my_database') :Args(0) {
     );
 }
 
+
+# -------------------------------------------------------------------------
+# Accounting Setup Wizard (Ph.1a S3 / todo 1839)
+# Owner self-serve: provision -> choose template -> review -> seed -> done
+# -------------------------------------------------------------------------
+
+sub setup_index :Path('/Accounting/setup') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema = $self->_schema($c);
+
+    my $coa_model = Comserv::Model::CoaTemplate->new;
+
+    # Only sites subscribed to accounting (live site_modules source of truth) get
+    # to choose a chart template. Same gate the provision step uses.
+    my $subscribed = $coa_model->is_accounting_subscriber($c, $sitename);
+    unless ($subscribed) {
+        $c->flash->{error_msg} =
+            "Your site ('$sitename') is not subscribed to Accounting. "
+          . "Enable the Accounting (or Commerce/E-Commerce) module in Site Modules, then return here.";
+        return $c->res->redirect($c->uri_for('/Accounting'));
+    }
+
+    # Site → base archetype (Axis 1) from site_map.json
+    my $site_map = $coa_model->site_map($c);
+    my $user_archetype = $site_map->{sites}{$sitename}{base_archetype} // 'sole_proprietor';
+
+    # Determine provisioning status
+    my ($reg, $provision_status, $provision_error, $db_ok) = ('', 'no_provision', '', 0);
+    eval {
+        $reg = $schema->resultset('SiteAccountingDb')->find({ sitename => $sitename });
+    };
+    if ($@) { $reg = ''; }
+
+    if ($reg && $reg->status eq 'active') {
+        $provision_status = 'provisioned';
+        my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+        if ($acct_schema) {
+            $db_ok = eval { $acct_schema->storage->dbh->do('SELECT 1'); 1 };
+        }
+    }
+    elsif ($reg && $reg->status =~ /provisioning/) {
+        $provision_status = 'provisioning';
+    }
+    elsif ($reg) {
+        $provision_status = 'error';
+        $provision_error = $reg->last_error // 'Provisioning failed';
+    }
+
+    # Check if chart already seeded
+    my ($chart_seeded, $coa_count) = (0, 0);
+    if ($db_ok) {
+        eval {
+            my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+            if ($acct_schema) {
+                $coa_count = $acct_schema->resultset('Accounting::Chart')->count;
+                $chart_seeded = $coa_count > 0;
+            }
+        };
+    }
+
+    # The subscriber only picks from their own archetype (deterministic from site_map).
+    # CSC admin sees all archetypes; everyone else sees just theirs.
+    my @archetypes = $coa_model->list_archetypes($c);
+    my $is_csc = $self->admin_auth->is_csc_admin($c);
+    my @shown = $is_csc
+        ? @archetypes
+        : grep { $_->{id} eq $user_archetype } @archetypes;
+
+    # For admin context: which sites are currently subscribed to accounting.
+    my $subscribers = $is_csc ? $coa_model->accounting_subscribers($c) : [];
+
+    $c->stash(
+        sitename        => $sitename,
+        reg             => $reg,
+        provision_status=> $provision_status,
+        provision_error => $provision_error,
+        db_ok           => $db_ok,
+        chart_seeded    => $chart_seeded,
+        coa_count       => $coa_count,
+        chosen_base     => ($reg && $reg->chart_base) ? $reg->chart_base : $user_archetype,
+        chosen_overlays => ($reg && $reg->chart_overlays) ? $reg->chart_overlays : '',
+        archetypes      => \@shown,
+        subscribers     => $subscribers,
+        template        => 'Accounting/setup/index.tt',
+    );
+}
+
+sub setup_choose_template :Path('/Accounting/setup/choose_template') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $p = $c->req->body_parameters;
+
+    my $base    = $p->{base_archetype};
+    my @overlays = grep { $_ } ($p->{overlays} // []);
+
+    unless ($base) {
+        $c->flash->{error_msg} = 'Please select a base archetype.';
+        return $c->res->redirect($c->uri_for('/Accounting/setup'));
+    }
+
+    eval {
+        my $coa = Comserv::Model::CoaTemplate->new;
+        my $pg_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+        if ($pg_schema) {
+            my ($added, @collisions) = $coa->seed_site_chart($c, $pg_schema, $base, \@overlays);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                "setup_choose_template", "Seeded $added chart rows for '$sitename' (base=$base)");
+            $c->flash->{success_msg} = "Chart of Accounts seeded with $added entries.";
+            eval {
+                my $reg = $c->model('DBEncy')->resultset('SiteAccountingDb')
+                                ->find({ sitename => $sitename });
+                if ($reg) {
+                    $reg->update({
+                        chart_base    => $base,
+                        chart_overlays=> join(',', @overlays),
+                        chart_seeded  => 1,
+                    });
+                }
+            };
+        }
+        else {
+            $c->flash->{error_msg} = 'Cannot connect to site database for seeding.';
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            "setup_choose_template", "Seed failed: $@");
+        $c->flash->{error_msg} = "Seed failed: $@";
+    }
+
+    return $c->res->redirect($c->uri_for('/Accounting/setup'));
+}
+
+sub setup_ai_generate :Path('/Accounting/setup/ai_generate') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+
+    # Placeholder for Ph.2: AI generation
+    # TODO: implement AI2 structured generation via AI2Chat endpoint
+    $c->stash(
+        sitename => $sitename,
+        template => 'Accounting/setup/ai_generate.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

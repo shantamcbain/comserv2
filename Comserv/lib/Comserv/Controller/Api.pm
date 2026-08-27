@@ -573,6 +573,49 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     $c->detach();
 }
 
+# Thin AI/local aliases. DB writes stay in Controller::Inventory.
+sub api_inventory_items :Path('inventory/items') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_items($c);
+}
+
+sub api_inventory_item_create :Path('inventory/item/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_item_create($c);
+}
+
+sub api_inventory_bom_add :Path('inventory/bom/add') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_bom_add($c);
+}
+
+sub api_inventory_bom :Path('inventory/bom') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_bom($c);
+}
+
+sub api_inventory_stock :Path('inventory/stock') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_stock($c);
+}
+
+sub api_inventory_need :Path('inventory/need') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_need($c);
+}
+
+sub api_inventory_po_create :Path('inventory/po/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_po_create($c);
+}
+
 =head2 api_list_documentation
 
 GET /api/documentation - List all documentation pages (Bypass keyword/token for local/workstation.local)

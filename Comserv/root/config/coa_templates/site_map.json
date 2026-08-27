@@ -1,0 +1,17 @@
+{
+  "_comment": "Site → base archetype mapping (Axis 1). Capability overlays (Axis 2) are NOT listed here — they are derived from enabled site_modules at merge time.",
+  "last_updated": "2026-08-24",
+  "sites": {
+    "CSC":     { "base_archetype": "service_consulting",       "accounting_enabled": true,  "notes": "Hosting, programming, helpdesk" },
+    "3d":      { "base_archetype": "maker_light_manufacturing","accounting_enabled": true,  "notes": "Print farm + teaching" },
+    "BMaster": { "base_archetype": "agriculture_apiary",       "accounting_enabled": false, "notes": "Beekeeping teaching + beeyard — teaching overlay via site module when accounting enabled" },
+    "USBM":    { "base_archetype": "nonprofit_coop",           "accounting_enabled": false, "notes": "School — teaching overlay when accounting enabled" },
+    "Shanta":  { "base_archetype": "sole_proprietor",          "accounting_enabled": false, "notes": "T2125 filer" },
+    "Ve7tit":  { "base_archetype": "sole_proprietor",          "accounting_enabled": false, "notes": "Ham radio hobby, T2125 (canonical SiteName, lowercase v)" },
+    "MCOOP":   { "base_archetype": "nonprofit_coop",           "accounting_enabled": false, "notes": "Monachee Cooperative — teaching overlay when accounting enabled" },
+    "AltPower": { "base_archetype": "service_consulting",      "accounting_enabled": false, "notes": "Alternative energy services" },
+    "CountryStores": { "base_archetype": "maker_light_manufacturing", "accounting_enabled": false, "notes": "Rural equipment resale" },
+    "Grindrodbc.com": { "base_archetype": "service_consulting", "accounting_enabled": false, "notes": "Software services business" },
+    "Forager": { "base_archetype": "maker_light_manufacturing", "accounting_enabled": false, "notes": "File manager / 3D printing tool" }
+  }
+}
