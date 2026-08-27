@@ -31,12 +31,11 @@
       [% ELSE %]<span style="color:#991b1b;">&#10007; not enabled</span>[% END %]
     </h2>
     [% IF !module_enabled %]
-    <p style="margin:0;font-size:0.88rem;">
-      The Accounting/Commerce module must be enabled for [% sitename | html %] before a
-      database can be provisioned.
-      [% IF is_csc_admin %]<a href="/admin/site_modules">Manage site modules</a>.
-      [% ELSE %]Please contact your CSC administrator to enable it.[% END %]
+    <p style="margin:0 0 0.6rem;font-size:0.88rem;">
+      The Accounting package is not on for [% sitename | html %] yet. A site owner
+      adds it on their account add-ons page. The database step cannot run until that is on.
     </p>
+    <a href="[% c.uri_for('/membership/addons') %]" class="btn btn-primary" style="font-size:0.88rem;">Add Accounting add-on</a>
     [% END %]
   </div>
 
@@ -80,7 +79,10 @@
         existing database is never re-created.
       </p>
     [% ELSE %]
-      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 1 first.</p>
+      <p style="margin:0 0 0.6rem;font-size:0.88rem;color:var(--text-muted-color,#666);">
+        Complete step 1 first — add the Accounting add-on, then return here to create the database.
+      </p>
+      <a href="[% c.uri_for('/membership/addons') %]" class="btn btn-secondary" style="font-size:0.88rem;">Go to add-ons</a>
     [% END %]
   </div>
 

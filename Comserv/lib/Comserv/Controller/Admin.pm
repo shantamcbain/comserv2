@@ -1012,14 +1012,19 @@ sub index :Path :Args(0) {
 
     my $site_name_idx = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     my $is_csc        = (lc($site_name_idx) eq 'csc') ? 1 : 0;
-    my $has_accounting = $is_csc ? 1 : 0;
-    unless ($is_csc) {
-        eval {
-            $has_accounting = $c->model('DBEncy')->resultset('SiteModule')->search({
-                sitename    => $site_name_idx,
-                module_name => 'accounting',
-            })->count ? 1 : 0;
-        };
+    # Opt-in only: CSC must enable the accounting site module like every other
+    # SiteName. A row that exists but is disabled is not opted in.
+    my $has_accounting = 0;
+    eval {
+        $has_accounting = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename    => $site_name_idx,
+            module_name => { -in => [qw(accounting Accounting)] },
+            enabled     => 1,
+        })->count ? 1 : 0;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "has_accounting site_modules lookup failed: $@");
     }
 
     $c->stash(
