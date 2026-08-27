@@ -338,6 +338,7 @@ Decided separately; not authoritative schema-branch tracking until re-homed.</p>
 <ul>
     <li><a href="/Documentation/Schema">Schema.tt</a> — code-first Result-class schema management.</li>
     <li><a href="/Documentation/SchemaSystemPlan">SchemaSystemPlan.tt</a> — W0.1 detail + consolidation (this branch).</li>
+    <li><a href="/Documentation/SchemaComparePostgresPlan">SchemaComparePostgresPlan.tt</a> — schema-compare PG connection + first DB create (SCHEMAPG #289; first code todo #2325).</li>
     <li><a href="/Documentation/SchemaNamingStandardizationPlan">SchemaNamingStandardizationPlan.tt</a> — 4-file snake_case fix.</li>
     <li><a href="/Documentation/AccountingEntityStructurePlan">AccountingEntityStructurePlan.md</a> (ACCENT) — entity structure, owner-draw, CoA archetypes.</li>
     <li><a href="/Documentation/DatabaseConnectionChanges">DatabaseConnectionChanges.md</a> — DSN driver fixes, db_config.json.</li>

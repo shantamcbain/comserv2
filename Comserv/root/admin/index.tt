@@ -13,7 +13,7 @@
         [% IF is_csc %]<a href="#section-docker"><i class="fas fa-docker"></i> Docker</a>[% END %]
         [% IF is_csc %]<a href="#section-software"><i class="fas fa-cogs"></i> Software</a>[% END %]
         <a href="#section-helpdesk"><i class="fas fa-life-ring"></i> HelpDesk</a>
-        [% IF has_accounting %]<a href="#section-accounting"><i class="fas fa-book"></i> Accounting &amp; Inventory</a>[% END %]
+        <a href="#section-accounting"><i class="fas fa-book"></i> Accounting</a>
         [% IF has_accounting %]<a href="#section-customers"><i class="fas fa-users"></i> Customers</a>[% END %]
         <a href="#section-membership"><i class="fas fa-id-card"></i> Membership</a>
         <a href="#section-shop"><i class="fas fa-shopping-bag"></i> Shop</a>
@@ -167,13 +167,13 @@
         [% END %]
     
 
-        [% IF has_accounting %]
         <div id="section-accounting" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-book"></i> Accounting &amp; Inventory</h3>
+                <h3><i class="fas fa-book"></i> Accounting</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
+                    [% IF has_accounting %]
                     <a href="[% c.uri_for('/Accounting') %]" class="admin-link">
                         <i class="fas fa-book"></i>
                         <span>Accounting Dashboard</span>
@@ -226,10 +226,20 @@
                         <i class="fas fa-print"></i>
                         <span>Price List</span>
                     </a>
+                    [% ELSE %]
+                    <a href="[% c.uri_for('/membership/addons') %]" class="admin-link">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add Accounting package</span>
+                    </a>
+                    [% END %]
                 </div>
+                [% UNLESS has_accounting %]
+                <p class="doc-muted">This SiteName has not opted in. Add the Accounting add-on on the owner account, then the setup wizard can create the database.</p>
+                [% END %]
             </div>
         </div>
 
+        [% IF has_accounting %]
         <div id="section-customers" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-users"></i> Customers</h3>
@@ -378,6 +388,10 @@
                     <a href="[% c.uri_for('/remotedb') %]" class="admin-link">
                         <i class="fas fa-server"></i>
                         <span>Database Servers</span>
+                    </a>
+                    <a href="[% c.uri_for('/remotedb') %]" class="admin-link">
+                        <i class="fas fa-key"></i>
+                        <span>Change DB password</span>
                     </a>
                     <a href="[% c.uri_for('/admin/schema_compare') %]" class="admin-link">
                         <i class="fas fa-code-branch"></i>
