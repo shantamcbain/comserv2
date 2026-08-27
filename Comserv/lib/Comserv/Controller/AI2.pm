@@ -910,6 +910,32 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.
+    my $inv_hit = eval {
+        require Comserv::Model::AI2::InvoiceCreate;
+        my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
+        $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
+        $ibrain->try_chat_create($c, prompt => $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "InvoiceCreate try_chat_create threw: $@");
+    }
+    if ($inv_hit && $inv_hit->{handled}) {
+        $c->res->body(encode_json({
+            success         => $inv_hit->{success} ? 1 : 0,
+            response        => $inv_hit->{response} // '',
+            model           => $inv_hit->{model} // '(invoice-create)',
+            provider        => $inv_hit->{provider} // 'ai2-invoice',
+            needs_web_search=> 0,
+            error           => $inv_hit->{error},
+            invoice_action  => $inv_hit->{invoice_action},
+            conversation_id => $conversation_id,
+            thinking        => [],
+        }));
+        return;
+    }
+
     # Code-read: "can you read the files" must not reach Hy3.
     if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
         my $read_hit = eval {
