@@ -50,6 +50,7 @@
                 <a href="[% c.uri_for('/admin/dev-preview') %]"><i class="icon-flask"></i>Preview Upcoming Changes</a>
                 <a href="/admin/environment_variables"><i class="icon-settings"></i>DB Passwords / Env</a>
                 <a href="/remotedb"><i class="icon-server"></i>Database Servers</a>
+                <a href="/remotedb"><i class="icon-key"></i>Change DB password</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
                 [% SET admin_sub_db = c.stash.admin_submenu_links || [] %]
                 [% INCLUDE 'Navigation/inc/menu_db_links.tt'
