@@ -456,7 +456,7 @@ sub chat_contract {
     }
 
     return <<"END";
-TODO CREATION (SiteName=$sitename):
+TODO CREATION + TIME TRACKING (SiteName=$sitename):
 When the user asks to add, create, or track a todo/task:
 1. Extract subject (required), optional description, due_date (YYYY-MM-DD), priority (1=highest … 5=lowest, default 3).
 2. If they named a project, put it in params.project_name or project_code or project_id. Prefer a sub-project when both a parent and a child match.
@@ -464,6 +464,13 @@ When the user asks to add, create, or track a todo/task:
 [ACTION: {"action":"create_todo","params":{"subject":"...","description":"...","project_name":"...","due_date":"YYYY-MM-DD","priority":3}}]
 4. The server matches against $sitename projects. If none match it will ASK the user whether to create a new project — do not create a project yourself unless they already said yes.
 5. Do not emit create_todo unless the user asked to track/add/create a todo.
+
+TIME TRACKING (start/stop work on an EXISTING todo):
+- "Start/track/work on todo #N" → [ACTION: {"action":"start_todo","params":{"todo_id":N}}]
+- "Stop/done working/pause todo #N" → [ACTION: {"action":"stop_todo","params":{"todo_id":N},"notes":"optional summary"}]
+- start_todo opens a timer (status IN PROGRESS); stop_todo closes it and reports minutes logged.
+- Only use these with a REAL numeric todo id from live data or the conversation — never invent one.
+
 $list
 END
 }
@@ -715,9 +722,29 @@ sub create_from_params {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_from_params',
         "AI todo #$new_id sitename=$sitename project=$project->{id} subject='$subject' by=$user");
 
+    # AGENT HANDOFF (AISYSTEM plan §3d, Phase A): after WRITE, spin up the
+    # TodoRank agent scoped to this project. Dry-run ONLY — it returns
+    # proposed priority/type/due for the new row as advisory text; nothing is
+    # written until someone reviews and re-runs with apply:true.
+    my $rank_note = $self->rank_handoff($c,
+        todo_id     => $new_id,
+        project_id  => $project->{id},
+        sitename    => $sitename,
+        model       => $params->{rank_model},
+    );
+
+    my $message = "Todo #$new_id created on $sitename / $project->{name}";
+    if ($rank_note && $rank_note->{suggestion}) {
+        $message .= "\nTodoRank agent reviewed it (dry-run): " . $rank_note->{suggestion}
+                 .  " — say \"apply rank suggestions\" to write them.";
+    }
+    elsif ($rank_note && $rank_note->{error}) {
+        $message .= "\n(TodoRank review unavailable: $rank_note->{error})";
+    }
+
     return {
         success      => JSON::true,
-        message      => "Todo #$new_id created on $sitename / $project->{name}",
+        message      => $message,
         todo_id      => 0 + $new_id,
         todo_url     => "/todo/details?record_id=$new_id",
         project_id   => 0 + $project->{id},
@@ -728,7 +755,56 @@ sub create_from_params {
         created_project => $match->{created_project} ? JSON::true : JSON::false,
         similar      => $similar,
         sitename_mismatch => $match->{sitename_mismatch} ? JSON::true : JSON::false,
+        rank_review  => $rank_note,
     };
+}
+
+# ---------------------------------------------------------------------------
+# Spin up the AI2::TodoRank agent for ONE freshly created todo (Phase A of the
+# agent-spawn chain: Task Assistant → TodoRank). Advisory/dry-run only:
+# proposes {priority, todo_type, due_date} + reason; never writes here.
+# Failure is NON-FATAL and reported in-band — a ranking outage must not make
+# the user think their todo was lost.
+# Returns { suggestion?, proposals?{}, error?, skipped? }.
+# ---------------------------------------------------------------------------
+sub rank_handoff {
+    my ($self, $c, %args) = @_;
+    my $todo_id = $args{todo_id} or return { skipped => 'no todo_id' };
+
+    my $rank = eval { $c->model('AI2::TodoRank') };
+    return { error => 'TodoRank agent not available' } unless $rank;
+
+    my ($rows, $rbid) = eval {
+        $rank->gather_todos($c, project_id => $args{project_id},
+                                 sitename  => $args{sitename});
+    };
+    if ($@ || !ref($rows)) {
+        return { error => 'could not gather todos' };
+    }
+    my ($mine) = grep { ($_->{record_id} // 0) == $todo_id } @$rows;
+    return { skipped => 'new todo not in gather scope' } unless $mine;
+
+    # Same NO-default-model rule as FocusTune: the caller must name the model
+    # (params.rank_model). Without one we skip rather than guess.
+    return { skipped => 'no rank_model given' } unless $args{model} && "$args{model}" =~ /\S/;
+    my ($system, $user_prompt) = $rank->build_prompt([$mine], {
+        sitename => $args{sitename},
+    });
+    my $res = $rank->run_batch($c, { name => $args{model} }, $system, $user_prompt);
+    return { error => ($res && $res->{error}) || 'AI ranking unavailable' }
+        unless $res && $res->{success};
+
+    my $parsed = $rank->parse_result($res, [$todo_id]);
+    my $prop = $parsed->{proposals}{$todo_id};
+    return { skipped => 'agent had no change to suggest' } unless $prop && %$prop;
+
+    my @parts;
+    push @parts, "priority $prop->{priority}"       if defined $prop->{priority};
+    push @parts, "type '$prop->{todo_type}'"        if $prop->{todo_type};
+    push @parts, "due $prop->{due_date}"            if $prop->{due_date};
+    my $sugg = @parts ? ucfirst(join(', ', @parts)) : '';
+    $sugg .= " — $prop->{reason}" if $prop->{reason};
+    return { suggestion => $sugg, proposals => $prop };
 }
 
 sub resolve_from_params {
