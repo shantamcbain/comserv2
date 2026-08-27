@@ -66,6 +66,30 @@ sub auto :Private {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return 0;
     }
+
+    # No books until this SiteName has opted in (enabled accounting module).
+    my $module_on = 0;
+    eval {
+        $module_on = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename    => $sitename,
+            module_name => { -in => [qw(accounting Accounting)] },
+            enabled     => 1,
+        })->count ? 1 : 0;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+            "Accounting site_modules lookup failed for '$sitename': $@");
+    }
+    unless ($module_on) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+            "Accounting: site '$sitename' has not opted in (user "
+            . ($c->session->{username} || 'guest') . ")");
+        $c->flash->{error_msg} =
+            "Accounting is not enabled for '$sitename'. Add the Accounting add-on for this site first.";
+        $c->response->redirect($c->uri_for('/membership/addons'));
+        return 0;
+    }
+
     return 1;
 }
 

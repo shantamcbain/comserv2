@@ -242,7 +242,7 @@ DailyPlanSystem.tt ────────────────────�
     <li>Remaining (blocks every other plan's schema work):
         <ul>
             <li><strong>G0</strong> document the real topology + the Docker first-run credential bootstrap (container detects missing secrets, prompts first admin user + primary Ency creds; <code>.198</code>/<code>.222</code> planned as K8s DB HA node; live primary <strong>.20:3307</strong>). <em>Blocking — do first.</em></li>
-            <li><strong>G1</strong> extend <code>Util::SchemaCompare</code> with <code>create_table_from_result</code>, <code>sync_result_to_table</code>, <code>sync_to_backup</code>.</li>
+            <li><strong>G1</strong> Maria create/sync already live in <code>SchemaComparison.pm</code> (not in <code>Util::SchemaCompare</code>). PG half is <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a> (SCHEMAPG #289) — compare cannot create a PG connection or database yet.</li>
             <li><strong>G2</strong> fold <code>/admin/backup</code> into the schema system.</li>
             <li><strong>G3</strong> strip ~42 raw-SQL lines from <code>Admin/SchemaComparison.pm</code>.</li>
             <li><strong>G4</strong> drift guard (report-only, one-click repair).</li>
