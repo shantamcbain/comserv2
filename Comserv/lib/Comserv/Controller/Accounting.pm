@@ -66,6 +66,30 @@ sub auto :Private {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return 0;
     }
+
+    # No books until this SiteName has opted in (enabled accounting module).
+    my $module_on = 0;
+    eval {
+        $module_on = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename    => $sitename,
+            module_name => { -in => [qw(accounting Accounting)] },
+            enabled     => 1,
+        })->count ? 1 : 0;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+            "Accounting site_modules lookup failed for '$sitename': $@");
+    }
+    unless ($module_on) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+            "Accounting: site '$sitename' has not opted in (user "
+            . ($c->session->{username} || 'guest') . ")");
+        $c->flash->{error_msg} =
+            "Accounting is not enabled for '$sitename'. Add the Accounting add-on for this site first.";
+        $c->response->redirect($c->uri_for('/membership/addons'));
+        return 0;
+    }
+
     return 1;
 }
 
@@ -1455,87 +1479,8 @@ sub my_database :Path('/Accounting/my_database') :Args(0) {
 # Owner self-serve: provision -> choose template -> review -> seed -> done
 # -------------------------------------------------------------------------
 
-sub setup_index :Path('/Accounting/setup') :Args(0) {
-    my ($self, $c) = @_;
-    my $sitename = $self->_sitename($c);
-    my $schema = $self->_schema($c);
-
-    my $coa_model = Comserv::Model::CoaTemplate->new;
-
-    # Only sites subscribed to accounting (live site_modules source of truth) get
-    # to choose a chart template. Same gate the provision step uses.
-    my $subscribed = $coa_model->is_accounting_subscriber($c, $sitename);
-    unless ($subscribed) {
-        $c->flash->{error_msg} =
-            "Your site ('$sitename') is not subscribed to Accounting. "
-          . "Enable the Accounting (or Commerce/E-Commerce) module in Site Modules, then return here.";
-        return $c->res->redirect($c->uri_for('/Accounting'));
-    }
-
-    # Site → base archetype (Axis 1) from site_map.json
-    my $site_map = $coa_model->site_map($c);
-    my $user_archetype = $site_map->{sites}{$sitename}{base_archetype} // 'sole_proprietor';
-
-    # Determine provisioning status
-    my ($reg, $provision_status, $provision_error, $db_ok) = ('', 'no_provision', '', 0);
-    eval {
-        $reg = $schema->resultset('SiteAccountingDb')->find({ sitename => $sitename });
-    };
-    if ($@) { $reg = ''; }
-
-    if ($reg && $reg->status eq 'active') {
-        $provision_status = 'provisioned';
-        my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
-        if ($acct_schema) {
-            $db_ok = eval { $acct_schema->storage->dbh->do('SELECT 1'); 1 };
-        }
-    }
-    elsif ($reg && $reg->status =~ /provisioning/) {
-        $provision_status = 'provisioning';
-    }
-    elsif ($reg) {
-        $provision_status = 'error';
-        $provision_error = $reg->last_error // 'Provisioning failed';
-    }
-
-    # Check if chart already seeded
-    my ($chart_seeded, $coa_count) = (0, 0);
-    if ($db_ok) {
-        eval {
-            my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
-            if ($acct_schema) {
-                $coa_count = $acct_schema->resultset('Accounting::Chart')->count;
-                $chart_seeded = $coa_count > 0;
-            }
-        };
-    }
-
-    # The subscriber only picks from their own archetype (deterministic from site_map).
-    # CSC admin sees all archetypes; everyone else sees just theirs.
-    my @archetypes = $coa_model->list_archetypes($c);
-    my $is_csc = $self->admin_auth->is_csc_admin($c);
-    my @shown = $is_csc
-        ? @archetypes
-        : grep { $_->{id} eq $user_archetype } @archetypes;
-
-    # For admin context: which sites are currently subscribed to accounting.
-    my $subscribers = $is_csc ? $coa_model->accounting_subscribers($c) : [];
-
-    $c->stash(
-        sitename        => $sitename,
-        reg             => $reg,
-        provision_status=> $provision_status,
-        provision_error => $provision_error,
-        db_ok           => $db_ok,
-        chart_seeded    => $chart_seeded,
-        coa_count       => $coa_count,
-        chosen_base     => ($reg && $reg->chart_base) ? $reg->chart_base : $user_archetype,
-        chosen_overlays => ($reg && $reg->chart_overlays) ? $reg->chart_overlays : '',
-        archetypes      => \@shown,
-        subscribers     => $subscribers,
-        template        => 'Accounting/setup/index.tt',
-    );
-}
+# GET /Accounting/setup is owned by Controller::Accounting::Setup (main).
+# Keep choose_template + ai_generate here so the IA chart store still posts.
 
 sub setup_choose_template :Path('/Accounting/setup/choose_template') :Args(0) {
     my ($self, $c) = @_;
