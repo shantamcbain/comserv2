@@ -1,0 +1,364 @@
+[% META
+    title = "Documentation System Standard"
+    description = "The one documentation system: human-readable and navigable pages that match the code, with SQL as the only catalog. JSON config is abandoned."
+    roles = "admin,developer"
+    TemplateType = "Documentation"
+    category = "documentation"
+    page_version = "2.0"
+    last_updated = "2026-08-26"
+    site_specific = "false"
+    project_id = "138"
+    project_code = "DOCMASTER"
+%]
+[% PageVersion = 'Documentation/STANDARD.tt,v 2.0 2026/08/26 shanta Exp shanta - One system: human nav + docs-match-code + SQL catalog; JSON abandoned' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = 'Documentation System Standard'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <p class="doc-muted">Jump to section:</p>
+            <div class="doc-navrow">
+                <a href="#now" class="doc-navlink">Now</a>
+                <a href="#one-system" class="doc-navlink">One system</a>
+                <a href="#human-nav" class="doc-navlink">Human navigation</a>
+                <a href="#match-code" class="doc-navlink">Docs match code</a>
+                <a href="#sql-catalog" class="doc-navlink">SQL catalog (no JSON)</a>
+                <a href="#work-items" class="doc-navlink">Work items</a>
+                <a href="#project-tracking" class="doc-navlink">Project tracking</a>
+                <a href="#decisions" class="doc-navlink">Decisions</a>
+                <a href="#see-also" class="doc-navlink">See also</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="now" class="doc-h2">Now</h2>
+            <p class="doc-body">This page is the <strong>one definition</strong> of the documentation system.
+            It does not replace the global
+            <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a>
+            (all projects) or the coordinator
+            <a href="[% c.uri_for('/Documentation/DocumentationMasterPlan') %]" class="doc-link">DocumentationMasterPlan</a>
+            (audit + work list). Those link here.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Question</th><th class="doc-th">Answer today</th><th class="doc-th">Target</th></tr>
+                <tr>
+                    <td class="doc-td">Where do humans read docs?</td>
+                    <td class="doc-td"><code>/Documentation</code> index is a JSON-catalog dump. 24 of 34 module folders have no <code>index.tt</code>. Many pages lack TOC / shared header / theme classes.</td>
+                    <td class="doc-td">Role-filtered category home, module landing pages, every page with shared header + TOC + See also. Theme via <code>var(--*)</code> / <code>.doc-*</code> only.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Do docs match the code?</td>
+                    <td class="doc-td">No guarantee. Measured 2026-08-26 on this branch: 612 <code>.tt</code>, META 461 (75%), PageVersion 491 (80%), themed 210 (34%). Stale JSON still lists files that are INCLUDE fragments, not pages.</td>
+                    <td class="doc-td">Same-commit Rule DOC. Indexer hashes file content. A page that describes old behaviour is unfinished work.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Where is the catalog?</td>
+                    <td class="doc-td">Live: JSON overlay <code>root/session/documentation_config/DocumentationConfig.json</code> (gitignored, still written). Seed still tracked. <code>load_from_db</code> exists but is <strong>not called</strong>.</td>
+                    <td class="doc-td"><code>documentationmetadataindex</code> in Ency (per-site). JSON files deleted. No write path to JSON.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Blocked by</td>
+                    <td class="doc-td" colspan="2">Schema owner must confirm live table matches Result (including <code>categories</code> JSON column) via schema-compare. Documentation branch then wires loader + indexer + deletes JSON.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="one-system" class="doc-h2">The one system</h2>
+            <p class="doc-body">One directory. One catalog. One reader. One route. One authoring template.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Piece</th><th class="doc-th">Rule</th></tr>
+                <tr>
+                    <td class="doc-td">Directory</td>
+                    <td class="doc-td">Only <code>Comserv/root/Documentation/</code>. The repo-root <code>Documentation/</code> folder is a misplacement trap — never write there.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Pages humans read in-app</td>
+                    <td class="doc-td"><code>.tt</code> with META + PageVersion, following
+                    <a href="[% c.uri_for('/Documentation/DocumentationTtTemplate') %]" class="doc-link">DocumentationTtTemplate</a>
+                    (shared header INCLUDE, TOC, section ids, Back to Top, See also, <code>.doc-*</code> classes, no inline <code>style=</code>).</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">AI / scratch notes</td>
+                    <td class="doc-td"><code>.md</code> is allowed only as non-served reference (and is gitignored unless a specific negation exists). Do not put human-facing pages in <code>.md</code>.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Catalog</td>
+                    <td class="doc-td">SQL table <code>documentationmetadataindex</code> (Ency, per-SiteName). Defaults seed: <code>documentationroleaccess</code>. Live gate is the row's <code>role_access</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Reader</td>
+                    <td class="doc-td"><code>Comserv::Util::DocumentationConfig</code> only. Controllers never parse JSON or walk disk for the catalog.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Route</td>
+                    <td class="doc-td">Flat <code>/Documentation/&lt;BareFilename&gt;</code> — no subdirectory, no <code>.tt</code>. Verified against <code>Documentation.pm</code> <code>view :Path('/Documentation') :Args(1)</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Indexer</td>
+                    <td class="doc-td">Scans disk, upserts SQL by unique <code>file_path</code>, stores content_hash. INCLUDE fragments (no META, only included by another page) are <strong>not</strong> catalog pages.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Changelog</td>
+                    <td class="doc-td">New file <code>changelog/entries/YYYY-MM-DD-slug.inc</code> only. Never edit <code>CHANGELOG.tt</code>.</td>
+                </tr>
+            </table>
+            <div class="doc-codebox"><pre>disk:  Comserv/root/Documentation/**.tt
+         (META is authoring hints on the file)
+
+SQL:   documentationmetadataindex   &lt;-- ONLY catalog
+       documentationroleaccess      &lt;-- DEFAULTS seed
+
+Perl:  Util::DocumentationConfig    &lt;-- ONLY reader
+         |-- load_config  -&gt; load_from_db  (no JSON fallback once cutover is proven)
+         |-- save_config  -&gt; upsert row
+         `-- indexer      -&gt; scan disk, upsert, prune missing files
+
+HTTP:  GET /Documentation                 category home from SQL
+       GET /Documentation/&lt;Key&gt;           render .tt or .md viewer
+       POST /Documentation/rescan         run indexer (admin)</pre></div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="human-nav" class="doc-h2">Human navigation</h2>
+            <p class="doc-body">A person who is not an AI must be able to find the right page without reading 600 files. That means three layers, always:</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Layer</th><th class="doc-th">What the human sees</th><th class="doc-th">Source</th></tr>
+                <tr>
+                    <td class="doc-td">1. Home</td>
+                    <td class="doc-td"><code>/Documentation</code> — categories the current role may see; each category lists titles + one-line description + last updated. Search box uses SQL <code>searchable_text</code>.</td>
+                    <td class="doc-td">SQL catalog</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">2. Module landing</td>
+                    <td class="doc-td">Each real module directory has <code>index.tt</code> (Accounting, Inventory, system, guides, …) with a short “now” and links to the pages in that folder. 10 of 34 exist today; 24 are missing.</td>
+                    <td class="doc-td">Files on disk, listed from SQL</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">3. The page</td>
+                    <td class="doc-td">Shared header (title, site, role, last updated, Open project / View todos, Documentation Home). In-page TOC. Section ids. Back to Top. See also with <code>[&#37; c.uri_for('/Documentation/Key') &#37;]</code> only.</td>
+                    <td class="doc-td">DocumentationTtTemplate + <code>_doc_header.tt</code></td>
+                </tr>
+            </table>
+            <div class="doc-info">
+                <strong>Not a page.</strong> Changelog <code>.inc</code> fragments, TT INCLUDE worksheets, and session_history dumps must not appear as <code>/Documentation/&lt;name&gt;</code> entries. The indexer skips files with no META (or an explicit fragment marker).
+            </div>
+            <p class="doc-body">Coordinators stay two, not more:</p>
+            <ul>
+                <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a> — every branch / project.</li>
+                <li><a href="[% c.uri_for('/Documentation/DocumentationMasterPlan') %]" class="doc-link">DocumentationMasterPlan</a> — documentation work only, linked from MASTER_PLAN.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="match-code" class="doc-h2">Docs match the code</h2>
+            <p class="doc-body">Documentation that describes yesterday’s code is a bug. Standing rules:</p>
+            <ol>
+                <li><strong>Same commit.</strong> A code change updates the matching <code>.tt</code> and adds a changelog <code>.inc</code> in the same commit. A fix whose docs still describe the old behaviour is not finished.</li>
+                <li><strong>Author on the owning branch.</strong> Documentation branch owns structure, templates, catalog wiring. Feature branches own the pages for their feature — they must not invent a second catalog.</li>
+                <li><strong>Indexer after new files.</strong> A new <code>.tt</code> is invisible at <code>/Documentation/Key</code> until indexed. After SQL cutover that is a table upsert, not a JSON rewrite.</li>
+                <li><strong>Drift audit.</strong> Recurring todo (RULE P2): controllers/models without a doc page; META title vs real behaviour; stale <code>PycharmProjects</code> paths; unthemed pages. Measured baseline (this branch, 2026-08-26): 612 <code>.tt</code>, 34% themed, 24 modules without <code>index.tt</code>, 49 stray <code>.md</code>.</li>
+            </ol>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="sql-catalog" class="doc-h2">SQL catalog — abandon JSON altogether</h2>
+            <p class="doc-body">The ratified S1–S7 already said SQL is the only catalog. That was never finished. This section is the cutover. There is <strong>no remaining JSON store</strong> after the last step — not overlay, not shipped seed, not lowercase orphan.</p>
+
+            <h3 class="doc-h3">What exists (reuse, do not rebuild)</h3>
+            <table class="doc-table">
+                <tr><th class="doc-th">Piece</th><th class="doc-th">Where</th><th class="doc-th">State</th></tr>
+                <tr>
+                    <td class="doc-td">Result <code>DocumentationMetadataIndex</code></td>
+                    <td class="doc-td"><code>lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</code></td>
+                    <td class="doc-td">DONE — unique <code>file_path</code>, <code>file_type</code>, title, excerpt, searchable_text, content_hash, role_access, <code>categories</code>, timestamps, file_size.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Result <code>DocumentationRoleAccess</code></td>
+                    <td class="doc-td"><code>.../Result/DocumentationRoleAccess.pm</code></td>
+                    <td class="doc-td">DONE — defaults seed only.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td"><code>load_from_db</code></td>
+                    <td class="doc-td"><code>Util/DocumentationConfig.pm</code></td>
+                    <td class="doc-td">DONE but dormant — not called from <code>load_config</code>. Falls back to JSON by design until cutover.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Indexer that writes SQL</td>
+                    <td class="doc-td">none</td>
+                    <td class="doc-td">MISSING — AutoDiscovery still calls JSON <code>save_config</code>.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">JSON still written</td>
+                    <td class="doc-td"><code>Documentation.pm</code> <code>_atomic_write_json</code> (save_config / rescan paths)</td>
+                    <td class="doc-td">LIVE — this is what we delete.</td>
+                </tr>
+            </table>
+            <div class="doc-warning">
+                <strong>Stale comment in <code>load_from_db</code>.</strong> The source comment still says the table has no <code>categories</code> column. The Result class <em>does</em> have <code>categories</code>. Schema branch must schema-compare live Ency (192.168.1.20:3307) to the Result and add the column if the live table lags. Never hand-DDL.
+            </div>
+
+            <h3 class="doc-h3">JSON files to delete (after SQL is proven)</h3>
+            <ul>
+                <li><code>Comserv/root/session/documentation_config/DocumentationConfig.json</code> + <code>scan_state.json</code> (runtime overlay; already gitignored).</li>
+                <li><code>Comserv/root/Documentation/config/DocumentationConfig.json</code> (shipped seed).</li>
+                <li><code>Comserv/root/Documentation/config/documentation_config.json</code> (lowercase orphan, still tracked).</li>
+                <li>Tracked <code>*.backup.*</code> copies of the same files.</li>
+            </ul>
+
+            <h3 class="doc-h3">Cutover (non-breaking, then delete)</h3>
+            <ol>
+                <li><strong>Confirm table (schema branch).</strong> Schema-compare Result vs live Ency. Repair via app flow only. GATE: <code>resultset('DocumentationMetadataIndex')</code> returns, <code>categories</code> column present.</li>
+                <li><strong>Indexer (Documentation branch).</strong> Scan <code>root/Documentation</code>, skip fragments, upsert rows (title, excerpt, searchable_text, content_hash, role_access, categories, file_type, timestamps, size). Prune rows whose file is gone. GATE: row count ≈ real pages, not 13k-line JSON including scripts and session_history.</li>
+                <li><strong>Read SQL first.</strong> <code>load_config</code> calls <code>load_from_db</code>; JSON only if DB returns 0. GATE: <code>/Documentation</code> identical with JSON temporarily disabled in a worktree.</li>
+                <li><strong>Write SQL only.</strong> <code>save_config</code> and admin role edits upsert the row. Stop calling <code>_atomic_write_json</code> for the catalog. GATE: admin “update roles” changes the row; no JSON mtime change.</li>
+                <li><strong>Delete JSON.</strong> Remove overlay/seed/orphan files, JSON read/write helpers, gitignore rules that exist only for those files. GATE: grep for <code>DocumentationConfig.json</code> in <code>lib/</code> is empty; app still serves docs.</li>
+            </ol>
+            <p class="doc-body">Detail and file:line notes:
+            <a href="[% c.uri_for('/Documentation/doc_config_db_move_plan') %]" class="doc-link">doc_config_db_move_plan</a>
+            (that page still allowed a seed JSON; this page overrides — seed is deleted at the last step).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="work-items" class="doc-h2">Work items</h2>
+            <p class="doc-body">Named steps under project #138 DOCMASTER. Not “Phase N”.</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Work item</th><th class="doc-th">Owner</th><th class="doc-th">Done when</th></tr>
+                <tr>
+                    <td class="doc-td">Schema-compare <code>documentationmetadataindex</code> (incl. <code>categories</code>) on live Ency</td>
+                    <td class="doc-td">schema branch</td>
+                    <td class="doc-td">Live table matches Result; no hand-DDL</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Indexer: disk → upsert + prune; skip INCLUDE fragments</td>
+                    <td class="doc-td">Documentation</td>
+                    <td class="doc-td">Rescan writes rows, not JSON</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Wire <code>load_config</code> → <code>load_from_db</code>; then delete JSON fallback</td>
+                    <td class="doc-td">Documentation</td>
+                    <td class="doc-td">Home + view work with JSON files removed</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><code>save_config</code> / role UI write SQL only; remove <code>_atomic_write_json</code> catalog path</td>
+                    <td class="doc-td">Documentation</td>
+                    <td class="doc-td">No catalog JSON writer in lib</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Delete seed, overlay, lowercase orphan, backup JSON</td>
+                    <td class="doc-td">Documentation</td>
+                    <td class="doc-td">Files gone; grep clean</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Rebuild <code>/Documentation</code> home as category + search from SQL</td>
+                    <td class="doc-td">Documentation</td>
+                    <td class="doc-td">A human can find a page by category without knowing the filename</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Add <code>index.tt</code> to the 24 modules that lack one</td>
+                    <td class="doc-td">Documentation (+ module owners)</td>
+                    <td class="doc-td">Every served module folder has a landing page</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Theming + META/PageVersion sweep; convert or archive 49 stray <code>.md</code></td>
+                    <td class="doc-td">Documentation</td>
+                    <td class="doc-td">New/edited pages use <code>.doc-*</code>; human pages are <code>.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Retire overlapping system docs (banner + link here): <code>DocumentationSystem.tt</code>, <code>STANDARD.md</code>, old audit plans</td>
+                    <td class="doc-td">Documentation</td>
+                    <td class="doc-td">One definition page; others say superseded</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="project-tracking" class="doc-h2">Project tracking</h2>
+            <div class="doc-success">
+                <p class="doc-body">This definition is tracked under
+                <a href="[% c.uri_for('/project/details') %]?project_id=138" class="doc-link">project #138 (DOCMASTER)</a>
+                (child of PLANNING).
+                <a href="[% c.uri_for('/todo') %]?project_id=138" class="doc-link">View todos</a>
+                ·
+                <a href="[% c.uri_for('/project') %]" class="doc-link">All projects</a>.</p>
+            </div>
+            <p class="doc-muted">Todos for the work items above are created after this page is approved (sync tool / <code>/api/todo/create</code> on the Documentation worktree origin). Do not invent ids here.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="decisions" class="doc-h2">Decisions</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">#</th><th class="doc-th">Decision</th><th class="doc-th">Resolution</th></tr>
+                <tr>
+                    <td class="doc-td">D1</td>
+                    <td class="doc-td">Keep a JSON seed after SQL works?</td>
+                    <td class="doc-td">DECIDED 2026-08-26 — No. User asked to abandon the JSON file altogether. Seed is deleted at cutover step 5.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D2</td>
+                    <td class="doc-td">Keep META blocks?</td>
+                    <td class="doc-td">DECIDED — Yes as <em>authoring hints on the file</em> (title, roles, category, project_id). SQL is authoritative for the catalog. Indexer copies META into the row. Do not hand-edit JSON.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">D3</td>
+                    <td class="doc-td">Where does this definition live?</td>
+                    <td class="doc-td">DECIDED — In-app <code>STANDARD.tt</code> at <code>/Documentation/STANDARD</code> (this page). <code>STANDARD.md</code> is superseded (same key; <code>.tt</code> wins). Delete the <code>.md</code> after this page is accepted.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">D4</td>
+                    <td class="doc-td">Table writes / new columns</td>
+                    <td class="doc-td">DECIDED — schema branch + schema-compare only. Documentation branch may upsert existing columns once the live table matches the Result.</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" class="doc-h2">See also</h2>
+            <div class="doc-navrow">
+                <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationMasterPlan') %]">Documentation Master Plan</a>
+                <a class="doc-navlink" href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">Master Plan (all projects)</a>
+                <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationTtTemplate') %]">DocumentationTtTemplate</a>
+                <a class="doc-navlink" href="[% c.uri_for('/Documentation/doc_config_db_move_plan') %]">DB move (implementation notes)</a>
+                <a class="doc-navlink" href="[% c.uri_for('/Documentation/PlanningLanguageStandard') %]">Planning Language Standard</a>
+                <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_Model_Selection_Guide') %]">AI Model Selection Guide</a>
+            </div>
+            <p class="doc-footer">Supersedes: <code>STANDARD.md</code> (same route), architecture claims in <code>DocumentationSystem.tt</code> (Dec 2025, still describes JSON config). Those pages should gain a superseded banner after this page is accepted — not deleted in this draft.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+</div>

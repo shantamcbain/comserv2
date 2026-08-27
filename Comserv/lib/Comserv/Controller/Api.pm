@@ -2003,6 +2003,154 @@ sub api_focus_models :Path('focus/models') :Args(0) {
     $c->res->body(encode_json({ success => 1, models => \@models, default => $default }));
 }
 
+# ============================================================================
+# TodoRank agent endpoints (project #287 TODOAGENT, plan
+# Documentation/TodoRankAgentPlan.tt Phases 1-tail/3/4). All AI work delegates
+# to Model::AI2::TodoRank. DRY-RUN BY DEFAULT: pass {"apply": true} to write.
+# ============================================================================
+
+# GET /api/todo/duplicates?sitename=CSC — normalized-subject grouping of open
+# todos (plan Phase 1 helper). Read-only; never deletes anything.
+sub api_todo_duplicates :Path('todo/duplicates') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $req = $c->req->params;
+    my $site = $req->{sitename} || $c->stash->{SiteName} || 'CSC';
+    my %groups;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @rows = $schema->resultset('Todo')->search(
+            { sitename => $site, status => { -not_in => [3, 4, '3', '4'] } },
+            { columns => [qw(record_id subject project_id priority status)],
+              order_by => { -asc => 'record_id' }, rows => 2000 },
+        )->all;
+        for my $t (@rows) {
+            my $subj = lc($t->subject // '');
+            $subj =~ s/[^a-z0-9]+/ /g;
+            $subj =~ s/^\s+|\s+$//g;
+            next unless length $subj > 8;   # too-short subjects group everything
+            push @{ $groups{$subj} }, {
+                record_id  => $t->record_id,
+                subject    => $t->subject // '',
+                project_id => $t->project_id,
+                priority   => $t->priority,
+                status     => $t->status,
+            };
+        }
+    };
+    if ($@) {
+        $self->_json_error($c, 500, "duplicate scan failed: $@", 'scan_failed');
+    }
+    my @dupes = grep { @{ $_->{todos} } > 1 }
+                map { { key => $_, todos => $groups{$_} } } sort keys %groups;
+    $self->_json_ok($c, {
+        success       => 1,
+        sitename      => $site,
+        groups        => \@dupes,
+        group_count   => scalar(@dupes),
+        note          => 'Advisory only — duplicates are FLAGGED for human merge, never auto-deleted.',
+    });
+}
+
+# POST /api/todo/rank — the TodoRank coordinator (plan Phase 3).
+# Body: { sitename?, project_id?, model | models[], apply? (default false), limit? }
+# Lists open todos scoped to the branch/site/project, batches them (~15),
+# asks the model per batch, and returns per-record proposals + a diff of what
+# WOULD change. With apply:true it writes only differing values as
+# last_mod_by='ai-todorank'. Never closes/deletes rows; status=5 dates frozen.
+sub api_todo_rank :Path('todo/rank') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $apply = ($data->{apply} && "$data->{apply}" eq '1') ? 1 : 0;
+
+    # Resolve target model(s): same contract as /api/focus/top5.
+    my @targets;
+    if (ref($data->{models}) eq 'ARRAY') {
+        for my $m (@{ $data->{models} }) {
+            push @targets, ref($m) ? { name => $m->{name}, host => $m->{host} // '' }
+                                   : { name => "$m", host => '' } if ref($m) ? $m->{name} : $m;
+        }
+    }
+    elsif (my $one = ($data->{model} // '') =~ s/^\s+|\s+$//gr) {
+        push @targets, { name => $one, host => $data->{host} // '' };
+    }
+    unless (@targets) {
+        $self->_json_error($c, 400, 'Missing required field: model (or models[])', 'validation_error');
+    }
+
+    my $rank = eval { $c->model('AI2::TodoRank') };
+    unless ($rank) {
+        $self->_json_error($c, 500, 'AI2::TodoRank model not available', 'model_missing');
+    }
+
+    # Branch/SiteName/role context: which branch instance am I serving, which
+    # coordination project owns it, who is asking. The agent ranks SITE
+    # OPERATIONS for this SiteName only — no git, no cross-site view.
+    my $bctx  = $rank->branch_context($c);
+    my @roles = ref($c->session->{roles}) eq 'ARRAY' ? @{ $c->session->{roles} } : ();
+
+    my ($rows, $rbid) = $rank->gather_todos($c,
+        sitename  => $data->{sitename},
+        project_id=> $data->{project_id} // $bctx->{project_id},
+    );
+    unless (@$rows) {
+        $self->_json_ok($c, { success => 1, message => 'No open todos matched the scope',
+                              batches => 0, results => [], dry_run => \!$apply });
+    }
+
+    my $limit = ($data->{limit} && $data->{limit} =~ /^\d+$/) ? $data->{limit} : 200;
+    @$rows = @$rows[0 .. ($#$rows < $limit - 1 ? $#$rows : $limit - 1)];
+
+    my @all_changes;
+    my $total_proposed = 0;
+    my @batch_errors;
+    my $bs = eval { $rank->can('BATCH_SIZE') } ? Comserv::Model::AI2::TodoRank->BATCH_SIZE : 15;
+    my %pctx = (
+        sitename     => $data->{sitename} // $rank->_sitename($c),
+        branch       => $bctx->{branch},
+        project_name => $bctx->{project_name},
+        roles        => \@roles,
+    );
+    while (@$rows) {
+        my @batch = splice(@$rows, 0, $bs);
+        my ($system, $user_prompt) = $rank->build_prompt(\@batch, \%pctx);
+        my $res = $rank->run_batch($c, $targets[0], $system, $user_prompt);
+        unless ($res && $res->{success}) {
+            push @batch_errors, ($res && $res->{error}) || 'AI ranking unavailable';
+            next;
+        }
+        my $parsed = $rank->parse_result($res, [ map { $_->{record_id} } @batch ]);
+        $total_proposed += scalar keys %{ $parsed->{proposals} };
+        my $applied = $rank->apply_proposals($c, $rbid, $parsed->{proposals},
+                                             apply => $apply, model => $targets[0]{name});
+        push @all_changes, @{ $applied->{changed} };
+    }
+
+    $self->_json_ok($c, {
+        success        => \1,
+        model          => $targets[0]{name},
+        sitename       => $pctx{sitename},
+        branch         => $bctx->{branch},
+        project_id     => $bctx->{project_id},
+        project_name   => $bctx->{project_name},
+        requester_roles=> \@roles,
+        scoped_todos   => 0 + (scalar keys %$rbid),
+        proposed       => $total_proposed,
+        changed        => \@all_changes,
+        change_count   => scalar(@all_changes),
+        batch_errors   => \@batch_errors,
+        applied        => $apply ? \1 : \0,
+        dry_run        => $apply ? \0 : \1,
+        note           => 'DRY-RUN by default: changed[] shows what WOULD be written. '
+                        . 'Re-post with {"apply":true} after review. Writes are attributed to ai-todorank.',
+    });
+}
+
 # Gather the plan-doc context for api_focus_top5: BOTH the on-disk planning
 # corpus (root/Documentation/**/*.{tt,md} that look like plan docs) AND the DB
 # DailyPlan rows (with their open phase todos). Pure, no mutation; returns an
