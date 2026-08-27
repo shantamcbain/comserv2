@@ -43,3 +43,10 @@ config/dev_tls/
 # Secrets: real credentials live ONLY in ~/.comserv/secrets (outside the repo).
 # Never commit Comserv/secrets/ — it may contain live DB passwords.
 /secrets/
+
+# Runtime Documentation catalog overlay — rewritten on every scan/save.
+# Tracking it causes merge conflicts on every cross-branch merge.
+/root/session/documentation_config/DocumentationConfig.json
+/root/session/documentation_config/scan_state.json
+/root/session/documentation_config/*.bak
+/root/session/documentation_config/*.tmp
