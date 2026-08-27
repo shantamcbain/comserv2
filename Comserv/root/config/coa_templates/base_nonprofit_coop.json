@@ -1,0 +1,28 @@
+{
+  "id": "nonprofit_coop",
+  "label": "Non-Profit / Co-op",
+  "description": "Schools, co-ops and non-profits. Uses the published NPO→GIFI mapping (RC4088 Appendix C): grants 8242, gifts 8223, membership 8221, interfund transfers 3745 (equity) / 9286 (income statement).",
+  "gifi_basis": "CRA RC4088 Rev.23 Appendix C; restricted funds via the 3745/9286 interfund-transfer split.",
+  "accounts": [
+    { "accno": "1000", "description": "Cash / Chequing Account",            "charttype": "A", "category": "A", "link": "", "gifi_accno": "1000" },
+    { "accno": "1073", "description": "Amounts Receivable from Members",    "charttype": "A", "category": "A", "link": "AR", "gifi_accno": "1073" },
+    { "accno": "1300", "description": "Prepaid Expenses",                   "charttype": "A", "category": "A", "link": "", "gifi_accno": "1180" },
+    { "accno": "2000", "description": "Accounts Payable",                   "charttype": "A", "category": "L", "link": "AP", "gifi_accno": "2620" },
+    { "accno": "2100", "description": "GST/HST Payable / ITC Rebate Due",   "charttype": "A", "category": "L", "link": "AR_tax AP_tax", "gifi_accno": "2640" },
+    { "accno": "2630", "description": "Amounts Payable to Members",         "charttype": "A", "category": "L", "link": "", "gifi_accno": "2630" },
+    { "accno": "3200", "description": "Fund Balances — Restricted",         "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3745" },
+    { "accno": "3210", "description": "Fund Balances — Unrestricted",       "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3620" },
+    { "accno": "3745", "description": "Interfund Transfers (equity)",       "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3745" },
+    { "accno": "8221", "description": "Membership Dues & Fees",             "charttype": "A", "category": "I", "link": "AR_amount", "gifi_accno": "8221" },
+    { "accno": "8223", "description": "Gifts & Donations Received",         "charttype": "A", "category": "I", "link": "", "gifi_accno": "8223" },
+    { "accno": "8242", "description": "Grants — Subsidies Received",        "charttype": "A", "category": "I", "link": "", "gifi_accno": "8242" },
+    { "accno": "8224", "description": "Revenue from Organizational Activities", "charttype": "A", "category": "I", "link": "", "gifi_accno": "8224" },
+    { "accno": "6100", "description": "Program Instructor / Staff Costs",   "charttype": "A", "category": "E", "link": "", "gifi_accno": "9060" },
+    { "accno": "6200", "description": "Program Supplies",                   "charttype": "A", "category": "E", "link": "", "gifi_accno": "8910" },
+    { "accno": "6300", "description": "Facilities & Utilities",             "charttype": "A", "category": "E", "link": "", "gifi_accno": "8510" },
+    { "accno": "6710", "description": "Bank & Payment Processing Fees",     "charttype": "A", "category": "E", "link": "", "gifi_accno": "8710" },
+    { "accno": "9286", "description": "Interfund Transfers (income statement)", "charttype": "A", "category": "E", "link": "", "gifi_accno": "9286" },
+    { "accno": "6900", "description": "Other Expenses",                     "charttype": "A", "category": "E", "link": "", "gifi_accno": "9367" }
+  ],
+  "headings": []
+}

@@ -187,7 +187,8 @@ sub provision_site_for_owner {
     eval {
         $module_ok = $c->model('DBEncy')->resultset('SiteModule')->search({
             sitename    => $sitename,
-            module_name => { -in => [qw(accounting commerce Accounting Commerce)] },
+            module_name => { -in => [qw(accounting commerce ecommerce
+                                          Accounting Commerce Ecommerce)] },
             enabled     => 1,
         })->count ? 1 : 0;
     };
@@ -374,6 +375,34 @@ sub provision_site {
     }
 
     delete $self->_schema_cache->{$sitename};
+
+    # ── 7. Seed the chart of accounts from the template store (ACCON Ph.1) ──
+    # Data-driven: base archetype from site_map.json + capability overlays
+    # derived from enabled site_modules. Idempotent — existing accnos skipped.
+    eval {
+        my $coa = Comserv::Model::CoaTemplate->instance;
+        my ($base_id, $overlay_ids) = $coa->chart_for_site($c, $sitename);
+        my $site_schema = $self->schema_for_site($c, $sitename);
+        if ($site_schema) {
+            my ($added, @collisions) =
+                $coa->seed_site_chart($c, $site_schema, $base_id, $overlay_ids);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'provision_site',
+                "CoA seeded for '$sitename': $added rows (base=$base_id, overlays=["
+                . join(',', @$overlay_ids) . "])"
+                . (@collisions ? " COLLISIONS: " . join('; ', @collisions) : ''));
+        }
+        else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'provision_site',
+                "Could not connect to '$db_name' to seed the chart — seed manually via /Accounting/coa/seed");
+        }
+    };
+    if ($@) {
+        # Provisioning itself succeeded — chart seeding failure must not be silent.
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'provision_site', "Chart seeding failed for '$sitename': $@");
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
         "Provisioned accounting DB '$db_name' for site '$sitename' ($jurisdiction/$currency)");
