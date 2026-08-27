@@ -32,13 +32,21 @@
         <meta name="description" content="[% http_header_description %]">
     [% END %]
     [%- SET site_favicon = c.stash.site_favicon || '' -%]
+    [%- SET doc_favicon  = c.stash.documentation_favicon || '' -%]
     [%- SET req_port      = c.stash.req_port || 0 -%]
     [%- SET fav_bg        = c.stash.favicon_bg_color || '' -%]
     [%- SET site_name_enc = SiteName | uri -%]
     [%- SET fallback_icon = site_favicon
             ? site_favicon
             : '/favicon/site/' _ site_name_enc -%]
-    [% IF site_favicon %]
+    [% IF doc_favicon %]
+    [%# Documentation branch marker: book icon on doc pages #]
+    <link rel="icon" type="image/svg+xml" href="[% doc_favicon %]">
+    [% IF req_port %]
+    [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
+    <link rel="alternate icon" sizes="32x32" href="[% port_icon_url %]">
+    [% END %]
+    [% ELSIF site_favicon %]
     <link rel="icon" type="image/svg+xml" href="[% site_favicon %]">
     [% IF req_port %]
     [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
