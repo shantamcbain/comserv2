@@ -5,6 +5,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Model::AccountingDB;
+use Comserv::Model::CoaTemplate;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -124,12 +125,56 @@ sub _status {
     eval { $st{coa_count} = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0 })->count };
     eval { $st{gl_count}  = $schema->resultset('Accounting::GlEntry')->search({ sitename => $sitename })->count };
 
+    # PG chart count (clone-target). Maria coa_count stays the live /Accounting/coa number.
+    $st{pg_coa_count}      = 0;
+    $st{chart_seeded}      = 0;
+    $st{provision_status}  = $st{provisioned} ? 'provisioned'
+                           : ($st{reg} && (($st{reg}->status // '') =~ /provisioning/) ? 'provisioning'
+                           : ($st{reg} ? 'error' : 'no_provision'));
+    $st{provision_error}   = '';
+    if ($st{reg} && $st{provision_status} eq 'error') {
+        $st{provision_error} = eval { $st{reg}->last_error } || 'Provisioning failed';
+    }
+
+    if ($st{db_ok}) {
+        eval {
+            my $acct = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+            if ($acct) {
+                $st{pg_coa_count} = $acct->resultset('Chart')->count;
+                $st{chart_seeded} = $st{pg_coa_count} > 0 ? 1 : 0;
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_status',
+                "PG chart count failed for '$sitename': $@");
+        }
+    }
+
+    my $coa_model = Comserv::Model::CoaTemplate->new;
+    my $site_map  = eval { $coa_model->site_map($c) } || {};
+    my $user_archetype = $site_map->{sites}{$sitename}{base_archetype} // 'sole_proprietor';
+    my @archetypes = eval { $coa_model->list_archetypes($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_status',
+            "list_archetypes failed: $@");
+        @archetypes = ();
+    }
+    my $is_csc = $st{is_csc_admin};
+    my @shown = $is_csc
+        ? @archetypes
+        : grep { $_->{id} eq $user_archetype } @archetypes;
+    $st{chosen_base}      = $user_archetype;
+    $st{archetypes}       = \@shown;
+    $st{selected_overlays}= [];
+    $st{chosen_overlays}  = [];
+    $st{subscribers}      = $is_csc ? (eval { $coa_model->accounting_subscribers($c) } || []) : [];
+
     # Wizard step: 1 module, 2 provision, 3 chart, 4 import/review, 5 done
     my $step = 1;
     $step = 2 if $st{module_enabled};
     $step = 3 if $st{provisioned};
-    $step = 4 if $st{provisioned} && $st{coa_count} > 0;
-    $step = 5 if $st{provisioned} && $st{coa_count} > 0 && $st{gl_count} > 0;
+    $step = 4 if $st{provisioned} && ($st{pg_coa_count} > 0 || $st{coa_count} > 0);
+    $step = 5 if $st{provisioned} && ($st{pg_coa_count} > 0 || $st{coa_count} > 0) && $st{gl_count} > 0;
     $st{step} = $step;
 
     return \%st;

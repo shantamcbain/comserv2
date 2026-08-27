@@ -1,165 +1,245 @@
 [% INCLUDE Accounting/_acct_inv_nav.tt %]
-
-[% IF c.flash.success_msg %]
-<div style="background:#d1fae5;border:1px solid #86efac;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">
-    [% c.flash.success_msg | html %]
-</div>
-[% END %]
-
-[% IF c.flash.error_msg %]
-<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">
-    [% c.flash.error_msg | html %]
-</div>
-[% END %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="app-container">
-    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
-        <h1 style="margin:0;">📋 Accounting Setup — [% sitename | html %]</h1>
-        <a href="/Accounting" class="btn btn-secondary" style="font-size:0.88rem;">← Accounting Dashboard</a>
-    </div>
 
-    [%# ── Step 1: Database Status ────────────────────────────────────── %]
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;">
-        <h2 style="margin-top:0;color:#065f46;font-size:1.1rem;">✅ Accounting Database: Provisioned</h2>
-        <p style="margin:0.5rem 0 0;font-size:0.9rem;color:#374151;">
-            Connected to <code>[% db_name | html %]@[% db_host | html %]:[% db_port %]/[% db_name | html %]</code>
-            <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 8px;font-size:0.78rem;margin-left:0.5rem;">[% jurisdiction | html %]/[% currency | html %]</span>
-        </p>
-    </div>
+  [% IF c.flash.error_msg %]
+  <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.success_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.info_msg %]
+  <div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.info_msg | html %]</div>
+  [% END %]
 
-    [%# ── Step 2: Provisioned? ──────────────────────────────────────── %]
-    [% IF provision_status eq 'provisioning' %]
-    <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;">
-        <strong style="color:#92400e;">⏳ Provisioning in progress…</strong>
-        <p style="margin:0.5rem 0 0;font-size:0.9rem;color:#b45309;">
-            PostgreSQL database is being created. Refresh in a minute or check the admin panel.
-        </p>
-    </div>
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
+    <h1 style="margin:0;">Accounting Setup — [% sitename | html %]</h1>
+    <a href="/Accounting" class="btn btn-secondary" style="font-size:0.88rem;">&larr; Accounting Dashboard</a>
+  </div>
 
-    [% ELSIF provision_status eq 'error' %]
-    <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;">
-        <strong style="color:#991b1b;">❌ Provisioning Failed</strong>
-        <p style="margin:0.5rem 0 0;font-size:0.9rem;color:#b45309;">
-            [% provision_error | html %]
-        </p>
-    </div>
+  <p style="font-size:0.9rem;color:var(--text-muted-color,#666);margin-top:0;">
+    You are running this setup for your own site, <strong>[% sitename | html %]</strong>.
+    Each step is resumable — come back any time and continue where you left off.
+  </p>
 
+  [%# ── Step 1: module ───────────────────────────────────────────── %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      1. Accounting module
+      [% IF module_enabled %]<span style="color:#065f46;">&#10004; enabled</span>
+      [% ELSE %]<span style="color:#991b1b;">&#10007; not enabled</span>[% END %]
+    </h2>
+    [% IF !module_enabled %]
+    <p style="margin:0 0 0.6rem;font-size:0.88rem;">
+      The Accounting package is not on for [% sitename | html %] yet. A site owner
+      adds it on their account add-ons page. The database step cannot run until that is on.
+    </p>
+    <a href="[% c.uri_for('/membership/addons') %]" class="btn btn-primary" style="font-size:0.88rem;">Add Accounting add-on</a>
+    [% END %]
+  </div>
+
+  [%# ── Step 2: provision ────────────────────────────────────────── %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      2. Accounting database
+      [% IF provisioned && db_ok %]<span style="color:#065f46;">&#10004; provisioned &amp; reachable</span>
+      [% ELSIF provisioned %]<span style="color:#92400e;">&#9888; provisioned, not reachable</span>
+      [% ELSIF provision_status eq 'provisioning' %]<span style="color:#92400e;">provisioning…</span>
+      [% ELSE %]<span style="color:#6b7280;">not provisioned</span>[% END %]
+    </h2>
+
+    [% IF provision_status eq 'error' && provision_error %]
+      <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#991b1b;">[% provision_error | html %]</p>
+    [% END %]
+
+    [% IF provisioned %]
+      <p style="margin:0 0 0.4rem;font-size:0.88rem;">
+        <code>[% reg.db_name | html %]@[% reg.db_host | html %]:[% reg.db_port %]</code>
+        &nbsp;<span style="background:#e0e7ff;color:#3730a3;border-radius:4px;padding:2px 8px;font-size:0.8rem;">[% reg.jurisdiction | html %] / [% reg.currency | html %]</span>
+        [% IF db_ok %]&nbsp;<span style="font-size:0.85rem;color:#6b7280;">[% schema_tables %] tables</span>[% END %]
+      </p>
+      [% IF db_error %]
+      <p style="margin:0;font-size:0.85rem;color:#991b1b;">Error: [% db_error | html %]</p>
+      [% END %]
+      <a href="/Accounting/my_database" class="btn btn-secondary" style="font-size:0.85rem;margin-top:0.5rem;">View database details</a>
+
+    [% ELSIF module_enabled %]
+      <form method="post" action="/Accounting/setup/provision"
+            onsubmit="return confirm('Provision a PostgreSQL accounting database for [% sitename | html %]? This is a one-time setup step.');"
+            style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:flex-end;margin:0;">
+        <label style="font-size:0.85rem;">Jurisdiction<br>
+          <input type="text" name="jurisdiction" value="CA" maxlength="2" size="4" class="form-control">
+        </label>
+        <label style="font-size:0.85rem;">Currency<br>
+          <input type="text" name="currency" value="CAD" maxlength="3" size="5" class="form-control">
+        </label>
+        <label style="font-size:0.85rem;display:flex;align-items:center;gap:0.35rem;">
+          <input type="checkbox" name="confirm" value="1" required> I confirm
+        </label>
+        <button type="submit" class="btn btn-primary">Provision my accounting database</button>
+      </form>
+      <p style="margin:0.5rem 0 0;font-size:0.8rem;color:var(--text-muted-color,#666);">
+        The server chooses the host, database name and database user. Safe to re-run — an
+        existing database is never re-created. Tables come from the <code>accounting_template</code>
+        database, not an empty schema.
+      </p>
     [% ELSE %]
-    [%# ── Step 3: Template Selector (Ph.1a S9) ──────────────────────────── %]
-    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;">
-        <h2 style="color:#1e40af;font-size:1rem;margin-top:0;">📂 Choose Chart Template</h2>
-        <p style="margin:0.5rem 0;color:#374151;font-size:0.95rem;">
-            Select a pre-built Chart of Accounts template tailored to your business model.
-            Each base archetype covers multiple industries; you can add teaching/ecommerce overlays below.
-        </p>
+      <p style="margin:0 0 0.6rem;font-size:0.88rem;color:var(--text-muted-color,#666);">
+        Complete step 1 first — add the Accounting add-on, then return here to create the database.
+      </p>
+      <a href="[% c.uri_for('/membership/addons') %]" class="btn btn-secondary" style="font-size:0.88rem;">Go to add-ons</a>
+    [% END %]
+  </div>
 
-        <form method="post" action="/Accounting/setup/choose_template" style="margin-top:1rem;">
-            <input type="hidden" name="action" value="choose">
+  [%# ── Step 3: chart of accounts (IA template store + AI generate) ─ %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      3. Chart of accounts
+      [% IF chart_seeded || pg_coa_count %]<span style="color:#065f46;">&#10004; [% pg_coa_count || coa_count %] PG accounts</span>
+      [% ELSIF coa_count %]<span style="color:#92400e;">[% coa_count %] on Maria (not yet seeded to PG)</span>
+      [% ELSE %]<span style="color:#6b7280;">empty</span>[% END %]
+    </h2>
 
-            <div style="margin-bottom:1rem;">
-                <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Base Archetype</label>
-                <select name="base_archetype" required style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
-                    <option value="">-- Select a template --</option>
-                    [% FOREACH a IN archetypes %]
-                    <option value="[% a.id %]" [% IF chosen_base == a.id %]selected[% END %]>
-                        [% a.label %][% IF a.description %] — [% a.description %][% END %]
-                    </option>
-                    [% END %]
-                </select>
-                <small style="color:#6b7280;margin-top:0.25rem;display:block;">
-                    This is pre-selected for your site's business model. The system uses CRA GIFI bands for statutory compliance.
-                </small>
-            </div>
+    [% IF provisioned && db_ok %]
+      <p style="margin:0.5rem 0;color:#374151;font-size:0.95rem;">
+        Select a pre-built Chart of Accounts template tailored to your business model.
+        Each base archetype covers multiple industries; you can add teaching/ecommerce overlays below.
+      </p>
 
-            <div style="margin-bottom:1rem;">
-                <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Capability Overlays (optional)</label>
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
-                        <input type="checkbox" name="overlays" value="teaching" [% IF 'teaching' IN selected_overlays %]checked[% END %]>
-                        <span style="font-size:0.9rem;">Teaching (tuition, grants, donations)</span>
-                    </label>
-                    <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
-                        <input type="checkbox" name="overlays" value="ecommerce" [% IF 'ecommerce' IN selected_overlays %]checked[% END %]>
-                        <span style="font-size:0.9rem;">E-Commerce (sales tax, shipping, COGS)</span>
-                    </label>
-                </div>
-                <small style="color:#6b7280;margin-top:0.25rem;display:block;">
-                    Activate overlays for your needs. Overlays combine with the base without number collisions.
-                </small>
-            </div>
+      <form method="post" action="/Accounting/setup/choose_template" style="margin-top:1rem;">
+        <input type="hidden" name="action" value="choose">
 
-            <div style="display:flex;gap:0.75rem;margin-top:1rem;">
-                <button type="submit" class="btn btn-primary" style="flex:1;">
-                    📊 Review & Seed Chart
-                </button>
-                <a href="/Accounting/setup/ai_generate" class="btn btn-outline-secondary" style="flex:1;text-align:center;">
-                    🤖 Let AI Generate Template
-                </a>
-            </div>
-        </form>
-    </div>
+        <div style="margin-bottom:1rem;">
+          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Base Archetype</label>
+          <select name="base_archetype" required style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+            <option value="">-- Select a template --</option>
+            [% FOREACH a IN archetypes %]
+            <option value="[% a.id %]" [% IF chosen_base == a.id %]selected[% END %]>
+              [% a.label %][% IF a.description %] — [% a.description %][% END %]
+            </option>
+            [% END %]
+          </select>
+          <small style="color:#6b7280;margin-top:0.25rem;display:block;">
+            This is pre-selected for your site's business model. The system uses CRA GIFI bands for statutory compliance.
+          </small>
+        </div>
 
-    [%# ── Preview when a template is selected ─────────────────────────── %]
-    [% IF merged_chart %]
-    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;">
-        <h3 style="color:#1e40af;font-size:1rem;margin-top:0;">📋 Preview: [% merged_chart.base.label %]</h3>
+        <div style="margin-bottom:1rem;">
+          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Capability Overlays (optional)</label>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
+              <input type="checkbox" name="overlays" value="teaching" [% IF 'teaching' IN selected_overlays %]checked[% END %]>
+              <span style="font-size:0.9rem;">Teaching (tuition, grants, donations)</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
+              <input type="checkbox" name="overlays" value="ecommerce" [% IF 'ecommerce' IN selected_overlays %]checked[% END %]>
+              <span style="font-size:0.9rem;">E-Commerce (sales tax, shipping, COGS)</span>
+            </label>
+          </div>
+          <small style="color:#6b7280;margin-top:0.25rem;display:block;">
+            Activate overlays for your needs. Overlays combine with the base without number collisions.
+          </small>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap;">
+          <button type="submit" class="btn btn-primary" style="flex:1;">
+            Review &amp; Seed Chart
+          </button>
+          <a href="/Accounting/setup/ai_generate" class="btn btn-outline-secondary" style="flex:1;text-align:center;">
+            Let AI Generate Template
+          </a>
+        </div>
+      </form>
+
+      [% IF merged_chart %]
+      <div style="margin-top:1rem;">
+        <h3 style="color:#1e40af;font-size:1rem;margin-top:0;">Preview: [% merged_chart.base.label %]</h3>
         <p style="margin:0.5rem 0;color:#374151;font-size:0.88rem;">
-            [% IF merged_chart.overlays.size %]
-                [% merged_chart.base.label | html %] + [% merged_chart.overlays.size %] overlay(s)
-            [% ELSE %]
-                Base archetype only
-            [% END %] — [% merged_chart.rows.size %] chart entries
+          [% IF merged_chart.overlays.size %]
+            [% merged_chart.base.label | html %] + [% merged_chart.overlays.size %] overlay(s)
+          [% ELSE %]
+            Base archetype only
+          [% END %] — [% merged_chart.rows.size %] chart entries
         </p>
         <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
-            <thead><tr style="background:#f3f4f6;">
-                <th style="text-align:left;padding:0.4rem;">Acc #</th>
-                <th style="text-align:left;padding:0.4rem;">Description</th>
-                <th style="text-align:center;padding:0.4rem;">Category</th>
-                <th style="text-align:center;padding:0.4rem;">GIFI</th>
-            </tr></thead>
-            <tbody>
-            [% FOREACH row IN merged_chart.rows %]
-                <tr style="border-top:1px solid #f3f4f6;">
-                    <td style="padding:0.4rem;font-family:monospace;">[% row.accno | html %]</td>
-                    <td style="padding:0.4rem;">[% row.description | html %]</td>
-                    <td style="padding:0.4rem;text-align:center;">
-                        [% IF row.category == 'A' %]Asset[% ELSIF row.category == 'L' %]Liability[% ELSIF row.category == 'Q' %]Equity[% ELSIF row.category == 'I' %]Income[% ELSIF row.category == 'E' %]Expense[% END %]
-                    </td>
-                    <td style="padding:0.4rem;text-align:center;color:#6b7280;">
-                        [% IF row.gifi_accno %}[% row.gifi_accno | html %][% ELSE %]–[% END %]
-                    </td>
-                </tr>
-            [% END %]
-            </tbody>
+          <thead><tr style="background:#f3f4f6;">
+            <th style="text-align:left;padding:0.4rem;">Acc #</th>
+            <th style="text-align:left;padding:0.4rem;">Description</th>
+            <th style="text-align:center;padding:0.4rem;">Category</th>
+            <th style="text-align:center;padding:0.4rem;">GIFI</th>
+          </tr></thead>
+          <tbody>
+          [% FOREACH row IN merged_chart.rows %]
+            <tr style="border-top:1px solid #f3f4f6;">
+              <td style="padding:0.4rem;font-family:monospace;">[% row.accno | html %]</td>
+              <td style="padding:0.4rem;">[% row.description | html %]</td>
+              <td style="padding:0.4rem;text-align:center;">
+                [% IF row.category == 'A' %]Asset[% ELSIF row.category == 'L' %]Liability[% ELSIF row.category == 'Q' %]Equity[% ELSIF row.category == 'I' %]Income[% ELSIF row.category == 'E' %]Expense[% END %]
+              </td>
+              <td style="padding:0.4rem;text-align:center;color:#6b7280;">
+                [% IF row.gifi_accno %][% row.gifi_accno | html %][% ELSE %]–[% END %]
+              </td>
+            </tr>
+          [% END %]
+          </tbody>
         </table>
         <p style="margin-top:0.75rem;font-size:0.8rem;color:#6b7280;">
-            Previewed rows limited. Full chart seeded on your request. 
-            [<a href="/Accounting/setup/seed_chart">Seed this chart to my database</a>]
+          Previewed rows limited. Full chart seeded on your request.
+          [<a href="/Accounting/setup/seed_chart">Seed this chart to my database</a>]
         </p>
-    </div>
-    [% END %]
-[% END %]
+      </div>
+      [% END %]
 
-    [%# ── Step 4: Already seeded? ───────────────────────────────────── %]
-    [% IF chart_seeded %]
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;">
-        <h3 style="margin-top:0;color:#065f46;font-size:1rem;">✅ Chart of Accounts Seeded</h3>
-        <p style="margin:0.5rem 0;color:#374151;font-size:0.9rem;">
-            [% coa_count | numeric_format %] accounts loaded from <strong>[% chosen_base | html %]</strong>
-            [% IF chosen_overlays.size %](with [% chosen_overlays.join(', ') | html %] overlay)% END %.
-            You can <a href="/Accounting/coa">view and edit</a> entries, or <a href="/Accounting/setup">start the data import</a>.
+      [% IF chart_seeded %]
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:0.75rem 1rem;margin-top:1rem;">
+        <strong style="color:#065f46;">Chart of Accounts seeded</strong>
+        <p style="margin:0.5rem 0 0;color:#374151;font-size:0.9rem;">
+          [% pg_coa_count | html %] accounts loaded from <strong>[% chosen_base | html %]</strong>
+          [% IF chosen_overlays.size %](with [% chosen_overlays.join(', ') | html %] overlay)[% END %].
+          You can <a href="/Accounting/coa">view and edit</a> (Maria live chart until cutover).
         </p>
-    </div>
-    [% END %]
+      </div>
+      [% END %]
 
-    [%# ── Admin-only: which sites are subscribed to accounting ─────────── %]
-    [% IF subscribers.size %]
-    <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.5rem;">
-        <h4 style="margin-top:0;color:#475569;font-size:0.92rem;">Sites subscribed to Accounting (CSC admin view)</h4>
-        <p style="margin:0.4rem 0 0;font-size:0.85rem;color:#64748b;">
-            [% subscribers.size %] site(s): [% subscribers.join(', ') | html %]
-        </p>
-    </div>
+    [% ELSIF provisioned %]
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Database is registered but not reachable. Fix step 2 before seeding a chart.</p>
+    [% ELSE %]
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 2 first.</p>
     [% END %]
+  </div>
+
+  [%# ── Step 4: import existing Maria rows ────────────────────────── %]
+  <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+    <h2 style="font-size:1rem;margin:0 0 0.5rem;">
+      4. Import existing data <span style="font-weight:normal;font-size:0.85rem;color:var(--text-muted-color,#666);">(optional — Maria CoA, GL, suppliers)</span>
+      [% IF gl_count %]<span style="color:#065f46;">&#10004; [% gl_count %] GL entries on Maria</span>[% END %]
+    </h2>
+    [% IF provisioned && db_ok %]
+      <form method="post" action="/Accounting/migrate_to_pg" style="margin:0;"
+            onsubmit="return confirm('Copy existing MariaDB accounting data for [% sitename | html %] into PostgreSQL? Already-migrated records are skipped.');">
+        <button type="submit" class="btn btn-secondary" style="font-size:0.88rem;">Import my existing accounting data</button>
+      </form>
+    [% ELSE %]
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 2 first.</p>
+    [% END %]
+  </div>
+
+  [%# ── Step 5: done ─────────────────────────────────────────────── %]
+  [% IF step >= 5 %]
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.25rem;">
+    <strong style="color:#065f46;">&#10004; Accounting setup complete for [% sitename | html %].</strong>
+    <a href="/Accounting" class="btn btn-primary" style="font-size:0.85rem;margin-left:0.75rem;">Go to the dashboard</a>
+  </div>
+  [% END %]
+
+  [% IF subscribers.size %]
+  <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:1rem 1.5rem;margin:1rem 0 0;">
+    <h4 style="margin-top:0;color:#475569;font-size:0.92rem;">Sites subscribed to Accounting (CSC admin view)</h4>
+    <p style="margin:0.4rem 0 0;font-size:0.85rem;color:#64748b;">
+      [% subscribers.size %] site(s): [% subscribers.join(', ') | html %]
+    </p>
+  </div>
+  [% END %]
 
 </div>
