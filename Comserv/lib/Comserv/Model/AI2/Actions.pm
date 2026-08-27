@@ -414,6 +414,16 @@ sub perform {
         return;
     }
 
+    # ── create_invoice ────────────────────────────────────────────────────────
+    # Draft AP/AR via existing Inventory tables. Never posts GL.
+    if ($action_name eq 'create_invoice') {
+        require Comserv::Model::AI2::InvoiceCreate;
+        my $brain = eval { $c->model('AI2::InvoiceCreate') };
+        $brain = Comserv::Model::AI2::InvoiceCreate->new if !$brain || !ref $brain;
+        $brain->perform_create($c, $params);
+        return;
+    }
+
     # ── open_project_wizard ───────────────────────────────────────────────────
     # This is handled entirely client-side; the server just echoes the params back
     # so the JS wizard handler can pre-fill the form fields.

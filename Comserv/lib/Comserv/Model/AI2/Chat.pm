@@ -101,6 +101,18 @@ sub build_system_prompt {
                 'build_system_prompt', "TodoCreate chat_contract failed: $@");
         }
         push @parts, $contract if $contract;
+
+        my $inv_contract = eval {
+            require Comserv::Model::AI2::InvoiceCreate;
+            my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
+            $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
+            $ibrain->chat_contract($c);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                'build_system_prompt', "InvoiceCreate chat_contract failed: $@");
+        }
+        push @parts, $inv_contract if $inv_contract;
     }
 
     # Positive-learning retrieval (proj #288): reuse what the app already knows
@@ -206,6 +218,30 @@ sub process {
             provider    => $todo_hit->{provider} // 'ai2-todo',
             todo_action => $todo_hit->{todo_action},
             thinking    => [],
+        };
+    }
+
+    # Invoice-create AGENT. Same intercept as todos — draft only, never posts GL.
+    my $inv_hit = eval {
+        require Comserv::Model::AI2::InvoiceCreate;
+        my $ibrain = eval { $c->model('AI2::InvoiceCreate') };
+        $ibrain = Comserv::Model::AI2::InvoiceCreate->new if !$ibrain || !ref $ibrain;
+        $ibrain->try_chat_create($c, prompt => $prompt);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+            "InvoiceCreate try_chat_create threw: $@");
+    }
+    if ($inv_hit && $inv_hit->{handled}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+            'Invoice-create agent handled chat (no LLM)');
+        return {
+            success        => 1,
+            response       => $inv_hit->{response} // '',
+            model          => $inv_hit->{model} // '(invoice-create)',
+            provider       => $inv_hit->{provider} // 'ai2-invoice',
+            invoice_action => $inv_hit->{invoice_action},
+            thinking       => [],
         };
     }
 
