@@ -435,13 +435,19 @@ sub get_available_models {
 
     my @all;
 
+    # Baseline: a small static list of confirmed-free OpenRouter models. This
+    # guarantees the catalog is never empty on hosts with no API keys or where
+    # Ollama / external provider probes fail. Live provider lists overlay below.
+    push @all, $self->_default_free_catalog($c);
+
     # --- Local Ollama ---
+    # Ollama is slow and can block Starman workers for tens of seconds when the
+    # host is down. It must NOT be probed during ordinary page rendering. Only
+    # refresh when an AI surface explicitly asks for the live list.
     # Production1 is image-only and cannot reach the workstation Ollama host.
-    # Catalog discovery runs during ordinary page rendering, so probing Ollama
-    # there pins one Starman worker per request under crawler traffic. Do not
-    # probe, log an unreachable sentinel, or advertise Ollama on production1.
     my $system_identifier = $ENV{SYSTEM_IDENTIFIER} // '';
-    my $skip_ollama = $system_identifier =~ /^(?:production1|comservproduction1)$/i;
+    my $skip_ollama = $system_identifier =~ /^(?:production1|comservproduction1)$/i
+                   || !$opts{include_ollama};
 
     unless ($skip_ollama) {
     # v2 parity with v1 get_user_providers: emit Ollama entries on hosts where
@@ -501,6 +507,28 @@ sub get_available_models {
         };
     };
     }
+
+# Minimal static list used as the cheap default catalog, built on app startup
+# and ordinary page requests without probing Ollama or any external provider.
+# It covers the common free/cheap defaults so chat has something usable until
+# an explicit refresh pulls the live list.
+sub _default_free_catalog {
+    my ($self, $c) = @_;
+    return (
+        { name => 'google/gemma-4-31b-it:free', provider => 'openrouter',
+          label => 'OpenRouter: google/gemma-4-31b-it:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'google/gemma-4-26b-a4b-it:free', provider => 'openrouter',
+          label => 'OpenRouter: google/gemma-4-26b-a4b-it:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'nvidia/nemotron-3-nano-30b-a3b:free', provider => 'openrouter',
+          label => 'OpenRouter: nvidia/nemotron-3-nano-30b-a3b:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'ollama_unreachable', provider => 'ollama',
+          label => 'Ollama (refresh to see local models)', local => 1,
+          unreachable => 1, disabled => 1 },
+    );
+}
 
     # --- External (x.AI / OpenRouter) ---
     # Driven by key *resolution*, not by the presence of a UserApiKeys row.
