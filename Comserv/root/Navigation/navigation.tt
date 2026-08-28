@@ -42,6 +42,15 @@
         [% IF user_roles.grep('admin').size || cached_nav.admin_menu.defined %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
+
+        <!-- DB user indicator (admin-only, inline with the nav) -->
+        [% IF user_roles.grep('admin').size %]
+        <li class="horizontal-dropdown nav-db-user" title="Active database connection user">
+            <span class="nav-db-user__label">DB:</span>
+            <span class="nav-db-user__name">[% active_db_user || 'unknown' | html %]</span>
+            <span class="nav-db-user__src">[% active_db_auth_source | html %]</span>
+        </li>
+        [% END %]
         
         <!-- Planning Menu (logged-in users with planning access only) -->
         [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
