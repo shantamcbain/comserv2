@@ -40,7 +40,7 @@
             ? site_favicon
             : '/favicon/site/' _ site_name_enc -%]
     [% IF doc_favicon %]
-    [%# Documentation branch marker: book icon on doc pages #]
+    [%# Documentation branch marker: book icon on doc pages %]
     <link rel="icon" type="image/svg+xml" href="[% doc_favicon %]">
     [% IF req_port %]
     [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
