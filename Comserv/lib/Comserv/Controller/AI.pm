@@ -253,21 +253,23 @@ sub index :Path :Args(0) {
         push @_catalog, { value => "ollama|$name", label => $name, provider => 'ollama', local => 1, free => 0 };
     }
     # Live external models (Grok/xAI, OpenRouter, ...) — same dynamic source the
-    # chat dropdown uses. De-dupe by value, then role-filter so a guest sees
-    # only the free/open tier (never the full admin list).
-    my $live = try { $c->model('AI2::Router')->get_available_models($c) } catch { undef };
+    # chat dropdown uses. Refresh the full live catalog once per session when the
+    # AI page is opened, then de-dupe by value. No Ollama probe on ordinary pages.
+    my $live = try {
+        Comserv::Util::ModelCatalog->refresh($c, once_per_session => 1);
+    } catch { undef };
     if ($live && ref($live) eq 'ARRAY') {
         for my $m (@$live) {
             next unless $m && ref($m) eq 'HASH';
-            my $prov = $m->{provider} // '';
-            next if $prov eq 'ollama';
             next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
-            my $name = $m->{name} // $m->{id} // '';
-            next unless $name;
+            my $value = $m->{value} // '';
+            next unless $value;
+            # Skip Ollama entries already added from installed_models above.
+            next if ($m->{provider} // '') eq 'ollama';
             push @_catalog, {
-                value             => "$prov|$name",
-                label             => $m->{label} // $name,
-                provider          => $prov,
+                value             => $value,
+                label             => $m->{label} // '',
+                provider          => $m->{provider} // '',
                 free              => $m->{free} ? 1 : 0,
                 local             => $m->{local} ? 1 : 0,
                 price_prompt      => $m->{price_prompt} // 0,
@@ -363,8 +365,11 @@ sub widget :Local :Args(0) {
     # dropdown while the main page was fine. Pass the values explicitly.
     # Pull from the shared single-source-of-truth util rather than the stash:
     # this action detaches with its own Template->new, and Root::auto's stash is
-    # not guaranteed to be populated on this path.
-    my $cat_arr  = Comserv::Util::ModelCatalog->catalog($c);
+    # not guaranteed to be populated on this path. Refresh the live catalog once
+    # per session when the widget popup is opened.
+    my $cat_arr  = try {
+        Comserv::Util::ModelCatalog->refresh($c, once_per_session => 1);
+    } catch { Comserv::Util::ModelCatalog->catalog($c) };
     my $cat_json = Comserv::Util::ModelCatalog->catalog_json($c);
     my $css_v    = $c->stash->{css_v} || time();
     my $cat_def  = Comserv::Util::ModelCatalog->default_for($c, page => 'chat');

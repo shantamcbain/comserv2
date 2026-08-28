@@ -98,11 +98,42 @@ sub _get_fresh_dbh {
         die "No connection found for database '$database'";
     }
 
-    # Use the highest-priority connection — one attempt, done
-    my $conn_name = $group_conns[0];
-    my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+    # DDL (CREATE/DROP/ALTER) must run as the admin DB user (comserv_admin), so it
+    # can CREATE/DROP tables. Prefer the env-provided admin credentials; fall back
+    # to the highest-priority connection's own credentials if admin is not set.
+    my $admin_user = eval { Comserv::Util::DatabaseCredentials->admin_user };
+    my $admin_pass = eval { Comserv::Util::DatabaseCredentials->admin_password };
+    my $want_admin = ($admin_user && $admin_pass);
+
+    my $dbh;
+    for my $conn_name (@group_conns) {
+        my $user = $want_admin ? $admin_user : $all_conns->{$conn_name}{config}{username};
+        my $pass = $want_admin ? $admin_pass : $all_conns->{$conn_name}{config}{password};
+
+        # Temporarily override the connection's credentials so get_connection uses
+        # the admin user, then restore (get_connection reads from $self->config).
+        my $saved_cfg = $all_conns->{$conn_name}{config};
+        my $orig_user = $saved_cfg->{username};
+        my $orig_pass = $saved_cfg->{password};
+        $saved_cfg->{username} = $user;
+        $saved_cfg->{password} = $pass;
+        $remote_db->config($all_conns);
+
+        $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+
+        # Restore original credentials immediately.
+        $saved_cfg->{username} = $orig_user;
+        $saved_cfg->{password} = $orig_pass;
+        $remote_db->config($all_conns);
+
+        if ($dbh) {
+            $c->stash->{schema_compare_ddl_user} = $user;
+            last;
+        }
+    }
+
     unless ($dbh) {
-        die "Failed to connect to database '$database' via '$conn_name': $@";
+        die "Failed to connect to database '$database' for DDL via admin user '$admin_user': $@";
     }
 
     return $dbh;
