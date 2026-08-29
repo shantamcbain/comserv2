@@ -34,6 +34,7 @@ talk to OpenRouter must strip the "provider|" prefix first.
 # Process-level cache: built once, reused by every request/surface.
 our $CACHE_JSON;
 our $CACHE_ARR;
+our $CACHE_RAW;       # raw Router catalog (array of hashes with name/provider) for grouping
 our $CACHE_AT = 0;
 our $TTL      = 600;   # seconds; providers change rarely
 our $CACHE_GEN = 5;    # bump when catalog shape/providers/guest-default change
@@ -421,10 +422,10 @@ sub _price_tier {
 }
 
 sub _build {
-    my ($class, $c) = @_;
+    my ($class, $c, %opts) = @_;
 
     my $catalog = try {
-        $c->model('AI2')->get_available_models($c);
+        $c->model('AI2')->get_available_models($c, include_ollama => 0);
     } catch {
         my $err = $_;
         eval { $c->log->warn("ModelCatalog: build failed: $err") };
@@ -446,6 +447,67 @@ sub _build {
         $CACHE_AT = time() - $TTL + 30;   # retry sooner than a full TTL
     }
     return $CACHE_ARR;
+}
+
+=head2 refresh($c, %opts)
+
+Explicitly rebuild the catalog with the live provider lists (Ollama + external).
+Called by AI surfaces when the user opens chat, the AI editor, or an admin
+explicitly triggers a refresh. The cache is process-level, so this helps every
+subsequent request on this worker.
+
+If opts{once_per_session} is true, a flag is stored in the session to avoid
+refreshing more than once per user session.
+
+=cut
+
+sub refresh {
+    my ($class, $c, %opts) = @_;
+
+    if ($opts{once_per_session}) {
+        my $sess_key = '_ai_catalog_refreshed_v' . $CACHE_GEN;
+        return $CACHE_ARR if $c->session && $c->session->{$sess_key};
+    }
+
+    my $catalog = try {
+        $c->model('AI2')->get_available_models($c, include_ollama => 1);
+    } catch {
+        my $err = $_;
+        eval { $c->log->warn("ModelCatalog: refresh failed: $err") };
+        undef;
+    };
+
+    if ($catalog && ref($catalog) eq 'ARRAY') {
+        $CACHE_RAW = $catalog;   # keep raw Router shape for grouping endpoints
+        my $flat = $class->_flatten($catalog);
+        if (@$flat) {
+            $CACHE_ARR  = $flat;
+            $CACHE_JSON = try { JSON->new->utf8->canonical->encode($flat) } catch { '[]' };
+        }
+        $CACHE_AT = time();
+        $CACHE_GEN_LOADED = $CACHE_GEN;
+    }
+
+    if ($opts{once_per_session}) {
+        my $sess_key = '_ai_catalog_refreshed_v' . $CACHE_GEN;
+        $c->session->{$sess_key} = time() if $c->session;
+    }
+
+    return $CACHE_ARR;
+}
+
+=head2 raw_catalog
+
+Returns the most recently fetched raw Router catalog (array of hashes with
+name/provider/local etc.) as used by /ai2/providers for grouping. Empty if no
+refresh has run yet.
+
+=cut
+
+sub raw_catalog {
+    my ($class, $c) = @_;
+    $class->refresh($c, once_per_session => 1) unless $CACHE_RAW;
+    return $CACHE_RAW || [];
 }
 
 1;

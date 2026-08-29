@@ -1196,6 +1196,17 @@ sub auto :Private {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
             "CRITICAL DEBUG: About to set server_ip='$display_ip' into stash");
         $c->stash->{server_ip} = $display_ip;
+
+        # ── ACTIVE DB USER (for the on-page admin banner) ──────────────────
+        # Show which MariaDB/MySQL user the app is actually connected as.
+        # DBEncy::COMPONENT resolves this at startup; surface it for admins.
+        my $db_user_info = eval { $c->model('DBEncy')->get_connection_info() } || {};
+        my $active_db_user = $db_user_info->{current_username} || 'unknown';
+        my $active_db_auth = $db_user_info->{startup_info}{auth_source} || 'unknown';
+        $c->stash->{active_db_user}      = $active_db_user;
+        $c->stash->{active_db_auth_source} = $active_db_auth;
+        $c->stash->{active_db_host}      = $db_user_info->{startup_info}{host} || '';
+        $c->stash->{active_db_name}      = $db_user_info->{startup_info}{database} || '';
         
         # Verify stash was actually set
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
@@ -1208,14 +1219,15 @@ sub auto :Private {
 
         # ── CANONICAL AI MODEL CATALOG ────────────────────────────────────
         # SINGLE SOURCE OF TRUTH: Comserv::Util::ModelCatalog owns the list for
-        # EVERY AI surface (floating widget, /ai/widget popup, /ai, /ai2, editor,
-        # git dashboard). It builds once per process from the v2 Router — the
-        # same source /ai2/providers uses — and caches with a TTL, so this adds
-        # no per-request provider round-trip. Stash both shapes: the decoded
-        # array for server-side .tt rendering (ai/model_select.tt, the reliable
-        # path) and the JSON string for window.ComservConfig.models.
-        $c->stash->{ai_model_catalog}      = Comserv::Util::ModelCatalog->catalog($c);
-        $c->stash->{ai_model_catalog_json} = Comserv::Util::ModelCatalog->catalog_json($c);
+        # EVERY AI surface. Ordinary page loads use the cheap default cache
+        # (built without probing Ollama). AI surfaces explicitly refresh once per
+        # session when opened, so Ollama is only probed when the user asks for it.
+        # Stash both shapes only when a controller has pre-populated them; the
+        # default is empty so js_load.tt falls back to a lazy /ai2/providers fetch.
+        unless (defined $c->stash->{ai_model_catalog}) {
+            $c->stash->{ai_model_catalog}      = [];
+            $c->stash->{ai_model_catalog_json} = '[]';
+        }
 
         # Role + page context used by the .tt to SORT/order the dropdown.
         my $roles = $c->session->{roles} || [];
