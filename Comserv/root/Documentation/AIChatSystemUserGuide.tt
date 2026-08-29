@@ -290,16 +290,17 @@
 <h3>Ollama vs SuperGrok vs xAI vs OpenRouter</h3>
 <ul>
     <li><strong>Ollama</strong> — Runs locally on your own server. Private, no data leaves your network. Slower on CPU; faster with GPU. Has a long timeout for cold starts.</li>
-    <li><strong>SuperGrok (prepaid)</strong> — Same Grok models (grok-4.6 first) billed to the SuperGrok / X Premium+ subscription. A different provider group than xAI. Admin, developer, and editor only. Pick this group to spend the prepaid token. After send, the status line should stay SuperGrok (prepaid), not flip to Grok (xAI).</li>
-    <li><strong>xAI (Grok)</strong> — Pay-per-token cloud key. Same model names can appear here. Do not confuse this group with SuperGrok.</li>
-    <li><strong>OpenRouter</strong> — Cloud catalog (free and paid). Guests see free models only.</li>
+    <li><strong>SuperGrok (prepaid)</strong> — Same Grok models (grok-4.6 first) billed to the SuperGrok / X Premium+ weekly credits. A different provider than xAI pay-per-token and than OpenRouter. Admin, developer, and editor only. The app uses SuperGrok first. Grok slugs are not sent to OpenRouter (that would bill OpenRouter). After SuperGrok answers, the status line should stay SuperGrok, not flip to Grok (xAI).</li>
+    <li><strong>xAI (Grok)</strong> — Pay-per-token cloud key. Same model names can appear here. Do not pick this until SuperGrok weekly credits are used. Do not confuse this group with SuperGrok.</li>
+    <li><strong>OpenRouter</strong> — Cloud catalog. Paid OpenRouter is not the Grok hop. If SuperGrok fails, chat falls back to a cheaper OpenRouter <code>:free</code> model, then Ollama. Guests see free models only.</li>
 </ul>
 
 <h3>Manual Override</h3>
 <p>You can override the automatic selection at any time using the provider/model dropdown in the chat header. Select <em>SuperGrok (prepaid)</em> for the subscription, <em>xAI (Grok)</em> for a pay-per-token key, or a specific Ollama / OpenRouter model.</p>
 
 <h3>Timeout and Retry</h3>
-<p>If Ollama takes too long (over 11 minutes), the widget shows a <strong>Retry Ollama</strong> button and a <strong>Switch to Grok</strong> button. Clicking "Switch to Grok" immediately resends your question to the cloud model. A <strong>✕ Cancel</strong> button is also available during any request to abort it immediately.</p>
+<p>If Ollama takes too long (over 11 minutes), the widget shows a <strong>Retry Ollama</strong> button and a <strong>Switch to Grok</strong> button. Clicking "Switch to Grok" should land on SuperGrok (prepaid), not OpenRouter Grok. A <strong>✕ Cancel</strong> button is also available during any request to abort it immediately.</p>
+<p>If OpenRouter returns 502/503/504, the server retries the same model twice (1s then 2s), then falls through to a free model or Ollama. You should see a short “model temporarily unavailable” line, not the raw provider error.</p>
 </div>
 
 <hr>
