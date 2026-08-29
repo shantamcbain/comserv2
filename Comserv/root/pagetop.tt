@@ -202,7 +202,8 @@ header h1 {
         Server: <strong>[% system_identifier || app_workflow %]</strong> | Workflow: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
         [% IF app_version %]Build: <strong title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]" style="cursor:help;">[% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC</strong> | Git: <strong>[% app_version.branch %]</strong>@<code style="font-size:0.85em;">[% app_version.commit %]</code> | [% END %]
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
-        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
+        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span> |
+        DB User: <strong>[% active_db_user || 'unknown' | html %]</strong>
         [% IF c.session.debug_mode == 1 %] | [% END %]
         </span>
         [% IF is_admin %]

@@ -5,6 +5,8 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Model::AccountingDB;
+use Comserv::Model::CoaTemplate;
+use Comserv::Util::Accounting::CoaAiGenerate;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -124,12 +126,56 @@ sub _status {
     eval { $st{coa_count} = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0 })->count };
     eval { $st{gl_count}  = $schema->resultset('Accounting::GlEntry')->search({ sitename => $sitename })->count };
 
+    # PG chart count (clone-target). Maria coa_count stays the live /Accounting/coa number.
+    $st{pg_coa_count}      = 0;
+    $st{chart_seeded}      = 0;
+    $st{provision_status}  = $st{provisioned} ? 'provisioned'
+                           : ($st{reg} && (($st{reg}->status // '') =~ /provisioning/) ? 'provisioning'
+                           : ($st{reg} ? 'error' : 'no_provision'));
+    $st{provision_error}   = '';
+    if ($st{reg} && $st{provision_status} eq 'error') {
+        $st{provision_error} = eval { $st{reg}->last_error } || 'Provisioning failed';
+    }
+
+    if ($st{db_ok}) {
+        eval {
+            my $acct = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+            if ($acct) {
+                $st{pg_coa_count} = $acct->resultset('Chart')->count;
+                $st{chart_seeded} = $st{pg_coa_count} > 0 ? 1 : 0;
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_status',
+                "PG chart count failed for '$sitename': $@");
+        }
+    }
+
+    my $coa_model = Comserv::Model::CoaTemplate->new;
+    my $site_map  = eval { $coa_model->site_map($c) } || {};
+    my $user_archetype = $site_map->{sites}{$sitename}{base_archetype} // 'sole_proprietor';
+    my $archetypes = eval { $coa_model->list_archetypes($c) } || [];
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_status',
+            "list_archetypes failed: $@");
+        $archetypes = [];
+    }
+    $archetypes = [] unless ref $archetypes eq 'ARRAY';
+    # list_archetypes returns an arrayref. Putting it in @list flattens to one
+    # nested ref and FOREACH renders a blank <select>.
+    $st{chosen_base}       = $user_archetype;
+    $st{legal_form}        = $site_map->{sites}{$sitename}{legal_form} // 'sole_owner';
+    $st{archetypes}        = $archetypes;
+    $st{selected_overlays} = eval { $coa_model->overlays_for_site($c, $sitename) } || [];
+    $st{chosen_overlays}   = $st{selected_overlays};
+    $st{subscribers}       = $st{is_csc_admin} ? (eval { $coa_model->accounting_subscribers($c) } || []) : [];
+
     # Wizard step: 1 module, 2 provision, 3 chart, 4 import/review, 5 done
     my $step = 1;
     $step = 2 if $st{module_enabled};
     $step = 3 if $st{provisioned};
-    $step = 4 if $st{provisioned} && $st{coa_count} > 0;
-    $step = 5 if $st{provisioned} && $st{coa_count} > 0 && $st{gl_count} > 0;
+    $step = 4 if $st{provisioned} && ($st{pg_coa_count} > 0 || $st{coa_count} > 0);
+    $step = 5 if $st{provisioned} && ($st{pg_coa_count} > 0 || $st{coa_count} > 0) && $st{gl_count} > 0;
     $st{step} = $step;
 
     return \%st;
@@ -141,6 +187,15 @@ sub _status {
 
 sub index :Path('') :Args(0) {
     my ($self, $c) = @_;
+
+    # Live :4001 404'd /Accounting/setup/ai_generate (new Path not in the worker).
+    # ?ai=1 uses this already-registered action.
+    if ($c->req->body_parameters->{go_ai_commit}) {
+        return $self->ai_commit($c);
+    }
+    if ($c->req->query_parameters->{ai} || $c->req->body_parameters->{go_ai}) {
+        return $self->ai_generate($c);
+    }
 
     my $sitename = $self->_sitename($c);
     my $status   = $self->_status($c, $sitename);
@@ -194,6 +249,151 @@ sub provision :Path('provision') :Args(0) {
         $c->flash->{error_msg} = $msg;
     }
 
+    $c->response->redirect($c->uri_for('/Accounting/setup'));
+}
+
+# -------------------------------------------------------------------------
+# GET/POST /Accounting/setup/ai_generate — draft chart; human review first
+# -------------------------------------------------------------------------
+
+sub ai_generate :Path('ai_generate') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $status   = $self->_status($c, $sitename);
+
+    unless ($status->{module_enabled}) {
+        $c->flash->{error_msg} = 'Add the Accounting add-on before generating a chart.';
+        $c->response->redirect($c->uri_for('/membership/addons'));
+        return;
+    }
+    unless ($status->{provisioned} && $status->{db_ok}) {
+        $c->flash->{error_msg} = 'Provision the accounting database (step 2) before the AI chart wizard.';
+        $c->response->redirect($c->uri_for('/Accounting/setup'));
+        return;
+    }
+
+    my $gen = Comserv::Util::Accounting::CoaAiGenerate->new;
+    my $maria = $gen->maria_rows($c, $sitename);
+    my $p = $c->req->body_parameters;
+    my $module_overlays = eval { $gen->coa->overlays_for_site($c, $sitename) } || [];
+
+    if ($c->req->method eq 'POST') {
+        my $base = $p->{base_archetype} || $status->{chosen_base} || 'sole_proprietor';
+        my @overlays = grep { $_ } (ref $p->{overlays} eq 'ARRAY' ? @{$p->{overlays}} : ($p->{overlays} // ()));
+        my $use_maria = $p->{use_maria} ? 1 : 0;
+        my $draft = $gen->generate($c,
+            sitename     => $sitename,
+            base_id      => $base,
+            overlays     => \@overlays,
+            use_maria    => $use_maria,
+            maria        => $maria,
+            jurisdiction => $status->{reg} ? $status->{reg}->jurisdiction : ($p->{jurisdiction} || ''),
+            currency     => $status->{reg} ? $status->{reg}->currency     : ($p->{currency} || ''),
+            location     => $p->{location} || '',
+            notes        => $p->{notes} || '',
+            model        => $p->{model},
+        );
+        unless ($draft->{success}) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ai_generate',
+                $draft->{error} || 'generate failed');
+            $c->flash->{error_msg} = $draft->{error} || 'Could not draft a chart.';
+            $c->response->redirect($c->uri_for('/Accounting/setup/ai_generate'));
+            return;
+        }
+        $c->session->{coa_ai_draft} = {
+            sitename     => $sitename,
+            base         => $base,
+            overlays     => \@overlays,
+            rows         => $draft->{rows},
+            notes        => $draft->{notes},
+            source       => $draft->{source},
+            provider     => $draft->{provider},
+        };
+        $c->stash(
+            %$status,
+            draft         => $c->session->{coa_ai_draft},
+            maria_count   => scalar @$maria,
+            selected_overlays => \@overlays,
+            template      => 'Accounting/setup/ai_generate.tt',
+        );
+        return;
+    }
+
+    my $draft = $c->session->{coa_ai_draft};
+    $draft = undef unless $draft && ($draft->{sitename} // '') eq $sitename;
+
+    $c->stash(
+        %$status,
+        maria_count        => scalar @$maria,
+        use_maria          => @$maria ? 1 : 0,
+        selected_overlays  => $module_overlays,
+        draft              => $draft,
+        template           => 'Accounting/setup/ai_generate.tt',
+    );
+}
+
+sub ai_commit :Path('ai_commit') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/Accounting/setup/ai_generate'));
+        return;
+    }
+    unless ($c->req->body_parameters->{confirm}) {
+        $c->flash->{error_msg} = 'Confirm before seeding the reviewed chart.';
+        $c->response->redirect($c->uri_for('/Accounting/setup/ai_generate'));
+        return;
+    }
+
+    my $draft = $c->session->{coa_ai_draft};
+    unless ($draft && ($draft->{sitename} // '') eq $sitename && ref $draft->{rows} eq 'ARRAY') {
+        $c->flash->{error_msg} = 'No reviewed draft in this session. Generate again.';
+        $c->response->redirect($c->uri_for('/Accounting/setup/ai_generate'));
+        return;
+    }
+
+    my @wanted = grep { $_ } (
+        ref $c->req->body_parameters->{accno} eq 'ARRAY'
+            ? @{ $c->req->body_parameters->{accno} }
+            : ($c->req->body_parameters->{accno} // ())
+    );
+    my %pick = map { $_ => 1 } @wanted;
+    my @rows;
+    for my $r (@{ $draft->{rows} }) {
+        my %copy = %$r;
+        if ($copy{in_use}) {
+            $copy{action} = ($copy{action} && $copy{action} eq 'change') ? 'change' : 'keep';
+        }
+        elsif ($pick{ $copy{accno} }) {
+            $copy{action} = 'keep' if ($copy{action} || '') eq 'drop';
+        }
+        else {
+            $copy{action} = 'drop';
+        }
+        push @rows, \%copy;
+    }
+    unless (grep { ($_->{action} || '') ne 'drop' } @rows) {
+        $c->flash->{error_msg} = 'Select at least one account to seed.';
+        $c->response->redirect($c->uri_for('/Accounting/setup/ai_generate'));
+        return;
+    }
+
+    my $gen = Comserv::Util::Accounting::CoaAiGenerate->new;
+    my ($added, $err) = $gen->commit_rows($c, $sitename, \@rows, {
+        base        => $draft->{base},
+        overlays    => $draft->{overlays},
+    });
+    if ($err) {
+        $c->flash->{error_msg} = $err;
+        $c->response->redirect($c->uri_for('/Accounting/setup/ai_generate'));
+        return;
+    }
+    delete $c->session->{coa_ai_draft};
+    $c->flash->{success_msg} =
+        "Seeded $added reviewed account(s) into the PostgreSQL chart for '$sitename'. "
+      . "Unused dropped accounts will not be reinserted by Import. "
+      . "Live /Accounting/coa still reads Maria until cutover.";
     $c->response->redirect($c->uri_for('/Accounting/setup'));
 }
 

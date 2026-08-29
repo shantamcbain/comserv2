@@ -75,43 +75,34 @@ sub providers :Local :Args(0) {
     # Ollama for guests; +cheap/mid for members). Admin sees everything.
     # The shared ModelCatalog is the single source of truth for the tier
     # filter, so this endpoint can never leak the full list to a guest.
-    # The Router (Model::AI2::Router::get_available_models) already applies
-    # the role filter at line 587 — guests get free OpenRouter + local Ollama,
-    # members get +cheap/mid, admins get everything. Do NOT re-filter here:
-    # filter_catalog_for_role would double-filter and, worse, prime() the
-    # ModelCatalog cache with the filtered list, breaking /api/focus/models
-    # for admins who then only see the guest set. Single source of truth = Router.
-    my $catalog = try { $c->model('AI2')->get_available_models($c) } || [];
+    # Refresh the live catalog once per session when this endpoint is hit;
+    # ordinary page loads use the cheap default cache.
+    my $catalog = try {
+        Comserv::Util::ModelCatalog->refresh($c, once_per_session => 1);
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ai2_providers', "Live catalog refresh failed: $_");
+        Comserv::Util::ModelCatalog->catalog($c);
+    };
+    $catalog ||= [];
 
-    # Group v2 catalog (each: name, provider, label, local) into providers[].
+    # Group flattened catalog (each: value, label, provider, local, free, ...)
+    # into providers[]. The JS consumes either value (provider|model) or id.
     my %by_service;
     for my $m (@$catalog) {
-        # Defensive: the catalog is built from upstream provider JSON (Ollama
-        # /api/tags, OpenRouter /v1/models). If a provider returns a malformed
-        # entry (e.g. a bare string instead of an object), a single bad element
-        # must NOT 500 the entire /ai2/providers endpoint for every user. Skip
-        # it and log the offending element so the source can be fixed.
-        if (ref $m ne 'HASH') {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                'ai2_providers', "Skipping non-hash catalog element: "
-                . (defined $m ? (ref $m ? ref($m) : "'$m'") : 'undef'));
-            next;
-        }
+        next unless $m && ref($m) eq 'HASH';
+        next if $m->{disabled} || $m->{needs_key} || $m->{unreachable};
         my $svc = $m->{provider} || 'unknown';
+        my $id  = $m->{value}    || $m->{name} || '';
+        next unless length $id;
         $by_service{$svc} ||= { service => $svc, models => [], name => ucfirst($svc) };
-        # v2 Router carries { name, provider, label, local, price_prompt,
-        # price_completion, pricing } for external models. Pass the pricing
-        # through so JS surfaces (and ModelCatalog->prime, called below) can
-        # show real per-token cost — otherwise the dropdown shows provider but
-        # a blank fee (AIMPS-P1/#253 regression).
         push @{ $by_service{$svc}{models} }, {
-            id              => $m->{name},
-            label           => $m->{label},
+            id              => $id,
+            label           => $m->{label} // $id,
             unreachable     => $m->{unreachable} ? 1 : 0,
             local           => $m->{local}     ? 1 : 0,
             price_prompt    => $m->{price_prompt}     // 0,
             price_completion=> $m->{price_completion} // 0,
-            pricing         => $m->{pricing}         || {},
         };
     }
 
@@ -138,7 +129,10 @@ sub providers :Local :Args(0) {
     # other surface (Root auto -> stash -> ai/model_select.tt) reuses it instead
     # of hitting the provider APIs again. Single source of truth lives in
     # Comserv::Util::ModelCatalog.
-    eval { Comserv::Util::ModelCatalog->prime($c, $catalog); };
+    # NOTE: ModelCatalog->refresh() already keeps the cache current; prime() is
+    # only useful when we have the RAW Router shape. The flattened catalog
+    # returned by refresh() is the wrong shape for prime(), so skip it here.
+    # eval { Comserv::Util::ModelCatalog->prime($c, $catalog); };
 
     $c->res->content_type('application/json');
     $c->res->body(encode_json({

@@ -1,0 +1,28 @@
+{
+  "id": "sole_proprietor",
+  "label": "Sole Proprietor / Personal",
+  "description": "T2125 filers (GIFI does NOT apply to sole proprietors — RC4088 covers corporations and partnerships only). Accounts map to T2125 business-use-of-home and professional/IT service lines. NOTE: T2125 line-item mapping is still an open research item; gifi_accno is left null pending that research.",
+  "gifi_basis": "None — sole proprietors file T2125 with the personal T1 return. GIFI column intentionally unpopulated.",
+  "accounts": [
+    { "accno": "1000", "description": "Cash / Chequing Account",            "charttype": "A", "category": "A", "link": "", "gifi_accno": null },
+    { "accno": "1100", "description": "Accounts Receivable",                "charttype": "A", "category": "A", "link": "AR", "gifi_accno": null },
+    { "accno": "1310", "description": "GST/HST Receivable (ITCs)",          "charttype": "A", "category": "A", "link": "", "gifi_accno": null },
+    { "accno": "2000", "description": "Accounts Payable",                   "charttype": "A", "category": "L", "link": "AP", "gifi_accno": null },
+    { "accno": "2100", "description": "GST/HST Payable",                    "charttype": "A", "category": "L", "link": "AR_tax AP_tax", "gifi_accno": null },
+    { "accno": "3000", "description": "Owner's Equity",                     "charttype": "A", "category": "Q", "link": "", "gifi_accno": null },
+    { "accno": "3100", "description": "Owner's Drawings",                   "charttype": "A", "category": "Q", "link": "", "gifi_accno": null, "contra": true },
+    { "accno": "4200", "description": "Professional / Consulting Fees Earned", "charttype": "A", "category": "I", "link": "AR_amount IC_sale", "gifi_accno": null },
+    { "accno": "4210", "description": "Hobby / Other Sales Revenue",        "charttype": "A", "category": "I", "link": "", "gifi_accno": null },
+    { "accno": "6100", "description": "Salaries, Wages & Benefits",         "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6600", "description": "Advertising & Promotion",            "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6610", "description": "Licences, Dues & Subscriptions",     "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6620", "description": "Supplies",                           "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6630", "description": "Business-Use-of-Home Expenses",      "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6640", "description": "Telephone & Utilities",              "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6650", "description": "Repairs & Maintenance",              "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6660", "description": "Capital Cost Allowance",             "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6710", "description": "Bank Charges & Merchant Fees",       "charttype": "A", "category": "E", "link": "", "gifi_accno": null },
+    { "accno": "6900", "description": "Other Expenses",                     "charttype": "A", "category": "E", "link": "", "gifi_accno": null }
+  ],
+  "headings": []
+}

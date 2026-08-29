@@ -35,17 +35,17 @@
                 — <a href="[% c.uri_for('/todo') %]?project_id=272" class="doc-link">todos</a>
                 — <a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>
                 — <a href="[% c.uri_for('/Inventory/bom/list') %]" class="doc-link">/Inventory/bom/list</a>.</p>
-                <p class="doc-body"><strong>Now:</strong> first prints are on the queue. Hardware is listed in
-                the worksheet but not proven in inventory. Two masters (base + add-on) are the real BOM,
-                not one 3MF file.</p>
+                <p class="doc-body"><strong>Now:</strong> items and hardware SKUs exist on sitename=3d.
+                BOM for base <code>INT-HDRY-001-P36787</code> is 37 lines (GET
+                <code>/api/inventory/bom?sitename=3d&amp;parent_sku=INT-HDRY-001-P36787</code>).
+                All hardware on-hand is 0. One make-or-buy process (shop can be the customer; no AR for internal — cost GL only).</p>
                 <p class="doc-body"><strong>Blocked by:</strong>
                 <a href="[% c.uri_for('/todo/details') %]?record_id=2310" class="doc-link">#2310 PO-R1</a>
-                (multi-supplier purchase order code, Inventory/Accounting) —
-                hardware buy list is
-                <a href="[% c.uri_for('/todo/details') %]?record_id=2309" class="doc-link">#2309</a>.</p>
-                <p class="doc-body"><strong>Next:</strong> create BASE and MOD inventory items, attach every
-                printed + hardware line from the worksheets, then issue the PO. Do not queue a job named
-                “Module 1.3mf”.</p>
+                (purchase-order + multi-supplier). Until a PO posts, buy on the vendor site then receive at
+                <a href="[% c.uri_for('/Inventory/invoice/new') %]" class="doc-link">/Inventory/invoice/new</a>.</p>
+                <p class="doc-body"><strong>Next:</strong> #2310 — need list from BOM shortfall, pick supplier, PO then receive.
+                Fix printed parts still stored as <code>item_origin=purchased</code> or they will be treated as buy, not print.
+                Do not queue a job named “Module 1.3mf”.</p>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
