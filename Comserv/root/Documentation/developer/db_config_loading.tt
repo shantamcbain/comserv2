@@ -237,3 +237,13 @@ If you encounter issues with the configuration file loading:
 3. **Check JSON syntax**: Ensure the JSON file is properly formatted.
 4. **Look for warning messages**: The application will output a warning if it has to fall back to using FindBin.
 5. **Check error messages**: The enhanced error handling will provide detailed information about what went wrong.
+
+## Role-Based Runtime User (2026-08-28)
+
+The active connection is now chosen by **priority** from the `~/.comserv/secrets/dbi/*.json`
+(K8s-Secrets) files loaded first by `Comserv::Util::RemoteDB`. For the `ency` database,
+`db_production_mysql.json` declares three prioritized entries: `comserv_app` (priority 1, limited DML,
+preferred normal user), `comserv_admin` (priority 2, full DDL for SchemaComparison), and `shanta_forager`
+(priority 3, safe fallback). `DBEncy` logs an `error`-level warning when `comserv_app` is not active.
+Only `comserv_app` belongs in the deployable secret files; full-access/customer users stay DB-backed.
+See `system/database_configuration.tt` for the authoritative table.
