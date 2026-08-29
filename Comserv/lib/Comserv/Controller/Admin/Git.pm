@@ -599,9 +599,21 @@ PROMPT
     };
 
     unless ($resp && $resp->{success} && length($resp->{response} // '')) {
+        my $err = ($resp && $resp->{error}) ? $resp->{error} : 'AI returned no message';
+        # UI surfaces this verbatim — never dump full OAuth JSON / JWT bodies.
+        $err =~ s/\s+/ /g;
+        if ($err =~ /unauthenticated|bad-credentials|token could not be validated/i
+            || ($resp && $resp->{auth_failed})) {
+            $err = 'SuperGrok/xAI login expired or invalid — re-auth Hermes (xai-oauth), then run script/sync_supergrok_token.pl';
+        }
+        elsif (length($err) > 200) {
+            $err = substr($err, 0, 200) . '…';
+        }
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'suggest_commit_message', "AI draft failed: $err");
         $c->response->body(encode_json({
             success => 0,
-            error   => ($resp && $resp->{error}) ? $resp->{error} : 'AI returned no message',
+            error   => $err,
         }));
         return;
     }
