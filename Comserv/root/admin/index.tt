@@ -13,7 +13,7 @@
         [% IF is_csc %]<a href="#section-docker"><i class="fas fa-docker"></i> Docker</a>[% END %]
         [% IF is_csc %]<a href="#section-software"><i class="fas fa-cogs"></i> Software</a>[% END %]
         <a href="#section-helpdesk"><i class="fas fa-life-ring"></i> HelpDesk</a>
-        [% IF has_accounting %]<a href="#section-accounting"><i class="fas fa-book"></i> Accounting &amp; Inventory</a>[% END %]
+        <a href="#section-accounting"><i class="fas fa-book"></i> Accounting</a>
         [% IF has_accounting %]<a href="#section-customers"><i class="fas fa-users"></i> Customers</a>[% END %]
         <a href="#section-membership"><i class="fas fa-id-card"></i> Membership</a>
         <a href="#section-shop"><i class="fas fa-shopping-bag"></i> Shop</a>
@@ -167,13 +167,13 @@
         [% END %]
     
 
-        [% IF has_accounting %]
         <div id="section-accounting" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-book"></i> Accounting &amp; Inventory</h3>
+                <h3><i class="fas fa-book"></i> Accounting</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
+                    [% IF has_accounting %]
                     <a href="[% c.uri_for('/Accounting') %]" class="admin-link">
                         <i class="fas fa-book"></i>
                         <span>Accounting Dashboard</span>
@@ -226,10 +226,20 @@
                         <i class="fas fa-print"></i>
                         <span>Price List</span>
                     </a>
+                    [% ELSE %]
+                    <a href="[% c.uri_for('/membership/addons') %]" class="admin-link">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add Accounting package</span>
+                    </a>
+                    [% END %]
                 </div>
+                [% UNLESS has_accounting %]
+                <p class="doc-muted">This SiteName has not opted in. Add the Accounting add-on on the owner account, then the setup wizard can create the database.</p>
+                [% END %]
             </div>
         </div>
 
+        [% IF has_accounting %]
         <div id="section-customers" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-users"></i> Customers</h3>
@@ -379,6 +389,10 @@
                         <i class="fas fa-server"></i>
                         <span>Database Servers</span>
                     </a>
+                    <a href="[% c.uri_for('/remotedb') %]" class="admin-link">
+                        <i class="fas fa-key"></i>
+                        <span>Change DB password</span>
+                    </a>
                     <a href="[% c.uri_for('/admin/schema_compare') %]" class="admin-link">
                         <i class="fas fa-code-branch"></i>
                         <span>Schema Compare &amp; Migration</span>
@@ -404,6 +418,64 @@
                         <span>Migration Server Setup Guide</span>
                     </a>
                 </div>
+
+                [% # ── DB-user switcher (inside the Database card) ── %]
+                <div class="admin-db-user-switcher">
+                    <h4><i class="fas fa-user-cog"></i> Connected DB user</h4>
+                    <p class="db-user-current">
+                        <strong>Current:</strong> [% db_user_info.current_user | html %]
+                        [% IF db_user_info.auth_source %]<span class="db-user-meta">([% db_user_info.auth_source | html %])</span>[% END %]
+                        <span class="db-user-meta">on [% db_user_info.host | html %][% IF db_user_info.port %]:[% db_user_info.port | html %][% END %]/[% db_user_info.database | html %]</span>
+                    </p>
+                    <form method="POST" action="/api/db/switch_user" class="db-user-form" onsubmit="return dbUserSwitchSubmit(this);">
+                        <input type="hidden" name="return_to" value="[% c.req.uri | html %]">
+                        <div class="db-user-field">
+                            <label for="db_user_select">Switch to</label>
+                            <select id="db_user_select" name="user" required>
+                                [% FOREACH u IN db_user_info.known_users.sort %]
+                                <option value="[% u | html %]"[% IF u == db_user_info.current_user %] selected[% END %]>[% u | html %][% IF u == db_user_info.current_user %] (current)[% END %]</option>
+                                [% END %]
+                            </select>
+                        </div>
+                        <div class="db-user-actions">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-exchange-alt"></i> Switch user</button>
+                        </div>
+                        <div id="db-user-result" class="db-user-result" style="display:none;"></div>
+                    </form>
+                </div>
+
+                <script>
+                function dbUserSwitchSubmit(form) {
+                    var result = document.getElementById('db-user-result');
+                    result.style.display = 'none';
+                    result.className = 'db-user-result';
+                    result.textContent = 'Attempting switch…';
+                    result.style.display = 'block';
+
+                    var data = new FormData(form);
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', form.action, true);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.onload = function() {
+                        if (xhr.status === 200) {
+                            result.className = 'db-user-result success';
+                            result.textContent = 'Switched to ' + (data.get('user') || 'new user') + '. Reloading…';
+                            window.location.reload();
+                        } else {
+                            var resp = {};
+                            try { resp = JSON.parse(xhr.responseText); } catch(e){}
+                            result.className = 'db-user-result error';
+                            result.textContent = 'Switch failed: ' + (resp.error || xhr.statusText || 'unknown error');
+                        }
+                    };
+                    xhr.onerror = function() {
+                        result.className = 'db-user-result error';
+                        result.textContent = 'Switch failed: network error';
+                    };
+                    xhr.send(data);
+                    return false;
+                }
+                </script>
             </div>
         </div>
         [% END %]
