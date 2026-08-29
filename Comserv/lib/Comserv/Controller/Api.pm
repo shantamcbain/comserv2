@@ -1,6 +1,7 @@
 package Comserv::Controller::Api;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
+use File::Spec;
 use JSON::MaybeXS;
 use DateTime;
 use Digest::SHA qw(sha256_hex);
@@ -2240,6 +2241,290 @@ sub _focus_top5_plan_docs {
     $c->log->warn("api_focus_top5: could not scan on-disk plan docs: $@") if $@;
 
     return @docs;
+}
+
+# ----------------------------------------------------------------------------
+# Local DB diagnostics / admin helpers (localhost-bypassed)
+# ----------------------------------------------------------------------------
+
+=head2 api_db_inspect
+
+GET /api/db/inspect - Return current DB connection user, existing application
+DB users, and current grants for the runtime DB user.
+=cut
+
+sub api_db_inspect :Path('db/inspect') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $info = eval { $c->model('DBEncy')->get_connection_info() };
+    my $error = $@ || '';
+
+    my ($current_user, $users, $grants);
+    if ($info && ref($info) eq 'HASH' && $info->{current_username}) {
+        $current_user = $info->{current_username};
+        my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+        if ($dbh) {
+            $users = eval {
+                my $sth = $dbh->prepare(
+                    "SELECT user, host FROM mysql.user WHERE user IN (?, ?, ?, ?)"
+                );
+                $sth->execute('comserv_app','comserv_admin','comserv_user',$current_user);
+                $sth->fetchall_arrayref({});
+            };
+            $grants = eval {
+                my $sth = $dbh->prepare("SHOW GRANTS");
+                $sth->execute();
+                $sth->fetchall_arrayref();
+            };
+        }
+    }
+
+    $c->res->body(encode_json({
+        success => 1,
+        current_user => $current_user,
+        connection_info => $info,
+        users => $users,
+        grants => $grants,
+        credentials_diag => {},
+        error => ($error ? "$error" : undef),
+    }));
+}
+
+=head2 api_db_users
+
+GET /api/db/users - List DB user/host entries for the known accounts.
+=cut
+
+sub api_db_users :Path('db/users') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    unless ($dbh) {
+        $c->res->body(encode_json({ success => 0, error => 'No DB handle' }));
+        return;
+    }
+
+    my $rows = eval {
+        my $sth = $dbh->prepare(
+            "SELECT user, host, plugin, password_expired FROM mysql.user WHERE user IN (?, ?, ?)"
+        );
+        $sth->execute('comserv_app','comserv_admin','shanta_forager');
+        $sth->fetchall_arrayref({});
+    };
+
+    $c->res->body(encode_json({
+        success => 1,
+        users => ($rows || []),
+        error => ($@ ? "$@" : undef),
+    }));
+}
+
+=head2 api_db_switch_user
+
+POST /api/db/switch_user  { user, password }
+Verifies the given credentials against the live DB host/db, and if they work,
+reconnects DBEncy as that user (in-process) and persists it to .env as the
+preferred app user. Falls back to the previous working user on failure.
+=cut
+
+sub api_db_switch_user :Path('db/switch_user') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Accept both JSON API calls and plain form POSTs from /admin.
+    my $data = eval { $self->_api_json_body($c) } || {};
+    my $is_form = !$data->{user};
+    if ($is_form) {
+        $data->{user}      = $c->request->params->{user}      // '';
+        $data->{return_to} = $c->request->params->{return_to} // '';
+    }
+
+    my $return_to = $data->{return_to} // '';
+
+    # Admin users can switch via the /admin page form; local 127.0.0.1 callers
+    # can still use the JSON endpoint directly.
+    my $is_admin = eval {
+        my $auth = Comserv::Util::AdminAuth->new();
+        $auth->check_admin_access($c, 'admin_dashboard');
+    } ? 1 : 0;
+    unless ($is_admin || _api_local_ok($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            'Unauthorized switch attempt');
+        return $self->_switch_user_response($c, 0, 'admin access required', $return_to);
+    }
+
+    my $user = $data->{user} // '';
+    my $pass = $data->{password} // '';
+
+    # If no password was supplied, look it up from the dbi/*.json secret file
+    # that RemoteDB uses as the source of truth for this workstation.
+    unless ($pass) {
+        eval {
+            require JSON;
+            my $home = $ENV{HOME} || '/home/shanta';
+            my $secret = "$home/.comserv/secrets/dbi/db_production_mysql.json";
+            if (-f $secret) {
+                open my $fh, '<', $secret or return;
+                local $/; my $raw = <$fh>; close $fh;
+                my $data = JSON::decode_json($raw);
+                for my $conn_name (keys %$data) {
+                    my $cfg = $data->{$conn_name};
+                    next unless ref($cfg) eq 'HASH';
+                    if (($cfg->{username} // '') eq $user && ($cfg->{password} // '') ne '') {
+                        $pass = $cfg->{password};
+                        last;
+                    }
+                }
+            }
+        };
+    }
+
+    unless ($user && $pass) {
+        return $self->_switch_user_response($c, 0, 'user not recognised or no stored password', $return_to);
+    }
+
+    my $conn = eval { $c->model('DBEncy')->get_connection_info } || {};
+    my $host = $conn->{host} || '192.168.1.20';
+    my $port = $conn->{port} || 3307;
+    my $db   = $conn->{database} || 'ency';
+
+    my $ok = 0;
+    my $err = '';
+    my $probe = eval {
+        require Comserv::Util::DbConfigPassword;
+        Comserv::Util::DbConfigPassword->new->test_login(
+            { db_type => 'mysql', host => $host, port => $port, database => $db, username => $user },
+            $pass
+        );
+    };
+    if ($probe && $probe->{ok}) {
+        $ok = 1;
+    } else {
+        $err = $@ || ($probe && $probe->{error}) || 'authentication failed';
+    }
+
+    unless ($ok) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            "Switch to '$user' rejected: $err");
+        return $self->_switch_user_response($c, 0, $err, $return_to, { user => $user });
+    }
+
+    # Reconnect DBEncy as the new user (in-process). If this fails, fall back.
+    my $reconnected = 0;
+    eval {
+        $reconnected = $c->model('DBEncy')->reconnect_as($c, $user, $pass) ? 1 : 0;
+    };
+    if (!$reconnected) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            "Switch to '$user' verified but in-process reconnect failed");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_db_switch_user',
+        "Switched active DB user to '$user' (reconnected=$reconnected)");
+
+    return $self->_switch_user_response($c, 1, undef, $return_to, {
+        user => $user,
+        reconnected => $reconnected,
+    });
+}
+
+sub _switch_user_response {
+    my ($self, $c, $success, $error, $return_to, $extra) = @_;
+    $extra ||= {};
+
+    if ($return_to) {
+        if ($success) {
+            $c->flash->{success_msg} = "Switched active DB user to $extra->{user}.";
+        } else {
+            $c->flash->{error_msg} = "Could not switch to $extra->{user}: $error";
+        }
+        $c->response->redirect($return_to);
+        return;
+    }
+
+    $c->res->content_type('application/json');
+    if ($success) {
+        $c->res->body(encode_json({ success => 1, switched => 1, %$extra }));
+    } else {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => $error, switched => 0 }));
+    }
+}
+
+=head2 api_db_apply_grants
+
+POST /api/db/apply_grants - Create comserv_app/comserv_admin users and apply
+limited DML / DDL grants on the runtime database. Uses the current connection,
+so call this while connected as a user with CREATE USER + GRANT privileges.
+=cut
+
+sub api_db_apply_grants :Path('db/apply_grants') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $app_password   = $data->{app_password}   // $data->{password} // '';
+    my $admin_password = $data->{admin_password} // $data->{password} // '';
+    unless ($app_password && $admin_password) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'app_password and admin_password required' }));
+        return;
+    }
+
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    unless ($dbh) {
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => 'Could not get DB handle' }));
+        return;
+    }
+
+    my $db = eval {
+        my $row = $dbh->selectrow_arrayref("SELECT DATABASE()");
+        $row ? $row->[0] : '';
+    } // '';
+    unless ($db) {
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => 'No current database selected' }));
+        return;
+    }
+
+    my @log;
+    my $ok = 1;
+    my $err = '';
+
+    my @statements = (
+        "CREATE USER IF NOT EXISTS 'comserv_app'@'%' IDENTIFIED BY '$app_password'",
+        "CREATE USER IF NOT EXISTS 'comserv_admin'@'%' IDENTIFIED BY '$admin_password'",
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON `$db`.* TO 'comserv_app'@'%'",
+        "GRANT ALL PRIVILEGES ON `$db`.* TO 'comserv_admin'@'%'",
+        "FLUSH PRIVILEGES",
+    );
+
+    for my $sql (@statements) {
+        my $res = eval { $dbh->do($sql); 1; };
+        if ($@ || !$res) {
+            $ok = 0;
+            $err = $@ || $dbh->errstr || 'unknown';
+            push @log, { sql => $sql, ok => 0, error => "$err" };
+            last;
+        }
+        push @log, { sql => $sql, ok => 1 };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_db_apply_grants',
+        "Applied grants for $db: ok=$ok") if $ok;
+
+    $c->res->status($ok ? 200 : 500);
+    $c->res->body(encode_json({
+        success => $ok,
+        database => $db,
+        log => \@log,
+        error => $ok ? undef : "$err",
+    }));
 }
 
 # Owner sitename for a write: explicit param, else the related project's

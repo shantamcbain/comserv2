@@ -1012,6 +1012,7 @@ sub index :Path :Args(0) {
 
     my $site_name_idx = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     my $is_csc        = (lc($site_name_idx) eq 'csc') ? 1 : 0;
+    my $db_user_info  = $self->_db_user_info($c);
     # Opt-in only: CSC must enable the accounting site module like every other
     # SiteName. A row that exists but is disabled is not opted in.
     my $has_accounting = 0;
@@ -1041,6 +1042,7 @@ sub index :Path :Args(0) {
         software_status        => $software_status,
         is_csc                 => $is_csc,
         has_accounting         => $has_accounting,
+        db_user_info           => $db_user_info,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
@@ -1689,6 +1691,56 @@ sub get_system_notifications {
 }
 
 # Admin users management
+# Build the data needed by the database-card DB-user switcher on /admin.
+sub _db_user_info {
+    my ($self, $c) = @_;
+
+    my $info = eval {
+        my $schema = $c->model('DBEncy');
+        $schema && $schema->can('get_startup_connection_info')
+            ? $schema->get_startup_connection_info()
+            : undef;
+    };
+    $info ||= {};
+
+    my $current = $info->{current_username} || 'unknown';
+
+    my @known;
+    my %seen;
+    $seen{$current} = 1;
+
+    # Known users come from the active dbi/*.json secret files.
+    eval {
+        require JSON;
+        my $home = $ENV{HOME} || '/home/shanta';
+        my $sec_dir = "$home/.comserv/secrets/dbi";
+        if (-d $sec_dir && opendir(my $dh, $sec_dir)) {
+            while (my $f = readdir $dh) {
+                next if $f =~ /^\./ || $f =~ /\.backup/ || $f !~ /\.json$/;
+                my $fp = "$sec_dir/$f";
+                next unless -f $fp;
+                open my $fh, '<', $fp or next;
+                local $/; my $raw = <$fh>; close $fh;
+                my $data = JSON::decode_json($raw);
+                for my $k (keys %$data) {
+                    my $u = $data->{$k}{username};
+                    push @known, $u if $u && !$seen{$u}++;
+                }
+            }
+            closedir $dh;
+        }
+    };
+    return {
+        current_user    => $current,
+        auth_source     => $info->{auth_source} || '',
+        host            => $info->{host} || '',
+        port            => $info->{port} || '',
+        database        => $info->{database} || '',
+        connection_name => $info->{connection_name} || '',
+        known_users     => \@known,
+    };
+}
+
 sub users :Path('/admin/users') :Args(0) {
     my ($self, $c) = @_;
     

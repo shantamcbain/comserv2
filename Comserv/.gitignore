@@ -4,6 +4,9 @@ workspace.xml
 .idea/workspace.xml
 .idea/vcs.xml
 /db_config.json
+# Timestamped dumps of db_config.json. Already-tracked backups stay in the
+# index as credential-free templates; this stops NEW live dumps being added.
+db_config.json.backup.*
 .env
 .env.*
 *.log
