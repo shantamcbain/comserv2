@@ -28,8 +28,10 @@ has 'db_pw' => (
 );
 
 # RemoteDB is a plain Moose class, not Catalyst::Model.
-# $c->model('RemoteDB') therefore returns the class NAME string; Moose
-# accessors then die: Can't use string ("Comserv::Model::RemoteDB") as a HASH ref.
+# $c->model('RemoteDB') therefore returns the class NAME string (NOT a ref, and it
+# does NOT throw) when RemoteDB is not registered as a Catalyst model; Moose accessors
+# then die with "Can't use string (\"Comserv::Model::RemoteDB\") as a HASH ref".
+# So we must detect the non-ref string and instantiate a real object ourselves.
 sub _remote_db {
     my ($self, $c) = @_;
     my $m = eval { $c->model('RemoteDB') };
@@ -37,7 +39,14 @@ sub _remote_db {
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_remote_db',
             "model('RemoteDB') threw: $@ — instantiating Comserv::Model::RemoteDB->new");
     }
-    return $m if ref $m;
+    # Catalyst returns the bare class-name string when the model is not registered;
+    # only accept it if it is an actual object (ref).
+    if (ref $m) {
+        return $m;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_remote_db',
+        "model('RemoteDB') did not return an object (got: " . (defined $m ? $m : 'undef') .
+        ") — instantiating Comserv::Model::RemoteDB->new directly");
     require Comserv::Model::RemoteDB;
     return Comserv::Model::RemoteDB->new();
 }
@@ -302,14 +311,19 @@ sub change_password :Path('change_password') :Args(1) {
             $form_error = 'New password and confirmation do not match';
         } elsif ($new eq $current) {
             $form_error = 'New password must be different from the current password';
-        } else {
-            my $stored;
-            for my $path (@paths) {
-                $stored = eval { $self->db_pw->stored_password_for($path, $conn_name) };
-                last if defined $stored && length $stored;
-            }
-            if (defined $stored && length $stored && $stored ne $current) {
-                $form_error = 'Current password does not match the stored value';
+        }
+
+        # The stored JSON value is only a cache; the LIVE database server is the source of
+        # truth. If the user is rotating the live server, the only thing that matters is that
+        # $current actually authenticates against MariaDB. We no longer reject a mismatch
+        # between $current and the stored JSON, because that JSON can be stale (e.g. after a
+        # prior .env-only change) and would otherwise block a legitimate unlock. If a live
+        # login is requested and fails, the catch block reports the real cause.
+        if (!$form_error && $rotate) {
+            my $probe = eval { $self->db_pw->test_login($cfg, $current) };
+            if (!$probe || !$probe->{ok}) {
+                my $err = $@ || ($probe && $probe->{error}) || 'login failed';
+                $form_error = "Could not log in to the database server with the current password you entered ($err). This must be the password the server currently has. The stored/cached value is not used for authentication.";
             }
         }
 
