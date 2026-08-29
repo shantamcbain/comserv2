@@ -1,0 +1,7 @@
+<div id="2026-08-25-documentation-expert-role" class="cl-entry">
+<h3>2026-08-25 — Documentation Expert role: .hermes.md + maintenance plan</h3>
+<p class="doc-body"><strong>What.</strong> Created the consolidated AI guidance file <code>.hermes.md</code> at repo root (the file <code>AGENTS.md</code> already pointed to as "read first" but which did not exist on any branch) and a companion <code>.hermes/docs-maintenance-plan.md</code> with the audit, standing process, and backlog for keeping all documentation in order.</p>
+<p class="doc-body"><strong>Why.</strong> Documentation had no single owner or plan: 1,486 <code>.tt</code> files, 73 stray <code>.md</code> files under <code>root/Documentation/</code>, 29 <code>.tt</code> files still carrying stale <code>/home/shanta/PycharmProjects/…</code> paths, and <code>AI_ASSISTANT_GUIDELINES.tt</code> referenced a non-existent <code>Documantation.pm</code>. The plan gives a repeatable process so docs stop drifting.</p>
+<p class="doc-body"><strong>Changelog location fixed.</strong> Notes now live as per-entry <code>.inc</code> fragments here (this dir is present on every branch; adding a file never collides on merge). The root <code>CHANGELOG.tt</code> is a generated reader and is not hand-edited — this entry is the correct place.</p>
+<p class="doc-body"><strong>Files.</strong> <code>.hermes.md</code>, <code>.hermes/docs-maintenance-plan.md</code>, and a corrected <code>AI_ASSISTANT_GUIDELINES.tt</code> (removed the false <code>Documantation.pm</code> mismatch claim).</p>
+</div>

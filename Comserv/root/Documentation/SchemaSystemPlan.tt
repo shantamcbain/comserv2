@@ -1,0 +1,189 @@
+[% META
+        title = "Schema System Plan (W0.1 detail)"
+   description = "The schema-branch work breakdown that unblocks every other plan's schema changes: primary/backup resolution, Util::SchemaCompare extension, folding /admin/backup in, stripping raw SQL, drift guard, retiring sync_dev_from_production."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database,schema-management"
+   page_version = "1.0"
+   last_updated = "Sun Aug 24 2026 (v1.0 — authored on schema branch; consolidates MASTER_PLAN W0.1)"
+   site_specific = "false"
+   project_id = "138"
+   project_code = "PLANNING"
+%]
+
+<div class="container masterplan">
+
+<h1 id="top">Schema System Plan — W0.1 detail</h1>
+
+<div class="last-updated doc-muted">
+    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Status: ACTIVE (schema branch)
+</div>
+
+<p>This is the detailed breakdown of MASTER_PLAN's <strong>W0.1 — Schema System Plan</strong>, and the
+schema-branch portion of the consolidated <a href="/Documentation/SchemaMasterPlan">SchemaMasterPlan</a>.
+It defines the work THIS branch owns. Plans that belong to other branches (AccountingPostgresMigrationPlan / ACCPG,
+AccountingOnboardingPlan / ACCON) are <strong>not</strong> authored here — they are tracked as todos for their owners
+(see <a href="#blocking">§6 Blocking</a>).</p>
+
+<div class="notice">
+    <strong>Why this plan exists.</strong> Every other plan's schema work (Voice Inspection columns, 3D showcase flag,
+    Inventory §8 columns, the Maria→PG clone) currently depends on a coherent schema mechanism. Today that mechanism is
+    half-done: <code>Util::SchemaCompare</code> exists and <code>/admin</code> endpoints work via DDL-from-Result, but the
+    primary/backup resolution is unresolved, raw SQL still lives in <code>Admin/SchemaComparison.pm</code>, and there is no
+    drift guard. Until G0+G1 land, other plans cannot safely add columns.
+</div>
+
+<!-- TOC -->
+<div id="toc" class="row doc-toc">
+    <div class="col-100">
+        <h2 class="doc-h2">Quick Navigation</h2>
+        <div class="doc-navrow">
+            <a href="#authority" class="doc-navlink">Authority</a>
+            <a href="#done" class="doc-navlink">Done</a>
+            <a href="#gates" class="doc-navlink">G0–G5</a>
+            <a href="#constraints" class="doc-navlink">Constraints</a>
+            <a href="#blocking" class="doc-navlink">Blocking</a>
+            <a href="#todos" class="doc-navlink">Todos</a>
+        </div>
+        <p class="doc-backtop"><a href="#top">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+[%# ── §1 Authority ── %]
+<div class="card" id="authority"><details open><summary class="card-header">1. Authority &amp; scope</summary>
+<div class="card-body">
+<ul>
+    <li><strong>Result class = single source of truth.</strong> Every table create/repair goes through the in-app
+        schema-compare workflow (<code>/admin/compare_schema</code> → <code>create_table_from_result</code> /
+        <code>sync_result_to_table</code>). NEVER hand-write DDL.</li>
+    <li><strong>One schema mechanism.</strong> All DB grunt in <code>Util::SchemaCompare</code> +
+        <code>Util::Schema::*</code>. Zero raw SQL in controllers.</li>
+    <li><strong>Two engines, strict authority.</strong> Maria (<code>Ency::</code>) is live/authoritative;
+        Postgres (<code>Accounting::</code>) is clone-target-only. This plan covers the mechanism for BOTH; the
+        per-site PG seed is ACCPG's job (see §6).</li>
+    <li><strong>DBD::ic pitfall.</strong> No <code>add_index</code> (reload crash) → use
+        <code>add_unique_constraint(name =&gt; [cols])</code>.</li>
+</ul>
+</div>
+</details></div>
+
+[%# ── §2 Done ── %]
+<div class="card" id="done"><details><summary class="card-header">2. Already done</summary>
+<div class="card-body">
+<ul>
+    <li>Problem framed; <code>Util::SchemaCompare</code> exists.</li>
+    <li><code>/admin</code> endpoints work via DDL-from-Result.</li>
+    <li>Live DB topology (2026-08): the active primary Ency is <strong>192.168.1.20:3307</strong> (MariaDB, holds all live data). <code>192.168.1.198</code> / <code>172.30.161.222</code> is the legacy physical host (two routes to the same server), currently far behind <code>.20</code>; it is planned to become a K8s node providing DB load-balancing/failover — the future DB HA node, not a discarded relic. <code>INFRA_NAMING.md</code> is planned to be created and will document the authoritative host assignments. See <a href="/Documentation/K3S_APP_HA_PLAN">K3S_APP_HA_PLAN</a>.</li>
+    <li>Code-first Result-class approach documented (<a href="/Documentation/Schema">Schema.tt</a>).</li>
+    <li>Naming convention established; 4 Ency Result files identified for fix (SchemaNamingStandardizationPlan).</li>
+</ul>
+</div>
+</details></div>
+
+[%# ── §3 Gates G0-G5 ── %]
+<div class="card" id="gates"><details><summary class="card-header">3. Remaining work — G0 through G5 (this branch)</summary>
+<div class="card-body">
+<table class="data-table">
+    <thead><tr><th>Gate</th><th>Work</th><th>Blocks</th><th>Risk</th></tr></thead>
+    <tbody>
+        <tr>
+            <td><strong>G0</strong></td>
+            <td>Document the <em>real</em> DB topology and the secure credential bootstrap. Live primary Ency = <strong>192.168.1.20:3307</strong> (MariaDB, all live data); <code>.198</code> / <code>.222</code> is the legacy host planned to become a K8s DB node (load-balancing/failover). Deployment is a Docker container pull+start on the new server — the app detects missing secrets and prompts a first-run setup (create first admin user + input the active primary Ency credentials). <code>db_config.json</code> is a tracked, credential-free template; creds are injected at deploy and removed once K8s secrets supply them. This bootstrap belongs in the Docker deploy workflow, not a standalone installer. See K3S_APP_HA_PLAN.</td>
+            <td>Everything — the clone/compare pipeline must target the real primary (<code>.20</code>), and creds must come from secrets/first-run, never inline in tracked config.</td>
+            <td>MED — docs + a secure bootstrap design.</td>
+        </tr>
+        <tr>
+            <td><strong>G1</strong></td>
+            <td>Maria create/sync already live in <code>SchemaComparison.pm</code>. PG half: <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a> (SCHEMAPG #289) — compare cannot connect or CREATE a PG database yet. Do not rebuild the Maria endpoints.</td>
+            <td>New columns on Maria OR Postgres via compare (no hand DDL).</td>
+            <td>MED — core mechanism.</td>
+        </tr>
+        <tr>
+            <td><strong>G2</strong></td>
+            <td>Fold <code>/admin/backup</code> into the schema system (one backup path, priority-aware).</td>
+            <td>Backup consistency across primary/backup.</td>
+            <td>LOW.</td>
+        </tr>
+        <tr>
+            <td><strong>G3</strong></td>
+            <td>Strip ~42 raw-SQL lines from <code>Admin/SchemaComparison.pm</code> into <code>Util::SchemaCompare</code>.</td>
+            <td>Compliance with "one schema mechanism".</td>
+            <td>MED — refactor; keep compare UI working.</td>
+        </tr>
+        <tr>
+            <td><strong>G4</strong></td>
+            <td>Drift guard — report-only, with one-click repair (compare Result vs live table, surface deltas).</td>
+            <td>Trusting the compare UI on both engines.</td>
+            <td>LOW–MED.</td>
+        </tr>
+        <tr>
+            <td><strong>G5</strong></td>
+            <td>Retire <code>script/sync_dev_from_production.pl</code> (superseded by the schema system).</td>
+            <td>Removes a second, divergent sync path.</td>
+            <td>LOW.</td>
+        </tr>
+    </tbody>
+</table>
+<p><strong>Gate to call W0.1 done:</strong> G0 + G1 land so other plans can add columns to either engine via
+schema-compare. G2–G5 are follow-ons that can land incrementally.</p>
+</div>
+</details></div>
+
+[%# ── §4 Constraints ── %]
+<div class="card" id="constraints"><details><summary class="card-header">4. Hard constraints (from .hermes.md / .ai-policy.md)</summary>
+<div class="card-body">
+<ul>
+    <li>No app restart; no edit to <code>comserv_server.pl</code>. Verify with <code>perl -c</code>, targeted scripts, SQL inspection.</li>
+    <li>Schema rule: Result class = source of truth; never raw ALTER.</li>
+    <li>One doc mechanism: metadata in SQL; one reader <code>Comserv::Util::DocumentationConfig</code>.</li>
+    <li>No duplicate files; consolidate; stay in scope. Reuse before create.</li>
+    <li>File-size discipline: Controllers ≤2,000 soft; Util/Model/Result ≤800 soft.</li>
+    <li>JS: modular files under <code>static/js/</code>, wired through <code>js_load.tt</code>, <code>data-*</code> delegation. No inline <code>&lt;script&gt;</code>.</li>
+</ul>
+</div>
+</details></div>
+
+[%# ── §5 Blocking ── %]
+<div class="card" id="blocking"><details><summary class="card-header">5. Blocking relationships (cross-branch)</summary>
+<div class="card-body">
+<p>The following are <strong>prerequisites this branch owns</strong> that other branches' plans depend on. Each is tracked
+as a todo with <code>is_blocking = 1</code>; the dependent cross-branch todo carries
+<code>blocked_by_todo_id = &lt;this todo&gt;</code> so the dependency is visible in the Focus Queue.</p>
+<table class="data-table">
+    <thead><tr><th>Schema prerequisite (is_blocking)</th><th>Unblocks</th></tr></thead>
+    <tbody>
+        <tr>
+            <td><strong>G0+G1</strong> — primary/backup resolution + Util::SchemaCompare extension</td>
+            <td>ACCPG (Maria→PG clone) — the clone cannot target the right primary or create PG tables from Result without G1.</td>
+        </tr>
+        <tr>
+            <td><strong>Naming P1</strong> — fix the 4 Ency Result declarations</td>
+            <td>Trusting drift reports on Maria; any plan that adds columns to those 4 tables.</td>
+        </tr>
+    </tbody>
+</table>
+<p><strong>Not owned here (todos raised for other systems, see §6):</strong></p>
+<ul>
+    <li><code>AccountingPostgresMigrationPlan</code> (ACCPG) → InventoryAccounting branch.</li>
+    <li><code>AccountingOnboardingPlan</code> (ACCON) → InventoryAccounting branch.</li>
+</ul>
+</div>
+</details></div>
+
+[%# ── §6 Todos ── %]
+<div class="card" id="todos"><details><summary class="card-header">6. Tracking todos (API-created)</summary>
+<div class="card-body">
+<p>These todos are created via the <code>/api/todo/create</code> + <code>/api/todo/update</code> endpoints (local bypass),
+then re-GET to confirm:</p>
+<ul>
+    <li><strong>Schema W0.1 G0+G1 (is_blocking=1)</strong> — prerequisite for PG clone. Subject: "Schema: resolve primary/backup (G0) + extend Util::SchemaCompare (G1) — blocks PG clone".</li>
+    <li><strong>Schema Naming P1 (is_blocking=1)</strong> — fix 4 Ency Result declarations.</li>
+    <li><strong>ACCPG (blocked_by = G0+G1 todo)</strong> — AccountingPostgresMigrationPlan, raised for InventoryAccounting.</li>
+    <li><strong>ACCON (blocked_by = G0+G1 todo)</strong> — AccountingOnboardingPlan, raised for InventoryAccounting.</li>
+</ul>
+</div>
+</details></div>
+
+<p class="mp-back-link"><a href="/Documentation/SchemaMasterPlan">← Back to Schema Master Plan</a> · <a href="/Documentation/MASTER_PLAN">Master Plan</a></p>
+
+</div>

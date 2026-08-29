@@ -102,6 +102,7 @@
                 <li>Add tax and shipping amounts with their respective accounts</li>
                 <li>Click <strong>Save Invoice</strong> — stock updated, GL posted automatically</li>
             </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)"><strong>2026-08-26:</strong> this is receive-after-buy, not “send a PO”. Need list = GET <code>/api/inventory/bom</code> (or low stock). Purchase-order create/receive is todo #2310.</p>
             <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
         </div>
     </div>

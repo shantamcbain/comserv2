@@ -1,1 +1,66 @@
-{"base_dir":"/home/shanta/.comserv/worktrees","port_start":4000,"branches":{"DockerHA":{"project_id":202,"label":"DockerHA","url":"/planning/daily","port":4002,"host":"workstation.local","sitename":"CSC"},"aisystem":{"sitename":"CSC","port":4006,"host":"workstation.local","project_id":280,"url":"/planning/daily","label":"aisystem"},"3d":{"label":"3d","project_id":272,"url":"/planning/daily","host":"3d.local","port":4003,"sitename":"3d"},"planning":{"url":"/planning/daily","project_id":138,"label":"planning","port":4005,"host":"workstation.local","sitename":"CSC"},"schema":{"port":4007,"url":"/planning/daily","label":"schema"},"git":{"port":4004,"host":"workstation.local","sitename":"CSC","url":"/planning/daily","project_id":238,"label":"git"},"InventoryAccounting":{"url":"/planning/daily","label":"InventoryAccounting","sitename":"CSC","host":"workstation.local","port":4001}}}
+{
+  "base_dir": "/home/shanta/.comserv/worktrees",
+  "port_start": 4000,
+  "branches": {
+    "InventoryAccounting": {
+      "label": "InventoryAccounting",
+      "port": 4001,
+      "url": "/planning/daily",
+      "host": "workstation.local",
+      "sitename": "CSC"
+    },
+    "DockerHA": {
+      "label": "DockerHA",
+      "port": 4002,
+      "url": "/planning/daily",
+      "project_id": 202,
+      "host": "workstation.local",
+      "sitename": "CSC"
+    },
+    "3d": {
+      "label": "3d",
+      "port": 4003,
+      "url": "/planning/daily",
+      "project_id": 272,
+      "host": "3d.local",
+      "sitename": "3d"
+    },
+    "git": {
+      "label": "git",
+      "port": 4004,
+      "url": "/planning/daily",
+      "project_id": 238,
+      "host": "workstation.local",
+      "sitename": "CSC"
+    },
+    "planning": {
+      "label": "planning",
+      "port": 4005,
+      "url": "/planning/daily",
+      "project_id": 138,
+      "host": "workstation.local",
+      "sitename": "CSC"
+    },
+    "aisystem": {
+      "label": "aisystem",
+      "port": 4006,
+      "url": "/planning/daily",
+      "project_id": 280,
+      "host": "workstation.local",
+      "sitename": "CSC"
+    },
+    "schema": {
+      "label": "schema",
+      "port": 4007,
+      "url": "/Documentation/SchemaMasterPlan",
+      "project_id": 138,
+      "host": "workstation.local",
+      "sitename": "CSC"
+    },
+    "Documentation": {
+      "label": "Documentation",
+      "port": 4008,
+      "url": "/planning/daily"
+    }
+  }
+}
