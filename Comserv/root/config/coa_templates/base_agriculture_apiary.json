@@ -1,0 +1,30 @@
+{
+  "id": "agriculture_apiary",
+  "label": "Agriculture & Apiary",
+  "description": "Beekeeping / beeyard operations. Built on the CRA farming band 9370-9899 (GIFI 9470 names apiary and honey explicitly) — farm income is a parallel statement, not the generic 8000/9000 block.",
+  "gifi_basis": "CRA RC4088 Rev.23 farming band 9370-9899; 9470 apiary/honey revenue; 9711 feed; 9713 veterinary; 9898 total farm expenses; 9899 net farm income.",
+  "accounts": [
+    { "accno": "1000", "description": "Cash / Chequing Account",      "charttype": "A", "category": "A", "link": "", "gifi_accno": "1000" },
+    { "accno": "1100", "description": "Accounts Receivable",          "charttype": "A", "category": "A", "link": "AR", "gifi_accno": "1141" },
+    { "accno": "1200", "description": "Inventory — Honey & Products", "charttype": "A", "category": "A", "link": "IC", "gifi_accno": "1120" },
+    { "accno": "1310", "description": "GST/HST Receivable (ITCs)",    "charttype": "A", "category": "A", "link": "", "gifi_accno": "1180" },
+    { "accno": "1500", "description": "Apiary Equipment",             "charttype": "A", "category": "A", "link": "", "gifi_accno": "1680" },
+    { "accno": "1510", "description": "Bee Colonies (livestock)",     "charttype": "A", "category": "A", "link": "", "gifi_accno": "1662" },
+    { "accno": "2000", "description": "Accounts Payable",             "charttype": "A", "category": "L", "link": "AP", "gifi_accno": "2620" },
+    { "accno": "2100", "description": "GST/HST Payable",              "charttype": "A", "category": "L", "link": "AR_tax AP_tax", "gifi_accno": "2640" },
+    { "accno": "3000", "description": "Owner's Equity",               "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3600" },
+    { "accno": "3100", "description": "Retained Earnings",            "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3620" },
+    { "accno": "9470", "description": "Apiary & Honey Sales Revenue", "charttype": "A", "category": "I", "link": "AR_amount IC_sale", "gifi_accno": "9470" },
+    { "accno": "9480", "description": "Bees & Nuc Sales Revenue",     "charttype": "A", "category": "I", "link": "AR_amount", "gifi_accno": "9470" },
+    { "accno": "9490", "description": "Other Farm Revenue",           "charttype": "A", "category": "I", "link": "", "gifi_accno": "9659" },
+    { "accno": "9700", "description": "Purchases — Resale Goods",     "charttype": "A", "category": "E", "link": "IC_cogs", "gifi_accno": "9665" },
+    { "accno": "9711", "description": "Feed, Supplements, Straw & Bedding", "charttype": "A", "category": "E", "link": "", "gifi_accno": "9711" },
+    { "accno": "9713", "description": "Veterinary, Medicine & Breeding Fees", "charttype": "A", "category": "E", "link": "", "gifi_accno": "9713" },
+    { "accno": "9720", "description": "Hive Components & Woodenware", "charttype": "A", "category": "E", "link": "", "gifi_accno": "9665" },
+    { "accno": "9730", "description": "Extracting & Bottling Supplies", "charttype": "A", "category": "E", "link": "", "gifi_accno": "9665" },
+    { "accno": "9806", "description": "Marketing Board Fees",         "charttype": "A", "category": "E", "link": "", "gifi_accno": "9806" },
+    { "accno": "9810", "description": "Farm Wages & Salaries",        "charttype": "A", "category": "E", "link": "", "gifi_accno": "9760" },
+    { "accno": "9890", "description": "Other Farm Expenses",          "charttype": "A", "category": "E", "link": "", "gifi_accno": "9898" }
+  ],
+  "headings": []
+}

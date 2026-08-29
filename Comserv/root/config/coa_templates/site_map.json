@@ -1,0 +1,17 @@
+{
+  "_comment": "Site → base archetype (industry) + legal_form (ownership). Overlays are from enabled site_modules, not listed here.",
+  "last_updated": "2026-08-27",
+  "sites": {
+    "CSC":     { "base_archetype": "service_consulting",        "legal_form": "sole_owner", "accounting_enabled": true,  "notes": "Hosting, programming, helpdesk — owned by Shanta as sole proprietor" },
+    "3d":      { "base_archetype": "maker_light_manufacturing", "legal_form": "sole_owner", "accounting_enabled": true,  "notes": "Print farm + teaching" },
+    "BMaster": { "base_archetype": "agriculture_apiary",        "legal_form": "sole_owner", "accounting_enabled": false, "notes": "Beekeeping teaching + beeyard" },
+    "USBM":    { "base_archetype": "nonprofit_coop",            "legal_form": "nonprofit",  "accounting_enabled": false, "notes": "School" },
+    "Shanta":  { "base_archetype": "sole_proprietor",           "legal_form": "sole_owner", "accounting_enabled": false, "notes": "Personal T2125 books" },
+    "Ve7tit":  { "base_archetype": "sole_proprietor",           "legal_form": "sole_owner", "accounting_enabled": false, "notes": "Ham radio hobby (canonical SiteName, lowercase v)" },
+    "MCOOP":   { "base_archetype": "nonprofit_coop",            "legal_form": "nonprofit",  "accounting_enabled": false, "notes": "Monachee Cooperative" },
+    "AltPower": { "base_archetype": "service_consulting",       "legal_form": "sole_owner", "accounting_enabled": false, "notes": "Alternative energy services" },
+    "CountryStores": { "base_archetype": "maker_light_manufacturing", "legal_form": "sole_owner", "accounting_enabled": false, "notes": "Rural equipment resale" },
+    "Grindrodbc.com": { "base_archetype": "service_consulting", "legal_form": "sole_owner", "accounting_enabled": false, "notes": "Software services" },
+    "Forager": { "base_archetype": "maker_light_manufacturing", "legal_form": "sole_owner", "accounting_enabled": false, "notes": "File manager / 3D printing tool" }
+  }
+}

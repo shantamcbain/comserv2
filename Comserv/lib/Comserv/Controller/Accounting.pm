@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Model::AccountingDB;
+use Comserv::Model::CoaTemplate;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Accounting::Migrator;
 use POSIX qw(strftime);
@@ -1471,6 +1472,104 @@ sub my_database :Path('/Accounting/my_database') :Args(0) {
         tables    => \@tables,
         template  => 'Accounting/my_database.tt',
     );
+}
+
+
+# -------------------------------------------------------------------------
+# Accounting Setup Wizard (Ph.1a S3 / todo 1839)
+# Owner self-serve: provision -> choose template -> review -> seed -> done
+# -------------------------------------------------------------------------
+
+# GET /Accounting/setup is owned by Controller::Accounting::Setup (main).
+# Keep choose_template + ai_generate here so the IA chart store still posts.
+
+sub setup_choose_template :Path('/Accounting/setup/choose_template') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    unless ($c->req->method eq 'POST') {
+        return $c->res->redirect($c->uri_for('/Accounting/setup'));
+    }
+    my $p = $c->req->body_parameters;
+    my $coa = Comserv::Model::CoaTemplate->new;
+    my $map = eval { $coa->site_map($c) } || {};
+    # SiteName wins. CSC admin must not seed honey/3d onto CSC from the all-archetype list.
+    my $base = $p->{base_archetype}
+            || $map->{sites}{$sitename}{base_archetype};
+    my @overlays = grep { $_ } (
+        ref $p->{overlays} eq 'ARRAY' ? @{$p->{overlays}} : ($p->{overlays} // ())
+    );
+
+    unless ($base) {
+        $c->flash->{error_msg} = 'No business-model archetype is mapped for this site.';
+        return $c->res->redirect($c->uri_for('/Accounting/setup'));
+    }
+
+    eval {
+        require Comserv::Util::Accounting::CoaAiGenerate;
+        my $gen = Comserv::Util::Accounting::CoaAiGenerate->new;
+        my $legal = $p->{legal_form}
+                 || $map->{sites}{$sitename}{legal_form}
+                 || 'sole_owner';
+        my $reg = eval {
+            $c->model('DBEncy')->resultset('SiteAccountingDb')->find({ sitename => $sitename })
+        };
+        my $draft = $gen->generate($c,
+            sitename     => $sitename,
+            base_id      => $base,
+            overlays     => \@overlays,
+            use_maria    => 1,
+            legal_form   => $legal,
+            jurisdiction => $reg ? $reg->jurisdiction : '',
+            currency     => $reg ? $reg->currency     : '',
+        );
+        my ($added, $dropped, $err);
+        if ($draft && $draft->{success} && @{ $draft->{rows} || [] }) {
+            ($added, $dropped, $err) = $gen->apply_draft_to_pg($c, $sitename, $draft->{rows}, {
+                base       => $base,
+                overlays   => \@overlays,
+                legal_form => $legal,
+            });
+        }
+        else {
+            ($added, $dropped, $err) = $gen->replace_with_industry($c, $sitename, $base, \@overlays);
+            $draft ||= { source => 'template_fallback' };
+        }
+        if ($err) {
+            $c->flash->{error_msg} = $err;
+        } else {
+            my $via = ($draft->{source} && $draft->{source} eq 'ai')
+                ? 'AI'
+                : 'industry template';
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'setup_choose_template',
+                "Replaced PG chart for '$sitename' via $via base=$base legal=$legal added=$added dropped="
+                . scalar(@$dropped));
+            $c->flash->{success_msg} =
+                "PostgreSQL chart for '$sitename' rebuilt via $via "
+              . "($base, $legal). Kept accounts that have data on this site. "
+              . ($added || 0) . " rows seeded, "
+              . scalar(@$dropped) . " unused other-industry accounts removed.";
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'setup_choose_template', "Replace failed: $@");
+        $c->flash->{error_msg} = "Replace failed: $@";
+    }
+
+    return $c->res->redirect($c->uri_for('/Accounting/setup'));
+}
+
+# Absolute Path so this registers even when Accounting::Setup's relative
+# Path('ai_generate') was not picked up by a stale Starman worker (404 at 07:18).
+sub setup_ai_generate :Path('/Accounting/setup/ai_generate') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->controller('Accounting::Setup')->ai_generate($c);
+}
+
+sub setup_ai_commit :Path('/Accounting/setup/ai_commit') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->controller('Accounting::Setup')->ai_commit($c);
 }
 
 __PACKAGE__->meta->make_immutable;
