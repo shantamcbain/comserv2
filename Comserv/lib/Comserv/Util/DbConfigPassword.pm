@@ -169,7 +169,9 @@ sub test_login {
     my $port = $cfg->{port} || 3306;
     my $db   = $cfg->{database} || 'ency';
     my $user = $cfg->{username} or die "username missing";
-    my $dsn  = "dbi:$driver:database=$db;host=$host;port=$port;connect_timeout=8";
+    # Remove attributes the plain mysql driver does not accept (only MariaDB
+    # understands connect_timeout at the DSN level).
+    my $dsn  = "dbi:mysql:database=$db;host=$host;port=$port";
     my $dbh  = DBI->connect($dsn, $user, $password, {
         RaiseError => 1,
         PrintError => 0,

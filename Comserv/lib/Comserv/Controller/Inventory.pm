@@ -28,8 +28,13 @@ sub auto :Private {
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
     unless ($is_admin) {
-        my $path = $c->req->path;
-        if ($path =~ m{/Inventory/api/}i) {
+        my $path = $c->req->path // '';
+        if ($path =~ m{(?:^|/)Inventory/api/}i) {
+            # Same LAN bypass as Controller::Api (todos): Hermes/local agents.
+            my $address  = $c->req->address // '';
+            my $is_local = ($address eq '127.0.0.1' || $address eq '::1'
+                || $address =~ /^192\.168\.1\./);
+            return 1 if $is_local;
             my $token    = $c->req->header('X-API-Token') || $c->req->params->{api_token};
             my $expected = $c->config->{api_token} || $ENV{COMSERV_API_TOKEN} || '';
             if ($expected && $token && $token eq $expected) {
@@ -184,7 +189,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
             { prefetch => [
                 'stock_levels', 'item_suppliers', 'assignments',
                 'inventory_account', 'income_account', 'expense_account', 'returns_account',
-                { 'bom_components' => 'component_item' },
+                { 'bom_components' => { 'component_item' => 'stock_levels' } },
             ]}
         );
     };
@@ -284,8 +289,9 @@ sub _create_item {
     my $schema = $self->_schema($c);
     my $now    = $self->_now();
 
+    my $sitename = $p->{sitename} || $self->_sitename($c);
     return $schema->resultset('Accounting::InventoryItem')->create({
-        sitename            => $self->_sitename($c),
+        sitename            => $sitename,
         sku                 => $p->{sku},
         name                => $p->{name},
         description         => $p->{description},
@@ -311,6 +317,135 @@ sub _create_item {
         created_at          => $now,
         updated_at          => $now,
     });
+}
+
+# BOM attach used by /Inventory/bom/add and the AI/local API.
+# Returns { ok => 1, parent_id, component_item_id } or { ok => 0, error => ... }.
+sub _add_bom_line {
+    my ($self, $c, $p) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $p->{sitename} || $self->_sitename($c);
+
+    my $parent = $p->{parent_item_id}
+        ? $schema->resultset('Accounting::InventoryItem')->find($p->{parent_item_id})
+        : $schema->resultset('Accounting::InventoryItem')->find({ sitename => $sitename, sku => $p->{parent_sku} });
+    return { ok => 0, error => 'parent item not found' } unless $parent;
+    return { ok => 0, error => 'parent sitename mismatch' }
+        unless ($parent->sitename || '') eq $sitename;
+    return { ok => 0, error => 'parent is not assemblable (Has BOM)' }
+        unless $parent->is_assemblable;
+
+    my $comp = $p->{component_item_id}
+        ? $schema->resultset('Accounting::InventoryItem')->find($p->{component_item_id})
+        : $schema->resultset('Accounting::InventoryItem')->find({ sitename => $sitename, sku => $p->{component_sku} });
+    return { ok => 0, error => 'component item not found' } unless $comp;
+    return { ok => 0, error => 'cannot use an item as its own component' }
+        if $comp->id == $parent->id;
+
+    my $scrap = ($p->{scrap_factor} || 0);
+    $scrap = $scrap / 100 if $scrap > 1;
+
+    my $row;
+    eval {
+        $row = $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
+            parent_item_id    => $parent->id,
+            component_item_id => $comp->id,
+            quantity          => $p->{quantity}   || 1,
+            unit              => $p->{unit}        || 'each',
+            is_optional       => $p->{is_optional} ? 1 : 0,
+            scrap_factor      => $scrap,
+            sort_order        => $p->{sort_order}  || 0,
+            notes             => $p->{notes}       || undef,
+        }, { key => 'unique_parent_component' });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_add_bom_line',
+            "BOM add failed parent=" . $parent->id . " comp=" . $comp->id . ": $@");
+        return { ok => 0, error => "BOM add failed: $@" };
+    }
+    return {
+        ok                => 1,
+        parent_id         => $parent->id,
+        component_item_id => $comp->id,
+        quantity          => $p->{quantity} || 1,
+    };
+}
+
+# BOM read used by GET /Inventory/api/bom. No writes.
+sub _list_bom_lines {
+    my ($self, $c, $p) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $p->{sitename} || $self->_sitename($c);
+
+    my $parent;
+    eval {
+        $parent = $p->{parent_item_id}
+            ? $schema->resultset('Accounting::InventoryItem')->find($p->{parent_item_id})
+            : $schema->resultset('Accounting::InventoryItem')->find({
+                sitename => $sitename, sku => $p->{parent_sku}
+            });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_list_bom_lines',
+            "parent lookup failed: $@");
+        return { ok => 0, error => "parent lookup failed: $@" };
+    }
+    return { ok => 0, error => 'parent item not found' } unless $parent;
+    return { ok => 0, error => 'parent sitename mismatch' }
+        unless ($parent->sitename || '') eq $sitename;
+
+    my @rows;
+    eval {
+        @rows = $schema->resultset('Accounting::InventoryItemBOM')->search(
+            { parent_item_id => $parent->id },
+            {
+                prefetch => { component_item => 'stock_levels' },
+                order_by => [ 'me.sort_order', 'me.id' ],
+            }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_list_bom_lines',
+            "BOM list failed parent=" . $parent->id . ": $@");
+        return { ok => 0, error => "BOM list failed: $@" };
+    }
+
+    my @lines;
+    for my $row (@rows) {
+        my $comp = eval { $row->component_item };
+        my ($on_hand, $reserved) = (0, 0);
+        if ($comp) {
+            eval {
+                for my $sl ($comp->stock_levels->all) {
+                    $on_hand  += ($sl->quantity_on_hand  || 0);
+                    $reserved += ($sl->quantity_reserved || 0);
+                }
+            };
+        }
+        push @lines, {
+            id                => $row->id,
+            component_item_id => $row->component_item_id,
+            sku               => $comp ? $comp->sku : undef,
+            name              => $comp ? $comp->name : undef,
+            item_origin       => $comp ? $comp->item_origin : undef,
+            category          => $comp ? $comp->category : undef,
+            quantity          => $row->quantity,
+            unit              => $row->unit,
+            is_optional       => $row->is_optional ? 1 : 0,
+            scrap_factor      => $row->scrap_factor,
+            on_hand           => $on_hand,
+            reserved          => $reserved,
+            available         => $on_hand - $reserved,
+        };
+    }
+    return {
+        ok         => 1,
+        parent_id  => $parent->id,
+        parent_sku => $parent->sku,
+        parent_name => $parent->name,
+        is_assemblable => $parent->is_assemblable ? 1 : 0,
+        lines      => \@lines,
+    };
 }
 
 sub item_edit :Path('/Inventory/item/edit') :Args(1) {
@@ -1795,9 +1930,12 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
             name             => $_->name,
             description      => $_->description,
             category         => $_->category,
+            item_origin      => $_->item_origin,
+            is_assemblable   => $_->is_assemblable ? 1 : 0,
             unit_of_measure  => $_->unit_of_measure,
             unit_cost        => $_->unit_cost,
             reorder_point    => $_->reorder_point,
+            reorder_quantity => $_->reorder_quantity,
             status           => $_->status,
         }
     } @items;
@@ -1807,6 +1945,178 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
         require JSON;
         JSON::encode_json(\@result);
     });
+    $c->detach;
+}
+
+# POST /Inventory/api/item/create
+# JSON: sku, name, sitename (required). Optional: description, category,
+# item_origin, unit_of_measure, reorder_point, reorder_quantity, is_assemblable, notes.
+# Idempotent on sku. DB write is _create_item only.
+sub api_item_create :Path('/Inventory/api/item/create') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_item_create',
+            "JSON parse failed: $@");
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    my $sitename = $p->{sitename} || $self->_sitename($c);
+    unless ($p->{sku} && $p->{name}) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'sku and name required' }));
+        $c->detach;
+    }
+
+    my $schema = $self->_schema($c);
+    my $existing = eval {
+        $schema->resultset('Accounting::InventoryItem')->find({ sku => $p->{sku} })
+    };
+    if ($existing) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
+            "SKU $p->{sku} already exists id=" . $existing->id);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({
+            success  => 1,
+            existed  => 1,
+            item_id  => $existing->id,
+            sku      => $existing->sku,
+            sitename => $existing->sitename,
+        }));
+        $c->detach;
+    }
+
+    $p->{sitename} = $sitename;
+    my $item;
+    eval { $item = $self->_create_item($c, $p); };
+    if ($@ || !$item) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_create',
+            "create failed sku=$p->{sku}: $@");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "create failed: $@" }));
+        $c->detach;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
+        "created item id=" . $item->id . " sku=" . $item->sku . " site=$sitename");
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success  => 1,
+        existed  => 0,
+        item_id  => $item->id,
+        sku      => $item->sku,
+        sitename => $item->sitename,
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/bom/add
+# JSON: sitename, parent_sku or parent_item_id, component_sku or component_item_id, quantity
+sub api_bom_add :Path('/Inventory/api/bom/add') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_bom_add',
+            "JSON parse failed: $@");
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    $p->{sitename} ||= $self->_sitename($c);
+
+    my $res = $self->_add_bom_line($c, $p);
+    unless ($res->{ok}) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => $res->{error} }));
+        $c->detach;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_bom_add',
+        "BOM line parent=$res->{parent_id} comp=$res->{component_item_id}");
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({ success => 1, %$res }));
+    $c->detach;
+}
+
+# GET /Inventory/api/bom?sitename=&parent_sku= or parent_item_id=
+sub api_bom :Path('/Inventory/api/bom') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    my $p = {
+        sitename        => $c->req->params->{sitename} || $self->_sitename($c),
+        parent_sku      => $c->req->params->{parent_sku},
+        parent_item_id  => $c->req->params->{parent_item_id},
+    };
+    unless ($p->{parent_sku} || $p->{parent_item_id}) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'parent_sku or parent_item_id required' }));
+        $c->detach;
+    }
+
+    my $res = $self->_list_bom_lines($c, $p);
+    unless ($res->{ok}) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => $res->{error} }));
+        $c->detach;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_bom',
+        "BOM list parent=$res->{parent_sku} lines=" . scalar(@{ $res->{lines} || [] }));
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({ success => 1, %$res }));
     $c->detach;
 }
 

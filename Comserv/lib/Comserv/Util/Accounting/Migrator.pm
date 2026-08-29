@@ -150,11 +150,28 @@ sub migrate_site {
     };
     push @log, "  Found " . scalar(@coa_rows) . " COA accounts in MariaDB for '$sitename'.";
 
+    my %dropped;
+    eval {
+        require Comserv::Util::Accounting::CoaAiGenerate;
+        my $drop_list = Comserv::Util::Accounting::CoaAiGenerate->new
+            ->dropped_accnos_from_registry($maria, $sitename);
+        $dropped{$_} = 1 for @$drop_list;
+    };
+    if (%dropped) {
+        push @log, "  Skipping " . scalar(keys %dropped)
+          . " accno(s) dropped in the AI review for '$sitename'.";
+    }
+
     my $coa_ok = 0; my $coa_skip = 0; my $coa_fail = 0;
     my %accno_to_pg_id;  # map accno → new PG chart.id
 
     # First pass: insert without heading (to get PG IDs)
     for my $row (@coa_rows) {
+        if ($dropped{ $row->accno }) {
+            $coa_skip++;
+            push @log, "  SKIP unused/dropped accno=" . $row->accno . " (not reinserted for '$sitename')";
+            next;
+        }
         my ($exists) = $pg->selectrow_array("SELECT id FROM chart WHERE accno = ?", undef, $row->accno);
         if ($exists) {
             $accno_to_pg_id{ $row->accno } = $exists;
@@ -238,9 +255,21 @@ sub migrate_site {
         my @lines = eval { $entry->lines->all };
         for my $line (@lines) {
             my $coa_row = eval { $line->account };
-            next unless $coa_row;
+            unless ($coa_row) {
+                push @log, "  FAIL GL line on ref=" . $entry->reference
+                  . " has no Maria account";
+                $errors++;
+                next;
+            }
             my $chart_id = $accno_to_pg_id{ $coa_row->accno };
-            next unless $chart_id;
+            unless ($chart_id) {
+                push @log, "  FAIL GL line on ref=" . $entry->reference
+                  . " accno=" . $coa_row->accno
+                  . " — no PostgreSQL chart row (dropped or not seeded). Refusing silent skip.";
+                $errors++;
+                $gl_fail++;
+                next;
+            }
             $pg->do(
                 "INSERT INTO acc_trans (trans_id, chart_id, amount, transdate, memo)
                  VALUES (?, ?, ?, ?, ?)",
