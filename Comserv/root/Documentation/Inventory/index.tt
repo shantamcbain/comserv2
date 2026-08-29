@@ -99,10 +99,10 @@
 
             <h3 style="color:var(--text-color);font-family:var(--header-font);font-size:var(--font-size-large)">4.2 Buying Stock (Purchasing)</h3>
             <ol style="color:var(--text-color);font-family:var(--body-font)">
-                <li>Receive goods from a supplier.</li>
-                <li>Go to <strong>Inventory → Supplier Invoices → New Invoice</strong>.</li>
-                <li>Select supplier, add line items (item, qty, unit cost). Add tax and shipping if applicable.</li>
-                <li>Save — stock levels are updated automatically and a GL double-entry is posted (DR Inventory/Expense, CR Accounts Payable).</li>
+                <li><strong>Need list (2026-08-26):</strong> GET <code>/api/inventory/need?sitename=&amp;parent_sku=</code> splits BOM shortfall into buy vs print and groups buy lines by preferred supplier. Raw BOM: GET <code>/api/inventory/bom</code>. Low-stock at <code>/Inventory</code> is warehouse min, not a job BOM.</li>
+                <li><strong>Find a supplier:</strong> <code>/Inventory/suppliers</code> and item↔supplier (preferred, supplier SKU, cost). Ordering still happens on the vendor’s own channel until a PO is sent.</li>
+                <li><strong>Receive (built):</strong> after goods/bill, <strong>Inventory → Supplier Invoices → New Invoice</strong>. Select supplier, add lines, save — stock + AP GL.</li>
+                <li><strong>#2310 in progress:</strong> Result classes for purchase orders (apply via schema-compare), then POST <code>/api/inventory/po/create</code>. Receive-from-PO not built yet.</li>
             </ol>
 
             <h3 style="color:var(--text-color);font-family:var(--header-font);font-size:var(--font-size-large)">4.3 Selling (Shop / Cart)</h3>

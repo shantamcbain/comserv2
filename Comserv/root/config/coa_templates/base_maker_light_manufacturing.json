@@ -1,0 +1,30 @@
+{
+  "id": "maker_light_manufacturing",
+  "label": "Maker & Light Manufacturing",
+  "description": "Print farm / small-batch manufacturing with BOM-based production. Generic trade bands plus inventory, COGS and equipment cost centres.",
+  "gifi_basis": "GIFI general business bands (CRA RC4088 Rev.23): revenue 8000-8299, expenses 8300-9368.",
+  "accounts": [
+    { "accno": "1000", "description": "Cash / Chequing Account",       "charttype": "A", "category": "A", "link": "", "gifi_accno": "1000" },
+    { "accno": "1100", "description": "Accounts Receivable",           "charttype": "A", "category": "A", "link": "AR", "gifi_accno": "1141" },
+    { "accno": "1200", "description": "Inventory — Finished Goods",    "charttype": "A", "category": "A", "link": "IC", "gifi_accno": "1120" },
+    { "accno": "1210", "description": "Inventory — Raw Materials",     "charttype": "A", "category": "A", "link": "IC", "gifi_accno": "1120" },
+    { "accno": "1310", "description": "GST/HST Receivable (ITCs)",     "charttype": "A", "category": "A", "link": "", "gifi_accno": "1180" },
+    { "accno": "1500", "description": "Production Equipment",          "charttype": "A", "category": "A", "link": "", "gifi_accno": "1680" },
+    { "accno": "2000", "description": "Accounts Payable",              "charttype": "A", "category": "L", "link": "AP", "gifi_accno": "2620" },
+    { "accno": "2100", "description": "GST/HST Payable",               "charttype": "A", "category": "L", "link": "AR_tax AP_tax", "gifi_accno": "2640" },
+    { "accno": "3000", "description": "Owner's Equity",                "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3600" },
+    { "accno": "3100", "description": "Retained Earnings",             "charttype": "A", "category": "Q", "link": "", "gifi_accno": "3620" },
+    { "accno": "4000", "description": "Product Sales Revenue",         "charttype": "A", "category": "I", "link": "AR_amount IC_sale", "gifi_accno": "8100" },
+    { "accno": "4215", "description": "Print / Production Service Revenue", "charttype": "A", "category": "I", "link": "AR_amount", "gifi_accno": "8230" },
+    { "accno": "4900", "description": "Other Income",                  "charttype": "A", "category": "I", "link": "", "gifi_accno": "8299" },
+    { "accno": "5000", "description": "Cost of Goods Sold",            "charttype": "A", "category": "E", "link": "IC_cogs", "gifi_accno": "8519" },
+    { "accno": "6210", "description": "Filament & Materials",          "charttype": "A", "category": "E", "link": "", "gifi_accno": "8519" },
+    { "accno": "6215", "description": "Equipment Lease",               "charttype": "A", "category": "E", "link": "", "gifi_accno": "8620" },
+    { "accno": "6216", "description": "Electricity & Power",           "charttype": "A", "category": "E", "link": "", "gifi_accno": "8510" },
+    { "accno": "6300", "description": "Equipment Maintenance",         "charttype": "A", "category": "E", "link": "", "gifi_accno": "8620" },
+    { "accno": "6510", "description": "Equipment Depreciation",        "charttype": "A", "category": "E", "link": "", "gifi_accno": "8670" },
+    { "accno": "6400", "description": "Shipping & Postage",            "charttype": "A", "category": "E", "link": "", "gifi_accno": "8870" },
+    { "accno": "6900", "description": "Other Expenses",                "charttype": "A", "category": "E", "link": "", "gifi_accno": "9367" }
+  ],
+  "headings": []
+}

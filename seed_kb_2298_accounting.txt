@@ -1,0 +1,27 @@
+# Seed payload for #2298 — CSC Accounting KB entry (ai_kb VERIFIED)
+# Paste into the in-app Documentation create form (admin session).
+# NOTE: the section <select> in root/admin/edit_documentation.tt does NOT list
+# "ai_kb" — either add an <option value="ai_kb"> option first, or POST
+# section=ai_kb directly. The recall code matches section =~ /^(ai_kb|...)/i.
+
+title:
+How to enable the Accounting feature on a CSC membership account
+
+section:
+ai_kb
+
+version:
+1.0.0
+
+content:
+VERIFIED: To add the Accounting feature to a CSC membership account:
+1. Log in as an admin (or a user with permission to edit membership settings).
+2. Go to CSC -> Membership Settings (under Administration / Account).
+3. Open the target membership record and choose Edit.
+4. In the edit form, find the Features / Modules section and enable "Accounting".
+5. Save the record. The account now has Accounting enabled.
+
+Notes:
+- This is the membership-level Accounting module toggle, not the InventoryAccounting worktree schema/CoA work.
+- If the Accounting option is missing from the Features list, the module may not be registered for that site — check the site's enabled modules before reporting it as a bug.
+- VERIFIED reflects the procedure as of 2026-08-25; re-confirm if the Membership Settings UI changes.

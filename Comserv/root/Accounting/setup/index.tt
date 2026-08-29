@@ -14,7 +14,7 @@
   [% END %]
 
   <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
-    <h1 style="margin:0;">&#9881;&#65039; Accounting Setup — [% sitename | html %]</h1>
+    <h1 style="margin:0;">Accounting Setup — [% sitename | html %]</h1>
     <a href="/Accounting" class="btn btn-secondary" style="font-size:0.88rem;">&larr; Accounting Dashboard</a>
   </div>
 
@@ -45,8 +45,13 @@
       2. Accounting database
       [% IF provisioned && db_ok %]<span style="color:#065f46;">&#10004; provisioned &amp; reachable</span>
       [% ELSIF provisioned %]<span style="color:#92400e;">&#9888; provisioned, not reachable</span>
+      [% ELSIF provision_status == 'provisioning' %]<span style="color:#92400e;">provisioning…</span>
       [% ELSE %]<span style="color:#6b7280;">not provisioned</span>[% END %]
     </h2>
+
+    [% IF provision_status == 'error' && provision_error %]
+      <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#991b1b;">[% provision_error | html %]</p>
+    [% END %]
 
     [% IF provisioned %]
       <p style="margin:0 0 0.4rem;font-size:0.88rem;">
@@ -76,7 +81,8 @@
       </form>
       <p style="margin:0.5rem 0 0;font-size:0.8rem;color:var(--text-muted-color,#666);">
         The server chooses the host, database name and database user. Safe to re-run — an
-        existing database is never re-created.
+        existing database is never re-created. Tables come from the <code>accounting_template</code>
+        database, not an empty schema.
       </p>
     [% ELSE %]
       <p style="margin:0 0 0.6rem;font-size:0.88rem;color:var(--text-muted-color,#666);">
@@ -86,43 +92,160 @@
     [% END %]
   </div>
 
-  [%# ── Step 3: chart of accounts ────────────────────────────────── %]
+  [%# ── Step 3: chart of accounts (IA template store + AI generate) ─ %]
   <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
     <h2 style="font-size:1rem;margin:0 0 0.5rem;">
       3. Chart of accounts
-      [% IF coa_count %]<span style="color:#065f46;">&#10004; [% coa_count %] accounts</span>
-      [% ELSE %]<span style="color:#6b7280;">empty</span>[% END %]
+      <span style="font-weight:normal;font-size:0.85rem;">
+        Maria (live /Accounting/coa): [% coa_count || 0 %]
+        · PG for [% sitename | html %]: [% pg_coa_count || 0 %]
+      </span>
     </h2>
-    [% IF provisioned %]
-      [% IF coa_count %]
-        <a href="/Accounting/coa" class="btn btn-secondary" style="font-size:0.85rem;">Review / edit chart</a>
-      [% ELSE %]
-        <form method="post" action="/Accounting/coa/seed" style="display:inline;margin:0;"
-              onsubmit="return confirm('Seed the standard chart of accounts for [% sitename | html %]?');">
-          <button type="submit" class="btn btn-primary" style="font-size:0.88rem;">Use the standard template</button>
-        </form>
-        <span style="font-size:0.82rem;color:var(--text-muted-color,#666);margin-left:0.6rem;">
-          A generated / imported chart is added in ACCON Ph.1.
-        </span>
+
+    [% IF provisioned && db_ok %]
+      <p style="margin:0.5rem 0;color:#374151;font-size:0.95rem;">
+        [% sitename | html %] industry is pre-selected from site settings.
+        Replace updates PostgreSQL for this site only. Live
+        <a href="/Accounting/coa">/Accounting/coa</a> is still Maria until cutover.
+      </p>
+
+      <form method="post" action="[% c.uri_for('/Accounting/setup/choose_template') %]" style="margin-top:1rem;">
+        <input type="hidden" name="action" value="choose">
+
+        <div style="margin-bottom:1rem;">
+          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Industry (what this SiteName does)</label>
+          [% SET industry_label = chosen_base %]
+          [% FOREACH a IN archetypes %]
+            [% IF a.id == chosen_base && a.label %][% SET industry_label = a.label %][% END %]
+          [% END %]
+          <select name="base_archetype" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+            <option value="[% chosen_base | html %]" selected>[% industry_label | html %]</option>
+            [% FOREACH a IN archetypes %]
+              [% IF a.id && a.id != chosen_base %]
+              <option value="[% a.id %]">[% a.label %][% IF a.description %] — [% a.description %][% END %]</option>
+              [% END %]
+            [% END %]
+          </select>
+          <small style="color:#6b7280;margin-top:0.25rem;display:block;">
+            Industry is the work (CSC = hosting / programming / helpdesk).
+            Personal books, if any, are SiteName Shanta.
+          </small>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Legal form (how this SiteName is owned)</label>
+          [% SET lf = legal_form || 'sole_owner' %]
+          <select name="legal_form" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+            <option value="sole_owner" [% IF lf == 'sole_owner' %]selected[% END %]>Sole owner / sole proprietor</option>
+            <option value="company" [% IF lf == 'company' %]selected[% END %]>Company / corporation</option>
+            <option value="partnership" [% IF lf == 'partnership' %]selected[% END %]>Partnership</option>
+            <option value="nonprofit" [% IF lf == 'nonprofit' %]selected[% END %]>Non-profit / co-op</option>
+            <option value="other" [% IF lf == 'other' %]selected[% END %]>Other</option>
+          </select>
+          <small style="color:#6b7280;margin-top:0.25rem;display:block;">
+            Not the same as industry. CSC is Shanta’s sole proprietorship, so Sole owner is pre-selected.
+            These labels are generic worldwide. Tax filings (T2125, T2, GmbH, LLC, …) follow location, not this name.
+          </small>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Capability Overlays (optional)</label>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
+              <input type="checkbox" name="overlays" value="teaching"[% FOREACH o IN selected_overlays %][% IF o == 'teaching' %] checked[% END %][% END %]>
+              <span style="font-size:0.9rem;">Teaching (tuition, grants, donations)</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
+              <input type="checkbox" name="overlays" value="ecommerce"[% FOREACH o IN selected_overlays %][% IF o == 'ecommerce' %] checked[% END %][% END %]>
+              <span style="font-size:0.9rem;">E-Commerce (sales tax, shipping, COGS)</span>
+            </label>
+          </div>
+          <small style="color:#6b7280;margin-top:0.25rem;display:block;">
+            Activate overlays for your needs. Overlays combine with the base without number collisions.
+          </small>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap;">
+          <button type="submit" class="btn btn-primary" style="flex:1;">
+            Replace PG chart with AI for this industry
+          </button>
+        </div>
+      </form>
+      <form method="get" action="[% c.uri_for('/Accounting/setup') %]" style="margin:0.75rem 0 0;">
+        <input type="hidden" name="ai" value="1">
+        <button type="submit" class="btn btn-secondary">Let AI Generate Template</button>
+      </form>
+
+      [% IF merged_chart %]
+      <div style="margin-top:1rem;">
+        <h3 style="color:#1e40af;font-size:1rem;margin-top:0;">Preview: [% merged_chart.base.label %]</h3>
+        <p style="margin:0.5rem 0;color:#374151;font-size:0.88rem;">
+          [% IF merged_chart.overlays.size %]
+            [% merged_chart.base.label | html %] + [% merged_chart.overlays.size %] overlay(s)
+          [% ELSE %]
+            Base archetype only
+          [% END %] — [% merged_chart.rows.size %] chart entries
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+          <thead><tr style="background:#f3f4f6;">
+            <th style="text-align:left;padding:0.4rem;">Acc #</th>
+            <th style="text-align:left;padding:0.4rem;">Description</th>
+            <th style="text-align:center;padding:0.4rem;">Category</th>
+            <th style="text-align:center;padding:0.4rem;">GIFI</th>
+          </tr></thead>
+          <tbody>
+          [% FOREACH row IN merged_chart.rows %]
+            <tr style="border-top:1px solid #f3f4f6;">
+              <td style="padding:0.4rem;font-family:monospace;">[% row.accno | html %]</td>
+              <td style="padding:0.4rem;">[% row.description | html %]</td>
+              <td style="padding:0.4rem;text-align:center;">
+                [% IF row.category == 'A' %]Asset[% ELSIF row.category == 'L' %]Liability[% ELSIF row.category == 'Q' %]Equity[% ELSIF row.category == 'I' %]Income[% ELSIF row.category == 'E' %]Expense[% END %]
+              </td>
+              <td style="padding:0.4rem;text-align:center;color:#6b7280;">
+                [% IF row.gifi_accno %][% row.gifi_accno | html %][% ELSE %]–[% END %]
+              </td>
+            </tr>
+          [% END %]
+          </tbody>
+        </table>
+        <p style="margin-top:0.75rem;font-size:0.8rem;color:#6b7280;">
+          Previewed rows limited. Full chart seeded on your request.
+          [<a href="/Accounting/setup/seed_chart">Seed this chart to my database</a>]
+        </p>
+      </div>
       [% END %]
+
+      [% IF chart_seeded %]
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:0.75rem 1rem;margin-top:1rem;">
+        <strong style="color:#065f46;">Chart of Accounts seeded</strong>
+        <p style="margin:0.5rem 0 0;color:#374151;font-size:0.9rem;">
+          [% pg_coa_count | html %] accounts loaded from <strong>[% chosen_base | html %]</strong>
+          [% IF chosen_overlays.size %](with [% chosen_overlays.join(', ') | html %] overlay)[% END %].
+          You can <a href="/Accounting/coa">view and edit</a> (Maria live chart until cutover).
+        </p>
+      </div>
+      [% END %]
+
+    [% ELSIF provisioned %]
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Database is registered but not reachable. Fix step 2 before seeding a chart.</p>
     [% ELSE %]
       <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 2 first.</p>
     [% END %]
   </div>
 
-  [%# ── Step 4: import ───────────────────────────────────────────── %]
+  [%# ── Step 4: import existing Maria rows ────────────────────────── %]
   <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
     <h2 style="font-size:1rem;margin:0 0 0.5rem;">
-      4. Import existing data <span style="font-weight:normal;font-size:0.85rem;color:var(--text-muted-color,#666);">(optional)</span>
-      [% IF gl_count %]<span style="color:#065f46;">&#10004; [% gl_count %] GL entries</span>[% END %]
+      4. Import existing data <span style="font-weight:normal;font-size:0.85rem;color:var(--text-muted-color,#666);">(optional — Maria CoA, GL, suppliers)</span>
+      [% IF gl_count %]<span style="color:#065f46;">&#10004; [% gl_count %] GL entries on Maria</span>[% END %]
     </h2>
-    [% IF provisioned && coa_count %]
+    [% IF provisioned && db_ok %]
       <form method="post" action="/Accounting/migrate_to_pg" style="margin:0;"
             onsubmit="return confirm('Copy existing MariaDB accounting data for [% sitename | html %] into PostgreSQL? Already-migrated records are skipped.');">
         <button type="submit" class="btn btn-secondary" style="font-size:0.88rem;">Import my existing accounting data</button>
       </form>
     [% ELSE %]
-      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 3 first.</p>
+      <p style="margin:0;font-size:0.88rem;color:var(--text-muted-color,#666);">Complete step 2 first.</p>
     [% END %]
   </div>
 
@@ -131,6 +254,15 @@
   <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.25rem;">
     <strong style="color:#065f46;">&#10004; Accounting setup complete for [% sitename | html %].</strong>
     <a href="/Accounting" class="btn btn-primary" style="font-size:0.85rem;margin-left:0.75rem;">Go to the dashboard</a>
+  </div>
+  [% END %]
+
+  [% IF subscribers.size %]
+  <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:1rem 1.5rem;margin:1rem 0 0;">
+    <h4 style="margin-top:0;color:#475569;font-size:0.92rem;">Sites subscribed to Accounting (CSC admin view)</h4>
+    <p style="margin:0.4rem 0 0;font-size:0.85rem;color:#64748b;">
+      [% subscribers.size %] site(s): [% subscribers.join(', ') | html %]
+    </p>
   </div>
   [% END %]
 
