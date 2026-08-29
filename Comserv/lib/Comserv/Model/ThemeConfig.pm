@@ -363,6 +363,38 @@ sub update_theme {
     return $self->save_theme($c, $theme_name, $theme_data);
 }
 
+# Page-area favicons: map a URL-path regex to a favicon URL.
+# Read from theme_definitions.json -> "page_favicons": { "<regex>": "<url>", ... }
+# First matching regex (in sorted-key order) wins. Used by Root.pm to stash
+# page_favicon, which Header.tt renders as the highest-priority tab icon.
+sub get_page_favicon {
+    my ($self, $c, $path) = @_;
+    return undef unless defined $path && length $path;
+
+    my $config_file = $self->get_theme_definitions_path($c);
+    return undef unless -f $config_file;
+
+    my $config_data;
+    try {
+        my $json = read_file($config_file);
+        $config_data = decode_json($json);
+    }
+    catch {
+        $self->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_page_favicon',
+            "Error loading theme definitions for page_favicons: $_");
+        return undef;
+    };
+
+    my $mappings = $config_data->{page_favicons} || {};
+    for my $pattern (sort keys %$mappings) {
+        # Patterns are matched against the leading path only, anchored at start
+        if ($path =~ /$pattern/) {
+            return $mappings->{$pattern};
+        }
+    }
+    return undef;
+}
+
 # Get the favicon URL for a site (falls back to undef → default)
 sub get_site_favicon {
     my ($self, $c, $site_name) = @_;
