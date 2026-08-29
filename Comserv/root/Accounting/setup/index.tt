@@ -45,11 +45,11 @@
       2. Accounting database
       [% IF provisioned && db_ok %]<span style="color:#065f46;">&#10004; provisioned &amp; reachable</span>
       [% ELSIF provisioned %]<span style="color:#92400e;">&#9888; provisioned, not reachable</span>
-      [% ELSIF provision_status eq 'provisioning' %]<span style="color:#92400e;">provisioning…</span>
+      [% ELSIF provision_status == 'provisioning' %]<span style="color:#92400e;">provisioning…</span>
       [% ELSE %]<span style="color:#6b7280;">not provisioned</span>[% END %]
     </h2>
 
-    [% IF provision_status eq 'error' && provision_error %]
+    [% IF provision_status == 'error' && provision_error %]
       <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#991b1b;">[% provision_error | html %]</p>
     [% END %]
 
@@ -96,32 +96,55 @@
   <div style="border:1px solid var(--border-color,#dee2e6);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
     <h2 style="font-size:1rem;margin:0 0 0.5rem;">
       3. Chart of accounts
-      [% IF chart_seeded || pg_coa_count %]<span style="color:#065f46;">&#10004; [% pg_coa_count || coa_count %] PG accounts</span>
-      [% ELSIF coa_count %]<span style="color:#92400e;">[% coa_count %] on Maria (not yet seeded to PG)</span>
-      [% ELSE %]<span style="color:#6b7280;">empty</span>[% END %]
+      <span style="font-weight:normal;font-size:0.85rem;">
+        Maria (live /Accounting/coa): [% coa_count || 0 %]
+        · PG for [% sitename | html %]: [% pg_coa_count || 0 %]
+      </span>
     </h2>
 
     [% IF provisioned && db_ok %]
       <p style="margin:0.5rem 0;color:#374151;font-size:0.95rem;">
-        Select a pre-built Chart of Accounts template tailored to your business model.
-        Each base archetype covers multiple industries; you can add teaching/ecommerce overlays below.
+        [% sitename | html %] industry is pre-selected from site settings.
+        Replace updates PostgreSQL for this site only. Live
+        <a href="/Accounting/coa">/Accounting/coa</a> is still Maria until cutover.
       </p>
 
-      <form method="post" action="/Accounting/setup/choose_template" style="margin-top:1rem;">
+      <form method="post" action="[% c.uri_for('/Accounting/setup/choose_template') %]" style="margin-top:1rem;">
         <input type="hidden" name="action" value="choose">
 
         <div style="margin-bottom:1rem;">
-          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Base Archetype</label>
-          <select name="base_archetype" required style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
-            <option value="">-- Select a template --</option>
+          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Industry (what this SiteName does)</label>
+          [% SET industry_label = chosen_base %]
+          [% FOREACH a IN archetypes %]
+            [% IF a.id == chosen_base && a.label %][% SET industry_label = a.label %][% END %]
+          [% END %]
+          <select name="base_archetype" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+            <option value="[% chosen_base | html %]" selected>[% industry_label | html %]</option>
             [% FOREACH a IN archetypes %]
-            <option value="[% a.id %]" [% IF chosen_base == a.id %]selected[% END %]>
-              [% a.label %][% IF a.description %] — [% a.description %][% END %]
-            </option>
+              [% IF a.id && a.id != chosen_base %]
+              <option value="[% a.id %]">[% a.label %][% IF a.description %] — [% a.description %][% END %]</option>
+              [% END %]
             [% END %]
           </select>
           <small style="color:#6b7280;margin-top:0.25rem;display:block;">
-            This is pre-selected for your site's business model. The system uses CRA GIFI bands for statutory compliance.
+            Industry is the work (CSC = hosting / programming / helpdesk).
+            Personal books, if any, are SiteName Shanta.
+          </small>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Legal form (how this SiteName is owned)</label>
+          [% SET lf = legal_form || 'sole_owner' %]
+          <select name="legal_form" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+            <option value="sole_owner" [% IF lf == 'sole_owner' %]selected[% END %]>Sole owner / sole proprietor</option>
+            <option value="company" [% IF lf == 'company' %]selected[% END %]>Company / corporation</option>
+            <option value="partnership" [% IF lf == 'partnership' %]selected[% END %]>Partnership</option>
+            <option value="nonprofit" [% IF lf == 'nonprofit' %]selected[% END %]>Non-profit / co-op</option>
+            <option value="other" [% IF lf == 'other' %]selected[% END %]>Other</option>
+          </select>
+          <small style="color:#6b7280;margin-top:0.25rem;display:block;">
+            Not the same as industry. CSC is Shanta’s sole proprietorship, so Sole owner is pre-selected.
+            These labels are generic worldwide. Tax filings (T2125, T2, GmbH, LLC, …) follow location, not this name.
           </small>
         </div>
 
@@ -129,11 +152,11 @@
           <label style="font-weight:500;color:#374151;margin-bottom:0.25rem;display:block;">Capability Overlays (optional)</label>
           <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
             <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
-              <input type="checkbox" name="overlays" value="teaching" [% IF 'teaching' IN selected_overlays %]checked[% END %]>
+              <input type="checkbox" name="overlays" value="teaching"[% FOREACH o IN selected_overlays %][% IF o == 'teaching' %] checked[% END %][% END %]>
               <span style="font-size:0.9rem;">Teaching (tuition, grants, donations)</span>
             </label>
             <label style="display:flex;align-items:center;gap:0.5rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:0.5rem 0.75rem;">
-              <input type="checkbox" name="overlays" value="ecommerce" [% IF 'ecommerce' IN selected_overlays %]checked[% END %]>
+              <input type="checkbox" name="overlays" value="ecommerce"[% FOREACH o IN selected_overlays %][% IF o == 'ecommerce' %] checked[% END %][% END %]>
               <span style="font-size:0.9rem;">E-Commerce (sales tax, shipping, COGS)</span>
             </label>
           </div>
@@ -144,12 +167,13 @@
 
         <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap;">
           <button type="submit" class="btn btn-primary" style="flex:1;">
-            Review &amp; Seed Chart
+            Replace PG chart with AI for this industry
           </button>
-          <a href="/Accounting/setup/ai_generate" class="btn btn-outline-secondary" style="flex:1;text-align:center;">
-            Let AI Generate Template
-          </a>
         </div>
+      </form>
+      <form method="get" action="[% c.uri_for('/Accounting/setup') %]" style="margin:0.75rem 0 0;">
+        <input type="hidden" name="ai" value="1">
+        <button type="submit" class="btn btn-secondary">Let AI Generate Template</button>
       </form>
 
       [% IF merged_chart %]
