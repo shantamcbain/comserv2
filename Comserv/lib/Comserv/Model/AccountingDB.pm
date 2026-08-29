@@ -352,6 +352,15 @@ sub provision_site {
         $target_dbh->do("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"$db_user\"");
         $target_dbh->do("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"$db_user\"");
         $target_dbh->do("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"$db_user\"");
+        # accounting_template currently clones mixed CoA rows (honey/3d/craft).
+        # A new site DB must get TABLES only; industry chart is seeded later.
+        if (!$db_exists) {
+            $target_dbh->do("DELETE FROM acc_trans");
+            $target_dbh->do("DELETE FROM gl");
+            $target_dbh->do("DELETE FROM chart");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
+                "Cleared cloned chart seed from '$db_name' (tables kept).");
+        }
         $target_dbh->disconnect;
     }
 

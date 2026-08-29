@@ -288,7 +288,7 @@ sub seed_site_chart {
     my $merged = $self->merged_chart($c, $base_id, $overlay_ids);
     my $added  = 0;
 
-    my $rs = $schema->resultset('Accounting::Chart');
+    my $rs = eval { $schema->resultset('Chart') } || $schema->resultset('Accounting::Chart');
     for my $row (@{ $merged->{rows} }) {
         my %ins = map { $_ => $row->{$_} }
                   grep { exists $row->{$_} }
