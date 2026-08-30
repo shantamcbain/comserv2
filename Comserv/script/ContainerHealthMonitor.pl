@@ -17,7 +17,9 @@ my $mem_threshold  = $ENV{HEALTH_MEM_THRESHOLD}  || 95;
 
 my $sys_id   = $ENV{SYSTEM_IDENTIFIER} || $logger->get_system_identifier();
 my $hostname = eval { Sys::Hostname::hostname() } || 'unknown-host';
-my $db_host  = $ENV{DB_HOST} || '192.168.1.198';
+# App-read Ency is ONLY 192.168.1.20:3307 — never .198 (no DB the app uses there).
+my $db_host  = $ENV{DB_HOST} || '192.168.1.20';
+my $db_port  = $ENV{DB_PORT} || 3307;
 my $db_name  = $ENV{DB_NAME} || 'ency';
 
 my $id_str = "[$sys_id\@$hostname]";
@@ -82,7 +84,7 @@ sub _db_credentials {
 
 sub _db_ping {
     my ($user, $pass) = _db_credentials();
-    my $port = $ENV{DB_PORT} || 3306;
+    my $port = $db_port;  # defaults 3307 with host .20 — not legacy 3306/@.198
     
     if ($user) {
         my $driver = 'MariaDB';
