@@ -92,6 +92,25 @@ The system will look for <code>db_config.json</code> in:
 
 <ul><li>Keep database credentials secure</li></ul>
 
+<h2>Role-Based Runtime User (2026-08-28)</h2>
+<p>The active Ency connection is chosen by <strong>priority</strong> from the
+<code>~/.comserv/secrets/dbi/*.json</code> files (K8s-Secrets pattern, loaded first by
+<code>Comserv::Util::RemoteDB</code>). The canonical <code>db_production_mysql.json</code> now declares three
+prioritized entries for the <code>ency</code> database:</p>
+<ul>
+  <li><code>comserv_app</code> (priority 1) — limited DML, the preferred normal runtime user. This is the only
+      DB user that should live in the deployable secret files.</li>
+  <li><code>comserv_admin</code> (priority 2) — full DDL rights, used only by SchemaComparison for
+      CREATE/DROP/ALTER. Store full-access users DB-backed, never in git.</li>
+  <li><code>shanta_forager</code> (priority 3) — safe fallback backup; used automatically if the higher-priority
+      users fail to authenticate.</li>
+</ul>
+<p><code>DBEncy</code> logs an <code>error</code>-level warning (surfaces as a GUI alert) when
+<code>comserv_app</code> is not the active user. Admins switch the active user from the DB-user dropdown on
+<code>/admin</code> (Database Management card); the current user is shown in the page footer. See
+<code>database_configuration.tt</code> for the full table and the MariaDB <code>%</code> host requirement that
+gates the switch to <code>comserv_app</code>.</p>
+
 <ul><li>Do not commit <code>db_config.json</code> to version control</li></ul>
 
 <ul><li>Ensure proper file permissions</li></ul>

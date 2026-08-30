@@ -373,6 +373,41 @@ sub subject_needs_clarify {
     return 0;
 }
 
+# todo.subject is varchar(255). Chat often dumps the whole request into subject,
+# which raised Application Error Audit #2344 (Data too long for column 'subject').
+# Keep a short title on subject; move overflow into description (text).
+use constant SUBJECT_MAX => 255;
+
+sub normalize_subject_description {
+    my ($self, $subject, $description) = @_;
+    $subject = defined $subject ? $subject : '';
+    $description = defined $description ? $description : '';
+    $subject =~ s/^\s+|\s+$//g;
+    $description =~ s/^\s+|\s+$//g;
+    return ($subject, $description) unless length $subject > SUBJECT_MAX;
+
+    my $max = SUBJECT_MAX;
+    my $head = substr($subject, 0, $max);
+    # Prefer a clean break on whitespace/punctuation near the end of the head.
+    if ($head =~ /^(.*[\s,;:\-\.])\S*$/s && length($1) >= int($max * 0.55)) {
+        $head = $1;
+        $head =~ s/\s+$//;
+    }
+    my $overflow = substr($subject, length($head));
+    $overflow =~ s/^\s+//;
+    $subject = $head;
+    if (length $overflow) {
+        if (length $description) {
+            $description = $overflow . "\n\n" . $description
+                unless index($description, $overflow) == 0;
+        }
+        else {
+            $description = $overflow;
+        }
+    }
+    return ($subject, $description);
+}
+
 # Short-circuit /ai2/chat when the user asked to create a todo.
 # Returns a chat-shaped hash (handled=>1) or undef to fall through to the LLM.
 sub try_chat_create {
@@ -458,7 +493,7 @@ sub chat_contract {
     return <<"END";
 TODO CREATION + TIME TRACKING (SiteName=$sitename):
 When the user asks to add, create, or track a todo/task:
-1. Extract subject (required), optional description, due_date (YYYY-MM-DD), priority (1=highest … 5=lowest, default 3).
+1. Extract a SHORT subject (required, max 255 chars — a title, not the whole message), optional description (put long detail here), due_date (YYYY-MM-DD), priority (1=highest … 5=lowest, default 3).
 2. If they named a project, put it in params.project_name or project_code or project_id. Prefer a sub-project when both a parent and a child match.
 3. Emit exactly one ACTION on its own line (do not invent a project_id if you are unsure):
 [ACTION: {"action":"create_todo","params":{"subject":"...","description":"...","project_name":"...","due_date":"YYYY-MM-DD","priority":3}}]
@@ -547,6 +582,10 @@ sub _insert_todo {
     my $roles    = $c->session->{roles} || [];
     my $group    = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
     my $code     = $project->{project_code} || '';
+    # Defense in depth: never INSERT a subject longer than the column
+    # (Application Error Audit #2344 — Data too long for column 'subject').
+    my $description = $args{description} // '';
+    ($subject, $description) = $self->normalize_subject_description($subject, $description);
     my $row;
     eval {
         $row = $schema->resultset('Todo')->create({
@@ -555,7 +594,7 @@ sub _insert_todo {
             parent_todo         => '',
             due_date            => $due,
             subject             => $subject,
-            description         => $args{description} // '',
+            description         => $description,
             estimated_man_hours => 0,
             comments            => $args{comments} // '',
             reporter            => $user,
@@ -587,7 +626,7 @@ sub _insert_todo {
                 parent_todo         => '',
                 due_date            => $due,
                 subject             => $subject,
-                description         => $args{description} // '',
+                description         => $description,
                 estimated_man_hours => 0,
                 comments            => $args{comments} // '',
                 reporter            => $user,
@@ -619,9 +658,13 @@ sub _insert_todo {
 sub _draft_from_params {
     my ($self, $params) = @_;
     $params ||= {};
+    my ($subject, $description) = $self->normalize_subject_description(
+        $params->{subject} || '',
+        $params->{description} || '',
+    );
     return {
-        subject        => $params->{subject} || '',
-        description    => $params->{description} || '',
+        subject        => $subject,
+        description    => $description,
         due_date       => $params->{due_date} || '',
         priority       => $params->{priority} // 3,
         status         => $params->{status} // 1,

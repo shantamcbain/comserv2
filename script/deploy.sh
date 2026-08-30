@@ -432,15 +432,20 @@ setup_shared_secrets_standalone() {
     fi
     local MON_NODES="${HW_MONITOR_NODES:-}"
     if [ -z "$MON_NODES" ]; then
+        # App nodes only (.126 prod1, .199 workstation). Gateway proxmoxt210=.3
+        # runs this cron; it is NOT a DB host. Live Ency the app reads = .20:3307 only.
         case "$SYSTEM_IDENTIFIER" in
             production1) MON_NODES="http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run" ;;
             *workstation*|workstation-prod-local) MON_NODES="http://192.168.1.199:5000/admin/hardware_monitor/run,http://192.168.1.126:5000/admin/hardware_monitor/run" ;;
+            *proxmoxt210*|*gateway*|proxmox*) MON_NODES="http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run" ;;
             *) MON_NODES="http://192.168.1.126:5000/admin/hardware_monitor/run,http://192.168.1.199:5000/admin/hardware_monitor/run" ;;
         esac
     fi
 
+    # Marker MUST be at end of the cron line. A leading "# comserv-..." after the
+    # schedule turns the rest of the line into a comment and the job never runs.
     local CRON_MARKER="# comserv-hardware-monitor"
-    local CRON_LINE="*/5 * * * * $CRON_MARKER HW_MONITOR_NODES='$MON_NODES' HW_INGEST_TOKEN=\"\$(cat /usr/local/etc/comserv/hw_ingest_token 2>/dev/null || echo MISSING_TOKEN)\" /usr/local/bin/hardware_monitor.pl >> /var/log/comserv-hardware-monitor.log 2>&1"
+    local CRON_LINE="*/5 * * * * HW_MONITOR_NODES='$MON_NODES' HW_INGEST_TOKEN=\"\$(cat /usr/local/etc/comserv/hw_ingest_token 2>/dev/null || echo MISSING_TOKEN)\" /usr/local/bin/hardware_monitor.pl >> /var/log/comserv-hardware-monitor.log 2>&1 $CRON_MARKER"
     local TMP_CRON
     TMP_CRON=$(mktemp)
     ( crontab -l 2>/dev/null | grep -v "$CRON_MARKER" ) > "$TMP_CRON" 2>/dev/null || true

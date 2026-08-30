@@ -40,6 +40,20 @@
     <div id="ticket-form-section" class="ticket-form" style="display:none;">
         <h2>New Support Ticket</h2>
         <form method="post" action="[% c.uri_for('/HelpDesk/ticket/submit') %]">
+            <!-- Honeypot field - bots fill this, humans don't see it -->
+            <div class="form-group honeypot-field" style="display:none; position:absolute; left:-9999px;">
+                <label for="website">Website</label>
+                <input type="text" id="website" name="website" value="" tabindex="-1" autocomplete="off">
+            </div>
+
+            <!-- Math challenge - session-based arithmetic question -->
+            <div class="form-group math-challenge">
+                <label for="math_challenge_ans">Security Question: What is [% num1 %] + [% num2 %]?</label>
+                <input type="number" id="math_challenge_ans" name="math_challenge_ans"
+                       class="form-control" required min="0" max="20"
+                       placeholder="Enter the sum">
+            </div>
+
             <div class="form-group">
                 <label for="subject">Subject:</label>
                 <input type="text" id="subject" name="subject" class="form-control" required

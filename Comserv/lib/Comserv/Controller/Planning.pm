@@ -212,23 +212,17 @@ sub daily :Path('/planning/daily') :Args {
                             push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
                         }
                     } elsif ($start && $start eq $selected_date) {
-                        # Has scheduled start_date matching today — show it
+                        # Has scheduled start_date matching the day — show it
                         push @$todos_for_today, $todo;
                     } elsif (!$start && $due && $due eq $selected_date) {
-                        # No scheduled date, but due today — show it
+                        # No scheduled date, but due that day — show it
                         push @$todos_for_today, $todo;
-                    } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
-                        push @$todos_for_today, $todo;
-                    } elsif (!$is_done && !$is_recurr) {
-                        # Overdue: scheduled date in the past, OR (no scheduled date AND due date in past)
-                        if ($start && $start lt $selected_date) {
-                            push @$overdue_todos, $todo;
-                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
-                        } elsif (!$start && $due && $due lt $selected_date) {
-                            push @$overdue_todos, $todo;
-                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
-                        }
                     }
+                    # NOTE: undated open todos and overdue items are intentionally
+                    # NOT dumped into the day view. The day schedule shows only what
+                    # is actually scheduled for that date (start_date == date, or
+                    # due == date when no start). Overdue belongs in the backlog /
+                    # todos views, not the day schedule.
 
                     unless ($is_recurr) {
                         # Use start_date as calendar anchor; fall back to due_date only when no start_date
@@ -328,6 +322,43 @@ sub daily :Path('/planning/daily') :Args {
             }
         }
     };
+
+    # Branch awareness for the day view: on a worktree server (app_workflow !=
+    # main) keep ONLY todos that belong to the current branch's project tree.
+    # This is the same branch scope used by the Focus Queue, applied to the day
+    # schedule so the day view never shows another branch's scheduled work.
+    my $day_branch = $c->stash->{app_workflow} // 'main';
+    if ($day_branch ne 'main') {
+        my $day_hint = '';
+        my $day_list = eval { _build_worktree_list($c) } || [];
+        my ($day_wt) = grep { ($_->{name} || '') eq $day_branch } @$day_list;
+        $day_hint = $day_wt->{project_id} if $day_wt;
+        my @day_pids = eval {
+            Comserv::Util::ProjectDependencies::resolve_branch_project_ids(
+                $c, $day_branch, $day_hint
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'daily',
+                "Day-view branch scope resolve failed for '$day_branch': $@");
+            @day_pids = ();
+        }
+        if (@day_pids) {
+            my %day_scope = map { $_ => 1 } @day_pids;
+            my @day_filtered;
+            for my $todo (@$todos_for_today) {
+                my %h = $todo->get_columns;
+                push @day_filtered, $todo
+                    if Comserv::Util::FocusRanking::todo_matches_branch(
+                        \%h, $day_branch, \%day_scope
+                    );
+            }
+            $todos_for_today = \@day_filtered;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily',
+                "Day view branch-scoped to '$day_branch': "
+                . scalar(@day_filtered) . " of scheduled todos kept");
+        }
+    }
 
     # Convert todos_for_today to plain hashrefs with precomputed display fields.
     # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
