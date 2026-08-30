@@ -61,6 +61,13 @@
       "label": "Documentation",
       "port": 4008,
       "url": "/planning/daily"
+    },
+    "helpdesk": {
+      "label": "helpdesk",
+      "port": 4009,
+      "url": "/HelpDesk",
+      "host": "workstation.local",
+      "sitename": "CSC"
     }
   }
 }
