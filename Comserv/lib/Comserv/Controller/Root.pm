@@ -2601,38 +2601,51 @@ sub _track_nav_back_url {
 
 sub _port_label {
     my ($port) = @_;
+    # Prefer short known labels for worktree branch names (helpdesk was HD on
+    # legacy :4013; live helpdesk worktree is now :4009).
+    my %branch_labels = (
+        helpdesk             => 'HD',
+        Documentation        => 'Do',
+        aisystem             => "\x{1F916}",
+        schema               => 'Sc',
+        planning             => 'Pl',
+        git                  => 'Gi',
+        '3d'                 => '3D',
+        DockerHA             => 'HA',
+        InventoryAccounting  => 'IA',
+    );
     # Single source of truth first: worktrees.json maps each live branch to its
-    # port. Use the branch name as the label so favicons follow the registry
-    # instead of the stale zenflow-era static map below.
+    # port. Prefer %branch_labels, else first two letters of the branch name.
     my $cfg = eval { Comserv::Util::Git->_worktree_config };
     if ($cfg && $cfg->{branches}) {
         for my $name (sort keys %{$cfg->{branches}}) {
             my $b = $cfg->{branches}{$name};
-            return ucfirst(substr($name, 0, 2))
-                if $b && ($b->{port} || 0) == $port;
+            next unless $b && ($b->{port} || 0) == $port;
+            return $branch_labels{$name} if exists $branch_labels{$name};
+            return _branch_favicon_label($name);
         }
     }
     my %named = (
         3000 => 'PC',   # ProjectConfig
-        4001 => 'Pl',   # PlanningSystem
-        4002 => 'SM',   # SchemaManagement
-        4003 => 'HA',   # InfrastructureHA
-        4004 => 'WS',   # WorkShops
-        4005 => 'Us',   # Users
+        4001 => 'IA',   # InventoryAccounting worktree
+        4002 => 'HA',   # DockerHA
+        4003 => '3D',   # 3d worktree
+        4004 => 'Gi',   # git
+        4005 => 'Pl',   # planning
         # 4006 is the aisystem worktree (AI system use) — show the AI robot
         # glyph instead of the stale 'FM' FileManagement label.
         4006 => "\x{1F916}",   # aisystem — AI robot
-        4007 => 'Ma',   # UnifiedMail
-        4008 => 'Mb',   # Membership
-        4009 => 'Pt',   # PointSystem
+        4007 => 'Sc',   # schema
+        4008 => 'Do',   # Documentation
+        4009 => 'HD',   # helpdesk worktree (was zenflow :4013 HD)
         4010 => 'AI',   # AIChatSystem
         4011 => 'Cs',   # CssThemes
         4012 => 'En',   # ENCY
-        4013 => 'HD',   # HelpDesk
+        4013 => 'HD',   # HelpDesk (legacy zenflow port — keep HD)
         4014 => 'Hp',   # HealthPlanning
         4015 => 'SH',   # ProdServerHealth
         4016 => 'Sc',   # Security
-        4017 => 'Dc',   # Documentation
+        4017 => 'Dc',   # Documentation (legacy)
         4018 => 'AP',   # APISystem
         4019 => 'BM',   # BMaster
         4020 => 'Ch',   # AIChatPlanInt
@@ -2735,6 +2748,7 @@ sub site_favicon :Path('/favicon/site') :Args(1) {
 
 sub _branch_favicon_label {
     my ($branch) = @_;
+    return 'HD' if defined $branch && $branch =~ /^helpdesk$/i;
     # Split into words on separators AND camelCase boundaries:
     #   InventoryAccounting -> Inventory, Accounting -> "IA"
     #   comserv2-git-worktree -> c, g, w -> "CGW"
@@ -2775,9 +2789,16 @@ sub branch_favicon :Path('/favicon/branch') :Args(1) {
     my $fs  = $len == 1 ? 20 : $len == 2 ? 16 : 12;
     my $y   = $len == 1 ? 24 : 22;
 
+    # Use short label (not full branch name) so the badge stays readable.
+    # helpdesk branch → HD (matches legacy :4013 / public HelpDesk domain).
+    if (lc($branch) eq 'helpdesk') {
+        $c->detach('helpdesk_favicon');
+        return;
+    }
+
     my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="4" fill="$bg"/>
-  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$branch</text>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$label</text>
 </svg>};
 
     $c->response->content_type('image/svg+xml');
