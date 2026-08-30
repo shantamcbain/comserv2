@@ -102,7 +102,7 @@
                     <th class="doc-th">Role</th>
                 </tr>
                 <tr>
-                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></td>
                     <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=272" class="doc-link">#272 DRYER-INT</a></td>
                     <td class="doc-td">Test scenario: PDF is the BOM; 3MF files are plates of labeled parts; base unit vs add-on module; hardware lines.</td>
                 </tr>
@@ -133,8 +133,12 @@
             <h2 id="order" class="doc-h2">4. Work order</h2>
             <ol class="doc-body">
                 <li><strong>Domain model</strong> — assemblies, BOM qty, hardware vs printed, filament type. Dryer PDF is the current proof that plate-level import is not a BOM.</li>
-                <li><strong>Import playbook</strong> — DryerProjectImportPlan v0.22+: scan manual → part SKUs → extract STL → items + BOM → order a config → explode to jobs.</li>
-                <li><strong>Farm</strong> — queue any item, change filament, grams from STL or manual, issue on complete.</li>
+                <li><strong>Import playbook</strong> — DryerProjectPlan v0.22+: scan manual → part SKUs → extract STL → items + BOM → order a config → explode to jobs.</li>
+                <li><strong>Farm</strong> — queue any item, change filament, grams from STL or manual, issue on complete.
+                    Download uses <code>/3d/model_download</code> via NfsPath. Both production1 and
+                    workstation Docker must mount <code>comserv2_nfs_data_nfs</code> (NFS
+                    192.168.1.175:/mnt/data). See
+                    <a href="[% c.uri_for('/Documentation/DEPLOY_WORKFLOW') %]" class="doc-link">DEPLOY_WORKFLOW</a>.</li>
                 <li><strong>Signs / browse</strong> — after import+queue are honest; do not rebuild tables.</li>
                 <li><strong>Commerce</strong> — shop/cart/order stay on Inventory; 3d is the production provider.</li>
             </ol>
@@ -198,7 +202,7 @@
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=272" class="doc-link">#272 DRYER-INT</a></td>
-                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></td>
                     <td class="doc-td">PDF BOM exploded; configs orderable</td>
                 </tr>
             </table>
@@ -213,7 +217,7 @@
                 <ul class="doc-body">
                     <li><a href="[% c.uri_for('/Documentation/InventoryInternalBuildBom') %]" class="doc-link">InventoryInternalBuildBom</a> (manual: two masters + BOM)</li>
                     <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/SignGenerator') %]" class="doc-link">SignGenerator</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing (operator KB)</a></li>
                 </ul>

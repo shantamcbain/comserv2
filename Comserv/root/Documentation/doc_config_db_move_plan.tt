@@ -1,0 +1,114 @@
+[% META
+    title = "Documentation Config: Permanent DB Move"
+    description = "Permanent fix for the DocumentationConfig.json merge-blocker: move the mutable doc catalog from a rewritten JSON overlay into the documentationmetadataindex table. Reuses the existing (half-built) loader in DocumentationConfig.pm."
+    roles = "admin,developer"
+    TemplateType = "Documentation"
+    category = "system"
+    page_version = "1.0"
+    last_updated = "2026-08-26"
+    site_specific = "false"
+    project_id = "138"
+    project_code = "DOCMASTER"
+%]
+[% PageVersion = 'Documentation/doc_config_db_move_plan.tt,v 1.0 2026/08/26 shanta Exp - Permanent fix: move doc config catalog out of rewritten JSON into documentationmetadataindex' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container masterplan">
+
+<h1 id="top">Documentation Config — Permanent DB Move (merge-blocker cure)</h1>
+
+<div class="last-updated doc-muted">
+    Created: 2026-08-26 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Status: SPEC (ready to hand to schema owner)
+    &nbsp;|&nbsp; Parent project: <a href="/project/details?project_id=138" class="doc-link">#138 DOCMASTER</a>
+</div>
+
+<div class="notice">
+    <strong>Why this plan exists.</strong> The acute blocker (recurring merge conflicts on
+    <code>root/session/documentation_config/DocumentationConfig.json</code>) is already fixed short-term by
+    gitignoring + untracking that runtime overlay (see changelog <code>2026-08-26-doc-config-merge-blocker</code>).
+    This plan is the <em>permanent</em> cure: stop serializing the doc catalog to a file that gets rewritten
+    on every scan/save, and store it in the database instead.
+</div>
+
+<h2 id="problem">The problem (root cause)</h2>
+<ul>
+    <li>The doc system keeps a catalog of pages/categories in a JSON file. There are two copies:
+        <ul>
+            <li><code>Comserv/root/Documentation/config/DocumentationConfig.json</code> — the <strong>shipped seed</strong> (source, stays tracked).</li>
+            <li><code>Comserv/root/session/documentation_config/DocumentationConfig.json</code> — the <strong>runtime overlay</strong>, rewritten on every scan/save via
+                <code>_atomic_write_json</code> (Documentation.pm:1494, 1820, 2179; Util/DocumentationConfig.pm:609 <code>save_config</code>).</li>
+        </ul>
+    </li>
+    <li>Readers consult the overlay first, then the seed (Documentation.pm:63 <code>_documentation_config_read_path</code>).</li>
+    <li>Because the overlay is a ~13,000-line generated blob tracked in git, every <code>main &lt;-&gt; Documentation</code>
+        merge collided on it. Tracking is now stopped (short-term fix), but the architecture still rewrites a file on
+        every save — fragile, and a regression risk if anyone re-tracks it.</li>
+</ul>
+
+<h2 id="good-news">Already 70% built (reuse it)</h2>
+<p>The DB foundation exists but is incomplete. Do not rebuild — finish it:</p>
+<table class="doc-table">
+    <tr><th class="doc-th">What exists</th><th class="doc-th">Where</th><th class="doc-th">State</th></tr>
+    <tr><td class="doc-td">Result class <code>documentationmetadataindex</code></td><td class="doc-td">Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</td><td class="doc-td">DONE — columns: file_path (unique), file_type, title, excerpt, searchable_text, content_hash, role_access (JSON), <strong>categories (JSON)</strong>, indexed_at, last_file_modified, file_size. Has <code>can_user_access</code> / <code>is_content_stale</code> helpers.</td></tr>
+    <tr><td class="doc-td">DB-backed loader</td><td class="doc-td">Comserv/lib/Comserv/Util/DocumentationConfig.pm:338 <code>load_from_db</code></td><td class="doc-td">DONE but ADDITIVE-ONLY — explicitly NOT called by <code>load_config</code> (comment at line 312). Returns 1 on success, 0 to fall back to JSON.</td></tr>
+    <tr><td class="doc-td">Indexer that WRITES the table</td><td class="doc-td">(none yet)</td><td class="doc-td">MISSING — AutoDiscovery.pm still writes the JSON overlay, not the table.</td></tr>
+    <tr><td class="doc-td">Write path in <code>save_config</code></td><td class="doc-td">Util/DocumentationConfig.pm:609</td><td class="doc-td">MISSING — writes JSON overlay only.</td></tr>
+</table>
+
+<h2 id="plan">The permanent plan (steps)</h2>
+
+<h3 id="s1">Step 1 — Author the table write (schema branch)</h3>
+<p>DB writes belong on the <strong>schema</strong> branch per branch discipline (Result-class/table work is not a Documentation-branch change).
+<strong>Never hand-DDL</strong> — create/repair structure via the app schema-compare flow, Result-file first.
+The Result class already exists, so this step is mostly the <em>indexer</em> that populates it:</p>
+<ul>
+    <li>In <code>Documentation/AutoDiscovery.pm</code> (the scan that currently calls <code>save_config</code> at line ~2179),
+        replace the JSON write with an upsert into <code>documentationmetadataindex</code> keyed on <code>file_path</code>
+        (unique constraint already set). Store: title, excerpt, file_type, role_access (JSON), categories (JSON), content_hash, last_file_modified, file_size.</li>
+    <li>Reuse the same per-page normalization <code>DocumentationConfig.pm:_normalize_page</code> (line 485) so DB rows match the in-memory shape.</li>
+</ul>
+
+<h3 id="s2">Step 2 — Wire <code>load_config</code> to prefer DB</h3>
+<p>In <code>DocumentationConfig.pm:load_config</code> (line 70), change precedence to:</p>
+<ol>
+    <li>Try <code>load_from_db($c)</code> — if it returns 1, use the DB structures.</li>
+    <li>Fall back to shipped seed JSON (read-only) on any failure.</li>
+    <li>Drop the runtime JSON overlay read entirely (it will no longer be written).</li>
+</ol>
+<p><code>load_from_db</code> already builds <code>categories / pages / pages_by_id / pages_by_category / pages_by_site</code> identically to the JSON path, so callers (Documentation.pm, Api.pm, Config.pm) need no changes.</p>
+
+<h3 id="s3">Step 3 — Move <code>save_config</code> writes to DB</h3>
+<p>Rewrite <code>DocumentationConfig.pm:609 save_config</code> to upsert the affected page row(s) into
+<code>documentationmetadataindex</code> instead of writing the overlay JSON. The admin UI (manage_config / update_roles / save_config action, Documentation.pm:1353) keeps working unchanged because it only calls <code>save_config</code> — the storage target is internal.</p>
+
+<h3 id="s4">Step 4 — Remove the overlay entirely</h3>
+<ul>
+    <li>Delete the now-dead <code>_overlay_path</code> / <code>_active_path</code> JSON logic in DocumentationConfig.pm (lines 460–481) and the JSON write in Documentation.pm <code>_documentation_config_write_path</code> consumers.</li>
+    <li>The shipped seed <code>root/Documentation/config/DocumentationConfig.json</code> becomes an optional bootstrap/seed only (or is dropped once the table is populated). Keep it tracked as the seed source.</li>
+    <li>Remove <code>DocumentationConfig.json</code> / <code>scan_state.json</code> references from <code>.gitignore</code> (no longer needed) — or leave them; harmless.</li>
+</ul>
+
+<h2 id="per-site">Per-site note (correctness win)</h2>
+<p><code>documentationmetadataindex</code> lives in the <strong>Ency</strong> schema = the <strong>per-SiteName</strong> database.
+Today the catalog is a single global file with a <code>site</code> field. Moving to the table makes the catalog
+<em>genuinely per-site</em>, which matches the existing <code>site_specific</code> / <code>site_filter</code> design and removes
+the awkward global-file-with-site-field hack. No extra work — it falls out of using the Ency schema.</p>
+
+<h2 id="verify">Verification</h2>
+<ol>
+    <li>Spin up a worktree on the <code>schema</code> branch (or wherever the write lands), run the app schema-compare so the table is confirmed.</li>
+    <li>Trigger a doc scan; confirm rows appear in <code>documentationmetadataindex</code> (one per page, unique file_path).</li>
+    <li>Load <code>/Documentation</code> — pages/categories render identically to the JSON path (compare <code>get_filtered_pages</code> output).</li>
+    <li>Edit a page role via the admin UI; confirm the row's <code>role_access</code> updates and the change is visible without a file write.</li>
+    <li><code>git merge main</code> and <code>git merge Documentation</code> both report no conflict on any doc-config file (already true after the short-term fix; stays true because no file is rewritten).</li>
+</ol>
+
+<h2 id="size">Size &amp; ownership</h2>
+<ul>
+    <li><strong>Size:</strong> M (finish loader wiring + indexer + save_config rewrite).</li>
+    <li><strong>Owner:</strong> schema branch for the table-write/indexer; Documentation branch for the loader/save_config wiring once the table is available.</li>
+    <li><strong>Dependency:</strong> Ency Result class already present — low risk.</li>
+</ul>
+
+<p class="doc-backtop"><a href="#top">&#8593; Back to Top</a></p>
+</div>

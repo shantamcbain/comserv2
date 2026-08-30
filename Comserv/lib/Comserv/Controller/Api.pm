@@ -1,6 +1,7 @@
 package Comserv::Controller::Api;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
+use File::Spec;
 use JSON::MaybeXS;
 use DateTime;
 use Digest::SHA qw(sha256_hex);
@@ -571,6 +572,49 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         todo => $self->_todo_to_hash($todo)
     }));
     $c->detach();
+}
+
+# Thin AI/local aliases. DB writes stay in Controller::Inventory.
+sub api_inventory_items :Path('inventory/items') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_items($c);
+}
+
+sub api_inventory_item_create :Path('inventory/item/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_item_create($c);
+}
+
+sub api_inventory_bom_add :Path('inventory/bom/add') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_bom_add($c);
+}
+
+sub api_inventory_bom :Path('inventory/bom') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_bom($c);
+}
+
+sub api_inventory_stock :Path('inventory/stock') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_stock($c);
+}
+
+sub api_inventory_need :Path('inventory/need') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_need($c);
+}
+
+sub api_inventory_po_create :Path('inventory/po/create') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory::PurchaseOrder')->api_po_create($c);
 }
 
 =head2 api_list_documentation
@@ -1960,6 +2004,154 @@ sub api_focus_models :Path('focus/models') :Args(0) {
     $c->res->body(encode_json({ success => 1, models => \@models, default => $default }));
 }
 
+# ============================================================================
+# TodoRank agent endpoints (project #287 TODOAGENT, plan
+# Documentation/TodoRankAgentPlan.tt Phases 1-tail/3/4). All AI work delegates
+# to Model::AI2::TodoRank. DRY-RUN BY DEFAULT: pass {"apply": true} to write.
+# ============================================================================
+
+# GET /api/todo/duplicates?sitename=CSC — normalized-subject grouping of open
+# todos (plan Phase 1 helper). Read-only; never deletes anything.
+sub api_todo_duplicates :Path('todo/duplicates') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $req = $c->req->params;
+    my $site = $req->{sitename} || $c->stash->{SiteName} || 'CSC';
+    my %groups;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @rows = $schema->resultset('Todo')->search(
+            { sitename => $site, status => { -not_in => [3, 4, '3', '4'] } },
+            { columns => [qw(record_id subject project_id priority status)],
+              order_by => { -asc => 'record_id' }, rows => 2000 },
+        )->all;
+        for my $t (@rows) {
+            my $subj = lc($t->subject // '');
+            $subj =~ s/[^a-z0-9]+/ /g;
+            $subj =~ s/^\s+|\s+$//g;
+            next unless length $subj > 8;   # too-short subjects group everything
+            push @{ $groups{$subj} }, {
+                record_id  => $t->record_id,
+                subject    => $t->subject // '',
+                project_id => $t->project_id,
+                priority   => $t->priority,
+                status     => $t->status,
+            };
+        }
+    };
+    if ($@) {
+        $self->_json_error($c, 500, "duplicate scan failed: $@", 'scan_failed');
+    }
+    my @dupes = grep { @{ $_->{todos} } > 1 }
+                map { { key => $_, todos => $groups{$_} } } sort keys %groups;
+    $self->_json_ok($c, {
+        success       => 1,
+        sitename      => $site,
+        groups        => \@dupes,
+        group_count   => scalar(@dupes),
+        note          => 'Advisory only — duplicates are FLAGGED for human merge, never auto-deleted.',
+    });
+}
+
+# POST /api/todo/rank — the TodoRank coordinator (plan Phase 3).
+# Body: { sitename?, project_id?, model | models[], apply? (default false), limit? }
+# Lists open todos scoped to the branch/site/project, batches them (~15),
+# asks the model per batch, and returns per-record proposals + a diff of what
+# WOULD change. With apply:true it writes only differing values as
+# last_mod_by='ai-todorank'. Never closes/deletes rows; status=5 dates frozen.
+sub api_todo_rank :Path('todo/rank') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $apply = ($data->{apply} && "$data->{apply}" eq '1') ? 1 : 0;
+
+    # Resolve target model(s): same contract as /api/focus/top5.
+    my @targets;
+    if (ref($data->{models}) eq 'ARRAY') {
+        for my $m (@{ $data->{models} }) {
+            push @targets, ref($m) ? { name => $m->{name}, host => $m->{host} // '' }
+                                   : { name => "$m", host => '' } if ref($m) ? $m->{name} : $m;
+        }
+    }
+    elsif (my $one = ($data->{model} // '') =~ s/^\s+|\s+$//gr) {
+        push @targets, { name => $one, host => $data->{host} // '' };
+    }
+    unless (@targets) {
+        $self->_json_error($c, 400, 'Missing required field: model (or models[])', 'validation_error');
+    }
+
+    my $rank = eval { $c->model('AI2::TodoRank') };
+    unless ($rank) {
+        $self->_json_error($c, 500, 'AI2::TodoRank model not available', 'model_missing');
+    }
+
+    # Branch/SiteName/role context: which branch instance am I serving, which
+    # coordination project owns it, who is asking. The agent ranks SITE
+    # OPERATIONS for this SiteName only — no git, no cross-site view.
+    my $bctx  = $rank->branch_context($c);
+    my @roles = ref($c->session->{roles}) eq 'ARRAY' ? @{ $c->session->{roles} } : ();
+
+    my ($rows, $rbid) = $rank->gather_todos($c,
+        sitename  => $data->{sitename},
+        project_id=> $data->{project_id} // $bctx->{project_id},
+    );
+    unless (@$rows) {
+        $self->_json_ok($c, { success => 1, message => 'No open todos matched the scope',
+                              batches => 0, results => [], dry_run => \!$apply });
+    }
+
+    my $limit = ($data->{limit} && $data->{limit} =~ /^\d+$/) ? $data->{limit} : 200;
+    @$rows = @$rows[0 .. ($#$rows < $limit - 1 ? $#$rows : $limit - 1)];
+
+    my @all_changes;
+    my $total_proposed = 0;
+    my @batch_errors;
+    my $bs = eval { $rank->can('BATCH_SIZE') } ? Comserv::Model::AI2::TodoRank->BATCH_SIZE : 15;
+    my %pctx = (
+        sitename     => $data->{sitename} // $rank->_sitename($c),
+        branch       => $bctx->{branch},
+        project_name => $bctx->{project_name},
+        roles        => \@roles,
+    );
+    while (@$rows) {
+        my @batch = splice(@$rows, 0, $bs);
+        my ($system, $user_prompt) = $rank->build_prompt(\@batch, \%pctx);
+        my $res = $rank->run_batch($c, $targets[0], $system, $user_prompt);
+        unless ($res && $res->{success}) {
+            push @batch_errors, ($res && $res->{error}) || 'AI ranking unavailable';
+            next;
+        }
+        my $parsed = $rank->parse_result($res, [ map { $_->{record_id} } @batch ]);
+        $total_proposed += scalar keys %{ $parsed->{proposals} };
+        my $applied = $rank->apply_proposals($c, $rbid, $parsed->{proposals},
+                                             apply => $apply, model => $targets[0]{name});
+        push @all_changes, @{ $applied->{changed} };
+    }
+
+    $self->_json_ok($c, {
+        success        => \1,
+        model          => $targets[0]{name},
+        sitename       => $pctx{sitename},
+        branch         => $bctx->{branch},
+        project_id     => $bctx->{project_id},
+        project_name   => $bctx->{project_name},
+        requester_roles=> \@roles,
+        scoped_todos   => 0 + (scalar keys %$rbid),
+        proposed       => $total_proposed,
+        changed        => \@all_changes,
+        change_count   => scalar(@all_changes),
+        batch_errors   => \@batch_errors,
+        applied        => $apply ? \1 : \0,
+        dry_run        => $apply ? \0 : \1,
+        note           => 'DRY-RUN by default: changed[] shows what WOULD be written. '
+                        . 'Re-post with {"apply":true} after review. Writes are attributed to ai-todorank.',
+    });
+}
+
 # Gather the plan-doc context for api_focus_top5: BOTH the on-disk planning
 # corpus (root/Documentation/**/*.{tt,md} that look like plan docs) AND the DB
 # DailyPlan rows (with their open phase todos). Pure, no mutation; returns an
@@ -2049,6 +2241,290 @@ sub _focus_top5_plan_docs {
     $c->log->warn("api_focus_top5: could not scan on-disk plan docs: $@") if $@;
 
     return @docs;
+}
+
+# ----------------------------------------------------------------------------
+# Local DB diagnostics / admin helpers (localhost-bypassed)
+# ----------------------------------------------------------------------------
+
+=head2 api_db_inspect
+
+GET /api/db/inspect - Return current DB connection user, existing application
+DB users, and current grants for the runtime DB user.
+=cut
+
+sub api_db_inspect :Path('db/inspect') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $info = eval { $c->model('DBEncy')->get_connection_info() };
+    my $error = $@ || '';
+
+    my ($current_user, $users, $grants);
+    if ($info && ref($info) eq 'HASH' && $info->{current_username}) {
+        $current_user = $info->{current_username};
+        my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+        if ($dbh) {
+            $users = eval {
+                my $sth = $dbh->prepare(
+                    "SELECT user, host FROM mysql.user WHERE user IN (?, ?, ?, ?)"
+                );
+                $sth->execute('comserv_app','comserv_admin','comserv_user',$current_user);
+                $sth->fetchall_arrayref({});
+            };
+            $grants = eval {
+                my $sth = $dbh->prepare("SHOW GRANTS");
+                $sth->execute();
+                $sth->fetchall_arrayref();
+            };
+        }
+    }
+
+    $c->res->body(encode_json({
+        success => 1,
+        current_user => $current_user,
+        connection_info => $info,
+        users => $users,
+        grants => $grants,
+        credentials_diag => {},
+        error => ($error ? "$error" : undef),
+    }));
+}
+
+=head2 api_db_users
+
+GET /api/db/users - List DB user/host entries for the known accounts.
+=cut
+
+sub api_db_users :Path('db/users') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    unless ($dbh) {
+        $c->res->body(encode_json({ success => 0, error => 'No DB handle' }));
+        return;
+    }
+
+    my $rows = eval {
+        my $sth = $dbh->prepare(
+            "SELECT user, host, plugin, password_expired FROM mysql.user WHERE user IN (?, ?, ?)"
+        );
+        $sth->execute('comserv_app','comserv_admin','shanta_forager');
+        $sth->fetchall_arrayref({});
+    };
+
+    $c->res->body(encode_json({
+        success => 1,
+        users => ($rows || []),
+        error => ($@ ? "$@" : undef),
+    }));
+}
+
+=head2 api_db_switch_user
+
+POST /api/db/switch_user  { user, password }
+Verifies the given credentials against the live DB host/db, and if they work,
+reconnects DBEncy as that user (in-process) and persists it to .env as the
+preferred app user. Falls back to the previous working user on failure.
+=cut
+
+sub api_db_switch_user :Path('db/switch_user') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Accept both JSON API calls and plain form POSTs from /admin.
+    my $data = eval { $self->_api_json_body($c) } || {};
+    my $is_form = !$data->{user};
+    if ($is_form) {
+        $data->{user}      = $c->request->params->{user}      // '';
+        $data->{return_to} = $c->request->params->{return_to} // '';
+    }
+
+    my $return_to = $data->{return_to} // '';
+
+    # Admin users can switch via the /admin page form; local 127.0.0.1 callers
+    # can still use the JSON endpoint directly.
+    my $is_admin = eval {
+        my $auth = Comserv::Util::AdminAuth->new();
+        $auth->check_admin_access($c, 'admin_dashboard');
+    } ? 1 : 0;
+    unless ($is_admin || _api_local_ok($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            'Unauthorized switch attempt');
+        return $self->_switch_user_response($c, 0, 'admin access required', $return_to);
+    }
+
+    my $user = $data->{user} // '';
+    my $pass = $data->{password} // '';
+
+    # If no password was supplied, look it up from the dbi/*.json secret file
+    # that RemoteDB uses as the source of truth for this workstation.
+    unless ($pass) {
+        eval {
+            require JSON;
+            my $home = $ENV{HOME} || '/home/shanta';
+            my $secret = "$home/.comserv/secrets/dbi/db_production_mysql.json";
+            if (-f $secret) {
+                open my $fh, '<', $secret or return;
+                local $/; my $raw = <$fh>; close $fh;
+                my $data = JSON::decode_json($raw);
+                for my $conn_name (keys %$data) {
+                    my $cfg = $data->{$conn_name};
+                    next unless ref($cfg) eq 'HASH';
+                    if (($cfg->{username} // '') eq $user && ($cfg->{password} // '') ne '') {
+                        $pass = $cfg->{password};
+                        last;
+                    }
+                }
+            }
+        };
+    }
+
+    unless ($user && $pass) {
+        return $self->_switch_user_response($c, 0, 'user not recognised or no stored password', $return_to);
+    }
+
+    my $conn = eval { $c->model('DBEncy')->get_connection_info } || {};
+    my $host = $conn->{host} || '192.168.1.20';
+    my $port = $conn->{port} || 3307;
+    my $db   = $conn->{database} || 'ency';
+
+    my $ok = 0;
+    my $err = '';
+    my $probe = eval {
+        require Comserv::Util::DbConfigPassword;
+        Comserv::Util::DbConfigPassword->new->test_login(
+            { db_type => 'mysql', host => $host, port => $port, database => $db, username => $user },
+            $pass
+        );
+    };
+    if ($probe && $probe->{ok}) {
+        $ok = 1;
+    } else {
+        $err = $@ || ($probe && $probe->{error}) || 'authentication failed';
+    }
+
+    unless ($ok) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            "Switch to '$user' rejected: $err");
+        return $self->_switch_user_response($c, 0, $err, $return_to, { user => $user });
+    }
+
+    # Reconnect DBEncy as the new user (in-process). If this fails, fall back.
+    my $reconnected = 0;
+    eval {
+        $reconnected = $c->model('DBEncy')->reconnect_as($c, $user, $pass) ? 1 : 0;
+    };
+    if (!$reconnected) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_db_switch_user',
+            "Switch to '$user' verified but in-process reconnect failed");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_db_switch_user',
+        "Switched active DB user to '$user' (reconnected=$reconnected)");
+
+    return $self->_switch_user_response($c, 1, undef, $return_to, {
+        user => $user,
+        reconnected => $reconnected,
+    });
+}
+
+sub _switch_user_response {
+    my ($self, $c, $success, $error, $return_to, $extra) = @_;
+    $extra ||= {};
+
+    if ($return_to) {
+        if ($success) {
+            $c->flash->{success_msg} = "Switched active DB user to $extra->{user}.";
+        } else {
+            $c->flash->{error_msg} = "Could not switch to $extra->{user}: $error";
+        }
+        $c->response->redirect($return_to);
+        return;
+    }
+
+    $c->res->content_type('application/json');
+    if ($success) {
+        $c->res->body(encode_json({ success => 1, switched => 1, %$extra }));
+    } else {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => $error, switched => 0 }));
+    }
+}
+
+=head2 api_db_apply_grants
+
+POST /api/db/apply_grants - Create comserv_app/comserv_admin users and apply
+limited DML / DDL grants on the runtime database. Uses the current connection,
+so call this while connected as a user with CREATE USER + GRANT privileges.
+=cut
+
+sub api_db_apply_grants :Path('db/apply_grants') :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->content_type('application/json');
+    unless (_api_local_ok($c)) { _api_log_unauthorized($c); return; }
+
+    my $data = $self->_api_json_body($c);
+    my $app_password   = $data->{app_password}   // $data->{password} // '';
+    my $admin_password = $data->{admin_password} // $data->{password} // '';
+    unless ($app_password && $admin_password) {
+        $c->res->status(400);
+        $c->res->body(encode_json({ success => 0, error => 'app_password and admin_password required' }));
+        return;
+    }
+
+    my $dbh = eval { $c->model('DBEncy')->schema->storage->dbh };
+    unless ($dbh) {
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => 'Could not get DB handle' }));
+        return;
+    }
+
+    my $db = eval {
+        my $row = $dbh->selectrow_arrayref("SELECT DATABASE()");
+        $row ? $row->[0] : '';
+    } // '';
+    unless ($db) {
+        $c->res->status(500);
+        $c->res->body(encode_json({ success => 0, error => 'No current database selected' }));
+        return;
+    }
+
+    my @log;
+    my $ok = 1;
+    my $err = '';
+
+    my @statements = (
+        "CREATE USER IF NOT EXISTS 'comserv_app'@'%' IDENTIFIED BY '$app_password'",
+        "CREATE USER IF NOT EXISTS 'comserv_admin'@'%' IDENTIFIED BY '$admin_password'",
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON `$db`.* TO 'comserv_app'@'%'",
+        "GRANT ALL PRIVILEGES ON `$db`.* TO 'comserv_admin'@'%'",
+        "FLUSH PRIVILEGES",
+    );
+
+    for my $sql (@statements) {
+        my $res = eval { $dbh->do($sql); 1; };
+        if ($@ || !$res) {
+            $ok = 0;
+            $err = $@ || $dbh->errstr || 'unknown';
+            push @log, { sql => $sql, ok => 0, error => "$err" };
+            last;
+        }
+        push @log, { sql => $sql, ok => 1 };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_db_apply_grants',
+        "Applied grants for $db: ok=$ok") if $ok;
+
+    $c->res->status($ok ? 200 : 500);
+    $c->res->body(encode_json({
+        success => $ok,
+        database => $db,
+        log => \@log,
+        error => $ok ? undef : "$err",
+    }));
 }
 
 # Owner sitename for a write: explicit param, else the related project's

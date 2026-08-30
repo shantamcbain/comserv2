@@ -2034,9 +2034,36 @@ sub day :Path('/todo/day') :Args {
         ($a->start_date // '') cmp ($b->start_date // '')
     } @$filtered_todos;
 
-    # Separate overdue and today's todos.
-    # Use start_date as the calendar anchor (set by reschedule).
-    # Fall back to due_date only when start_date is absent.
+    # Branch awareness: on a worktree server (app_workflow != main) only keep
+    # todos that belong to the current branch's project tree. This mirrors the
+    # Planning.pm Focus Queue branch scope so the day view shows only what this
+    # branch is actually scheduled to work on.
+    my $cur_branch = $c->stash->{app_workflow} || 'main';
+    my %branch_scope;
+    if ($cur_branch ne 'main') {
+        my $hint = '';
+        my $list = eval { Comserv::Controller::Planning::_build_worktree_list($c) } || [];
+        my ($wt) = grep { ($_->{name} || '') eq $cur_branch } @$list;
+        $hint = $wt->{project_id} if $wt;
+        my @branch_pids = eval {
+            Comserv::Util::ProjectDependencies::resolve_branch_project_ids(
+                $c, $cur_branch, $hint
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'day',
+                "Branch scope resolve failed for '$cur_branch': $@");
+        }
+        %branch_scope = map { $_ => 1 } @branch_pids;
+    }
+
+    # The day view shows ONLY todos actually scheduled for this date.
+    # A todo is "scheduled for the day" when its start_date equals the date,
+    # OR (when it has no start_date) its due_date equals the date.
+    # Past-dated open todos (overdue) and undated open todos are NOT dumped
+    # into the day list — they belong in the todos/backlog views, not the
+    # day schedule. Recurring fixtures (breaks/appointments) still inject via
+    # the shared date-range filter above.
     my @overdue_todos;
     my @today_todos;
 
@@ -2049,18 +2076,30 @@ sub day :Path('/todo/day') :Args {
         $dd_raw = ref($dd_raw) ? $dd_raw->ymd : "$dd_raw";
         my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
         my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
-        my $anchor = $sd || $dd || '';
+
+        # Branch gate (worktree servers only).
+        if (%branch_scope) {
+            my %h = $todo->get_columns;
+            next unless Comserv::Util::FocusRanking::todo_matches_branch(
+                \%h, $cur_branch, \%branch_scope
+            );
+        }
+
         my $is_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
-        if (!$is_done && $anchor && $anchor lt $date && !$is_rec) {
-            push @overdue_todos, $todo;
-            push @today_todos, $todo;
-        } else {
+        my $scheduled =
+            (!$is_done && $sd && $sd eq $date)                       # start_date == date
+         || (!$is_done && !$sd && $dd && $dd eq $date)             # due date == date, no start
+         || (!$is_done && $is_rec && recurring_matches_date($todo, $date)); # recurring fixture for date
+
+        if ($scheduled) {
             push @today_todos, $todo;
         }
+        # Overdue items are intentionally NOT pushed into today's day view.
     }
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
-        "Separated into " . scalar(@overdue_todos) . " overdue and " . scalar(@today_todos) . " today todos");
+        "Branch='$cur_branch' scope=" . scalar(keys %branch_scope)
+        . " -> " . scalar(@today_todos) . " scheduled todos (overdue excluded from day view)");
 
     my %proj_name_map;
     eval {

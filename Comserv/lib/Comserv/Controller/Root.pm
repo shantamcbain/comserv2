@@ -246,6 +246,10 @@ sub auto :Private {
     eval { require Comserv::Util::DevPreview; Comserv::Util::DevPreview::maybe_apply_preview_session($c) };
 
     $c->stash->{is_dev_server} = IS_DEV_WORKTREE;
+    # Branch identity for worktree favicon (Header.tt renders /favicon/branch/<name>)
+    $c->stash->{git_branch} = IS_DEV_WORKTREE
+        ? Comserv::Util::SystemInfo->get_app_workflow($c->config->{home})
+        : '';
 
     # Cache-busting version for CSS/JS asset URLs (?v=... in js_load.tt).
     # Set on EVERY request here — previously it was only set inside the
@@ -340,8 +344,8 @@ sub auto :Private {
         # Set up theme using canonical ThemeConfig model with timeout protection
         my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
-        # CSS cache-busting version (Unix timestamp, changes every request forcing fresh CSS)
-        $c->stash->{css_v} = time();
+        # css_v is set once per server start at the top of auto() (ASSET_EPOCH);
+        # do NOT reset it per-request or browsers cache stale JS/CSS.
 
         # Determine request domain (host without port) and non-standard port
         my $req_host = $c->req->uri->host;   # strips port already
@@ -357,6 +361,11 @@ sub auto :Private {
             my $domain_favicon = $c->model('ThemeConfig')->get_domain_favicon($c, $req_host);
             my $site_favicon   = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
             $c->stash->{site_favicon} = $domain_favicon || $site_favicon || '';
+            # Page-area favicon from the theme system (theme_definitions.json
+            # -> "page_favicons" URL-regex map). Highest tab-icon priority in
+            # Header.tt; controllers may override via $c->stash->{page_favicon}.
+            my $page_favicon = $c->model('ThemeConfig')->get_page_favicon($c, $c->req->path);
+            $c->stash->{page_favicon} = $c->stash->{page_favicon} || $page_favicon || '';
             # Stash theme primary colour (stripped of #) for port-favicon background
             my $theme_data  = $c->model('ThemeConfig')->get_theme($c, $theme_name) || {};
             my $theme_vars  = $theme_data->{variables} || {};
@@ -907,10 +916,18 @@ sub auto :Private {
         # differs from the baked one (or absent) so the "locally modified" signal
         # survives the overlay.
         if ($c->stash->{app_version}) {
-            my $live = eval {
+            # Skip the live-git overlay when this tree has no .git (prod image).
+            # App home is Comserv/; the git root is usually one level up.
+            # Worktrees use a .git *file*. Without this guard every request
+            # spawned `git branch --show-current` → exit 128 → ERROR audit todo.
+            my $app_home = $c->config->{home} || '';
+            my $has_git  = $app_home && (
+                -e "$app_home/.git" || -e "$app_home/../.git"
+            );
+            my $live = ($has_git) ? eval {
                 Comserv::Util::Git->new(logging => $self->logging)
                     ->current_branch_and_commit($c);
-            };
+            } : undef;
             if ($live && $live->{branch}) {
                 my $av   = $c->stash->{app_version};
                 my $baked = $av->{commit} // '';
@@ -1179,6 +1196,17 @@ sub auto :Private {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
             "CRITICAL DEBUG: About to set server_ip='$display_ip' into stash");
         $c->stash->{server_ip} = $display_ip;
+
+        # ── ACTIVE DB USER (for the on-page admin banner) ──────────────────
+        # Show which MariaDB/MySQL user the app is actually connected as.
+        # DBEncy::COMPONENT resolves this at startup; surface it for admins.
+        my $db_user_info = eval { $c->model('DBEncy')->get_connection_info() } || {};
+        my $active_db_user = $db_user_info->{current_username} || 'unknown';
+        my $active_db_auth = $db_user_info->{startup_info}{auth_source} || 'unknown';
+        $c->stash->{active_db_user}      = $active_db_user;
+        $c->stash->{active_db_auth_source} = $active_db_auth;
+        $c->stash->{active_db_host}      = $db_user_info->{startup_info}{host} || '';
+        $c->stash->{active_db_name}      = $db_user_info->{startup_info}{database} || '';
         
         # Verify stash was actually set
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
@@ -1191,14 +1219,15 @@ sub auto :Private {
 
         # ── CANONICAL AI MODEL CATALOG ────────────────────────────────────
         # SINGLE SOURCE OF TRUTH: Comserv::Util::ModelCatalog owns the list for
-        # EVERY AI surface (floating widget, /ai/widget popup, /ai, /ai2, editor,
-        # git dashboard). It builds once per process from the v2 Router — the
-        # same source /ai2/providers uses — and caches with a TTL, so this adds
-        # no per-request provider round-trip. Stash both shapes: the decoded
-        # array for server-side .tt rendering (ai/model_select.tt, the reliable
-        # path) and the JSON string for window.ComservConfig.models.
-        $c->stash->{ai_model_catalog}      = Comserv::Util::ModelCatalog->catalog($c);
-        $c->stash->{ai_model_catalog_json} = Comserv::Util::ModelCatalog->catalog_json($c);
+        # EVERY AI surface. Ordinary page loads use the cheap default cache
+        # (built without probing Ollama). AI surfaces explicitly refresh once per
+        # session when opened, so Ollama is only probed when the user asks for it.
+        # Stash both shapes only when a controller has pre-populated them; the
+        # default is empty so js_load.tt falls back to a lazy /ai2/providers fetch.
+        unless (defined $c->stash->{ai_model_catalog}) {
+            $c->stash->{ai_model_catalog}      = [];
+            $c->stash->{ai_model_catalog_json} = '[]';
+        }
 
         # Role + page context used by the .tt to SORT/order the dropdown.
         my $roles = $c->session->{roles} || [];
@@ -2697,6 +2726,102 @@ sub site_favicon :Path('/favicon/site') :Args(1) {
     my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="4" fill="$bg"/>
   <text x="16" y="23" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="20" fill="$fg">$letter</text>
+</svg>};
+
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
+sub _branch_favicon_label {
+    my ($branch) = @_;
+    # Split into words on separators AND camelCase boundaries:
+    #   InventoryAccounting -> Inventory, Accounting -> "IA"
+    #   comserv2-git-worktree -> c, g, w -> "CGW"
+    my @parts = $branch =~ /[A-Z]+(?![a-z])|[A-Z][a-z]*|[a-z0-9]+/g;
+    my $label = uc(join '', map { substr($_, 0, 1) } @parts);
+    # Single-word branches keep their first two letters (e.g. "git" -> "GI")
+    if (@parts == 1 && length($parts[0]) > 1) {
+        $label = uc(substr($parts[0], 0, 2));
+    }
+    $label = substr($label, 0, 3);
+    return $label || '?';
+}
+
+sub branch_favicon :Path('/favicon/branch') :Args(1) {
+    my ($self, $c, $branch) = @_;
+
+    $branch =~ s/[^A-Za-z0-9_-]//g;
+    unless (length $branch) {
+        $c->response->status(400);
+        $c->response->content_type('text/plain');
+        $c->response->body('Invalid branch');
+        return;
+    }
+
+    # Deterministic colour per branch name so a given branch always looks the same
+    my @palette = (
+        '#1565C0', '#2E7D32', '#E65100', '#6A1B9A',
+        '#B71C1C', '#00695C', '#4E342E', '#37474F',
+        '#AD1457', '#0277BD', '#558B2F', '#EF6C00',
+    );
+    my $sum = 0;
+    $sum += ord($_) for split //, $branch;
+    my $bg = $palette[$sum % scalar(@palette)];
+    my $fg = _svg_text_color($bg);
+
+    my $label = _branch_favicon_label($branch);
+    my $len = length($label);
+    my $fs  = $len == 1 ? 20 : $len == 2 ? 16 : 12;
+    my $y   = $len == 1 ? 24 : 22;
+
+    my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="$bg"/>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$branch</text>
+</svg>};
+
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
+sub label_favicon :Path('/favicon/label') :Args(1) {
+    my ($self, $c, $text) = @_;
+
+    $text =~ s/[^A-Za-z0-9_-]//g;
+    unless (length $text) {
+        $c->response->status(400);
+        $c->response->content_type('text/plain');
+        $c->response->body('Invalid label');
+        return;
+    }
+
+    # Optional ?bg=RRGGBB overrides the palette pick
+    my @palette = (
+        '#1565C0', '#2E7D32', '#E65100', '#6A1B9A',
+        '#B71C1C', '#00695C', '#4E342E', '#37474F',
+        '#AD1457', '#0277BD', '#558B2F', '#EF6C00',
+    );
+    my $bg_param = $c->req->param('bg') || '';
+    my $bg;
+    if ($bg_param =~ /^[0-9a-fA-F]{6}$/) {
+        $bg = '#' . lc($bg_param);
+    } else {
+        my $sum = 0;
+        $sum += ord($_) for split //, $text;
+        $bg = $palette[$sum % scalar(@palette)];
+    }
+    my $fg = _svg_text_color($bg);
+
+    # Uppercase for display; cap at 3 chars like the branch favicon
+    my $label = uc(substr($text, 0, 3));
+    my $len   = length($label);
+    my $fs    = $len == 1 ? 20 : $len == 2 ? 16 : 12;
+    my $y     = $len == 1 ? 24 : 22;
+
+    my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="$bg"/>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$label</text>
 </svg>};
 
     $c->response->content_type('image/svg+xml');

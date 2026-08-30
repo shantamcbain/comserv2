@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,ai"
-   page_version = "1.02"
-   last_updated = "Thu Aug 20 2026"
+   page_version = "1.03"
+   last_updated = "2026-08-26"
    site_specific = "false"
    project_id = "280"
    project_code = "AISYSTEM"
 %]
-[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.02 2026/08/20 hermes-agent Exp - Todo-create code vs Scheduler parked' %]
+[% PageVersion = 'Documentation/AISYSTEMPlan.tt,v 1.03 2026/08/26 hermes-agent Exp - SuperGrok first, invoice chat, 503 retry' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -32,7 +32,9 @@
                 <a href="#audit" class="doc-navlink">Audit</a>
                 <a href="#order" class="doc-navlink">Wave order</a>
                 <a href="#chat-todo-agent" class="doc-navlink" title="In-chat agent that writes a todo to the database.">Todo agent</a>
+                <a href="#chat-invoice" class="doc-navlink" title="In-chat draft invoices on Inventory tables.">Invoice from chat</a>
                 <a href="#scheduler-agent" class="doc-navlink" title="Separate agent: create blocker todos and queue-aware start dates. Not bulk reschedule.">Scheduler agent</a>
+                <a href="#shipped-0826" class="doc-navlink">Shipped 2026-08-26</a>
                 <a href="#hermes" class="doc-navlink">Hermes settings</a>
                 <a href="#providers" class="doc-navlink">In-app providers</a>
                 <a href="#park" class="doc-navlink">Parked work</a>
@@ -58,6 +60,9 @@
                     <a href="[% c.uri_for('/todo') %]?project_id=280" class="doc-navlink" title="Lists every todo whose project_id is 280 (AISYSTEM waves plus the Todo-create agent).">Todos on #280 (work list)</a>
                     <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-navlink" title="Opens todo #2217. Tracks the in-chat job that WRITES a todo into the database (code now). Not a form page.">Todo #2217 (Todo-create — code now)</a>
                     <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-navlink" title="Opens todo #2218. Scheduler agent: blockers and queue-aware start dates. Specified, not built. Not bulk reschedule.">Todo #2218 (Scheduler — specified)</a>
+                    <a href="[% c.uri_for('/todo/details') %]?record_id=2313" class="doc-navlink" title="SuperGrok first; never OpenRouter Grok.">Todo #2313 (SuperGrok-first routing)</a>
+                    <a href="[% c.uri_for('/todo/details') %]?record_id=2292" class="doc-navlink" title="OpenRouter 503 retry then fallback.">Todo #2292 (503 retry)</a>
+                    <a href="[% c.uri_for('/project/details') %]?project_id=121" class="doc-navlink" title="AIC-004 AI Logic Integration — invoice chat, Router.">Project #121 AIC-004</a>
                     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-navlink" title="Returns to the Master Plan coordinator, which indexes every active plan including this one.">Master Plan (index of all plans)</a>
                 </div>
             </div>
@@ -227,6 +232,55 @@
 
     <div class="row">
         <div class="col-100">
+            <h2 id="chat-invoice" class="doc-h2">3d. Invoice from chat (draft only — shipped 2026-08-26)</h2>
+            <p class="doc-body">Code in <code>Model::AI2::InvoiceCreate</code>, same intercept as TodoCreate. Tracking: <a href="[% c.uri_for('/todo/details') %]?record_id=2311" class="doc-link">#2311</a> on <a href="[% c.uri_for('/project/details') %]?project_id=121" class="doc-link">#121 AIC-004</a>. Reuses existing Inventory tables — no new schema. Chat never Posts the GL.</p>
+            <ul class="doc-body">
+                <li><strong>Trigger:</strong> “enter/record this invoice from &lt;supplier&gt; for $X …” or “create a sales invoice for &lt;name&gt; for $X”.</li>
+                <li><strong>Write:</strong> supplier bill → draft on <code>inventory_supplier_invoices</code> (<a href="[% c.uri_for('/Inventory/invoice') %]" class="doc-link">/Inventory/invoice</a>). Sales → draft on <code>inventory_customer_invoices</code> (<a href="[% c.uri_for('/Inventory/sales') %]" class="doc-link">/Inventory/sales</a>). SiteName of the page. Admin or accounting role. Missing amount or unknown supplier: ask.</li>
+                <li><strong>Not built:</strong> auto-create supplier; Post GL from chat; line-item SKU matching.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="shipped-0826" class="doc-h2">3e. Shipped 2026-08-26 (aisystem worktree — not committed)</h2>
+            <p class="doc-body">Branch <code>aisystem</code>. Do not treat schema-branch table creation as in scope. User reviews diffs before commit.</p>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">Item</th>
+                    <th class="doc-th">Tracking</th>
+                    <th class="doc-th">Code / gate</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">SuperGrok first; never OpenRouter Grok</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2313" class="doc-link">#2313</a></td>
+                    <td class="doc-td"><code>Router::_detect_provider</code> remaps <code>grok-*</code> and <code>openrouter|x-ai/grok-*</code> to SuperGrok. Default is SuperGrok <code>grok-4.6</code> when OAuth exists. Fail → OpenRouter <code>:free</code> (no grok slug) then Ollama. Tests in <code>t/model_ai2_router_outage.t</code>.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">OpenRouter 503 retry + clean errors</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2292" class="doc-link">#2292</a> / <a href="[% c.uri_for('/todo/details') %]?record_id=2293" class="doc-link">#2293</a></td>
+                    <td class="doc-td">502/503/504 retry twice (1s, 2s) then hop-down. Widget never shows raw <code>OpenRouter provider error: 503</code>. Fallback keeps the same system prompt / ACTION contract.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Invoice from chat</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2311" class="doc-link">#2311</a></td>
+                    <td class="doc-td"><code>InvoiceCreate</code> + <code>/ai2/action create_invoice</code>. Draft only. <code>t/model_ai2_invoice_create.t</code>.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Positive learning (partial)</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=288" class="doc-link">#288 AILEARN</a> <a href="[% c.uri_for('/todo/details') %]?record_id=2299" class="doc-link">#2299</a></td>
+                    <td class="doc-td"><code>KnowledgeRecall</code> injects prior docs/todos into the system prompt with UNVERIFIED/INTERNAL labels. It currently reads the DB <code>documentation</code> table, which is empty — live KB is file-based <code>root/Documentation</code>. Next: point recall at the file store. No new table on this branch (schema later).</td>
+                </tr>
+            </table>
+            <p class="doc-warning">Next AISYSTEM-specified work after this: Scheduler <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link">#2218</a>, or W1 AIMPS shortlists <a href="[% c.uri_for('/todo/details') %]?record_id=2194" class="doc-link">#2194</a>. Do not start schema <code>AiKnowledge</code> from aisystem.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
             <h2 id="hermes" class="doc-h2">4. Hermes focus settings (W0 — applied 2026-08-19)</h2>
             <p class="doc-body">Settings live in <code>~/.hermes/config.yaml</code> via <code>hermes config set</code> (never hand-edit). Secrets stay in <code>~/.hermes/.env</code>.</p>
             <table class="doc-table">
@@ -291,8 +345,8 @@
                     <td class="doc-td">OpenRouter key (k8s / env / DB)</td>
                 </tr>
             </table>
-            <p class="doc-warning">The same slug <code>grok-4.6</code> can appear under SuperGrok and under xAI. Pick the SuperGrok (prepaid) group to spend the subscription. After send, the status line must stay SuperGrok — if it flips to Grok (xAI) that was a label bug (fixed: Router keeps prefix <code>supergrok</code>; Chat.pm dispatches it to the Grok client; JS does not relabel).</p>
-            <p class="doc-body">W1.0 (<a href="[% c.uri_for('/todo/details') %]?record_id=2202" class="doc-link">#2202</a>) delivered this source. Remaining W1 is AIMPS shortlists/sort, not another provider.</p>
+            <p class="doc-warning">The same slug <code>grok-4.6</code> can appear under SuperGrok and under xAI. Pick SuperGrok (prepaid) to spend weekly credits. Router (2026-08-26): <code>grok-*</code> and <code>openrouter|x-ai/grok-*</code> are remapped to SuperGrok. App default is SuperGrok <code>grok-4.6</code> when the OAuth token exists — not paid OpenRouter. SuperGrok fail → cheaper OpenRouter <code>:free</code> (never a Grok slug) → Ollama. After send, status must stay SuperGrok if SuperGrok answered; if it fell back, the :free/Ollama hop is correct, not Grok-on-OpenRouter.</p>
+            <p class="doc-body">W1.0 (<a href="[% c.uri_for('/todo/details') %]?record_id=2202" class="doc-link">#2202</a>) delivered the four-group picker. Routing fix <a href="[% c.uri_for('/todo/details') %]?record_id=2313" class="doc-link">#2313</a>. Remaining W1 is AIMPS shortlists/sort, not another provider.</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -396,6 +450,21 @@
                     <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" title="Opens todo #2218: Scheduler agent. Creates blocking predecessor todos and sets start_date after existing queue work. Must not bulk-reschedule every row.">#2218</a></td>
                     <td class="doc-td">Specified 2026-08-20. Not implemented. Must not bulk-reschedule. Planning #138 owns scoring.</td>
                 </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">SuperGrok-first routing</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2313" class="doc-link">#2313</a> on #121</td>
+                    <td class="doc-td">Shipped 2026-08-26. Never OpenRouter Grok. Fail to :free then Ollama.</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">503 retry + clean outage text</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2292" class="doc-link">#2292</a> / <a href="[% c.uri_for('/todo/details') %]?record_id=2293" class="doc-link">#2293</a></td>
+                    <td class="doc-td">Shipped 2026-08-26. Retry then hop-down. No raw 503 in the widget.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Invoice from chat</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2311" class="doc-link">#2311</a> on #121</td>
+                    <td class="doc-td">Shipped 2026-08-26. Draft only. No GL post from chat.</td>
+                </tr>
                 <tr>
                     <td class="doc-td">ROUTINE re-audit (RULE P2)</td>
                     <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2201" class="doc-link">#2201</a> (quarterly)</td>
@@ -419,6 +488,7 @@
                     <li><a href="[% c.uri_for('/Documentation/V2MigrationPlan') %]" class="doc-link">V2 Migration</a></li>
                     <li><a href="[% c.uri_for('/Documentation/HermesBranchContextPlan') %]" class="doc-link">Hermes Branch Context</a></li>
                     <li><a href="[% c.uri_for('/Documentation/AIChatSystemUserGuide') %]" class="doc-link">AI Chat User Guide</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/invoices') %]" class="doc-link">Supplier invoices (includes chat draft path)</a></li>
                     <li><a href="[% c.uri_for('/project') %]" class="doc-link">All projects</a></li>
                 </ul>
             </div>

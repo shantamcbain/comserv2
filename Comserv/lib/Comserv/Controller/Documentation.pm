@@ -852,6 +852,11 @@ sub view :Path('/Documentation') :Args(1) {
                     site_name => $site_name,
                     template => $path
                 };
+                # Documentation branch marker: book favicon on every doc page,
+                # and flag public docs for the production notice (Header.tt).
+                $stash_data->{documentation_favicon} = '/static/images/favicons/documentation-book.svg';
+                my @doc_roles = $metadata->{roles} ? split(/\s*,\s*/, $metadata->{roles}) : ();
+                $stash_data->{doc_is_public} = (!@doc_roles || (grep { $_ eq 'guest' } @doc_roles)) ? 1 : 0;
                 $self->_stash_changelog_index($c, $stash_data);
                 
                 # Special handling for DailyPlans pages - fetch todos for that day
@@ -1049,6 +1054,10 @@ sub view :Path('/Documentation') :Args(1) {
             site_name => $site_name,
             template => $tt_path
         };
+        # Documentation branch marker: book favicon on every doc page,
+        # and flag public docs for the production notice (Header.tt).
+        $stash_data->{documentation_favicon} = '/static/images/favicons/documentation-book.svg';
+        $stash_data->{doc_is_public} = (!@unreg_roles || (grep { $_ eq 'guest' } @unreg_roles)) ? 1 : 0;
         $self->_stash_changelog_index($c, $stash_data);
         
         # Special handling for DailyPlans pages - fetch todos for that day

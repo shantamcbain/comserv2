@@ -44,9 +44,23 @@ sub _detect_provider {
         $prefix = lc($1);
     }
     if ($prefix eq 'supergrok' || $prefix eq 'grok-oauth') {
+        $bare =~ s/^x-ai\///i;
         return ('supergrok', $bare);
     }
-    if ($prefix eq 'grok' || $bare =~ /^grok/i) {
+    # Grok-named models NEVER go through OpenRouter (that bills OpenRouter).
+    # SuperGrok (prepaid weekly) is the grok hop. xAI pay-per-token is only
+    # the explicit "grok|" prefix when SuperGrok is unavailable (select_model).
+    if ($bare =~ /^(?:x-ai\/)?grok/i) {
+        $bare =~ s/^x-ai\///i;
+        if ($prefix eq 'openrouter' || $prefix eq 'external') {
+            return ('supergrok', $bare);
+        }
+        if ($prefix eq 'grok') {
+            return ('grok', $bare);
+        }
+        return ('supergrok', $bare);
+    }
+    if ($prefix eq 'grok') {
         return ('grok', $bare);
     }
     if ($prefix eq 'openrouter' || $prefix eq 'external' || $bare =~ m{/}) {
@@ -55,7 +69,13 @@ sub _detect_provider {
     if ($requested_model =~ m{/}) {
         return ('external', $requested_model);
     }
-    if ($requested_model =~ /^(gpt|claude|llama3|mixtral|groq|openrouter|or-|tencent)/i) {
+    # Ollama tags are name:tag (llama3.1:8b, phi4:14b). OpenRouter ids use
+    # org/model. The old /^(llama3|...)/i match sent local llama3* tags to
+    # OpenRouter → 400 "is not a valid model ID" (audit todo 2308).
+    if ($prefix eq 'ollama' || ($bare =~ /:/ && $bare !~ m{/})) {
+        return ('ollama', $bare);
+    }
+    if ($requested_model =~ /^(gpt|claude|mixtral|groq|openrouter|or-|tencent)/i) {
         return ('external', $requested_model);
     }
     return ('ollama', $requested_model);
@@ -179,20 +199,18 @@ sub select_model {
     my $context_key = $self->_context_for($ctx{agent_id} // $ctx{page_context} // 'general');
 
     # 1) Explicit selection wins if the provider can serve it.
+    #    Grok-named models use SuperGrok (weekly prepaid) when that
+    #    credential exists — never OpenRouter Grok, never xAI pay-per-token first.
     if ($requested) {
         my ($prov, $model) = $self->_detect_provider($requested);
+        ($prov, $model) = $self->_prefer_supergrok($c, $prov, $model);
         return ($prov, $model);
     }
 
-    # 1.5) App-wide DEFAULT: prefer the off-host OpenRouter model so automatic
-    # selection never stalls the workstation by cold-loading a ~9GB local
-    # Ollama weight. This is the SINGLE default used by every surface that
-    # reaches the Router (chat widget, Git drafting, editor, focus-tune) so
-    # behavior is consistent across the whole app. Only used when an external
-    # key is actually resolvable AND the model is reachable.
-    my $default_external = 'openrouter|tencent/hy3';
-    if ($self->_external_default_available($c, $default_external)) {
-        return ('external', $default_external);
+    # 1.5) SuperGrok weekly credits BEFORE any paid OpenRouter hop.
+    # OpenRouter has no auto-fill — do not default the app onto a paid OR model.
+    if ($self->_external_default_available($c, 'supergrok|grok-4.6')) {
+        return ('supergrok', 'grok-4.6');
     }
 
     # 2) Build a lookup of installed chat models (short name -> full name).
@@ -229,6 +247,24 @@ sub select_model {
     return ('ollama', 'phi4:14b');
 }
 
+# If SuperGrok OAuth is present, every grok-* hop uses it (weekly credits)
+# instead of xAI pay-per-token or OpenRouter x-ai/grok.
+sub _prefer_supergrok {
+    my ($self, $c, $prov, $model) = @_;
+    return ($prov, $model) unless $c && $model;
+    my $bare = $self->_bare_model($model);
+    $bare =~ s/^x-ai\///i;
+    return ($prov, $model) unless $prov eq 'supergrok' || $prov eq 'grok' || $bare =~ /^grok/i;
+    my $g = try { $c->model('AI2::Provider::Grok') } catch { undef };
+    my $prepaid = ($g && $g->can('resolve_prepaid_key'))
+        ? (try { $g->resolve_prepaid_key($c) } catch { undef })
+        : undef;
+    if ($prepaid) {
+        return ('supergrok', $bare);
+    }
+    return ($prov eq 'grok' ? 'grok' : 'supergrok', $bare);
+}
+
 # -------------------------------------------------------------------
 # select_best_model — controller convenience wrapper returning a list.
 # -------------------------------------------------------------------
@@ -254,7 +290,30 @@ sub _credits_exhausted {
     # not known) — fall through rather than surfacing a dead provider.
     return 1 if $error =~ /can'?t connect|connection (refused|reset|timed? ?out)|name or service not known|temporary failure in name resolution|\b500 can't connect|\btimed? ?out\b/i;
     return 1 if $error =~ /402\b|payment.?required|insufficient credit|out of credit|credit.?balance|can only afford|prepaid credit|usage limit|quota|weekly usage|limit_remaining|no auto-fill/i;
+    return 1 if $self->_transient_outage($error);
     return 0;
+}
+
+# 502/503/504 / "Service Unavailable" — retry same hop, then fall through
+# (todo #2292: OpenRouter 503 killed the turn instead of retrying).
+sub _transient_outage {
+    my ($self, $error) = @_;
+    return 0 unless defined $error && length $error;
+    return 1 if $error =~ /\b50[234]\b/;
+    return 1 if $error =~ /service unavailable|bad gateway|gateway time-?out/i;
+    return 0;
+}
+
+sub _user_facing_error {
+    my ($self, $error) = @_;
+    $error = '' unless defined $error;
+    if ($self->_transient_outage($error) || $error =~ /can'?t connect|\btimed? ?out\b/i) {
+        return 'The selected model is temporarily unavailable. Retrying another model if possible — try Send again if this persists.';
+    }
+    if ($error =~ /402\b|insufficient credit|out of credit|quota|usage limit/i) {
+        return 'That paid model is out of credit. Falling back to a free or local model.';
+    }
+    return 'The AI provider did not complete this turn. Try again or pick another model.';
 }
 
 sub _provider_needs_credit_fallback {
@@ -279,6 +338,7 @@ sub pick_free_fallback {
         my $name = $m->{name} // '';
         my $svc  = $m->{provider} || '';
         next unless length $name;
+        next if $name =~ /grok/i || $name =~ /^x-ai\//i;
         next if $svc eq ($skip_provider // '') && $name eq ($skip_model // '');
         my $is_free  = $m->{free} || ($name =~ /:free$/);
         my $is_local = $m->{local} || ($svc eq 'ollama');
@@ -336,6 +396,25 @@ sub _chat_one {
     return $resp;
 }
 
+# Same hop, up to 3 tries, on 502/503/504 only. Sleep 1s then 2s.
+# Does not retry 401/400 (bad key / bad model).
+sub _chat_one_with_retry {
+    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my $resp;
+    for my $attempt (1 .. 3) {
+        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages);
+        return $resp if $resp && $resp->{success};
+        my $err = ($resp && $resp->{error}) || '';
+        last unless $self->_transient_outage($err);
+        last if $attempt == 3;
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+            '_chat_one_with_retry',
+            "Transient $provider_name/$use_model ($err); retry $attempt/2 after ${attempt}s");
+        sleep $attempt;
+    }
+    return $resp;
+}
+
 # Paid OpenRouter (no auto-fill) and SuperGrok (prepaid, no remaining-quota
 # API) fall back to free OpenRouter then Ollama. xAI grok auto-fills — do
 # not steal the turn away from grok on a credit error.
@@ -358,7 +437,7 @@ sub chat_with_fallback {
 
     my $resp;
     unless ($skip_paid) {
-        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages);
+        $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages);
         if ($resp && $resp->{success}) {
             return $resp;
         }
@@ -379,7 +458,7 @@ sub chat_with_fallback {
         next unless $hop;
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
             "Paid $provider_name exhausted ($err); falling back to $hop->{provider} $hop->{model}");
-        my $retry = $self->_chat_one($c, $hop->{provider}, $hop->{model}, $messages);
+        my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages);
         if ($retry && $retry->{success}) {
             $retry->{provider}       = $hop->{provider};
             $retry->{fallback}       = 1;
@@ -429,13 +508,19 @@ sub get_available_models {
 
     my @all;
 
+    # Baseline: a small static list of confirmed-free OpenRouter models. This
+    # guarantees the catalog is never empty on hosts with no API keys or where
+    # Ollama / external provider probes fail. Live provider lists overlay below.
+    push @all, $self->_default_free_catalog($c);
+
     # --- Local Ollama ---
+    # Ollama is slow and can block Starman workers for tens of seconds when the
+    # host is down. It must NOT be probed during ordinary page rendering. Only
+    # refresh when an AI surface explicitly asks for the live list.
     # Production1 is image-only and cannot reach the workstation Ollama host.
-    # Catalog discovery runs during ordinary page rendering, so probing Ollama
-    # there pins one Starman worker per request under crawler traffic. Do not
-    # probe, log an unreachable sentinel, or advertise Ollama on production1.
     my $system_identifier = $ENV{SYSTEM_IDENTIFIER} // '';
-    my $skip_ollama = $system_identifier =~ /^(?:production1|comservproduction1)$/i;
+    my $skip_ollama = $system_identifier =~ /^(?:production1|comservproduction1)$/i
+                   || !$opts{include_ollama};
 
     unless ($skip_ollama) {
     # v2 parity with v1 get_user_providers: emit Ollama entries on hosts where
@@ -495,6 +580,28 @@ sub get_available_models {
         };
     };
     }
+
+# Minimal static list used as the cheap default catalog, built on app startup
+# and ordinary page requests without probing Ollama or any external provider.
+# It covers the common free/cheap defaults so chat has something usable until
+# an explicit refresh pulls the live list.
+sub _default_free_catalog {
+    my ($self, $c) = @_;
+    return (
+        { name => 'google/gemma-4-31b-it:free', provider => 'openrouter',
+          label => 'OpenRouter: google/gemma-4-31b-it:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'google/gemma-4-26b-a4b-it:free', provider => 'openrouter',
+          label => 'OpenRouter: google/gemma-4-26b-a4b-it:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'nvidia/nemotron-3-nano-30b-a3b:free', provider => 'openrouter',
+          label => 'OpenRouter: nvidia/nemotron-3-nano-30b-a3b:free', local => 0, free => 1,
+          price_prompt => 0, price_completion => 0 },
+        { name => 'ollama_unreachable', provider => 'ollama',
+          label => 'Ollama (refresh to see local models)', local => 1,
+          unreachable => 1, disabled => 1 },
+    );
+}
 
     # --- External (x.AI / OpenRouter) ---
     # Driven by key *resolution*, not by the presence of a UserApiKeys row.

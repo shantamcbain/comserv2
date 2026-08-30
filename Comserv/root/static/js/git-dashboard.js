@@ -356,7 +356,17 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString(),
                 credentials: 'same-origin'
-            }).then(function (r) { return r.json(); })
+            }).then(function (r) {
+                if (!r.ok || !/application\/json/.test(r.headers.get('content-type') || '')) {
+                    return r.text().then(function (txt) {
+                        var why = 'Merge request returned a non-JSON response (HTTP ' + r.status + ').';
+                        if (r.status === 403) { why = 'Administrator access required to merge.'; }
+                        else if (txt && txt.length) { why += ' ' + txt.slice(0, 400); }
+                        throw new Error(why);
+                    });
+                }
+                return r.json();
+            })
               .then(function (res) {
                   console.log('[git-dashboard] merge response:', res);
                   if (res.conflict) {
@@ -412,7 +422,16 @@
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: body.toString(),
                     credentials: 'same-origin'
-                }).then(function (r) { return r.json(); })
+                }).then(function (r) {
+                    if (!r.ok || !/application\/json/.test(r.headers.get('content-type') || '')) {
+                        return r.text().then(function (txt) {
+                            var why = 'Merge-abort returned a non-JSON response (HTTP ' + r.status + ').';
+                            if (txt && txt.length) { why += ' ' + txt.slice(0, 400); }
+                            throw new Error(why);
+                        });
+                    }
+                    return r.json();
+                })
                   .then(function (res) {
                       showMergeResult(res.success, false, res.success ? 'aborted' : 'abort failed',
                           res.output || res.error || '');

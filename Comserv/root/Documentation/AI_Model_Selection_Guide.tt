@@ -1,0 +1,288 @@
+[% META
+    title = "AI Model Selection Guide for Documentation Tasks"
+    description = "Which AI model/agent to use for each documentation task type in Comserv2 — with live pricing, strengths, and how to pick from the live catalog"
+    roles = "admin,developer"
+    TemplateType = "Documentation"
+    category = "ai-guidance"
+    page_version = "1.0"
+    last_updated = "2026-08-26"
+    site_specific = "false"
+    project_id = "138"
+    project_code = "DOCMASTER"
+%]
+[% PageVersion = 'Documentation/AI_Model_Selection_Guide.tt,v 1.0 2026/08/26 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container masterplan">
+
+<h1 id="top">AI Model Selection Guide for Documentation Tasks</h1>
+
+<div class="last-updated doc-muted">
+    Created: 2026-08-26 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Status: ACTIVE
+    &nbsp;|&nbsp; Parent project: <a href="/project/details?project_id=138" class="doc-link">#138 PLANNING</a>
+</div>
+
+<div class="notice">
+    <strong>Live catalog only.</strong> This guide references the <em>live Router catalog</em> served by
+    <code>Comserv::Model::AI2::Router::get_available_models</code> (wrapped by
+    <code>Comserv::Util::ModelCatalog</code>). There are <strong>no hardcoded defaults</strong> in the app.
+    Open the AI chat → model dropdown, or Daily Plans → AI Focus-Tune → Models, to see what's
+    actually available right now. This page teaches you how to choose from that live list.
+</div>
+
+<h2 id="quick-reference">Quick Reference Table</h2>
+
+<table class="doc-table">
+    <thead>
+        <tr>
+            <th class="doc-th">Documentation Task</th>
+            <th class="doc-th">What to look for in live list</th>
+            <th class="doc-th">Recommended models (when available)</th>
+            <th class="doc-th">Typical cost tier</th>
+            <th class="doc-th">Why</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="doc-td"><strong>Editing planning docs</strong><br/>(MASTER_PLAN, project plans, phase breakdowns)</td>
+            <td class="doc-td"><code>price_tier: "premium"</code> or <code>"standard"</code><br/>Long context (≥32k)<br/>Strong structure/reasoning</td>
+            <td class="doc-td">
+                <code>gpt-4o</code> (OpenRouter)<br/>
+                <code>claude-3.5-sonnet</code> (OpenRouter)<br/>
+                <code>nemotron-3-ultra</code> (OpenRouter free tier)
+            </td>
+            <td class="doc-td">$2.50–15.00 / 1M tokens<br/><span class="badge-free">FREE tier: nemotron-3-ultra-free</span></td>
+            <td class="doc-td">Plans need coherence across sections, cross-references, and logical flow. Premium models keep structure over long context.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><strong>Organizing documentation</strong><br/>(restructuring, moving files, creating indexes, module <code>index.tt</code>)</td>
+            <td class="doc-td"><code>price_tier: "standard"</code> or <code>"budget"</code><br/>Good at following explicit instructions<br/>Fast enough for batch operations</td>
+            <td class="doc-td">
+                <code>gpt-4o-mini</code> (OpenRouter)<br/>
+                <code>deepseek-chat</code> (OpenRouter)<br/>
+                <code>llama3.1:8b</code> / <code>phi4:14b</code> (Ollama local)
+            </td>
+            <td class="doc-td">$0.15–0.60 / 1M tokens<br/><span class="badge-free">FREE: Ollama local, nemotron-3-ultra-free</span></td>
+            <td class="doc-td">Organization is instruction-following, not deep reasoning. Cheaper/faster models excel here.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><strong>Adjusting wording / polishing</strong><br/>(tone, clarity, grammar, style consistency)</td>
+            <td class="doc-td"><code>price_tier: "standard"</code><br/>Strong writing quality<br/>Good at style transfer</td>
+            <td class="doc-td">
+                <code>gpt-4o-mini</code> (OpenRouter)<br/>
+                <code>claude-3.5-haiku</code> (OpenRouter)<br/>
+                <code>nemotron-3-ultra-free</code> (OpenRouter free)
+            </td>
+            <td class="doc-td">$0.15–0.80 / 1M tokens<br/><span class="badge-free">FREE: nemotron-3-ultra-free, Ollama local</span></td>
+            <td class="doc-td">Polishing is high-volume, low-complexity. Mini/haiku models are cost-effective and excellent at prose.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><strong>Code documentation</strong><br/>(explaining Perl/Catalyst/TT/DBIx::Class, API docs, inline comments)</td>
+            <td class="doc-td"><code>price_tier: "standard"</code> or <code>"premium"</code><br/>Code-aware (trained on code)<br/>Understands Perl, Catalyst, TT, SQL</td>
+            <td class="doc-td">
+                <code>gpt-4o</code> (OpenRouter)<br/>
+                <code>deepseek-coder-v2</code> (OpenRouter)<br/>
+                <code>qwen2.5-coder</code> (OpenRouter/Ollama)<br/>
+                <code>phi4:14b</code> (Ollama local)
+            </td>
+            <td class="doc-td">$0.50–15.00 / 1M tokens<br/><span class="badge-free">FREE: qwen2.5-coder (Ollama), phi4:14b (Ollama)</span></td>
+            <td class="doc-td">Code-aware models explain frameworks correctly. <code>deepseek-coder-v2</code> and <code>qwen2.5-coder</code> are specialized for this.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><strong>Using the code / implementation help</strong><br/>(writing new .tt, .pm, JS, debugging, refactoring)</td>
+            <td class="doc-td"><code>price_tier: "premium"</code><br/>Strong code generation<br/>Multi-file context<br/>Test-aware</td>
+            <td class="doc-td">
+                <code>gpt-4o</code> (OpenRouter)<br/>
+                <code>claude-3.5-sonnet</code> (OpenRouter)<br/>
+                <code>deepseek-coder-v2</code> (OpenRouter)
+            </td>
+            <td class="doc-td">$2.50–15.00 / 1M tokens<br/><span class="badge-free">FREE: qwen2.5-coder (Ollama) for simpler tasks</span></td>
+            <td class="doc-td">Implementation needs correct APIs, conventions, and test patterns. Premium models hallucinate less on framework specifics.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><strong>Changelog entries</strong><br/>(<code>.inc</code> fragments: what/why/files)</td>
+            <td class="doc-td"><code>price_tier: "budget"</code> or <code>"standard"</code><br/>Concise, factual<br/>Follows template exactly</td>
+            <td class="doc-td">
+                <code>gpt-4o-mini</code> (OpenRouter)<br/>
+                <code>nemotron-3-ultra-free</code> (OpenRouter free)<br/>
+                <code>llama3.1:8b</code> (Ollama)
+            </td>
+            <td class="doc-td">$0.15–0.60 / 1M tokens<br/><span class="badge-free">FREE: nemotron-3-ultra-free, Ollama local</span></td>
+            <td class="doc-td">Template-driven, low creativity. Cheapest model that follows format works.</td>
+        </tr>
+        <tr>
+            <td class="doc-td"><strong>AI context stubs</strong><br/>(<code>.SUMMARY.md</code>, handoff notes, session summaries)</td>
+            <td class="doc-td"><code>price_tier: "budget"</code><br/>Structured extraction<br/>Concise</td>
+            <td class="doc-td">
+                <code>gpt-4o-mini</code> (OpenRouter)<br/>
+                <code>nemotron-3-ultra-free</code> (OpenRouter free)<br/>
+                <code>phi4:14b</code> (Ollama)
+            </td>
+            <td class="doc-td">$0.15–0.60 / 1M tokens<br/><span class="badge-free">FREE: nemotron-3-ultra-free, Ollama local</span></td>
+            <td class="doc-td">Structured summarization — budget models are sufficient.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="how-to-pick">How to Pick from the Live Catalog</h2>
+
+<ol>
+    <li><strong>Open the live picker</strong> — AI Chat header → model dropdown, OR Daily Plans → AI Focus-Tune → "Models" button. Both hit <code>/ai2/providers</code> (chat) or <code>/api/focus/models</code> (daily plan) which return the live merged catalog.</li>
+    <li><strong>Filter by <code>provider</code> and <code>price_tier</code></strong> — Each entry has:
+        <ul>
+            <li><code>provider</code>: <code>ollama</code> | <code>grok</code> | <code>openrouter</code></li>
+            <li><code>price_tier</code>: <code>free</code> | <code>budget</code> | <code>standard</code> | <code>premium</code></li>
+            <li><code>free</code>: boolean (true = no API cost)</li>
+            <li><code>local</code>: boolean (true = runs on your Ollama host)</li>
+            <li><code>price_prompt</code> / <code>price_completion</code>: USD per 1M tokens (when priced)</li>
+        </ul>
+    </li>
+    <li><strong>Apply the task row above</strong> — Match your task to the "What to look for" column, then pick an available model from "Recommended models" that appears in the live list.</li>
+    <li><strong>Prefer FREE first</strong> — If <code>nemotron-3-ultra-free</code> (OpenRouter) or your local Ollama models (<code>phi4:14b</code>, <code>llama3.1:8b</code>, <code>qwen2.5-coder</code>) are in the list, use them for budget/standard tasks. Save premium for planning and implementation.</li>
+</ol>
+
+<h2 id="provider-notes">Provider Notes (Comserv2 Specific)</h2>
+
+<div class="doc-h3">OpenRouter (external, pay-per-token or free tier)</div>
+<ul>
+    <li>Models: <code>gpt-4o</code>, <code>gpt-4o-mini</code>, <code>claude-3.5-sonnet</code>, <code>claude-3.5-haiku</code>, <code>deepseek-coder-v2</code>, <code>deepseek-chat</code>, <code>nemotron-3-ultra-free</code>, <code>qwen2.5-coder</code>, etc.</li>
+    <li>Free tier: <code>nemotron-3-ultra-free</code> — strong general model, no cost. <strong>OpenRouter does NOT auto-refill</strong> — when paid credits hit 0 (HTTP 402), the app falls back to free models or Ollama.</li>
+    <li>Pricing shown in live catalog is per 1M tokens (prompt/completion separate).</li>
+</ul>
+
+<div class="doc-h3">xAI Grok (external, auto-fill pay-per-token)</div>
+<ul>
+    <li>Models: <code>grok-3</code>, <code>grok-3-mini</code>, etc.</li>
+    <li>Auto-fills from linked payment method — no "quota API" to check remaining.</li>
+    <li>Not free; use when you specifically want Grok's reasoning style.</li>
+</ul>
+
+<div class="doc-h3">Ollama (local, zero API cost)</div>
+<ul>
+    <li>Models: whatever you have pulled on the Ollama host (<code>phi4:14b</code>, <code>llama3.1:8b</code>, <code>qwen2.5-coder</code>, <code>nemotron3-ultra</code>, etc.)</li>
+    <li><strong>Always free</strong> — runs on your hardware. No network latency for generation.</li>
+    <li>Best for: high-volume budget tasks, code documentation (with <code>qwen2.5-coder</code>), offline work.</li>
+    <li>IP/host selection is in the picker (not model dropdown) — <code>/ai</code> endpoint resolves Ollama host.</li>
+</ul>
+
+<div class="doc-h3">SuperGrok (prepaid OAuth, NOT the same as xAI API)</div>
+<ul>
+    <li>Prepaid subscription (OAuth token at <code>~/.comserv/secrets/supergrok_oauth</code>).</li>
+    <li>No remaining-quota API — you won't see a balance in the picker.</li>
+    <li>When exhausted, app falls back to OpenRouter free / Ollama.</li>
+    <li>Token sync: <code>script/sync_supergrok_token.pl</code>.</li>
+</ul>
+
+<h2 id="anti-patterns">Anti-Patterns to Avoid</h2>
+
+<table class="doc-table">
+    <thead>
+        <tr><th class="doc-th">Anti-pattern</th><th class="doc-th">Why it fails</th><th class="doc-th">Correct approach</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="doc-td">Hardcoding <code>gpt-4o</code> or <code>grok-3</code> as default</td>
+            <td class="doc-td">Model may not be in live catalog (key expired, network down, not pulled)</td>
+            <td class="doc-td">Use <code>ModelCatalog->default_for($c, page => '...')</code> — returns first live match</td>
+        </tr>
+        <tr>
+            <td class="doc-td">Assuming OpenRouter free tier always works</td>
+            <td class="doc-td">402 when credits empty; no auto-refill</td>
+            <td class="doc-td">Always have Ollama models pulled as ultimate fallback</td>
+        </tr>
+        <tr>
+            <td class="doc-td">Using premium model for changelogs/polishing</td>
+            <td class="doc-td">Wastes budget on template-driven work</td>
+            <td class="doc-td">Match model tier to task tier (table above)</td>
+        </tr>
+        <tr>
+            <td class="doc-td">Ignoring <code>local</code> flag</td>
+            <td class="doc-td">Ollama models need host reachable; picker shows IP selector separately</td>
+            <td class="doc-td">Check host connectivity if Ollama models show but don't respond</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="quick-decision-flow">Quick Decision Flow</h2>
+
+<pre class="doc-code">
+TASK TYPE
+    │
+    ├─► Planning / Architecture / Master Plans
+    │       └─► LIVE LIST → premium (gpt-4o, claude-3.5-sonnet, nemotron-3-ultra-free)
+    │
+    ├─► Code Documentation / Explaining Implementation
+    │       └─► LIVE LIST → code-aware (deepseek-coder-v2, qwen2.5-coder, gpt-4o, phi4:14b)
+    │
+    ├─► Writing Code / Refactoring / Debugging
+    │       └─► LIVE LIST → premium code (gpt-4o, claude-3.5-sonnet, deepseek-coder-v2)
+    │
+    ├─► Organizing / Restructuring / Indexing
+    │       └─► LIVE LIST → standard/budget (gpt-4o-mini, deepseek-chat, llama3.1:8b)
+    │
+    ├─► Polishing / Wording / Style
+    │       └─► LIVE LIST → standard writing (gpt-4o-mini, claude-3.5-haiku, nemotron-3-ultra-free)
+    │
+    └─► Changelogs / SUMMARY.md / Templates
+            └─► LIVE LIST → budget (gpt-4o-mini, nemotron-3-ultra-free, phi4:14b)
+</pre>
+
+<h2 id="live-catalog-access">Accessing the Live Catalog Programmatically</h2>
+
+<p>In Perl (Controller/Model):</p>
+<pre class="doc-code">
+use Comserv::Util::ModelCatalog;
+
+# Get full live catalog (600s cached)
+my $models = Comserv::Util::ModelCatalog->catalog($c);
+
+# Get page-appropriate default (respects role filters)
+my $default = Comserv::Util::ModelCatalog->default_for($c, page => 'documentation');
+</pre>
+
+<p>In JavaScript (browser):</p>
+<pre class="doc-code">
+// Chat header picker (model-select.js)
+fetch('/ai2/providers', { headers: { 'X-Forwarded-For': '127.0.0.1' } })
+  .then(r => r.json())
+  .then(data => console.log(data.models)); // [{name, provider, label, price_tier, free, local, ...}]
+
+// Daily Plan AI Focus-Tune
+fetch('/api/focus/models', { headers: { 'X-Forwarded-For': '127.0.0.1' } })
+  .then(r => r.json())
+  .then(data => console.log(data.models));
+</pre>
+
+<h2 id="related">Related Pages</h2>
+
+<div class="doc-navrow">
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/DocumentationMasterPlan') %]">Documentation Master Plan</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_DEVELOPMENT_GUIDELINES') %]">AI Development Guidelines</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/AI_DOCUMENTATION_GUIDELINES') %]">AI Documentation Guidelines</a>
+    <a class="doc-navlink" href="[% c.uri_for('/Documentation/comserv2-ai-model-catalog') %]">AI Model Catalog Architecture (dev reference)</a>
+</div>
+
+<p class="doc-backtop"><a href="#top">&#8593; Back to Top</a></p>
+
+</div>
+
+<style>
+.badge-free {
+    background: var(--success-color);
+    color: var(--text-on-success);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: var(--font-size-xsmall);
+    font-weight: 600;
+}
+.doc-code {
+    background: var(--code-bg);
+    color: var(--code-color);
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: var(--mono-font);
+    font-size: var(--font-size-small);
+    line-height: 1.5;
+}
+</style>

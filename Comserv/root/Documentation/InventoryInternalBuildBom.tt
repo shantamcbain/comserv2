@@ -80,7 +80,7 @@
                     Note qty <em>per base</em> vs <em>per add-on</em>.</li>
                 <li>Decide sitename (3d site owns 3d builds). Stay logged in on that Host.</li>
                 <li>Have File Manager rows for the 3MF/STL/PDF if you will link models later
-                    (<a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">Dryer playbook</a>).</li>
+                    (<a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">Dryer project plan</a>).</li>
                 <li>Confirm filament spools already exist (e.g. PETG White). Create those
                     first if missing:
                     <a href="[% c.uri_for('/Inventory/item/add') %]" class="doc-link">/Inventory/item/add</a>,
@@ -230,7 +230,7 @@
             <p class="doc-body">Source: assembly manual 1 Feb 2025. Complete the
             printed-label table from the PDF; 29 codes are already visible
             (FLS01/02, BLS01/02, BBL01/02, …). Hardware per module is in
-            <a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">DryerProjectImportPlan</a>
+            <a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a>
             §1b.</p>
             <p class="doc-body">Do not reuse inventory item 51
             <code>INT-HDRY-001</code> as a master if it still means “one row per 3MF”.
@@ -247,7 +247,7 @@
                 <ul class="doc-body">
                     <li><a href="[% c.uri_for('/Documentation/Inventory') %]" class="doc-link">Inventory (module overview)</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing coordinator plan</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-link">Dryer import playbook</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">Dryer project plan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing operator KB</a></li>
                 </ul>
             </div>

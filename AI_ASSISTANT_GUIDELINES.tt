@@ -51,13 +51,13 @@ All AI assistants working with this codebase must adhere to the following rules:
 
 
 
-- The Documentation controller has a filename/package mismatch:
+- The Documentation controller lives at:
 
-  - File: `Documantation.pm` (with an 'a')
+  - File: `Comserv/lib/Comserv/Controller/Documentation.pm`
 
-  - Package: `Comserv::Controller::Documentation` (with an 'o')
+  - Package: `Comserv::Controller::Documentation`
 
-  - This causes route failures for `/documentation` and `/Documentation`
+  - Served at `/documentation` and `/Documentation`
 
 
 

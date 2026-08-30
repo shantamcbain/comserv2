@@ -1,0 +1,354 @@
+[% META
+        title = "Schema Master Plan — Database System Consolidation"
+   description = "Reconsiders the WHOLE database-access layer (every DB-named model/util/controller: DBEncy, DBForager, AccountingDB, HybridDB, RemoteDB, SchemaCompare, Migrator, BackupManager, DBSchemaManager, DatabaseSchemaCache) as one fragmented system to simplify, with schema-compare as a subset. Consolidates the existing schema/docs and flags the referenced-but-missing plans."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database,schema-management,coordination"
+   page_version = "1.1"
+   last_updated = "Sun Aug 24 2026 (v1.1 — reframed: whole DB system, not just schema-compare; schema branch port 4007 added)"
+   site_specific = "false"
+   project_id = "138"
+   project_code = "PLANNING"
+%]
+
+<div class="container masterplan">
+
+<h1 id="top">Schema Master Plan — Database System Consolidation</h1>
+
+<div class="last-updated doc-muted">
+    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.1 &nbsp;|&nbsp; Status: COORDINATOR (schema branch)
+</div>
+
+<p class="mp-back-link"><a href="/Documentation/MASTER_PLAN">← Back to Master Plan</a></p>
+
+<div class="notice">
+    <strong>Scope correction (v1.1).</strong> The original framing put <em>schema-compare</em> at the center. That is
+    wrong. Schema-compare is a <strong>subset</strong> of a much larger, highly fragmented database system. Across
+    <code>lib/Comserv/</code> there are many components with "DB" in their name — <code>DBEncy</code>, <code>DBForager</code>,
+    <code>AccountingDB</code>, <code>HybridDB</code>, <code>RemoteDB</code>, <code>Util::SchemaCompare</code>,
+    <code>Util::Accounting::Migrator</code>, <code>Util::BackupManager</code>, <code>Util::DatabaseSchemaCache</code>,
+    plus the <code>DBSchemaManager</code> referenced by docs — each added by separate AI improvements
+    <strong>before plans were enforced</strong>. This plan now treats the <em>entire DB-access layer</em> as the thing
+    to reconsider and simplify, and schema-compare as one part of it.
+</div>
+
+<p>This is the single entry point for how Comserv manages its two database engines <em>and</em> the sprawl of code that
+talks to them. It does <strong>not</strong> replace the sub-plans — it sequences them, records what is done, names the
+gates, and — critically — records the <strong>consolidation debt</strong> this branch must address. The schema/doc
+story was spread across seven partially overlapping docs, and MASTER_PLAN references three plans that are
+<strong>not yet written</strong> (see <a href="#gaps">§9 Gaps</a>).</p>
+
+<div class="doc-info">
+    <strong>Vocabulary:</strong> <strong>Result class</strong> = a <code>lib/Comserv/Model/Schema/.../Result/Foo.pm</code>
+    file declaring a table via <code>__PACKAGE__-&gt;table(...)</code> + <code>add_columns(...)</code> — the single source of
+    truth for a table's shape. <strong>Schema-compare</strong> = the in-app workflow (<code>/admin/compare_schema</code>)
+    that diffs Result classes against live tables. <strong>Clone</strong> = the Maria→PG copy pipeline
+    (<code>Util::Accounting::Migrator</code> + <code>/Accounting/setup</code>). <strong>DB system</strong> = the union of every
+    model/util/controller that opens a database connection.
+</div>
+
+<!-- TOC -->
+<div id="toc" class="row doc-toc">
+    <div class="col-100">
+        <h2 class="doc-h2">Quick Navigation</h2>
+        <div class="doc-navrow">
+            <a href="#fragmentation" class="doc-navlink">Fragmentation</a>
+            <a href="#consolidation" class="doc-navlink">Consolidation</a>
+            <a href="#principles" class="doc-navlink">Principles</a>
+            <a href="#engines" class="doc-navlink">Engines</a>
+            <a href="#tooling" class="doc-navlink">Tooling</a>
+            <a href="#naming" class="doc-navlink">Naming</a>
+            <a href="#entity" class="doc-navlink">Accounting Entities</a>
+            <a href="#connection" class="doc-navlink">Connections</a>
+            <a href="#roadmap" class="doc-navlink">Roadmap</a>
+            <a href="#gaps" class="doc-navlink">Gaps</a>
+            <a href="#index" class="doc-navlink">Index</a>
+        </div>
+        <p class="doc-backtop"><a href="#top">&#8593; Back to Top</a></p>
+    </div>
+</div>
+
+[%# ── §1 Fragmentation inventory ── %]
+<div class="card" id="fragmentation"><details open><summary class="card-header">1. The fragmented DB system (inventory)</summary>
+<div class="card-body">
+<p>This is the actual set of DB-named components found under <code>lib/Comserv/</code>. They overlap in concern and have
+no single owner — the core problem this branch must fix.</p>
+<table class="data-table">
+    <thead><tr><th>Layer</th><th>Component</th><th>Role (as built)</th></tr></thead>
+    <tbody>
+        <tr><td>Model</td><td><code>DBEncy</code></td><td>Primary live connection (Maria <code>ency</code>); COMPONENT picks connection via RemoteDB; SQLite fallback.</td></tr>
+        <tr><td>Model</td><td><code>DBForager</code></td><td>Herbal/Forager Maria database.</td></tr>
+        <tr><td>Model</td><td><code>AccountingDB</code></td><td>Postgres accounting connection (clone-target).</td></tr>
+        <tr><td>Model</td><td><code>HybridDB</code></td><td>Mixed-source queries across connections.</td></tr>
+        <tr><td>Model</td><td><code>Model/Schema/Ency/Result/*</code></td><td>Live Maria Result classes (source of truth).</td></tr>
+        <tr><td>Model</td><td><code>Model/Schema/Accounting/Result/*</code></td><td>PG clone-target Result classes (no live DB yet).</td></tr>
+        <tr><td>Util</td><td><code>Util::SchemaCompare</code></td><td>The one schema mechanism (DDL-from-Result).</td></tr>
+        <tr><td>Util</td><td><code>Util::RemoteDB</code></td><td>Runtime connection selection (priority/failover) used by DBEncy.</td></tr>
+        <tr><td>Util</td><td><code>Util::Accounting::Migrator</code></td><td>Maria→PG clone/seed.</td></tr>
+        <tr><td>Util</td><td><code>Util::BackupManager</code></td><td>Backup (to be folded into the schema system, W0.1 G2).</td></tr>
+        <tr><td>Util</td><td><code>Util::DatabaseSchemaCache</code></td><td>Caches schema introspection.</td></tr>
+        <tr><td>Util</td><td><code>Util::DatabaseEnv</code></td><td>DB environment/config helpers.</td></tr>
+        <tr><td>Util</td><td><code>Util::DBSchemaManager</code> (per Schema.tt)</td><td>Startup schema init — referenced by docs, verify it still exists.</td></tr>
+        <tr><td>Controller</td><td><code>Admin/SchemaComparison</code></td><td>UI + ~42 raw-SQL lines (W0.1 G3 strips these).</td></tr>
+        <tr><td>Controller</td><td><code>RemoteDBExample</code>, <code>DatabaseMode</code></td><td>Demo / mode-switch surfaces for remote DB.</td></tr>
+        <tr><td>Templates</td><td><code>admin/schema_manager</code>, <code>compare_schema</code> (+3 sub-views), <code>migrate_schema</code></td><td>The schema UI.</td></tr>
+    </tbody>
+</table>
+<p><strong>Overlap to eliminate:</strong> three things each "manage a DB connection" (<code>DBEncy</code>/<code>RemoteDB</code>/
+<code>DatabaseEnv</code>); two things each "do schema" (<code>SchemaCompare</code> + <code>DBSchemaManager</code>); backup is separate
+from schema. None share an interface.</p>
+</div>
+</details></div>
+
+[%# ── §2 Consolidation target ── %]
+<div class="card" id="consolidation"><details><summary class="card-header">2. Consolidation target (simplify the construction)</summary>
+<div class="card-body">
+<p>The goal is not more docs — it is fewer, coherent components, each within the file-size limits that keep them
+readable by AI tooling (Controllers ≤2,000 soft / 4,000 hard; Util/Model/Result ≤800 soft / 1,500 hard).
+Consolidation = <strong>fewer files with clear interfaces</strong>, NOT one bloated file. Where a merge would push a
+file past its cap, split by responsibility instead.</p>
+<ul>
+    <li><strong>One connection registry.</strong> <code>RemoteDB</code> + <code>DatabaseEnv</code> + the inline DSN logic in
+        <code>DBEncy</code>/<code>DBForager</code> collapse into a single connection <em>service</em> with a typed interface
+        (get primary, get backup, get by sitename, list replicas). <code>DBEncy</code> stays as the <strong>Ency handle</strong> —
+        its job is to reach the <code>ency</code> database wherever it currently runs, and to stay available + in sync as we
+        grow to <strong>more than one Ency instance</strong> over time. The registry is the layer beneath DBEncy, not a
+        replacement for it.</li>
+    <li><strong>One schema mechanism.</strong> <code>Util::SchemaCompare</code> is the only DDL path and must become
+        <strong>engine-aware</strong> (drive both Maria and PostgreSQL from a Result class). <code>DBSchemaManager</code>
+        (if still present) is demoted to a thin caller or removed. <strong>The ~42 raw-SQL lines currently living in
+        <code>Controller/Admin.pm</code></strong> (lines ~3486–3998: <code>build_result_table_mapping</code>,
+        <code>compare_table_with_result_file</code>, <code>build_schema_comparison_data</code>) are extracted INTO
+        <code>Util::SchemaCompare</code> — the controller must not own schema logic (this is W0.1 G3, and the
+        <code>/admin/migrate_schema</code> route is a stale early-AI injection that is not utilized and should be retired).</li>
+    <li><strong>One backup path.</strong> <code>BackupManager</code> folded into the schema system, priority-aware (W0.1 G2).</li>
+    <li><strong>Structural target: fewer large controllers, more models/utils.</strong> Schema/DB logic belongs in
+        <code>Util::</code> / <code>Model::</code>, not in <code>Admin.pm</code>. This is a standing direction, not a one-off.</li>
+    <li><strong>Clear engine split.</strong> Maria (<code>Ency::</code>) live/authoritative; Postgres
+        (<code>Accounting::</code>) clone-target-only. Clone lives in <code>Accounting::Migrator</code> only.</li>
+    <li><strong>Result classes as the only schema source.</strong> No <code>accounting_template.sql</code>, no hand DDL.</li>
+</ul>
+<p><strong>Why now:</strong> the fragmentation predates plan enforcement. Every new AI improvement added another DB-named
+file instead of extending the last. Consolidating before more features land prevents the next orphan.</p>
+<p><strong>Cross-branch lag (standing risk):</strong> files needed by all branches (the engine-aware
+<code>SchemaCompare</code>, the connection registry) frequently are not merged to <code>main</code>/<code>schema</code> in a
+timely manner. The PG-aware schema-compare in particular may still live only in the <code>accounting</code> branch. The
+shared interface must land in a branch all others can reach, and be merged <em>before</em> other branches build on it.</p>
+</div>
+</details></div>
+
+[%# ── §3 Principles ── %]
+<div class="card" id="principles"><details><summary class="card-header">3. Guiding principles (hard constraints)</summary>
+<div class="card-body">
+<ul>
+    <li><strong>Result-file first.</strong> The Result class is the authoritative schema definition. Create/edit the
+        Result file <em>before</em> the DB table. Never author DDL by hand.</li>
+    <li><strong>One schema mechanism.</strong> All DB grunt goes through <code>Util::SchemaCompare</code> +
+        <code>Util::Schema::*</code>. Zero raw <code>ALTER</code>/<code>CREATE TABLE</code> in controllers.</li>
+    <li><strong>One connection service.</strong> All connections resolved through the single registry; no per-model DSN.</li>
+    <li><strong>DBD::ic pitfall.</strong> No <code>add_index</code> (reload crash) → use <code>add_unique_constraint(name =&gt; [cols])</code>.</li>
+    <li><strong>Two-engine authority.</strong> Maria (<code>Ency::</code>) live/authoritative; Postgres (<code>Accounting::</code>)
+        clone-target-only. Never originate accounting state in PG.</li>
+    <li><strong>Don't mix namespaces.</strong> <code>Ency::Result::*</code> and <code>Schema::Accounting::Result::*</code> are separate trees.</li>
+    <li><strong>No app restart / no edit to <code>comserv_server.pl</code>.</strong> Verify with <code>perl -c</code>, targeted scripts, SQL inspection.</li>
+    <li><strong>JS:</strong> modular files under <code>static/js/</code>, wired through <code>js_load.tt</code>, <code>data-*</code> delegation. No inline <code>&lt;script&gt;</code>.</li>
+</ul>
+</div>
+</details></div>
+
+[%# ── §4 Engines ── %]
+<div class="card" id="engines"><details><summary class="card-header">4. The two engines and their namespaces</summary>
+<div class="card-body">
+<table class="data-table">
+    <thead><tr><th>Engine</th><th>Role</th><th>Namespace / Result path</th><th>Live?</th><th>Source of truth</th></tr></thead>
+    <tbody>
+        <tr>
+            <td><strong>MariaDB</strong> (<code>ency</code>)</td>
+            <td>Live application DB — todos, users, inventory, AI, docs, and live accounting subsidiary tables
+                (<code>CoaAccount</code>, <code>GlEntry</code>, <code>InventoryItem</code>, …)</td>
+            <td><code>Comserv::Model::Schema::Ency::Result::*</code></td>
+            <td>Yes — authoritative</td>
+            <td>Result class in this namespace</td>
+        </tr>
+        <tr>
+            <td><strong>PostgreSQL</strong></td>
+            <td>Clone-target. One DB per SiteName for isolated accounting (SQL-Ledger/LedgerSMB shape). <strong>No live DBs yet.</strong></td>
+            <td><code>Comserv::Model::Schema::Accounting::Result::*</code></td>
+            <td>No — target only</td>
+            <td>Result class in this namespace; rows cloned from Maria</td>
+        </tr>
+    </tbody>
+</table>
+<p><strong>CoA note:</strong> the live Maria chart is <code>CoaAccount</code> (NOT <code>Chart</code>). Authority = Result class
++ schema-compare, <strong>not</strong> <code>accounting_template.sql</code>. Phase-1 CoA seeding = <code>root/config/coa_templates/</code>
++ <code>CoaTemplate.pm</code>.</p>
+</div>
+</details></div>
+
+[%# ── §5 Tooling ── %]
+<div class="card" id="tooling"><details><summary class="card-header">5. Schema tooling (what exists, what to use)</summary>
+<div class="card-body">
+<ul>
+    <li><strong><code>/admin/schema_manager</code></strong> — lists databases, table counts, Result-file mapping status. Read-only.</li>
+    <li><strong><code>/admin/compare_schema</code></strong> — Result-file-first diff UI (tables_with_result / tables_without_result / result_without_tables).</li>
+    <li><strong><code>/admin/migrate_schema</code></strong> — one-button "apply pending schema changes"; real logic in <code>Util::SchemaCompare</code>.</li>
+    <li><strong><code>Util::SchemaCompare</code></strong> — the one DDL-from-Result mechanism. <code>Util::Schema::Inspector</code> and <code>Util::DatabaseSchemaCache</code> support it.</li>
+    <li><strong>Maria→PG clone:</strong> <code>Util::Accounting::Migrator</code>, <code>AccountingDB</code>, <code>HybridDB</code>, <code>RemoteDB</code>; seeding entry <code>/Accounting/setup</code>. Subscribers of the <code>accounting|commerce|ecommerce</code> site-modules (today CSC + 3d) are the live PG seed targets.</li>
+</ul>
+<div class="doc-codebox"><pre>Preferred flow for a NEW column (any engine):
+  1. Edit the Result class  -> add_columns(...)   (or add_unique_constraint)
+  2. perl -c the .pm
+  3. /admin/compare_schema   -> see "needs sync"
+  4. Sync (Result -> table)  -- never hand-write DDL
+  5. Re-GET / inspect the row to confirm</pre></div>
+</div>
+</details></div>
+
+[%# ── §6 Naming ── %]
+<div class="card" id="naming"><details><summary class="card-header">6. Naming standardization (status: near-done)</summary>
+<div class="card-body">
+<p>Doc: <a href="/Documentation/SchemaNamingStandardizationPlan">SchemaNamingStandardizationPlan.tt</a>. Rule in force:
+<strong>PascalCase Result filename + snake_case table declaration</strong>. Owner note: as an old Delphi programmer the
+preference is PascalCase everywhere (easier to read); the <code>_</code> in table names was added for Windows
+case-insensitivity safety, not readability. We keep snake_case for DB tables as a pragmatic cross-platform
+compromise; Result <em>filenames</em> stay PascalCase. Four Ency Result files currently violate even that and must be
+fixed:</p>
+<table class="data-table">
+    <thead><tr><th>Result file</th><th>Current</th><th>Should be</th></tr></thead>
+    <tbody>
+        <tr><td><code>CodeSearchIndex.pm</code></td><td><code>codesearchindex</code></td><td><code>code_search_index</code></td></tr>
+        <tr><td><code>DocumentationMetadataIndex.pm</code></td><td><code>documentationmetadataindex</code></td><td><code>documentation_metadata_index</code></td></tr>
+        <tr><td><code>WebSearchResult.pm</code></td><td><code>websearchresult</code></td><td><code>web_search_result</code></td></tr>
+        <tr><td><code>SiteDomain.pm</code></td><td><code>sitedomain</code></td><td><code>site_domain</code></td></tr>
+    </tbody>
+</table>
+<p>Phases: P1 (code-only declaration fix, ~30 min, VERY LOW risk) → P2 (rename DB tables if present, via schema-compare, with backup) → P3 (grep code for old names) → P4 (delete <code>Util::TableNameNormalizer</code>, revert the <code>lc()</code> workaround in <code>Admin.pm</code>). This branch owns P1–P4. Track as todos under project #138.</p>
+</div>
+</details></div>
+
+[%# ── §7 Accounting entities ── %]
+<div class="card" id="entity"><details><summary class="card-header">7. Accounting-entity structure (why Postgres exists)</summary>
+<div class="card-body">
+<p>Doc: <a href="/Documentation/AccountingEntityStructurePlan">AccountingEntityStructurePlan.md</a> (ACCENT, DRAFT).</p>
+<ul>
+    <li>Shanta is one sole proprietor (DBAs CSC, BMaster, 3D, USBM, VE7TIT). Books must be <strong>separable by construction</strong> (E2) and the consolidated picture is a <strong>read, never a write</strong> (E4).</li>
+    <li>Owner-draw model: funding in/out recorded on <strong>both</strong> sides; owner's <code>Loan receivable — &lt;entity&gt;</code> must equal entity's <code>Loan from owner</code> (reconciliation, §5.2).</li>
+    <li>Chart-of-accounts = base archetype + overlays; BMaster uses the GIFI farm block (9370–9899). <code>gifi_accno</code> is forward-looking carve-out infrastructure.</li>
+    <li>Client-owned sites must <strong>never</strong> consolidate into the owner's roll-up (E5, explicit allow-list).</li>
+</ul>
+<p>ACCENT defines <em>what</em> the per-site PG books contain; this plan defines <em>how</em> the consolidated DB system
+enforces that. ACCENT is a consumer; the clone + connection registry are the mechanism.</p>
+<p><strong>Open questions blocking ACCENT code:</strong> O2 (interchange formats), O6 (T2125 line numbers) — research, not this branch's code.</p>
+</div>
+</details></div>
+
+[%# ── §8 Connections ── %]
+<div class="card" id="connection"><details><summary class="card-header">8. Connection configuration</summary>
+<div class="card-body">
+<p>Docs: <a href="/Documentation/DatabaseConnectionChanges">DatabaseConnectionChanges.md</a> (DSN fixes) and
+<code>DatabaseSystemImprovementPlan.md</code> (legacy, superseded).</p>
+<ul>
+    <li><strong>Driver format:</strong> DSNs use <code>dbi:mysql:database=...;host=...;port=...</code> (fixed in DBEncy/DBForager/RemoteDB).</li>
+    <li><strong><code>db_config.json</code></strong> holds connection profiles with a 1–10 <code>priority</code> scale and a
+        <code>remote_connections</code> section. W0.1 G0: document that the live primary is <strong>192.168.1.20:3307</strong> (MariaDB, all live data); <code>.198</code> / <code>172.30.161.222</code> is the legacy host planned to become a K8s DB node (load-balancing/failover); <code>db_config.json</code> is a tracked credential-free template, with creds injected at deploy and removed once K8s secrets supply them. The first-run bootstrap belongs in the Docker deploy workflow.</li>
+    <li><strong>Postgres profile:</strong> when the clone pipeline creates PG connections, follow the same
+        <code>db_type</code>/<code>priority</code> structure (add <code>db_type: "postgresql"</code>), not a separate code path.</li>
+</ul>
+</div>
+</details></div>
+
+[%# ── §9 Roadmap ── %]
+<div class="card" id="roadmap"><details><summary class="card-header">9. Ordered roadmap (by dependency)</summary>
+<div class="card-body">
+<div class="doc-codebox"><pre>Consolidation (this branch, simplify the DB layer)
+  G0  document real topology (live primary 192.168.1.20:3307; .198/.222 = planned K8s DB HA node) + Docker first-run cred bootstrap (container detects missing secrets -> prompt admin user + primary Ency creds)   (unblocks everything)
+  G1  extend Util::SchemaCompare: create_table_from_result / sync_result_to_table / sync_to_backup
+  C1  one connection registry: RemoteDB + DatabaseEnv + inline DSNs -> single service (beneath DBEncy)
+  C2  one schema mechanism: extract ~42 raw-SQL lines OUT of Admin.pm into Util::SchemaCompare; retire /admin/migrate_schema
+  C3  fold BackupManager into the schema system (G2)
+  HA  plan + stand up DB in k8s so Ency is never down; DBEncy reaches it wherever it runs; design for >1 Ency instance
+   │
+Naming P1  fix the 4 Ency Result declarations (snake_case)             (low risk, this branch)
+   │
+Clone      Util::Accounting::Migrator + /Accounting/setup seeds PG per SiteName
+   │
+ACCENT     owner-draw accounts + paired-entry + consolidation read     (await O2/O6)
+   │
+Naming P2-P4  rename DB tables, grep refs, delete TableNameNormalizer workaround</pre></div>
+<p><strong>Gates:</strong> G0+G1 land so the clone can target the right primary and create PG tables from Result (no hand DDL).
+C1–C3 are the consolidation that stops the next orphan file. <strong>HA</strong> is explicitly in-scope for this branch:
+moving the database into Kubernetes so it is never down, with DBEncy as the always-available, in-sync Ency handle
+across (eventually multiple) instances. Naming P1 lands so the compare UI stops false-flagging.</p>
+</div>
+</details></div>
+
+[%# ── §10 Gaps ── %]
+<div class="card" id="gaps"><details><summary class="card-header">10. Gaps — referenced but MISSING plans</summary>
+<div class="card-body">
+<table class="data-table">
+    <thead><tr><th>Missing plan</th><th>Referenced by</th><th>What it should contain</th><th>Owner</th></tr></thead>
+    <tbody>
+        <tr>
+            <td><code>SchemaSystemPlan</code> (W0.1 detail)</td>
+            <td>MASTER_PLAN W0.1; <code>/Documentation/SchemaSystemPlan</code></td>
+            <td>Full W0.1 breakdown (G0 + G1 + the consolidation C1–C3). <strong>Authored on this branch as of v1.1.</strong></td>
+            <td>schema branch</td>
+        </tr>
+        <tr>
+            <td><code>AccountingPostgresMigrationPlan</code> (ACCPG)</td>
+            <td>ACCENT §8; <code>/Documentation/AccountingPostgresMigrationPlan</code></td>
+            <td>One PostgreSQL DB per SiteName; Maria→PG clone mechanics.</td>
+            <td>InventoryAccounting</td>
+        </tr>
+        <tr>
+            <td><code>AccountingOnboardingPlan</code> (ACCON)</td>
+            <td>ACCENT §4, §8; <code>/Documentation/AccountingOnboardingPlan</code></td>
+            <td>Archetype chart template store (Ph.1 #1803) + AI chart generation (Ph.2 #1804).</td>
+            <td>InventoryAccounting</td>
+        </tr>
+    </tbody>
+</table>
+<p><strong>Legacy / superseded:</strong> <code>DatabaseSystemImprovementPlan.md</code> — its schema portions superseded by the
+code-first approach + this plan. Only its Phase 1–3 function-reference (no code) remains useful; reference, not backlog.</p>
+<div class="notice">
+    <strong>Open decisions this plan surfaces (not yet resolved):</strong>
+    <ul>
+        <li><strong>Clone vs test-sites direction conflict.</strong> The built PG namespace is a <em>clone target</em>
+            reached only through the accounting module (<code>AccountingDB</code> / <code>Accounting::Migrator</code>); the rest
+            of the app runs in the <code>Ency::</code> (Maria) namespace. But the intended direction was to <em>abandon</em> the
+            clone and do all accounting development in the test sites (Shanta, CSC, 3d). The built code and the intended
+            direction disagree. Resolve before ACCPG/ACCON are authored.</li>
+        <li><strong>Engine-aware schema-compare location.</strong> Extending <code>Util::SchemaCompare</code> to drive both
+            Maria and PostgreSQL may already exist in the accounting branch and not yet be merged here — a concrete case of
+            the cross-branch lag risk above. Confirm where the PG-aware version lives before building on it.</li>
+        <li><strong>Which "primary" Ency is authoritative during k8s move.</strong> Resolved: the live primary is <strong>192.168.1.20:3307</strong> (MariaDB, all live data). <code>.198</code> / <code>172.30.161.222</code> is the legacy host, planned to become a K8s DB node providing load-balancing/failover (the future DB HA), not a discarded relic. G0 documents this and the Docker first-run credential bootstrap (container detects missing secrets, prompts first admin user + primary Ency creds); the HA registry points at <code>.20</code> until the K8s DB node takes over.</li>
+    </ul>
+</div>
+<p><strong>Todo tracking note:</strong> the four reminder todos created earlier in this branch's session (Schema G0+G1 #2280,
+Naming P1 #2281, ACCPG #2282, ACCON #2283) were written against the <strong>main</strong> server (<code>:3001</code>) because the
+schema branch had no running server on its own port. They are real rows on main but <strong>mis-targeted</strong> — they
+should be re-created against the schema branch's own server (<code>:4007</code>, now registered) or deleted from main.
+Decided separately; not authoritative schema-branch tracking until re-homed.</p>
+</div>
+</details></div>
+
+[%# ── §11 Index ── %]
+<div class="card" id="index"><details><summary class="card-header">11. Document index (everything this plan ties together)</summary>
+<div class="card-body">
+<ul>
+    <li><a href="/Documentation/Schema">Schema.tt</a> — code-first Result-class schema management.</li>
+    <li><a href="/Documentation/SchemaSystemPlan">SchemaSystemPlan.tt</a> — W0.1 detail + consolidation (this branch).</li>
+    <li><a href="/Documentation/SchemaComparePostgresPlan">SchemaComparePostgresPlan.tt</a> — schema-compare PG connection + first DB create (SCHEMAPG #289; first code todo #2325).</li>
+    <li><a href="/Documentation/SchemaNamingStandardizationPlan">SchemaNamingStandardizationPlan.tt</a> — 4-file snake_case fix.</li>
+    <li><a href="/Documentation/AccountingEntityStructurePlan">AccountingEntityStructurePlan.md</a> (ACCENT) — entity structure, owner-draw, CoA archetypes.</li>
+    <li><a href="/Documentation/DatabaseConnectionChanges">DatabaseConnectionChanges.md</a> — DSN driver fixes, db_config.json.</li>
+    <li>DatabaseSystemImprovementPlan.md — legacy; schema portions superseded.</li>
+    <li>In-app: <code>/admin/schema_manager</code>, <code>/admin/compare_schema</code> (+ sub-views), <code>/admin/migrate_schema</code>; code: <code>Util::SchemaCompare</code>, <code>Util::RemoteDB</code>, <code>Util::Accounting::Migrator</code>, <code>Util::BackupManager</code>, <code>Model/DBEncy.pm</code>, <code>Model/DBForager.pm</code>, <code>Model/AccountingDB.pm</code>, <code>Model/HybridDB.pm</code>, <code>Controller/Admin/SchemaComparison.pm</code>.</li>
+    <li><strong>Missing (see §10):</strong> AccountingPostgresMigrationPlan (ACCPG), AccountingOnboardingPlan (ACCON).</li>
+</ul>
+</div>
+</details></div>
+
+<p class="mp-back-link"><a href="/Documentation/MASTER_PLAN">← Back to Master Plan</a></p>
+
+</div>

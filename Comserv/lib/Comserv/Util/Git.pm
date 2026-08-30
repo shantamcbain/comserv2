@@ -403,6 +403,18 @@ sub _run {
         return $result;
     }
 
+    # Prod Docker images are code-only (no .git). Root::auto used to call
+    # current_branch_and_commit on every request; git then exited 128 with
+    # empty output and we logged ERROR → 10k+ audit todos per bot probe.
+    # Worktrees have .git as a *file* pointing at the main repo; -e covers both.
+    # Caller (get_current_branch) treats success=0 as 'unknown'; no log here —
+    # this is the expected baked-image state, not a failure. (Audit trail:
+    # a real git failure after this check still logs below.)
+    unless (-e "$repo/.git") {
+        $result->{error} = 'Not a git checkout';
+        return $result;
+    }
+
     my $subcmd = $argv[0] // '';
     unless ($ALLOWED_SUBCMD{$subcmd}) {
         $result->{error} = "Refused: '$subcmd' is not an allowed git subcommand";
@@ -470,9 +482,18 @@ sub _run {
     # hits git, do not spawn an ERROR audit todo — the refusal is expected.
     my $checkout_collision = ($subcmd eq 'checkout')
         && $combined =~ /already used by worktree|already checked out/i;
+    # `git branch --show-current` exits 128 with empty stdout when there is no
+    # HEAD / no checkout (detached missing, empty repo, or image without git
+    # metadata that somehow still ran). get_current_branch() already maps that
+    # to 'unknown'. Logging it as ERROR flooded the audit panel.
+    my $show_current_empty = ($subcmd eq 'branch')
+        && (grep { defined $_ && $_ eq '--show-current' } @argv)
+        && $code == 128
+        && (($result->{output} // '') =~ /^\s*$/);
     my $benign   = !$result->{success}
                 && ( $asks_upstream
                   || $checkout_collision
+                  || $show_current_empty
                   || $combined =~ /no upstream configured|does not have an upstream|no such branch/i );
     my $level    = $result->{success} ? 'info'
                  : $benign            ? 'info'
