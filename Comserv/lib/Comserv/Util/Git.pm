@@ -1660,72 +1660,180 @@ sub merge_branch {
 
     $opts //= {};
     my $repo = $opts->{repo};   # optional explicit checkout (primary repo for merge_to_main)
+    my $run_opts = $repo ? { repo => $repo } : {};
+    my $checkout_label = $repo // 'this checkout';
 
     if (!$branch) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             'merge_branch: branch name is required');
         $result->{error_msg} = "Branch name is required.";
+        $result->{reason}    = 'missing_branch';
         return $result;
     }
-    # Guard: refuse to merge a protected branch *into itself* (merging main INTO a
-    # worktree branch — the "pull main down" direction — is the normal, intended
-    # operation and must NOT be blocked). Previously this refused any merge that
-    # named main as the source, which broke the main->branch "update this branch"
-    # direction entirely. Now we only refuse main->main / master->master.
-    my $current = $self->get_current_branch($c);
+
+    # Target branch must come from the checkout we merge INTO (main_repo when
+    # landing a worktree branch), not the request's default worktree path.
+    my $cur_r = $self->_run($c, 'branch', '--show-current', $run_opts);
+    my $current = $cur_r->{output} // '';
+    $current =~ s/\s+\z//;
+    $current = 'unknown' unless length $current;
+    $result->{target_branch} = $current;
+    $result->{checkout_path} = $repo if $repo;
+
     if (($branch eq 'main'   && $current eq 'main')
      || ($branch eq 'master' && $current eq 'master')
      || ($branch eq 'Production' && $current eq 'Production')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
             "merge_branch: refusing to merge protected branch '$branch' into itself");
         $result->{error_msg} = "Refusing to merge a protected branch into itself.";
+        $result->{reason}    = 'protected_self_merge';
         return $result;
     }
 
-    my $r = $self->_run($c, 'merge', '--no-ff', $branch, ($repo ? { repo => $repo } : ()));
-    $result->{output} = $r->{output};
+    # Pre-flight dirty status so we can name files even when git is terse, and
+    # so the browser can tell the user to fix MAIN (not the worktree) when the
+    # merge target is the primary checkout.
+    my $st = $self->_run($c, 'status', '--porcelain', $run_opts);
+    my $st_out = join("\n", grep { defined && length }
+        $st->{output}, $st->{error});
+    my @dirty;
+    for my $line (split /\n/, $st_out // '') {
+        next unless $line =~ /\S/;
+        # porcelain: XY PATH or XY ORIG -> PATH
+        my $path = $line;
+        $path =~ s/^\s*[0-9A-Za-z?!. ]{1,2}\s+//;
+        $path =~ s/^.* -> //;   # renames
+        $path =~ s/\s+\z//;
+        push @dirty, $path if length $path;
+    }
+    my %seen_d; @dirty = grep { !$seen_d{$_}++ } @dirty;
+    $result->{uncommitted_files} = \@dirty if @dirty;
+
+    my $r = $self->_run($c, 'merge', '--no-ff', $branch, $run_opts);
+    # CRITICAL: git prints almost all merge failures on stderr. _run keeps
+    # stdout/stderr separate — reading only {output} produced the useless UI
+    # message "Merge of 'helpdesk' failed" with no reason.
+    my $out = join("\n", grep { defined && length }
+        $r->{output}, $r->{error});
+    $result->{output}    = $out;
+    $result->{exit_code} = $r->{exit_code};
+
     if ($r->{success}) {
         $result->{success}     = 1;
-        $result->{success_msg} = "Merged '$branch' into current branch.";
+        $result->{success_msg} = "Merged '$branch' into $current"
+            . ($repo ? " at $repo" : '') . '.';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
-            "merge_branch: merged '$branch' into " . ($repo // 'current checkout') . " (success)");
+            "merge_branch: merged '$branch' into $current"
+            . ($repo ? " (repo=$repo)" : '') . ' (success)');
+        return $result;
     }
-    else {
-        # Detect conflict so the UI can offer --abort, and build a SPECIFIC
-        # failure message. "Merge failed (see output)" forced the user to read
-        # raw git spew; now we say WHY it failed: which files conflict, or that
-        # uncommitted changes are blocking the merge.
-        my $out = $r->{output} // '';
-        if ($out =~ /CONFLICT|Automatic merge failed/) {
-            $result->{conflict} = 1;
-            # Collect every file git named: "CONFLICT (content): Merge conflict in <path>"
-            my @files = $out =~ /Merge conflict in ([^\s]+)/g;
-            # de-dup, keep order
-            my %seenf; @files = grep { !$seenf{$_}++ } @files;
-            $result->{conflict_files} = \@files if @files;
-            $result->{error_msg} = @files
-                ? "Merge conflict — these files have conflicting edits: "
-                  . join(', ', @files)
-                  . ". Resolve them in the worktree, then commit the result."
-                : "Merge conflict. Resolve in the worktree, then commit (or abort).";
-        }
-        elsif ($out =~ /Please commit or stash|local changes.*would be overwritten|untracked working tree files.*would be overwritten/i) {
-            # Uncommitted WIP is the other classic blocker — name it plainly.
-            $result->{uncommitted} = 1;
-            $result->{error_msg} = "Merge blocked by uncommitted changes in "
-                . ($repo // 'this checkout')
-                . ". Commit or stash your work first (the dashboard's Stash / autostash handles this).";
+
+    # --- Classify failure for the browser + detailed log ---
+    my $is_main_target = ($current eq 'main' || $current eq 'master'
+        || (defined $repo && length $repo && $repo eq ($self->main_repo_path($c) // '')));
+
+    if ($out =~ /already used by worktree|already checked out/i) {
+        $result->{reason}    = 'worktree_collision';
+        $result->{error_msg} =
+            "Git refused the merge because a branch is already checked out in another worktree. "
+          . "Do not switch this checkout to main from a linked worktree — merge '$branch' "
+          . "into the primary main checkout instead.";
+        $result->{fix_hint} =
+            "Use the primary repo Git dashboard (usually :3001 /admin/git) and merge "
+          . "'$branch' → main there. Never run git checkout main inside a worktree.";
+    }
+    elsif ($out =~ /CONFLICT|Automatic merge failed/) {
+        $result->{conflict} = 1;
+        $result->{reason}   = 'conflict';
+        my @files = $out =~ /Merge conflict in ([^\s]+)/g;
+        my %seenf; @files = grep { !$seenf{$_}++ } @files;
+        $result->{conflict_files} = \@files if @files;
+        $result->{error_msg} = @files
+            ? "Merge conflict merging '$branch' into $current — conflicting files: "
+              . join(', ', @files)
+              . '. Resolve, commit, or abort the merge.'
+            : "Merge conflict merging '$branch' into $current. Resolve in the target checkout, then commit (or abort).";
+        $result->{fix_hint} = $is_main_target
+            ? "Open the main checkout, resolve conflicts, commit the merge (or Abort on the Git dashboard)."
+            : "Resolve conflicts in the worktree for $current, then commit or abort.";
+    }
+    elsif ($out =~ /Please commit or stash|local changes.*would be overwritten|untracked working tree files.*would be overwritten/i
+        || (@dirty && $out !~ /\S/)) {
+        # Prefer the dirty list when git blocked on WIP, or when porcelain shows
+        # dirty and git gave us no stderr/stdout (do not assume WIP for every
+        # failure while the tree happens to be dirty).
+        $result->{uncommitted} = 1;
+        $result->{reason}      = $is_main_target ? 'uncommitted_on_main' : 'uncommitted';
+        my $file_bit = @dirty
+            ? (' Dirty files: ' . join(', ', @dirty[0 .. ($#dirty > 11 ? 11 : $#dirty)])
+               . ($#dirty > 11 ? ' …' : '') . '.')
+            : '';
+        if ($is_main_target) {
+            $result->{error_msg} =
+                "Cannot merge '$branch' into main: the main checkout has uncommitted changes"
+              . ($repo ? " at $repo" : '')
+              . ".$file_bit Commit or stash them on main, then retry the merge.";
+            $result->{fix_hint} =
+                "Go to the main branch server (typically http://workstation.local:3001/admin/git), "
+              . "commit or stash the dirty files on main, then retry merging '$branch' into main. "
+              . "Do not try to clean main from this worktree.";
         }
         else {
-            $result->{error_msg} = "Merge of '$branch' failed"
-                . ($out =~ /\S/ ? ': ' . (split(/\n/, $out))[0] : '.');
+            $result->{error_msg} =
+                "Merge blocked by uncommitted changes in $checkout_label.$file_bit "
+              . "Commit or stash first (dashboard Stash / main→branch uses --autostash).";
+            $result->{fix_hint} =
+                "Commit or stash WIP in $checkout_label, then retry.";
         }
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge',
-            "merge_branch: merge of '$branch' failed"
-            . ($result->{conflict} ? ' (conflict)' : '')
-            . ($result->{uncommitted} ? ' (uncommitted changes)' : '')
-            . ': ' . $out);
     }
+    elsif ($out =~ /not something we can merge|bad revision|unknown revision|invalid reference/i) {
+        $result->{reason}    = 'missing_ref';
+        $result->{error_msg} =
+            "Cannot merge '$branch': git does not see that branch/ref from "
+          . "$checkout_label ($current).";
+        $result->{fix_hint} =
+            "Confirm the branch exists (linked worktrees share refs). Fetch origin if needed, then retry.";
+    }
+    elsif ($out =~ /You have not concluded your merge|Merge with strategy|unmerged paths|index\.lock/i) {
+        $result->{reason}    = 'merge_in_progress';
+        $result->{conflict}  = 1 if $out =~ /unmerged|not concluded/i;
+        $result->{error_msg} =
+            "Cannot start merge of '$branch': the target checkout already has a merge "
+          . "(or lock) in progress.";
+        $result->{fix_hint} =
+            "On the target checkout, finish the in-progress merge or use Merge Abort, then retry.";
+    }
+    else {
+        $result->{reason} = 'merge_failed';
+        my $first = '';
+        for my $line (split /\n/, $out) {
+            next unless defined $line && $line =~ /\S/;
+            next if $line =~ /^\s*hint:/i;
+            $first = $line;
+            last;
+        }
+        $first =~ s/^\s+//;
+        $result->{error_msg} = length $first
+            ? "Merge of '$branch' into $current failed: $first"
+            : "Merge of '$branch' into $current failed (exit "
+              . ($r->{exit_code} // '?') . ').';
+        $result->{fix_hint} =
+            "See the detail below and the server log (git_merge). Fix the reported cause, then retry.";
+    }
+
+    # Always attach porcelain dirty list when we have it and reason is WIP-ish
+    $result->{uncommitted} = 1 if @dirty && ($result->{reason} // '') =~ /uncommitted/;
+
+    my $log_line = "merge_branch FAILED branch='$branch' into='$current'"
+        . ($repo ? " repo=$repo" : '')
+        . " reason=" . ($result->{reason} // 'unknown')
+        . ($result->{conflict} ? ' conflict=1' : '')
+        . ($result->{uncommitted} ? ' uncommitted=1' : '')
+        . " exit=" . ($r->{exit_code} // '?')
+        . " msg=" . ($result->{error_msg} // '')
+        . " detail=" . substr($out // '', 0, 800);
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge', $log_line);
+
     return $result;
 }
 

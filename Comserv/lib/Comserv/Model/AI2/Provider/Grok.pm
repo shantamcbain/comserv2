@@ -96,10 +96,12 @@ sub _read_secret_file {
     return length($k) ? $k : undef;
 }
 
-# Same paths in every container: K8s /run/secrets, the mounted
-# ~/.comserv/secrets volume (compose already bind-mounts it at
-# /home/comserv/.comserv/secrets), then COMSERV_SECRETS_DIR.
-sub _portable_secret_paths {
+# Container/runtime secret paths only (K8s CSI + compose mount at
+# /home/comserv/.comserv/secrets). Do NOT put the workstation copy
+# ~/.comserv/secrets/supergrok_oauth first — it is often a stale sync and
+# shadows a fresh Hermes xai-oauth token (Git dashboard 403 bad-credentials,
+# todo #2355). That host path is tried AFTER Hermes auth.json.
+sub _runtime_secret_paths {
     my @paths = (
         '/run/secrets/supergrok_oauth',
         '/run/secrets/xai_oauth_token',
@@ -108,27 +110,54 @@ sub _portable_secret_paths {
     if ($ENV{COMSERV_SECRETS_DIR}) {
         push @paths, File::Spec->catfile($ENV{COMSERV_SECRETS_DIR}, 'supergrok_oauth');
     }
-    my $home = $ENV{HOME} || '';
-    push @paths, File::Spec->catfile($home, '.comserv', 'secrets', 'supergrok_oauth') if $home;
     return @paths;
+}
+
+sub _workstation_secret_paths {
+    my $home = $ENV{HOME} || '';
+    return $home
+        ? (File::Spec->catfile($home, '.comserv', 'secrets', 'supergrok_oauth'))
+        : ();
+}
+
+# Human-facing auth errors for UI (Git dashboard, chat). Never echo full JWT bodies.
+sub _sanitize_provider_error {
+    my ($code, $body) = @_;
+    $body //= '';
+    $body =~ s/\s+/ /g;
+    if ($code == 401 || $code == 403
+        || $body =~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) {
+        return 'SuperGrok/xAI login expired or invalid — re-auth (hermes auth add xai-oauth) then run script/sync_supergrok_token.pl';
+    }
+    # Keep short; strip obvious token-shaped blobs
+    $body =~ s/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-.]{10,}/[redacted-jwt]/g;
+    return length($body) > 180 ? substr($body, 0, 180) . '…' : $body;
 }
 
 sub resolve_prepaid_key {
     my ($self, $c) = @_;
     $self->{_last_cred_source} = undef;
-    for my $p ($self->_portable_secret_paths) {
+    # 1) True runtime secrets (pods / compose as comserv user)
+    for my $p ($self->_runtime_secret_paths) {
         my $k = _read_secret_file($p);
         return $self->_remember_source('supergrok_file', $k) if $k;
     }
+    # 2) Env
     if ($ENV{SUPERGROK_OAUTH_TOKEN} && length $ENV{SUPERGROK_OAUTH_TOKEN}) {
         return $self->_remember_source('supergrok_env', $ENV{SUPERGROK_OAUTH_TOKEN});
     }
     if ($ENV{XAI_OAUTH_TOKEN} && length $ENV{XAI_OAUTH_TOKEN}) {
         return $self->_remember_source('supergrok_env', $ENV{XAI_OAUTH_TOKEN});
     }
+    # 3) Live Hermes OAuth store (workstation freshest after hermes auth refresh)
     my $oauth = _supergrok_oauth_token_from_file($self->hermes_auth_json_path);
     if ($oauth) {
         return $self->_remember_source('supergrok_oauth', $oauth);
+    }
+    # 4) Host secrets dir last (may lag Hermes — keep for containers that only mount it)
+    for my $p ($self->_workstation_secret_paths) {
+        my $k = _read_secret_file($p);
+        return $self->_remember_source('supergrok_file', $k) if $k;
     }
     my $schema = eval { $c && $c->model('DBEncy')->schema } or return undef;
     my $uid = eval { $c->session->{user_id} };
@@ -305,14 +334,21 @@ sub chat {
     };
     unless ($res && $res->is_success) {
         my $code = $res ? $res->code : 599;
-        my $body = $res ? substr(($res->decoded_content // ''), 0, 200) : 'no response';
-        $body =~ s/\s+/ /g;
-        # Verbatim status + detail (429 rate limit, 401 bad key, 402/429
-        # quota...) so the Router fallback chain engages on this hop.
+        my $raw  = $res ? ($res->decoded_content // '') : 'no response';
+        my $safe = _sanitize_provider_error($code, substr($raw, 0, 300));
+        my $auth_fail = ($code == 401 || $code == 403
+            || $raw =~ /unauthenticated|bad-credentials|invalid.?token/i) ? 1 : 0;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'grok_chat',
+            "x.AI chat HTTP $code source=" . ($self->{_last_cred_source} || '?')
+                . " auth_failed=$auth_fail detail=" . substr($safe, 0, 120));
+        # Keep a machine-readable prefix so Router fallback can still match 401/403/429.
         return {
             success => 0,
-            error   => "$code $body",
-            ($code == 401 ? (auth_failed => 1) : ()),
+            error   => $auth_fail
+                ? $safe
+                : "$code $safe",
+            ($auth_fail ? (auth_failed => 1) : ()),
         };
     }
 

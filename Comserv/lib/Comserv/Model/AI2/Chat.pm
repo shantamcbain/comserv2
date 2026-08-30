@@ -380,7 +380,9 @@ sub process {
                 request_type      => 'chat',
             );
         };
-        return { success => 0, error => $resp->{error} // 'AI provider error' };
+        my $public = eval { $c->model('AI2::Router')->_user_facing_error($resp->{error}) }
+                  || 'The AI provider did not complete this turn. Try again or pick another model.';
+        return { success => 0, error => $public };
     }
 
     if ($resp->{fallback}) {

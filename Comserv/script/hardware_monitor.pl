@@ -24,16 +24,15 @@ use POSIX qw(strftime);
 sub _ts { strftime('%Y-%m-%d %H:%M:%S', localtime) }
 
 # Candidate nodes, in priority order. Override via env (comma-separated URLs).
-# IMPORTANT: these are REACHABLE node addresses, NOT localhost. The script runs
-# on a separate host (proxmox720) and curls the app containers directly — the app
-# has no concept of "localhost" on this host. The deploy pipeline writes the
-# correct HW_MONITOR_NODES for each server; these fallbacks are only used if the
-# env is unset. production1 -> 192.168.1.126:5000, workstation -> 192.168.1.199:5000.
-# (No 127.0.0.1 — it would target this script host's own loopback, which is wrong.)
+# IMPORTANT: these are REACHABLE *app* addresses, NOT the DB host and NOT
+# localhost. The script often runs on the gateway (proxmoxt210 = 192.168.1.3)
+# and curls app containers on the LAN. The app (not this script) talks to Ency
+# on 192.168.1.20:3307 only — there is no app-read DB on .198.
+# deploy.sh writes HW_MONITOR_NODES per server; these fallbacks apply if unset.
+# production1 -> 192.168.1.126:5000, workstation -> 192.168.1.199:5000.
 my @NODES = split /,/, ($ENV{HW_MONITOR_NODES}
     || 'http://192.168.1.126:5000/admin/hardware_monitor/run,'
-    .  'http://192.168.1.199:5000/admin/hardware_monitor/run,'
-    .  'http://192.168.1.198:5000/admin/hardware_monitor/run');
+    .  'http://192.168.1.199:5000/admin/hardware_monitor/run');
 
 # The shared token. Every cron host and every container MUST use the IDENTICAL
 # key, otherwise healthy nodes are falsely reported down. deploy.sh provisions it
