@@ -1842,19 +1842,35 @@ sub merge_to_main :Path('/admin/git/merge_to_main') :Args(0) {
     }
 
     my $res = $self->git_service->merge_branch($c, $branch, { repo => $main_repo });
-    if ($res->{conflict}) {
+    if (!$res->{success}) {
+        my $level = $res->{conflict} || $res->{uncommitted} ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
+            "merge_to_main failed branch='$branch' reason="
+            . ($res->{reason} // 'unknown')
+            . ' msg=' . ($res->{error_msg} // '')
+            . ' detail=' . substr($res->{output} // '', 0, 500));
         $c->response->body(encode_json({
-            success  => 0,
-            conflict => 1,
-            error    => "Merge conflict in '$branch'. Resolve in the worktree, then retry (or abort).",
-            output   => $res->{output},
+            success            => 0,
+            conflict           => $res->{conflict} ? 1 : 0,
+            uncommitted        => $res->{uncommitted} ? 1 : 0,
+            reason             => $res->{reason},
+            fix_hint           => $res->{fix_hint},
+            conflict_files     => $res->{conflict_files} || [],
+            uncommitted_files  => $res->{uncommitted_files} || [],
+            checkout_path      => $res->{checkout_path},
+            target_branch      => $res->{target_branch},
+            error              => $res->{error_msg}
+                || "Merge of '$branch' into main failed.",
+            output             => $res->{output},
         }));
         return;
     }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_merge',
+        "merge_to_main: merged '$branch' into main (success)");
     $c->response->body(encode_json({
-        success => $res->{success} ? 1 : 0,
+        success => 1,
         output  => $res->{output},
-        error   => $res->{error_msg},
+        error   => undef,
     }));
 }
 
@@ -1969,13 +1985,61 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         # that distinctly so the user knows to recover via Stash Pop.
         my $autostash_conflict = ($combined // '') =~ /Cannot store stash|Please commit or stash|stash.*conflict/i
             && $autostash_used ? 1 : 0;
+        my $fail_msg;
+        my $reason;
+        my $fix_hint;
+        my $uncommitted = 0;
+        my $conflict = ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0;
+        if (!$up->{success}) {
+            if ($combined =~ /already used by worktree|already checked out/i) {
+                $reason = 'worktree_collision';
+                $fail_msg =
+                    "Git refused to merge main into '$target' (worktree checkout collision). "
+                  . "Stay on the branch worktree; do not checkout main there.";
+                $fix_hint =
+                    "Run this merge from the branch worktree dashboard (or primary) without switching branches.";
+            }
+            elsif ($conflict) {
+                $reason = 'conflict';
+                my @files = $combined =~ /Merge conflict in ([^\s]+)/g;
+                my %sf; @files = grep { !$sf{$_}++ } @files;
+                $fail_msg = @files
+                    ? "Merge conflict bringing main into '$target': " . join(', ', @files)
+                    : "Merge conflict bringing main into '$target'.";
+                $fix_hint = "Resolve in the '$target' worktree, commit, or abort.";
+            }
+            elsif ($combined =~ /Please commit or stash|local changes.*would be overwritten/i) {
+                $reason = 'uncommitted';
+                $uncommitted = 1;
+                $fail_msg =
+                    "Merge of main into '$target' blocked by uncommitted changes in the worktree.";
+                $fix_hint =
+                    "Commit/stash WIP, or retry (this path uses --autostash when possible).";
+            }
+            else {
+                $reason = 'merge_failed';
+                my $first = '';
+                for my $line (split /\n/, $combined) {
+                    next unless defined $line && $line =~ /\S/;
+                    next if $line =~ /^\s*hint:/i;
+                    $first = $line; last;
+                }
+                $fail_msg = length $first
+                    ? "Merge of main into '$target' failed: $first"
+                    : "Merge of main into '$target' failed.";
+                $fix_hint = "See detail and server log (git_merge).";
+            }
+        }
         $res = {
             success   => $up->{success} ? 1 : 0,
             output    => $combined,
             autostash => $autostash_used,
             autostash_conflict => $autostash_conflict,
-            error_msg => $up->{success} ? undef : ($up->{error} || $up->{output} || 'merge failed'),
-            conflict  => ($combined // '') =~ /CONFLICT|Automatic merge failed|overwritten by merge/ ? 1 : 0,
+            error_msg => $up->{success} ? undef : $fail_msg,
+            reason    => $reason,
+            fix_hint  => $fix_hint,
+            uncommitted => $uncommitted,
+            conflict  => $conflict,
         };
     }
     elsif ($source ne 'main' && $target eq 'main') {
@@ -2011,10 +2075,17 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         }
         my $mr = $self->git_service->merge_branch($c, $source, { repo => $main_repo });
         $res = {
-            success   => $mr->{success} ? 1 : 0,
-            output    => $mr->{output} // '',
-            error_msg => $mr->{error_msg},
-            conflict  => $mr->{conflict} ? 1 : 0,
+            success           => $mr->{success} ? 1 : 0,
+            output            => $mr->{output} // '',
+            error_msg         => $mr->{error_msg},
+            conflict          => $mr->{conflict} ? 1 : 0,
+            uncommitted       => $mr->{uncommitted} ? 1 : 0,
+            reason            => $mr->{reason},
+            fix_hint          => $mr->{fix_hint},
+            conflict_files    => $mr->{conflict_files} || [],
+            uncommitted_files => $mr->{uncommitted_files} || [],
+            checkout_path     => $mr->{checkout_path},
+            target_branch     => $mr->{target_branch},
         };
     }
     else {
@@ -2025,36 +2096,55 @@ sub merge :Path('/admin/git/merge') :Args(0) {
         return;
     }
 
-    if ($res->{conflict}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_merge',
-            "merge conflict: direction=$direction source=$source target=$target");
-        # Name the conflicting files (and the uncommitted-changes case) in the
-        # error itself — the raw output <pre> stays as supporting detail.
-        my $why = $res->{error_msg} // "Merge conflict. Resolve in the worktree, then retry (or abort).";
+    if (!$res->{success}) {
+        my $level = ($res->{conflict} || $res->{uncommitted}) ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'git_merge',
+            "merge failed direction=$direction source=$source target=$target"
+            . " reason=" . ($res->{reason} // 'unknown')
+            . " conflict=" . ($res->{conflict} ? 1 : 0)
+            . " uncommitted=" . ($res->{uncommitted} ? 1 : 0)
+            . " msg=" . ($res->{error_msg} // '')
+            . " detail=" . substr($res->{output} // '', 0, 500));
+
+        my $why = $res->{error_msg}
+            // ($res->{conflict}
+                ? "Merge conflict. Resolve, then retry (or abort)."
+                : "Merge of '$source' into '$target' failed.");
+        if ($res->{fix_hint} && CORE::index($why, $res->{fix_hint}) < 0) {
+            $why .= "\n\nWhat to do: " . $res->{fix_hint};
+        }
+
         $c->response->body(encode_json({
-            success  => 0,
-            conflict => 1,
-            target   => $target,
-            direction => $direction,
-            conflict_files => $res->{conflict_files} || [],
-            uncommitted    => $res->{uncommitted} ? 1 : 0,
-            error    => $why,
-            output   => $res->{output},
+            success            => 0,
+            conflict           => $res->{conflict} ? 1 : 0,
+            uncommitted        => $res->{uncommitted} ? 1 : 0,
+            reason             => $res->{reason},
+            fix_hint           => $res->{fix_hint},
+            target             => $target,
+            direction          => $direction,
+            conflict_files     => $res->{conflict_files} || [],
+            uncommitted_files  => $res->{uncommitted_files} || [],
+            checkout_path      => $res->{checkout_path},
+            target_branch      => $res->{target_branch},
+            error              => $why,
+            output             => $res->{output},
+            autostash          => $res->{autostash} ? 1 : 0,
+            autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
         }));
         return;
     }
 
-    $self->logging->log_with_details($c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
-        'git_merge', "direction=$direction source=$source target=$target success=" . ($res->{success} // 0));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'git_merge', "direction=$direction source=$source target=$target success=1");
 
     $c->response->body(encode_json({
-        success   => $res->{success} ? 1 : 0,
+        success   => 1,
         target    => $target,
         direction => $direction,
         conflict  => 0,
         autostash => $res->{autostash} ? 1 : 0,
         autostash_conflict => $res->{autostash_conflict} ? 1 : 0,
-        error     => $res->{error_msg},
+        error     => undef,
         output    => $res->{output},
     }));
 }

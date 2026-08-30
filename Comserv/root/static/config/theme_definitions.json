@@ -9,7 +9,12 @@
   "brew.computersystemconsulting.ca": "/static/images/favicons/brew.computersystemconsulting.ca.svg",
   "usbm.ca": "/static/images/favicons/usbm.ca.svg",
   "ve7tit.com": "/static/images/favicons/ve7tit.com.svg",
-  "3d.usbm.ca": "/static/images/favicons/3d.svg"
+  "3d.usbm.ca": "/static/images/favicons/3d.svg",
+  "helpdesk.computersystemconsulting.ca": "/static/images/favicons/helpdesk.svg",
+  "helpdesk.local": "/static/images/favicons/helpdesk.svg"
+ },
+ "page_favicons": {
+  "(?i)^/?HelpDesk": "/favicon/helpdesk"
  },
  "component_styles": {
   "api_credentials": "api_credentials.css",
