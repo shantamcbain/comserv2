@@ -1,0 +1,6 @@
+<div id="2026-08-29-proxmoxt210-hardware-monitor-thin" class="cl-entry">
+<h3>2026-08-29 — proxmoxt210 hardware_monitor: thin trigger + topology correction</h3>
+<p class="doc-body"><strong>What.</strong> Replaced the old DBI <code>hardware_monitor.pl</code> on gateway proxmoxt210 (<code>192.168.1.3</code>) that mailed <code>Cannot connect to DB</code> with the thin HTTP trigger (no DB). Token under <code>/usr/local/etc/comserv/</code>; cron hits prod1/workstation <code>:5000</code> only. Fixed <code>deploy.sh</code> cron marker to end-of-line. Dropped <code>.198</code> from default monitor node list. <code>ContainerHealthMonitor.pl</code> default DB is now <code>192.168.1.20:3307</code>.</p>
+<p class="doc-body"><strong>Why / topology.</strong> Live Ency the app reads is <strong>only</strong> <code>.20:3307</code> — there is no app-read DB on <code>.198</code>. <code>proxmoxt210</code> (<code>.3</code>) is the gateway cron host, not a database. Host cron must not open MariaDB; the app owns DB selection.</p>
+<p class="doc-body"><strong>Files.</strong> Host <code>.3</code>: <code>/usr/local/bin/hardware_monitor.pl</code>, crontab. Repo: <code>Comserv/script/hardware_monitor.pl</code>, <code>ContainerHealthMonitor.pl</code>, <code>Comserv/script/deploy.sh</code>, <code>script/deploy.sh</code>, <code>deploy.sh</code>.</p>
+</div>
