@@ -58,8 +58,8 @@
                     </span>
                 </td>
                 <td>[% t.username || t.email || 'guest' %]</td>
-                <td>[% t.created_at %]</td>
-                <td>[% t.updated_at || t.created_at %]</td>
+                <td>[% t.created_at | user_time %]</td>
+                <td>[% (t.updated_at || t.created_at) | user_time %]</td>
                 <td class="ticket-row-actions">
                     <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"
                        class="btn btn-sm btn-primary">View</a>

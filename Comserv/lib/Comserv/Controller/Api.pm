@@ -4,6 +4,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 use File::Spec;
 use JSON::MaybeXS;
 use DateTime;
+use Comserv::Util::AppTime;
 use Digest::SHA qw(sha256_hex);
 use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
@@ -133,7 +134,7 @@ sub api_generate_token :Local :Args(0) {
         $c->detach();
     }
     
-    my $token_name = $params->{token_name} || 'API Token ' . DateTime->now->ymd;
+    my $token_name = $params->{token_name} || 'API Token ' . Comserv::Util::AppTime->today_utc_ymd;
     my $expires_in_days = $params->{expires_in_days};
     
     my $schema = $c->model('DBEncy');
@@ -159,7 +160,7 @@ sub api_generate_token :Local :Args(0) {
     
     my $expires_at;
     if ($expires_in_days && $expires_in_days =~ /^\d+$/) {
-        my $dt = DateTime->now->add(days => $expires_in_days);
+        my $dt = Comserv::Util::AppTime->now_dt->add(days => $expires_in_days);
         $expires_at = $dt;
     }
     
@@ -168,7 +169,7 @@ sub api_generate_token :Local :Args(0) {
         token_hash => $token_hash,
         token_name => $token_name,
         is_active => 1,
-        created_at => DateTime->now,
+        created_at => Comserv::Util::AppTime->now_dt,
         expires_at => $expires_at,
     });
     
@@ -297,7 +298,7 @@ sub api_revoke_token :Local :Args(1) {
     
     $api_token->update({
         is_active => 0,
-        revoked_at => DateTime->now
+        revoked_at => Comserv::Util::AppTime->now_dt
     });
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_revoke_token',
@@ -547,10 +548,10 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         status => $params->{status},
         developer => $params->{assigned_to} || $params->{developer} || $current_user,
         sitename => $sitename,
-        date_time_posted => DateTime->now->ymd . ' ' . DateTime->now->hms,
+        date_time_posted => Comserv::Util::AppTime->now_utc,
         username_of_poster => $current_user,
         last_mod_by => $current_user,
-        last_mod_date => DateTime->now->ymd,
+        last_mod_date => Comserv::Util::AppTime->today_ymd_for($c),
         parent_todo => '',
         estimated_man_hours => 0,
         accumulative_time => '00:00:00',
@@ -749,7 +750,7 @@ sub api_create_project :Path('project/create') :Args(0) {
             comments            => $params->{comments}             || '',
             username_of_poster  => $current_user,
             group_of_poster     => 'admin',
-            date_time_posted    => DateTime->now->ymd . ' ' . DateTime->now->hms,
+            date_time_posted    => Comserv::Util::AppTime->now_utc,
             parent_id           => $parent_id,
             record_id           => 0,
         });
@@ -1436,7 +1437,7 @@ sub api_todo_update :Path('todo/update') :Args(0) {
         if (@updated) {
             $todo->update({
                 last_mod_by   => $current_user,
-                last_mod_date => DateTime->now->ymd,
+                last_mod_date => Comserv::Util::AppTime->today_ymd_for($c),
             });
         }
     };
@@ -1640,11 +1641,7 @@ sub api_todo_open_log :Path('todo/open_log') :Args(0) {
     }
     my $username = $data->{actor} // $data->{username} // 'api';
 
-    my $now   = DateTime->now(time_zone => 'local');
-    my $today = $now->ymd;
-
-    # ONE shared implementation with the UI Start button. Start is a TOGGLE:
-    # if the todo is already active it stops instead (todo -> 2).
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->toggle_start($c,
             record_id => $record_id,
@@ -1699,11 +1696,7 @@ sub api_todo_close_log :Path('todo/close_log') :Args(0) {
     my $username = $data->{actor} // $data->{username} // 'api';
     my $notes    = $data->{notes} // '';
 
-    my $now_dt   = DateTime->now(time_zone => 'local');
-    my $today    = $now_dt->ymd;
-
-    # ONE shared implementation with the UI close_log. Graceful when no log
-    # is open (caller mistake -> warn, never an ERROR audit todo).
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->close_log($c,
             record_id => $record_id,
@@ -1754,10 +1747,7 @@ sub api_todo_done_with_log :Path('todo/done_with_log') :Args(0) {
     my $username = $data->{actor} // $data->{username} // 'api';
     my $notes    = $data->{notes} // '';
 
-    my $now_dt   = DateTime->now(time_zone => 'local');
-    my $today    = $now_dt->ymd;
-
-    # ONE shared implementation with the UI done_with_log.
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->done_with_log($c,
             record_id => $record_id,

@@ -13,6 +13,7 @@ use Comserv::Model::Ollama;
 use JSON qw(encode_json);
 use Time::Piece;
 use DateTime;
+use Comserv::Util::AppTime;
 use DateTime::Format::ISO8601;
 use POSIX ();
 
@@ -65,8 +66,8 @@ sub daily :Path('/planning/daily') :Args {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -1183,8 +1184,8 @@ sub daily_impl :Private {
     }
 
     # Current date
-    my $now              = Time::Piece->new();
-    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_date_str = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now = eval { Time::Piece->strptime($current_date_str, '%Y-%m-%d') } || Time::Piece->new();
     my $current_display  = $now->strftime('%A, %B %d, %Y');
 
     # Selected date (from URL or today)
@@ -1630,7 +1631,7 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     my $username = $c->session->{username} || 'user';
     my $user_id  = $c->session->{user_id}  || 0;
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1740,8 +1741,8 @@ sub _daily_log_action {
     $user_id  //= $c->session->{user_id}  || 0;
 
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-    my $now_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now_time = Comserv::Util::AppTime->now_hms_utc;
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
@@ -1903,7 +1904,7 @@ sub _daily_log_action {
                 error    => 'No open log entry for today',
             };
         }
-        my $now_end = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+        my $now_end = Comserv::Util::AppTime->now_hms_utc;
         eval { $open_entry->update({ status => 3, end_time => $now_end }) };
         return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
 
@@ -2082,7 +2083,7 @@ sub schedule_day :Path('/planning/schedule_day') :Args(0) {
     }
     my $sitename = $c->session->{SiteName} || $c->stash->{SiteName} || 'CSC';
     my $username = $c->session->{username} || '';
-    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
     if ($@ || !$schema) {
@@ -2358,7 +2359,7 @@ sub deploy :Path('deploy') :Args(0) {
                            no_cache => $c->req->body_params->{no_cache} // 0,
                        );
             my $ok = $deploy->deploy_to_target_safe();
-            print $log "[${\scalar localtime}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
+            print $log "[${\Comserv::Util::AppTime->now_utc}] deploy_to_target_safe finished: " . ($ok ? "SUCCESS\n" : "FAIL\n");
             close($log);
             exit($ok ? 0 : 1);
         } else {
