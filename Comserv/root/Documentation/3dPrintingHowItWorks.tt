@@ -1,0 +1,261 @@
+[% META
+   title = "3D printing — how browse, inventory, and orders work"
+   description = "Generic operator and agent guide: catalog vs inventory, Inventory vs Order buttons, unit and sign colour themes, queue complete, and what accounting does not yet do."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "3d-printing,inventory,operations"
+   page_version = "0.1"
+   last_updated = "Thu Aug 27 2026"
+   site_specific = "false"
+   project_id = "206"
+   project_code = "3DPRINT"
+%]
+[% PageVersion = 'Documentation/3dPrintingHowItWorks.tt,v 0.1 2026/08/27 hermes-agent Exp - generic system how-it-works' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    [% INCLUDE 'admin/documentation/_doc_header.tt'
+        page_title   = '3D printing — how browse, inventory, and orders work'
+        site_name    = site_name
+        user_role    = user_role
+        last_updated = last_updated
+        page_name    = page_name
+        doc_project_id   = project_id
+        doc_project_code = project_code %]
+
+    <div class="doc-info">
+        <p class="doc-body">This page describes <strong>the code as it runs now</strong>, not a future shop checkout.
+        Project tracking:
+        <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">#206 3DPRINT</a>
+        · <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-link">todos</a>
+        · dryer example
+        <a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a>.</p>
+    </div>
+
+    <div id="toc" class="row doc-toc">
+        <div class="col-100">
+            <h2 class="doc-h2">Quick Navigation</h2>
+            <div class="doc-navrow">
+                <a href="#two-records" class="doc-navlink">Two records</a>
+                <a href="#browse" class="doc-navlink">Browse</a>
+                <a href="#inventory-vs-order" class="doc-navlink">Inventory vs Order</a>
+                <a href="#unit-order" class="doc-navlink">Unit order</a>
+                <a href="#signs" class="doc-navlink">Signs</a>
+                <a href="#queue" class="doc-navlink">Queue</a>
+                <a href="#bom-stock" class="doc-navlink">BOM and stock</a>
+                <a href="#not-yet" class="doc-navlink">Not yet</a>
+                <a href="#urls" class="doc-navlink">URLs</a>
+                <a href="#tracking" class="doc-navlink">Project Tracking</a>
+                <a href="#see-also" class="doc-navlink">See Also</a>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="two-records">
+        <div class="col-100">
+            <h2 class="doc-h2">1. Two records, one product</h2>
+            <p class="doc-body">A printable thing is usually <strong>two rows</strong>:</p>
+            <ul class="doc-body">
+                <li><code>printing_3d_models</code> — file, <code>nfs_path</code> (STL/3MF for download), thumbnail, source.</li>
+                <li><code>inventory_items</code> — SKU, stock, reorder, optional BOM. Linked by <code>printing_3d_models.item_id</code>.</li>
+            </ul>
+            <p class="doc-body">A 3MF plate is not a product. An assemblable inventory item (Has BOM) is the unit.
+            Fasteners and bearings are <strong>general stock</strong> (<code>HW-*</code>), not project-prefixed SKUs.
+            Any BOM can consume them.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="browse">
+        <div class="col-100">
+            <h2 class="doc-h2">2. Browse is the catalog, not the BOM editor</h2>
+            <p class="doc-body"><a href="[% c.uri_for('/3d/browse') %]" class="doc-link">/3d/browse</a>
+            filters with <code>?kind=</code>:</p>
+            <table class="doc-table">
+                <tr><th class="doc-th">Chip</th><th class="doc-th">Shows</th></tr>
+                <tr><td class="doc-td">Units</td><td class="doc-td">Standalone models (bee house, funnel) plus orderable assemblies. Default on sitename=3d.</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td">Printable parts</td><td class="doc-td">Labeled parts whose name contains a code like <code>(BBL01)</code>.</td></tr>
+                <tr><td class="doc-td">Signs</td><td class="doc-td"><code>source=sign_generator</code>.</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td">All</td><td class="doc-td">Printable catalog after dropping pack 3MFs (Module 1.3mf) and other Has-BOM kits.</td></tr>
+            </table>
+            <p class="doc-body">Search keeps the current chip (hidden <code>kind</code> field).</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="inventory-vs-order">
+        <div class="col-100">
+            <h2 class="doc-h2">3. Inventory vs Order (do not send both to the same page)</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">Button</th><th class="doc-th">Goes to</th><th class="doc-th">Why</th></tr>
+                <tr>
+                    <td class="doc-td">Inventory</td>
+                    <td class="doc-td"><code>/Inventory/item/view/&lt;item_id&gt;</code></td>
+                    <td class="doc-td">Real inventory item: picture, stock, full BOM, each line is a component item.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Order</td>
+                    <td class="doc-td"><code>/3d/model/&lt;model_id&gt;</code></td>
+                    <td class="doc-td">Print form: filament, add-ons, attach jobs, Place Order.</td>
+                </tr>
+            </table>
+            <p class="doc-body"><code>GET /3d/order?model_id=N</code> <strong>redirects</strong> to
+            <code>/3d/model/N</code>. Do not document the old Colour/Type form as live.
+            On the inventory page, <strong>Order print</strong> returns to the 3D form when a model is linked.
+            Shop is only offered if <code>show_in_shop</code> is on.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="unit-order">
+        <div class="col-100">
+            <h2 class="doc-h2">4. In-house unit order (assemblable item)</h2>
+            <p class="doc-body">Place Order on a Has-BOM model runs <code>_order_unit</code>. There is no shop invoice.</p>
+            <ol class="doc-body">
+                <li><strong>Filament first</strong> — two stock dropdowns: panels (sides/doors) and connectors (corners/bottoms/rollers). Signs use the same fields as body and text.</li>
+                <li><strong>Required printed BOM lines</strong> each become a <code>printing_3d_jobs</code> row. Quantity is an integer. <code>source_type=project</code>, <code>source_item_id</code> = the unit inventory id.</li>
+                <li><strong>Optional add-ons</strong> — printed extras (e.g. wheel kit) queue extra jobs; buy-to-order (e.g. Polydryer) is noted on the job, not warehouse stock.</li>
+                <li><strong>Attach existing jobs</strong> — tick open queue rows; they get the same <code>source_item_id</code>. They are not printed twice.</li>
+                <li><strong>Backorder</strong> — if chosen filament available is 0, either pick another pair or tick backorder (~18 hours per part, one printer).</li>
+            </ol>
+            <p class="doc-body">The unit page order form is <strong>not theme-driven</strong> (high-contrast box) so filament cannot hide under a BOM table.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="signs">
+        <div class="col-100">
+            <h2 class="doc-h2">5. Signs</h2>
+            <p class="doc-body"><code>source=sign_generator</code>: one job, body + text filament.
+            Notes store <code>sign_body_id=</code> / <code>sign_body=</code> /
+            <code>sign_text_id=</code> / <code>sign_text=</code> / <code>order_3mf=</code>.
+            Place Order builds a two-object 3MF on the fly from those stock picks
+            (object names carry filament type and colour). Download it from the
+            post-order page or <code>/signgenerator/download/&lt;id&gt;/3mf?job_id=</code>.
+            Extra sign rows: Delete on browse or model (owner or admin; cancel active jobs first).
+            Layout PDF is the browse preview when logged in.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="queue">
+        <div class="col-100">
+            <h2 class="doc-h2">6. Queue and Complete</h2>
+            <p class="doc-body"><a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>
+            (admin). Download is <code>/3d/model_download/&lt;model_id&gt;</code> and only appears when
+            <code>nfs_path</code> is set. The file is named with the item SKU.</p>
+            <p class="doc-body">On Complete, <strong>Filament (g)</strong> is the grams the printer used for
+            <em>that job</em> (the whole plate). The app does not multiply by quantity.
+            Those grams issue from the filament inventory item (<code>3D-JOB-{id}</code>).
+            Printed-part stock receive uses job <strong>quantity</strong>, not grams.
+            Hardware and Polydryer are not deducted here.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="bom-stock">
+        <div class="col-100">
+            <h2 class="doc-h2">7. BOM and stock APIs</h2>
+            <p class="doc-body">Writes go through Inventory helpers, not raw SQL:</p>
+            <ul class="doc-body">
+                <li><code>GET /api/inventory/items?sitename=</code></li>
+                <li><code>POST /api/inventory/item/create</code> (idempotent on sku)</li>
+                <li><code>POST /api/inventory/bom/add</code></li>
+                <li>InventoryAccounting (uncommitted on that branch) also adds
+                    <code>GET /api/inventory/bom</code> and <code>GET /api/inventory/stock</code>.</li>
+            </ul>
+            <p class="doc-body">Manual restock print: <code>POST /3d/reorder_item</code> queues one job for
+            <em>that SKU</em> if it has a model. It does not walk the parent BOM.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="not-yet">
+        <div class="col-100">
+            <h2 class="doc-h2">8. What this does not do yet</h2>
+            <ul class="doc-body">
+                <li>No customer invoice or pay-first gate on Place Order (in-house).</li>
+                <li>No purchase order from BOM shortfall (Inventory/Accounting, todo #2310).</li>
+                <li>Reorder-point flags on the stock screen do not auto-queue prints or POs.</li>
+                <li>Shop cart still does not write a customer-order row that explodes to the farm.
+                    Planned in
+                    <a href="[% c.uri_for('/Documentation/InventoryOrderFulfillmentPlan') %]" class="doc-link">InventoryOrderFulfillmentPlan</a>.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="urls">
+        <div class="col-100">
+            <h2 class="doc-h2">9. URL reference (verified in Controller::3d / Inventory)</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">URL</th><th class="doc-th">What it is</th></tr>
+                <tr><td class="doc-td"><code>/3d/browse</code></td><td class="doc-td">Catalog + kind chips</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td"><code>/3d/model/&lt;id&gt;</code></td><td class="doc-td">Order / print form</td></tr>
+                <tr><td class="doc-td"><code>/3d/order?model_id=</code></td><td class="doc-td">Redirects to model page</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td"><code>/Inventory/item/view/&lt;id&gt;</code></td><td class="doc-td">Inventory + BOM</td></tr>
+                <tr><td class="doc-td"><code>/3d/queue</code></td><td class="doc-td">Farm queue (admin)</td></tr>
+                <tr class="doc-tr-alt"><td class="doc-td"><code>/3d/my_orders</code></td><td class="doc-td">Jobs for the logged-in user</td></tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row" id="tracking">
+        <div class="col-100">
+            <h2 class="doc-h2">10. Project Tracking</h2>
+            <table class="doc-table">
+                <tr><th class="doc-th">Work</th><th class="doc-th">Todo / project</th><th class="doc-th">Gate</th></tr>
+                <tr>
+                    <td class="doc-td">3D coordinator</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-link">#206 3DPRINT</a></td>
+                    <td class="doc-td">This page matches Controller::3d + Inventory helpers</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Dryer worked example</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo') %]?project_id=272" class="doc-link">#272 todos</a></td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></td>
+                </tr>
+                <tr>
+                    <td class="doc-td">PO / multi-supplier</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2310" class="doc-link">#2310</a></td>
+                    <td class="doc-td">InventoryAccounting</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">ROUTINE re-audit</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/todo/details') %]?record_id=2189" class="doc-link">#2189</a></td>
+                    <td class="doc-td">Keep this page current with code</td>
+                </tr>
+            </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="doc-success">
+                <h2 class="doc-h3">See Also</h2>
+                <ul class="doc-body">
+                    <li><a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3dPrintingPlan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing (operator KB)</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/InventoryInternalBuildBom') %]" class="doc-link">InventoryInternalBuildBom</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/InventoryOrderFulfillmentPlan') %]" class="doc-link">InventoryOrderFulfillmentPlan</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/STANDARD') %]" class="doc-link">STANDARD</a></li>
+                </ul>
+            </div>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="doc-footer">
+                <p>Tracked as project #206 3DPRINT. Rescan Documentation admin so this basename appears at
+                /Documentation/3dPrintingHowItWorks (verified: Documentation.pm Path Args(1), flat basename).</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
