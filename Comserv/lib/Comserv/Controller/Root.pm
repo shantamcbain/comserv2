@@ -260,6 +260,14 @@ sub auto :Private {
     # restart/deploy, which is exactly when assets change.
     $c->stash->{css_v} = ($Comserv::Controller::Root::ASSET_EPOCH ||= time());
 
+    # Canonical clock: UTC storage + viewer TZ for | user_time TT filter
+    # (Comserv::Util::AppTime). Fail-soft — never block the request.
+    eval {
+        require Comserv::Util::AppTime;
+        Comserv::Util::AppTime->inject_request($c);
+        1;
+    };
+
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip setup redirect for setup pages themselves and static assets

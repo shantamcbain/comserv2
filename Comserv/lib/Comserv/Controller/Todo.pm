@@ -2,6 +2,7 @@ package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
 use DateTime;
+use Comserv::Util::AppTime;
 use DateTime::Format::ISO8601;
 use Data::Dumper;
 use JSON::MaybeXS;
@@ -71,7 +72,7 @@ sub filter_todos_by_date_range {
     my @done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     my %done_set  = map { $_ => 1 } @done_vals;
 
-    my $today = DateTime->now->ymd;
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
     my @filtered_todos = grep {
         my $todo = $_;
         my $include_todo = 0;
@@ -346,7 +347,7 @@ sub todo :Path('/todo') :Args(0) {
     }
 
     # Apply date filters first
-    my $now = DateTime->now;
+    my $now = Comserv::Util::AppTime->now_user_dt($c);
     my $today = $now->ymd;
     my $date_conditions = [];
 
@@ -717,7 +718,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         default_priority => Comserv::Util::Priority::default_priority(),
         build_status    => \%status_options,
         return_to       => $return_to,
-        start_date      => $c->request->params->{start_date} || DateTime->now->ymd,
+        start_date      => $c->request->params->{start_date} || Comserv::Util::AppTime->today_ymd_for($c),
         time_of_day     => $c->request->params->{time_of_day},
         sites           => $add_sites,
         is_csc          => $add_is_csc,
@@ -978,8 +979,8 @@ sub modify :Path('/todo/modify') :Args(1) {
     my $old_due_date   = $todo->due_date   // '';
     my $old_start_date = $todo->start_date // '';
     my $old_status     = $todo->status     // '';
-    my $new_due_date   = $form_data->{due_date} || DateTime->now->add(days => 7)->ymd;
-    my $today          = DateTime->now->ymd;
+    my $new_due_date   = $form_data->{due_date} || Comserv::Util::AppTime->ymd_plus_days_for($c, 7);
+    my $today          = Comserv::Util::AppTime->today_ymd_for($c);
     my $current_user   = $c->session->{username} || 'system';
 
     my $old_type = eval { $todo->get_column('todo_type') } // 'task';
@@ -1236,7 +1237,7 @@ sub create :Local {
     # Set default values
     my $schema = $c->model('DBEncy');
     my $current_user = $c->session->{username} || 'system';
-    my $current_date = DateTime->now->ymd;
+    my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
     
     # Process project information
     my $selected_project_id = $params->{manual_project_id} || $params->{project_id};
@@ -1440,7 +1441,7 @@ sub update_time :Path('/todo/update_time') :Args(0) {
         my $sd = $todo->start_date // '';
         $sd = ref($sd) ? $sd->ymd : "$sd";
         $sd = substr($sd, 0, 10) if length($sd) >= 10;
-        $sd ||= DateTime->now->ymd;
+        $sd ||= Comserv::Util::AppTime->today_ymd_for($c);
         my $time_hhmm = $time_of_day;
         $time_hhmm =~ s/:00$//;
         my $est = $todo->estimated_man_hours // 30;
@@ -1516,7 +1517,7 @@ sub update_recurring_time :Path('/todo/update_recurring_time') :Args(0) {
         return;
     }
 
-    my $today = DateTime->now->ymd;
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
     my $target_date = $exception_date || $today;
 
     if ($mode eq 'today') {
@@ -1615,9 +1616,9 @@ sub update_status :Path('/todo/update_status') :Args(0) {
         return;
     }
 
-    my $_now_dt = DateTime->now(time_zone => 'local');
-    my $today   = $_now_dt->ymd;
-    my $now_hms = $_now_dt->strftime('%H:%M:%S');
+    # last_mod_date = viewer calendar day; log end_time = UTC HMS (matches TodoLog).
+    my $today   = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now_hms = Comserv::Util::AppTime->now_hms_utc;
 
     eval { $todo->update({ status => $status, last_mod_date => $today }) };
     if ($@) {
@@ -1990,9 +1991,9 @@ sub day :Path('/todo/day') :Args {
         my $iso8601 = DateTime::Format::ISO8601->new;
         my $dt_parsed;
         eval { $dt_parsed = $iso8601->parse_datetime($date_arg) };
-        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
+        $date = $dt_parsed ? $dt_parsed->ymd : Comserv::Util::AppTime->today_ymd_for($c);
     } else {
-        $date = DateTime->now->ymd;
+        $date = Comserv::Util::AppTime->today_ymd_for($c);
     }
 
     # Calculate the previous and next dates
@@ -2185,7 +2186,7 @@ sub week :Path('/todo/week') :Args {
         my $iso8601 = DateTime::Format::ISO8601->new;
         my $dt_parsed;
         eval { $dt_parsed = $iso8601->parse_datetime($date) } if defined $date;
-        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
+        $date = $dt_parsed ? $dt_parsed->ymd : Comserv::Util::AppTime->today_ymd_for($c);
     }
 
     # Calculate the start and end of the week
@@ -2205,7 +2206,7 @@ sub week :Path('/todo/week') :Args {
     
     # Generate array of dates for the week (7 days starting from Sunday)
     my @week_dates = ();
-    my $today_str = DateTime->now->ymd;
+    my $today_str = Comserv::Util::AppTime->today_ymd_for($c);
     for my $day_offset (0..6) {
         my $current_date = $start_dt->clone->add(days => $day_offset);
         my $d_str = $current_date->strftime('%Y-%m-%d');
@@ -2263,7 +2264,7 @@ sub week :Path('/todo/week') :Args {
                       || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
 
         if ($is_rec && !$is_done) {
-            my $effective_start = $sd || DateTime->now->ymd;
+            my $effective_start = $sd || Comserv::Util::AppTime->today_ymd_for($c);
             for my $day_info (@week_dates) {
                 my $d_str = $day_info->{date_str};
                 next if $effective_start gt $d_str;
@@ -2329,7 +2330,7 @@ sub month :Path('/todo/month') :Args {
         my $iso8601 = DateTime::Format::ISO8601->new;
         my $dt_parsed;
         eval { $dt_parsed = $iso8601->parse_datetime($date) } if defined $date;
-        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
+        $date = $dt_parsed ? $dt_parsed->ymd : Comserv::Util::AppTime->today_ymd_for($c);
     }
 
     # Parse the date
@@ -2392,7 +2393,7 @@ sub month :Path('/todo/month') :Args {
     }
 
     # Get today's date for highlighting
-    my $today = DateTime->now->ymd;
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
 
     my $month_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
 
@@ -2547,7 +2548,7 @@ sub api_todo_create :Local :Args(0) {
         status => $params->{status},
         assigned_to => $params->{assigned_to} || $current_user,
         sitename => $sitename,
-        date_time_posted => DateTime->now,
+        date_time_posted => Comserv::Util::AppTime->now_utc,
         posted_by => $current_user,
     });
     
@@ -2634,7 +2635,7 @@ sub api_todo_update :Path('/api/todo/update') :Args(1) {
 
     if (%update) {
         $update{last_mod_by}   = 'system';
-        $update{last_mod_date} = DateTime->now->ymd;
+        $update{last_mod_date} = Comserv::Util::AppTime->today_ymd_for($c);
         $todo->update(\%update);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
             "Todo updated via API: record_id=$todo_id, Fields=" . join(',', keys %update));
@@ -2735,9 +2736,8 @@ sub quick_close :Path('quick_close') :Args(0) {
         return;
     }
 
-    my $now_dt     = DateTime->now(time_zone => 'local');
-    my $today      = $now_dt->ymd;
-    my $now_hms    = $now_dt->strftime('%H:%M:%S');
+    my $today   = Comserv::Util::AppTime->today_ymd_for($c);
+    my $now_hms = Comserv::Util::AppTime->now_hms_utc;
     my ($deps_resolved, $cross_blocker_count);
     eval {
         my $dbh  = $c->model('DBEncy')->storage->dbh;
@@ -3106,7 +3106,7 @@ sub _do_reschedule {
     my $is_csc     = ($sitename eq 'CSC' && $is_admin) || $username eq 'Shanta';
 
     my $now_epoch  = time();
-    my $today_dt   = DateTime->now(time_zone => 'local');
+    my $today_dt   = Comserv::Util::AppTime->now_user_dt($c);
     my $today      = $today_dt->ymd;
     my $view_date  = ($req_date && $req_date =~ /^\d{4}-\d{2}-\d{2}$/) ? $req_date : $today;
     my $count      = 0;
@@ -3323,7 +3323,7 @@ sub _do_reschedule {
                 year      => substr($view_date, 0, 4),
                 month     => substr($view_date, 5, 2),
                 day       => substr($view_date, 8, 2),
-                time_zone => 'local',
+                time_zone => Comserv::Util::AppTime->timezone_for($c),
             );
         } else {
             $init_dt = $today_dt->clone;
@@ -3621,11 +3621,7 @@ sub open_log :Path('open_log') :Args(0) {
         return;
     }
 
-    my $now   = DateTime->now(time_zone => 'local');
-    my $today = $now->ymd;
-
-    # ONE shared implementation (also used by /api/todo/open_log). Start is a
-    # TOGGLE: if the todo is already active it stops instead (todo -> 2).
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->toggle_start($c,
             record_id => $record_id,
@@ -3680,10 +3676,7 @@ sub close_log :Path('close_log') :Args(0) {
         return;
     }
 
-    my $now_dt  = DateTime->now(time_zone => 'local');
-    my $today   = $now_dt->ymd;
-
-    # ONE shared implementation (also used by /api/todo/close_log).
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->close_log($c,
             record_id => $record_id,
@@ -3736,11 +3729,9 @@ sub done_with_log :Path('done_with_log') :Args(0) {
         return;
     }
 
-    my $notes    = $data->{notes} // '';
-    my $now_dt   = DateTime->now(time_zone => 'local');
-    my $today    = $now_dt->ymd;
+    my $notes = $data->{notes} // '';
 
-    # ONE shared implementation (also used by /api/todo/done_with_log).
+    # Clock lives inside TodoLog (UTC HMS + viewer today).
     my $res = eval {
         Comserv::Util::TodoLog->done_with_log($c,
             record_id => $record_id,
@@ -3785,9 +3776,8 @@ sub next_step :Path('next_step') :Args(0) {
         return;
     }
 
-    my $now   = DateTime->now;
-    my $today = $now->ymd;
-    my $time  = $now->hms;
+    my $today = Comserv::Util::AppTime->today_ymd_for($c);
+    my $time  = Comserv::Util::AppTime->now_hms_utc;
     my $next_todo_id;
 
     eval {

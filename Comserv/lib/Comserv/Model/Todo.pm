@@ -130,7 +130,8 @@ sub get_all_todos_for_calendar {
 
     my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     require DateTime;
-    my $cutoff_date = DateTime->now->subtract(days => 30)->ymd;
+    require Comserv::Util::AppTime;
+    my $cutoff_date = Comserv::Util::AppTime->now_dt->subtract(days => 30)->ymd;
 
     my $username = $c->session->{username} || '';
 

@@ -8,6 +8,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::SignGenerator;
 use Comserv::Util::Printing3d;
 use Comserv::Util::NfsPath;
+use Comserv::Util::AppTime;
 
 has 'logging' => (
     is      => 'ro',
@@ -55,8 +56,9 @@ sub _schema {
     return $c->model('DBEncy');
 }
 
+# UTC DATETIME for DB columns — see Comserv::Util::AppTime (one app clock).
 sub _now {
-    return strftime('%Y-%m-%d %H:%M:%S', localtime);
+    return Comserv::Util::AppTime->now_utc;
 }
 
 sub _is_module_enabled {
@@ -78,6 +80,392 @@ sub _require_module {
         $c->stash->{template}  = '3d/index.tt';
         $c->detach;
     }
+}
+
+# True for a catalog card: labeled printable parts, plus the two HDRY
+# orderable units. Other assemblies and pack 3MF plates stay on the BOM page.
+sub _browse_is_printable {
+    my ($self, $schema, $model) = @_;
+    return 0 unless $model;
+    if (my $iid = $model->item_id) {
+        my $it = eval { $schema->resultset('Accounting::InventoryItem')->find($iid) };
+        if ($it) {
+            my $sku = $it->sku // '';
+            return 1 if $sku eq 'INT-HDRY-001-P36787'   # Base unit
+                     || $sku eq 'INT-HDRY-001-P36788';  # Add-on module
+            return 0 if $it->is_assemblable;
+        }
+    }
+    my $name = $model->name // '';
+    my $ft   = lc($model->file_type // '');
+    my $src  = $model->source // '';
+    if ($ft eq '3mf' && $src eq 'project_import' && $name !~ /\([A-Z]{2,4}\d{2}/) {
+        return 0;
+    }
+    return 1;
+}
+
+# product = orderable HDRY units; sign = sign_generator; part = labeled STL/3MF.
+sub _browse_kind {
+    my ($self, $schema, $model) = @_;
+    return 'sign' if ($model->source // '') eq 'sign_generator';
+    my $name = $model->name // '';
+    return 'part' if $name =~ /\([A-Z]{2,4}\d{2}/;
+    return 'product';
+}
+
+# Panels = side/door skins. Connectors = corners, bottoms, rollers.
+sub _part_theme_role {
+    my ($self, $sku) = @_;
+    $sku ||= '';
+    $sku =~ s/^INT-HDRY-//;
+    return 'panel' if $sku =~ /^(FLS|FRS|BLS|BRS|FFL|FFR)/i;
+    return 'connector';
+}
+
+sub _bom_line_is_printed {
+    my ($self, $comp) = @_;
+    return 0 unless $comp;
+    my $sku = $comp->sku || '';
+    return 1 if ($comp->item_origin || '') eq '3d_printed';
+    return 1 if $sku =~ /^INT-HDRY-[A-Z]{2,4}\d/;
+    return 0;
+}
+
+sub _filament_available {
+    my ($self, $item) = @_;
+    return 0 unless $item;
+    my $avail = 0;
+    eval {
+        for my $sl ($item->stock_levels->all) {
+            $avail += (($sl->quantity_on_hand || 0) - ($sl->quantity_reserved || 0));
+        }
+    };
+    return $avail;
+}
+
+# Explode an assemblable unit into print jobs (required printed BOM + chosen options).
+# Colour theme: panel vs connector. Out-of-stock filament can backorder (~18h/part).
+sub _order_unit {
+    my ($self, $c, $schema, $sitename, $model, $parent) = @_;
+    my $p = $c->req->params;
+    my $qty_units = $p->{quantity} || 1;
+    $qty_units = 1 if $qty_units < 1;
+
+    my $panel_id     = $p->{panel_filament_id}     || '';
+    my $conn_id      = $p->{connector_filament_id} || '';
+    my $allow_bo     = $p->{allow_backorder} ? 1 : 0;
+    my $notes        = $p->{notes} || '';
+    my @opt_ids      = $c->req->param('option_item_id');
+    my %opt          = map { $_ => 1 } grep { $_ } @opt_ids;
+
+    unless ($panel_id && $conn_id) {
+        $c->flash->{error_msg} = 'Choose a filament for panels and a contrasting filament for connectors.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $panel_fil = eval { $schema->resultset('Accounting::InventoryItem')->find($panel_id) };
+    my $conn_fil  = eval { $schema->resultset('Accounting::InventoryItem')->find($conn_id) };
+    unless ($panel_fil && $conn_fil) {
+        $c->flash->{error_msg} = 'One of the chosen filaments was not found.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $panel_avail = $self->_filament_available($panel_fil);
+    my $conn_avail  = $self->_filament_available($conn_fil);
+    my $need_bo = ($panel_avail <= 0 || $conn_avail <= 0);
+    if ($need_bo && !$allow_bo) {
+        $c->flash->{error_msg} =
+            'Chosen colour is not in stock. Pick another combination, or tick backorder '
+          . '(~18 hours per part — enough to receive filament). '
+          . 'Panel avail=' . $panel_avail . ', connector avail=' . $conn_avail . '.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my @lines = $schema->resultset('Accounting::InventoryItemBOM')->search(
+        { parent_item_id => $parent->id },
+        { prefetch => 'component_item' },
+    )->all;
+
+    my @print_jobs;
+    my @buy_notes;
+    for my $line (@lines) {
+        my $comp = $line->component_item or next;
+        my $is_opt = $line->is_optional ? 1 : 0;
+        next if $is_opt && !$opt{ $comp->id };
+        if ($self->_bom_line_is_printed($comp)) {
+            my $pm = $schema->resultset('Printing3dModel')->search(
+                { item_id => $comp->id, sitename => $sitename, is_active => 1 },
+                { rows => 1 },
+            )->first;
+            push @print_jobs, {
+                comp     => $comp,
+                model    => $pm,
+                qty      => ($line->quantity || 1) * $qty_units,
+                role     => $self->_part_theme_role($comp->sku),
+                optional => $is_opt,
+            };
+        }
+        else {
+            push @buy_notes, sprintf('%s x%s', $comp->sku || $comp->name, $line->quantity || 1);
+        }
+    }
+
+    unless (@print_jobs) {
+        $c->flash->{error_msg} = 'No printable parts to queue for this unit.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $idle_printer = eval {
+        $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename, status => 'idle' }, { rows => 1 }
+        )->first
+    };
+    my $first = 1;
+    my @created;
+    my $user_id  = $c->session->{user_id};
+    my $username = $c->session->{username} || '';
+
+    eval {
+        $schema->txn_do(sub {
+            for my $pj (@print_jobs) {
+                unless ($pj->{model}) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_unit',
+                        'No 3D model for '.$pj->{comp}->sku.' — skipped print job');
+                    next;
+                }
+                my $fil = $pj->{role} eq 'panel' ? $panel_fil : $conn_fil;
+                my ($ftype, $fcolor) = Comserv::Util::Printing3d->new->infer_type_color($fil);
+                my $job_notes = join(' | ', grep { $_ } (
+                    $notes,
+                    'unit='.$parent->sku,
+                    'theme_role='.$pj->{role},
+                    ($need_bo ? 'BACKORDER filament' : ()),
+                    (@buy_notes ? 'buy='.join(',', @buy_notes) : ()),
+                ));
+                my $status = ($first && $idle_printer && !$need_bo) ? 'assigned' : 'queued';
+                my $stamp = _now();
+                my $job = $schema->resultset('Printing3dJob')->create({
+                    sitename           => $sitename,
+                    model_id           => $pj->{model}->id,
+                    user_id            => $user_id,
+                    username           => $username,
+                    printer_id         => ($status eq 'assigned') ? $idle_printer->id : undef,
+                    status             => $status,
+                    filament_item_id   => $fil->id,
+                    filament_quantity  => $pj->{qty},
+                    filament_color     => $fcolor || '',
+                    quantity           => $pj->{qty},
+                    notes              => $job_notes,
+                    inventory_reserved => 0,
+                    source_type        => 'project',
+                    source_item_id     => $parent->id,
+                    created_at         => $stamp,
+                    ( $status eq 'assigned' ? ( started_at => $stamp ) : () ),
+                });
+                if ($status eq 'assigned') {
+                    $idle_printer->update({
+                        status         => 'printing',
+                        current_job_id => $job->id,
+                        updated_at     => $stamp,
+                    });
+                    $first = 0;
+                }
+                push @created, { job => $job, fil => $fil, qty => $pj->{qty} };
+            }
+        });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_order_unit',
+            "unit order failed: $@");
+        $c->flash->{error_msg} = "Could not create print jobs: $@";
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my @attach_ids = $c->req->param('attach_job_id');
+    my $attached = 0;
+    for my $jid (grep { $_ } @attach_ids) {
+        my $old = eval { $schema->resultset('Printing3dJob')->find($jid) } or next;
+        next unless ($old->sitename || '') eq $sitename;
+        next unless ($old->status || '') =~ /^(queued|assigned|printing)$/;
+        my $note = $old->notes || '';
+        $note .= ' | attached to unit='.$parent->sku unless $note =~ /unit=\Q$parent->sku\E/;
+        eval {
+            $old->update({
+                source_type    => 'project',
+                source_item_id => $parent->id,
+                notes          => $note,
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_unit',
+                "attach job $jid failed: $@");
+        } else {
+            $attached++;
+        }
+    }
+
+    unless ($need_bo) {
+        for my $cj (@created) {
+            my $fil = $cj->{fil};
+            my $job = $cj->{job};
+            my $first_stock = eval { ($fil->stock_levels->all)[0] };
+            eval {
+                $self->_inventory_transaction($c,
+                    schema           => $schema,
+                    sitename         => $sitename,
+                    item_id          => $fil->id,
+                    location_id      => $first_stock ? $first_stock->location_id : undef,
+                    transaction_type => 'reserve',
+                    quantity         => $cj->{qty},
+                    reference_number => '3D-JOB-' . $job->id,
+                    notes            => 'Filament reserved for unit job #'.$job->id,
+                    performed_by     => $username || 'system',
+                );
+                $job->update({ inventory_reserved => 1 });
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_unit',
+                "reserve failed job ".$job->id.": $@") if $@;
+        }
+    }
+
+    my $n = scalar @created;
+    my $msg = $need_bo
+        ? "$n print job(s) queued as backorder (filament on order / incoming)."
+        : "$n print job(s) created for this unit. One printer — extras wait in the queue.";
+    $msg .= " Attached $attached existing job(s)." if $attached;
+    $c->flash->{success_msg} = $msg;
+    $c->res->redirect($c->uri_for('/3d/my_orders'));
+    $c->detach;
+}
+
+# Signs: body (plate) one colour, text another. Same backorder rule as units.
+sub _order_two_colour {
+    my ($self, $c, $schema, $sitename, $model) = @_;
+    my $p = $c->req->params;
+    my $body_id = $p->{panel_filament_id}     || $p->{filament_item_id} || '';
+    my $text_id = $p->{connector_filament_id} || '';
+    my $allow_bo = $p->{allow_backorder} ? 1 : 0;
+    unless ($body_id && $text_id) {
+        $c->flash->{error_msg} = 'Choose a filament for the sign body and another for the text.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+    my $body_fil = eval { $schema->resultset('Accounting::InventoryItem')->find($body_id) };
+    my $text_fil = eval { $schema->resultset('Accounting::InventoryItem')->find($text_id) };
+    unless ($body_fil && $text_fil) {
+        $c->flash->{error_msg} = 'One of the chosen filaments was not found.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+    my $need_bo = ($self->_filament_available($body_fil) <= 0
+                || $self->_filament_available($text_fil) <= 0);
+    if ($need_bo && !$allow_bo) {
+        $c->flash->{error_msg} =
+            'Chosen colour is not in stock. Pick another pair, or tick backorder.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    my $idle = eval {
+        $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename, status => 'idle' }, { rows => 1 }
+        )->first
+    };
+    my ($bt, $bc) = Comserv::Util::Printing3d->new->infer_type_color($body_fil);
+    my ($tt, $tc) = Comserv::Util::Printing3d->new->infer_type_color($text_fil);
+    my $qty = $p->{quantity} || 1;
+    my $notes = join(' | ', grep { $_ } (
+        $p->{notes},
+        "sign_body_id=".$body_fil->id,
+        "sign_body=$bc $bt",
+        "sign_text_id=".$text_fil->id,
+        "sign_text=$tc $tt",
+        ($need_bo ? 'BACKORDER filament' : ()),
+    ));
+    my $status = ($idle && !$need_bo) ? 'assigned' : 'queued';
+    my $job;
+    my $stamp = _now();
+    eval {
+        $job = $schema->resultset('Printing3dJob')->create({
+            sitename           => $sitename,
+            model_id           => $model->id,
+            source_type        => 'sign',
+            item_name          => $model->name,
+            user_id            => $c->session->{user_id},
+            username           => $c->session->{username} || '',
+            printer_id         => $status eq 'assigned' ? $idle->id : undef,
+            status             => $status,
+            filament_item_id   => $body_fil->id,
+            filament_quantity  => $qty,
+            filament_color     => "body:$bc text:$tc",
+            filament_type      => join('+', grep { $_ } $bt, $tt) || undef,
+            quantity           => $qty,
+            notes              => $notes,
+            inventory_reserved => 0,
+            created_at         => $stamp,
+            ( $status eq 'assigned' ? ( started_at => $stamp ) : () ),
+        });
+        if ($status eq 'assigned') {
+            $idle->update({
+                status => 'printing', current_job_id => $job->id, updated_at => $stamp,
+            });
+        }
+    };
+    if ($@ || !$job) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_order_two_colour',
+            "sign order failed: $@");
+        $c->flash->{error_msg} = "Could not create print job: $@";
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+    unless ($need_bo) {
+        my $fs = eval { ($body_fil->stock_levels->all)[0] };
+        eval {
+            $self->_inventory_transaction($c,
+                schema => $schema, sitename => $sitename, item_id => $body_fil->id,
+                location_id => $fs ? $fs->location_id : undef,
+                transaction_type => 'reserve', quantity => $qty,
+                reference_number => '3D-JOB-'.$job->id,
+                notes => 'Sign body filament reserved',
+                performed_by => $c->session->{username} || 'system',
+            );
+            $job->update({ inventory_reserved => 1 });
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_order_two_colour',
+            "reserve failed: $@") if $@;
+    }
+
+    my $sg = Comserv::Util::SignGenerator->new;
+    my $built = $sg->render_for_order($c,
+        model    => $model,
+        body_fil => $body_fil,
+        text_fil => $text_fil,
+        job      => $job,
+    );
+    if ($built && !$built->{error} && $built->{filename}) {
+        eval {
+            $job->update({
+                notes => join(' | ', grep { $_ } ($job->notes, 'order_3mf='.$built->{filename})),
+            });
+        };
+        $c->flash->{success_msg} = $need_bo
+            ? 'Sign queued as backorder. Two-colour 3MF is ready to download.'
+            : 'Sign print job created. Download the two-colour 3MF to slice.';
+    }
+    else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_order_two_colour',
+            'order 3MF failed: '.(($built && $built->{error}) || 'unknown'));
+        $c->flash->{success_msg} = 'Sign job created, but the two-colour file could not be built yet. Open the job page and download again.';
+        $c->flash->{error_msg} = $built->{error} if $built && $built->{error};
+    }
+    $c->res->redirect($c->uri_for('/signgenerator/ordered', [$job->id]));
+    $c->detach;
 }
 
 sub _require_login {
@@ -273,7 +661,10 @@ sub browse :Path('/3d/browse') :Args(0) {
 
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
-    my $q        = $c->req->params->{q} || '';
+    my $q    = $c->req->params->{q}    || '';
+    my $kind = $c->req->params->{kind} || '';
+    $kind = 'product' if $kind eq '' && $sitename eq '3d';
+    $kind = 'all' unless $kind =~ /^(all|product|part|sign)$/;
 
     my @models;
     eval {
@@ -288,6 +679,12 @@ sub browse :Path('/3d/browse') :Args(0) {
         @models = $schema->resultset('Printing3dModel')->search(
             \%search, { order_by => { -asc => 'name' } }
         )->all;
+        # Browse is the printable-part catalog. Assemblies (Has BOM) and
+        # pack 3MF plates belong on the item/BOM page, not here.
+        @models = grep { $self->_browse_is_printable($schema, $_) } @models;
+        if ($kind ne 'all') {
+            @models = grep { $self->_browse_kind($schema, $_) eq $kind } @models;
+        }
     };
     push @{$c->stash->{debug_errors}}, "Error loading models: $@" if $@;
 
@@ -306,6 +703,7 @@ sub browse :Path('/3d/browse') :Args(0) {
         models    => \@models,
         sign_meta => \%sign_meta,
         q         => $q,
+        kind      => $kind,
         template  => '3d/browse.tt',
     );
 }
@@ -341,6 +739,14 @@ sub model_detail :Path('/3d/model') :Args(1) {
             { prefetch => 'stock_levels', order_by => 'name' }
         )->all;
     };
+    my @filament_spools = Comserv::Util::Printing3d->new->list_filaments($schema, $sitename);
+
+    my $printer_count = 0;
+    eval {
+        $printer_count = $schema->resultset('Printing3dPrinter')->search(
+            { sitename => $sitename }
+        )->count;
+    };
 
     # Build available qty per filament
     my %fil_available;
@@ -352,12 +758,97 @@ sub model_detail :Path('/3d/model') :Args(1) {
         $fil_available{ $f->id } = $avail;
     }
 
+    my $inv_item;
+    my @bom_admin;
+    eval {
+        if ($model->item_id) {
+            $inv_item = $schema->resultset('Accounting::InventoryItem')->find(
+                { id => $model->item_id },
+                { prefetch => [
+                    'stock_levels',
+                    { 'bom_components' => { 'component_item' => 'stock_levels' } },
+                ]},
+            );
+        }
+        if ($inv_item && $inv_item->is_assemblable) {
+            for my $line ($inv_item->bom_components->all) {
+                my $comp = $line->component_item;
+                my ($on_hand, $reserved) = (0, 0);
+                if ($comp) {
+                    for my $sl ($comp->stock_levels->all) {
+                        $on_hand  += ($sl->quantity_on_hand  || 0);
+                        $reserved += ($sl->quantity_reserved || 0);
+                    }
+                }
+                my $thumb = '';
+                if ($comp && $comp->image_path) {
+                    $thumb = $comp->image_path;
+                }
+                elsif ($comp) {
+                    my $pm = $schema->resultset('Printing3dModel')->search(
+                        { item_id => $comp->id, sitename => $sitename, is_active => 1 },
+                        { rows => 1 },
+                    )->first;
+                    $thumb = $pm->thumbnail_url if $pm && $pm->thumbnail_url;
+                }
+                push @bom_admin, {
+                    sku         => $comp ? $comp->sku  : '',
+                    name        => $comp ? $comp->name : ('#'.$line->component_item_id),
+                    item_id     => $comp ? $comp->id   : $line->component_item_id,
+                    origin      => $comp ? ($comp->item_origin || '') : '',
+                    quantity    => int($line->quantity || 1),
+                    unit        => $line->unit,
+                    is_optional => $line->is_optional ? 1 : 0,
+                    on_hand     => $on_hand,
+                    reserved    => $reserved,
+                    available   => $on_hand - $reserved,
+                    image       => $thumb,
+                    print_role  => $self->_part_theme_role($comp ? $comp->sku : ''),
+                    is_printed  => $self->_bom_line_is_printed($comp),
+                };
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_detail',
+            "BOM/stock load failed for model $id: $@");
+    }
+
+    my @attachable_jobs;
+    eval {
+        my $uid = $c->session->{user_id};
+        my $rs = $schema->resultset('Printing3dJob')->search(
+            {
+                sitename => $sitename,
+                status   => { -in => [qw(queued assigned printing)] },
+                ($uid ? (user_id => $uid) : ()),
+            },
+            { order_by => { -desc => 'id' }, rows => 40, prefetch => 'model' },
+        );
+        while (my $j = $rs->next) {
+            my $mn = eval { $j->model ? $j->model->name : '' } || '';
+            push @attachable_jobs, {
+                id     => $j->id,
+                name   => $mn || ('job #'.$j->id),
+                status => $j->status,
+                qty    => $j->quantity || 1,
+                linked => ($j->source_item_id && $inv_item && $j->source_item_id == $inv_item->id) ? 1 : 0,
+            };
+        }
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_detail',
+        "attachable jobs load failed: $@") if $@;
+
     $c->stash(
         sitename      => $sitename,
         model         => $model,
-        filaments     => \@filaments,
-        fil_available => \%fil_available,
-        template      => '3d/model_detail.tt',
+        inv_item      => $inv_item,
+        bom_admin     => \@bom_admin,
+        filaments       => \@filaments,
+        filament_spools => \@filament_spools,
+        printer_count   => $printer_count,
+        attachable_jobs => \@attachable_jobs,
+        template        => '3d/model_detail.tt',
     );
 }
 
@@ -468,6 +959,20 @@ sub order :Path('/3d/order') :Args(0) {
             $c->detach;
         }
 
+        my $parent_item = eval {
+            $model->item_id
+                ? $schema->resultset('Accounting::InventoryItem')->find($model->item_id)
+                : undef
+        };
+        if ($parent_item && $parent_item->is_assemblable) {
+            $self->_order_unit($c, $schema, $sitename, $model, $parent_item);
+            return;
+        }
+        if (($model->source || '') eq 'sign_generator') {
+            $self->_order_two_colour($c, $schema, $sitename, $model);
+            return;
+        }
+
         # Validate filament stock if a specific filament was selected
         if ($filament_item_id) {
             my $fil;
@@ -498,6 +1003,7 @@ sub order :Path('/3d/order') :Args(0) {
         my $job_status = $idle_printer ? 'assigned' : 'queued';
 
         my $job;
+        my $stamp = _now();
         eval {
             $schema->txn_do(sub {
                 $job = $schema->resultset('Printing3dJob')->create({
@@ -513,14 +1019,15 @@ sub order :Path('/3d/order') :Args(0) {
                     quantity           => $quantity,
                     notes              => $notes,
                     inventory_reserved => 0,
-                    created_at         => _now(),
+                    created_at         => $stamp,
+                    ( $job_status eq 'assigned' ? ( started_at => $stamp ) : () ),
                 });
 
                 if ($idle_printer) {
                     $idle_printer->update({
                         status         => 'printing',
                         current_job_id => $job->id,
-                        updated_at     => _now(),
+                        updated_at     => $stamp,
                     });
                 }
             });
@@ -565,25 +1072,14 @@ sub order :Path('/3d/order') :Args(0) {
         $c->detach;
     }
 
-    # GET — show order form for a specific model
+    # One order form: the model page (unit theme, sign body/text, or single part).
     my $model_id = $c->req->params->{model_id};
-    my ($model, @filaments);
-    eval {
-        $model = $schema->resultset('Printing3dModel')->find(
-            { id => $model_id, sitename => $sitename }
-        ) if $model_id;
-        @filaments = $schema->resultset('Accounting::InventoryItem')->search(
-            { sitename => $sitename, category => '3d_filament', status => 'active' },
-            { order_by => 'name' }
-        )->all;
-    };
-
-    $c->stash(
-        sitename  => $sitename,
-        model     => $model,
-        filaments => \@filaments,
-        template  => '3d/order.tt',
-    );
+    if ($model_id) {
+        $c->res->redirect($c->uri_for('/3d/model', [$model_id]));
+    } else {
+        $c->res->redirect($c->uri_for('/3d/browse'));
+    }
+    $c->detach;
 }
 
 # ============================================================
@@ -673,11 +1169,19 @@ sub queue :Path('/3d/queue') :Args(0) {
             if ($action eq 'assign' && $printer_id) {
                 my $printer = $schema->resultset('Printing3dPrinter')->find($printer_id);
                 if ($printer) {
-                    $job->update({ printer_id => $printer_id, status => 'assigned' });
+                    my $stamp = _now();
+                    my %job_upd = (
+                        printer_id => $printer_id,
+                        status     => 'assigned',
+                    );
+                    # Only stamp started_at once (first assign).
+                    $job_upd{started_at} = $stamp
+                        unless defined $job->started_at && length $job->started_at;
+                    $job->update(\%job_upd);
                     $printer->update({
                         status         => 'printing',
                         current_job_id => $job_id,
-                        updated_at     => _now(),
+                        updated_at     => $stamp,
                     });
                 }
 
@@ -1133,6 +1637,25 @@ sub printers :Path('/3d/printers') :Args(0) {
                     $c->req->params->{printer_id}
                 );
                 $printer->delete if $printer && $printer->status eq 'idle';
+            } elsif ($action eq 'pause_lan' || $action eq 'resume_lan') {
+                my $printer = $schema->resultset('Printing3dPrinter')->find(
+                    $c->req->params->{printer_id}
+                );
+                if ($printer) {
+                    my $notes = $printer->notes || '';
+                    my $today = strftime('%Y-%m-%d', localtime);
+                    if ($action eq 'pause_lan') {
+                        unless ($notes =~ /\[LAN_PAUSED:/) {
+                            $notes .= " [LAN_PAUSED:$today]";
+                            $printer->update({ notes => $notes, updated_at => _now() });
+                        }
+                        $c->flash->{success_msg} = 'LAN connect paused for this printer today.';
+                    } else {
+                        $notes =~ s/\s*\[LAN_PAUSED:[^\]]+\]//g;
+                        $printer->update({ notes => $notes, updated_at => _now() });
+                        $c->flash->{success_msg} = 'LAN connect resumed for this printer.';
+                    }
+                }
             }
         };
         if ($@) {
@@ -2084,6 +2607,38 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
+
+
+sub sign_delete :Path('/3d/sign/delete') :Args(1) {
+    my ($self, $c, $model_id) = @_;
+    $self->_require_login($c);
+
+    my $schema = $self->_schema($c);
+    my $model = eval { $schema->resultset('Printing3dModel')->find($model_id) };
+    unless ($model && ($model->source || '') eq 'sign_generator') {
+        $c->flash->{error_msg} = 'Sign not found.';
+        $c->res->redirect($c->uri_for('/3d/browse', { q => 'sign', kind => 'sign' }));
+        $c->detach;
+    }
+
+    my $username = $c->session->{username} || '';
+    my $is_admin = $self->_is_admin($c);
+    unless ($is_admin || ($model->added_by || '') eq $username) {
+        $c->flash->{error_msg} = 'Not allowed to delete this sign.';
+        $c->res->redirect($c->uri_for('/3d/model', [$model->id]));
+        $c->detach;
+    }
+
+    # Unlink files using the util (works even in offline mode for file cleanup)
+    my $sg = Comserv::Util::SignGenerator->new;
+    $sg->unlink_sign_files($c, $model, []);
+
+    eval { $model->delete };
+    $c->flash->{success_msg} = 'Sign removed.';
+    $c->res->redirect($c->uri_for('/3d/browse', { q => 'sign', kind => 'sign' }));
+    $c->detach;
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

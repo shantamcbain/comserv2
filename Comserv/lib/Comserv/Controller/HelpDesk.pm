@@ -2,6 +2,7 @@ package Comserv::Controller::HelpDesk;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Comserv::Util::Logging;
+use Comserv::Util::AppTime;
 use POSIX qw(strftime);
 use Try::Tiny;
 use JSON ();
@@ -525,7 +526,7 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
     my $username  = $c->session->{username} || 'guest';
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
-    my $ticket_number = uc($site_name) . '-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', int(rand(9999)) + 1);
+    my $ticket_number = uc($site_name) . '-' . Comserv::Util::AppTime->today_utc_ymd_compact . '-' . sprintf('%04d', int(rand(9999)) + 1);
 
     try {
         my $schema = $c->model('DBEncy')->schema;
@@ -540,7 +541,7 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
             category      => $category,
             priority      => $priority,
             status        => 'open',
-            created_at    => strftime('%Y-%m-%d %H:%M:%S', localtime),
+            created_at    => Comserv::Util::AppTime->now_utc,
         });
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
@@ -700,7 +701,7 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             return;
         }
 
-        my $reply_now = strftime('%Y-%m-%d %H:%M:%S', localtime);
+        my $reply_now = Comserv::Util::AppTime->now_utc;
 
         if ($sender_type eq 'user' && ($ticket->status eq 'closed' || $ticket->status eq 'resolved')) {
             $ticket->update({ status => 'open', updated_at => $reply_now, closed_at => undef });
@@ -838,7 +839,7 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
 
     my $staff_name  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
     $staff_name     = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
-    my $now         = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $now = Comserv::Util::AppTime->now_utc;
     my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
     try {
@@ -966,7 +967,7 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
         return;
     }
 
-    my $now       = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $now = Comserv::Util::AppTime->now_utc;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
     my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
     $staff_name    = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
@@ -1192,9 +1193,9 @@ sub _auto_close_stale_tickets {
     my ($self, $c) = @_;
 
     my $auto_close_days = 14;
-    my $now             = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $now = Comserv::Util::AppTime->now_utc;
     my $cutoff_epoch    = time() - ($auto_close_days * 86400);
-    my $cutoff_dt       = strftime('%Y-%m-%d %H:%M:%S', localtime($cutoff_epoch));
+    my $cutoff_dt = Comserv::Util::AppTime->from_epoch_utc($cutoff_epoch);
 
     eval {
         my $schema = $c->model('DBEncy')->schema;

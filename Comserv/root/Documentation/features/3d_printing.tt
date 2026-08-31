@@ -6,6 +6,9 @@
 [% META roles = 'admin developer editor' %]
 
 <h1>3D Printing System</h1>
+<p class="doc-info">Current browse / Inventory vs Order / unit colour theme:
+<a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]">3dPrintingHowItWorks</a>
+(generic; matches Controller::3d as of 2026-08-27).</p>
 <p>
     <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing coordinator plan</a>
     ·
@@ -81,7 +84,7 @@ Items are shown in the shop when their linked inventory item has <code>show_in_s
 <p><strong>Customer order flow:</strong></p>
 <ol>
     <li>Customer browses <a href="/shop">/shop</a> and adds a 3D-print item to cart.</li>
-    <li>Alternatively, they visit <a href="/3d/order">/3d/order</a> to place a direct print order.</li>
+    <li>Alternatively, they use <a href="/3d/browse">/3d/browse</a> Order (opens <code>/3d/model/&lt;id&gt;</code>; <code>/3d/order?model_id=</code> redirects there).</li>
     <li>The <strong>Add to Cart</strong> button at <a href="/3d/buy">/3d/buy</a> also goes to the Cart.</li>
     <li>Customers view their order history at <a href="/3d/my_orders">/3d/my_orders</a>.</li>
 </ol>
@@ -160,7 +163,7 @@ Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts ma
         <tr><td><code>/3d/model_download/&lt;id&gt;</code></td><td>Download model file</td><td>All (if enabled)</td></tr>
         <tr><td><code>/3d/store</code></td><td>Redirects to /shop</td><td>All</td></tr>
         <tr><td><code>/3d/buy</code></td><td>Redirects to Cart</td><td>All</td></tr>
-        <tr><td><code>/3d/order</code></td><td>Place a print order</td><td>Logged in</td></tr>
+        <tr><td><code>/3d/order</code></td><td>Redirects to /3d/model/&lt;id&gt;</td><td>Logged in</td></tr>
         <tr><td><code>/3d/my_orders</code></td><td>Customer's order history</td><td>Logged in</td></tr>
         <tr><td><code>/3d/queue</code></td><td>Print job queue</td><td>Admin</td></tr>
         <tr><td><code>/3d/queue_print</code></td><td>Mark job as printed</td><td>Admin</td></tr>

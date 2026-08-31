@@ -1976,6 +1976,10 @@ sub api_item_create :Path('/Inventory/api/item/create') :Args(0) {
             }
         }
     };
+<<<<<<< Updated upstream
+=======
+    require JSON;
+>>>>>>> Stashed changes
     if ($@ || ref($p) ne 'HASH') {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_item_create',
             "JSON parse failed: $@");
