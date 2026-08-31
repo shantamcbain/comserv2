@@ -1,66 +1,73 @@
 {
-  "base_dir": "/home/shanta/.comserv/worktrees",
-  "port_start": 4000,
   "branches": {
-    "InventoryAccounting": {
-      "label": "InventoryAccounting",
-      "port": 4001,
-      "url": "/planning/daily",
-      "host": "workstation.local",
-      "sitename": "CSC"
-    },
-    "DockerHA": {
-      "label": "DockerHA",
-      "port": 4002,
-      "url": "/planning/daily",
-      "project_id": 202,
-      "host": "workstation.local",
-      "sitename": "CSC"
-    },
-    "3d": {
-      "label": "3d",
-      "port": 4003,
-      "url": "/planning/daily",
-      "project_id": 272,
-      "host": "3d.local",
-      "sitename": "3d"
-    },
-    "git": {
-      "label": "git",
-      "port": 4004,
-      "url": "/planning/daily",
-      "project_id": 238,
-      "host": "workstation.local",
-      "sitename": "CSC"
-    },
-    "planning": {
-      "label": "planning",
-      "port": 4005,
-      "url": "/planning/daily",
-      "project_id": 138,
-      "host": "workstation.local",
-      "sitename": "CSC"
-    },
-    "aisystem": {
-      "label": "aisystem",
-      "port": 4006,
-      "url": "/planning/daily",
-      "project_id": 280,
-      "host": "workstation.local",
-      "sitename": "CSC"
-    },
-    "schema": {
-      "label": "schema",
-      "port": 4007,
-      "url": "/Documentation/SchemaMasterPlan",
-      "project_id": 138,
+    "helpdesk": {
+      "label": "helpdesk",
+      "port": 4009,
+      "url": "/HelpDesk",
       "host": "workstation.local",
       "sitename": "CSC"
     },
     "Documentation": {
-      "label": "Documentation",
       "port": 4008,
+      "url": "/planning/daily",
+      "label": "Documentation"
+    },
+    "schema": {
+      "label": "schema",
+      "project_id": 138,
+      "port": 4007,
+      "host": "workstation.local",
+      "sitename": "CSC",
+      "url": "/Documentation/SchemaMasterPlan"
+    },
+    "planning": {
+      "label": "planning",
+      "project_id": 138,
+      "port": 4005,
+      "host": "workstation.local",
+      "sitename": "CSC",
       "url": "/planning/daily"
+    },
+    "aisystem": {
+      "sitename": "CSC",
+      "url": "/planning/daily",
+      "port": 4006,
+      "host": "workstation.local",
+      "project_id": 280,
+      "label": "aisystem"
+    },
+    "InventoryAccounting": {
+      "port": 4001,
+      "host": "workstation.local",
+      "url": "/planning/daily",
+      "sitename": "CSC",
+      "label": "InventoryAccounting"
+    },
+    "3d": {
+      "project_id": 272,
+      "label": "3d",
+      "sitename": "3d",
+      "url": "/planning/daily",
+      "host": "3d.local",
+      "port": 4003
+    },
+    "DockerHA": {
+      "port": 4002,
+      "host": "workstation.local",
+      "sitename": "CSC",
+      "url": "/planning/daily",
+      "label": "DockerHA",
+      "project_id": 202
+    },
+    "git": {
+      "project_id": 238,
+      "label": "git",
+      "sitename": "CSC",
+      "url": "/planning/daily",
+      "host": "workstation.local",
+      "port": 4004
     }
-  }
+  },
+  "port_start": 4000,
+  "base_dir": "/home/shanta/.comserv/worktrees"
 }

@@ -369,19 +369,63 @@
             })
               .then(function (res) {
                   console.log('[git-dashboard] merge response:', res);
-                  if (res.conflict) {
-                      // Lead with WHY: the server now names the conflicting
-                      // files (or the uncommitted-changes blocker) in res.error;
-                      // raw git output stays in the <pre> as detail.
-                      var why = res.error || 'Merge conflict';
-                      showMergeResult(false, true, 'conflict', why + '\n\n' + (res.output || ''));
-                      return;
-                  }
                   var stashNote = '';
                   if (res.autostash_conflict) {
                       stashNote = 'WIP not cleanly reapplied \u2014 safe in stash@{0} (use Stash Pop)';
                   } else if (res.autostash) {
                       stashNote = 'uncommitted changes preserved & reapplied';
+                  }
+
+                  function buildFailBody(r) {
+                      var parts = [];
+                      if (r.error) { parts.push(String(r.error)); }
+                      if (r.fix_hint && (!r.error || String(r.error).indexOf(r.fix_hint) < 0)) {
+                          parts.push('What to do: ' + r.fix_hint);
+                      }
+                      if (r.uncommitted_files && r.uncommitted_files.length) {
+                          parts.push('Uncommitted files:\n  - ' + r.uncommitted_files.slice(0, 20).join('\n  - '));
+                      }
+                      if (r.conflict_files && r.conflict_files.length) {
+                          parts.push('Conflict files:\n  - ' + r.conflict_files.join('\n  - '));
+                      }
+                      if (r.checkout_path) {
+                          parts.push('Checkout: ' + r.checkout_path
+                              + (r.target_branch ? ' (branch ' + r.target_branch + ')' : ''));
+                      }
+                      if (r.output && String(r.output).replace(/\s/g, '').length) {
+                          parts.push('--- git detail ---\n' + r.output);
+                      }
+                      if (r.detail && String(r.detail).replace(/\s/g, '').length) {
+                          parts.push(String(r.detail));
+                      }
+                      return parts.join('\n\n') || 'merge failed';
+                  }
+
+                  function failTitle(r) {
+                      if (r.reason === 'uncommitted_on_main') {
+                          return 'blocked \u2014 main has uncommitted changes';
+                      }
+                      if (r.reason === 'uncommitted' || r.uncommitted) {
+                          return 'blocked \u2014 uncommitted changes';
+                      }
+                      if (r.reason === 'worktree_collision') {
+                          return 'blocked \u2014 worktree checkout collision';
+                      }
+                      if (r.conflict || r.reason === 'conflict') {
+                          return 'conflict';
+                      }
+                      if (r.reason === 'merge_in_progress') {
+                          return 'blocked \u2014 merge already in progress';
+                      }
+                      if (r.reason === 'missing_ref') {
+                          return 'failed \u2014 branch/ref not found';
+                      }
+                      return 'failed';
+                  }
+
+                  if (res.conflict) {
+                      showMergeResult(false, true, failTitle(res), buildFailBody(res), stashNote);
+                      return;
                   }
                   if (res.success) {
                       showMergeResult(true, false, 'merged \u2014 reloading\u2026', res.output || '', stashNote);
@@ -393,8 +437,7 @@
                       });
                       reloadGitDashboardSoon();
                   } else {
-                      var failText = (res.error || '') + (res.output && res.output.replace(/\s/g,'') ? ('\n' + res.output) : '') + (res.detail ? ('\n' + res.detail) : '');
-                      showMergeResult(false, false, 'failed', failText || 'merge failed', stashNote);
+                      showMergeResult(false, false, failTitle(res), buildFailBody(res), stashNote);
                   }
               })
               .catch(function (err) {

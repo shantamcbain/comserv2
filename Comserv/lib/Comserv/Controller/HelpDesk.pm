@@ -36,15 +36,20 @@ Common setup for all HelpDesk actions
 
 sub auto :Private {
     my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
         "HelpDesk controller auto method called");
-    
+
+    # Tab icon: green HD badge (legacy public HelpDesk / zenflow :4013).
+    # page_favicon is highest priority in Header.tt.
+    $c->stash->{page_favicon} = '/favicon/helpdesk'
+        unless $c->stash->{page_favicon};
+
     # Initialize debug_msg array if it doesn't exist
     $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-    
+
     # Add the debug message to the array
     push @{$c->stash->{debug_msg}}, "HelpDesk controller loaded successfully";
-    
+
     return 1; # Allow the request to proceed
 }
 
@@ -122,21 +127,25 @@ Create new ticket page
 
 sub ticket_new :Chained('ticket_base') :PathPart('new') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new', 
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new',
         "Starting ticket_new action");
-    
+
+    my ($num1, $num2) = $self->_issue_math_challenge($c);
+
     $c->stash(
         template => 'CSC/HelpDesk/new_ticket.tt',
-        title => 'Create New Support Ticket'
+        title    => 'Create New Support Ticket',
+        num1     => $num1,
+        num2     => $num2,
     );
-    
+
     # Push debug message to stash
     push @{$c->stash->{debug_msg}}, "New ticket form loaded";
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new', 
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_new',
         "Completed ticket_new action");
-    
+
     # Explicitly forward to the TT view
     $c->forward($c->view('TT'));
 }
@@ -234,22 +243,120 @@ Contact Support page
 
 sub contact :Chained('base') :PathPart('contact') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact', 
+
+    # POST lands here (form action /HelpDesk/contact). A separate contact/send
+    # PathPart never reliably beat the HelpDesk default catch-all.
+    if (uc($c->req->method || '') eq 'POST') {
+        return $self->_process_contact_post($c);
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact',
         "Starting contact action");
-    
+
+    my ($num1, $num2) = $self->_issue_math_challenge($c);
+
     $c->stash(
         template => 'CSC/HelpDesk/contact.tt',
-        title => 'Contact Support'
+        title    => 'Contact Support',
+        num1     => $num1,
+        num2     => $num2,
     );
-    
+
     # Push debug message to stash
     push @{$c->stash->{debug_msg}}, "Contact Support page loaded";
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact', 
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact',
         "Completed contact action");
-    
+
     # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
+=head2 contact_send
+
+Compatibility alias: /HelpDesk/contact/send → same POST processor.
+
+=cut
+
+sub contact_send :Chained('base') :PathPart('contact') :Args(1) {
+    my ($self, $c, $arg) = @_;
+    if (defined $arg && $arg eq 'send' && uc($c->req->method || '') eq 'POST') {
+        return $self->_process_contact_post($c);
+    }
+    $c->res->redirect($c->uri_for($self->action_for('contact')));
+}
+
+sub _process_contact_post {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact_send',
+        "Processing contact form submission");
+
+    my $name    = $c->req->params->{name}    || '';
+    my $email   = $c->req->params->{email}   || '';
+    my $subject = $c->req->params->{subject} || '';
+    my $message = $c->req->params->{message} || '';
+
+    my $spam_err = $self->_spam_guard_fail($c, 'contact_send', $subject, $message);
+    if ($spam_err) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template  => 'CSC/HelpDesk/contact.tt',
+            error_msg => $spam_err,
+            title     => 'Contact Support',
+            num1      => $n1,
+            num2      => $n2,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    unless ($name && $email && $subject && $message) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template  => 'CSC/HelpDesk/contact.tt',
+            error_msg => 'All fields are required.',
+            title     => 'Contact Support',
+            num1      => $n1,
+            num2      => $n2,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+    try {
+        $self->_notify_contact_admins($c,
+            site_name => $site_name,
+            subject   => "[HelpDesk] Contact form: $subject",
+            body      => "A new contact form message has been submitted on $site_name.\n\n"
+                       . "From:     $name <$email>\n"
+                       . "Subject:  $subject\n\n"
+                       . "Message:\n$message\n",
+        );
+        $self->_record_public_submit($c);
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template    => 'CSC/HelpDesk/contact.tt',
+            success_msg => 'Your message has been sent. We will respond within 24 hours.',
+            title       => 'Contact Support',
+            num1        => $n1,
+            num2        => $n2,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'contact_send',
+            "Error sending contact form: $_");
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template  => 'CSC/HelpDesk/contact.tt',
+            error_msg => 'There was an error sending your message. Please try again.',
+            title     => 'Contact Support',
+            num1      => $n1,
+            num2      => $n2,
+        );
+    };
+
     $c->forward($c->view('TT'));
 }
 
@@ -387,11 +494,28 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
     my $priority    = $c->req->params->{priority}    || 'medium';
     my $email       = $c->req->params->{email}       || $c->session->{email} || '';
 
+    my $spam_err = $self->_spam_guard_fail($c, 'submit_ticket', $subject, $description);
+    if ($spam_err) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
+        $c->stash(
+            template  => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg => $spam_err,
+            title     => 'Create New Support Ticket',
+            num1      => $n1,
+            num2      => $n2,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     unless ($subject && $description) {
+        my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
             template  => 'CSC/HelpDesk/new_ticket.tt',
             error_msg => 'Subject and description are required.',
             title     => 'Create New Support Ticket',
+            num1      => $n1,
+            num2      => $n2,
         );
         $c->forward($c->view('TT'));
         return;
@@ -421,6 +545,8 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
             "Ticket created: " . $ticket->ticket_number . " (id=" . $ticket->id . ")");
+
+        $self->_record_public_submit($c);
 
         $self->_notify_site_admins($c,
             ticket  => $ticket,
@@ -1124,15 +1250,133 @@ sub _auto_close_stale_tickets {
     }
 }
 
+# --- Public-form anti-spam helpers (ticket submit + contact) ---
+
+sub _issue_math_challenge {
+    my ($self, $c) = @_;
+    my $num1 = int(rand(8)) + 2;
+    my $num2 = int(rand(8)) + 2;
+    $c->session->{math_challenge_sum} = $num1 + $num2;
+    return ($num1, $num2);
+}
+
+sub _record_public_submit {
+    my ($self, $c) = @_;
+    my $now = time();
+    my $key = 'hd_public_submits';
+    my $list = $c->session->{$key} || [];
+    $list = [] unless ref $list eq 'ARRAY';
+    push @$list, $now;
+    # keep last hour only
+    @$list = grep { defined $_ && ($_ > $now - 3600) } @$list;
+    $c->session->{$key} = $list;
+}
+
+sub _public_submit_rate_exceeded {
+    my ($self, $c) = @_;
+    my $now  = time();
+    my $list = $c->session->{hd_public_submits} || [];
+    return 0 unless ref $list eq 'ARRAY';
+    my @recent = grep { defined $_ && ($_ > $now - 3600) } @$list;
+    # guests: max 5 public HelpDesk submits per session/hour
+    return scalar(@recent) >= 5 ? 1 : 0;
+}
+
+sub _looks_like_spam_content {
+    my ($self, $subject, $body) = @_;
+    my $text = lc(join(' ', map { defined $_ ? $_ : '' } ($subject, $body)));
+    $text =~ s/\s+/ /g;
+
+    # Crypto/phishing patterns seen on CSC HelpDesk (e.g. CSC-20260830-2900)
+    my @patterns = (
+        qr/graph\.org/i,
+        qr/coinbase/i,
+        qr/\bbitcoin\b/i,
+        qr/\bbtc\b/i,
+        qr/you.?have.?a.?new.?bitcoin/i,
+        qr/wallet.?transfer/i,
+        qr/claim.?your.?crypto/i,
+        qr/hs=[0-9a-f]{16,}/i,
+        qr/№\s*[A-Z0-9]/i,
+        qr/open\s*[⚡⚡]/i,
+    );
+    for my $re (@patterns) {
+        return 1 if $text =~ $re;
+    }
+    # Extreme link density / short-link spam
+    my $links = () = $text =~ m{https?://}g;
+    return 1 if $links >= 3 && length($text) < 400;
+    return 0;
+}
+
+# Returns error message string on failure, empty string if OK.
+# Fail-closed on missing math session. Math required for guests only.
+sub _spam_guard_fail {
+    my ($self, $c, $event, $subject, $body) = @_;
+    my $ip = $c->req->address || 'unknown';
+    $event ||= 'spam_guard';
+
+    my $honeypot = $c->req->params->{website} // '';
+    if ($honeypot ne '') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Bot detected (honeypot filled) from ip=$ip");
+        return 'Submission failed. Please try again.';
+    }
+
+    if ($self->_public_submit_rate_exceeded($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Rate limit exceeded for HelpDesk public submit ip=$ip");
+        return 'Too many submissions. Please wait before trying again.';
+    }
+
+    my $is_guest = !($c->session->{user_id});
+    if ($is_guest) {
+        my $ans = $c->req->params->{math_challenge_ans};
+        $ans = '' unless defined $ans;
+        $ans =~ s/^\s+|\s+$//g;
+        my $expected = $c->session->{math_challenge_sum};
+        # Fail closed: missing session answer is a reject (do not skip)
+        if (!defined $expected || $expected eq '' || $ans eq '' || "$ans" ne "$expected") {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+                "Math challenge failed (submitted='$ans', expected='"
+                . (defined $expected ? $expected : '') . "') from ip=$ip");
+            delete $c->session->{math_challenge_sum};
+            return 'Security check failed. Please solve the arithmetic question correctly.';
+        }
+        delete $c->session->{math_challenge_sum};
+    }
+
+    if ($self->_looks_like_spam_content($subject, $body)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Spam content rejected from ip=$ip subject=" . substr($subject // '', 0, 80));
+        return 'Your message was blocked by our spam filter. If this is a real support request, email support or rephrase without promotional links.';
+    }
+
+    return '';
+}
+
+sub _notify_contact_admins {
+    my ($self, $c, %args) = @_;
+    $self->_notify_site_admins($c,
+        site_name => $args{site_name},
+        subject   => $args{subject},
+        body      => $args{body},
+        event     => 'contact_form',
+    );
+}
+
 sub _notify_site_admins {
     my ($self, $c, %args) = @_;
-    my $ticket    = $args{ticket}    or return;
+    my $ticket    = $args{ticket};
     my $subject   = $args{subject}   or return;
     my $body      = $args{body}      or return;
     my $event     = $args{event}     || 'ticket_event';
+    my $site_name = $args{site_name}
+        || (defined $ticket ? (eval { $ticket->site_name } || '') : '')
+        || '';
+    return unless $ticket || $site_name;
 
     my $schema    = $c->model('DBEncy')->schema;
-    my $site_name = $ticket->site_name || '';
 
     my @admin_emails;
     eval {
