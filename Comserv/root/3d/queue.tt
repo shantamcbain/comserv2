@@ -1,4 +1,4 @@
-[% PageVersion = '3d/queue.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% PageVersion = '3d/queue.tt,v 1.01 2026/08/31 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <style>
@@ -123,7 +123,7 @@
                     [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
                 </td>
                 <td>[% job.quantity %]</td>
-                <td>[% job.created_at | user_time %]</td>
+                <td>[%# user_time needs View::TT reload; show stored UTC until then %][% job.created_at %]</td>
                 <td>
                     [% IF idle_printers && idle_printers.size %]
                     <form method="post" action="/3d/queue" style="display:inline;">
@@ -191,7 +191,7 @@
                     [% ELSE %]&mdash;[% END %]
                 </td>
                 <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
-                <td>[% IF job.started_at %][% job.started_at | user_time %][% ELSE %]&mdash;[% END %]</td>
+                <td>[% IF job.started_at %][% job.started_at %][% ELSE %]&mdash;[% END %]</td>
                 <td>
                     <form method="post" action="/3d/queue" class="complete-form"
                           data-started-at="[% job.started_at || '' %]"
@@ -279,7 +279,7 @@
             <td style="font-weight:bold;">
                 [% IF job.total_cost %]$[% job.total_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]
             </td>
-            <td>[% job.completed_at | user_time %]</td>
+            <td>[% job.completed_at %]</td>
         </tr>
         [% END %]
         </tbody>

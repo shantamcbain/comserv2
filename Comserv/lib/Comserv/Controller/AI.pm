@@ -5301,7 +5301,7 @@ sub _assess_response_quality {
     );
     my $lc_resp = lc($response);
     for my $phrase (@uncertain_phrases) {
-        return 'poor' if index($lc_resp, $phrase) >= 0;
+        return 'poor' if CORE::index($lc_resp, $phrase) >= 0;
     }
 
     return 'good';
@@ -5536,25 +5536,25 @@ sub _pick_ollama_tier {
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
-    for my $n (@names) {
-        my $score;
-        # 1. Explicit Nb in name (deepseek-r1:7b, llama2:13b, etc.)
-        if ($n =~ /[:\-](\d+)b/i) { $score = $1; }
-        # 2. Known family prefix
-        unless ($score) {
-            for my $family (sort { length($b) <=> length($a) } keys %known_family) {
-                if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+        for my $n (@names) {
+            my $score;
+            # 1. Explicit Nb in name (deepseek-r1:7b, llama2:13b, etc.)
+            if ($n =~ /[:\\-](\d+)b/i) { $score = $1; }
+            # 2. Known family prefix
+            unless ($score) {
+                for my $family (sort { length($b) <=> length($a) } keys %known_family) {
+                    if (CORE::index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+                }
             }
+            # 3. Generic hints
+            $score //= $n =~ /tiny/i   ? 1
+                     : $n =~ /small/i  ? 3
+                     : $n =~ /mini/i   ? 3
+                     : $n =~ /medium/i ? 7
+                     : $n =~ /large/i  ? 13
+                     :                   7;
+            $size_score{$n} = $score;
         }
-        # 3. Generic hints
-        $score //= $n =~ /tiny/i   ? 1
-                 : $n =~ /small/i  ? 3
-                 : $n =~ /mini/i   ? 3
-                 : $n =~ /medium/i ? 7
-                 : $n =~ /large/i  ? 13
-                 :                   7;
-        $size_score{$n} = $score;
-    }
 
     my @sorted = sort { ($size_score{$a} || 7) <=> ($size_score{$b} || 7) } @names;
 
