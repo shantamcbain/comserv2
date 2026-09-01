@@ -42,7 +42,7 @@
                     [% ELSE %]—[% END %]</td></tr>
             <tr><td><strong>Posted By</strong></td><td>[% project.username_of_poster OR '—' %]</td></tr>
             <tr><td><strong>Group</strong></td><td>[% project.group_of_poster OR '—' %]</td></tr>
-            <tr><td><strong>Date Posted</strong></td><td>[% project.date_time_posted OR '—' %]</td></tr>
+            <tr><td><strong>Date Posted</strong></td><td>[% IF project.date_time_posted %][% project.date_time_posted | user_time %][% ELSE %]—[% END %]</td></tr>
             <tr><td><strong>Comments</strong></td><td>[% project.comments OR '—' %]</td></tr>
         </table>
 

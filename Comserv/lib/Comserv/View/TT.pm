@@ -42,6 +42,33 @@ __PACKAGE__->config(
             $text = decode_entities($text);
             return encode_entities( $text, '<>&"' );
         },
+        # Stored UTC DATETIME → viewer timezone (Comserv::Util::AppTime).
+        # Usage: [% row.created_at | user_time %]
+        # Optional format: [% row.created_at | user_time('%Y-%m-%d %H:%M') %]
+        user_time => [
+            sub {
+                my ( $context, $fmt ) = @_;
+                return sub {
+                    my $val = shift;
+                    return '' unless defined $val && length $val;
+                    my $out;
+                    eval {
+                        require Comserv::Util::AppTime;
+                        my $tz;
+                        my $st = eval { $context->stash };
+                        if ($st) {
+                            $tz = eval { $st->get('user_timezone') } if $st->can('get');
+                            $tz = $st->{user_timezone} if !defined $tz && ref $st eq 'HASH';
+                        }
+                        $tz ||= $Comserv::Util::AppTime::DEFAULT_USER_TZ || 'America/Vancouver';
+                        $out = Comserv::Util::AppTime->format_for_display( $val, $tz, $fmt );
+                        1;
+                    } or return $val;
+                    return defined $out ? $out : $val;
+                };
+            },
+            1,
+        ],
     },
 );
 # Register the format_time filter

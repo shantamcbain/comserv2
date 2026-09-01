@@ -1,0 +1,6 @@
+<div id="2026-08-30-app-time-utc" class="cl-entry">
+<h3>2026-08-30 — One app clock: UTC store + user-TZ display</h3>
+<p class="doc-body"><strong>What.</strong> Added <code>Comserv::Util::AppTime</code> as the single time system: all new DB timestamps write UTC; templates show times with the <code>| user_time</code> filter in the viewer’s timezone (session / <code>ui.timezone</code> pref / schedule settings / default America/Vancouver). 3D queue no longer fakes “Started” from <code>created_at</code> — assign paths set <code>started_at</code>. HelpDesk ticket/message stamps use AppTime.</p>
+<p class="doc-body"><strong>Why.</strong> Mixed host PDT vs docker/DB UTC and bare <code>localtime</code> made Active print start times look like multi-day runtimes (~95h) and HelpDesk stamps disagree across hosts.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Util/AppTime.pm</code>, <code>View/TT.pm</code> (<code>user_time</code>), <code>Controller/Root.pm</code>, <code>Controller/3d.pm</code>, <code>Controller/HelpDesk.pm</code>, <code>Util/UserPreferences.pm</code> (<code>ui.timezone</code>), queue/HelpDesk <code>.tt</code>, <code>Comserv.pm</code> TZ comment, docs.</p>
+</div>
