@@ -164,7 +164,7 @@
           [% ELSE %]—[% END %]
         </td>
         <td>[% job.username | html %]</td>
-        <td style="white-space:nowrap;font-size:0.82em">[% job.created_at | user_time %]</td>
+        <td style="white-space:nowrap;font-size:0.82em">[% job.created_at %]</td>
         <td></td>
       </tr>
       [% END %]
@@ -210,7 +210,7 @@
         </td>
         <td>[% job.printer_name | html %]</td>
         <td>[% job.username | html %]</td>
-        <td style="white-space:nowrap;font-size:0.82em">[% IF job.started_at %][% job.started_at | user_time %][% ELSE %]&mdash;[% END %]</td>
+        <td style="white-space:nowrap;font-size:0.82em">[% IF job.started_at %][% job.started_at %][% ELSE %]&mdash;[% END %]</td>
         <td></td>
       </tr>
       [% END %]
@@ -262,7 +262,7 @@
         <td style="text-align:right">[% job.printer_cost    ? '$' _ job.printer_cost    : '—' %]</td>
         <td style="text-align:right">[% job.electricity_cost ? '$' _ job.electricity_cost : '—' %]</td>
         <td style="text-align:right;font-weight:bold">[% job.total_cost ? '$' _ job.total_cost : '—' %]</td>
-        <td style="white-space:nowrap;font-size:0.82em">[% job.completed_at | user_time %]</td>
+        <td style="white-space:nowrap;font-size:0.82em">[% job.completed_at %]</td>
       </tr>
       [% END %]
       </tbody>

@@ -85,7 +85,7 @@
             <td>
                 [% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]
             </td>
-            <td>[% job.created_at | user_time %]</td>
+            <td>[% job.created_at %]</td>
             <td>
                 [% IF job.model && job.model.source == 'sign_generator' %]
                 <a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]">3MF</a>
