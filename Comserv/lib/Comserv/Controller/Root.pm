@@ -213,7 +213,7 @@ sub auto :Private {
     }
 
     # LAYER 0: Require admin role for sensitive paths
-    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|file/admin)}) {
+    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|themetest|file/admin)}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
