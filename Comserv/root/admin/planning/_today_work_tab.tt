@@ -109,11 +109,11 @@
                         <span class="HelpdeskPriority">[% ht.priority | upper %]</span>
                         <span class="HelpdeskSubject">[% ht.subject | html %]</span>
                         <span class="HelpdeskMeta">[% ht.username %] · [% ht.created_at %]</span>
-                        <a href="/HelpDesk/ticket/[% ht.ticket_number %]" class="HelpdeskItemLink">View →</a>
+                        <a href="/HelpDesk/ticket/view/[% ht.ticket_number %]" class="HelpdeskItemLink">View →</a>
                     </div>
                     [% END %]
                     <div class="HelpdeskViewAll">
-                        <a href="/HelpDesk">View all tickets →</a>
+                        <a href="/HelpDesk/admin/tickets/open">View all open tickets →</a>
                     </div>
                     [% ELSE %]
                     <p class="HelpdeskEmpty">No open support tickets.</p>
