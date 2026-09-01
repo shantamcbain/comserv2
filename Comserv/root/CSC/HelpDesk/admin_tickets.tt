@@ -7,6 +7,7 @@
  <br>[% PageVersion %]</br>
 
 [% END %]
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -45,7 +46,11 @@
            class="btn [% status_filter == 'closed' ? 'btn-primary' : 'btn-secondary' %]">Closed</a>
 
         <a href="[% c.uri_for('/HelpDesk/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
+<<<<<<< Updated upstream
 
+=======
+        <a href="[% c.uri_for('/HelpDesk') %]" class="btn btn-secondary">Back to Tickets</a>
+>>>>>>> Stashed changes
     </div>
 
 

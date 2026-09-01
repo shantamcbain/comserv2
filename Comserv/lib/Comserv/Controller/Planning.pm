@@ -1796,11 +1796,17 @@ sub _daily_log_action {
         my @audit_todo_subjects  = @{ $audit->{subjects} };
 
         # ── Check for open HelpDesk support tickets ──
+        # Link each ticket to /HelpDesk/ticket/view/<number> (not /HelpDesk public index).
         my $helpdesk_count = 0;
+        my @open_helpdesk_tickets;
         eval {
-            $helpdesk_count = $schema->resultset('SupportTicket')->count(
-                { status => 'open' }
-            ) || 0;
+            my %hd_search = ( status => 'open' );
+            $hd_search{site_name} = $sitename unless lc($sitename || '') eq 'csc';
+            @open_helpdesk_tickets = $schema->resultset('SupportTicket')->search(
+                \%hd_search,
+                { order_by => [{ -asc => 'priority' }, { -desc => 'created_at' }], rows => 20 }
+            )->all;
+            $helpdesk_count = scalar @open_helpdesk_tickets;
         };
 
         # ── Build daily log details ──
@@ -1813,7 +1819,14 @@ sub _daily_log_action {
             $details .= "\n";
         }
         if ($helpdesk_count) {
-            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response — see <a href='/HelpDesk'>/HelpDesk</a>\n\n";
+            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response:\n";
+            for my $ht (@open_helpdesk_tickets) {
+                my $num = eval { $ht->ticket_number } || '';
+                next unless $num;
+                my $subj = substr(eval { $ht->subject } || '', 0, 80);
+                $details .= "  \x{2022} <a href='/HelpDesk/ticket/view/$num'>$num</a> — $subj\n";
+            }
+            $details .= "  All open: <a href='/HelpDesk/admin/tickets/open'>/HelpDesk/admin/tickets/open</a>\n\n";
         }
         if (@top_todos) {
             $details .= "\x{1F4CB} TOP PRIORITIES FOR TODAY:\n";
@@ -1872,7 +1885,23 @@ sub _daily_log_action {
         $self->_schedule_day($c, $schema, $sitename, $today);
 
         my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
-        my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
+        my $helpdesk_msg = '';
+        if ($helpdesk_count) {
+            if ($helpdesk_count == 1) {
+                my $num = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                $helpdesk_msg = $num
+                    ? " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/ticket/view/$num'>view $num</a>."
+                    : " \x{1F3AB} 1 open HelpDesk ticket — <a href='/HelpDesk/admin/tickets/open'>view ticket</a>.";
+            }
+            else {
+                # Toast stays short: first ticket deep-link + admin open list for the rest
+                my $first = eval { $open_helpdesk_tickets[0]->ticket_number } || '';
+                my $first_link = $first
+                    ? "<a href='/HelpDesk/ticket/view/$first'>$first</a>"
+                    : 'tickets';
+                $helpdesk_msg = " \x{1F3AB} $helpdesk_count open HelpDesk tickets — $first_link + <a href='/HelpDesk/admin/tickets/open'>all open</a>.";
+            }
+        }
         my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
         my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found$deploy_since — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';

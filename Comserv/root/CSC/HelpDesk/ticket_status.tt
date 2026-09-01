@@ -9,9 +9,13 @@
  <br>[% PageVersion %]</br>
 
  [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
+<<<<<<< Updated upstream
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+=======
+<meta name="viewport" content="width=device-width, initial-scale=1">
+>>>>>>> Stashed changes
 [% END %]
 
 
