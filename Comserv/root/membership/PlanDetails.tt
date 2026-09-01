@@ -149,21 +149,35 @@
               [% END %]
 
               [%# Currency / Coins %]
-              <tr>
-                <td><strong>&#127881; Site Coins</strong></td>
-                <td>
-                  [% IF plan.has_currency %]
-                    <span class="text-success">&#10003; Included</span>
-                    [% IF plan.currency_bonus > 0 %]
-                    <br><small class="text-muted">+ <strong>[% plan.currency_bonus %] bonus coins</strong> credited on activation</small>
-                    [% END %]
-                  [% ELSE %]
-                    <span class="text-muted">Not included</span>
-                  [% END %]
-                </td>
-              </tr>
-
-              [%# Add-on Services %]
+                            <tr>
+                              <td><strong>&#127881; Site Coins</strong></td>
+                              <td>
+                                [% IF plan.has_currency %]
+                                  <span class="text-success">&#10003; Included</span>
+                                  [% IF plan.currency_bonus > 0 %]
+                                  <br><small class="text-muted">+ <strong>[% plan.currency_bonus %] bonus coins</strong> credited on activation</small>
+                                  [% END %]
+                                  [% END %]
+                                [% ELSE %]
+                                  <span class="text-muted">Not included</span>
+                                [% END %]
+                              </td>
+                            </tr>
+                            [% NEW %]
+                            [% NEW %]
+                            [%# Joining Bonus %]
+                            <tr>
+                              <td><strong>Welcome Bonus</strong></td>
+                              <td>
+                                [% IF plan.has_subdomain %]
+                                  <strong>100 points</strong> — awarded when you add your website
+                                [% ELSE %]
+                                  <strong>10 points</strong> — awarded on signup for all new accounts
+                                [% END %]
+                              </td>
+                            </tr>
+                            [% END %]
+                            [%# Add-on Services %]
               <tr>
                 <td><strong>Add-on Services</strong></td>
                 <td>Up to [% plan.max_services %] service[% IF plan.max_services != 1 %]s[% END %]</td>
