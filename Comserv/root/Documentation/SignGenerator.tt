@@ -50,13 +50,16 @@
                 wording and regenerate before wasting filament.</li>
             <li><strong>Print</strong>:
                 <ul>
-                    <li><em>3D</em>: download the <strong>3MF</strong> (two filaments) — it contains the
-                        sign as two separate objects (base plate + text/QR), each colour-tagged, so the
-                        Anycubic slicer shows <strong>two filament slots</strong>; assign a different
-                        filament to each. For one-colour / paint-fill printing, the single solid STL
-                        is also available. (Legacy path: the separate <code>base</code> and
-                        <code>text</code> STLs still exist for split import.) Slice, print, and record
-                        the job in the <a href="/3d">3D Printing module</a>.</li>
+                    <li><em>3D</em>: <strong>Order</strong> the sign from
+                        <code>/3d/model/&lt;id&gt;</code> and pick body + text filament
+                        (type and colour from stock). That builds a two-object
+                        <strong>3MF</strong> named with those filaments; object names
+                        inside the file are e.g. <code>base PLA Green</code> /
+                        <code>text PETG White</code> so Anycubic Slicer Next shows two
+                        filament slots already labelled. Download it from the
+                        post-order page. The design-time 3MF (hex pickers on the
+                        generator form) is only a preview. For one-colour / paint-fill,
+                        the solid STL is still available.</li>
                     <li><em>Paper / laser</em>: print the stored PDF on any printer.</li>
                 </ul></li>
         </ol>
@@ -69,7 +72,9 @@
             <tr><td><code>GET /signgenerator</code></td><td>Herb search form (+ render-service health banner)</td></tr>
             <tr><td><code>GET /signgenerator/preview/&lt;herb_id&gt;</code></td><td>Prefilled wording form with true-size live preview, colours, QR</td></tr>
             <tr><td><code>POST /signgenerator/generate</code></td><td>Render STL(s) + PDF, save files + sidecar JSON, create inventory row</td></tr>
-            <tr><td><code>GET /signgenerator/download/&lt;model_id&gt;[/base|/text|/3mf]</code></td><td>Stream the 3D file — solid STL, a two-colour part STL, or the multi-object 3MF (two filaments)</td></tr>
+            <tr><td><code>GET /signgenerator/download/&lt;model_id&gt;[/base|/text|/3mf]</code></td><td>Stream the 3D file — solid STL, a two-colour part STL, or the multi-object 3MF (two filaments). Add <code>?job_id=</code> to get the order-time 3MF (filament type + colour in the file, built from the body/text stock picks)</td></tr>
+            <tr><td><code>GET /signgenerator/ordered/&lt;job_id&gt;</code></td><td>Print-ready page after ordering a sign — download the two-colour 3MF</td></tr>
+            <tr><td><code>GET/POST /signgenerator/delete/&lt;model_id&gt;</code></td><td>Remove an extra sign build (owner or admin). Blocked while a job is queued/assigned/printing</td></tr>
             <tr><td><code>GET /signgenerator/pdf/&lt;model_id&gt;</code></td><td>Show the stored sign PDF inline (print/save from the browser viewer)</td></tr>
             <tr><td><code>GET /signgenerator/print/&lt;model_id&gt;</code></td><td>HTML print-page view (browser print dialog fallback for older signs)</td></tr>
             <tr><td><code>GET /signgenerator/qr_matrix?data=...</code></td><td>QR matrix proxy for the live preview</td></tr>

@@ -5,13 +5,14 @@
             (192244_HDRY_System__Assembly_Manual.pdf, 1 Feb 2025). Each row maps the code to its
             source 3MF and a preview pulled from that 3MF's own plate renders (no external render
             needed). Work the checklist top-to-bottom: create the <code>printing_3d_models</code>
-            row + child <code>inventory_items</code> + BOM line, then push a <code>printing_3d_jobs</code>
+            row + child <code>inventory_items</code> + BOM line, BOM qty is <strong>1 of each *01 and *02 per module</strong> (assembly manual L1 then L2),
+            not mention-count. Then push a <code>printing_3d_jobs</code>
             entry to <a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>.
             Pictures are served from <code>/static/images/3d/hdry/parts/</code>.</p>
             <table class="doc-table">
                 <tr>
                     <th class="doc-th">Code</th><th class="doc-th">Name</th><th class="doc-th">Preview</th>
-                    <th class="doc-th">Source 3MF</th><th class="doc-th">SKU</th><th class="doc-th">Qty (mentions)</th>
+                    <th class="doc-th">Source 3MF</th><th class="doc-th">SKU</th><th class="doc-th">Qty per module</th>
                     <th class="doc-th">Model+Item</th><th class="doc-th">Queued</th>
                 </tr>
                 <tr>
@@ -20,7 +21,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_1.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_1.png" alt="BBL01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 1</code></td>
                     <td class="doc-td"><code>INT-HDRY-BBL01</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -30,7 +31,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_1.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_1.png" alt="BBL02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 2</code></td>
                     <td class="doc-td"><code>INT-HDRY-BBL02</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -40,7 +41,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_2.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_2.png" alt="BBR01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 1</code></td>
                     <td class="doc-td"><code>INT-HDRY-BBR01</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -50,7 +51,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_2.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_2.png" alt="BBR02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 2</code></td>
                     <td class="doc-td"><code>INT-HDRY-BBR02</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -80,7 +81,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_4.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_4.png" alt="BLS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 1</code></td>
                     <td class="doc-td"><code>INT-HDRY-BLS01</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -90,7 +91,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_4.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_4.png" alt="BLS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 2</code></td>
                     <td class="doc-td"><code>INT-HDRY-BLS02</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -120,7 +121,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_6.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_6.png" alt="BRS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 1</code></td>
                     <td class="doc-td"><code>INT-HDRY-BRS01</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -130,7 +131,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_6.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_6.png" alt="BRS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 2</code></td>
                     <td class="doc-td"><code>INT-HDRY-BRS02</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -200,7 +201,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_8.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_8.png" alt="FLS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 1</code></td>
                     <td class="doc-td"><code>INT-HDRY-FLS01</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -210,7 +211,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_8.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_8.png" alt="FLS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 2</code></td>
                     <td class="doc-td"><code>INT-HDRY-FLS02</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -240,7 +241,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_10.png" target="_blank"><img src="/static/images/3d/hdry/parts/023022_HDRY_System_V3__Module_1/top_10.png" alt="FRS01" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 1</code></td>
                     <td class="doc-td"><code>INT-HDRY-FRS01</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -250,7 +251,7 @@
                     <td class="doc-td"><a href="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_10.png" target="_blank"><img src="/static/images/3d/hdry/parts/023030_HDRY_System_V3__Module_2/top_10.png" alt="FRS02" style="height:64px;border:1px solid #555;border-radius:4px"></a></td>
                     <td class="doc-td"><code>Module 2</code></td>
                     <td class="doc-td"><code>INT-HDRY-FRS02</code></td>
-                    <td class="doc-td">2</td>
+                    <td class="doc-td">1</td>
                     <td class="doc-td"><input type="checkbox"> model+item</td>
                     <td class="doc-td"><input type="checkbox"> queued</td>
                 </tr>
@@ -317,9 +318,8 @@
         <div class="col-100">
             <h2 id="hardware-worksheet" class="doc-h2">5c. Hardware (purchased) parts worksheet</h2>
             <p class="doc-body">These are the <strong>BUY, not print</strong> components from the HDRY assembly
-            manual (DryerProjectPlan section 1b / import pack). Each row becomes one
-            <code>inventory_items</code> row with <code>item_origin=purchased</code>, then a BOM line on the
-            base-unit parent (INT-HDRY-001). Wheel hardware is per wheel (4 wheels per base unit).
+            manual (DryerProjectPlan section 1b / import pack). Each row is <strong>general stock</strong> (any BOM can use it), <code>item_origin=purchased</code>.
+            The dryer BASE/MOD BOMs attach these later; the SKU is not dryer-prefixed. Wheel hardware is per wheel (4 wheels per base unit).
             Multi-supplier: the PO / todo (#2310) must support an item mapping to several suppliers
             (InventoryItemSupplier). Docs first — rows below are the source of truth for inventory creation.</p>
             <table class="doc-table">
@@ -329,63 +329,63 @@
                     <th class="doc-th">Reorder min</th><th class="doc-th">Reorder qty (order unit)</th>
                 </tr>
                 <tr>
-                    <td class="doc-td"><code>INT-HDRY-HW-M4x14</code></td>
+                    <td class="doc-td"><code>HW-M4-14</code></td>
                     <td class="doc-td">M4x14 screw</td>
                     <td class="doc-td">180</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_fastener</td>
                     <td class="doc-td">180</td><td class="doc-td">200 (box)</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td"><code>INT-HDRY-HW-M3x20</code></td>
+                    <td class="doc-td"><code>HW-M3-20</code></td>
                     <td class="doc-td">M3x20 screw</td>
                     <td class="doc-td">16</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_fastener</td>
                     <td class="doc-td">16</td><td class="doc-td">100 (bag)</td>
                 </tr>
                 <tr>
-                    <td class="doc-td"><code>INT-HDRY-HW-608ZZ</code></td>
+                    <td class="doc-td"><code>HW-608ZZ</code></td>
                     <td class="doc-td">608zz bearing</td>
                     <td class="doc-td">16</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_bearing</td>
                     <td class="doc-td">16</td><td class="doc-td">20 (set)</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td"><code>INT-HDRY-HW-MAG8x2</code></td>
+                    <td class="doc-td"><code>HW-MAG-8X2</code></td>
                     <td class="doc-td">8x2 mm magnet</td>
                     <td class="doc-td">20</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_magnet</td>
                     <td class="doc-td">20</td><td class="doc-td">50 (pack)</td>
                 </tr>
                 <tr>
-                    <td class="doc-td"><code>INT-HDRY-HW-GASKET</code></td>
+                    <td class="doc-td"><code>HW-GASKET-6X3</code></td>
                     <td class="doc-td">Adhesive gasket</td>
                     <td class="doc-td">6</td><td class="doc-td">m</td>
                     <td class="doc-td">hardware_gasket</td>
                     <td class="doc-td">6</td><td class="doc-td">6 (roll) / 30 (roll)</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td"><code>INT-HDRY-HW-POLYDRYER</code></td>
+                    <td class="doc-td"><code>HW-POLYDRYER</code></td>
                     <td class="doc-td">Polydryer</td>
                     <td class="doc-td">1</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_consumable</td>
                     <td class="doc-td">1</td><td class="doc-td">1 (unit)</td>
                 </tr>
                 <tr>
-                    <td class="doc-td"><code>INT-HDRY-HW-WASHER</code></td>
+                    <td class="doc-td"><code>HW-WASHER</code></td>
                     <td class="doc-td">Washer (wheel)</td>
                     <td class="doc-td">8 (4-8/wheel x4)</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_fastener</td>
                     <td class="doc-td">8</td><td class="doc-td">100 (bag)</td>
                 </tr>
                 <tr class="doc-tr-alt">
-                    <td class="doc-td"><code>INT-HDRY-HW-BOLTNUT</code></td>
+                    <td class="doc-td"><code>HW-BOLT-NUT</code></td>
                     <td class="doc-td">Bolt + nut (wheel)</td>
                     <td class="doc-td">8 (4-8/wheel x4)</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_fastener</td>
                     <td class="doc-td">8</td><td class="doc-td">100 (bag)</td>
                 </tr>
                 <tr>
-                    <td class="doc-td"><code>INT-HDRY-HW-SPACER50</code></td>
+                    <td class="doc-td"><code>HW-SPACER-50</code></td>
                     <td class="doc-td">50 mm spacer (wheel)</td>
                     <td class="doc-td">8 (4-8/wheel x4)</td><td class="doc-td">each</td>
                     <td class="doc-td">hardware_spacer</td>

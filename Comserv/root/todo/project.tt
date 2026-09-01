@@ -554,7 +554,7 @@
                                     [% END %]
                                     
                                     [% IF subproject.date_time_posted %]
-                                        <li><i class="far fa-calendar-plus"></i> <strong>Created:</strong> [% subproject.date_time_posted %]</li>
+                                        <li><i class="far fa-calendar-plus"></i> <strong>Created:</strong> [% subproject.date_time_posted | user_time %]</li>
                                     [% END %]
                                 </ul>
                             </div>

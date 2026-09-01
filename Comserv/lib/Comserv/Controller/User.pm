@@ -1276,17 +1276,30 @@ sub do_create_account :Local {
     $c->session->{email_sent} = $email_sent ? 1 : 0;
     
     # Send notification to admin about successful registration
+    my $admin_notification_ok = 1;
     eval {
         my $admin_notified = $self->email_notification->send_admin_registration_notification($c, $new_user);
         if ($admin_notified) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
                 "Admin notification sent for new user: " . $new_user->username);
+        } else {
+            $admin_notification_ok = 0;
         }
     };
     if ($@) {
+        $admin_notification_ok = 0;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
             "Failed to send admin notification: $@");
     }
+    
+    # Provide user-visible feedback about admin notification
+    if ($admin_notification_ok) {
+        $c->flash->{success_msg} .= ' Admin notification sent to administrators.';
+    } else {
+        $c->flash->{error_msg} = 'Registration completed, but admin notification failed. Site administrators may not be aware of this new registration.';
+    }
+    
+    $c->session->{admin_notification_status} = $admin_notification_ok ? 1 : 0;
     
     $c->response->redirect($c->uri_for('/user/verify_email'));
 }
