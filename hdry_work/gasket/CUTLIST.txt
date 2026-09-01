@@ -1,0 +1,65 @@
+HDRY gasket cut list — TPU printable strips
+Cross-section (print): **3 mm wide × 3 mm deep** (fills both sides of channel; user 2026-08-31)
+Kit tape reference: HW-GASKET-6X3 = 6×3 mm adhesive (different profile; lengths still apply)
+Generated from assembly manual + Module_1/Doors.3mf bounding boxes + dimensions p.4
+Date: 2026-08-31
+
+SOURCE FACTS
+- Kit / BOM: HW-GASKET-6X3 = adhesive gasket 6×3 mm × **6 m per module** (manual p.2; live BOM qty 6 on base unit).
+- Printed TPU profile: width_mm=3, thick_mm=3 (square section, seals both faces).
+- Body outer (manual p.4): **391 × 400 × 386 mm** (W×D×H body); full height with wheels 475 mm.
+- L1 wall height (3MF): **215 mm**; L2 wall height: **150 mm**.
+- Door opening (est. from dual door leaves): **~358 mm W × ~378 mm H**.
+- Wall ring perimeter (outer): 2×(391+400) = **1582 mm**.
+- Manual install points: L1/L2 side joints + top/bottom channels; bottom & top panels; door (2 sides + top + bottom); AMS/rear/cable cap slots.
+- Kit TPU 0.2 kg on p.2 is for **wheels**, not gasket — gasket is the 6 m tape. Printing gasket is a TPU substitute for that tape.
+
+IMPORTANT
+- Geometry-based full single-gasket-per-interface sum is **~10.4 m/module**, above the 6 m kit.
+- Kit assumes thin adhesive tape, butt joints, and “single gasket between pieces.”
+- **Print the recommended unique lengths, dry-fit channels on first L1 panel, then trim.** Do not trust 6 m as a hard maximum if channels want full rings.
+- Bed straight max ~220 mm (Anycubic-class). Longer runs: mode=coil (serpentine) or segments.
+
+==============================================================================
+PER MODULE — RECOMMENDED PIECE COUNT (single gasket per interface)
+==============================================================================
+Qty   Length    Role
+10    215 mm    L1 vertical ring seams (between wall pieces)
+10    150 mm    L2 vertical ring seams
+ 3   1582 mm    Horizontal rings: bottom↔L1, L1↔L2, L2↔top  (print as coil or 8×~198 mm segments each)
+ 2    378 mm    Door opening left/right sides
+ 2    358 mm    Door opening top + bottom
+ 3    180 mm    Cap slot loops (AMS connector cap, rear tube caps, cable cap) — measure slot, trim
+
+Piece count (if long rings stay one piece each): 10+10+3+2+2+3 = **30 pieces**
+Piece count (rings split to 200 mm bed segments): 10+10+(3×8)+2+2+3 = **51 pieces**
+Total length: **~10.4 m** (vs kit 6.0 m)
+
+If you only match the **6 m kit budget**, prioritize:
+  1) all verticals (215×10 + 150×10 = 3.65 m)
+  2) door perimeter (2×378 + 2×358 ≈ 1.47 m)  → subtotal 5.12 m
+  3) remaining ~0.9 m for one horizontal ring or cap loops
+  (You will likely want more tape/TPU for full weatherseal.)
+
+==============================================================================
+TWO-MODULE BUILD (base P36787 + add-on P36788)
+==============================================================================
+Manual gasket is “x Module” → plan **2×** the per-module list (~20.8 m geometry / 12 m kit).
+Add-on still has L1/L2 channels; door only if that module gets a door opening.
+
+==============================================================================
+UNIQUE STL LENGTHS TO GENERATE
+==============================================================================
+215  — straight — qty 10
+150  — straight — qty 10
+180  — straight — qty 3
+358  — coil or 2×179 segments — qty 2
+378  — coil or 2×189 segments — qty 2
+1582 — coil or 8×198 segments — qty 3
+
+OpenSCAD: hdry_gasket_strip.scad
+Render via: POST workstation.local:8083/render  (scad_source or file)
+Params: length_mm, width_mm=3, thick_mm=3, mode=straight|coil|segments
+
+TPU print notes: soft TPU 95A, 0–15% infill, 2–3 walls, slow outer walls, glue on bed.
+If channel is tight, set width_extra=-0.1, thick_extra=-0.1 for slip fit; +0.1 for compression.

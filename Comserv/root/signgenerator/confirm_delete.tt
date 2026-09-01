@@ -1,0 +1,49 @@
+[% META
+   title = "Delete sign"
+   description = "Confirm removal of an extra herb sign build"
+   roles = "admin,developer,editor,normal"
+   TemplateType = "Application"
+   category = "SignGenerator"
+   page_version = "0.01"
+%]
+
+<div class="app-page">
+    <nav class="breadcrumb">
+        <a href="/3d">3D Printing</a> &raquo;
+        <a href="/3d/browse">Browse</a> &raquo;
+        <strong>Delete sign</strong>
+        &nbsp;|&nbsp; <a href="/Documentation/SignGenerator">Help</a>
+    </nav>
+
+    <h1>Delete this sign?</h1>
+
+    [% IF c.flash.error_msg %]
+    <p class="alert alert-error">[% c.flash.error_msg | html %]</p>
+    [% END %]
+
+    <div class="app-section">
+        <p>This removes the catalog row and its STL / PDF / 3MF files. It does not delete inventory items.</p>
+        <p><strong>[% model.name | html %]</strong> (#[% model.id %])</p>
+        [% IF model.description %]
+        <p>[% model.description | html %]</p>
+        [% END %]
+
+        [% IF active && active.size %]
+        <p class="alert alert-error">
+            Job(s) still in the queue:
+            [% FOREACH j IN active %]#[% j.id %] ([% j.status | html %]) [% END %]
+            Cancel them on the queue first.
+        </p>
+        <p><a class="btn btn-secondary" href="/3d/queue">Open queue</a>
+           <a class="btn btn-secondary" href="/3d/model/[% model.id %]">Cancel</a></p>
+        [% ELSE %]
+        [% IF jobs && jobs.size %]
+        <p>Finished/cancelled jobs for this sign will keep their history rows (#[% FOREACH j IN jobs %][% j.id %][% UNLESS loop.last %], [% END %][% END %]).</p>
+        [% END %]
+        <form method="post" action="[% c.uri_for('/signgenerator/delete', [model.id]) %]">
+            <button type="submit" class="btn btn-primary">Yes, delete this sign</button>
+            <a class="btn btn-secondary" href="/3d/model/[% model.id %]">Keep it</a>
+        </form>
+        [% END %]
+    </div>
+</div>
