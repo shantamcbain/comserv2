@@ -278,6 +278,11 @@
             [% IF plan.description %]<p class="plan-card-desc">[% plan.description | html %]</p>[% END %]
             <ul class="plan-card-features">
               [% IF plan.has_subdomain %]<li>&#127760; Subdomain included</li>[% END %]
+              [% NEW %]
+              [% IF plan.has_subdomain %]<li>&#128274; 100 pts bonus for adding your website</li>[% END %]
+              [% END %]
+              [% IF !plan.has_subdomain AND plan.is_active %]<li>&#128274; 10 pts bonus on signup</li>[% END %]
+              [% END %]
               [% IF plan.has_custom_domain %]<li>&#127760; Custom domain support</li>[% END %]
               [% IF plan.has_email %]<li>&#9993; [% plan.email_addresses %] email address[% IF plan.email_addresses != 1 %]es[% END %]</li>[% END %]
               [% IF plan.has_hosting %]<li>&#128421; Hosting — [% plan.hosting_tier || 'Included' | html %]</li>[% END %]
