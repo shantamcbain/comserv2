@@ -91,15 +91,23 @@
             <span>Submitted by: <strong>[% ticket.username || ticket.email || 'Guest' %]</strong></span>
 
             &bull;
+<<<<<<< HEAD
+            <span>Created: <strong>[% ticket.created_at | user_time %]</strong></span>
+=======
 
             <span>Created: <strong>[% ticket.created_at %]</strong></span>
 
+>>>>>>> main
             [% IF ticket.updated_at %]
 
             &bull;
+<<<<<<< HEAD
+            <span>Last activity: <strong>[% ticket.updated_at | user_time %]</strong></span>
+=======
 
             <span>Last activity: <strong>[% ticket.updated_at %]</strong></span>
 
+>>>>>>> main
             [% END %]
 
             [% IF ticket.assigned_to %]
@@ -113,9 +121,13 @@
             [% IF ticket.closed_at %]
 
             &bull;
+<<<<<<< HEAD
+            <span>Closed: <strong>[% ticket.closed_at | user_time %]</strong></span>
+=======
 
             <span>Closed: <strong>[% ticket.closed_at %]</strong></span>
 
+>>>>>>> main
             [% END %]
 
         </div>
@@ -251,9 +263,13 @@
                 <span class="message-author">[% ticket.username || ticket.email || 'Customer' %]</span>
 
                 <span class="message-role-badge badge-user">Customer</span>
+<<<<<<< HEAD
+                <span class="message-time">[% ticket.created_at | user_time %]</span>
+=======
 
                 <span class="message-time">[% ticket.created_at %]</span>
 
+>>>>>>> main
             </div>
 
             <div class="message-body">[% ticket.description | html | replace('\n', '<br>') %]</div>
@@ -281,9 +297,13 @@
                 </span>
 
                 [% END %]
+<<<<<<< HEAD
+                <span class="message-time">[% msg.created_at | user_time %]</span>
+=======
 
                 <span class="message-time">[% msg.created_at %]</span>
 
+>>>>>>> main
             </div>
 
             <div class="message-body">[% msg.body | html | replace('\n', '<br>') %]</div>
