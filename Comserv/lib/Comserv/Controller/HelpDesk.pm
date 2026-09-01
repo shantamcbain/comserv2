@@ -134,10 +134,13 @@ sub ticket_new :Chained('ticket_base') :PathPart('new') :Args(0) {
     my ($num1, $num2) = $self->_issue_math_challenge($c);
 
     $c->stash(
-        template => 'CSC/HelpDesk/new_ticket.tt',
-        title    => 'Create New Support Ticket',
-        num1     => $num1,
-        num2     => $num2,
+        template        => 'CSC/HelpDesk/new_ticket.tt',
+        title           => 'Create New Support Ticket',
+        math_a          => $num1,
+        math_b          => $num2,
+        num1            => $num1,
+        num2            => $num2,
+        is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
     );
 
     # Push debug message to stash
@@ -256,10 +259,11 @@ sub contact :Chained('base') :PathPart('contact') :Args(0) {
     my ($num1, $num2) = $self->_issue_math_challenge($c);
 
     $c->stash(
-        template => 'CSC/HelpDesk/contact.tt',
-        title    => 'Contact Support',
-        num1     => $num1,
-        num2     => $num2,
+        template        => 'CSC/HelpDesk/contact.tt',
+        title           => 'Contact Support',
+        math_a => $num1, num1 => $num1,
+        math_b => $num2, num2 => $num2,
+        is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
     );
 
     # Push debug message to stash
@@ -301,11 +305,12 @@ sub _process_contact_post {
     if ($spam_err) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
-            template  => 'CSC/HelpDesk/contact.tt',
-            error_msg => $spam_err,
-            title     => 'Contact Support',
-            num1      => $n1,
-            num2      => $n2,
+            template        => 'CSC/HelpDesk/contact.tt',
+            error_msg       => $spam_err,
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
         );
         $c->forward($c->view('TT'));
         return;
@@ -314,11 +319,12 @@ sub _process_contact_post {
     unless ($name && $email && $subject && $message) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
-            template  => 'CSC/HelpDesk/contact.tt',
-            error_msg => 'All fields are required.',
-            title     => 'Contact Support',
-            num1      => $n1,
-            num2      => $n2,
+            template        => 'CSC/HelpDesk/contact.tt',
+            error_msg       => 'All fields are required.',
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
         );
         $c->forward($c->view('TT'));
         return;
@@ -335,25 +341,27 @@ sub _process_contact_post {
                        . "Subject:  $subject\n\n"
                        . "Message:\n$message\n",
         );
-        $self->_record_public_submit($c);
+        $self->_record_public_submit($c) if $self->_is_public_guest($c);
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
-            template    => 'CSC/HelpDesk/contact.tt',
-            success_msg => 'Your message has been sent. We will respond within 24 hours.',
-            title       => 'Contact Support',
-            num1        => $n1,
-            num2        => $n2,
+            template        => 'CSC/HelpDesk/contact.tt',
+            success_msg     => 'Your message has been sent. We will respond within 24 hours.',
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'contact_send',
             "Error sending contact form: $_");
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
-            template  => 'CSC/HelpDesk/contact.tt',
-            error_msg => 'There was an error sending your message. Please try again.',
-            title     => 'Contact Support',
-            num1      => $n1,
-            num2      => $n2,
+            template        => 'CSC/HelpDesk/contact.tt',
+            error_msg       => 'There was an error sending your message. Please try again.',
+            title           => 'Contact Support',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
         );
     };
 
@@ -490,19 +498,20 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
 
     my $subject     = $c->req->params->{subject}     || '';
     my $description = $c->req->params->{description} || '';
-    my $category    = $c->req->params->{category}    || 'other';
-    my $priority    = $c->req->params->{priority}    || 'medium';
+    my $category    = $self->_normalize_public_category($c, $c->req->params->{category});
+    my $priority    = $self->_normalize_public_priority($c, $c->req->params->{priority});
     my $email       = $c->req->params->{email}       || $c->session->{email} || '';
 
     my $spam_err = $self->_spam_guard_fail($c, 'submit_ticket', $subject, $description);
     if ($spam_err) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
-            template  => 'CSC/HelpDesk/new_ticket.tt',
-            error_msg => $spam_err,
-            title     => 'Create New Support Ticket',
-            num1      => $n1,
-            num2      => $n2,
+            template      => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg     => $spam_err,
+            title         => 'Create New Support Ticket',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
         );
         $c->forward($c->view('TT'));
         return;
@@ -511,11 +520,12 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
     unless ($subject && $description) {
         my ($n1, $n2) = $self->_issue_math_challenge($c);
         $c->stash(
-            template  => 'CSC/HelpDesk/new_ticket.tt',
-            error_msg => 'Subject and description are required.',
-            title     => 'Create New Support Ticket',
-            num1      => $n1,
-            num2      => $n2,
+            template      => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg     => 'Subject and description are required.',
+            title         => 'Create New Support Ticket',
+            math_a => $n1, num1 => $n1,
+            math_b => $n2, num2 => $n2,
+            is_public_guest => $self->_is_public_guest($c) ? 1 : 0,
         );
         $c->forward($c->view('TT'));
         return;
@@ -546,8 +556,9 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
             "Ticket created: " . $ticket->ticket_number . " (id=" . $ticket->id . ")");
 
-        $self->_record_public_submit($c);
+        $self->_record_public_submit($c) if $self->_is_public_guest($c);
 
+        my $view_url = $c->uri_for('/HelpDesk/ticket/view/' . $ticket->ticket_number);
         $self->_notify_site_admins($c,
             ticket  => $ticket,
             subject => "[HelpDesk] New ticket " . $ticket->ticket_number . ": " . $ticket->subject,
@@ -558,7 +569,8 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
                      . "Priority: " . ($ticket->priority || 'medium') . "\n"
                      . "From:     " . ($ticket->username || $ticket->email || 'Guest') . "\n\n"
                      . "Description:\n" . $ticket->description . "\n\n"
-                     . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open'),
+                     . "View ticket: $view_url\n"
+                     . "Open queue:  " . $c->uri_for('/HelpDesk/admin/tickets/open'),
             event   => 'submit_ticket',
         );
 
@@ -1252,12 +1264,51 @@ sub _auto_close_stale_tickets {
 
 # --- Public-form anti-spam helpers (ticket submit + contact) ---
 
+# Operands are always 2..9 so sum is always 4..18 (never 0).
+# Store operands in session so a stale/partial render can still show a real question
+# and validation can refuse a form that never issued a challenge.
 sub _issue_math_challenge {
     my ($self, $c) = @_;
     my $num1 = int(rand(8)) + 2;
     my $num2 = int(rand(8)) + 2;
-    $c->session->{math_challenge_sum} = $num1 + $num2;
+    my $sum  = $num1 + $num2;
+    $c->session->{math_challenge_a}   = $num1;
+    $c->session->{math_challenge_b}   = $num2;
+    $c->session->{math_challenge_sum} = $sum;
+    $c->session->{math_challenge_issued_at} = time();
     return ($num1, $num2);
+}
+
+# True when this session has no authenticated user (public form submitters).
+sub _is_public_guest {
+    my ($self, $c) = @_;
+    my $uid = $c->session->{user_id};
+    return 1 unless defined $uid && "$uid" =~ /^\d+$/ && $uid > 0;
+    my $uname = $c->session->{username} // '';
+    return 1 if $uname eq '' || lc($uname) eq 'guest';
+    return 0;
+}
+
+# Guests may not set critical/high — bots always pick Critical. Staff keep full scale.
+sub _normalize_public_priority {
+    my ($self, $c, $priority) = @_;
+    $priority = lc($priority // 'medium');
+    $priority =~ s/[^a-z]//g;
+    my %ok = map { $_ => 1 } qw(low medium high critical);
+    $priority = 'medium' unless $ok{$priority};
+    if ($self->_is_public_guest($c)) {
+        # Cap guests at medium so spam cannot force critical alerts
+        return 'medium' if $priority eq 'high' || $priority eq 'critical';
+    }
+    return $priority;
+}
+
+sub _normalize_public_category {
+    my ($self, $c, $category) = @_;
+    $category = lc($category // 'other');
+    $category =~ s/[^a-z_]//g;
+    my %ok = map { $_ => 1 } qw(technical billing account feature other);
+    return $ok{$category} ? $category : 'other';
 }
 
 sub _record_public_submit {
@@ -1284,21 +1335,27 @@ sub _public_submit_rate_exceeded {
 
 sub _looks_like_spam_content {
     my ($self, $subject, $body) = @_;
-    my $text = lc(join(' ', map { defined $_ ? $_ : '' } ($subject, $body)));
+    my $text = join(' ', map { defined $_ ? $_ : '' } ($subject, $body));
+    # Normalize lookalikes used by BMASTER-20260901-6247 class spam
+    $text =~ s/\x{2116}/No./g;  # №
+    $text = lc($text);
     $text =~ s/\s+/ /g;
 
-    # Crypto/phishing patterns seen on CSC HelpDesk (e.g. CSC-20260830-2900)
+    # Crypto/phishing patterns (CSC-20260830-2900, BMASTER-20260901-6247)
     my @patterns = (
         qr/graph\.org/i,
         qr/coinbase/i,
         qr/\bbitcoin\b/i,
+        qr/bitcoin[\s\-_]?mining/i,
         qr/\bbtc\b/i,
         qr/you.?have.?a.?new.?bitcoin/i,
         qr/wallet.?transfer/i,
         qr/claim.?your.?crypto/i,
         qr/hs=[0-9a-f]{16,}/i,
-        qr/№\s*[A-Z0-9]/i,
-        qr/open\s*[⚡⚡]/i,
+        qr/no\.\s*[a-z]?\d{3,}/i,          # Transfer No. V8998 / № V8998
+        qr/transfer\s+(?:no\.?|n[o0]\.?|#)\s*[a-z]?\d+/i,
+        qr/next\s*-*>+/i,                  # NEXT ->> graph.org
+        qr/open\s*[⚡]/i,
     );
     for my $re (@patterns) {
         return 1 if $text =~ $re;
@@ -1306,11 +1363,15 @@ sub _looks_like_spam_content {
     # Extreme link density / short-link spam
     my $links = () = $text =~ m{https?://}g;
     return 1 if $links >= 3 && length($text) < 400;
+    # Bare graph.org / shortener without scheme still counts as a link bait
+    my $bare = () = $text =~ m{\b[\w\-]+\.(?:org|com|net|io)/\S+}g;
+    return 1 if $bare >= 1 && $text =~ /(?:coinbase|bitcoin|mining|transfer|wallet)/i;
     return 0;
 }
 
 # Returns error message string on failure, empty string if OK.
-# Fail-closed on missing math session. Math required for guests only.
+# Fail-closed on missing/invalid math session. Math required for public guests.
+# Content filter always runs (even for logged-in users on public forms).
 sub _spam_guard_fail {
     my ($self, $c, $event, $subject, $body) = @_;
     my $ip = $c->req->address || 'unknown';
@@ -1329,21 +1390,51 @@ sub _spam_guard_fail {
         return 'Too many submissions. Please wait before trying again.';
     }
 
-    my $is_guest = !($c->session->{user_id});
+    my $is_guest = $self->_is_public_guest($c);
     if ($is_guest) {
         my $ans = $c->req->params->{math_challenge_ans};
         $ans = '' unless defined $ans;
         $ans =~ s/^\s+|\s+$//g;
+        # Strip leading zeros / force pure digits — refuse empty, non-numeric, or "0"
+        # when a real challenge sum is always 4..18.
         my $expected = $c->session->{math_challenge_sum};
-        # Fail closed: missing session answer is a reject (do not skip)
-        if (!defined $expected || $expected eq '' || $ans eq '' || "$ans" ne "$expected") {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
-                "Math challenge failed (submitted='$ans', expected='"
-                . (defined $expected ? $expected : '') . "') from ip=$ip");
+        my $issued_at = $c->session->{math_challenge_issued_at} // 0;
+        my $a = $c->session->{math_challenge_a};
+        my $b = $c->session->{math_challenge_b};
+
+        my $clear_challenge = sub {
             delete $c->session->{math_challenge_sum};
-            return 'Security check failed. Please solve the arithmetic question correctly.';
-        }
-        delete $c->session->{math_challenge_sum};
+            delete $c->session->{math_challenge_a};
+            delete $c->session->{math_challenge_b};
+            delete $c->session->{math_challenge_issued_at};
+        };
+
+        my $fail = sub {
+            my ($why) = @_;
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+                "Math challenge failed ($why; submitted='$ans', expected='"
+                . (defined $expected ? $expected : '') . "') from ip=$ip");
+            $clear_challenge->();
+            return 'Security check failed. Please reload the form and solve the arithmetic question correctly.';
+        };
+
+        # Fail closed: no challenge issued, expired (>2h), or inconsistent operands
+        return $fail->('missing sum')
+            if !defined $expected || $expected eq '' || $expected !~ /^\d+$/;
+        return $fail->('sum out of range')
+            if $expected < 4 || $expected > 18;
+        return $fail->('missing operands')
+            if !defined $a || !defined $b || $a !~ /^\d+$/ || $b !~ /^\d+$/
+               || ($a + $b) != $expected + 0;
+        return $fail->('challenge expired')
+            if $issued_at && (time() - $issued_at) > 7200;
+        return $fail->('empty answer') if $ans eq '';
+        return $fail->('non-numeric answer') if $ans !~ /^\d+$/;
+        # Explicit: bare 0 is never a valid sum (operands start at 2+2)
+        return $fail->('zero answer') if $ans + 0 == 0;
+        return $fail->('wrong answer') if ($ans + 0) != ($expected + 0);
+
+        $clear_challenge->();
     }
 
     if ($self->_looks_like_spam_content($subject, $body)) {

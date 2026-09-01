@@ -1,11 +1,15 @@
 [% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.02 2026/04/27' %]
 
 [% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
+<<<<<<< Updated upstream
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 
 
+=======
+<meta name="viewport" content="width=device-width, initial-scale=1">\n<met... (this is truncated)
+>>>>>>> Stashed changes
 <div class="helpdesk-container">
 
 
@@ -301,7 +305,10 @@
         <h3>
 
             [% IF is_staff %]Reply (will not reopen)[% ELSE %]Reply to Reopen[% END %]
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
             <div class="reply-actions-small" style="margin-top:10px;">
                 <a href="[% c.uri_for('/HelpDesk') %]" class="btn btn-secondary" style="font-size:0.85em;">Back to Tickets</a>
             </div>
