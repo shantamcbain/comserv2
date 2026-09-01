@@ -2,7 +2,7 @@ package Comserv::Util::TodoLog;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
 use Try::Tiny;
-use DateTime;
+use Comserv::Util::AppTime;
 
 =head1 NAME
 
@@ -28,6 +28,10 @@ Summary placement rules:
   done_with_log: closes the open log (or inserts a completed one if none was
                  open) with the summary in the log comments, todo -> 3.
 
+Time (AppTime):
+  start_time / end_time / last_mod_date on log rows are UTC.
+  Calendar "today" for day buckets uses the viewer's zone via AppTime.
+
 =cut
 
 # ---------------------------------------------------------------------------
@@ -41,6 +45,18 @@ sub _duration_hms {
     my $dur_mins  = (($eh // 9) * 60 + ($em // 0)) - (($sh // 9) * 60 + ($sm // 0));
     $dur_mins = 1 if !defined $dur_mins || $dur_mins <= 0;
     return (sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60), $dur_mins);
+}
+
+# Internal: UTC clock for log writes + user-local ymd for last_mod day labels.
+sub _clock {
+    my ($c) = @_;
+    # Storage times always UTC so duration is host-independent.
+    my $now_hms = Comserv::Util::AppTime->now_hms_utc;
+    # last_mod_date / start_date day bucket: viewer "today" when $c present.
+    my $today = $c
+        ? Comserv::Util::AppTime->today_ymd_for($c)
+        : Comserv::Util::AppTime->today_utc_ymd;
+    return ( $today, $now_hms );
 }
 
 # Internal: fetch the todo row + project code.
@@ -61,9 +77,7 @@ sub _todo_ctx {
 sub _insert_completed_log {
     my ($c, %args) = @_;
     my ($dbh, $todo, $proj_code) = _todo_ctx($c, $args{record_id});
-    my $now      = DateTime->now(time_zone => 'local');
-    my $today    = $now->ymd;
-    my $now_hms  = $now->hms;
+    my ( $today, $now_hms ) = _clock($c);
     my $est_mins = $args{duration_mins}
                    // eval { $todo->estimated_man_hours * 60 } // 15;
     $est_mins = 15 if $est_mins < 1;
@@ -100,9 +114,7 @@ sub toggle_start {
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
 
-    my $now     = DateTime->now(time_zone => 'local');
-    my $today   = $now->ymd;
-    my $now_hms = $now->hms;
+    my ( $today, $now_hms ) = _clock($c);
 
     my $result = try {
         my ($dbh, $todo, $proj_code) = _todo_ctx($c, $record_id);
@@ -181,9 +193,7 @@ sub close_log {
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
 
-    my $now_dt  = DateTime->now(time_zone => 'local');
-    my $today   = $now_dt->ymd;
-    my $now_hms = $now_dt->strftime('%H:%M:%S');
+    my ( $today, $now_hms ) = _clock($c);
 
     my $result = try {
         my ($dbh, $todo, undef) = eval { _todo_ctx($c, $record_id) };
@@ -237,9 +247,7 @@ sub done_with_log {
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
 
-    my $now_dt  = DateTime->now(time_zone => 'local');
-    my $today   = $now_dt->ymd;
-    my $now_hms = $now_dt->strftime('%H:%M:%S');
+    my ( $today, $now_hms ) = _clock($c);
 
     my $result = try {
         my ($dbh, $todo, undef) = _todo_ctx($c, $record_id);

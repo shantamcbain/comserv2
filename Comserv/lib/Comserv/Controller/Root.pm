@@ -213,7 +213,7 @@ sub auto :Private {
     }
 
     # LAYER 0: Require admin role for sensitive paths
-    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|file/admin)}) {
+    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|themetest|file/admin)}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
@@ -259,6 +259,14 @@ sub auto :Private {
     # stable across requests (good for caching) but changes on every app
     # restart/deploy, which is exactly when assets change.
     $c->stash->{css_v} = ($Comserv::Controller::Root::ASSET_EPOCH ||= time());
+
+    # Canonical clock: UTC storage + viewer TZ for | user_time TT filter
+    # (Comserv::Util::AppTime). Fail-soft — never block the request.
+    eval {
+        require Comserv::Util::AppTime;
+        Comserv::Util::AppTime->inject_request($c);
+        1;
+    };
 
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {

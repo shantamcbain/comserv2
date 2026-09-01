@@ -219,6 +219,7 @@
                     <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">MASTER_PLAN</a></li>
                     <li><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/SignGenerator') %]" class="doc-link">SignGenerator</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]" class="doc-link">3dPrintingHowItWorks</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing (operator KB)</a></li>
                 </ul>
             </div>

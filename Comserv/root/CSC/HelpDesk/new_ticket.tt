@@ -9,9 +9,13 @@
  <br>[% PageVersion %]</br>
 
  [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
+<<<<<<< Updated upstream
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+=======
+<meta name="viewport" content="width=device-width, initial-scale=1">
+>>>>>>> Stashed changes
 [% END %]
 
 
@@ -94,21 +98,44 @@
 
             </div>
 
+<<<<<<< Updated upstream
 
 
             <!-- Math challenge - session-based arithmetic question -->
 
             <div class="form-group math-challenge">
 
+=======
+            [%# Math challenge for guests. Never render blank "What is + ?". %]
+            [% IF is_public_guest || !c.session.user_id %]
+            <div class="form-group math-challenge">
+                [% IF math_a && math_b %]
+                <label for="math_challenge_ans">Security Question: What is [% math_a %] + [% math_b %]?</label>
+                <input type="number" id="math_challenge_ans" name="math_challenge_ans"
+                       class="form-control" required min="4" max="18" step="1"
+                       inputmode="numeric" autocomplete="off"
+                       placeholder="Enter the sum">
+                [% ELSIF num1 && num2 %]
+>>>>>>> Stashed changes
                 <label for="math_challenge_ans">Security Question: What is [% num1 %] + [% num2 %]?</label>
 
                 <input type="number" id="math_challenge_ans" name="math_challenge_ans"
+<<<<<<< Updated upstream
 
                        class="form-control" required min="0" max="20"
 
                        placeholder="Enter the sum">
 
+=======
+                       class="form-control" required min="4" max="18" step="1"
+                       inputmode="numeric" autocomplete="off"
+                       placeholder="Enter the sum">
+                [% ELSE %]
+                <p class="error">Security check could not be loaded. Please <a href="[% c.uri_for('/HelpDesk/ticket/new') %]">reload this page</a> before submitting.</p>
+                [% END %]
+>>>>>>> Stashed changes
             </div>
+            [% END %]
 
 
 
@@ -157,13 +184,23 @@
                     <option value="">-- Select Priority --</option>
 
                     <option value="low">Low</option>
+<<<<<<< Updated upstream
 
                     <option value="medium">Medium</option>
 
+=======
+                    <option value="medium" selected>Medium</option>
+                    [%# Guests: no high/critical in UI (server also clamps). Staff see full scale. %]
+                    [% UNLESS is_public_guest || !c.session.user_id %]
+>>>>>>> Stashed changes
                     <option value="high">High</option>
 
                     <option value="critical">Critical</option>
+<<<<<<< Updated upstream
 
+=======
+                    [% END %]
+>>>>>>> Stashed changes
                 </select>
 
             </div>

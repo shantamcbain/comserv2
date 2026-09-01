@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "3d-printing,planning,import,internal-build"
-   page_version = "0.23"
-   last_updated = "Wed Aug 26 2026"
+   page_version = "0.25"
+   last_updated = "Thu Aug 27 2026"
    site_specific = "false"
    project_id   = "272"
    project_code = "DRYER-INT"
@@ -35,6 +35,7 @@
                 — <a href="[% c.uri_for('/todo') %]?project_id=272" class="doc-link">todos</a>
                 — <a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>
                 — <a href="[% c.uri_for('/Inventory/bom/list') %]" class="doc-link">/Inventory/bom/list</a>.</p>
+<<<<<<< Updated upstream
                 <p class="doc-body"><strong>Now:</strong> items and hardware SKUs exist on sitename=3d.
                 BOM for base <code>INT-HDRY-001-P36787</code> is 37 lines (GET
                 <code>/api/inventory/bom?sitename=3d&amp;parent_sku=INT-HDRY-001-P36787</code>).
@@ -45,6 +46,21 @@
                 <a href="[% c.uri_for('/Inventory/invoice/new') %]" class="doc-link">/Inventory/invoice/new</a>.</p>
                 <p class="doc-body"><strong>Next:</strong> #2310 — need list from BOM shortfall, pick supplier, PO then receive.
                 Fix printed parts still stored as <code>item_origin=purchased</code> or they will be treated as buy, not print.
+=======
+                <p class="doc-body"><strong>Now:</strong> Base (id 52) and add-on (id 53) BOMs match the assembly
+                manual: <strong>one of each *01 and *02</strong> on both units (L1 + L2). Extra *01 prints belong
+                on the add-on, not a second copy on the base. Wheel kit hardware is 8 washers / 4 bolt+nut / 4 spacers.
+                Browse: <strong>Inventory</strong> opens the item+BOM;
+                <strong>Order</strong> opens the print form. Queue jobs have STLs wired for download.
+                Generic system page:
+                <a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]" class="doc-link">3dPrintingHowItWorks</a>.</p>
+                <p class="doc-body"><strong>Blocked by:</strong>
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2310" class="doc-link">#2310 PO-R1</a>
+                (PO + multi-supplier). Place Order does not create a PO or invoice. Pictures exist as 3MF
+                <code>top_N.png</code> but are not yet on item <code>image_path</code>.</p>
+                <p class="doc-body"><strong>Next:</strong> wire printed-part pictures onto inventory items;
+                bottom/top as their own SKUs if the PDF parts exist; InventoryAccounting GET bom/stock when they merge.
+>>>>>>> Stashed changes
                 Do not queue a job named “Module 1.3mf”.</p>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
@@ -151,6 +167,11 @@
             </table>
             <p class="doc-body">Do not reuse leftover item 51 <code>INT-HDRY-001</code> as a master
             if it still means “one row per 3MF”.</p>
+            <p class="doc-body"><strong>Order-time options (now / later):</strong>
+            <code>HW-WHEEL-KIT</code> is an optional BOM line on the base (Module 1) — kit BOM is
+            washer + bolt/nut + 50 mm spacer. Polydryer and the HDry Lite desiccant holder are
+            optional on both modules. Filament colour/type is chosen on the print job, not as a
+            kit SKU. Sale items will need the same option pattern later (see variants note in phases).</p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -652,6 +673,7 @@
                 <ul class="doc-body">
                     <li><a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-link">3D printing coordinator plan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/InventoryInternalBuildBom') %]" class="doc-link">Manual inventory BOM (two masters)</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]" class="doc-link">3dPrintingHowItWorks (generic)</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3D Printing System (operator KB)</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3dBrowseGalleryPlan') %]" class="doc-link">3D Browse Gallery Plan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-link">Master Plan (W3.3)</a></li>
