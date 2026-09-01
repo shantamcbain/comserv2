@@ -1056,8 +1056,174 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
 
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
 }
+=head2 create_todo
+
+Create a todo to work on the HelpDesk ticket
+POST /HelpDesk/ticket/create_todo/<ticket_number>
+  params: todo_type (work_on | escalate), note (optional)
+
+=cut
+
+sub create_todo :Chained('ticket_base') :PathPart('create_todo') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $todo_type = $c->req->params->{todo_type} || 'work_on';
+    my $note      = $c->req->params->{note} || '';
+    my $valid_types = { work_on => 1, escalate => 1 };
+
+    unless ($valid_types->{$todo_type}) {
+        $c->flash->{error_msg} = "Invalid todo type: $todo_type";
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $todo = $schema->resultset('Todo')->create({
+            sitename      => $site_name,
+            start_date    => { 'CURRENT_DATE' },
+            subject       => "HelpDesk Ticket: " . $ticket->ticket_number,
+            description   => "Working on ticket [$ticket->ticket_number]:\n" . ($note ? $note : 'No note provided'),
+            estimated_man_hours => 1,
+            status        => 'open',
+            todo_type     => $todo_type,
+            priority      => 3,
+            project_code  => $ticket->project_code || '',
+            username_of_poster => $c->session->{username} || 'admin',
+        });
+
+        # Add a ticket message about the todo creation
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => 'staff',
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => "Todo created: $todo_type to work on ticket $ticket_number. Todo ID: $todo->record_id.",
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_todo',
+            "Created $todo_type todo for ticket $ticket_number by $staff_name");
+
+        $c->flash->{success_msg} = "Todo created successfully ($todo_type) for ticket $ticket_number.";
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_todo',
+            "Error creating todo for $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error creating todo: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+=head2 escalate_ticket
+
+Escalate a HelpDesk ticket with a follow-up todo
+POST /HelpDesk/ticket/escalate_ticket/<ticket_number>
+  params: note (optional)
+
+=cut
+
+sub escalate_ticket :Chained('ticket_base') :PathPart('escalate_ticket') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $note = $c->req->params->{note} || '';
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $todo = $schema->resultset('Todo')->create({
+            sitename      => $site_name,
+            start_date    => { 'CURRENT_DATE' },
+            subject       => "Escalate HelpDesk Ticket: " . $ticket->ticket_number,
+            description   => "Escalating ticket [$ticket->ticket_number]:\n" . ($note ? $note : ''),
+            estimated_man_hours => 2,
+            status        => 'open',
+            todo_type     => 'escalate',
+            priority      => 5,  # High priority for escalation
+            project_code  => $ticket->project_code || '',
+            username_of_poster => $c->session->{username} || 'admin',
+        });
+
+        # Add a ticket message about the escalation
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => 'staff',
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => "Ticket escalated. Todo created: escalate (Todo ID: $todo->record_id). Note: $note",
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'escalate_ticket',
+            "Escalated ticket $ticket_number with todo by $staff_name");
+
+        $c->flash->{success_msg} = "Ticket escalated successfully. Todo created (priority 5).";
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'escalate_ticket',
+            "Error escalating ticket $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error escalating ticket: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
 
 =head2 ticket_list
+
+Show the authenticated user's tickets (or all tickets for admin)
+
+=cut
+
+sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_list',
+
 
 Show the authenticated user's tickets (or all tickets for admin)
 
