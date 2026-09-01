@@ -187,9 +187,13 @@
                             [% END %]
 
                         </td>
+<<<<<<< HEAD
+                        <td>[% t.created_at | user_time %]</td>
+=======
 
                         <td>[% t.created_at %]</td>
 
+>>>>>>> main
                         <td>
 
                             <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"

@@ -124,11 +124,16 @@
                 </td>
 
                 <td>[% t.username || t.email || 'guest' %]</td>
+<<<<<<< HEAD
+                <td>[% t.created_at | user_time %]</td>
+                <td>[% (t.updated_at || t.created_at) | user_time %]</td>
+=======
 
                 <td>[% t.created_at %]</td>
 
                 <td>[% t.updated_at || t.created_at %]</td>
 
+>>>>>>> main
                 <td class="ticket-row-actions">
 
                     <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"
