@@ -127,27 +127,7 @@ sub ensure_account {
     );
 }
 
-# ---------------------------------------------------------------------------
-# apply_joining_bonus($user_id) -> PointLedger row  (or undef if already given)
-# Awards the 100-point joining bonus.  Idempotent — checks the ledger first.
-# Called by User controller after successful registration.
-# ---------------------------------------------------------------------------
-sub apply_joining_bonus {
-    my ($self, $user_id) = @_;
-
-    my $already = $self->_schema->resultset('Accounting::PointLedger')->search({
-        to_user_id       => $user_id,
-        transaction_type => 'joining_bonus',
-    })->count;
-    return undef if $already;
-
-    return $self->credit(
-        user_id          => $user_id,
-        amount           => $JOINING_BONUS,
-        transaction_type => 'joining_bonus',
-        description      => 'Welcome bonus — awarded on registration',
-    );
-}
+# ---------------------------------------------------------------------------\\n# apply_joining_bonus($user_id) -> PointLedger row  (or undef if already given)\\n# Awards points based on user role:\\n#   - guest/normal user role: 10 points\\n#   - member with website (has_subdomain): 100 points\\n#   - Idempotent — checks the ledger first.\\n# Called by User controller after successful registration.\\n# ---------------------------------------------------------------------------\\nsub apply_joining_bonus {\\n    my ($self, $user_id) = @_;\\n\\n    my $already = $self->_schema->resultset('Accounting::PointLedger')->search({\\n        to_user_id       => $user_id,\\n        transaction_type => 'joining_bonus',\\n    })->count;\\n    return undef if $already;\\n\\n    my $c = $self->_c;\\n    my $user = $self->_schema->resultset('User')->search({ id => $user_id })->single;\\n    return undef unless $user;\\n\\n    my $role = ($user->min_role || 'user') eq 'guest' ? 'guest' : 'user';\\n\\n    # Check if the user has an active membership with a plan that has a subdomain (website)\\n    # User has_many memberships -> UserMembership has_one plan -> MembershipPlan\\n    my $has_website = 0;\\n    my $user_membership = $user->memberships->search({\\n        status => [qw(active grace)],\\n    })->first;\\n    if ($user_membership) {\\n        my $plan = $user_membership->plan;\\n        if ($plan) {\\n            $has_website = $plan->has_subdomain || 0;\\n        }\\n    }\\n\\n    my $points = 10;  # default for guest/normal user\\n    if ($has_website) {\\n        $points = 100;  # upgraded member with website\\n    } elsif ($role eq 'guest') {\\n        $points = 10;  # guest role\\n    } else {\\n        $points = 10;  # normal user role\\n    }\\n\\n    return $self->credit(\\n        user_id          => $user_id,\\n        amount           => $points,\\n        transaction_type => 'joining_bonus',\\n        description      => 'Welcome bonus — awarded on registration',\\n    );\\n}\n
 
 # ---------------------------------------------------------------------------
 # apply_plan_bonus($user_id, $plan_row) -> PointLedger row | undef
