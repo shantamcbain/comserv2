@@ -41,17 +41,51 @@
     margin-bottom: 1em;
 }
 .model-meta span { margin-right: 1em; }
+.bom-admin { margin-top: 1.4em; }
+.bom-admin table { width: 100%; border-collapse: collapse; background: #fff; color: #111; }
+.bom-admin th, .bom-admin td {
+    border: 1px solid #444;
+    padding: 0.4em 0.6em;
+    text-align: left;
+    font-size: 0.95em;
+    color: #111;
+}
+.bom-admin th { background: #e8e8e8; color: #111; }
+.order-options { list-style: none; padding: 0; margin: 0.4em 0 1em 0; }
+.order-options li { margin: 0.45em 0; }
+.order-options label {
+    display: block;
+    color: #111;
+    background: #fff;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 0.6em 0.8em;
+    font-size: 1em;
+}
+.order-options input { margin-right: 0.5em; }
 .order-form {
-    background: var(--secondary-color);
-    border: 1px solid var(--border-color);
+    background: #f4f4f4;
+    color: #111;
+    border: 1px solid #333;
     border-radius: 6px;
     padding: 1.2em;
     margin-top: 1.2em;
 }
+.order-form h2, .order-form h3, .order-form p, .order-form li, .order-form label {
+    color: #111;
+}
+.order-form select, .order-form input[type=number], .order-form textarea {
+    width: 100%;
+    min-width: 16em;
+    background: #fff;
+    color: #111;
+    border: 1px solid #333;
+    padding: 0.5em 0.7em;
+}
 .order-form h2 {
     margin: 0 0 0.8em 0;
     font-size: 1.1em;
-    color: var(--heading-color, var(--text-color));
+    color: #111;
 }
 .form-row {
     display: flex;
@@ -67,21 +101,14 @@
     gap: 0.3em;
 }
 .form-group label {
-    font-size: 0.9em;
-    color: var(--text-color);
+    font-size: 0.95em;
+    color: #111;
     font-weight: bold;
-}
-.form-group input, .form-group select, .form-group textarea {
-    padding: 0.5em 0.7em;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--input-bg, white);
-    color: var(--text-color);
 }
 .btn-order {
     padding: 0.7em 1.5em;
-    background: var(--button-bg, var(--accent-color));
-    color: var(--button-text, white);
+    background: #1a5fb4;
+    color: #fff;
     border: none;
     border-radius: 4px;
     font-size: 1em;
@@ -89,6 +116,19 @@
     cursor: pointer;
 }
 .btn-order:hover { opacity: 0.85; }
+.filament-pick {
+    background: #fff;
+    border: 3px solid #1a5fb4;
+    border-radius: 6px;
+    padding: 1em 1.1em;
+    margin: 0 0 1.2em 0;
+}
+.filament-pick h3 {
+    margin: 0 0 0.4em 0;
+    font-size: 1.25em;
+    color: #111;
+}
+.filament-pick p { margin: 0 0 0.8em 0; color: #222; }
 </style>
 
 <p><a href="/3d/browse">&larr; Back to Browse</a></p>
@@ -97,8 +137,10 @@
     <div class="model-detail-thumb">
         [% IF model.thumbnail_url %]
         <img src="[% model.thumbnail_url | html %]" alt="[% model.name | html %]">
+        [% ELSIF inv_item && inv_item.image_path %]
+        <img src="[% inv_item.image_path | html %]" alt="[% model.name | html %]">
         [% ELSE %]
-        <div class="no-thumb">No preview available</div>
+        <div class="no-thumb">No picture yet</div>
         [% END %]
     </div>
     <div class="model-detail-info">
@@ -121,6 +163,13 @@
                title="Download [% model.file_type | upper | html %] file to open in your slicer">
                 ⬇ Download [% model.file_type | upper | html %] File
             </a>
+            [% IF model.source == 'sign_generator' %]
+            <a href="/signgenerator/download/[% model.id %]/3mf"
+               style="display:inline-block;padding:0.45em 1.1em;background:#1a5fb4;color:#fff;border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;margin-left:0.4em;"
+               title="Design 3MF — two objects. Order the sign to bake the stock filament type and colour into a print file.">
+                ⬇ Design 3MF (two objects)
+            </a>
+            [% END %]
             <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Open in Bambu Studio, PrusaSlicer, Cura, etc.</small>
         </p>
         [% END %]
@@ -131,49 +180,160 @@
                title="Open the saved sign layout PDF showing the sign's exact text, colours and QR">
                 📄 View sign layout (PDF)
             </a>
-            <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Shows the exact layout as it will print.</small>
+            [% IF c.session.user_id && (c.session.roles.grep('admin').size || model.added_by == c.session.username) %]
+            <a href="[% c.uri_for('/signgenerator/delete', [model.id]) %]">Delete this sign</a>
+            [% END %]
+            <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Shows the exact layout as it will print. Order below to print with chosen filament.</small>
         </p>
         [% END %]
     </div>
 </div>
 
+[% SET two_colour = (inv_item && inv_item.is_assemblable) || (model.source == 'sign_generator') %]
+
 [% IF c.session.user_id %]
 <div class="order-form">
-    <h2>Order a Print</h2>
+    <h2>[% IF model.source == 'sign_generator' %]Order this sign[% ELSIF inv_item && inv_item.is_assemblable %]Order this unit[% ELSE %]Order a print[% END %]</h2>
+
     <form method="post" action="/3d/order">
         <input type="hidden" name="model_id" value="[% model.id %]">
-        <div class="form-row">
-            [% IF filaments && filaments.size %]
-            <div class="form-group">
-                <label>Filament Type</label>
-                <select name="filament_type">
-                    <option value="">-- Any available --</option>
-                    [% FOREACH f IN filaments %]
-                    <option value="[% f.name | html %]">[% f.name | html %]</option>
-                    [% END %]
-                </select>
-            </div>
+
+        <div class="filament-pick">
+            <h3>1. Choose filament type and colour</h3>
+            [% IF model.source == 'sign_generator' %]
+            <p>Signs use two colours: body (plate) and text.</p>
+            [% ELSIF inv_item && inv_item.is_assemblable %]
+            <p>Panels (sides, doors) one colour. Connectors (corners, bottoms, rollers) a contrast — e.g. black panels, red connectors.</p>
+            [% ELSE %]
+            <p>Pick the spool to print with.</p>
             [% END %]
-            <div class="form-group">
-                <label>Filament Color</label>
-                <input type="text" name="filament_color" placeholder="e.g. Black, White, Red">
+            <div class="form-row">
+                [% IF two_colour %]
+                <div class="form-group">
+                    <label>[% IF model.source == 'sign_generator' %]Body (plate)[% ELSE %]Panels[% END %]</label>
+                    <select name="panel_filament_id" required>
+                        <option value="">— type and colour —</option>
+                        [% FOREACH s IN filament_spools %]
+                        <option value="[% s.id %]">[% s.type | html %] / [% s.color | html %] — [% s.name | html %] ([% s.on_hand %] on hand)</option>
+                        [% END %]
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>[% IF model.source == 'sign_generator' %]Text[% ELSE %]Connectors (contrast)[% END %]</label>
+                    <select name="connector_filament_id" required>
+                        <option value="">— type and colour —</option>
+                        [% FOREACH s IN filament_spools %]
+                        <option value="[% s.id %]">[% s.type | html %] / [% s.color | html %] — [% s.name | html %] ([% s.on_hand %] on hand)</option>
+                        [% END %]
+                    </select>
+                </div>
+                [% ELSE %]
+                <div class="form-group">
+                    <label>Filament</label>
+                    <select name="filament_item_id">
+                        <option value="">— type and colour —</option>
+                        [% FOREACH s IN filament_spools %]
+                        <option value="[% s.id %]">[% s.type | html %] / [% s.color | html %] — [% s.name | html %] ([% s.on_hand %] on hand)</option>
+                        [% END %]
+                    </select>
+                </div>
+                [% END %]
+                <div class="form-group">
+                    <label>How many units</label>
+                    <input type="number" name="quantity" value="1" min="1" max="20">
+                </div>
             </div>
-            <div class="form-group">
-                <label>Quantity</label>
-                <input type="number" name="quantity" value="1" min="1" max="50">
-            </div>
+            [% IF two_colour %]
+            <label>
+                <input type="checkbox" name="allow_backorder" value="1">
+                Colour not in stock? Backorder (queue prints — about 18 hours each)
+            </label>
+            [% END %]
         </div>
+
+        [% IF inv_item && inv_item.is_assemblable && bom_admin && bom_admin.size %]
+        <h3>2. Add-ons (optional)</h3>
+        <ul class="order-options">
+        [% FOREACH row IN bom_admin %]
+        [% NEXT UNLESS row.is_optional && row.is_printed %]
+        <li>
+            <label>
+                <input type="checkbox" name="option_item_id" value="[% row.item_id %]">
+                [% row.name | html %] — extra print
+            </label>
+        </li>
+        [% END %]
+        [% FOREACH row IN bom_admin %]
+        [% NEXT UNLESS row.is_optional && !row.is_printed %]
+        <li>
+            <label>
+                <input type="checkbox" name="option_item_id" value="[% row.item_id %]">
+                [% row.name | html %] — we can order (not kept in stock)
+            </label>
+        </li>
+        [% END %]
+        </ul>
+        [% END %]
+
+        [% IF attachable_jobs && attachable_jobs.size %]
+        <h3>3. Attach existing print jobs</h3>
+        <p>Jobs already in the queue can count as this unit instead of printing another copy.</p>
+        <ul class="order-options">
+        [% FOREACH j IN attachable_jobs %]
+        <li>
+            <label>
+                <input type="checkbox" name="attach_job_id" value="[% j.id %]"
+                       [% IF j.linked %]checked[% END %]>
+                #[% j.id %] [% j.name | html %] — [% j.status | html %] ×[% j.qty %]
+                [% IF j.linked %](already on this unit)[% END %]
+            </label>
+        </li>
+        [% END %]
+        </ul>
+        [% END %]
+
         <div class="form-row">
             <div class="form-group" style="flex:2;">
-                <label>Notes (optional)</label>
-                <textarea name="notes" rows="2" placeholder="Any special requirements…"></textarea>
+                <label>Notes</label>
+                <textarea name="notes" rows="2"></textarea>
             </div>
         </div>
-        <button type="submit" class="btn-order"><i class="icon-print"></i> Place Order</button>
+        <button type="submit" class="btn-order">Place Order</button>
     </form>
 </div>
 [% ELSE %]
-<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-top:1em;">
-    <a href="/user/login?destination=/3d/model/[% model.id %]">Log in</a> to order a print of this model.
-</div>
+<p><a href="/user/login?destination=/3d/model/[% model.id %]">Log in</a> to order.</p>
+[% END %]
+
+[% IF is_admin && bom_admin && bom_admin.size %]
+<details class="bom-admin">
+    <summary>Printed parts and stock (admin)</summary>
+    <table>
+        <thead>
+            <tr>
+                <th></th><th>Item</th><th>SKU</th><th>Qty</th>
+                <th>On hand</th><th>Reserved</th><th>Available</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH row IN bom_admin %]
+        [% NEXT IF row.is_optional || !row.is_printed %]
+            <tr>
+                <td>[% IF row.image %]<img src="[% row.image | html %]" alt="">[% ELSE %]—[% END %]</td>
+                <td>[% row.name | html %]</td>
+                <td><code>[% row.sku | html %]</code></td>
+                <td>[% row.quantity %] [% row.unit | html %]</td>
+                <td>[% row.on_hand %]</td>
+                <td>[% row.reserved %]</td>
+                <td>[% row.available %]</td>
+                <td><a href="/Inventory/item/view/[% row.item_id %]">Inventory</a></td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% IF inv_item %]
+    <p><a href="/Inventory/bom/[% inv_item.id %]">BOM editor</a>
+       · <a href="/Inventory/item/view/[% inv_item.id %]">Inventory item</a></p>
+    [% END %]
+</details>
 [% END %]

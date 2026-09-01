@@ -179,6 +179,16 @@ sub forecast :Path('/Weather/forecast') :Args(0) {
 sub configuration :Path('/Weather/configuration') :Args(0) {
     my ( $self, $c ) = @_;
 
+    # Allow members and above to view/edit their own weather configuration
+    # Admin always allowed, members can view/edit their own config
+    my $is_admin = $c->check_user_roles('admin');
+    my $roles = $c->session->{roles} || [];
+    my $is_member = grep { /^(member|editor|developer)$/i } @$roles;
+    unless ($c->user_exists && ($is_admin || $is_member)) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 

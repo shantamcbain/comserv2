@@ -3,6 +3,16 @@
 
 <h1>Item: [% item.name %]</h1>
 
+[% IF item.image_path %]
+<p><img src="[% item.image_path | html %]" alt="[% item.name | html %]"
+        width="220" height="160" style="object-fit:cover;border:1px solid var(--border-color);border-radius:6px;"></p>
+[% ELSIF print_model && print_model.thumbnail_url %]
+<p><img src="[% print_model.thumbnail_url | html %]" alt="[% item.name | html %]"
+        width="220" height="160" style="object-fit:cover;border:1px solid var(--border-color);border-radius:6px;"></p>
+[% ELSE %]
+<p><em>No picture on this item yet. Set image_path or a 3D model thumbnail.</em></p>
+[% END %]
+
 [% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
 
 <div class="actions">
@@ -19,8 +29,13 @@
   <a href="/Inventory/equipment/[% item.id %]">Equipment Details</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/print/label/[% item.id %]" target="_blank">&#128438; Print Label</a>
+  [% IF print_model %]
   &nbsp;|&nbsp;
-  <a href="/shop/item/[% item.id %]"><strong>Order</strong></a>
+  <a href="/3d/model/[% print_model.id %]"><strong>Order print</strong></a>
+  [% ELSIF item.show_in_shop %]
+  &nbsp;|&nbsp;
+  <a href="/shop/item/[% item.id %]"><strong>Shop</strong></a>
+  [% END %]
   [% IF c.session.roles.grep('admin').size && print_model %]
   &nbsp;|&nbsp;
   <form method="post" action="/3d/reorder_item" style="display:inline;"
@@ -114,6 +129,8 @@
     <tr>
       <th>Component Item</th>
       <th>Qty</th>
+      <th>On hand</th>
+      <th>Available</th>
       <th>Unit</th>
       <th>Optional?</th>
       <th>Scrap %</th>
@@ -135,6 +152,15 @@
         [% END %]
       </td>
       <td style="text-align:right">[% comp.quantity %]</td>
+      [% SET oh = 0; SET resv = 0 %]
+      [% IF comp.component_item %]
+        [% FOREACH sl IN comp.component_item.stock_levels %]
+          [% SET oh = oh + sl.quantity_on_hand %]
+          [% SET resv = resv + sl.quantity_reserved %]
+        [% END %]
+      [% END %]
+      <td style="text-align:right">[% oh %]</td>
+      <td style="text-align:right">[% oh - resv %]</td>
       <td>[% comp.unit %]</td>
       <td style="text-align:center">[% comp.is_optional ? 'Yes' : '' %]</td>
       <td style="text-align:right">[% comp.scrap_factor ? (comp.scrap_factor * 100) _ '%' : '' %]</td>

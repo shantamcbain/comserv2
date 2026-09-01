@@ -2,7 +2,7 @@ package Comserv::Util::TodoLog;
 use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];
 use Try::Tiny;
-use DateTime;
+use Comserv::Util::AppTime;
 
 =head1 NAME
 
@@ -28,6 +28,10 @@ Summary placement rules:
   done_with_log: closes the open log (or inserts a completed one if none was
                  open) with the summary in the log comments, todo -> 3.
 
+Time (AppTime):
+  start_time / end_time / last_mod_date on log rows are UTC.
+  Calendar "today" for day buckets uses the viewer's zone via AppTime.
+
 =cut
 
 # ---------------------------------------------------------------------------
@@ -41,6 +45,18 @@ sub _duration_hms {
     my $dur_mins  = (($eh // 9) * 60 + ($em // 0)) - (($sh // 9) * 60 + ($sm // 0));
     $dur_mins = 1 if !defined $dur_mins || $dur_mins <= 0;
     return (sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60), $dur_mins);
+}
+
+# Internal: UTC clock for log writes + user-local ymd for last_mod day labels.
+sub _clock {
+    my ($c) = @_;
+    # Storage times always UTC so duration is host-independent.
+    my $now_hms = Comserv::Util::AppTime->now_hms_utc;
+    # last_mod_date / start_date day bucket: viewer "today" when $c present.
+    my $today = $c
+        ? Comserv::Util::AppTime->today_ymd_for($c)
+        : Comserv::Util::AppTime->today_utc_ymd;
+    return ( $today, $now_hms );
 }
 
 # Internal: fetch the todo row + project code.
@@ -61,18 +77,18 @@ sub _todo_ctx {
 sub _insert_completed_log {
     my ($c, %args) = @_;
     my ($dbh, $todo, $proj_code) = _todo_ctx($c, $args{record_id});
-    my $now      = DateTime->now(time_zone => 'local');
-    my $today    = $now->ymd;
-    my $now_hms  = $now->hms;
+    my ( $today, $now_hms ) = _clock($c);
     my $est_mins = $args{duration_mins}
                    // eval { $todo->estimated_man_hours * 60 } // 15;
     $est_mins = 15 if $est_mins < 1;
     # MySQL TIME max is 838:59:59. estimated_man_hours of 840 (todo 2103)
     # produced '840:00:00' and DBI rejected the INSERT (audit todo 2312).
+    # Use a sane default (30 min) for the no-open-log fallback path instead of
+    # trusting potentially-absurd estimated_man_hours.
+    if ($est_mins > 8*60) { $est_mins = 30; }
     my $mysql_time_max_mins = (838 * 60) + 59;
     $est_mins = $mysql_time_max_mins if $est_mins > $mysql_time_max_mins;
-    my ($dur_hms, undef) = _duration_hms('09:00', '00:' . sprintf('%02d', $est_mins % 60));
-    $dur_hms = sprintf('%02d:%02d:00', int($est_mins / 60), $est_mins % 60);
+    my $dur_hms = sprintf('%02d:%02d:00', int($est_mins / 60), $est_mins % 60);
 
     $dbh->do(
         'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,?)',
@@ -98,9 +114,7 @@ sub toggle_start {
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
 
-    my $now     = DateTime->now(time_zone => 'local');
-    my $today   = $now->ymd;
-    my $now_hms = $now->hms;
+    my ( $today, $now_hms ) = _clock($c);
 
     my $result = try {
         my ($dbh, $todo, $proj_code) = _todo_ctx($c, $record_id);
@@ -145,7 +159,23 @@ sub toggle_start {
         my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
         $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
             undef, $username, $today, $record_id);
-        return { success => 1, action => 'opened', log_id => ($new_log_id // 0) };
+
+        # Soft guidance when Start has no executable work order (todo #2350).
+        # Append-only — never wipe comments. UI/API Start both use toggle_start.
+        my $desc = eval { $todo->description } // '';
+        my $has_work_order = ($desc =~ /ROOT\s+CAUSE|CODER_READY|(?m)^\s*DO\s*:/i) ? 1 : 0;
+        unless ($has_work_order) {
+            my $cmt = eval { $todo->comments } // '';
+            unless ($cmt =~ /WORK_ORDER_NEEDED/) {
+                my $hint = "WORK_ORDER_NEEDED: description lacks ROOT/DO/DO NOT/ACCEPT — "
+                    . "Director must fill a work order before Coder runs ($today).\n";
+                $dbh->do("UPDATE todo SET comments=? WHERE record_id=?",
+                    undef, $cmt . $hint, $record_id);
+            }
+        }
+
+        return { success => 1, action => 'opened', log_id => ($new_log_id // 0),
+                 work_order_missing => $has_work_order ? 0 : 1 };
     } catch {
         die $_;  # caller logs via log_with_details (audit trail requirement)
     };
@@ -163,9 +193,7 @@ sub close_log {
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
 
-    my $now_dt  = DateTime->now(time_zone => 'local');
-    my $today   = $now_dt->ymd;
-    my $now_hms = $now_dt->strftime('%H:%M:%S');
+    my ( $today, $now_hms ) = _clock($c);
 
     my $result = try {
         my ($dbh, $todo, undef) = eval { _todo_ctx($c, $record_id) };
@@ -219,9 +247,7 @@ sub done_with_log {
     my $username  = $args{username} // 'api';
     my $summary   = $args{summary} // '';
 
-    my $now_dt  = DateTime->now(time_zone => 'local');
-    my $today   = $now_dt->ymd;
-    my $now_hms = $now_dt->strftime('%H:%M:%S');
+    my ( $today, $now_hms ) = _clock($c);
 
     my $result = try {
         my ($dbh, $todo, undef) = _todo_ctx($c, $record_id);

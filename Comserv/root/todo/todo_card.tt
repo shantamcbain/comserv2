@@ -81,9 +81,9 @@
         <a href="/log/log_form?todo_record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-info">Log</a>
         [% IF tc_show_done && is_admin && !tci_is_done %]
           [% IF tci_is_active %]
-          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="1" class="btn btn-sm btn-outline-warning">⏸ Active</button>
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="1" class="btn btn-sm btn-outline-warning" title="Work session open — click to close the log (todo stays open for more work)">⏸ Stop</button>
           [% ELSE %]
-          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0" class="btn btn-sm btn-outline-primary">▶ Start</button>
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0" class="btn btn-sm btn-outline-primary" title="Start working — creates a log entry, marks todo active">▶ Start</button>
           [% END %]
           <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="[% tci_is_active ? '1' : '0' %]" class="btn btn-sm btn-outline-success">Done</button>
         [% ELSIF tc_show_done && is_admin %]
@@ -122,9 +122,9 @@
         <a href="/log/log_form?todo_record_id=[% tc.record_id %]" class="btn btn-sm btn-outline-info">Log</a>
         [% IF tc_show_done && is_admin && !tci_is_done %]
           [% IF tci_is_active %]
-          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="1" class="btn btn-sm btn-outline-warning" title="Session active — click to close session">⏸ Active</button>
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="1" class="btn btn-sm btn-outline-warning" title="Work session open — click to close the log (todo stays open for more work)">⏸ Stop</button>
           [% ELSE %]
-          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0" class="btn btn-sm btn-outline-primary" title="Start working — creates a log entry">▶ Start</button>
+          <button data-start-btn="1" data-record-id="[% tc.record_id %]" data-is-active="0" class="btn btn-sm btn-outline-primary" title="Start working — creates a log entry, marks todo active">▶ Start</button>
           [% END %]
           <button data-done-btn="1" data-record-id="[% tc.record_id %]" data-is-active="[% tci_is_active ? '1' : '0' %]" class="btn btn-sm btn-outline-success" title="[% tci_is_active ? 'Close log and mark todo done' : 'Mark done' %]">Done</button>
         [% ELSIF tc_show_done && is_admin %]

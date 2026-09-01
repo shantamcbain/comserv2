@@ -213,7 +213,7 @@ sub auto :Private {
     }
 
     # LAYER 0: Require admin role for sensitive paths
-    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|file/admin)}) {
+    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|themetest|file/admin)}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
@@ -259,6 +259,14 @@ sub auto :Private {
     # stable across requests (good for caching) but changes on every app
     # restart/deploy, which is exactly when assets change.
     $c->stash->{css_v} = ($Comserv::Controller::Root::ASSET_EPOCH ||= time());
+
+    # Canonical clock: UTC storage + viewer TZ for | user_time TT filter
+    # (Comserv::Util::AppTime). Fail-soft — never block the request.
+    eval {
+        require Comserv::Util::AppTime;
+        Comserv::Util::AppTime->inject_request($c);
+        1;
+    };
 
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
@@ -915,7 +923,16 @@ sub auto :Private {
         # are corrected. The "+local" suffix is preserved when the live short sha
         # differs from the baked one (or absent) so the "locally modified" signal
         # survives the overlay.
-        if ($c->stash->{app_version}) {
+        #
+        # SECURITY / NOISE: only run live git for staff who can see the debug bar
+        # (admin or debug_mode). Public pages (marketplace, bots, crawlers) must
+        # NEVER spawn `git branch --show-current` — that is not "bots accessing
+        # /admin/git"; it was a side effect of Root::auto on every request, which
+        # also flooded error-audit when prod images have no usable checkout.
+        # The Git: branch@sha line in pagetop.tt is already IF is_admin||debug.
+        if ($c->stash->{app_version}
+            && ($c->stash->{is_admin} || ($c->session->{debug_mode} // 0) == 1)
+        ) {
             # Skip the live-git overlay when this tree has no .git (prod image).
             # App home is Comserv/; the git root is usually one level up.
             # Worktrees use a .git *file*. Without this guard every request
@@ -2601,38 +2618,51 @@ sub _track_nav_back_url {
 
 sub _port_label {
     my ($port) = @_;
+    # Prefer short known labels for worktree branch names (helpdesk was HD on
+    # legacy :4013; live helpdesk worktree is now :4009).
+    my %branch_labels = (
+        helpdesk             => 'HD',
+        Documentation        => 'Do',
+        aisystem             => "\x{1F916}",
+        schema               => 'Sc',
+        planning             => 'Pl',
+        git                  => 'Gi',
+        '3d'                 => '3D',
+        DockerHA             => 'HA',
+        InventoryAccounting  => 'IA',
+    );
     # Single source of truth first: worktrees.json maps each live branch to its
-    # port. Use the branch name as the label so favicons follow the registry
-    # instead of the stale zenflow-era static map below.
+    # port. Prefer %branch_labels, else first two letters of the branch name.
     my $cfg = eval { Comserv::Util::Git->_worktree_config };
     if ($cfg && $cfg->{branches}) {
         for my $name (sort keys %{$cfg->{branches}}) {
             my $b = $cfg->{branches}{$name};
-            return ucfirst(substr($name, 0, 2))
-                if $b && ($b->{port} || 0) == $port;
+            next unless $b && ($b->{port} || 0) == $port;
+            return $branch_labels{$name} if exists $branch_labels{$name};
+            return _branch_favicon_label($name);
         }
     }
     my %named = (
         3000 => 'PC',   # ProjectConfig
-        4001 => 'Pl',   # PlanningSystem
-        4002 => 'SM',   # SchemaManagement
-        4003 => 'HA',   # InfrastructureHA
-        4004 => 'WS',   # WorkShops
-        4005 => 'Us',   # Users
+        4001 => 'IA',   # InventoryAccounting worktree
+        4002 => 'HA',   # DockerHA
+        4003 => '3D',   # 3d worktree
+        4004 => 'Gi',   # git
+        4005 => 'Pl',   # planning
         # 4006 is the aisystem worktree (AI system use) — show the AI robot
         # glyph instead of the stale 'FM' FileManagement label.
         4006 => "\x{1F916}",   # aisystem — AI robot
-        4007 => 'Ma',   # UnifiedMail
-        4008 => 'Mb',   # Membership
-        4009 => 'Pt',   # PointSystem
+        4007 => 'Sc',   # schema
+        4008 => 'Do',   # Documentation
+        4009 => 'HD',   # helpdesk worktree (was zenflow :4013 HD)
         4010 => 'AI',   # AIChatSystem
         4011 => 'Cs',   # CssThemes
         4012 => 'En',   # ENCY
-        4013 => 'HD',   # HelpDesk
+        4013 => 'HD',   # HelpDesk (legacy zenflow port — keep HD)
         4014 => 'Hp',   # HealthPlanning
         4015 => 'SH',   # ProdServerHealth
         4016 => 'Sc',   # Security
-        4017 => 'Dc',   # Documentation
+        4017 => 'Dc',   # Documentation (legacy)
         4018 => 'AP',   # APISystem
         4019 => 'BM',   # BMaster
         4020 => 'Ch',   # AIChatPlanInt
@@ -2735,6 +2765,7 @@ sub site_favicon :Path('/favicon/site') :Args(1) {
 
 sub _branch_favicon_label {
     my ($branch) = @_;
+    return 'HD' if defined $branch && $branch =~ /^helpdesk$/i;
     # Split into words on separators AND camelCase boundaries:
     #   InventoryAccounting -> Inventory, Accounting -> "IA"
     #   comserv2-git-worktree -> c, g, w -> "CGW"
@@ -2775,9 +2806,16 @@ sub branch_favicon :Path('/favicon/branch') :Args(1) {
     my $fs  = $len == 1 ? 20 : $len == 2 ? 16 : 12;
     my $y   = $len == 1 ? 24 : 22;
 
+    # Use short label (not full branch name) so the badge stays readable.
+    # helpdesk branch → HD (matches legacy :4013 / public HelpDesk domain).
+    if (lc($branch) eq 'helpdesk') {
+        $c->detach('helpdesk_favicon');
+        return;
+    }
+
     my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="4" fill="$bg"/>
-  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$branch</text>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$label</text>
 </svg>};
 
     $c->response->content_type('image/svg+xml');

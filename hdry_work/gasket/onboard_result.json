@@ -1,0 +1,74 @@
+[
+  {
+    "existed": 0,
+    "item_id": 101,
+    "sitename": "3d",
+    "sku": "INT-HDRY-GSK215",
+    "success": 1,
+    "code": "GSK215",
+    "name": "TPU gasket 215 mm 3x3 (L1 vertical)",
+    "qty": 10,
+    "stl": "gasket_215_straight.stl",
+    "length": 215
+  },
+  {
+    "sku": "INT-HDRY-GSK150",
+    "success": 1,
+    "item_id": 102,
+    "existed": 0,
+    "sitename": "3d",
+    "code": "GSK150",
+    "name": "TPU gasket 150 mm 3x3 (L2 vertical)",
+    "qty": 10,
+    "stl": "gasket_150_straight.stl",
+    "length": 150
+  },
+  {
+    "sitename": "3d",
+    "item_id": 103,
+    "existed": 0,
+    "success": 1,
+    "sku": "INT-HDRY-GSK180",
+    "code": "GSK180",
+    "name": "TPU gasket 180 mm 3x3 (cap loop)",
+    "qty": 3,
+    "stl": "gasket_180_straight.stl",
+    "length": 180
+  },
+  {
+    "sitename": "3d",
+    "item_id": 104,
+    "existed": 0,
+    "success": 1,
+    "sku": "INT-HDRY-GSK358",
+    "code": "GSK358",
+    "name": "TPU gasket 358 mm 3x3 (door top/bot)",
+    "qty": 2,
+    "stl": "gasket_358_coil.stl",
+    "length": 358
+  },
+  {
+    "existed": 0,
+    "item_id": 105,
+    "sitename": "3d",
+    "sku": "INT-HDRY-GSK378",
+    "success": 1,
+    "code": "GSK378",
+    "name": "TPU gasket 378 mm 3x3 (door side)",
+    "qty": 2,
+    "stl": "gasket_378_coil.stl",
+    "length": 378
+  },
+  {
+    "existed": 0,
+    "item_id": 106,
+    "sitename": "3d",
+    "sku": "INT-HDRY-GSK1582",
+    "success": 1,
+    "code": "GSK1582",
+    "name": "TPU gasket 1582 mm 3x3 (ring perimeter)",
+    "qty": 3,
+    "stl": "gasket_1582_coil.stl",
+    "length": 1582
+  }
+]
