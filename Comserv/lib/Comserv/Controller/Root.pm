@@ -923,7 +923,16 @@ sub auto :Private {
         # are corrected. The "+local" suffix is preserved when the live short sha
         # differs from the baked one (or absent) so the "locally modified" signal
         # survives the overlay.
-        if ($c->stash->{app_version}) {
+        #
+        # SECURITY / NOISE: only run live git for staff who can see the debug bar
+        # (admin or debug_mode). Public pages (marketplace, bots, crawlers) must
+        # NEVER spawn `git branch --show-current` — that is not "bots accessing
+        # /admin/git"; it was a side effect of Root::auto on every request, which
+        # also flooded error-audit when prod images have no usable checkout.
+        # The Git: branch@sha line in pagetop.tt is already IF is_admin||debug.
+        if ($c->stash->{app_version}
+            && ($c->stash->{is_admin} || ($c->session->{debug_mode} // 0) == 1)
+        ) {
             # Skip the live-git overlay when this tree has no .git (prod image).
             # App home is Comserv/; the git root is usually one level up.
             # Worktrees use a .git *file*. Without this guard every request
