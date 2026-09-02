@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "database,schema-management"
-   page_version = "1.0"
-   last_updated = "Sun Aug 24 2026 (v1.0 — authored on schema branch; consolidates MASTER_PLAN W0.1)"
+   page_version = "1.1"
+   last_updated = "Fri Aug 29 2026 (v1.1 — G1 SCPG-REMOTEDB partial done)"
    site_specific = "false"
    project_id = "138"
    project_code = "PLANNING"
@@ -16,7 +16,7 @@
 <h1 id="top">Schema System Plan — W0.1 detail</h1>
 
 <div class="last-updated doc-muted">
-    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.0 &nbsp;|&nbsp; Status: ACTIVE (schema branch)
+    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.1 &nbsp;|&nbsp; Status: ACTIVE (schema branch)
 </div>
 
 <p>This is the detailed breakdown of MASTER_PLAN's <strong>W0.1 — Schema System Plan</strong>, and the
@@ -94,7 +94,7 @@ AccountingOnboardingPlan / ACCON) are <strong>not</strong> authored here — the
         </tr>
         <tr>
             <td><strong>G1</strong></td>
-            <td>Maria create/sync already live in <code>SchemaComparison.pm</code>. PG half: <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a> (SCHEMAPG #289) — compare cannot connect or CREATE a PG database yet. Do not rebuild the Maria endpoints.</td>
+            <td>Maria create/sync already live in <code>SchemaComparison.pm</code>. PG half: <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a> (SCHEMAPG #289). <strong>SCPG-REMOTEDB DONE 2026-08-29</strong> — <code>Model::RemoteDB::from_context</code>, PG allowlist, named PG connect verified. Remaining: SCPG-COMPARE (no Maria SQL on PG handles), then CREATEDB/DEPLOY after D1. Do not rebuild the Maria endpoints.</td>
             <td>New columns on Maria OR Postgres via compare (no hand DDL).</td>
             <td>MED — core mechanism.</td>
         </tr>

@@ -31,17 +31,22 @@ sub logging {
     return Comserv::Util::Logging->new();
 }
 
-# Get all Result files for a database (ency / forager)
+# Get all Result files for a database (ency / forager / accounting=PG clone-target)
 sub get_all_result_files {
     my ($self, $database, $c) = @_;
     my @result_files = ();
     my $base_path = $self->_get_schema_base($c);
+    my $db = lc($database || '');
 
-    if (lc($database || '') eq 'ency') {
+    if ($db eq 'ency') {
         my $result_dir = File::Spec->catdir($base_path, 'Ency', 'Result');
         @result_files = $self->scan_result_directory_recursive($result_dir, '');
-    } elsif (lc($database || '') eq 'forager') {
+    } elsif ($db eq 'forager') {
         my $result_dir = File::Spec->catdir($base_path, 'Forager', 'Result');
+        @result_files = $self->scan_result_directory_recursive($result_dir, '');
+    } elsif ($db eq 'accounting' || $db eq 'pg' || $db eq 'postgresql' || $db eq 'postgres') {
+        # Schema::Accounting::Result::* — PostgreSQL clone-target (not Maria Ency)
+        my $result_dir = File::Spec->catdir($base_path, 'Accounting', 'Result');
         @result_files = $self->scan_result_directory_recursive($result_dir, '');
     }
     return @result_files;

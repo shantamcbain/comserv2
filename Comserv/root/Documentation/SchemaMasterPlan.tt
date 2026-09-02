@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "database,schema-management,coordination"
-   page_version = "1.1"
-   last_updated = "Sun Aug 24 2026 (v1.1 — reframed: whole DB system, not just schema-compare; schema branch port 4007 added)"
+   page_version = "1.2"
+   last_updated = "Fri Aug 29 2026 (v1.2 — SCPG-REMOTEDB from_context/PG allowlist noted)"
    site_specific = "false"
    project_id = "138"
    project_code = "PLANNING"
@@ -16,7 +16,7 @@
 <h1 id="top">Schema Master Plan — Database System Consolidation</h1>
 
 <div class="last-updated doc-muted">
-    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.1 &nbsp;|&nbsp; Status: COORDINATOR (schema branch)
+    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.2 &nbsp;|&nbsp; Status: COORDINATOR (schema branch)
 </div>
 
 <p class="mp-back-link"><a href="/Documentation/MASTER_PLAN">← Back to Master Plan</a></p>
@@ -80,10 +80,11 @@ no single owner — the core problem this branch must fix.</p>
         <tr><td>Model</td><td><code>DBForager</code></td><td>Herbal/Forager Maria database.</td></tr>
         <tr><td>Model</td><td><code>AccountingDB</code></td><td>Postgres accounting connection (clone-target).</td></tr>
         <tr><td>Model</td><td><code>HybridDB</code></td><td>Mixed-source queries across connections.</td></tr>
+        <tr><td>Model</td><td><code>Model::RemoteDB</code></td><td>Connection registry (plain Moose, not Catalyst::Model). Callers must use <code>from_context($c)</code> — <code>$c-&gt;model('RemoteDB')</code> may return the class-name string (#2343). PG allowlist + <code>dbi:Pg</code> verified 2026-08-29 (SCPG-REMOTEDB).</td></tr>
         <tr><td>Model</td><td><code>Model/Schema/Ency/Result/*</code></td><td>Live Maria Result classes (source of truth).</td></tr>
         <tr><td>Model</td><td><code>Model/Schema/Accounting/Result/*</code></td><td>PG clone-target Result classes (no live DB yet).</td></tr>
         <tr><td>Util</td><td><code>Util::SchemaCompare</code></td><td>The one schema mechanism (DDL-from-Result).</td></tr>
-        <tr><td>Util</td><td><code>Util::RemoteDB</code></td><td>Runtime connection selection (priority/failover) used by DBEncy.</td></tr>
+        <tr><td>Util</td><td><code>Util::RemoteDB</code></td><td>Runtime connection selection (priority/failover) used by DBEncy; routes through <code>Model::RemoteDB-&gt;from_context</code>.</td></tr>
         <tr><td>Util</td><td><code>Util::Accounting::Migrator</code></td><td>Maria→PG clone/seed.</td></tr>
         <tr><td>Util</td><td><code>Util::BackupManager</code></td><td>Backup (to be folded into the schema system, W0.1 G2).</td></tr>
         <tr><td>Util</td><td><code>Util::DatabaseSchemaCache</code></td><td>Caches schema introspection.</td></tr>
@@ -338,7 +339,7 @@ Decided separately; not authoritative schema-branch tracking until re-homed.</p>
 <ul>
     <li><a href="/Documentation/Schema">Schema.tt</a> — code-first Result-class schema management.</li>
     <li><a href="/Documentation/SchemaSystemPlan">SchemaSystemPlan.tt</a> — W0.1 detail + consolidation (this branch).</li>
-    <li><a href="/Documentation/SchemaComparePostgresPlan">SchemaComparePostgresPlan.tt</a> — schema-compare PG connection + first DB create (SCHEMAPG #289; first code todo #2325).</li>
+    <li><a href="/Documentation/SchemaComparePostgresPlan">SchemaComparePostgresPlan.tt</a> — schema-compare PG connection + first DB create (SCHEMAPG #289). <strong>SCPG-REMOTEDB DONE 2026-08-29</strong> (#2325/#2326/#2343: <code>from_context</code> + PG allowlist + named connect). Next: SCPG-COMPARE.</li>
     <li><a href="/Documentation/SchemaNamingStandardizationPlan">SchemaNamingStandardizationPlan.tt</a> — 4-file snake_case fix.</li>
     <li><a href="/Documentation/AccountingEntityStructurePlan">AccountingEntityStructurePlan.md</a> (ACCENT) — entity structure, owner-draw, CoA archetypes.</li>
     <li><a href="/Documentation/DatabaseConnectionChanges">DatabaseConnectionChanges.md</a> — DSN driver fixes, db_config.json.</li>
