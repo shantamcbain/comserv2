@@ -27,28 +27,12 @@ has 'db_pw' => (
     default => sub { Comserv::Util::DbConfigPassword->new }
 );
 
-# RemoteDB is a plain Moose class, not Catalyst::Model.
-# $c->model('RemoteDB') therefore returns the class NAME string (NOT a ref, and it
-# does NOT throw) when RemoteDB is not registered as a Catalyst model; Moose accessors
-# then die with "Can't use string (\"Comserv::Model::RemoteDB\") as a HASH ref".
-# So we must detect the non-ref string and instantiate a real object ourselves.
+# Prefer the Catalyst-registered model (Model::RemoteDB now extends Catalyst::Model).
+# from_context still handles bare class-name strings during mid-reload windows.
 sub _remote_db {
     my ($self, $c) = @_;
-    my $m = eval { $c->model('RemoteDB') };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, '_remote_db',
-            "model('RemoteDB') threw: $@ — instantiating Comserv::Model::RemoteDB->new");
-    }
-    # Catalyst returns the bare class-name string when the model is not registered;
-    # only accept it if it is an actual object (ref).
-    if (ref $m) {
-        return $m;
-    }
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_remote_db',
-        "model('RemoteDB') did not return an object (got: " . (defined $m ? $m : 'undef') .
-        ") — instantiating Comserv::Model::RemoteDB->new directly");
     require Comserv::Model::RemoteDB;
-    return Comserv::Model::RemoteDB->new();
+    return Comserv::Model::RemoteDB->from_context($c);
 }
 
 # Main page for remote database management
