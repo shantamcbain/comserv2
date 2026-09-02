@@ -11,6 +11,7 @@ use File::Path qw(make_path);
 use File::Spec;
 use POSIX qw(strftime);
 use Comserv::Util::Logging;
+use Comserv::Util::Printing3d;
 
 =head1 NAME
 
@@ -303,6 +304,10 @@ sub generate_stl {
                 %params,
                 plate_color => $args{plate_color} || '#d8cfa8',
                 text_color  => $args{text_color}  || '#4a3b18',
+                plate_filament_type  => $args{plate_filament_type}  || '',
+                text_filament_type   => $args{text_filament_type}   || '',
+                plate_filament_color => $args{plate_filament_color} || '',
+                text_filament_color  => $args{text_filament_color}  || '',
                 _parts      => [ 'base', 'text' ],
             },
             ($args{qr_data} ? (qr_data => $args{qr_data}) : ()),
@@ -341,6 +346,8 @@ sub generate_stl {
         qr             => $args{qr_data} ? \1 : \0,
         plate_color    => $args{plate_color} || undef,
         text_color     => $args{text_color}  || undef,
+        body1          => $params{body1},
+        body2          => $params{body2},
         # Filament assignments for multi-colour printing (slot numbers on the
         # 4-colour Anycubic; colours match the picked plate/text colours).
         filaments      => {
@@ -374,6 +381,210 @@ sub generate_stl {
         (%part_paths ? (part_paths => \%part_paths) : ()),
         metadata  => $metadata,
     };
+}
+
+# Colour name from inventory (White, Forest Green) -> hex for 3MF tint.
+my %COLOR_HEX = (
+    white        => '#ffffff',
+    black        => '#111111',
+    red          => '#c0392b',
+    blue         => '#2471a3',
+    green        => '#1e8449',
+    forestgreen  => '#1e8449',
+    yellow       => '#f1c40f',
+    orange       => '#e67e22',
+    purple       => '#7d3c98',
+    pink         => '#e91e8c',
+    grey         => '#7f8c8d',
+    gray         => '#7f8c8d',
+    brown        => '#6e4c1e',
+    beige        => '#d8cfa8',
+    natural      => '#d8cfa8',
+    clear        => '#e8e8e8',
+    transparent  => '#e8e8e8',
+    gold         => '#c9a227',
+    silver       => '#bdc3c7',
+    wood         => '#c4a574',
+    woodtone     => '#c4a574',
+    ivory        => '#fffff0',
+    cream        => '#fffdd0',
+    navy         => '#1b4f72',
+    teal         => '#148f77',
+);
+
+sub color_to_hex {
+    my ($self, $color) = @_;
+    return '#888888' unless defined $color && length $color;
+    return lc($color) if $color =~ /^#[0-9A-Fa-f]{6}$/;
+    my $k = lc($color);
+    $k =~ s/[^a-z0-9]+//g;
+    return $COLOR_HEX{$k} || '#888888';
+}
+
+sub _slug_token {
+    my ($s) = @_;
+    $s = defined $s ? $s : '';
+    $s =~ s/[^A-Za-z0-9]+/-/g;
+    $s =~ s/^-+|-+$//g;
+    return $s || 'x';
+}
+
+# Job notes written by _order_two_colour: sign_body_id= / sign_text_id= / order_3mf=
+sub parse_order_notes {
+    my ($self, $notes) = @_;
+    $notes = '' unless defined $notes;
+    my %h;
+    $h{body_id}   = $1 if $notes =~ /sign_body_id=(\d+)/;
+    $h{text_id}   = $1 if $notes =~ /sign_text_id=(\d+)/;
+    $h{order_3mf} = $1 if $notes =~ /order_3mf=([^\s|]+)/;
+    return \%h;
+}
+
+# Build a two-object 3MF from the sign sidecar + the two filament inventory items
+# chosen on the order form. Filename and object names carry type + colour.
+sub render_for_order {
+    my ($self, $c, %args) = @_;
+    my $model    = $args{model} or return { error => 'No sign model' };
+    my $body_fil = $args{body_fil};
+    my $text_fil = $args{text_fil};
+    my $job      = $args{job};
+    unless ($body_fil && $text_fil) {
+        return { error => 'Body and text filaments are required' };
+    }
+
+    my $meta = $self->load_metadata($model);
+    unless ($meta && ($meta->{title} || $meta->{size_mm})) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'render_for_order',
+            'Sign sidecar JSON missing for model '.$model->id
+              .' path='.($model->nfs_path // ''));
+        return { error => 'Sign layout is missing — regenerate the sign first.' };
+    }
+
+    my $cfg = $self->_service_config($c);
+    my $base_url = $cfg->{url} or return { error => 'OpenSCAD render service is not configured.' };
+    my $timeout = $cfg->{timeout} || 150;
+
+    my ($bt, $bc) = Comserv::Util::Printing3d->new->infer_type_color($body_fil);
+    my ($tt, $tc) = Comserv::Util::Printing3d->new->infer_type_color($text_fil);
+    my $plate_hex = $self->color_to_hex($bc || $meta->{plate_color});
+    my $text_hex  = $self->color_to_hex($tc || $meta->{text_color});
+
+    my ($body1, $body2) = ($meta->{body1} // '', $meta->{body2} // '');
+    if (!$body1 && !$body2 && $meta->{body}) {
+        ($body1, $body2) = $self->_split_lines($meta->{body}, 80);
+    }
+
+    my %params = (
+        sign_w               => ($meta->{size_mm}{w} || 120),
+        sign_h               => ($meta->{size_mm}{h} || 80),
+        title                => $meta->{title}    // '',
+        subtitle             => $meta->{subtitle} // '',
+        body1                => $body1,
+        body2                => $body2,
+        url_text             => $meta->{url}      // '',
+        plate_color          => $plate_hex,
+        text_color           => $text_hex,
+        plate_filament_type  => $bt,
+        text_filament_type   => $tt,
+        plate_filament_color => $bc,
+        text_filament_color  => $tc,
+        _parts               => [ 'base', 'text' ],
+    );
+
+    my $qr_data;
+    if ($meta->{url}) {
+        $qr_data = $meta->{url};
+        $qr_data = "https://$qr_data" unless $qr_data =~ m{^https?://}i;
+    }
+
+    my $http = HTTP::Tiny->new(timeout => $timeout);
+    my $payload = encode_json({
+        template_name => 'herb_sign_v1',
+        params        => \%params,
+        ($qr_data ? (qr_data => $qr_data) : ()),
+    });
+    my $m3res = $http->post("$base_url/render_3mf", {
+        headers => { 'Content-Type' => 'application/json' },
+        content => $payload,
+    });
+    unless ($m3res->{success}) {
+        my $detail = substr($m3res->{content} // '', 0, 400);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'render_for_order',
+            '3MF render failed HTTP '.($m3res->{status} // '?')." — $detail");
+        return { error => 'Could not build the two-colour print file (render service).' };
+    }
+
+    my $dir = $self->signs_dir($c);
+    my $job_id = $job ? $job->id : 'x';
+    my $slug = _slug_token($meta->{title} || 'sign');
+    my $fname = sprintf('sign_order_%s_%s_%dx%d_%s-%s_%s-%s.3mf',
+        $job_id, $slug,
+        $params{sign_w}, $params{sign_h},
+        _slug_token($bt), _slug_token($bc),
+        _slug_token($tt), _slug_token($tc),
+    );
+    my $path = File::Spec->catfile($dir, $fname);
+    open my $fh, '>:raw', $path
+        or return { error => "Cannot write $path: $!" };
+    print {$fh} $m3res->{content};
+    close $fh;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'render_for_order',
+        "Order 3MF written: $path (body $bt $bc / text $tt $tc)");
+
+    return {
+        path       => $path,
+        filename   => $fname,
+        plate_hex  => $plate_hex,
+        text_hex   => $text_hex,
+        body_type  => $bt,
+        body_color => $bc,
+        text_type  => $tt,
+        text_color => $tc,
+        size       => length($m3res->{content}),
+    };
+}
+
+# Unlink STL/PDF/JSON/3MF (+ split parts) that share the model basename,
+# plus extra order-3MF names from job notes. Only files inside signs_dir.
+sub unlink_sign_files {
+    my ($self, $c, $model, $extra_names) = @_;
+    my $dir = $self->signs_dir($c);
+    my $abs_dir = File::Spec->rel2abs($dir);
+    my $stl = $model->nfs_path or return { unlinked => [] };
+    my $stl_abs = File::Spec->rel2abs($stl);
+    my ($vol, $stl_dir, $file) = File::Spec->splitpath($stl_abs);
+    $stl_dir = File::Spec->catpath($vol, $stl_dir, '');
+    $stl_dir =~ s{[\\/]+$}{};
+    unless ($stl_dir eq $abs_dir) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'unlink_sign_files',
+            "refusing delete outside signs dir stl=$stl_abs dir=$abs_dir");
+        return { error => 'Sign files are not in the signs directory.' };
+    }
+    (my $base = $file) =~ s/\.stl$//i;
+    my @names = (
+        "$base.stl", "$base.pdf", "$base.json", "$base.3mf",
+        "${base}_base.stl", "${base}_text.stl",
+    );
+    push @names, @$extra_names if $extra_names && ref $extra_names eq 'ARRAY';
+    my @gone;
+    for my $n (@names) {
+        next unless $n && $n !~ m{[\\/]};
+        my $p = File::Spec->catfile($dir, $n);
+        next unless -f $p;
+        if (unlink $p) {
+            push @gone, $n;
+        }
+        else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'unlink_sign_files', "unlink failed $p: $!");
+        }
+    }
+    return { unlinked => \@gone };
 }
 
 # Load the sidecar sign document for a printing_3d_models row

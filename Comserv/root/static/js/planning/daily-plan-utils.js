@@ -464,11 +464,11 @@
     /* ── Todo card operations ───────────────────────────────────────────── */
 
     function _todoCardSetActive(btn, recordId) {
-        btn.textContent = '⏸ Active';
+        btn.textContent = '⏸ Stop';
         btn.style.border = '';
         btn.style.background = '#ffc107';
         btn.style.color = '#000';
-        btn.title = 'Session active — click to close session';
+        btn.title = 'Work session open — click to close the log (todo stays open for more work)';
         btn.disabled = false;
         btn.setAttribute('data-record-id', recordId);
         btn.setAttribute('data-is-active', '1');
@@ -540,15 +540,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ record_id: recordId, notes: notes })
             }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d.ok) {
+                // Treat graceful "no open log" as success for the UI (revert button).
+                // The server already logged a warn; we do not want a stuck "Active" label.
+                if (d.ok || d.graceful) {
                     _todoCardSetStart(btn, recordId);
                 } else {
                     btn.disabled = false;
-                    btn.textContent = '⏸ Active';
+                    btn.textContent = '⏸ Stop';
                 }
             }).catch(function() {
                 btn.disabled = false;
-                btn.textContent = '⏸ Active';
+                btn.textContent = '⏸ Stop';
             });
     }
 

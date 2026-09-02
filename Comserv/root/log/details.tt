@@ -31,10 +31,10 @@
     <textarea id="details" name="details" required rows="4" cols="50">[% log.details %]</textarea><br>
 
     <label for="start_time">Start Time:</label><br>
-    <input type="time" id="start_time" name="start_time" value="[% log.start_time %]"><br>
+    <input type="time" id="start_time" name="start_time" value="[% start_time_disp OR log.start_time %]"><br>
 
     <label for="end_time">End Time:</label><br>
-    <input type="time" id="end_time" name="end_time" value="[% log.end_time %]"><br>
+    <input type="time" id="end_time" name="end_time" value="[% end_time OR log.end_time %]"><br>
 
 <label for="group_of_poster">Group of Poster:</label><br>
 <input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]"><br>

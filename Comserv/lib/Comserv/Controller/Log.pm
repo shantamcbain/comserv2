@@ -2,6 +2,7 @@ package Comserv::Controller::Log;
 use Moose;
 use namespace::autoclean;
 use DateTime;
+use Comserv::Util::AppTime;
 use DateTime::TimeZone;
 use DateTime::Format::Strptime;
 use Data::Dumper;
@@ -111,15 +112,23 @@ sub details :Path('/log/details') :Args(0) {
     my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
 
     if ($log) {
-        # Get the current local time
-        my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
+        # Defaults and stored TIME fields shown in viewer zone.
+        my $current_time = Comserv::Util::AppTime->now_user_hm($c);
+        my $st = eval { $log->start_time } // '';
+        my $et = eval { $log->end_time } // '';
+        my $start_disp = ($st && $st ne '00:00:00')
+            ? substr( Comserv::Util::AppTime->hms_utc_to_user( $c, "$st" ), 0, 5 )
+            : '';
+        my $end_disp = ($et && $et ne '00:00:00')
+            ? substr( Comserv::Util::AppTime->hms_utc_to_user( $c, "$et" ), 0, 5 )
+            : $current_time;
 
-        # Pass the log entry and dropdown data to the template
         $c->stash(
             log            => $log,
             build_priority => $self->priority,
             build_status   => $self->status,
-            end_time       => $current_time, # Use $current_time here
+            start_time_disp => $start_disp,
+            end_time        => $end_disp,
             template       => 'log/details.tt'
         );
     } else {
@@ -157,35 +166,30 @@ sub update :Path('/log/update') :Args(0) {
     # Get the status from the form data
     my $status = $c->request->body_parameters->{status};
 
-    # Create a DateTime::Format::Strptime object for parsing the time strings
+    # Form times are viewer wall clock; duration in that zone; store as UTC.
     my $strp = DateTime::Format::Strptime->new(
         pattern   => '%H:%M',
-        time_zone => 'local',
+        time_zone => Comserv::Util::AppTime->timezone_for($c),
     );
 
-    # Convert the start_time string to a DateTime object
     my $start_time = $strp->parse_datetime($start_time_str);
     my $end_time;
     my $time;
 
-    # Calculate the elapsed time only if the status is set to 'DONE' (3)
-    if ($status == 3) {
-        # Set the end_time to the current time
-        $end_time = DateTime->now(time_zone => 'local');
-
-        # Calculate the difference between the end time and the start time
-        my $duration = $end_time->subtract_datetime($start_time);
-
-        # Convert the duration to the format 'HH:MM'
-        $time = sprintf("%02d:%02d", $duration->hours, $duration->minutes);
-
-        # Update the end_time_str to the current time
+    if ( defined $status && $status == 3 ) {
+        $end_time = Comserv::Util::AppTime->now_user_dt($c);
+        if ($start_time) {
+            my $duration = $end_time->clone->subtract_datetime($start_time);
+            $time = sprintf("%02d:%02d", $duration->hours, $duration->minutes);
+        }
+        else {
+            $time = $c->request->body_parameters->{time};
+        }
         $end_time_str = $end_time->strftime('%H:%M');
     }
     else {
-        # If not 'DONE', use the provided end_time_str and do not calculate time
-        $end_time = $strp->parse_datetime($end_time_str);
-        $time = $c->request->body_parameters->{time}; # Use existing time value
+        $end_time = $strp->parse_datetime($end_time_str) if defined $end_time_str && length $end_time_str;
+        $time = $c->request->body_parameters->{time};
         
         # Ensure time is not undef - set default value if empty or undefined
         if (!defined $time || $time eq '') {
@@ -209,6 +213,18 @@ sub update :Path('/log/update') :Args(0) {
         "Setting group_of_poster to: $group_of_poster"
     );
 
+    # Store TIME columns as UTC (form values are viewer wall clock).
+    my $start_store = $start_time_str // '';
+    my $end_store   = $end_time_str // '';
+    $start_store = '00:00:00' if $start_store eq '';
+    $end_store   = '00:00:00' if $end_store eq '';
+    if ( $start_store ne '00:00:00' ) {
+        $start_store = Comserv::Util::AppTime->hms_user_to_utc( $c, $start_store );
+    }
+    if ( $end_store ne '00:00:00' ) {
+        $end_store = Comserv::Util::AppTime->hms_user_to_utc( $c, $end_store );
+    }
+
     # Get the new values from the form data
     my $new_values = {
         sitename        => $c->request->body_parameters->{sitename},
@@ -217,8 +233,8 @@ sub update :Path('/log/update') :Args(0) {
         due_date        => $c->request->body_parameters->{due_date},
         abstract        => $c->request->body_parameters->{abstract},
         details         => $c->request->body_parameters->{details},
-        start_time      => $start_time_str,
-        end_time        => $end_time_str,
+        start_time      => $start_store,
+        end_time        => $end_store,
         time            => $time,
         group_of_poster => $group_of_poster, # Use the converted string value
         status          => $status,
@@ -302,11 +318,9 @@ sub log_form :Path('/log/log_form') :Args() {
     my $todo = Comserv::Model::Todo->new();
     my $todo_record = $todo_record_id ? $todo->fetch_todo_record($c, $todo_record_id) : undef;
 
-    # Get the current time
-    my $current_time = DateTime->now->strftime('%H:%M:%S');
-
-    # We'll use the current time for both start_time and end_time by default
-    my $current_time_short = DateTime->now->strftime('%H:%M');
+    # Form defaults = viewer wall clock; create_log converts to UTC on write.
+    my $current_time_short = Comserv::Util::AppTime->now_user_hm($c);
+    my $current_time       = Comserv::Util::AppTime->now_user_hms($c);
 
     # Fetch project data from the Project Controller
     my $project_controller = $c->controller('Project');
@@ -339,9 +353,9 @@ sub log_form :Path('/log/log_form') :Args() {
         status         => $todo_record ? $todo_record->status     : ($p->{status}   || ''),
         project_id     => $todo_record ? $todo_record->project_id : ($p->{project_id} || ''),
         todo_record_id => $todo_record ? $todo_record->record_id  : $todo_record_id,
-        start_date     => $todo_record ? $todo_record->start_date : ($p->{start_date} || DateTime->now->ymd),
+        start_date     => $todo_record ? $todo_record->start_date : ($p->{start_date} || Comserv::Util::AppTime->today_ymd_for($c)),
         site_name      => $todo_record ? $todo_record->sitename   : ($p->{site_name} || $c->session->{SiteName}),
-        due_date       => $todo_record ? $todo_record->due_date   : ($p->{due_date}  || DateTime->now->ymd),
+        due_date       => $todo_record ? $todo_record->due_date   : ($p->{due_date}  || Comserv::Util::AppTime->today_ymd_for($c)),
         abstract       => $todo_record ? $todo_record->subject    : ($p->{abstract}  || ''),
         details        => $todo_record ? $todo_record->description: ($p->{details}   || ''),
         comments       => $todo_record ? $todo_record->comments   : ($p->{comments}  || ''),
@@ -423,7 +437,7 @@ sub create_log :Path('/log/create_log') :Args() {
         return;
     }
 
-    # Retrieve start_time and end_time from form data
+    # Retrieve start_time and end_time from form data (viewer wall clock).
     my $start_time = $c->request->body_parameters->{start_time};
     my $end_time = $c->request->body_parameters->{end_time};
 
@@ -431,9 +445,24 @@ sub create_log :Path('/log/create_log') :Args() {
     $start_time = '00:00:00' if !defined $start_time || $start_time eq '';
     $end_time = '00:00:00' if !defined $end_time || $end_time eq '';
 
-    # Calculate time difference
-    my ($start_hour, $start_min, $start_sec) = split(':', $start_time);
-    my ($end_hour, $end_min, $end_sec) = split(':', $end_time);
+    # Normalize to HH:MM:SS then convert wall clock → UTC for storage
+    # (matches TodoLog / automated paths).
+    for my $t ( \$start_time, \$end_time ) {
+        $$t = "$$t:00" if $$t =~ /^\d{1,2}:\d{2}$/;
+    }
+    my $start_time_local = $start_time;
+    my $end_time_local   = $end_time;
+    $start_time = Comserv::Util::AppTime->hms_user_to_utc( $c, $start_time_local )
+        unless $start_time_local eq '00:00:00';
+    $end_time = Comserv::Util::AppTime->hms_user_to_utc( $c, $end_time_local )
+        unless $end_time_local eq '00:00:00';
+    # Open-log sentinel stays 00:00:00 end_time.
+    $start_time = '00:00:00' if $start_time_local eq '00:00:00';
+    $end_time   = '00:00:00' if $end_time_local eq '00:00:00';
+
+    # Duration from the wall-clock values the user actually entered.
+    my ($start_hour, $start_min, $start_sec) = split(':', $start_time_local);
+    my ($end_hour, $end_min, $end_sec) = split(':', $end_time_local);
 
     # Ensure we have valid numeric values
     $start_hour = int($start_hour // 0);
@@ -449,7 +478,7 @@ sub create_log :Path('/log/create_log') :Args() {
     my $seconds = 0; # Assuming there are no seconds in the time difference
     my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
-    my $current_date = DateTime->now->ymd;
+    my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
 
     # Get the project_id from the form
     my $project_id = $c->request->body_parameters->{project_id} || '0'; # Default to '0' if not provided
@@ -517,7 +546,7 @@ sub create_log :Path('/log/create_log') :Args() {
         status           => $c->request->body_parameters->{status},
         priority         => $c->request->body_parameters->{priority},
         last_mod_by      => $c->session->{username},
-        last_mod_date    => DateTime->now->ymd,
+        last_mod_date    => Comserv::Util::AppTime->today_ymd_for($c),
         comments         => $c->request->body_parameters->{comments},
         points_processed => 0,
     });

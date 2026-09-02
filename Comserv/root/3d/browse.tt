@@ -30,6 +30,12 @@
     border-radius: 4px;
     cursor: pointer;
 }
+.browse-3d-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    margin: 0 0 1em 0;
+}
 .model-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -141,11 +147,23 @@
     <h1>Browse 3D Models</h1>
     <div class="browse-3d-search">
         <form method="get" action="/3d/browse">
+            <input type="hidden" name="kind" value="[% kind | html %]">
             <input type="text" name="q" value="[% q | html %]" placeholder="Search models…">
             <button type="submit"><i class="icon-search"></i> Search</button>
         </form>
     </div>
 </div>
+
+<p class="browse-3d-filters">
+    [% SET kinds = [ { id => 'product', label => 'Units' },
+                     { id => 'part',    label => 'Printable parts' },
+                     { id => 'sign',    label => 'Signs' },
+                     { id => 'all',     label => 'All' } ] %]
+    [% FOREACH k IN kinds %]
+    <a href="/3d/browse?kind=[% k.id %][% IF q %]&amp;q=[% q | uri %][% END %]"
+       class="btn-sm[% UNLESS kind == k.id %] secondary[% END %]">[% k.label %]</a>
+    [% END %]
+</p>
 
 [% IF c.session.username %]
 <p style="margin-bottom:1em;">
@@ -167,12 +185,19 @@
         </div>
         <p>[% model.description | truncate(100) | html %]</p>
         <div class="model-card-actions">
+            [% IF model.item_id %]
+            <a href="/Inventory/item/view/[% model.item_id %]" class="btn-sm"><i class="icon-view"></i> Inventory</a>
+            [% ELSE %]
             <a href="/3d/model/[% model.id %]" class="btn-sm"><i class="icon-view"></i> View</a>
+            [% END %]
             [% IF c.session.user_id %]
-            <a href="/3d/order?model_id=[% model.id %]" class="btn-sm secondary"><i class="icon-print"></i> Order</a>
+            <a href="/3d/model/[% model.id %]" class="btn-sm secondary"><i class="icon-print"></i> Order</a>
             [% END %]
             [% IF model.source == 'sign_generator' %]
-            <a href="/signgenerator/pdf/[% model.id %]" class="btn-sm secondary" target="_blank" title="Open the saved sign layout PDF"><i class="icon-doc"></i> Sign layout</a>
+            <a href="[% c.uri_for('/signgenerator/pdf', [model.id]) %]" class="btn-sm secondary" target="_blank" title="Open the saved sign layout PDF"><i class="icon-doc"></i> Sign layout</a>
+            [% IF c.session.user_id %]
+            <a href="[% c.uri_for('/signgenerator/delete', [model.id]) %]">Delete</a>
+            [% END %]
             [% END %]
         </div>
         [% IF sign_meta.exists(model.id) %]
@@ -194,7 +219,7 @@
         <div class="sign-preview">
             <object data="/signgenerator/pdf/[% model.id %]" type="application/pdf"
                     style="width:100%;height:200px;border:1px solid var(--border-color,#888);border-radius:4px;">
-                <a href="/signgenerator/pdf/[% model.id %]" target="_blank">Open sign layout PDF</a>
+                <a href="[% c.uri_for('/signgenerator/pdf', [model.id]) %]" target="_blank">Open sign layout PDF</a>
             </object>
         </div>
         [% END %]

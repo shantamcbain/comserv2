@@ -608,7 +608,7 @@ sub details :Path('details') :Args(0) {
 
     # Fetch recent AI conversations linked to this project
     my @ai_conversations;
-    my $schema = $c->model('DBEncy');
+    $schema = $c->model('DBEncy');
     eval {
         @ai_conversations = $schema->resultset('AiConversation')->search(
             { project_id => $project_id },

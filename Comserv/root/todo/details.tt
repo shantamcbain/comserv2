@@ -224,7 +224,7 @@
     <tr><th align="left">Last Modified Date</th>
         <td>[% record.get_column('last_mod_date') %]</td></tr>
     <tr><th align="left">Date Posted</th>
-        <td>[% record.get_column('date_time_posted') %]</td></tr>
+        <td>[% record.get_column('date_time_posted') | user_time %]</td></tr>
     [% IF record.get_column('comments') %]
     <tr><th align="left">Comments</th>
         <td style="white-space:pre-wrap">[% record.get_column('comments') | html %]</td></tr>

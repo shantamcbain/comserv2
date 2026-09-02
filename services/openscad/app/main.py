@@ -216,12 +216,18 @@ async def render_3mf(req: RenderRequest):
         raise HTTPException(400, "provide exactly one of template_name or scad_source")
 
     # Params that are NOT OpenSCAD variables (they are used here, in Python):
-    #   plate_color / text_color  -> per-part colours
-    #   _parts                    -> which parts to include
+    #   plate_color / text_color              -> per-part colours (hex)
+    #   plate_filament_type / text_filament_type
+    #   plate_filament_color / text_filament_color  -> human names (PLA / Green)
+    #   _parts                                -> which parts to include
     # Strip them before building the -D argv so they never reach openscad.
     raw = dict(req.params)
     plat = str(raw.pop("plate_color", None) or "#d8cfa8")
     textc = str(raw.pop("text_color", None) or "#4a3b18")
+    plat_type = str(raw.pop("plate_filament_type", None) or "").strip()
+    text_type = str(raw.pop("text_filament_type", None) or "").strip()
+    plat_name = str(raw.pop("plate_filament_color", None) or "").strip()
+    text_name = str(raw.pop("text_filament_color", None) or "").strip()
     _parts_raw = raw.pop("_parts", None)
     parts = (list(_parts_raw)
              if isinstance(_parts_raw, (list, tuple)) else ["base", "text"])
@@ -231,7 +237,24 @@ async def render_3mf(req: RenderRequest):
         params.update(_qr_matrix_params(req.qr_data))
         params["qr_enable"] = True
 
-    part_colors = {"base": plat, "text": textc}
+    def _obj_name(part: str, ftype: str, cname: str) -> str:
+        bits = [part] + [b for b in (ftype, cname) if b]
+        return " ".join(bits)
+
+    part_meta = {
+        "base": {
+            "color": plat,
+            "filament_type": plat_type,
+            "filament_color": plat_name,
+            "name": _obj_name("base", plat_type, plat_name),
+        },
+        "text": {
+            "color": textc,
+            "filament_type": text_type,
+            "filament_color": text_name,
+            "name": _obj_name("text", text_type, text_name),
+        },
+    }
     valid = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
     async with _render_sem:
@@ -267,8 +290,14 @@ async def render_3mf(req: RenderRequest):
                 if proc.returncode != 0 or not off_path.is_file():
                     detail = stderr.decode(errors="replace")[-2000:]
                     raise HTTPException(422, f"openscad part '{part}' failed: {detail}")
-                items.append({"path": str(off_path),
-                              "color": part_colors.get(part, "#cccccc")})
+                meta = part_meta.get(part, {"color": "#cccccc", "name": part})
+                items.append({
+                    "path": str(off_path),
+                    "color": meta.get("color", "#cccccc"),
+                    "name": meta.get("name") or part,
+                    "filament_type": meta.get("filament_type") or "",
+                    "filament_color": meta.get("filament_color") or "",
+                })
 
             if not items:
                 raise HTTPException(422, "no parts rendered")
@@ -321,9 +350,17 @@ def _build_3mf(items: list[dict]) -> bytes:
     ET.register_namespace("", NS)
     ET.register_namespace("p", P_NS)
 
-    meshes = [(verts, tris, it["color"])
-              for it in items
-              for (verts, tris) in (_parse_off(it["path"]),)]
+    meshes = []
+    for it in items:
+        verts, tris = _parse_off(it["path"])
+        meshes.append({
+            "verts": verts,
+            "tris": tris,
+            "color": it.get("color") or "#cccccc",
+            "name": it.get("name") or "",
+            "filament_type": it.get("filament_type") or "",
+            "filament_color": it.get("filament_color") or "",
+        })
 
     def mesh_xml(verts, tris):
         mesh = ET.Element(f"{{{NS}}}mesh")
@@ -343,16 +380,26 @@ def _build_3mf(items: list[dict]) -> bytes:
 
     objects = ET.Element(f"{{{NS}}}objects")
     item_ids = []
-    for idx, (verts, tris, color) in enumerate(meshes, start=1):
+    for idx, mesh in enumerate(meshes, start=1):
         obj = ET.SubElement(objects, f"{{{NS}}}object")
         obj.set("id", str(idx))
         obj.set("type", "model")
+        if mesh["name"]:
+            obj.set("name", mesh["name"])
         obj.set(f"{{{P_NS}}}uuid", f"00000000-0000-0000-0000-{idx:012d}")
         meta = ET.SubElement(obj, f"{{{P_NS}}}metadata")
         meta.set("name", "color")
         meta.set("type", "http://schemas.microsoft.com/3dmanufacturing/material/color")
-        meta.text = "#" + _safe_color(color)
-        obj.append(mesh_xml(verts, tris))
+        meta.text = "#" + _safe_color(mesh["color"])
+        if mesh["filament_type"]:
+            mt = ET.SubElement(obj, f"{{{P_NS}}}metadata")
+            mt.set("name", "filament_type")
+            mt.text = mesh["filament_type"]
+        if mesh["filament_color"]:
+            mc = ET.SubElement(obj, f"{{{P_NS}}}metadata")
+            mc.set("name", "filament_color")
+            mc.text = mesh["filament_color"]
+        obj.append(mesh_xml(mesh["verts"], mesh["tris"]))
         item_ids.append(idx)
 
     build = ET.Element(f"{{{NS}}}build")
