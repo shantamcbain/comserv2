@@ -191,7 +191,7 @@
                     [% ELSE %]&mdash;[% END %]
                 </td>
                 <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
-                <td>[% IF job.started_at %][% job.started_at %][% ELSE %]&mdash;[% END %]</td>
+                <td>[% IF job.started_at %][% job.started_at %][% IF job.elapsed_human %]<br><small style="color:var(--text-muted-color);">[% job.elapsed_human %] elapsed</small>[% END %][% ELSE %]&mdash;[% END %]</td>
                 <td>
                     <form method="post" action="/3d/queue" class="complete-form"
                           data-started-at="[% job.started_at || '' %]"
@@ -203,12 +203,14 @@
                         <input type="hidden" name="action" value="complete">
                         <label style="font-size:0.82em;color:var(--text-color);">Time:</label>
                         <input type="number" name="print_hours_h" min="0" max="999"
+                               value="[% job.elapsed_h %]"
                                style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="h" title="Hours">
+                               placeholder="h" title="[% IF job.started_at %]Elapsed since assigned: [% job.elapsed_human %][% IF job.bom_print_hours %] — BOM estimate: [% job.bom_print_hours %]h[% END %][% ELSE %]Hours[% END %]">
                         <span style="font-size:0.85em;color:var(--text-color);">h</span>
                         <input type="number" name="print_hours_m" min="0" max="59"
+                               value="[% job.elapsed_m %]"
                                style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="m" title="Minutes">
+                               placeholder="m" title="[% IF job.started_at %]Elapsed since assigned: [% job.elapsed_human %][% IF job.bom_print_hours %] — BOM estimate: [% job.bom_print_hours %]h[% END %][% ELSE %]Minutes[% END %]">
                         <span style="font-size:0.85em;color:var(--text-color);">m</span>
                         <label style="font-size:0.82em;color:var(--text-color);margin-left:0.3em;">Filament&nbsp;(g):</label>
                         <input type="number" name="filament_grams" step="0.01" min="0" max="9999"
@@ -307,8 +309,15 @@
 [% END %]
 
 <script>
+/* Elapsed time is now computed SERVER-SIDE by Comserv::Util::AppTime and
+   rendered into the inputs (value="..."). Do NOT reintroduce JS Date math
+   here: a stored UTC stamp parsed with new Date('YYYY-MM-DD HH:MM:SS') is
+   interpreted as browser-LOCAL time, which is what produced the bogus
+   multi-day runtimes. The controller is the single source for time.
+
+   JS here only fills the BOM estimate when the server had no elapsed value
+   (i.e. no started_at), and pre-fills filament grams from the BOM. */
 document.querySelectorAll('.complete-form').forEach(function(form) {
-    var startedAt = form.dataset.startedAt;
     var bomHours  = parseFloat(form.dataset.bomHours) || 0;
     var bomGrams  = parseFloat(form.dataset.bomGrams)  || 0;
     var qty       = parseInt(form.dataset.quantity) || 1;
@@ -317,33 +326,14 @@ document.querySelectorAll('.complete-form').forEach(function(form) {
     var mInput = form.querySelector('[name="print_hours_m"]');
     var gInput = form.querySelector('[name="filament_grams"]');
 
-    if (hInput && mInput) {
-        if (bomHours) {
-            var totalMin = Math.round(bomHours * qty * 60);
-            hInput.value = Math.floor(totalMin / 60);
-            mInput.value = totalMin % 60;
-            var hint = 'BOM estimate × ' + qty + ' item(s)';
-            if (startedAt) {
-                var started = new Date(startedAt.replace(' ', 'T'));
-                if (!isNaN(started.getTime())) {
-                    var elapsedMin = Math.floor((Date.now() - started.getTime()) / 60000);
-                    hint += ' — elapsed since assigned: ' + Math.floor(elapsedMin/60) + 'h ' + (elapsedMin%60) + 'm';
-                }
-            }
-            hInput.title = hint;
-            mInput.title = hint;
-        } else if (startedAt) {
-            var started2 = new Date(startedAt.replace(' ', 'T'));
-            if (!isNaN(started2.getTime())) {
-                var elapsedMin2 = Math.floor((Date.now() - started2.getTime()) / 60000);
-                if (elapsedMin2 > 0) {
-                    hInput.value = Math.floor(elapsedMin2 / 60);
-                    mInput.value = elapsedMin2 % 60;
-                    hInput.title = 'Elapsed since job assigned (no BOM data)';
-                    mInput.title = hInput.title;
-                }
-            }
-        }
+    /* Only fall back to the BOM estimate if the server left the boxes empty
+       (no started_at). Never overwrite a measured elapsed value. */
+    if (hInput && mInput && !hInput.value && !mInput.value && bomHours) {
+        var totalMin = Math.round(bomHours * qty * 60);
+        hInput.value = Math.floor(totalMin / 60);
+        mInput.value = totalMin % 60;
+        hInput.title = 'BOM estimate x ' + qty + ' item(s) - no start time recorded';
+        mInput.title = hInput.title;
     }
 
     if (bomGrams && gInput && !gInput.value) {

@@ -33,6 +33,7 @@
                 <a href="#plans" class="doc-navlink">Child plans</a>
                 <a href="#order" class="doc-navlink">Work order</a>
                 <a href="#cross" class="doc-navlink">Cross-plan</a>
+                <a href="#labour" class="doc-navlink">Labour tracking</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
                 <a href="#see-also" class="doc-navlink">See Also</a>
             </div>
@@ -206,6 +207,96 @@
                     <td class="doc-td">PDF BOM exploded; configs orderable</td>
                 </tr>
             </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="labour" class="doc-h2">6. Labour tracking (human time around a print)</h2>
+            <p class="doc-body">
+                <strong>The gap.</strong> <code>printing_3d_jobs</code> records
+                <em>machine</em> time (<code>print_hours</code>) and filament, and since
+                2026-09-02 the Complete button pre-fills measured elapsed time. None of the
+                <em>manual</em> work is captured anywhere: cleaning and support removal,
+                picking and kitting, bagging, labelling, packing, and QC. Until that is
+                recorded, "cost per part" silently excludes most of the labour and every
+                quote is a guess.
+            </p>
+            <p class="doc-body">
+                User direction (2026-09-03): print time is fine for now — what is missing is
+                a way to record time spent cleaning a part, picking parts, and so on.
+            </p>
+
+            <h3 class="doc-h3">Design rules</h3>
+            <ul class="doc-body">
+                <li><strong>One time authority.</strong> All duration math goes through
+                    <code>Comserv::Util::AppTime</code> (<code>duration_parts</code>,
+                    <code>duration_human</code>, <code>duration_hm</code>), computed
+                    server-side. Never JS <code>new Date()</code> arithmetic on a stored
+                    stamp — that misreads a UTC value as browser-local time.
+                    See section 5 note and the AppTime changelog entry.</li>
+                <li><strong>Reuse, do not rebuild.</strong> Prefer the existing log/todo
+                    time model (<code>accumulative_time</code>,
+                    <code>estimated_man_hours</code>, start/end time on the log table).
+                    The 3d subsystem needs no new table for most features.</li>
+                <li><strong>If a table is genuinely required</strong>, it must be
+                    Result-file-first via schema-compare. The <code>schema</code> branch
+                    owns DDL — no hand-written DDL, and no <code>add_index</code>
+                    (use <code>add_unique_constraint</code>).</li>
+            </ul>
+
+            <h3 class="doc-h3">Phases</h3>
+            <table class="doc-table">
+                <tr>
+                    <th class="doc-th">#</th>
+                    <th class="doc-th">Phase</th>
+                    <th class="doc-th">Gate</th>
+                </tr>
+                <tr>
+                    <td class="doc-td">1</td>
+                    <td class="doc-td">Decide where labour time lives (log rows vs new table);
+                        record the decision here.</td>
+                    <td class="doc-td">Decision written in this section</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">2</td>
+                    <td class="doc-td">Capture UI on the job — "Log labour" on
+                        <code>/3d/queue</code> and the job page: category
+                        (clean / pick / pack / qc / other), start/end, notes. Optional,
+                        so the queue stays fast.</td>
+                    <td class="doc-td">A labour entry can be saved against a job</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">3</td>
+                    <td class="doc-td">Roll up into job cost: show machine and labour
+                        separately on the completed table. Add labour into
+                        <code>total_cost</code> only once confirmed.</td>
+                    <td class="doc-td">Completed row shows both components</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">4</td>
+                    <td class="doc-td">Reporting: cost per part including labour,
+                        by part and by material.</td>
+                    <td class="doc-td">Report available to the operator</td>
+                </tr>
+            </table>
+
+            <h3 class="doc-h3">Out of scope (deliberately)</h3>
+            <ul class="doc-body">
+                <li><strong>Printer telemetry</strong> — reading actual print time from the
+                    printer is the Anycubic LAN adapter work (todo #2334). This section is
+                    about <em>human</em> time only.</li>
+                <li><strong>Changing what the Complete button records</strong> — machine
+                    elapsed is already correct; leave it alone.</li>
+            </ul>
+
+            <p class="doc-body">
+                <strong>Tracking:</strong>
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2390" class="doc-link">todo #2390</a>
+                (P1, project #272 DRYER-INT) — "track labour time (cleaning, picking,
+                packing, QC) per print job".
+            </p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
