@@ -17,8 +17,8 @@ has 'logging' => (
 sub execute_query {
     my ($self, $c, $conn_name, $query, $params) = @_;
     
-    # Get the RemoteDB model
-    my $remote_db = $c->model('RemoteDB');
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->from_context($c);
     
     # Check if the connection exists
     unless (exists $remote_db->connections->{$conn_name}) {
@@ -170,7 +170,8 @@ sub delete_row {
 sub get_connections {
     my ($self, $c) = @_;
     
-    my $remote_db = $c->model('RemoteDB');
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->from_context($c);
     return [sort keys %{$remote_db->connections}];
 }
 
@@ -178,7 +179,8 @@ sub get_connections {
 sub connection_exists {
     my ($self, $c, $conn_name) = @_;
     
-    my $remote_db = $c->model('RemoteDB');
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->from_context($c);
     return exists $remote_db->connections->{$conn_name};
 }
 
@@ -186,7 +188,8 @@ sub connection_exists {
 sub get_dbh {
     my ($self, $c, $conn_name) = @_;
     
-    my $remote_db = $c->model('RemoteDB');
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->from_context($c);
     return $remote_db->get_connection($c, $conn_name);
 }
 

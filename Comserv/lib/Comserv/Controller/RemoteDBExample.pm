@@ -41,7 +41,8 @@ sub index :Path :Args(0) {
     my $example_data;
     if ($self->remote_db_util->connection_exists($c, $conn_name)) {
         # Get the list of tables first
-        my $remote_db = $c->model('RemoteDB');
+        require Comserv::Model::RemoteDB;
+        my $remote_db = Comserv::Model::RemoteDB->from_context($c);
         my $tables = $remote_db->list_tables($c, $conn_name);
         
         if ($tables && @$tables > 0) {

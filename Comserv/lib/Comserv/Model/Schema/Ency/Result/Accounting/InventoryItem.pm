@@ -213,7 +213,12 @@ __PACKAGE__->add_columns(
         set_on_create => 1,
         set_on_update => 1,
     },
-);
+
+    selling_price => {
+        data_type => 'decimal',
+        size => [10, 2],
+        is_nullable => 1,
+    });
 
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(unique_sku => ['sku']);
