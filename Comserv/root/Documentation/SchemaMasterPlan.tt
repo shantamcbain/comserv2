@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "database,schema-management,coordination"
-   page_version = "1.2"
-   last_updated = "Fri Aug 29 2026 (v1.2 — SCPG-REMOTEDB from_context/PG allowlist noted)"
+   page_version = "1.3"
+   last_updated = "Wed Sep 2 2026 (v1.3 — schema-compare display/DDL/add-field fixes: §11)"
    site_specific = "false"
    project_id = "138"
    project_code = "PLANNING"
@@ -16,7 +16,7 @@
 <h1 id="top">Schema Master Plan — Database System Consolidation</h1>
 
 <div class="last-updated doc-muted">
-    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.2 &nbsp;|&nbsp; Status: COORDINATOR (schema branch)
+    Created: 2026-08-24 &nbsp;|&nbsp; Version: 1.3 &nbsp;|&nbsp; Status: COORDINATOR (schema branch)
 </div>
 
 <p class="mp-back-link"><a href="/Documentation/MASTER_PLAN">← Back to Master Plan</a></p>
@@ -334,7 +334,61 @@ Decided separately; not authoritative schema-branch tracking until re-homed.</p>
 </details></div>
 
 [%# ── §11 Index ── %]
-<div class="card" id="index"><details><summary class="card-header">11. Document index (everything this plan ties together)</summary>
+<div class="card" id="schema-compare-2026-09-02"><details open><summary class="card-header">11. Schema-compare fixes — DONE 2026-09-02 (SCHEMACMP-DISPLAY/DDL/ADD)</summary>
+<div class="card-body">
+<p><strong>Driver.</strong> <code>/admin/schema_compare/server/db-server-1:3307/db/ency/table/inventory_items</code>
+rendered with the DB/table side missing, and “Add to Result” failed twice. Four <strong>root-cause</strong> fixes landed in
+<code>Controller/Admin/SchemaComparison.pm</code>; all verified against the live <code>ency</code> database.</p>
+
+<table class="data-table">
+<thead><tr><th>#</th><th>Symptom</th><th>Root cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr>
+  <td>1</td>
+  <td>Table side vanished; only Result rows (“N result-only”). Looked intermittent — appeared to break on reload or after an unrelated action.</td>
+  <td>Display actions picked a connection with a single <code>grep</code> and used whichever came <em>first in hash order</em>. Groups contain dead rows (<code>YOUR_BACKUP_USERNAME</code> placeholders, offline hosts, wrong-port fallbacks), so the page nondeterministically bound to a dead connection; <code>get_connection()</code> returned undef and the column list came back empty.</td>
+  <td>New <code>_pick_live_connection()</code> — walks the group in priority order and returns the first handle that actually connects. Wired into <code>schema_compare_table</code> <em>and</em> <code>schema_compare_database</code> (same flaw in both).</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>“Add to Result” died: <code>Failed to connect to database 'ency' for DDL via admin user ''</code>.</td>
+  <td>(a) Only <code>db_production_mysql</code> (priority 1, <code>comserv_app</code>) authenticates — <code>db_production_mysql_admin</code> and all other <code>ency</code> connections fail. (b) The credential override was dead code: <code>RemoteDB::get_connection()</code> calls <code>_load_config()</code> internally, which reloads config from disk and <em>discards</em> any override set via <code>$remote_db-&gt;config()</code>.</td>
+  <td>Removed the ineffective swap. <code>_get_fresh_dbh</code> now uses <code>_pick_live_connection()</code>. Safe for read-only callers: <code>get_ency_table_schema</code> only reads metadata (<code>DESCRIBE</code> / <code>information_schema</code> / <code>SHOW INDEX</code>), never DDL. Error now lists every connection tried plus the real DBI error.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>“Add to Result” died: <code>Could not locate field 'selling_price' in result file</code> — nonsense for an ADD.</td>
+  <td>“Update Result” and “Add to Result” both post to <code>sync_table_to_result</code> → <code>update_result_field_from_table</code>, which only called <code>_replace_result_field_block()</code>. That returns undef when the field is absent — so an ADD had no insertion path and died with a replace-only message.</td>
+  <td>New <code>_insert_result_field_block()</code> — locates <code>add_columns( ... )</code> by paren counting and appends the entry before its closing paren, adding the separating comma only when needed and leaving every other field untouched. <code>update_result_field_from_table</code> now tries replace, then insert.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>selling_price</code> written as <code>size =&gt; 10,2,</code>.</td>
+  <td>The DB parser returns a decimal size as the scalar string <code>"10,2"</code>, not an array ref, so <code>ref($sz) eq 'ARRAY'</code> failed and the scalar branch emitted bare-list syntax. It passes <code>perl -c</code> (parses as two list elements) but silently sets <code>size</code> to <code>10</code> with a stray <code>2</code>, losing the scale.</td>
+  <td>Size serialization normalized: <code>"p,q"</code> → <code>[p, q]</code>; plain integers stay scalars; anything else is quoted so bare-list syntax can never be emitted. The written <code>InventoryItem.pm</code> entry was corrected to <code>size =&gt; [10, 2]</code>.</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Verification.</strong> <code>inventory_items</code> now reports <strong>43 DB columns / 43 Result columns — no missing, no extra</strong>.
+Display: 18/18 runs render both sides (previously failing ~2 in 3). Database drill-down lists 216 tables.
+Both <code>.pm</code> files pass <code>perl -c</code>. Changelog fragment:
+<code>changelog/entries/2026-09-02-schema-compare-connection-selection.inc</code>.</p>
+
+<p><strong>Operational note — stale servers.</strong> Two of these fixes appeared “not to work” because the
+<code>:4007</code> server was running a build from hours earlier. The UI <em>does</em> call
+<code>location.reload()</code> on success (<code>admin/schema_compare/fields.tt</code>), so a successful action
+refreshes — but only serves new results if the server has reloaded the changed modules. <strong>When a
+schema-compare fix seems ineffective, check the server start time against the file mtime before
+debugging the code.</strong></p>
+
+<p><strong>Remaining debt (not blocking).</strong> <code>db_production_mysql_admin</code> cannot authenticate. This only
+affects actions that genuinely run DDL (<code>create_table_from_result</code>, drop/alter); the read paths above no
+longer depend on it. Fixing the admin credentials in the secret store is a separate task.</p>
+</div>
+</details></div>
+
+<div class="card" id="index"><details><summary class="card-header">12. Document index (everything this plan ties together)</summary>
 <div class="card-body">
 <ul>
     <li><a href="/Documentation/Schema">Schema.tt</a> — code-first Result-class schema management.</li>
