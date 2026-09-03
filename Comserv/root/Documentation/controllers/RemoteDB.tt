@@ -4,11 +4,11 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "controllers"
-   page_version = "0.01"
-   last_updated = "2026-01-10"
+   page_version = "0.02"
+   last_updated = "2026-08-29"
    site_specific = "false"
 %]
-[% PageVersion = 'Documentation/controllers/RemoteDB.tt,v 0.01 2026/01/10 zencoder Exp - Initial documentation for RemoteDB controller' %]
+[% PageVersion = 'Documentation/controllers/RemoteDB.tt,v 0.02 2026/08/29 shanta Exp - from_context caller rule (#2343)' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -17,10 +17,10 @@
     <h1 style="color: var(--text-color); font-family: var(--header-font);">RemoteDB Controller</h1>
     
     <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-        Last Updated: 2026-01-10 | 
-        Version: 0.01 |
-        Author: Zencoder | 
-        Status: New Documentation
+        Last Updated: 2026-08-29 | 
+        Version: 0.02 |
+        Author: Shanta | 
+        Status: Updated for from_context
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
@@ -46,6 +46,7 @@
         <div class="col-100">
             <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">The RemoteDB controller manages connections to remote databases within the Comserv system. It provides functionality for adding, viewing, querying, and removing remote database connections, allowing administrators to interact with external databases through a web interface.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Implementation note (2026-08-29):</strong> The controller resolves the model via <code>_remote_db($c)</code> → <code>Comserv::Model::RemoteDB-&gt;from_context($c)</code>. Do not call Moose accessors on a bare <code>$c-&gt;model('RemoteDB')</code> result — that path caused the <code>/remotedb</code> HASH-ref crash (todo #2343). See <a href="[% c.uri_for('/Documentation/models/RemoteDB') %]" style="color: var(--link-color);">models/RemoteDB</a>.</p>
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
         </div>
     </div>
@@ -142,7 +143,13 @@ UPDATE table_name SET column = value WHERE id = 1;
             <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="ts-issue1" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Connection Failed</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Cannot establish database connection</p>
-                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Verify host, port, credentials, and network connectivity. Check database server logs.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Verify host, port, credentials, and network connectivity. Check database server logs. For PostgreSQL slots, confirm <code>db_type</code> is <code>postgresql</code> (or postgres/pg) — not a typo that falls outside the allowlist.</p>
+            </div>
+
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-issue-hash" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Can't use string (...RemoteDB) as a HASH ref</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Visiting <code>/remotedb</code> or calling model accessors crashes with a class-name string as HASH ref.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Use <code>Comserv::Model::RemoteDB-&gt;from_context($c)</code> (or this controller's <code>_remote_db</code>). Fixed on schema branch 2026-08-29 (todo #2343). Do not extend Catalyst::Model on RemoteDB.</p>
             </div>
 
             <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
