@@ -1447,6 +1447,21 @@ sub queue :Path('/3d/queue') :Args(0) {
             { Slice => {} }, $sitename);
         @active_jobs = @{ $a_rows // [] };
     };
+
+    # Elapsed time is computed SERVER-SIDE by Comserv::Util::AppTime — the one
+    # time authority. Templates must never do JS Date math: a stored UTC stamp
+    # parsed with new Date('YYYY-MM-DD HH:MM:SS') is read as browser-local time,
+    # which produced wildly wrong runtimes (the ~95h bug). We pass pre-computed
+    # values so the view just renders them.
+    for my $job (@active_jobs) {
+        my $hm = Comserv::Util::AppTime->duration_hm( $job->{started_at} );
+        $job->{elapsed_h}       = $hm->{h};
+        $job->{elapsed_m}       = $hm->{m};
+        $job->{elapsed_human}   = Comserv::Util::AppTime->duration_human( $job->{started_at} );
+        my $d = Comserv::Util::AppTime->elapsed_since( $job->{started_at} );
+        $job->{elapsed_hours}   = $d ? $d->{total_hours} : undef;
+        $job->{elapsed_days}    = $d ? $d->{days} : undef;
+    }
     $queue_error = $@ if $@;
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
         "Queue fetch error: $queue_error") if $queue_error;
