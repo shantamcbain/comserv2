@@ -572,6 +572,9 @@ sub _inventory_transaction {
                 quantity_on_hand  => $new_hand,
                 quantity_reserved => $new_res,
             });
+        } elsif ($type eq 'return') {
+            # Reverse of 'issue' — stock goes back on hand (job reopened, etc.)
+            $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
         } elsif ($type eq 'receive') {
             $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
         }
@@ -1339,6 +1342,21 @@ sub queue :Path('/3d/queue') :Args(0) {
                     }
                 }
 
+            } elsif ($action eq 'reopen') {
+                # Undo a mis-clicked complete/cancel: back to queued + reverse the
+                # inventory side effects (filament issue, finished-goods receipt).
+                # Logic lives in Util::Printing3d (3d.pm is at its size limit).
+                my $res = Comserv::Util::Printing3d->new->reopen_job($c, $job, $self);
+                if ($res && $res->{ok}) {
+                    my $rev = $res->{reversed} || [];
+                    $c->flash->{success_msg} = 'Job #' . $job_id
+                        . ' reopened — back in the queue.'
+                        . (@$rev ? ' Reversed: ' . join('; ', @$rev) . '.' : '');
+                } else {
+                    $c->flash->{error_msg} = 'Could not reopen job #' . $job_id
+                        . ': ' . (($res && $res->{error}) || 'unknown error');
+                }
+
             } elsif ($action eq 'cancel') {
                 my $printer = $job->printer;
                 $job->update({ status => 'cancelled', completed_at => _now() });
@@ -1445,6 +1463,8 @@ sub queue :Path('/3d/queue') :Args(0) {
                    j.quantity, j.print_hours, j.filament_quantity,
                    j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
                    j.completed_at,
+                   j.model_id, j.source_type,
+                   mo.nfs_path AS model_file,
                    pr.name AS printer_name,
                    fi.name AS filament_name,
                    mo.name AS model_name
@@ -1452,7 +1472,7 @@ sub queue :Path('/3d/queue') :Args(0) {
             LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
             LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
             LEFT JOIN inventory_items     fi ON fi.id = j.filament_item_id
-            WHERE j.sitename = ? AND j.status = 'completed'
+            WHERE j.sitename = ? AND j.status IN ('completed','cancelled')
             ORDER BY j.completed_at DESC
             LIMIT $history_limit
         ";

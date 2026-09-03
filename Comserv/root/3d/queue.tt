@@ -240,7 +240,7 @@
 [% IF recent_completed && recent_completed.size %]
 <div class="queue-section">
     <h2 style="display:flex;justify-content:space-between;align-items:center;">
-        <span>Recently Completed — Cost Summary (last [% history_limit %])</span>
+        <span>Recently Completed / Cancelled — Cost Summary (last [% history_limit %])</span>
         <span style="font-size:0.75em;font-weight:normal;display:flex;gap:0.5em;align-items:center;">
             Show:
             [% FOREACH n IN [10, 25, 50, 100, 200] %]
@@ -258,6 +258,7 @@
                 <th>#</th><th>Item / Model</th><th>User</th><th>Printer</th>
                 <th>Hours</th><th>Filament</th><th>Filament $</th><th>Printer $</th><th>Electricity $</th><th>Total $</th>
                 <th>Completed</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -280,6 +281,24 @@
                 [% IF job.total_cost %]$[% job.total_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]
             </td>
             <td>[% job.completed_at %]</td>
+            <td style="white-space:nowrap;">
+                [% IF job.model_id && job.source_type == 'sign' %]
+                <a href="/signgenerator/download/[% job.model_id %]/3mf?job_id=[% job.id %]"
+                   style="font-size:0.8em;color:var(--accent-color,#007bff);display:block;"
+                   title="Two-colour 3MF from the order filament picks">⬇ Download 3MF</a>
+                [% ELSIF job.model_id && job.model_file %]
+                <a href="/3d/model_download/[% job.model_id %]"
+                   style="font-size:0.8em;color:var(--accent-color,#007bff);display:block;"
+                   title="Download model file for slicer">⬇ Download File</a>
+                [% END %]
+                <form method="post" action="/3d/queue" style="display:inline;"
+                      onsubmit="return confirm('Reopen job #[% job.id %]? It goes back to the queue and the filament issue / stock receipt are reversed.')">
+                    <input type="hidden" name="job_id" value="[% job.id %]">
+                    <input type="hidden" name="action" value="reopen">
+                    <button type="submit" class="btn-action btn-assign"
+                        title="Undo a mis-clicked complete/cancel — back to queued">↩ Reopen</button>
+                </form>
+            </td>
         </tr>
         [% END %]
         </tbody>
