@@ -23,6 +23,46 @@ my @SUPERGROK_CHAT_FALLBACK = qw(
     grok-4.20-multi-agent-0309
 );
 
+# x.AI list price table — USD per 1M tokens, standard (< 200k prompt) tier.
+#
+# x.AI's GET /v1/models returns NO pricing field at all. Downstream we used to
+# read that as "price 0" and therefore "free", which labelled every Grok model
+# free (and leaked the whole paid x.AI catalog to guests). This table is the
+# authoritative fallback so cost is displayed and role-filtered correctly.
+#
+# Source: docs.x.ai/developers/pricing (per-million USD). Kept as a table
+# because x.AI publishes no machine-readable price endpoint; entries missing
+# here are reported as price_known => 0 (NOT free) rather than as zero-cost.
+my %XAI_PRICING = (
+    'grok-4.6'                      => [ 2.00,  6.00 ],
+    'grok-4.5'                      => [ 2.00,  6.00 ],
+    'grok-4.3'                      => [ 1.25,  2.50 ],
+    'grok-4.20-0309-reasoning'      => [ 1.25,  2.50 ],
+    'grok-4.20-0309-non-reasoning'  => [ 1.25,  2.50 ],
+    'grok-4.20-multi-agent-0309'    => [ 1.25,  2.50 ],
+    'grok-build-0.1'                => [ 1.00,  2.00 ],
+    'grok-4.1-fast'                 => [ 0.20,  0.50 ],
+    'grok-4-1-fast'                 => [ 0.20,  0.50 ],
+    'grok-4.1-fast-reasoning'       => [ 0.20,  0.50 ],
+    'grok-4.1-fast-non-reasoning'   => [ 0.20,  0.50 ],
+    'grok-3-mini'                   => [ 0.30,  0.50 ],
+    'grok-3'                        => [ 3.00, 15.00 ],
+    'grok-4'                        => [ 3.00, 15.00 ],
+    'grok-2-latest'                 => [ 2.00, 10.00 ],
+    'grok-2'                        => [ 2.00, 10.00 ],
+);
+
+# Look up list price for a model id. Returns (prompt, completion, known).
+# $known is 0 for ids absent from the table — the caller MUST treat those as
+# "cost unknown" (paid-by-default), never as free.
+sub _xai_price {
+    my ($id) = @_;
+    return (undef, undef, 0) unless defined $id && length $id;
+    my $row = $XAI_PRICING{$id};
+    return (undef, undef, 0) unless $row;
+    return ( $row->[0], $row->[1], 1 );
+}
+
 has 'logging' => (
     is      => 'ro',
     lazy    => 1,
@@ -228,10 +268,19 @@ sub _label_models {
     my @out;
     for my $id (@ids) {
         next unless $id && _is_chat_model_id($id);
+
+        # Attach real list price. x.AI's /v1/models carries no pricing, so we
+        # use the local table. $known is 0 when the id is not in the table —
+        # those are NOT free; the UI shows "cost not published" instead of $0.
+        my ($pp, $pc, $known) = _xai_price($id);
+
         push @out, {
             id      => $id,
             label   => $prepaid ? "SuperGrok: $id" : $id,
             prepaid => $prepaid ? 1 : 0,
+            price_prompt     => ($known ? $pp : undef),
+            price_completion => ($known ? $pc : undef),
+            price_known      => $known ? 1 : 0,
         };
     }
     # Pin grok-4.6 first — same as the Hermes SuperGrok picker.
