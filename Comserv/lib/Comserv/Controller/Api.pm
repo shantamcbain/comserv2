@@ -46,10 +46,24 @@ sub _focus_external_models {
             next if $m->{disabled} || $m->{needs_key}; # skip unconfigured stubs
             my $name = $m->{name} // $m->{id} // '';
             next unless $name;
+
+            # Carry real cost through so the picker can show "$X/$Y per 1M"
+            # instead of guessing. price_known == 0 means the provider published
+            # no price (x.AI /v1/models) — the client must render that as
+            # "cost not published", never as "free".
+            my $known = $m->{price_known};
+            $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                       || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+                unless defined $known;
+
             push @out, {
-                name     => $name,
-                provider => $prov,
-                label    => $m->{label} // $name,
+                name             => $name,
+                provider         => $prov,
+                label            => $m->{label} // $name,
+                price_prompt     => $m->{price_prompt},
+                price_completion => $m->{price_completion},
+                price_known      => $known ? 1 : 0,
+                price_tier       => Comserv::Util::ModelCatalog->_price_tier($m),
             };
         }
     };
