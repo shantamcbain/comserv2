@@ -111,6 +111,53 @@
         return 4;
     }
 
+    // ---- cost labelling ----------------------------------------------------
+    // One place that decides how a model's cost is shown, so the chat dropdown
+    // and every other surface can never disagree.
+    //
+    // The bug this fixes: "price missing" was rendered as "free". x.AI's
+    // /v1/models publishes NO pricing, so every Grok model arrived with
+    // price 0 and was labelled free even though it costs real money.
+    // Rule now: only say "free" when the price is known AND zero. Anything
+    // with an unknown price is labelled "cost not published" — it is never
+    // advertised as free.
+    function costKnown(m) {
+        if (!m) return false;
+        if (m.price_known != null) return !!m.price_known;
+        // Server did not send the flag (older cache): infer it. A price is
+        // known only when a numeric price or a raw pricing hash came back.
+        return (m.price_prompt != null || m.price_completion != null || !!m.pricing);
+    }
+
+    function fmtMoney(n) {
+        return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+    }
+
+    function costSuffix(m, svc) {
+        if (!m) return '';
+        if (m.local || svc === 'ollama') return ' — local';
+
+        var pp = Number(m.price_prompt) || 0;
+        var pc = Number(m.price_completion) || 0;
+        var known = costKnown(m);
+
+        // A ":free" slug (OpenRouter) is explicitly published as free.
+        var freeSlug = /(^|:)(free)$/i.test(String(m.value || m.name || ''));
+        if (m.free || freeSlug) return ' — free';
+
+        // Price published but genuinely zero (e.g. stealth/ox-alpha).
+        if (known && pp === 0 && pc === 0) return ' — free';
+
+        // Paid: show the real numbers.
+        if (known && (pp > 0 || pc > 0)) {
+            var tier = m.price_tier || (pp <= 1 && pc <= 1 ? 'cheap' : (pp <= 5 && pc <= 5 ? 'mid' : 'premium'));
+            return ' — $' + fmtMoney(pp) + '/$' + fmtMoney(pc) + ' per 1M (' + tier + ')';
+        }
+
+        // Unknown price — paid by default, never advertised as free.
+        return ' — cost not published';
+    }
+
     // ---- catalog normalization --------------------------------------------
     // Turn any known source shape into the internal flat list.
     function fromFlat(flat) {
@@ -130,6 +177,7 @@
                     price_completion: (m.price_completion != null) ? m.price_completion : 0,
                     pricing: m.pricing || null,
                     price_tier: m.price_tier || null,
+                    price_known: (m.price_known != null) ? !!m.price_known : null,
                     free: !!m.free,
                     local: !!m.local
                 };
@@ -150,7 +198,19 @@
             models.forEach(function (m) {
                 var id = m.id || m.value;
                 if (!id) return;
-                out.push({ value: svc + '|' + id, label: m.label || id, provider: svc });
+                // Carry cost metadata (incl. price_known) through so a provider
+                // that publishes no price is never rendered as "free".
+                out.push({
+                    value: svc + '|' + id,
+                    label: m.label || id,
+                    provider: svc,
+                    price_prompt: (m.price_prompt != null) ? m.price_prompt : null,
+                    price_completion: (m.price_completion != null) ? m.price_completion : null,
+                    price_known: (m.price_known != null) ? !!m.price_known : null,
+                    price_tier: m.price_tier || null,
+                    free: !!m.free,
+                    local: !!m.local
+                });
             });
         });
         return out.length ? out : null;
@@ -293,28 +353,11 @@
                 var text = (svc === 'ollama')
                     ? m.value.split('|').pop()
                     : String(m.label || m.value).replace(/\s*\([^)]*\)\s*$/, '');
-                // Per-token cost marker so the user sees what a choice costs
-                // before picking it (AIMPS-P2 / #254). Formatted in JS because
-                // the server already sends USD-per-1M numbers.
-                var pp = Number(m.price_prompt) || 0;
-                var pc = Number(m.price_completion) || 0;
-                if (m.local) {
-                    text += ' — local';
-                } else if (m.free || (svc === 'openrouter' && /(^|:)(free)$/i.test(m.value))
-                          || (!m.local && !m.pricing && pp === 0 && pc === 0)) {
-                    // Zero-priced external entries (stealth/ox-alpha,
-                    // openrouter/auto, ...) cost nothing — mark them free.
-                    text += ' — free';
-                } else if (pp > 0 || pc > 0 || m.pricing) {
-                    var fmt = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
-                    var tier = m.price_tier || (pp === 0 && pc === 0 ? 'free' : 'paid');
-                    text += ' — $' + fmt(pp) + '/$' + fmt(pc) + ' per 1M (' + tier + ')';
-                }
+                text += costSuffix(m, svc);
                 opt.textContent = text;
                 if (m.value === hy3Value) {
                     pinnedOpt = opt;
-                    opt.textContent = '⚡ tencent/hy3 (OpenRouter) — $' + (Math.round(pp * 100) / 100).toFixed(2)
-                        + '/$' + (Math.round(pc * 100) / 100).toFixed(2) + ' per 1M (' + (m.price_tier || 'paid') + ')';
+                    opt.textContent = '⚡ tencent/hy3 (OpenRouter)' + costSuffix(m, svc);
                 }
                 if (svc === 'openrouter' && /(^|:)(free)$/i.test(m.value)) freeOpenRouterValues.push(m.value);
                 grp.appendChild(opt);
