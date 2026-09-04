@@ -339,6 +339,69 @@ sub hours_between {
     return sprintf( '%.2f', $secs / 3600 );
 }
 
+# ---- durations / elapsed ----------------------------------------------------
+#
+# ONE place for every "how long between A and B" calculation in the app.
+# Templates and JS must NOT do Date arithmetic — that is how the queue page
+# ended up parsing a UTC stamp as browser-local time and showing bogus
+# runtimes. Call these and pass the results to the view.
+
+# Break a span into whole days / hours / minutes. Handles spans over many days.
+# Returns { days, hours, minutes, total_minutes, total_hours, negative } or undef.
+sub duration_parts {
+    my ( $class, $start, $end ) = @_;
+    my $a = $class->parse_stored($start) or return;
+    my $b = $class->parse_stored( $end // $class->now_utc ) or return;
+
+    my $secs = $b->epoch - $a->epoch;
+    my $neg  = $secs < 0 ? 1 : 0;
+    $secs = abs($secs);
+
+    my $total_minutes = int( $secs / 60 );
+    my $days          = int( $total_minutes / 1440 );
+    my $hours         = int( ( $total_minutes % 1440 ) / 60 );
+    my $minutes       = $total_minutes % 60;
+
+    return {
+        days          => $days,
+        hours         => $hours,
+        minutes       => $minutes,
+        total_minutes => $neg ? -$total_minutes : $total_minutes,
+        total_hours   => sprintf( '%.2f', $secs / 3600 ) * ( $neg ? -1 : 1 ),
+        total_seconds => $neg ? -$secs : $secs,
+        negative      => $neg,
+    };
+}
+
+# Elapsed since a stored stamp until now. Same shape as duration_parts.
+sub elapsed_since {
+    my ( $class, $start ) = @_;
+    return $class->duration_parts( $start, $class->now_utc );
+}
+
+# Human string: "2h 35m", or "3d 4h 10m" when the span crosses days.
+sub duration_human {
+    my ( $class, $start, $end ) = @_;
+    my $d = $class->duration_parts( $start, $end ) or return '';
+    my $sign = $d->{negative} ? '-' : '';
+    if ( $d->{days} > 0 ) {
+        return sprintf( '%s%dd %dh %dm', $sign, $d->{days}, $d->{hours}, $d->{minutes} );
+    }
+    return sprintf( '%s%dh %dm', $sign, $d->{hours}, $d->{minutes} );
+}
+
+# Split into whole hours + remainder minutes — for h/m form inputs.
+# Returns { h => N, m => N } (minutes rounded to whole).
+sub duration_hm {
+    my ( $class, $start, $end ) = @_;
+    my $d = $class->duration_parts( $start, $end ) or return { h => 0, m => 0 };
+    my $total = abs( $d->{total_minutes} );
+    return {
+        h => int( $total / 60 ),
+        m => $total % 60,
+    };
+}
+
 # Ensure stash has user_timezone for TT filters (call once per request from Root).
 sub inject_request {
     my ( $class, $c ) = @_;

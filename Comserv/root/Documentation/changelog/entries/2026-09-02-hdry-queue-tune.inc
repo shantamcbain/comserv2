@@ -1,0 +1,10 @@
+<div id="2026-09-02-hdry-queue-tune" class="cl-entry">
+<h3>2026-09-02 — HDRY queue tuned to one base unit (no stocking)</h3>
+<p class="doc-body"><strong>What.</strong> Queue reduced from 28 jobs / 83 units to <b>22 jobs / 51 units</b>, matching the base-unit BOM exactly. Cancelled 6 duplicate TPU gasket jobs (#82&ndash;87, exact dupes of #76&ndash;81 created one minute later at 16:24/16:25). Reduced #57 BBL01 and #60 BLS01 from q2 to q1 (BOM says 1). Verified 0 duplicate part-groups remain.</p>
+<p class="doc-body"><strong>Why.</strong> Objective is one base unit printed as needed &mdash; no spare stock &mdash; so every live job quantity must equal BOM quantity. Over-quantity jobs would have printed parts that are never assembled. Purchased components (screws, magnets, bearings, gasket tape, Polydryer) are correctly absent from the print queue.</p>
+<p class="doc-body"><strong>Important &mdash; 3 already-printed parts are wrong.</strong> These completed BEFORE the mis-link repair, so they printed L2 geometry while labelled L1 and must be re-printed:
+<b>#58 BBR01</b> (q2, 2026-08-27), <b>#61 BR01</b> (q1, 2026-08-30), <b>#63 FL01</b> (q1, 2026-08-31).
+They are <em>not</em> re-queued &mdash; the validator's <code>status IN ('queued','assigned','printing')</code> test sees no live job for them, but a completed job exists. Do not use the physical parts. Note #63's measured values (54.2 g, 5.75 h) are genuine FL02 results and are being kept.</p>
+<p class="doc-body"><strong>Files.</strong> New <code>script/hdry_tune_queue.pl</code> (idempotent, dry-run default, <code>--apply</code> to write). Companion <code>script/hdry_repair_part_links.pl</code>.</p>
+<p class="doc-body"><strong>Remaining gap.</strong> <code>HDry Lite Desiccant Box</code> (bom=1, 3d_printed) has no live job &mdash; its only job #25 was cancelled. <code>FLS02</code> (model 31) still has no STL on disk and cannot be queued. FFL01 printed from the <code>FFL01_no_Sensor</code> variant; confirm that is the intended variant.</p>
+</div>

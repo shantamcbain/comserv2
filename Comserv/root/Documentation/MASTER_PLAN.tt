@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,coordination"
-   page_version = "1.4"
-   last_updated = "Sat Aug 15 2026 (v1.4 — META project link + TOC nav + new-tab bridge)"
+   page_version = "1.5"
+   last_updated = "Fri Aug 29 2026 (v1.5 — G1 SCPG-REMOTEDB done note)"
    site_specific = "false"
    project_id = "138"
    project_code = "PLANNING"
@@ -242,7 +242,7 @@ DailyPlanSystem.tt ────────────────────�
     <li>Remaining (blocks every other plan's schema work):
         <ul>
             <li><strong>G0</strong> document the real topology + the Docker first-run credential bootstrap (container detects missing secrets, prompts first admin user + primary Ency creds; <code>.198</code>/<code>.222</code> planned as K8s DB HA node; live primary <strong>.20:3307</strong>). <em>Blocking — do first.</em></li>
-            <li><strong>G1</strong> Maria create/sync already live in <code>SchemaComparison.pm</code> (not in <code>Util::SchemaCompare</code>). PG half is <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a> (SCHEMAPG #289) — compare cannot create a PG connection or database yet.</li>
+            <li><strong>G1</strong> Maria create/sync already live in <code>SchemaComparison.pm</code> (not in <code>Util::SchemaCompare</code>). PG half is <a href="[% c.uri_for('/Documentation/SchemaComparePostgresPlan') %]">SchemaComparePostgresPlan</a> (SCHEMAPG #289): <strong>SCPG-REMOTEDB DONE 2026-08-29</strong> (<code>from_context</code> + PG allowlist + named <code>get_connection</code>); remaining = SCPG-COMPARE / CREATEDB / DEPLOY (list PG DBs without Maria SQL, first CREATE DATABASE after D1, one Result deploy).</li>
             <li><strong>G2</strong> fold <code>/admin/backup</code> into the schema system.</li>
             <li><strong>G3</strong> strip ~42 raw-SQL lines from <code>Admin/SchemaComparison.pm</code>.</li>
             <li><strong>G4</strong> drift guard (report-only, one-click repair).</li>
