@@ -1,0 +1,6 @@
+<div id="2026-09-04-traveler-location-null" class="cl-entry">
+<h3>2026-09-04 — Traveler put_part_in_pick_box location_id NULL insert</h3>
+<p class="doc-body"><strong>What.</strong> Auto-error-audit todo for item=84: DBIx::Class insert into inventory_stock_levels failed with "Column 'location_id' cannot be null". The code in Traveler.pm:660 created a row without a guaranteed location_id when no InventoryLocation existed for the sitename.</p>
+<p class="doc-body"><strong>Why.</strong> Location lookup/create block (lines 629-650) sets $loc_id but the fallback path for existing $stock (line 656) or edge cases could leave $loc_id undefined. The create() call did not pass a reliable default and the table has NOT NULL constraint (no DB default). Matches similar defensive patterns already used in Controller/Inventory.pm and Controller/3d.pm.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Util/Manufacturing/Traveler.pm:629-668</code> (main fix + defensive $loc_id), <code>Comserv/root/Documentation/changelog/entries/2026-09-04-traveler-location-null.inc</code> (this entry).</p>
+</div>
