@@ -440,10 +440,17 @@ sub reopen_job {
             }
 
             # ---- 2. Reverse the finished-goods receipt (part back out of stock) ----
+            # Mirror completion: prefer model.item_id (printed component), then source/consignment.
             my $printed_item_id;
-            if ($job->source_item_id) {
+            if ($job->model_id) {
+                my $model = eval { $job->model };
+                $printed_item_id = $model->item_id
+                    if $model && eval { $model->item_id };
+            }
+            if (!$printed_item_id && $job->source_item_id) {
                 $printed_item_id = $job->source_item_id;
-            } elsif ($job->consignment_line_id) {
+            }
+            if (!$printed_item_id && $job->consignment_line_id) {
                 $printed_item_id = eval {
                     $schema->storage->dbh->selectrow_array(
                         'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
