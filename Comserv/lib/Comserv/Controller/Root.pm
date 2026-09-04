@@ -278,15 +278,9 @@ sub auto :Private {
             my $now = time();
             if (!defined $_remotedb_status || ($now - $_remotedb_last_checked) > $_REMOTEDB_TTL) {
                 eval {
-                    my $remotedb_class = $c->model('RemoteDB');
-                    my $remotedb;
-                    if (!ref($remotedb_class)) {
-                        require Comserv::Model::RemoteDB;
-                        $remotedb = Comserv::Model::RemoteDB->new();
-                        $remotedb->_load_config();
-                    } else {
-                        $remotedb = $remotedb_class;
-                    }
+                    require Comserv::Model::RemoteDB;
+                    my $remotedb = Comserv::Model::RemoteDB->from_context($c);
+                    $remotedb->_load_config() if ref $remotedb;
                     $_remotedb_status = ($remotedb && ref($remotedb))
                         ? ($remotedb->{configuration_status} // 'ok')
                         : 'ok';
