@@ -1304,11 +1304,21 @@ sub queue :Path('/3d/queue') :Args(0) {
                         "Depreciation transaction failed for job $job_id: $@") if $@;
                 }
 
-                # Inventory: add finished printed item to stock (receive = goods in)
+                # Inventory: add finished printed PART to stock (receive = goods in).
+                # Prefer printing_3d_models.item_id — that is the component that was printed.
+                # source_item_id is often the parent unit/order (e.g. base assembly) and must
+                # NOT receive the finished part or wheel-half stock stays at 0 forever.
                 my $printed_item_id;
-                if ($job->source_item_id) {
+                if ($job->model_id) {
+                    my $model = eval { $job->model };
+                    $printed_item_id = $model->item_id
+                        if $model && eval { $model->item_id };
+                }
+                if (!$printed_item_id && $job->source_item_id) {
+                    # Fallback only when there is no model→item link
                     $printed_item_id = $job->source_item_id;
-                } elsif ($job->consignment_line_id) {
+                }
+                if (!$printed_item_id && $job->consignment_line_id) {
                     $printed_item_id = eval {
                         $schema->storage->dbh->selectrow_array(
                             'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
@@ -1332,14 +1342,20 @@ sub queue :Path('/3d/queue') :Args(0) {
                                 quantity         => $job->quantity || 1,
                                 unit_cost        => $total_cost   || undef,
                                 reference_number => '3D-JOB-' . $job->id,
-                                notes            => sprintf('Printed: %d unit(s) completed — job #%d',
-                                                        $job->quantity || 1, $job->id),
+                                notes            => sprintf('Printed: %d unit(s) completed — job #%d (item %d)',
+                                                        $job->quantity || 1, $job->id, $printed_item_id),
                                 performed_by     => $c->session->{username} || 'system',
                             );
                         };
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
                             "Finished goods receipt failed for job $job_id: $@") if $@;
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                            "Finished goods receipt skipped job $job_id: no inventory_locations for '$sitename'");
                     }
+                } else {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                        "Job $job_id completed with no printable item_id (model.item_id / source_item_id empty) — stock not received");
                 }
 
             } elsif ($action eq 'reopen') {
@@ -1761,6 +1777,7 @@ sub admin :Path('/3d/admin') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_module($c);
     $self->_require_admin($c);
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
 
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
