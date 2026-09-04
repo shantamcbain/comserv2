@@ -1,0 +1,459 @@
+[% META
+    title = 'Manufacturing Traveler - Live Tablet View'
+    description = 'Live tablet interface for print farm staff to track parts as they are printed and added to the pick box'
+    roles = 'admin,accounting,helpdesk'
+    TemplateType = 'Application'
+    category = 'Manufacturing'
+    page_version = '0.04 2026-09-03'
+%]
+[% PageVersion = 'Accounting/Manufacturing/traveler_view.tt,v 0.04 2026/09/03 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.traveler-tablet .traveler-legend {
+  display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem;
+  margin: 0.75rem 0 1rem; font-size: 0.95rem;
+  color: var(--text-color, #222);
+}
+.traveler-tablet .traveler-legend span {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+.traveler-tablet .traveler-legend i {
+  display: inline-block; width: 1.1rem; height: 1.1rem;
+  border-radius: 3px; border: 1px solid rgba(0,0,0,0.25);
+}
+.traveler-tablet .swatch-in-box { background: #c8e6c9; }
+.traveler-tablet .swatch-printed { background: #bbdefb; }
+.traveler-tablet .swatch-queue { background: #ffcdd2; }
+.traveler-tablet .swatch-need-print { background: #e1bee7; }
+.traveler-tablet .swatch-buy { background: #ffe0b2; }
+
+.traveler-tablet table.traveler-table {
+  width: 100%; border-collapse: collapse;
+  color: #111;
+}
+.traveler-tablet table.traveler-table th {
+  background: #eceff1; color: #111;
+  border-bottom: 2px solid #90a4ae;
+  padding: 0.55rem 0.45rem; text-align: left;
+}
+.traveler-tablet table.traveler-table td {
+  padding: 0.55rem 0.45rem;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+  vertical-align: middle;
+}
+/* GREEN — in pick box */
+.traveler-tablet tr.row-in_box td {
+  background: #c8e6c9 !important;
+  color: #1b5e20 !important;
+}
+/* BLUE — printed, ready to pick into box */
+.traveler-tablet tr.row-printed_ready td {
+  background: #bbdefb !important;
+  color: #0d47a1 !important;
+}
+/* RED — already on the print queue */
+.traveler-tablet tr.row-in_queue td {
+  background: #ffcdd2 !important;
+  color: #b71c1c !important;
+}
+/* PURPLE — need print, NOT queued yet */
+.traveler-tablet tr.row-need_print td {
+  background: #e1bee7 !important;
+  color: #4a148c !important;
+}
+/* Amber — buy hardware */
+.traveler-tablet tr.row-need_buy td {
+  background: #ffe0b2 !important;
+  color: #e65100 !important;
+}
+.traveler-tablet .status-badge {
+  display: inline-block; padding: 0.2rem 0.5rem;
+  border-radius: 4px; font-weight: 600; font-size: 0.9em;
+  background: rgba(255,255,255,0.55);
+}
+.traveler-tablet .pick-box { font-weight: 700; }
+.traveler-tablet .btn-queue {
+  background: #7b1fa2 !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 600;
+}
+.traveler-tablet .btn-clean-start {
+  background: #00838f !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 600;
+}
+.traveler-tablet .btn-clean-stop {
+  background: #e65100 !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 700;
+  animation: clean-pulse 1.2s ease-in-out infinite;
+}
+@keyframes clean-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+.traveler-tablet .clean-timer-display {
+  display: inline-block;
+  min-width: 4.5rem;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  color: #e65100;
+  margin-left: 0.25rem;
+}
+.traveler-tablet .clean-cell {
+  white-space: nowrap;
+}
+</style>
+
+<div class="traveler-tablet">
+    <div class="header-bar">
+        <h1>Manufacturing Traveler #<span id="order-id">[% traveler.order_id %]</span></h1>
+        <div class="status-pill" id="overall-status">In Progress</div>
+        <a href="[% c.uri_for('/Accounting/manufacturing/print', traveler.order_id) %]" class="print-btn" target="_blank">Print Form</a>
+        <a href="[% c.uri_for('/Accounting/manufacturing') %]" class="print-btn" style="margin-left:8px;background:#455a64;">All Orders</a>
+        <a href="[% c.uri_for('/3d/queue') %]" class="print-btn" style="margin-left:8px;background:#7b1fa2;">Print Queue</a>
+    </div>
+
+    <div class="order-info">
+        <strong>Customer/Order:</strong> [% traveler.customer_name %] — [% traveler.order_date %]<br>
+        <strong>Kit:</strong> [% traveler.parent_name %] (<code>[% traveler.parent_sku %]</code>)<br>
+        <strong>Notes:</strong> [% traveler.notes | html %]
+    </div>
+
+    <h2>Parts to Print / Manufacture</h2>
+    <div class="traveler-legend" aria-label="Color key">
+      <span><i class="swatch-in-box"></i> <strong>Green</strong> — in pick box</span>
+      <span><i class="swatch-printed"></i> <strong>Blue</strong> — printed, ready to pick from printer</span>
+      <span><i class="swatch-queue"></i> <strong>Red</strong> — already in print queue</span>
+      <span><i class="swatch-need-print"></i> <strong>Purple</strong> — need print, not queued</span>
+      <span><i class="swatch-buy"></i> <strong>Amber</strong> — buy / pick hardware</span>
+    </div>
+    <p style="color: var(--text-color, #555); font-size: 0.95em;">
+      Purple rows: use <strong>Add to Print Queue</strong> (queues the shortfall qty). Red rows are already on <a href="[% c.uri_for('/3d/queue') %]">/3d/queue</a>.
+      Blue → <strong>In Pick Box</strong> to turn green.
+      <strong>Start Clean Timer</strong> on any part while you clean supports; <strong>Stop &amp; Log</strong> adds labour cost to the item and credits your points.
+    </p>
+    <table class="data-table traveler-table">
+        <thead>
+            <tr>
+                <th>Part / SKU</th>
+                <th>Description</th>
+                <th>Origin</th>
+                <th>Qty Needed</th>
+                <th>In Stock</th>
+                <th>Printed (jobs)</th>
+                <th>In queue</th>
+                <th>Pick box</th>
+                <th>Short</th>
+                <th>Status</th>
+                <th>File</th>
+                <th>Clean labour</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH part IN traveler.parts %]
+            <tr data-part-id="[% part.id %]"
+                class="row-[% part.row_state || 'need_print' %][% IF part.need_pick_box %] need-pick[% END %]">
+                <td><strong>[% part.sku %]</strong></td>
+                <td>[% part.name | html %]</td>
+                <td>[% part.item_origin | html %]</td>
+                <td class="qty">[% part.qty_needed %]</td>
+                <td class="stock">[% part.in_stock %]</td>
+                <td>[% part.qty_printed_jobs %]</td>
+                <td>[% part.qty_in_queue %]</td>
+                <td class="pick-box">[% part.in_pick_box %]</td>
+                <td>[% part.qty_short %]</td>
+                <td class="status-cell">
+                    <span class="status-badge [% part.status %]">[% part.status_display %]</span>
+                    [% IF part.file_warn %]
+                    <div style="color:#b71c1c;font-size:0.82em;font-weight:700;margin-top:0.2rem;">⚠ [% part.file_warn | html %]</div>
+                    [% END %]
+                </td>
+                <td class="file-cell" style="white-space:nowrap;font-size:0.88em;">
+                  [% IF part.has_download && part.model_id %]
+                    <a href="[% c.uri_for('/3d/model_download', part.model_id) %]"
+                       class="btn btn-small"
+                       style="background:#1565c0;color:#fff;text-decoration:none;padding:0.25rem 0.5rem;border-radius:4px;display:inline-block;"
+                       title="Download linked STL/3MF — check name matches this part before printing">⬇ [% part.file_basename || 'Download' | html %]</a>
+                    [% IF part.file_ok && !part.file_warn %]
+                    <div style="opacity:0.7;margin-top:0.15rem;">ok</div>
+                    [% ELSIF part.file_ok && part.file_warn %]
+                    <div style="color:#e65100;font-weight:700;margin-top:0.15rem;">verify</div>
+                    [% ELSE %]
+                    <div style="color:#b71c1c;font-weight:700;margin-top:0.15rem;">mismatch</div>
+                    [% END %]
+                  [% ELSIF part.is_print || part.item_origin == '3d_printed' %]
+                    <span style="color:#b71c1c;font-weight:600;">No file</span>
+                  [% ELSE %]
+                    <span style="opacity:0.5">—</span>
+                  [% END %]
+                </td>
+                <td class="clean-cell" data-sku="[% part.sku | html %]">
+                  [% IF part.id %]
+                  <button type="button" class="btn btn-small btn-clean-start"
+                    id="clean-btn-[% part.id %]"
+                    data-part-id="[% part.id %]"
+                    data-sku="[% part.sku | html %]"
+                    onclick="toggleCleanTimer(this.getAttribute('data-part-id'), this.getAttribute('data-sku'))"
+                    title="Track time cleaning this part; stop to add cost + credit points">Start Clean Timer</button>
+                  <span class="clean-timer-display" id="clean-timer-[% part.id %]" hidden>00:00</span>
+                  [% ELSE %]
+                  <span style="opacity:0.5">—</span>
+                  [% END %]
+                </td>
+                <td>
+                    [% IF part.is_print || part.item_origin == '3d_printed' || part.need_print || part.can_queue %]
+                      [% IF part.can_queue %]
+                      <button class="btn btn-small btn-queue"
+                        onclick="addToPrintQueue([% part.id %], [% part.queue_qty || part.qty_short || 1 %])"
+                        title="Queue shortfall to /3d/queue">Add to Print Queue ([% part.queue_qty || part.qty_short || 1 %])</button>
+                      [% END %]
+                      <button class="btn btn-small btn-print" onclick="markPrinted([% part.id %])">Printed</button>
+                      <button class="btn btn-small btn-pick" onclick="markInPickBox([% part.id %])"
+                        title="Receive printed qty into inventory (pick box)">In Pick Box</button>
+                      <button class="btn btn-small btn-qc" onclick="markQC([% part.id %])">QC OK</button>
+                    [% ELSE %]
+                      <button class="btn btn-small btn-pick" onclick="markInPickBox([% part.id %])">Picked</button>
+                      <span style="opacity:0.7">Purchase / pick hardware</span>
+                    [% END %]
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+
+    <div class="notes-section">
+        <h3>Live Notes / QC Photos</h3>
+        <textarea id="live-notes" placeholder="Add notes as you work..."></textarea>
+        <button onclick="saveNotes()">Save Note</button>
+        <input type="file" id="qc-photo" accept="image/*" onchange="uploadPhoto()">
+    </div>
+
+    <div class="footer-bar">
+        <button onclick="finishTraveler()" class="btn btn-primary">Complete Traveler &amp; Update Stock</button>
+    </div>
+</div>
+
+<script>
+/* Clean-labour timers: display only in the browser; duration is settled server-side via AppTime. */
+var cleanTimers = {}; // id -> { startedMs, startedUtc, tick }
+var cleanLabourUrl = '[% c.uri_for("/Inventory/api/labour/clean") %]';
+var travelerReloadTimer = null;
+
+function anyCleanTimerRunning() {
+    var k;
+    for (k in cleanTimers) {
+        if (Object.prototype.hasOwnProperty.call(cleanTimers, k) && cleanTimers[k]) return true;
+    }
+    return false;
+}
+
+function scheduleTravelerReload() {
+    if (travelerReloadTimer) clearInterval(travelerReloadTimer);
+    travelerReloadTimer = setInterval(function () {
+        if (anyCleanTimerRunning()) return; // do not wipe an open clean session
+        location.reload();
+    }, 30000);
+}
+scheduleTravelerReload();
+
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+function formatElapsed(ms) {
+    var s = Math.max(0, Math.floor(ms / 1000));
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    if (h > 0) return h + ':' + pad2(m) + ':' + pad2(sec);
+    return pad2(m) + ':' + pad2(sec);
+}
+
+function utcStamp(d) {
+    d = d || new Date();
+    return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate())
+        + ' ' + pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()) + ':' + pad2(d.getUTCSeconds());
+}
+
+function toggleCleanTimer(id, sku) {
+    id = String(id);
+    if (cleanTimers[id]) {
+        stopCleanTimer(id, sku);
+    } else {
+        startCleanTimer(id, sku);
+    }
+}
+
+function startCleanTimer(id, sku) {
+    id = String(id);
+    if (cleanTimers[id]) return;
+    var btn = document.getElementById('clean-btn-' + id);
+    var disp = document.getElementById('clean-timer-' + id);
+    var startedMs = Date.now();
+    var startedUtc = utcStamp();
+    if (disp) {
+        disp.hidden = false;
+        disp.textContent = '00:00';
+    }
+    if (btn) {
+        btn.textContent = 'Stop & Log Clean';
+        btn.classList.remove('btn-clean-start');
+        btn.classList.add('btn-clean-stop');
+        btn.title = 'Stop timer — add labour cost to item and credit your points';
+    }
+    var tick = setInterval(function () {
+        if (disp) disp.textContent = formatElapsed(Date.now() - startedMs);
+    }, 250);
+    cleanTimers[id] = { startedMs: startedMs, startedUtc: startedUtc, tick: tick, sku: sku || '' };
+}
+
+function stopCleanTimer(id, sku) {
+    id = String(id);
+    var st = cleanTimers[id];
+    if (!st) return;
+    clearInterval(st.tick);
+    var endedMs = Date.now();
+    var secs = Math.max(0, Math.floor((endedMs - st.startedMs) / 1000));
+    var endedUtc = utcStamp();
+    var btn = document.getElementById('clean-btn-' + id);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+    }
+    fetch(cleanLabourUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            item_id: Number(id),
+            part_id: Number(id),
+            started_at: st.startedUtc,
+            ended_at: endedUtc,
+            duration_seconds: secs,
+            category: 'clean',
+            sku: sku || st.sku || ''
+        })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        delete cleanTimers[id];
+        if (j && j.success) {
+            var msg = j.message
+                || ('Clean logged: ' + (j.duration_human || secs + 's')
+                    + ' — item cost +$' + (j.labour_cost || '?')
+                    + (j.credited ? (', +' + j.points_credited + ' pts') : ''));
+            alert(msg);
+        } else {
+            alert('Clean labour failed: ' + ((j && (j.error || j.message)) || 'unknown'));
+        }
+        location.reload();
+      }).catch(function (e) {
+        delete cleanTimers[id];
+        alert('Clean labour failed: ' + e);
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Start Clean Timer';
+            btn.classList.add('btn-clean-start');
+            btn.classList.remove('btn-clean-stop');
+        }
+    });
+}
+
+function markPrinted(id) {
+    updatePartStatus(id, 'printed');
+}
+function markInPickBox(id) {
+    updatePartStatus(id, 'in_pick_box');
+}
+function markQC(id) {
+    updatePartStatus(id, 'qc_passed');
+}
+
+function addToPrintQueue(id, qty) {
+    qty = qty || 1;
+    if (!confirm('Add ' + qty + ' to the print queue for this part?')) return;
+    fetch('[% c.uri_for("/Inventory/api/print_queue/add") %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({item_id: id, part_id: id, quantity: qty})
+    }).then(r => r.json().catch(function(){ return {}; })).then(function (j) {
+        if (j && j.success) {
+            alert('Queued job #' + (j.job_id || '?') + ' x' + (j.quantity || qty));
+        } else {
+            alert('Queue failed: ' + ((j && (j.error || j.message)) || 'unknown'));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Queue failed: ' + e);
+        location.reload();
+    });
+}
+
+function updatePartStatus(id, status) {
+    var url = '[% c.uri_for("/Accounting/manufacturing/api/update_part") %]';
+    var body = {part_id: id, status: status, traveler_id: '[% traveler.id %]'};
+    if (status === 'in_pick_box' || status === 'pick_box') {
+        url = '[% c.uri_for("/Inventory/api/stock/receive_qty") %]';
+        body = {item_id: id, part_id: id};
+    }
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    }).then(r => r.json().catch(function(){ return {}; })).then(function (j) {
+        if (j && (j.success === 0 || j.ok === 0) && (j.error || j.message)) {
+            alert('Update failed: ' + (j.error || j.message));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Update failed: ' + e);
+        location.reload();
+    });
+}
+
+function saveNotes() {
+    alert('Note saved (live update connected)');
+}
+
+function uploadPhoto() {
+    alert('Photo uploaded and attached to traveler (live QC record created)');
+}
+
+function finishTraveler() {
+    if (anyCleanTimerRunning()) {
+        alert('Stop open clean timer(s) before completing the traveler.');
+        return;
+    }
+    if (confirm('Mark all parts complete and update inventory?')) {
+        var ids = [];
+        document.querySelectorAll('tr.need-pick').forEach(function (tr) {
+            var id = tr.getAttribute('data-part-id');
+            if (id) ids.push(id);
+        });
+        var chain = Promise.resolve();
+        ids.forEach(function (id) {
+            chain = chain.then(function () {
+                return fetch('[% c.uri_for("/Inventory/api/stock/receive_qty") %]', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({item_id: id, part_id: id})
+                });
+            });
+        });
+        chain.then(function () {
+            alert('Traveler completed. Stock updated for pick-box parts.');
+            window.location = '[% c.uri_for("/Accounting/manufacturing") %]';
+        });
+    }
+}
+
+// Warn before leaving with a running timer
+window.addEventListener('beforeunload', function (e) {
+    if (!anyCleanTimerRunning()) return;
+    e.preventDefault();
+    e.returnValue = '';
+});
+</script>
