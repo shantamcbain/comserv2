@@ -645,6 +645,15 @@ sub _default_free_catalog {
         if ($has_key) {
             if ($listed && $listed->{success} && $listed->{models} && @{$listed->{models}}) {
                 for my $m (@{$listed->{models}}) {
+                    # price_known distinguishes "this costs $0" (a genuinely
+                    # free model) from "the provider published no price"
+                    # (x.AI /v1/models returns no pricing at all). Defaulting
+                    # the latter to 0 made every Grok model look free and
+                    # leaked the paid x.AI catalog to guest-tier users.
+                    my $known = exists $m->{price_known}
+                        ? ($m->{price_known} ? 1 : 0)
+                        : ( (defined $m->{price_prompt} || defined $m->{price_completion}
+                             || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0 );
                     push @all, {
                         name     => $m->{id},
                         provider => $svc,
@@ -652,8 +661,11 @@ sub _default_free_catalog {
                         local    => 0,
                         prepaid  => ($svc eq 'supergrok' || $m->{prepaid}) ? 1 : 0,
                         pricing          => $m->{pricing}        || {},
-                        price_prompt     => $m->{price_prompt}     // 0,
-                        price_completion => $m->{price_completion} // 0,
+                        # Keep undef when unknown — consumers must NOT read
+                        # undef as zero/free.
+                        price_prompt     => $m->{price_prompt},
+                        price_completion => $m->{price_completion},
+                        price_known      => $known,
                     };
                 }
                 next;
@@ -717,11 +729,24 @@ sub _role_filter_models {
         # Zero-priced external entries (e.g. stealth/ox-alpha, openrouter/auto)
         # cost nothing — treat them as free so the guest/member tiers keep them
         # (mirrors the JS cost logic in daily-plan-utils.js / model-select.js).
+        #
+        # CRITICAL: only trust a zero price when the price is actually KNOWN.
+        # x.AI's /v1/models returns no pricing field, so every Grok model used
+        # to arrive with price_prompt/price_completion == 0 and was classified
+        # "free" — labelling paid Grok models free and leaking the whole paid
+        # x.AI catalog to guest-tier users. price_known gates that inference.
         unless ($free) {
-            my $pp = ($m->{price_prompt}     // 0) + 0;
-            my $pc = ($m->{price_completion} // 0) + 0;
-            $free = 1 if !$m->{local} && $pp == 0 && $pc == 0 && !($m->{pricing} && %{$m->{pricing}}
-                          && (($m->{pricing}{prompt} // 1) + 0) > 0);
+            my $known = $m->{price_known};
+            $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                       || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+                unless defined $known;
+            if ($known && !$m->{local}) {
+                my $pp = ($m->{price_prompt}     // 0) + 0;
+                my $pc = ($m->{price_completion} // 0) + 0;
+                my $pricing_prompt = ($m->{pricing} && %{$m->{pricing}})
+                    ? (($m->{pricing}{prompt} // 0) + 0) : 0;
+                $free = 1 if $pp == 0 && $pc == 0 && $pricing_prompt == 0;
+            }
         }
         my $local = $m->{local} || ( $svc eq 'ollama' ? 1 : 0 );
         if ($tier eq 'guest') {
