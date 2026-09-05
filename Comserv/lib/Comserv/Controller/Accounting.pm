@@ -1572,5 +1572,120 @@ sub setup_ai_commit :Path('/Accounting/setup/ai_commit') :Args(0) {
     return $c->controller('Accounting::Setup')->ai_commit($c);
 }
 
+# -------------------------------------------------------------------------
+# Manufacturing Traveler (todo #2399) — absolute Paths on this controller so
+# /Accounting/manufacturing works even if Accounting::Manufacturing is not
+# reloaded by a stale worker (same pattern as setup_ai_generate).
+# -------------------------------------------------------------------------
+sub manufacturing :Path('/Accounting/manufacturing') :Args(0) {
+    my ($self, $c) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_index')) {
+        return $ctl->_render_index($c);
+    }
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $pack = eval { $traveler->get_customers_with_open_orders($c) } || {};
+    $c->stash(
+        template    => 'Accounting/Manufacturing/index.tt',
+        customers   => $pack->{customers} || [],
+        open_orders => $pack->{open_orders} || [],
+        title       => 'Manufacturing — Customers with open orders',
+    );
+}
+
+sub manufacturing_customer :Path('/Accounting/manufacturing/customer') :Args(1) {
+    my ($self, $c, $customer_name) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl) {
+        return $ctl->customer($c, $customer_name);
+    }
+}
+
+sub manufacturing_view :Path('/Accounting/manufacturing/view') :Args(1) {
+    my ($self, $c, $order_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_view')) {
+        return $ctl->_render_view($c, $order_id);
+    }
+    require Comserv::Util::Manufacturing::Traveler;
+    my $data = Comserv::Util::Manufacturing::Traveler->new->get_traveler_data($c, $order_id);
+    $c->stash(
+        template => 'Accounting/Manufacturing/traveler_view.tt',
+        traveler => $data,
+        title    => "Manufacturing Traveler #$order_id",
+    );
+}
+
+sub manufacturing_view_item :Path('/Accounting/manufacturing/view/item') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_view')) {
+        return $ctl->_render_view($c, 'item-' . $item_id);
+    }
+}
+
+sub manufacturing_print :Path('/Accounting/manufacturing/print') :Args(1) {
+    my ($self, $c, $order_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_print')) {
+        return $ctl->_render_print($c, $order_id);
+    }
+    require Comserv::Util::Manufacturing::Traveler;
+    my $data = Comserv::Util::Manufacturing::Traveler->new->get_traveler_data($c, $order_id);
+    $c->stash(
+        template   => 'Accounting/Manufacturing/traveler_print.tt',
+        traveler   => $data,
+        title      => "Print Traveler #$order_id",
+        no_wrapper => 1,
+    );
+}
+
+sub manufacturing_print_item :Path('/Accounting/manufacturing/print/item') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('_render_print')) {
+        return $ctl->_render_print($c, 'item-' . $item_id);
+    }
+}
+
+# POST JSON: part_id, status=in_pick_box|printed|qc_passed
+sub manufacturing_api_update_part :Path('/Accounting/manufacturing/api/update_part') :Args(0) {
+    my ($self, $c) = @_;
+    my $ctl = eval { $c->controller('Accounting::Manufacturing') };
+    if ($ctl && $ctl->can('api_update_part')) {
+        return $ctl->api_update_part($c);
+    }
+    # Inline fallback if nested controller method not loaded yet
+    require JSON;
+    require Comserv::Util::Manufacturing::Traveler;
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    $p = {} unless ref($p) eq 'HASH';
+    my $part_id = $p->{part_id} // $p->{item_id};
+    my $status  = lc($p->{status} // '');
+    my $result  = { success => 0, error => 'unknown status' };
+    if ($status eq 'in_pick_box' || $status eq 'pick_box' || $status eq 'printed_to_stock') {
+        my $r = Comserv::Util::Manufacturing::Traveler->new->put_part_in_pick_box($c, $part_id, $p->{quantity});
+        $result = { %$r, success => $r->{ok} ? 1 : 0 };
+    } elsif ($status eq 'printed' || $status eq 'qc_passed') {
+        $result = { success => 1, status => $status, part_id => $part_id };
+    }
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json($result));
+    $c->detach;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

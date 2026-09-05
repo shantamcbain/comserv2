@@ -572,6 +572,9 @@ sub _inventory_transaction {
                 quantity_on_hand  => $new_hand,
                 quantity_reserved => $new_res,
             });
+        } elsif ($type eq 'return') {
+            # Reverse of 'issue' — stock goes back on hand (job reopened, etc.)
+            $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
         } elsif ($type eq 'receive') {
             $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
         }
@@ -1301,11 +1304,21 @@ sub queue :Path('/3d/queue') :Args(0) {
                         "Depreciation transaction failed for job $job_id: $@") if $@;
                 }
 
-                # Inventory: add finished printed item to stock (receive = goods in)
+                # Inventory: add finished printed PART to stock (receive = goods in).
+                # Prefer printing_3d_models.item_id — that is the component that was printed.
+                # source_item_id is often the parent unit/order (e.g. base assembly) and must
+                # NOT receive the finished part or wheel-half stock stays at 0 forever.
                 my $printed_item_id;
-                if ($job->source_item_id) {
+                if ($job->model_id) {
+                    my $model = eval { $job->model };
+                    $printed_item_id = $model->item_id
+                        if $model && eval { $model->item_id };
+                }
+                if (!$printed_item_id && $job->source_item_id) {
+                    # Fallback only when there is no model→item link
                     $printed_item_id = $job->source_item_id;
-                } elsif ($job->consignment_line_id) {
+                }
+                if (!$printed_item_id && $job->consignment_line_id) {
                     $printed_item_id = eval {
                         $schema->storage->dbh->selectrow_array(
                             'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
@@ -1329,14 +1342,35 @@ sub queue :Path('/3d/queue') :Args(0) {
                                 quantity         => $job->quantity || 1,
                                 unit_cost        => $total_cost   || undef,
                                 reference_number => '3D-JOB-' . $job->id,
-                                notes            => sprintf('Printed: %d unit(s) completed — job #%d',
-                                                        $job->quantity || 1, $job->id),
+                                notes            => sprintf('Printed: %d unit(s) completed — job #%d (item %d)',
+                                                        $job->quantity || 1, $job->id, $printed_item_id),
                                 performed_by     => $c->session->{username} || 'system',
                             );
                         };
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
                             "Finished goods receipt failed for job $job_id: $@") if $@;
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                            "Finished goods receipt skipped job $job_id: no inventory_locations for '$sitename'");
                     }
+                } else {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                        "Job $job_id completed with no printable item_id (model.item_id / source_item_id empty) — stock not received");
+                }
+
+            } elsif ($action eq 'reopen') {
+                # Undo a mis-clicked complete/cancel: back to queued + reverse the
+                # inventory side effects (filament issue, finished-goods receipt).
+                # Logic lives in Util::Printing3d (3d.pm is at its size limit).
+                my $res = Comserv::Util::Printing3d->new->reopen_job($c, $job, $self);
+                if ($res && $res->{ok}) {
+                    my $rev = $res->{reversed} || [];
+                    $c->flash->{success_msg} = 'Job #' . $job_id
+                        . ' reopened — back in the queue.'
+                        . (@$rev ? ' Reversed: ' . join('; ', @$rev) . '.' : '');
+                } else {
+                    $c->flash->{error_msg} = 'Could not reopen job #' . $job_id
+                        . ': ' . (($res && $res->{error}) || 'unknown error');
                 }
 
             } elsif ($action eq 'cancel') {
@@ -1429,6 +1463,21 @@ sub queue :Path('/3d/queue') :Args(0) {
             { Slice => {} }, $sitename);
         @active_jobs = @{ $a_rows // [] };
     };
+
+    # Elapsed time is computed SERVER-SIDE by Comserv::Util::AppTime — the one
+    # time authority. Templates must never do JS Date math: a stored UTC stamp
+    # parsed with new Date('YYYY-MM-DD HH:MM:SS') is read as browser-local time,
+    # which produced wildly wrong runtimes (the ~95h bug). We pass pre-computed
+    # values so the view just renders them.
+    for my $job (@active_jobs) {
+        my $hm = Comserv::Util::AppTime->duration_hm( $job->{started_at} );
+        $job->{elapsed_h}       = $hm->{h};
+        $job->{elapsed_m}       = $hm->{m};
+        $job->{elapsed_human}   = Comserv::Util::AppTime->duration_human( $job->{started_at} );
+        my $d = Comserv::Util::AppTime->elapsed_since( $job->{started_at} );
+        $job->{elapsed_hours}   = $d ? $d->{total_hours} : undef;
+        $job->{elapsed_days}    = $d ? $d->{days} : undef;
+    }
     $queue_error = $@ if $@;
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
         "Queue fetch error: $queue_error") if $queue_error;
@@ -1445,6 +1494,8 @@ sub queue :Path('/3d/queue') :Args(0) {
                    j.quantity, j.print_hours, j.filament_quantity,
                    j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
                    j.completed_at,
+                   j.model_id, j.source_type,
+                   mo.nfs_path AS model_file,
                    pr.name AS printer_name,
                    fi.name AS filament_name,
                    mo.name AS model_name
@@ -1452,7 +1503,7 @@ sub queue :Path('/3d/queue') :Args(0) {
             LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
             LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
             LEFT JOIN inventory_items     fi ON fi.id = j.filament_item_id
-            WHERE j.sitename = ? AND j.status = 'completed'
+            WHERE j.sitename = ? AND j.status IN ('completed','cancelled')
             ORDER BY j.completed_at DESC
             LIMIT $history_limit
         ";
@@ -1726,6 +1777,7 @@ sub admin :Path('/3d/admin') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_module($c);
     $self->_require_admin($c);
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
 
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
