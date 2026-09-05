@@ -1603,7 +1603,7 @@
             // Label from the SHARED helper: it derives the provider from the
             // "provider|model" value itself. The old code assumed anything that
             // was not Grok must be Ollama, so picking an OpenRouter model (e.g.
-            // openrouter|tencent/hy3) was mislabelled "Ollama (Local)".
+            // openrouter|…) was mislabelled "Ollama (Local)".
             let modelDisplay = describeModel(selectedVal, { host: state.ollamaHost });
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
@@ -1824,11 +1824,11 @@
             // Delegate catalog fetch + dropdown rendering to the SHARED module
             // (ai-chat/model-select.js). Both the general widget and the editor
             // chat use the same code path now, so model selection can't diverge.
-            // Pin hy3 to the top + default for this chat context.
+            // Pin coding default (north-mini-code:free) to the top for this chat context.
             ComservChat.modelSelect.init({
                 selectEl: providerSelect,
                 context: 'chat',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onReady: function (catalog) {
                     // Re-derive model tiers (used by auto-tier query routing).
                     (catalog || []).forEach(function (p) {
@@ -2990,7 +2990,7 @@
                 // Use the SHARED describeModel() helper so the label always matches
                 // the provider that actually served the request. The previous code
                 // treated every non-Grok response as Ollama, which is why an
-                // OpenRouter answer displayed as "Ollama (Local): tencent/hy3".
+                // OpenRouter answer displayed as "Ollama (Local): <model>".
                 const providerParts2 = (state.selectedProvider || '').split('|');
                 // Prefer the user's selected prefix when the backend collapses
                 // SuperGrok onto the Grok client (same API, different billing).
@@ -5162,7 +5162,7 @@
             ComservChat.modelSelect.init({
                 selectEl: modelSelectEl,
                 context: 'chat',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onReady: function () {
                     modelSelectEl.addEventListener('change', _applyPageModelSelection);
                     _applyPageModelSelection();

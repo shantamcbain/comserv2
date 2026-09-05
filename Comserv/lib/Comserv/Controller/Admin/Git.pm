@@ -564,8 +564,8 @@ PROMPT
 
     # An explicit model from the Git dashboard wins. The dropdown offers the
     # FULL catalog (Ollama + Grok + OpenRouter); the selected value is
-    # "provider|model" (e.g. "openrouter|tencent/hy3"). If empty, the Router
-    # falls back to the app-wide default (openrouter|tencent/hy3) unless no
+    # "provider|model" (e.g. "openrouter|cohere/north-mini-code:free"). If empty, the Router
+    # falls back to the app-wide default (openrouter|cohere/north-mini-code:free) unless no
     # external key is configured, in which case it uses local Ollama — so the
     # behavior is consistent with the chat widget and editor.
     my $requested_model = $c->req->param('model') || '';

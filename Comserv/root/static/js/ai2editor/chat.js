@@ -495,11 +495,11 @@
 
         // The editor is a coding context. The model is chosen from the shared
         // #model-select (populated by ai-chat/model-select.js), defaulting to
-        // hy3 — the same code path the general "Chat with AI" widget uses, so
-        // the two chat UIs can never diverge on model selection again.
+        // free north-mini-code — the same code path the general "Chat with AI"
+        // widget uses, so the two chat UIs can never diverge on model selection.
         const model = (window.ComservChat && ComservChat.modelSelect)
             ? ComservChat.modelSelect.getSelectedValue()
-            : 'tencent/hy3';
+            : 'openrouter|cohere/north-mini-code:free';
         const filePath = currentFilePath();
 
         loadCurrentFileContent().then(function (fileContent) {
@@ -724,13 +724,13 @@
         applyClosedState();
 
         // Populate the editor's #model-select from the SHARED model-selection
-        // module (same catalog + hy3 default the general widget uses).
+        // module (same catalog + coding default the general widget uses).
         const modelSel = document.getElementById('model-select');
         if (modelSel && window.ComservChat && ComservChat.modelSelect) {
             ComservChat.modelSelect.init({
                 selectEl: modelSel,
                 context: 'code',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onReady: function () {
                     console.log('[AI2EditorChat] model-select populated by shared module');
                 },
