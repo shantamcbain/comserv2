@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,3d-printing"
-   page_version = "0.2"
-   last_updated = "Thu Sep 03 2026"
+   page_version = "0.3"
+   last_updated = "Fri Sep 05 2026"
    site_specific = "false"
    project_id = "206"
    project_code = "3DPRINT"
 %]
-[% PageVersion = 'Documentation/3dPrintingPlan.tt,v 0.2 2026/09/03 hermes-agent Exp - traveler + labour' %]
+[% PageVersion = 'Documentation/3dPrintingPlan.tt,v 0.3 2026/09/05 hermes-agent Exp - LAN control now' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -33,6 +33,7 @@
                 <a href="#plans" class="doc-navlink">Child plans</a>
                 <a href="#order" class="doc-navlink">Work order</a>
                 <a href="#cross" class="doc-navlink">Cross-plan</a>
+                <a href="#lan" class="doc-navlink">Kobra 3 LAN</a>
                 <a href="#traveler" class="doc-navlink">Manufacturing traveler</a>
                 <a href="#labour" class="doc-navlink">Labour tracking</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
@@ -58,11 +59,20 @@
                 App URLs such as <code>/3d</code> belong there, not on MASTER_PLAN.</p>
             </div>
             <div class="doc-success">
+                <p class="doc-body"><strong>Now (2026-09-05).</strong>
+                Kobra 3 LAN is linked at 192.168.2.53 (farm id=1). Control page reads live MQTT state
+                (busy / file / % / temps) and can pause/resume/stop.
+                Spec:
+                <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
+                · todo
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a>.
+                Next on that todo: use printer % / remaining time on queue Complete. No gcode send yet.</p>
                 <p class="doc-body">Open the attached project and this plan standalone:</p>
                 <div class="doc-navrow">
                     <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" title="Project #206 3DPRINT — parent of INV, File Mgmt, Sales, DRYER-INT.">Project #206 3DPRINT</a>
                     <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-navlink" title="Todos attached to #206.">Todos on #206</a>
                     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-navlink" title="Site-wide coordinator. This 3D plan is one entry there.">MASTER_PLAN</a>
+                    <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-navlink">Kobra3LanMode</a>
                 </div>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
@@ -119,6 +129,11 @@
                     (cited on MASTER_PLAN; file not on this tree)</td>
                     <td class="doc-td">#206</td>
                     <td class="doc-td">Public browse vs farm console; STL thumbnails. Restore or rewrite before treating as live spec.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a></td>
+                    <td class="doc-td">#206 · <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a></td>
+                    <td class="doc-td">Stock LAN Mode: discover :18910, attach [LAN_HOST] on existing farm row, GET /info + MQTTS telemetry, control page Pause/Resume/Stop. Linked 192.168.2.53. No gcode send yet.</td>
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td"><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing</a> (operator KB, not a plan)</td>
@@ -218,7 +233,33 @@
                         · <a href="[% c.uri_for('/todo/details') %]?record_id=2399" class="doc-link">#2399</a></td>
                     <td class="doc-td">Tablet + colour print + queue/pick/clean/file download shipped 2026-09-03</td>
                 </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Kobra 3 LAN</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
+                        · <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a>
+                        · <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control</a></td>
+                    <td class="doc-td">Discover + attach + live MQTT state shipped 2026-09-05. Remaining: printer time/grams on Complete; no start-print.</td>
+                </tr>
             </table>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="lan" class="doc-h2">Kobra 3 LAN (todo #2334)</h2>
+            <p class="doc-body">Stock firmware LAN Mode — not cloud, not Moonraker.
+            Spec page:
+            <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>.
+            Farm row id=1 notes <code>[LAN_HOST:192.168.2.53]</code>. Control:
+            <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control?printer_id=1</a>.</p>
+            <ul class="doc-body">
+                <li><strong>Shipped 2026-09-05:</strong> discover TCP :18910 then GET /info;
+                    attach existing printer; signed POST /ctrl; MQTTS telemetry; Pause/Resume/Stop
+                    (Stop needs cancel checkbox). Do not log token/password/cert.</li>
+                <li><strong>Still open on #2334:</strong> printer remaining-time / % on queue Complete
+                    (today elapsed-since-assign is a stand-in); gcode upload / start print.</li>
+            </ul>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>
@@ -383,9 +424,12 @@
 
             <h3 class="doc-h3">Out of scope (deliberately)</h3>
             <ul class="doc-body">
-                <li><strong>Printer telemetry</strong> — reading actual print time from the
-                    printer is the Anycubic LAN adapter work (todo #2334). This section is
-                    about <em>human</em> time only.</li>
+                <li><strong>Printer telemetry on this labour section</strong> — human time only.
+                    Machine state is
+                    <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
+                    / todo
+                    <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a>
+                    (control page live 2026-09-05; wiring % into queue Complete is still open).</li>
                 <li><strong>Changing what the Complete button records</strong> — machine
                     elapsed is already correct; leave it alone.</li>
             </ul>
@@ -410,6 +454,7 @@
                     <li><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/SignGenerator') %]" class="doc-link">SignGenerator</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]" class="doc-link">3dPrintingHowItWorks</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a> (LAN discover + control)</li>
                     <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing (operator KB)</a></li>
                 </ul>
             </div>
