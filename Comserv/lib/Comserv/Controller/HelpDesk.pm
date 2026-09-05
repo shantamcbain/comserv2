@@ -643,14 +643,32 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view_ticket',
             "Loaded " . scalar(@messages) . " messages for ticket $ticket_number");
 
+        my $success_msg = $c->flash->{success_msg} || '';
+        my $created_todo_id = $c->flash->{created_todo_id} || '';
+        if ($is_admin && $created_todo_id) {
+            $success_msg = 'Todo #' . $created_todo_id . ' created. ' .
+                '<a href="/todo/details?record_id=' . $created_todo_id . '">View/edit todo</a>';
+        } elsif ($created_todo_id) {
+            $success_msg = 'A todo has been created for this ticket.';
+        }
+
+        # Per-ticket email control for spam / no-notification cases
+        my $emails_disabled = 0;
+        if ($ticket->metadata) {
+            my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+            $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+        }
+
         $c->stash(
-            template     => 'CSC/HelpDesk/ticket_view.tt',
-            ticket       => $ticket,
-            messages     => \@messages,
-            is_staff     => $is_admin,
-            title        => 'Ticket: ' . $ticket_number,
-            success_msg  => $c->flash->{success_msg} || '',
-            error_msg    => $c->flash->{error_msg}   || '',
+            template          => 'CSC/HelpDesk/ticket_view.tt',
+            ticket            => $ticket,
+            messages          => \@messages,
+            is_staff          => $is_admin,
+            title             => 'Ticket: ' . $ticket_number,
+            success_msg       => $success_msg,
+            error_msg         => $c->flash->{error_msg}   || '',
+            emails_disabled   => $emails_disabled,
+            guest_email       => $ticket->email || '',
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_ticket',
@@ -756,7 +774,13 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
 
         if ($sender_type eq 'staff') {
             my $to_email = $ticket->email || '';
-            if ($to_email) {
+            # Respect per-ticket email disable (for spam etc.)
+            my $emails_disabled = 0;
+            if ($ticket->metadata) {
+                my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+                $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+            }
+            if ($to_email && !$emails_disabled) {
                 my $subject = "Re: [Ticket " . $ticket->ticket_number . "] " . $ticket->subject;
                 my $body    = "Hello,\n\n"
                     . "A staff member has replied to your support ticket.\n\n"
@@ -886,7 +910,7 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
 
         $schema->resultset('TicketMessage')->create({
             ticket_id    => $ticket->id,
-            sender_type  => 'staff',
+            sender_type  => "system",  # internal todo note, not a customer reply
             sender_name  => $staff_name,
             sender_email => $c->session->{email} || '',
             body         => $audit_body,
@@ -914,8 +938,13 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
                 : $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number)->as_string;
         };
 
+        my $emails_disabled = 0;
+        if ($ticket->metadata) {
+            my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+            $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+        }
         if (($new_status eq 'closed' || $new_status eq 'resolved' || $new_status eq 'awaiting_response')
-            && $ticket->email) {
+            && $ticket->email && !$emails_disabled) {
             my ($email_subject, $email_body);
             if ($new_status eq 'awaiting_response') {
                 $email_subject = "[Ticket " . $ticket->ticket_number . "] We need your response";
@@ -1000,6 +1029,18 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
             return;
         }
 
+        # Check if emails are disabled for this ticket
+        my $emails_disabled = 0;
+        if ($ticket->metadata) {
+            my $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+            $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
+        }
+        if ($emails_disabled) {
+            $c->flash->{error_msg} = 'Email notifications are disabled for this ticket.';
+            $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+            return;
+        }
+
         my $public_ticket_url = do {
             my $public_domain = '';
             eval {
@@ -1036,7 +1077,7 @@ sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
         } else {
             $schema->resultset('TicketMessage')->create({
                 ticket_id    => $ticket->id,
-                sender_type  => 'staff',
+                sender_type  => "system",  # internal todo note, not a customer reply
                 sender_name  => $staff_name,
                 sender_email => $c->session->{email} || '',
                 body         => "Reminder email sent to " . $ticket->email,
@@ -1092,6 +1133,9 @@ sub create_todo :Chained('ticket_base') :PathPart('create_todo') :Args(1) {
     my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
     $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
+    my $username     = $c->session->{username} || 'admin';
+    my $user_id      = $c->session->{user_id} || 1;
 
     try {
         my $schema = $c->model('DBEncy')->schema;
@@ -1103,33 +1147,78 @@ sub create_todo :Chained('ticket_base') :PathPart('create_todo') :Args(1) {
             return;
         }
 
+        # Resolve project_code / project_id safely. SupportTicket has no project_code column.
+        # Prefer a project matching the ticket's site_name, else fall back to PLANNING.
+        my $project_code = 'PLANNING';
+        my $project_id   = 1;
+        eval {
+            my $site = $ticket->site_name || $site_name || 'default';
+            my $proj = $schema->resultset('Project')->search(
+                { sitename => $site },
+                { rows => 1, order_by => 'id' }
+            )->first;
+            if ($proj) {
+                $project_code = $proj->project_code || 'PLANNING';
+                $project_id   = $proj->id;
+            } else {
+                $proj = $schema->resultset('Project')->search(
+                    { project_code => 'PLANNING' },
+                    { rows => 1 }
+                )->first;
+                if ($proj) {
+                    $project_code = $proj->project_code;
+                    $project_id   = $proj->id;
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_todo',
+                "Project lookup failed for $ticket_number, using PLANNING: $@");
+        }
+
         my $todo = $schema->resultset('Todo')->create({
-            sitename      => $site_name,
-            start_date    => { 'CURRENT_DATE' },
-            subject       => "HelpDesk Ticket: " . $ticket->ticket_number,
-            description   => "Working on ticket [$ticket->ticket_number]:\n" . ($note ? $note : 'No note provided'),
+            sitename            => $site_name,
+            start_date          => $current_date,
+            due_date            => $current_date,
+            parent_todo         => '',
+            subject             => "HelpDesk Ticket: " . $ticket->ticket_number,
+            description         => "Working on ticket [" . $ticket->ticket_number . "]:\n" . ($note ? $note : 'No note provided'),
             estimated_man_hours => 1,
-            status        => 'open',
-            todo_type     => $todo_type,
-            priority      => 3,
-            project_code  => $ticket->project_code || '',
-            username_of_poster => $c->session->{username} || 'admin',
+            status              => 'open',
+            todo_type           => $todo_type,
+            priority            => 3,
+            project_code        => $project_code,
+            project_id          => $project_id,
+            username_of_poster  => $username,
+            last_mod_by         => $username,
+            last_mod_date       => $current_date,
+            date_time_posted    => $current_date . ' 00:00:00',
+            user_id             => $user_id,
+            group_of_poster     => 'admin',
+            share               => 0,
+            developer           => $username,
+            accumulative_time   => '00:00:00',
+            is_blocking         => 0,
         });
 
         # Add a ticket message about the todo creation
+        # IMPORTANT: This is internal tracking only. We deliberately do NOT email the guest.
+        # Use explicit reply or status for customer notification. Use Disable emails button for spam.
         $schema->resultset('TicketMessage')->create({
             ticket_id    => $ticket->id,
-            sender_type  => 'staff',
+            sender_type  => "system",  # internal todo note, not a customer reply
             sender_name  => $staff_name,
             sender_email => $c->session->{email} || '',
-            body         => "Todo created: $todo_type to work on ticket $ticket_number. Todo ID: $todo->record_id.",
+            body         => "Todo created: $todo_type to work on ticket $ticket_number. Todo ID: " . ($todo->record_id || $todo->id) . ". (internal, no email sent to guest)",
             created_at   => $now,
         });
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_todo',
             "Created $todo_type todo for ticket $ticket_number by $staff_name");
 
-        $c->flash->{success_msg} = "Todo created successfully ($todo_type) for ticket $ticket_number.";
+        my $todo_id = $todo->record_id || $todo->id;
+        $c->flash->{success_msg} = 'A todo has been created for this ticket.';
+        $c->flash->{created_todo_id} = $todo_id;
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_todo',
             "Error creating todo for $ticket_number: $_");
@@ -1166,6 +1255,9 @@ sub escalate_ticket :Chained('ticket_base') :PathPart('escalate_ticket') :Args(1
     my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
     $staff_name  = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $current_date = Comserv::Util::AppTime->today_ymd_for($c);
+    my $username     = $c->session->{username} || 'admin';
+    my $user_id      = $c->session->{user_id} || 1;
 
     try {
         my $schema = $c->model('DBEncy')->schema;
@@ -1178,32 +1270,46 @@ sub escalate_ticket :Chained('ticket_base') :PathPart('escalate_ticket') :Args(1
         }
 
         my $todo = $schema->resultset('Todo')->create({
-            sitename      => $site_name,
-            start_date    => { 'CURRENT_DATE' },
-            subject       => "Escalate HelpDesk Ticket: " . $ticket->ticket_number,
-            description   => "Escalating ticket [$ticket->ticket_number]:\n" . ($note ? $note : ''),
+            sitename            => $site_name,
+            start_date          => $current_date,
+            due_date            => $current_date,
+            parent_todo         => '',
+            subject             => "Escalate HelpDesk Ticket: " . $ticket->ticket_number,
+            description         => "Escalating ticket [" . $ticket->ticket_number . "]:\n" . ($note ? $note : ''),
             estimated_man_hours => 2,
-            status        => 'open',
-            todo_type     => 'escalate',
-            priority      => 5,  # High priority for escalation
-            project_code  => $ticket->project_code || '',
-            username_of_poster => $c->session->{username} || 'admin',
+            status              => 'open',
+            todo_type           => 'escalate',
+            priority            => 5,  # High priority for escalation
+            project_code        => 'PLANNING',
+            project_id          => 1,
+            username_of_poster  => $username,
+            last_mod_by         => $username,
+            last_mod_date       => $current_date,
+            date_time_posted    => $current_date . ' 00:00:00',
+            user_id             => $user_id,
+            group_of_poster     => 'admin',
+            share               => 0,
+            developer           => $username,
+            accumulative_time   => '00:00:00',
+            is_blocking         => 0,
         });
 
         # Add a ticket message about the escalation
         $schema->resultset('TicketMessage')->create({
             ticket_id    => $ticket->id,
-            sender_type  => 'staff',
+            sender_type  => "system",  # internal todo note, not a customer reply
             sender_name  => $staff_name,
             sender_email => $c->session->{email} || '',
-            body         => "Ticket escalated. Todo created: escalate (Todo ID: $todo->record_id). Note: $note",
+            body         => "Ticket escalated. Todo created: escalate (Todo ID: " . ($todo->record_id || $todo->id) . "). Note: $note",
             created_at   => $now,
         });
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'escalate_ticket',
             "Escalated ticket $ticket_number with todo by $staff_name");
 
-        $c->flash->{success_msg} = "Ticket escalated successfully. Todo created (priority 5).";
+        my $todo_id = $todo->record_id || $todo->id;
+        $c->flash->{success_msg} = 'A todo has been created for this ticket.';
+        $c->flash->{created_todo_id} = $todo_id;
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'escalate_ticket',
             "Error escalating ticket $ticket_number: $_");
@@ -1213,17 +1319,64 @@ sub escalate_ticket :Chained('ticket_base') :PathPart('escalate_ticket') :Args(1
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
 }
 
-=head2 ticket_list
+=head2 toggle_customer_emails
 
-Show the authenticated user's tickets (or all tickets for admin)
+Staff-only: enable or disable all email notifications to the ticket submitter.
+Useful for spam tickets so no emails are sent at all.
+POST /HelpDesk/ticket/toggle_customer_emails/<ticket_number>
+  params: disable=1 or disable=0
 
 =cut
 
-sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
-    my ($self, $c) = @_;
+sub toggle_customer_emails :Chained('ticket_base') :PathPart('toggle_customer_emails') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_list',
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
 
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $disable = $c->req->params->{disable} ? 1 : 0;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $meta = {};
+        if ($ticket->metadata) {
+            $meta = eval { JSON->new->decode($ticket->metadata) } || {};
+        }
+        $meta->{emails_disabled} = $disable;
+
+        $ticket->update({ metadata => JSON->new->utf8->encode($meta) });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'toggle_customer_emails',
+            ($disable ? 'Disabled' : 'Enabled') . " customer emails for ticket $ticket_number");
+
+        $c->flash->{success_msg} = $disable
+            ? 'Customer email notifications disabled for this ticket (no more emails will be sent).'
+            : 'Customer email notifications enabled for this ticket.';
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'toggle_customer_emails', "Error: $_");
+        $c->flash->{error_msg} = 'Error updating email setting.';
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+=head2 ticket_list
 
 Show the authenticated user's tickets (or all tickets for admin)
 
@@ -1395,7 +1548,7 @@ sub _auto_close_stale_tickets {
 
             $schema->resultset('TicketMessage')->create({
                 ticket_id    => $ticket->id,
-                sender_type  => 'staff',
+                sender_type  => "system",  # internal todo note, not a customer reply
                 sender_name  => 'System',
                 sender_email => '',
                 body         => "Ticket automatically closed after $auto_close_days days with no customer response.",
@@ -1508,12 +1661,15 @@ sub _looks_like_spam_content {
     $text = lc($text);
     $text =~ s/\s+/ /g;
 
-    # Crypto/phishing patterns (CSC-20260830-2900, BMASTER-20260901-6247)
+    # Crypto/phishing patterns (CSC-20260830-2900, BMASTER-20260901-6247, WEAVERBECK-20260902-0936)
     my @patterns = (
         qr/graph\.org/i,
         qr/coinbase/i,
         qr/\bbitcoin\b/i,
         qr/bitcoin[\s\-_]?mining/i,
+        qr/cloud.?mining/i,                 # Cloud-Mining-08-27 etc. (WEAVERBECK-20260902-0936)
+        qr/one.?message.?for.?you/i,        # ONE MESSAGE for you (WEAVERBECK spam)
+        qr/open\s*[-=]*>+/i,               # OPEN ->>> graph.org
         qr/\bbtc\b/i,
         qr/you.?have.?a.?new.?bitcoin/i,
         qr/wallet.?transfer/i,
@@ -1532,7 +1688,7 @@ sub _looks_like_spam_content {
     return 1 if $links >= 3 && length($text) < 400;
     # Bare graph.org / shortener without scheme still counts as a link bait
     my $bare = () = $text =~ m{\b[\w\-]+\.(?:org|com|net|io)/\S+}g;
-    return 1 if $bare >= 1 && $text =~ /(?:coinbase|bitcoin|mining|transfer|wallet)/i;
+    return 1 if $bare >= 1 && $text =~ /(?:coinbase|bitcoin|mining|transfer|wallet|cloud)/i;
     return 0;
 }
 

@@ -513,6 +513,14 @@ sub perform {
         my $user_id     = $c->session->{user_id} || undef;
         my $username    = $current_user;
 
+        if (Comserv::Controller::HelpDesk->_looks_like_spam_content($subject, $description)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'action',
+                "AI create_helpdesk_ticket blocked as spam: subject=" . substr($subject // '', 0, 80));
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Your request was blocked by our spam filter.' }));
+            return;
+        }
+
         my $ticket_number = uc($site_name) . '-' . DateTime->now->strftime('%Y%m%d') . '-' . sprintf('%04d', int(rand(9999)) + 1);
         my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
 
