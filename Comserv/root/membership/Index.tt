@@ -4,10 +4,10 @@
    roles = "guest,user,admin"
    TemplateType = "Application"
    category = "Membership"
-   page_version = "0.02"
-   last_updated = "2026-09-04"
+   page_version = "0.03"
+   last_updated = "2026-09-05"
 %]
-[% PageVersion = 'root/membership/Index.tt,v 0.02 2026/09/04 shanta Exp shanta ' %]
+[% PageVersion = 'root/membership/Index.tt,v 0.03 2026/09/05 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
