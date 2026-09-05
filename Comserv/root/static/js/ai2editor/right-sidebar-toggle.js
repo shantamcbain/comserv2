@@ -139,12 +139,23 @@
             })(icons[i]);
         }
         wireRailResize();
-        // Default: chat open, diff rail present (may be empty) — mark active accordingly.
+        // Default: chat open, Diff tool tab closed (open on demand).
         syncFromChat();
-        setDiffIconActive(isRailVisible());
+        setRailVisible(false);
 
         document.addEventListener('ai2:chat-view', function () { syncFromChat(); });
     }
+
+    function openDiff() { setRailVisible(true); }
+    function closeDiff() { setRailVisible(false); }
+
+    window.AI2RightSidebar = {
+        openDiff: openDiff,
+        closeDiff: closeDiff,
+        toggleDiff: toggleDiff,
+        isDiffOpen: isRailVisible,
+        setRailVisible: setRailVisible
+    };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', wire);
