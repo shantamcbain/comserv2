@@ -175,6 +175,11 @@
             if (sidebar) sidebar.style.display = (_closed || _detached) ? 'none' : 'flex';
             if (reopen) reopen.style.display = _closed ? 'block' : 'none';
             if (btn) btn.textContent = _detached ? '⊞ Attach' : '⤢ Detach';
+            try {
+                document.dispatchEvent(new CustomEvent('ai2:chat-view', {
+                    detail: { closed: _closed, detached: _detached }
+                }));
+            } catch (evErr) { /* ignore */ }
             if (window.AI2EditorCore && typeof window.AI2EditorCore.resizeEditor === 'function') {
                 window.AI2EditorCore.resizeEditor();
             }
@@ -262,7 +267,7 @@
                 'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
                 '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
                 '</head><body>' +
-                '<h3>AI Chat (Hy3) — detached <button id="attach">⊞ Attach</button></h3>' +
+                '<h3>AI Chat — detached <button id="attach">⊞ Attach</button></h3>' +
                 '<div id="chat-messages"></div>' +
                 '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
                 '<button id="send">Send</button></div>' +
@@ -770,6 +775,19 @@
     }
 
     console.log('%c[AI2] chat module ready', 'color:#0a0');
-    window.AI2Chat = { setActiveFile: setActiveFile };
+    window.AI2Chat = {
+        setActiveFile: setActiveFile,
+        setClosed: function (v) { _closed = !!v; applyViewState(); },
+        isClosed: function () { return !!_closed; },
+        isDetached: function () { return !!_detached; },
+        reattach: function () {
+            _detached = false;
+            if (window._aiChatWin && !window._aiChatWin.closed) {
+                try { window._aiChatWin.close(); } catch (e) {}
+                window._aiChatWin = null;
+            }
+            applyViewState();
+        }
+    };
     window[NS] = window.AI2Chat;
 })();
