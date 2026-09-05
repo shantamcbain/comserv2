@@ -1,15 +1,8 @@
 [% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.02 2026/04/27' %]
 
 [% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
-<<<<<<< Updated upstream
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-
-
-=======
-<meta name="viewport" content="width=device-width, initial-scale=1">\n<met... (this is truncated)
->>>>>>> Stashed changes
 <div class="helpdesk-container">
 
 
@@ -91,23 +84,11 @@
             <span>Submitted by: <strong>[% ticket.username || ticket.email || 'Guest' %]</strong></span>
 
             &bull;
-<<<<<<< HEAD
             <span>Created: <strong>[% ticket.created_at | user_time %]</strong></span>
-=======
-
-            <span>Created: <strong>[% ticket.created_at %]</strong></span>
-
->>>>>>> main
             [% IF ticket.updated_at %]
 
             &bull;
-<<<<<<< HEAD
             <span>Last activity: <strong>[% ticket.updated_at | user_time %]</strong></span>
-=======
-
-            <span>Last activity: <strong>[% ticket.updated_at %]</strong></span>
-
->>>>>>> main
             [% END %]
 
             [% IF ticket.assigned_to %]
@@ -121,16 +102,25 @@
             [% IF ticket.closed_at %]
 
             &bull;
-<<<<<<< HEAD
             <span>Closed: <strong>[% ticket.closed_at | user_time %]</strong></span>
-=======
-
-            <span>Closed: <strong>[% ticket.closed_at %]</strong></span>
-
->>>>>>> main
             [% END %]
 
         </div>
+
+        [% IF is_staff %]
+        <div class="ticket-customer-email" style="margin-top: 0.5rem; font-size: 0.9em; background: #f8f9fa; padding: 4px 8px; border-radius: 4px;">
+            <strong>Customer email:</strong> 
+            [% IF guest_email %]
+                <strong>[% guest_email %]</strong>
+                <a href="mailto:[% guest_email %]?subject=[% ticket.ticket_number %] [% ticket.subject | uri %]" 
+                   class="btn btn-sm btn-outline-secondary" style="margin-left: 6px; padding: 1px 6px; font-size: 0.8em;">
+                    ✉ Reply via email
+                </a>
+            [% ELSE %]
+                <em>none provided</em>
+            [% END %]
+        </div>
+        [% END %]
 
         <div style="margin-top:0.75rem;">
 
@@ -234,7 +224,30 @@
 
             [% END %]
 
-        </div>
+        
+            <form method="post"
+                  action="[% c.uri_for('/HelpDesk/ticket/create_todo/' _ ticket.ticket_number) %]"
+                  style="display:contents;">
+                <button type="submit" name="todo_type" value="work_on"
+                        class="btn btn-sm btn-outline-primary"
+                        title="Create a todo to track work on this ticket">
+                    Work On
+                </button>
+                <input type="text" name="note" placeholder="note (optional)" style="width:180px;font-size:0.85em;margin-left:2px;" value="">
+            </form>
+
+            <form method="post"
+                  action="[% c.uri_for('/HelpDesk/ticket/escalate_ticket/' _ ticket.ticket_number) %]"
+                  style="display:contents;">
+                <button type="submit" name="todo_type" value="escalate"
+                        class="btn btn-sm btn-outline-danger"
+                        title="Create a high-priority escalation todo">
+                    Escalate
+                </button>
+                <input type="text" name="note" placeholder="note (optional)" style="width:180px;font-size:0.85em;margin-left:2px;" value="">
+            </form>
+
+</div>
 
 
 
@@ -263,13 +276,7 @@
                 <span class="message-author">[% ticket.username || ticket.email || 'Customer' %]</span>
 
                 <span class="message-role-badge badge-user">Customer</span>
-<<<<<<< HEAD
                 <span class="message-time">[% ticket.created_at | user_time %]</span>
-=======
-
-                <span class="message-time">[% ticket.created_at %]</span>
-
->>>>>>> main
             </div>
 
             <div class="message-body">[% ticket.description | html | replace('\n', '<br>') %]</div>
@@ -297,13 +304,7 @@
                 </span>
 
                 [% END %]
-<<<<<<< HEAD
                 <span class="message-time">[% msg.created_at | user_time %]</span>
-=======
-
-                <span class="message-time">[% msg.created_at %]</span>
-
->>>>>>> main
             </div>
 
             <div class="message-body">[% msg.body | html | replace('\n', '<br>') %]</div>
@@ -325,10 +326,6 @@
         <h3>
 
             [% IF is_staff %]Reply (will not reopen)[% ELSE %]Reply to Reopen[% END %]
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
             <div class="reply-actions-small" style="margin-top:10px;">
                 <a href="[% c.uri_for('/HelpDesk') %]" class="btn btn-secondary" style="font-size:0.85em;">Back to Tickets</a>
             </div>
