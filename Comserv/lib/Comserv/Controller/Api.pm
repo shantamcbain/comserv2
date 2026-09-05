@@ -639,6 +639,12 @@ sub api_inventory_item_create :Path('inventory/item/create') :Args(0) {
     $c->controller('Inventory')->api_item_create($c);
 }
 
+sub api_inventory_item_update :Path('inventory/item/update') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_item_update($c);
+}
+
 sub api_inventory_bom_add :Path('inventory/bom/add') :Args(0) {
     my ($self, $c) = @_;
     $self->_api_authenticate($c);

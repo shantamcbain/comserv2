@@ -2979,6 +2979,58 @@ sub default :Path {
 
     my $requested_path = $c->req->path;
 
+    # Manufacturing Traveler (todo #2399): Catalyst -r Module::Refresh reloads
+    # method bodies but does NOT register NEW controller actions. Until the
+    # :4003 worker is fully restarted, serve these paths from Root default so
+    # /Accounting/manufacturing is reachable. Accounting.pm already has the
+    # permanent Path('/Accounting/manufacturing') actions for post-restart.
+    if ($requested_path =~ m{^Accounting/manufacturing(?:/(view|print)/([^/]+))?/?$}i) {
+        my ($mfg_action, $mfg_order) = ($1, $2);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default',
+            "Manufacturing traveler bridge path=/$requested_path action="
+            . ($mfg_action // 'index') . " order=" . ($mfg_order // '-'));
+        eval {
+            require Comserv::Util::Manufacturing::Traveler;
+            my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+            if (!$mfg_action) {
+                my $open_orders = eval { $traveler->get_open_manufacturing_orders($c) } || [];
+                $c->stash(
+                    template    => 'Accounting/Manufacturing/index.tt',
+                    open_orders => $open_orders,
+                    title       => 'Manufacturing Orders - Print Farm Traveler',
+                );
+            }
+            elsif ($mfg_action eq 'view') {
+                my $data = $traveler->get_traveler_data($c, $mfg_order);
+                $c->stash(
+                    template => 'Accounting/Manufacturing/traveler_view.tt',
+                    traveler => $data,
+                    title    => "Manufacturing Traveler #$mfg_order",
+                );
+            }
+            else {
+                my $data = $traveler->get_traveler_data($c, $mfg_order);
+                $c->stash(
+                    template => 'Accounting/Manufacturing/traveler_print.tt',
+                    traveler => $data,
+                    title    => "Print Traveler #$mfg_order",
+                );
+            }
+            $c->response->status(200);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'default',
+                "Manufacturing traveler bridge failed: $@");
+            $c->response->status(500);
+            $c->stash(
+                template    => 'error.tt',
+                error_title => 'Manufacturing Traveler Error',
+                error_msg   => "Could not load manufacturing traveler: $@",
+            );
+        }
+        return;
+    }
+
     # Classify the requester for logging context
     my %req_info = Comserv::Util::Logging::extract_request_info($c);
     my $req_type    = $req_info{request_type} // 'unknown';

@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "planning,3d-printing"
-   page_version = "0.1"
-   last_updated = "Sat Aug 22 2026"
+   page_version = "0.3"
+   last_updated = "Fri Sep 05 2026"
    site_specific = "false"
    project_id = "206"
    project_code = "3DPRINT"
 %]
-[% PageVersion = 'Documentation/3dPrintingPlan.tt,v 0.1 2026/08/22 hermes-agent Exp - coordinator for all 3d plans' %]
+[% PageVersion = 'Documentation/3dPrintingPlan.tt,v 0.3 2026/09/05 hermes-agent Exp - LAN control now' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container">
@@ -33,6 +33,8 @@
                 <a href="#plans" class="doc-navlink">Child plans</a>
                 <a href="#order" class="doc-navlink">Work order</a>
                 <a href="#cross" class="doc-navlink">Cross-plan</a>
+                <a href="#lan" class="doc-navlink">Kobra 3 LAN</a>
+                <a href="#traveler" class="doc-navlink">Manufacturing traveler</a>
                 <a href="#labour" class="doc-navlink">Labour tracking</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
                 <a href="#see-also" class="doc-navlink">See Also</a>
@@ -57,11 +59,20 @@
                 App URLs such as <code>/3d</code> belong there, not on MASTER_PLAN.</p>
             </div>
             <div class="doc-success">
+                <p class="doc-body"><strong>Now (2026-09-05).</strong>
+                Kobra 3 LAN is linked at 192.168.2.53 (farm id=1). Control page reads live MQTT state
+                (busy / file / % / temps) and can pause/resume/stop.
+                Spec:
+                <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
+                · todo
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a>.
+                Next on that todo: use printer % / remaining time on queue Complete. No gcode send yet.</p>
                 <p class="doc-body">Open the attached project and this plan standalone:</p>
                 <div class="doc-navrow">
                     <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" title="Project #206 3DPRINT — parent of INV, File Mgmt, Sales, DRYER-INT.">Project #206 3DPRINT</a>
                     <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-navlink" title="Todos attached to #206.">Todos on #206</a>
                     <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]" class="doc-navlink" title="Site-wide coordinator. This 3D plan is one entry there.">MASTER_PLAN</a>
+                    <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-navlink">Kobra3LanMode</a>
                 </div>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
@@ -118,6 +129,11 @@
                     (cited on MASTER_PLAN; file not on this tree)</td>
                     <td class="doc-td">#206</td>
                     <td class="doc-td">Public browse vs farm console; STL thumbnails. Restore or rewrite before treating as live spec.</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a></td>
+                    <td class="doc-td">#206 · <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a></td>
+                    <td class="doc-td">Stock LAN Mode: discover :18910, attach [LAN_HOST] on existing farm row, GET /info + MQTTS telemetry, control page Pause/Resume/Stop. Linked 192.168.2.53. No gcode send yet.</td>
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td"><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing</a> (operator KB, not a plan)</td>
@@ -203,8 +219,26 @@
                 </tr>
                 <tr class="doc-tr-alt">
                     <td class="doc-td"><a href="[% c.uri_for('/project/details') %]?project_id=272" class="doc-link">#272 DRYER-INT</a></td>
-                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></td>
-                    <td class="doc-td">PDF BOM exploded; configs orderable</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a>
+                        · traveler
+                        <a href="[% c.uri_for('/todo/details') %]?record_id=2399" class="doc-link">#2399</a>
+                        · labour
+                        <a href="[% c.uri_for('/todo/details') %]?record_id=2390" class="doc-link">#2390</a></td>
+                    <td class="doc-td">PDF BOM exploded; traveler live (stop #2399 after confirm); labour queue cost still open</td>
+                </tr>
+                <tr>
+                    <td class="doc-td">Manufacturing traveler</td>
+                    <td class="doc-td"><a href="#traveler" class="doc-link">§6 traveler</a>
+                        · <a href="[% c.uri_for('/Accounting/manufacturing') %]" class="doc-link">/Accounting/manufacturing</a>
+                        · <a href="[% c.uri_for('/todo/details') %]?record_id=2399" class="doc-link">#2399</a></td>
+                    <td class="doc-td">Tablet + colour print + queue/pick/clean/file download shipped 2026-09-03</td>
+                </tr>
+                <tr class="doc-tr-alt">
+                    <td class="doc-td">Kobra 3 LAN</td>
+                    <td class="doc-td"><a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
+                        · <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a>
+                        · <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control</a></td>
+                    <td class="doc-td">Discover + attach + live MQTT state shipped 2026-09-05. Remaining: printer time/grams on Complete; no start-print.</td>
                 </tr>
             </table>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
@@ -213,7 +247,86 @@
 
     <div class="row">
         <div class="col-100">
-            <h2 id="labour" class="doc-h2">6. Labour tracking (human time around a print)</h2>
+            <h2 id="lan" class="doc-h2">Kobra 3 LAN (todo #2334)</h2>
+            <p class="doc-body">Stock firmware LAN Mode — not cloud, not Moonraker.
+            Spec page:
+            <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>.
+            Farm row id=1 notes <code>[LAN_HOST:192.168.2.53]</code>. Control:
+            <a href="[% c.uri_for('/3d/printer_lan/control') %]?printer_id=1" class="doc-link">/3d/printer_lan/control?printer_id=1</a>.</p>
+            <ul class="doc-body">
+                <li><strong>Shipped 2026-09-05:</strong> discover TCP :18910 then GET /info;
+                    attach existing printer; signed POST /ctrl; MQTTS telemetry; Pause/Resume/Stop
+                    (Stop needs cancel checkbox). Do not log token/password/cert.</li>
+                <li><strong>Still open on #2334:</strong> printer remaining-time / % on queue Complete
+                    (today elapsed-since-assign is a stand-in); gcode upload / start print.</li>
+            </ul>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="traveler" class="doc-h2">6. Manufacturing traveler (print farm pick / print form)</h2>
+            <p class="doc-body">
+                Shop-floor tool under <strong>Accounting</strong> (orders own manufacturing;
+                3d is the production provider). Live on sitename <code>3d</code>:
+                <a href="[% c.uri_for('/Accounting/manufacturing') %]" class="doc-link">/Accounting/manufacturing</a>.
+                Tracked by
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2399" class="doc-link">todo #2399</a>
+                (project #272 DRYER-INT as the first full-system test order).
+            </p>
+            <div class="doc-success">
+                <p class="doc-body"><strong>Shipped 2026-09-03 (todo #2399 core):</strong></p>
+                <ul class="doc-body">
+                    <li><strong>Index</strong> — customers with open manufacturing orders + in-house kits (general; no HDRY-only reference table on the list).</li>
+                    <li><strong>Tablet traveler</strong> — full BOM explode for customer order or
+                        <code>/Accounting/manufacturing/view/item/51</code> (INT-HDRY-001).</li>
+                    <li><strong>Row colours</strong> — green in pick box; blue printed not yet boxed;
+                        red in print queue; purple need print not queued (+ Add to Print Queue);
+                        amber buy hardware.</li>
+                    <li><strong>Print sheet</strong> — standalone colour form
+                        (<code>no_wrapper</code>, <strong>Print Traveler</strong> →
+                        <code>window.print()</code>, Background graphics tip, QR to live tablet.</li>
+                    <li><strong>Pick box</strong> — <code>POST /Inventory/api/stock/receive_qty</code>.</li>
+                    <li><strong>Queue from traveler</strong> —
+                        <code>POST /Inventory/api/print_queue/add</code>
+                        (refuses missing/wrong STL).</li>
+                    <li><strong>Clean labour timer</strong> — Start/Stop per part;
+                        <code>POST /Inventory/api/labour/clean</code> adds
+                        <code>unit_cost</code> and credits the logged-in user (default $60/hr).
+                        Queue-page labour + job <code>total_cost</code> remain under
+                        <a href="[% c.uri_for('/todo/details') %]?record_id=2390" class="doc-link">#2390</a>.</li>
+                    <li><strong>File download kink</strong> — File column on tablet + Download on
+                        <code>/3d/queue</code> (queued/active/completed) by <code>model_id</code>;
+                        smart code↔filename match (rollers, gaskets, L1 *03 extracts OK;
+                        true cross-code e.g. SBR03→SBR01.stl = hard mismatch).</li>
+                </ul>
+            </div>
+            <h3 class="doc-h3">HDRY data fixes tied to traveler trust</h3>
+            <ul class="doc-body">
+                <li>Created <code>INT-HDRY-SBR01</code> + model → <code>SBR01__1_.stl</code>; BOM on 51/52/53.</li>
+                <li><strong>Kept SBR03 on BOM</strong> (do not drop still-needed print lines). Linked
+                    <code>SBR03_Reinforcement_small.stl</code> (manual small two-hole reinforcement;
+                    design has no third right spool bracket). Left brackets SBL01/SBL02 still optional import.</li>
+                <li>Mis-attributed stock moved SBR03 → SBR01; rollers renamed copies
+                    <code>SRC01.stl</code> / <code>SRL01.stl</code> / <code>SRR01.stl</code>.</li>
+                <li>Structure <code>item_origin</code> flipped to <code>3d_printed</code> where needed
+                    (queue_sync / traveler amber false positives).</li>
+            </ul>
+            <p class="doc-body">
+                Code:
+                <code>Controller::Accounting::Manufacturing</code>,
+                <code>Util::Manufacturing::Traveler</code>,
+                <code>root/Accounting/Manufacturing/*.tt</code>,
+                Inventory APIs above. No new tables.
+            </p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="labour" class="doc-h2">7. Labour tracking (human time around a print)</h2>
             <p class="doc-body">
                 <strong>The gap.</strong> <code>printing_3d_jobs</code> records
                 <em>machine</em> time (<code>print_hours</code>) and filament, and since
@@ -245,6 +358,33 @@
                     owns DDL — no hand-written DDL, and no <code>add_index</code>
                     (use <code>add_unique_constraint</code>).</li>
             </ul>
+
+            <h3 class="doc-h3">Decision (2026-09-03 traveler)</h3>
+            <p class="doc-body">
+                <strong>Where labour lives for shop-floor clean time:</strong>
+                no new table. The manufacturing traveler tablet has a per-part
+                <strong>Start Clean Timer / Stop &amp; Log</strong> control.
+                On stop, <code>POST /Inventory/api/labour/clean</code> calls
+                <code>Comserv::Util::Manufacturing::Traveler-&gt;record_clean_labour</code>:
+            </p>
+            <ul class="doc-body">
+                <li>Duration via <code>AppTime-&gt;duration_parts</code> (UTC start/end from the client; server is authority).</li>
+                <li>Hourly rate from <code>PointSystem-&gt;resolve_rate(hourly_rate)</code> (default 60 pts/hr = CAD/hr).</li>
+                <li><strong>Cost on the item:</strong> labour amount is <em>added</em> to
+                    <code>inventory_items.unit_cost</code>; a one-line note is appended;
+                    an inventory transaction (qty 0, unit_cost = labour) is written for audit.</li>
+                <li><strong>Credit the operator:</strong>
+                    <code>PointSystem-&gt;credit</code> with
+                    <code>transaction_type=time_log_earn</code> for the logged-in user
+                    (same path as todo time billing).</li>
+                <li>Category defaults to <code>clean</code>; API also accepts
+                    pick / pack / qc / other for later queue UI.</li>
+            </ul>
+            <p class="doc-body">
+                This satisfies phase 1 (decision) and a traveler-side slice of phase 2.
+                Job-page &quot;Log labour&quot; on <code>/3d/queue</code> and roll-up into
+                <code>printing_3d_jobs.total_cost</code> remain open under todo #2390.
+            </p>
 
             <h3 class="doc-h3">Phases</h3>
             <table class="doc-table">
@@ -284,9 +424,12 @@
 
             <h3 class="doc-h3">Out of scope (deliberately)</h3>
             <ul class="doc-body">
-                <li><strong>Printer telemetry</strong> — reading actual print time from the
-                    printer is the Anycubic LAN adapter work (todo #2334). This section is
-                    about <em>human</em> time only.</li>
+                <li><strong>Printer telemetry on this labour section</strong> — human time only.
+                    Machine state is
+                    <a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a>
+                    / todo
+                    <a href="[% c.uri_for('/todo/details') %]?record_id=2334" class="doc-link">#2334</a>
+                    (control page live 2026-09-05; wiring % into queue Complete is still open).</li>
                 <li><strong>Changing what the Complete button records</strong> — machine
                     elapsed is already correct; leave it alone.</li>
             </ul>
@@ -311,6 +454,7 @@
                     <li><a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-link">DryerProjectPlan</a></li>
                     <li><a href="[% c.uri_for('/Documentation/SignGenerator') %]" class="doc-link">SignGenerator</a></li>
                     <li><a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]" class="doc-link">3dPrintingHowItWorks</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/Kobra3LanMode') %]" class="doc-link">Kobra3LanMode</a> (LAN discover + control)</li>
                     <li><a href="[% c.uri_for('/Documentation/3d_printing') %]" class="doc-link">3d_printing (operator KB)</a></li>
                 </ul>
             </div>

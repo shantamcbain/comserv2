@@ -85,6 +85,10 @@
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
     <h1>Printer Farm</h1>
     <div>
+        <form method="get" action="/3d/printer_lan/discover" style="display:inline;margin-right:0.8em;">
+            <input type="hidden" name="subnet" value="192.168.2.0/24">
+            <button type="submit" class="btn-sm btn-idle">Discover Printers</button>
+        </form>
         <a href="/3d/queue" style="font-size:0.9em;">Print Queue</a> |
         <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
     </div>
@@ -136,9 +140,10 @@
                         <button type="submit" class="btn-sm btn-idle" style="font-size:0.75em;padding:0.15em 0.4em;">Resume LAN</button>
                     </form>
                 [% ELSE %]
+                    <a class="btn-sm btn-idle" href="/3d/printer_lan/control?printer_id=[% p.id %]">Control</a>
                     <form method="get" action="/3d/printer_lan/ping" class="app-form" style="display:inline;">
                         <input type="hidden" name="printer_id" value="[% p.id %]">
-                        <input type="text" name="host" placeholder="192.168.1.x" size="14">
+                        <input type="text" name="host" placeholder="192.168.2.x" size="14">
                         <input type="hidden" name="port" value="18910">
                         <button type="submit" class="btn-sm btn-idle">LAN ping</button>
                     </form>
