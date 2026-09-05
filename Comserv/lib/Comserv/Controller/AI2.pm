@@ -1119,6 +1119,94 @@ sub action :Local :Args(0) {
     $c->model('AI2::Actions')->perform($c);
 }
 
+
+# -------------------------------------------------------------------
+# AI2 editor Review panel — list/create worktrees (developer/editor/admin).
+# Create-only; merge/push remain on /admin/git (admin-gated).
+# Reuses Comserv::Util::Git->create_worktree / list_worktrees (same validation
+# as POST /admin/git/create_worktree).
+# -------------------------------------------------------------------
+
+# GET /ai2/git_worktrees
+# Prefer build_worktree_list (worktrees.json) — same source as the Git dashboard.
+# list_worktrees(porcelain) currently mis-parses "branch refs/heads/..." lines.
+sub git_worktrees :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    return unless $self->_ai2_require_editor_role($c);
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+    my $raw = eval { $git->build_worktree_list() } || [];
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'git_worktrees', "$@");
+        $c->response->body(encode_json({ success => 0, error => 'Failed to list worktrees' }));
+        return;
+    }
+
+    # Shape expected by ai2editor/git-review.js
+    my @wts = map {
+        my $name = $_->{name} // '';
+        {
+            branch  => $name,
+            port    => $_->{port},
+            label   => $_->{label} // $name,
+            path    => $_->{cmd},
+            ahead   => 0,
+            behind  => 0,
+            is_main => ($name eq 'main' || $name eq 'master') ? 1 : 0,
+        }
+    } @$raw;
+
+    $c->response->body(encode_json({ success => 1, worktrees => \@wts }));
+}
+
+# POST /ai2/git_create_worktree  (branch, parent=main, label, url)
+sub git_create_worktree :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    return unless $self->_ai2_require_editor_role($c);
+
+    unless (($c->request->method || '') eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $p      = $c->req->params;
+    my $branch = $p->{branch} // '';
+    my $parent = $p->{parent} // 'main';
+    my $label  = $p->{label}  // $branch;
+    my $url    = $p->{url}    // '/planning/daily';
+    $label = $branch if !defined $label || $label eq '';
+
+    unless ($branch) {
+        $c->response->body(encode_json({ success => 0, error => 'branch is required' }));
+        return;
+    }
+
+    my $git = Comserv::Util::Git->new(logging => $self->logging);
+    my $res = $git->create_worktree($c, $branch,
+        { parent => $parent, label => $label, url => $url });
+
+    $self->logging->log_with_details(
+        $c, $res->{success} ? 'info' : 'error', __FILE__, __LINE__,
+        'git_create_worktree',
+        "user=" . ($c->session->{username} // '') .
+        " branch='$branch' parent='$parent' port=" . ($res->{port} // '?') .
+        ($res->{error} ? " error=$res->{error}" : '')
+    );
+
+    $c->response->body(encode_json({
+        success => $res->{success} ? 1 : 0,
+        branch  => $branch,
+        port    => $res->{port},
+        path    => $res->{path},
+        cmd     => $res->{cmd},
+        ($res->{error} ? (error => $res->{error}) : ()),
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
