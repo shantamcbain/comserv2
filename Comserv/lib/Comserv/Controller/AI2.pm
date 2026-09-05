@@ -13,6 +13,7 @@ use DateTime;
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Git;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -166,10 +167,26 @@ sub editing_widget_popup :Local :Args(0) {
     my $selected_model = $router ? $router->select_best_model($c) : 'grok-beta';
     my $recommended_models = $router ? $router->get_recommended_models($c) : ['grok-beta','ollama/llama3','ollama/codellama'];
     my $branches = $router ? $router->get_available_branches($c) : ['main','ai2-refactor','feature/ai2-popup'];
+    $branches = [] unless $branches && ref $branches eq 'ARRAY';
 
-    # Sort branches: current branch first, then alphabetically
-    my $current_branch = 'main';
-    @$branches = sort { $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b } @$branches;
+    # Live checkout branch for THIS process (e.g. aisystem on :4006) — never hardcode main.
+    my $git = eval { Comserv::Util::Git->new(logging => $self->logging) };
+    my $current_branch = ($git ? eval { $git->get_current_branch($c) } : '') // '';
+    $current_branch = '' unless defined $current_branch;
+    $current_branch = '' if $current_branch eq 'unknown';
+    # Ensure current branch appears in the dropdown even if the branch list omitted it.
+    if (length $current_branch && !grep { $_ eq $current_branch } @$branches) {
+        unshift @$branches, $current_branch;
+    }
+    # Sort: current first, then alphabetically
+    if (length $current_branch) {
+        @$branches = sort {
+            $a eq $current_branch ? -1 : $b eq $current_branch ? 1 : $a cmp $b
+        } @$branches;
+    } else {
+        @$branches = sort { $a cmp $b } @$branches;
+        $current_branch = $branches->[0] // 'main';
+    }
 
     # Accept optional file path to load on open
     my $file_to_load = $c->req->param('file') || '';
@@ -179,6 +196,7 @@ sub editing_widget_popup :Local :Args(0) {
         selected_model      => $selected_model,
         recommended_models  => $recommended_models,
         branches            => $branches,
+        current_branch      => $current_branch,
         no_wrapper          => 1,
         ai_popup_mode       => 1,   # triggers conditional loading of ai2editor/*.js in js_load.tt
         show_ai2_editor     => 1,

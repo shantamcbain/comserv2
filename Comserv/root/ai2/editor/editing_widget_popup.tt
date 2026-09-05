@@ -44,7 +44,7 @@
         <label>Branch:
             <select id="branch-select">
                 [% FOREACH b IN branches %]
-                    <option [% IF b == 'main' %]selected[% END %]>[% b | html %]</option>
+                    <option value="[% b | html %]" [% IF b == current_branch %]selected[% END %]>[% b | html %]</option>
                 [% END %]
             </select>
         </label>
