@@ -1,16 +1,16 @@
 [% META
    title = "Hardware Monitor & Watchdog Plan"
-   description = "Root-cause + fix for the hardware_monitor watchdog false CRITICAL (todo #2065), and the rollout of that fix to the production containers."
+   description = "Architecture (why two crons/scripts), file/cron/log/DB locations, current monitored hosts, and plans for full equipment coverage + Add Server page."
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "infrastructure,monitoring"
-   page_version = "1.0"
-   last_updated = "Thu Aug 13 2026 (v1.0 — watchdog false-CRITICAL fix + :3001 cron)"
+   page_version = "1.1"
+   last_updated = "2026-09-05 (v1.1 — two-script explanation + current status + expansion plan)"
    project_id = 258
    project_code = "HWMON"
    site_specific = "false"
 %]
-[% PageVersion = 'Documentation/HardwareMonitorPlan.tt,v 1.0 2026/08/13 Shanta Exp - watchdog false-CRITICAL fix + prod rollout plan' %]
+[% PageVersion = 'Documentation/HardwareMonitorPlan.tt,v 1.1 2026/09/05 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <div class="container masterplan">
@@ -92,7 +92,87 @@ and the remaining work to roll the fix out to the production containers.</p>
         proxmox720 / production1 per the established &ldquo;prove local first, then mirror&rdquo; workflow.</li>
 </ul>
 
-<h2 id="links">4. Related</h2>
+<h2 id="architecture">5. Current Architecture — Why Two Crons/Scripts</h2>
+
+<p>The system uses <strong>two separate cron-driven scripts</strong> for a reason:</p>
+
+<ul>
+    <li><strong>hardware_monitor.pl</strong> (thin trigger, lives on the gateway host only):
+        <ul>
+            <li>Lightweight "ping" that runs every 5 min from the gateway (.1/.3 proxmoxt210).</li>
+            <li>It only curls the central app nodes (currently 192.168.1.126:5000 and .199:5000) to hit <code>/admin/hardware_monitor/run</code> and <code>/admin/logging_audit/run</code>.</li>
+            <li>This wakes the app so it records heartbeats (<code>monitor_heartbeat</code> etc.) and (when DB is up) collects its own local metrics via <code>HardwareAgent</code>.</li>
+            <li><strong>It does NOT collect or send the gateway's own CPU/disk/mem values.</strong></li>
+            <li>Updated (2026-09) to be completely silent on success to stop cron email spam. Only real outages still produce STDERR (which can mail).</li>
+        </ul>
+    </li>
+    <li><strong>device_agent.sh</strong> (the actual collector — put this on any hardware):
+        <ul>
+            <li>Runs on the target machine (gateway, proxmox hosts, DB server, workstation, future equipment).</li>
+            <li>Collects local system values (disk_used_pct_*, cpu_load_pct, mem_used_pct, temps, uptime, etc.).</li>
+            <li>POSTs them as JSON to the app's <code>/admin/hardware_monitor/ingest</code> (token-protected).</li>
+            <li>This is what populates <code>hardware_metrics</code> for history, dashboards, and alerts (e.g. disk space warnings).</li>
+            <li>Script lives on NFS so one central copy; each host runs it from its own mount.</li>
+        </ul>
+    </li>
+</ul>
+
+<p><strong>Why two?</strong> The gateway is an external "watchdog" host (no full app containers). It needs a tiny trigger to keep central monitoring alive. Any arbitrary hardware needs a collector to send its own numbers back. They serve different roles. On pure app servers we rely on the triggered internal collection (not device_agent) to avoid duplicates.</p>
+
+<h3>File / Cron / Log / DB Locations</h3>
+<ul>
+    <li><strong>Source (repo)</strong>: <code>Comserv/script/hardware_monitor.pl</code> and <code>script/device_agent.sh</code></li>
+    <li><strong>Trigger script on gateway</strong>: copied to <code>/usr/local/bin/hardware_monitor.pl</code> (manual or via deploy on hosts that run it). Cron in host crontab (marked <code># comserv-hardware-monitor</code>). Log: <code>/tmp/comserv-hardware-monitor.log</code> (writable, avoids /var/log perms).</li>
+    <li><strong>Collector (device_agent)</strong>: on NFS server (192.168.1.175) at <code>/mnt/data/comserv/scripts/device_agent.sh</code>. On each host: mounted as <code>/mnt/nfs_data/comserv/scripts/device_agent.sh</code>. Cron: manual <code>/etc/cron.d/comserv_agent</code> or crontab entry (every 5 min, with INGEST_URL + INGEST_TOKEN).</li>
+    <li><strong>Deploy involvement</strong>: <code>script/deploy.sh</code> handles copying the trigger script and installing the marked cron line on hosts that run full deploy. Gateway (pure cron host) usually requires manual copy of the .pl because no app code/deploy runs there.</li>
+    <li><strong>DB</strong>: <code>Ency.hardware_metrics</code> table (primary currently ~192.168.1.20:3307). Rows use <code>hostname</code> + <code>system_identifier</code> (e.g. "hostname:agent").</li>
+    <li><strong>App endpoints</strong>: <code>/admin/hardware_monitor/run</code> (trigger), <code>/ingest</code> (agent posts), <code>/watchdog</code>, <code>/disk_health</code> etc. (see <code>lib/Comserv/Controller/Admin/HardwareMonitor.pm</code> and <code>Util/HardwareAgent.pm</code>).</li>
+</ul>
+
+<h3>Currently Monitored Hosts (as of 2026-09-05)</h3>
+<p>The dashboard (<code>/admin/hardware_monitor</code>) only shows hosts that have recent rows in <code>hardware_metrics</code> (within the time filter window, default 2h). Old/stale hosts disappear from view until they report again.</p>
+
+<p>Known / recently active or configured:</p>
+<ul>
+    <li>workstation (.199)</li>
+    <li>production1 / comservproduction1 (.126, and references to old .198 DB location)</li>
+    <li>gateway / proxmoxt210 (.3 and recently .1 with the trigger cron)</li>
+    <li>NFS server (192.168.1.175)</li>
+    <li>DB server (.20)</li>
+    <li>proxmox hosts (proxmox720, .2 and others just added)</li>
+</ul>
+
+<p>The "Hardware Monitor" view has looked stale for a long time (only showing workstation + production1) because:</p>
+<ul>
+    <li>Not all hosts were running the collector agent.</li>
+    <li>Old DB references (.198) and limited recent data in the query window.</li>
+    <li>The gateway trigger was updated recently but the collector (device_agent) was not yet deployed on it or the new proxmox nodes.</li>
+</ul>
+
+<p>The trigger cron on the gateway is now active and successfully hitting the app (HTTP 200s). The collector is still missing on most non-app hosts.</p>
+
+<h2 id="expansion">6. Plans — Get All Equipment Reporting + Add Server Page</h2>
+
+<ol>
+    <li><strong>Deploy collector everywhere</strong>: Install NFS mount + <code>device_agent.sh</code> cron on every proxmox host, the gateway, DB server, any other servers/switches/appliances that can run a simple bash+curl cron. Update the reference table in <code>root/admin/HardwareMonitor/index.tt</code> and docs as hosts come online.</li>
+    <li><strong>Add Server UI</strong> (planned):
+        <ul>
+            <li>New page or section under <code>/admin/hardware_monitor</code> (or a dedicated "Add Monitored Host").</li>
+            <li>Form: hostname, IP, type (gateway, proxmox, server, etc.), optional notes.</li>
+            <li>Generates the exact ready-to-paste cron line (with correct INGEST_URL for the production app and the shared token).</li>
+            <li>Tracks "expected" hosts vs "last seen" from the DB.</li>
+            <li>Button to "mark as deployed" or auto-detect via a one-time test POST.</li>
+            <li>Future: integrate with network discovery or inventory to suggest new hosts.</li>
+        </ul>
+    </li>
+    <li><strong>Dashboard improvements</strong>: Show all known/expected hosts (even if stale) with "last reported" and "missing" badges. Better grouping by site/rack/role.</li>
+    <li><strong>Central token &amp; URL management</strong>: Already partially done via env + NFS token file. Make the Add Server page pull live values from the running app config.</li>
+    <li><strong>One-script simplification option</strong> (if desired): Enhance the gateway version of hardware_monitor.pl to also run the local collection + ingest before/after the trigger pings. This would mean only one script to manage on external/pure-cron hosts.</li>
+</ol>
+
+<p>Once device_agent is on all equipment, the dashboard will populate with full history and the disk/health alerts will cover everything.</p>
+
+<h2 id="links">7. Related</h2>
 <ul>
     <li>Master plan: <a href="[% c.uri_for('/Documentation/MASTER_PLAN') %]">/Documentation/MASTER_PLAN</a></li>
     <li>Project: <a href="[% c.uri_for('/admin/project') %]/258">Hardware Monitor &amp; Watchdog (HWMON, #258)</a></li>
@@ -100,9 +180,9 @@ and the remaining work to roll the fix out to the production containers.</p>
     <li>Next-steps todo: <a href="[% c.uri_for('/admin/todo') %]/2074">#2074 Hardware Monitor next steps</a></li>
     <li>Code: <code>lib/Comserv/Controller/Admin/HardwareMonitor.pm</code>,
         <code>lib/Comserv/Model/Schema/Ency/Result/HardwareMetrics.pm</code>,
-        <code>script/hardware_monitor.pl</code></li>
+        <code>script/hardware_monitor.pl</code>, <code>script/device_agent.sh</code></li>
     <li>Changelog: <a href="[% c.uri_for('/Documentation/changelog/CHANGELOG') %]">/Documentation/changelog/CHANGELOG</a>
-        (entry under [Unreleased])</li>
+        (recent entries for silent trigger + architecture updates)</li>
 </ul>
 
 <a class="back-to-top" href="#top" style="color: var(--link-color, #007bff);">↑ Back to top</a>
