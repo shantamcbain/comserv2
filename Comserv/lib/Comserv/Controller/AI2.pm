@@ -164,8 +164,20 @@ sub editing_widget_popup :Local :Args(0) {
 
     my $router = eval { $c->model('AI2::Router') } || undef;
 
+    # select_best_model returns [$model,$prov]; coerce to a plain string for TT/JS.
     my $selected_model = $router ? $router->select_best_model($c) : 'grok-beta';
-    my $recommended_models = $router ? $router->get_recommended_models($c) : ['grok-beta','ollama/llama3','ollama/codellama'];
+    if (ref $selected_model eq 'ARRAY') {
+        my ($model, $prov) = @$selected_model;
+        $selected_model = (defined $prov && length $prov && defined $model && length $model)
+            ? "$prov|$model"
+            : (defined $model && length $model ? $model : 'grok-beta');
+    } elsif (ref $selected_model) {
+        $selected_model = 'grok-beta';
+    }
+    $selected_model = 'grok-beta' unless defined $selected_model && !ref($selected_model) && length $selected_model;
+    # Model <select> is filled by ComservChat.modelSelect.init from catalog — do not
+    # stash hashrefs (TT [% m | html %] → HASH(0x…)). Empty list keeps TT safe.
+    my $recommended_models = [];
     my $branches = $router ? $router->get_available_branches($c) : ['main','ai2-refactor','feature/ai2-popup'];
     $branches = [] unless $branches && ref $branches eq 'ARRAY';
 
