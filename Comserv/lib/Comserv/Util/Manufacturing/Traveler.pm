@@ -586,6 +586,11 @@ sub _parts_from_leaves {
 
 # Receive completed-print lag into inventory so "In Stock" / pick box matches shop floor.
 # Returns { ok, received, on_hand, error }
+#
+# Error audit (2026-09-03, item=84, site 3d): location_id NULL on INSERT to inventory_stock_levels.
+# Fixed by guaranteeing InventoryLocation (active or created "Print Farm Pick Box" per sitename)
+# before any stock create. See changelog 2026-09-04-traveler-location-null.
+# Verified perl -c + code review 2026-09-05. CODER_READY (no re-plan needed for similar location issues).
 sub put_part_in_pick_box {
     my ($self, $c, $item_id, $qty_hint) = @_;
     $item_id = 0 + ($item_id // 0);

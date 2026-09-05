@@ -1693,6 +1693,9 @@ sub merge_branch {
     # Pre-flight dirty status so we can name files even when git is terse, and
     # so the browser can tell the user to fix MAIN (not the worktree) when the
     # merge target is the primary checkout.
+    # See error-audit for uncommitted_on_main (2026-09-01 / 3d -> main): main
+    # must be clean on primary; this preflight + conditional warn log prevents
+    # spurious ERROR todos. CODER_READY for similar precondition cases.
     my $st = $self->_run($c, 'status', '--porcelain', $run_opts);
     my $st_out = join("\n", grep { defined && length }
         $st->{output}, $st->{error});
@@ -1832,7 +1835,16 @@ sub merge_branch {
         . " exit=" . ($r->{exit_code} // '?')
         . " msg=" . ($result->{error_msg} // '')
         . " detail=" . substr($out // '', 0, 800);
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_merge', $log_line);
+
+    # Use 'warn' (not 'error') for expected precondition blockers so they do
+    # not auto-create error-audit todos. Real failures and unexpected errors
+    # remain at 'error'.
+    my $log_level = 'error';
+    if (($result->{reason} // '') =~ /^(uncommitted|uncommitted_on_main|worktree_collision|merge_in_progress|missing_ref)$/
+        || $result->{conflict}) {
+        $log_level = 'warn';
+    }
+    $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 'git_merge', $log_line);
 
     return $result;
 }

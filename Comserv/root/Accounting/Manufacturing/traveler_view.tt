@@ -28,8 +28,14 @@
 .traveler-tablet .swatch-need-print { background: #e1bee7; }
 .traveler-tablet .swatch-buy { background: #ffe0b2; }
 
+.traveler-tablet {
+  max-width: 100%;
+  overflow-x: auto;
+}
 .traveler-tablet table.traveler-table {
-  width: 100%; border-collapse: collapse;
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
   color: #111;
 }
 .traveler-tablet table.traveler-table th {
