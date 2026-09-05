@@ -3795,7 +3795,7 @@ sub admin_delete_site_role :Local :Args(1) {
 sub _load_available_roles {
     my ($self, $c, $is_csc_admin, $sitename) = @_;
 
-    my @default_roles = qw(normal member editor developer admin);
+    my @default_roles = qw(normal member editor developer helpdesk admin);
 
     my @site_specific;
     eval {
