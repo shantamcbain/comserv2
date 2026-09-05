@@ -2040,6 +2040,292 @@ require JSON;
     $c->detach;
 }
 
+# POST /Inventory/api/item/update
+# JSON: item_id or sku (+ optional sitename). Optional fields to patch:
+# item_origin, name, description, category, reorder_point, reorder_quantity,
+# is_assemblable, notes, status, unit_of_measure.
+# Used to correct import defaults (e.g. printed HDRY parts marked purchased).
+sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    my $schema = $self->_schema($c);
+    my $item;
+    if ($p->{item_id}) {
+        $item = eval { $schema->resultset('Accounting::InventoryItem')->find($p->{item_id}) };
+    } elsif ($p->{sku}) {
+        my $where = { sku => $p->{sku} };
+        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        $item = eval { $schema->resultset('Accounting::InventoryItem')->search($where)->first };
+    }
+    unless ($item) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'item not found' }));
+        $c->detach;
+    }
+
+    my %upd;
+    for my $col (qw(
+        item_origin name description category notes status unit_of_measure
+        reorder_point reorder_quantity unit_cost unit_price
+    )) {
+        $upd{$col} = $p->{$col} if exists $p->{$col};
+    }
+    if (exists $p->{is_assemblable}) {
+        $upd{is_assemblable} = $p->{is_assemblable} ? 1 : 0;
+    }
+    unless (keys %upd) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'no updatable fields' }));
+        $c->detach;
+    }
+    $upd{updated_at} = $self->_now();
+    $upd{updated_by} = $c->session->{username} || 'api';
+
+    eval { $item->update(\%upd) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+            "update failed id=" . $item->id . ": $@");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "update failed: $@" }));
+        $c->detach;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_update',
+        "updated item id=" . $item->id . " sku=" . ($item->sku // '') .
+        " fields=" . join(',', sort keys %upd));
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success     => 1,
+        item_id     => $item->id,
+        sku         => $item->sku,
+        item_origin => $item->item_origin,
+        sitename    => $item->sitename,
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/stock/receive_qty
+# JSON: item_id (or sku+sitename), quantity (optional — default = print-job lag).
+# Creates stock row if missing and receives finished printed parts into pick-box stock.
+# Used by Manufacturing Traveler "In Pick Box" without a full PO receive form.
+sub api_stock_receive_qty :Path('/Inventory/api/stock/receive_qty') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $item_id  = $p->{item_id} // $p->{part_id};
+    if (!$item_id && $p->{sku}) {
+        my $where = { sku => $p->{sku} };
+        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        my $it = eval { $self->_schema($c)->resultset('Accounting::InventoryItem')->search($where)->first };
+        $item_id = $it->id if $it;
+    }
+    my $r = $traveler->put_part_in_pick_box($c, $item_id, $p->{quantity});
+    $c->res->content_type('application/json');
+    $c->res->status($r->{ok} ? 200 : 500);
+    $c->res->body(JSON::encode_json({
+        success  => $r->{ok} ? 1 : 0,
+        received => $r->{received},
+        on_hand  => $r->{on_hand},
+        message  => $r->{message},
+        error    => $r->{error},
+        item_id  => $item_id,
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/print_queue/add
+# JSON: item_id (or sku), quantity (optional — shortfall qty from traveler)
+# Creates a printing_3d_jobs row status=queued for the print farm.
+sub api_print_queue_add :Path('/Inventory/api/print_queue/add') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $item_id  = $p->{item_id} // $p->{part_id};
+    if (!$item_id && $p->{sku}) {
+        my $where = { sku => $p->{sku} };
+        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        my $it = eval { $self->_schema($c)->resultset('Accounting::InventoryItem')->search($where)->first };
+        $item_id = $it->id if $it;
+    }
+    my $r = $traveler->queue_part_print($c, $item_id, $p->{quantity} // $p->{qty});
+    $c->res->content_type('application/json');
+    $c->res->status($r->{ok} ? 200 : 500);
+    $c->res->body(JSON::encode_json({
+        success  => $r->{ok} ? 1 : 0,
+        job_id   => $r->{job_id},
+        quantity => $r->{quantity},
+        model_id => $r->{model_id},
+        item_id  => $item_id,
+        sku      => $r->{sku},
+        error    => $r->{error},
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/labour/clean
+# JSON: item_id|part_id, started_at (UTC), ended_at?, duration_seconds?,
+#       category=clean|pick|pack|qc|other, notes?
+# Stops a traveler clean timer: adds labour $ to inventory unit_cost and
+# credits the logged-in user points for the time (PointSystem hourly_rate).
+sub api_labour_clean :Path('/Inventory/api/labour/clean') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $r = $traveler->record_clean_labour($c, $p);
+    $c->res->content_type('application/json');
+    $c->res->status($r->{ok} ? 200 : (($r->{error} || '') =~ /required|short|not found/i ? 400 : 500));
+    $c->res->body(JSON::encode_json({
+        success           => $r->{ok} ? 1 : 0,
+        item_id           => $r->{item_id},
+        sku               => $r->{sku},
+        category          => $r->{category},
+        duration_secs     => $r->{duration_secs},
+        duration_mins     => $r->{duration_mins},
+        duration_human    => $r->{duration_human},
+        hourly_rate       => $r->{hourly_rate},
+        labour_cost       => $r->{labour_cost},
+        unit_cost_old     => $r->{unit_cost_old},
+        unit_cost_new     => $r->{unit_cost_new},
+        points_credited   => $r->{points_credited},
+        credited          => $r->{credited},
+        username          => $r->{username},
+        ledger_id         => $r->{ledger_id},
+        message           => $r->{message},
+        error             => $r->{error},
+    }));
+    $c->detach;
+}
+
 # POST /Inventory/api/bom/add
 # JSON: sitename, parent_sku or parent_item_id, component_sku or component_item_id, quantity
 sub api_bom_add :Path('/Inventory/api/bom/add') :Args(0) {

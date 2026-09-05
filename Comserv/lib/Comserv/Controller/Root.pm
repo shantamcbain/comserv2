@@ -278,15 +278,9 @@ sub auto :Private {
             my $now = time();
             if (!defined $_remotedb_status || ($now - $_remotedb_last_checked) > $_REMOTEDB_TTL) {
                 eval {
-                    my $remotedb_class = $c->model('RemoteDB');
-                    my $remotedb;
-                    if (!ref($remotedb_class)) {
-                        require Comserv::Model::RemoteDB;
-                        $remotedb = Comserv::Model::RemoteDB->new();
-                        $remotedb->_load_config();
-                    } else {
-                        $remotedb = $remotedb_class;
-                    }
+                    require Comserv::Model::RemoteDB;
+                    my $remotedb = Comserv::Model::RemoteDB->from_context($c);
+                    $remotedb->_load_config() if ref $remotedb;
                     $_remotedb_status = ($remotedb && ref($remotedb))
                         ? ($remotedb->{configuration_status} // 'ok')
                         : 'ok';
@@ -2984,6 +2978,58 @@ sub default :Path {
     my ($self, $c) = @_;
 
     my $requested_path = $c->req->path;
+
+    # Manufacturing Traveler (todo #2399): Catalyst -r Module::Refresh reloads
+    # method bodies but does NOT register NEW controller actions. Until the
+    # :4003 worker is fully restarted, serve these paths from Root default so
+    # /Accounting/manufacturing is reachable. Accounting.pm already has the
+    # permanent Path('/Accounting/manufacturing') actions for post-restart.
+    if ($requested_path =~ m{^Accounting/manufacturing(?:/(view|print)/([^/]+))?/?$}i) {
+        my ($mfg_action, $mfg_order) = ($1, $2);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default',
+            "Manufacturing traveler bridge path=/$requested_path action="
+            . ($mfg_action // 'index') . " order=" . ($mfg_order // '-'));
+        eval {
+            require Comserv::Util::Manufacturing::Traveler;
+            my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+            if (!$mfg_action) {
+                my $open_orders = eval { $traveler->get_open_manufacturing_orders($c) } || [];
+                $c->stash(
+                    template    => 'Accounting/Manufacturing/index.tt',
+                    open_orders => $open_orders,
+                    title       => 'Manufacturing Orders - Print Farm Traveler',
+                );
+            }
+            elsif ($mfg_action eq 'view') {
+                my $data = $traveler->get_traveler_data($c, $mfg_order);
+                $c->stash(
+                    template => 'Accounting/Manufacturing/traveler_view.tt',
+                    traveler => $data,
+                    title    => "Manufacturing Traveler #$mfg_order",
+                );
+            }
+            else {
+                my $data = $traveler->get_traveler_data($c, $mfg_order);
+                $c->stash(
+                    template => 'Accounting/Manufacturing/traveler_print.tt',
+                    traveler => $data,
+                    title    => "Print Traveler #$mfg_order",
+                );
+            }
+            $c->response->status(200);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'default',
+                "Manufacturing traveler bridge failed: $@");
+            $c->response->status(500);
+            $c->stash(
+                template    => 'error.tt',
+                error_title => 'Manufacturing Traveler Error',
+                error_msg   => "Could not load manufacturing traveler: $@",
+            );
+        }
+        return;
+    }
 
     # Classify the requester for logging context
     my %req_info = Comserv::Util::Logging::extract_request_info($c);

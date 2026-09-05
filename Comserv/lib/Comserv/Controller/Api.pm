@@ -46,10 +46,24 @@ sub _focus_external_models {
             next if $m->{disabled} || $m->{needs_key}; # skip unconfigured stubs
             my $name = $m->{name} // $m->{id} // '';
             next unless $name;
+
+            # Carry real cost through so the picker can show "$X/$Y per 1M"
+            # instead of guessing. price_known == 0 means the provider published
+            # no price (x.AI /v1/models) — the client must render that as
+            # "cost not published", never as "free".
+            my $known = $m->{price_known};
+            $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                       || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+                unless defined $known;
+
             push @out, {
-                name     => $name,
-                provider => $prov,
-                label    => $m->{label} // $name,
+                name             => $name,
+                provider         => $prov,
+                label            => $m->{label} // $name,
+                price_prompt     => $m->{price_prompt},
+                price_completion => $m->{price_completion},
+                price_known      => $known ? 1 : 0,
+                price_tier       => Comserv::Util::ModelCatalog->_price_tier($m),
             };
         }
     };
@@ -421,7 +435,18 @@ sub api_list_todos :Path('todos') :Args(0) {
 POST /api/todo/create - Create a new todo (Bypass keyword/token for local/workstation.local)
 
 Required JSON fields: subject, start_date, due_date, priority, status
-Optional JSON fields: description, project_id, assigned_to
+Optional JSON fields: description, project_id, project_code, assigned_to, developer
+
+Optional columns honoured at create time (previously silently ignored, which
+forced a create-then-update workaround):
+    reporter owner is_blocking blocked_by_todo_id parent_id sort_order
+    todo_type billable estimated_man_hours comments company_code
+    time_of_day scheduled_date scheduled_start scheduled_end
+    plan_id point_rate role_category is_fixed is_recurring
+
+Set is_blocking => 1 on anything urgent: Util::TodoRanking dampens a
+priority-1 todo to 5 unless is_blocking is set (or the text matches outage
+keywords), so a bare P1 will not surface in the Focus Queue.
 
 Returns: { success, message, todo_id, todo: { ... } }
 =cut
@@ -538,7 +563,25 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         $c->detach();
     }
 
-    my $todo = $schema->resultset('Todo')->create({
+    # Optional columns a caller may set at create time.
+    #
+    # Historically these were silently dropped: the INSERT below listed only a
+    # fixed set, so passing reporter / owner / is_blocking appeared to succeed
+    # but stored nothing — callers had to create-then-update as a workaround.
+    # Now they are honoured when present. Only real Todo columns are accepted
+    # (whitelist), and anything not supplied keeps its documented default.
+    #
+    # Note is_blocking matters for ranking: Util::TodoRanking dampens a
+    # priority-1 todo to 5 unless is_blocking is set, so a P1 created without
+    # it is invisible in the Focus Queue.
+    my %OPTIONAL_CREATE_COLUMNS = map { $_ => 1 } qw(
+        reporter owner is_blocking blocked_by_todo_id parent_id
+        sort_order todo_type billable estimated_man_hours comments
+        company_code time_of_day scheduled_date scheduled_start scheduled_end
+        plan_id point_rate role_category is_fixed is_recurring
+    );
+
+    my %create = (
         subject => $params->{subject},
         description => $params->{description} || '',
         project_id => $project_id,
@@ -559,7 +602,15 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         project_code => $params->{project_code} || 'system',
         share => 0,
         user_id => $poster_user_id,
-    });
+    );
+
+    # Copy through any optional column the caller actually supplied.
+    for my $col (keys %OPTIONAL_CREATE_COLUMNS) {
+        next unless exists $params->{$col} && defined $params->{$col};
+        $create{$col} = $params->{$col};
+    }
+
+    my $todo = $schema->resultset('Todo')->create(\%create);
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
         "Todo created via API: ID=" . $todo->id . ", Subject=" . $params->{subject});
@@ -586,6 +637,12 @@ sub api_inventory_item_create :Path('inventory/item/create') :Args(0) {
     my ($self, $c) = @_;
     $self->_api_authenticate($c);
     $c->controller('Inventory')->api_item_create($c);
+}
+
+sub api_inventory_item_update :Path('inventory/item/update') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_api_authenticate($c);
+    $c->controller('Inventory')->api_item_update($c);
 }
 
 sub api_inventory_bom_add :Path('inventory/bom/add') :Args(0) {

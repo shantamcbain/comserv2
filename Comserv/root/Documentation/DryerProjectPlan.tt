@@ -4,13 +4,13 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "3d-printing,planning,import,internal-build"
-   page_version = "0.25"
-   last_updated = "Thu Aug 27 2026"
+   page_version = "0.26"
+   last_updated = "Thu Sep 03 2026"
    site_specific = "false"
    project_id   = "272"
    project_code = "DRYER-INT"
 %]
-[% PageVersion = 'Documentation/DryerProjectPlan.tt,v 0.23 2026/08/26 hermes-agent Exp - hub + rename; import is a subset' %]
+[% PageVersion = 'Documentation/DryerProjectPlan.tt,v 0.26 2026/09/03 hermes-agent Exp - traveler Now hub' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -35,33 +35,31 @@
                 — <a href="[% c.uri_for('/todo') %]?project_id=272" class="doc-link">todos</a>
                 — <a href="[% c.uri_for('/3d/queue') %]" class="doc-link">/3d/queue</a>
                 — <a href="[% c.uri_for('/Inventory/bom/list') %]" class="doc-link">/Inventory/bom/list</a>.</p>
-<<<<<<< Updated upstream
-                <p class="doc-body"><strong>Now:</strong> items and hardware SKUs exist on sitename=3d.
-                BOM for base <code>INT-HDRY-001-P36787</code> is 37 lines (GET
-                <code>/api/inventory/bom?sitename=3d&amp;parent_sku=INT-HDRY-001-P36787</code>).
-                All hardware on-hand is 0. One make-or-buy process (shop can be the customer; no AR for internal — cost GL only).</p>
+                <p class="doc-body"><strong>Now:</strong> Manufacturing traveler is live for print-farm pick/print
+                (todo
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2399" class="doc-link">#2399</a>):
+                <a href="[% c.uri_for('/Accounting/manufacturing') %]" class="doc-link">/Accounting/manufacturing</a>
+                · in-house
+                <a href="[% c.uri_for('/Accounting/manufacturing/view/item/51') %]" class="doc-link">view/item/51</a>
+                (INT-HDRY-001). Tablet colours green/blue/red/purple/amber; colour print sheet with Print button;
+                Add to Print Queue; In Pick Box receive; clean labour timer; File download + smart STL match.
+                SBR01 on BOM with correct STL; <strong>SBR03 kept</strong> (reinforcement small STL — not a dropped line);
+                rollers/gaskets/L1 *03 files are valid (not false mismatch). Base (52) / add-on (53): one of each *01/*02;
+                wheel kit printed lines on base. Browse Inventory = item+BOM; Order = print form.</p>
                 <p class="doc-body"><strong>Blocked by:</strong>
                 <a href="[% c.uri_for('/todo/details') %]?record_id=2310" class="doc-link">#2310 PO-R1</a>
-                (purchase-order + multi-supplier). Until a PO posts, buy on the vendor site then receive at
-                <a href="[% c.uri_for('/Inventory/invoice/new') %]" class="doc-link">/Inventory/invoice/new</a>.</p>
-                <p class="doc-body"><strong>Next:</strong> #2310 — need list from BOM shortfall, pick supplier, PO then receive.
-                Fix printed parts still stored as <code>item_origin=purchased</code> or they will be treated as buy, not print.
-=======
-                <p class="doc-body"><strong>Now:</strong> Base (id 52) and add-on (id 53) BOMs match the assembly
-                manual: <strong>one of each *01 and *02</strong> on both units (L1 + L2). Extra *01 prints belong
-                on the add-on, not a second copy on the base. Wheel kit hardware is 8 washers / 4 bolt+nut / 4 spacers.
-                Browse: <strong>Inventory</strong> opens the item+BOM;
-                <strong>Order</strong> opens the print form. Queue jobs have STLs wired for download.
-                Generic system page:
-                <a href="[% c.uri_for('/Documentation/3dPrintingHowItWorks') %]" class="doc-link">3dPrintingHowItWorks</a>.</p>
-                <p class="doc-body"><strong>Blocked by:</strong>
-                <a href="[% c.uri_for('/todo/details') %]?record_id=2310" class="doc-link">#2310 PO-R1</a>
-                (PO + multi-supplier). Place Order does not create a PO or invoice. Pictures exist as 3MF
-                <code>top_N.png</code> but are not yet on item <code>image_path</code>.</p>
-                <p class="doc-body"><strong>Next:</strong> wire printed-part pictures onto inventory items;
-                bottom/top as their own SKUs if the PDF parts exist; InventoryAccounting GET bom/stock when they merge.
->>>>>>> Stashed changes
-                Do not queue a job named “Module 1.3mf”.</p>
+                (purchase-order + multi-supplier) — <em>in progress</em>. Until a PO posts, buy on the vendor
+                site then receive at
+                <a href="[% c.uri_for('/Inventory/invoice/new') %]" class="doc-link">/Inventory/invoice/new</a>.
+                Place Order does not create a PO or invoice.</p>
+                <p class="doc-body"><strong>Still open on traveler / labour:</strong>
+                <a href="[% c.uri_for('/todo/details') %]?record_id=2390" class="doc-link">#2390</a>
+                queue-page Log labour + roll into job <code>total_cost</code>; optional SBL01/SBL02 left brackets
+                import; remaining picture/<code>image_path</code> wiring.</p>
+                <p class="doc-body"><strong>Next:</strong> finish any remaining
+                <code>item_origin</code> edge cases; wire printed-part pictures onto inventory items;
+                then #2310 — BOM shortfall list, pick supplier, PO, receive. Do not queue a job named
+                &quot;Module 1.3mf&quot;. Operator may <strong>stop #2399</strong> after confirming traveler on tablet/print.</p>
             </div>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>

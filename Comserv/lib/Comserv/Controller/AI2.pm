@@ -101,8 +101,14 @@ sub providers :Local :Args(0) {
             label           => $m->{label} // $id,
             unreachable     => $m->{unreachable} ? 1 : 0,
             local           => $m->{local}     ? 1 : 0,
-            price_prompt    => $m->{price_prompt}     // 0,
-            price_completion=> $m->{price_completion} // 0,
+            # price_known tells the client whether these numbers are real.
+            # When absent/0 the client must NOT render "$0.00 — free"
+            # (x.AI publishes no pricing; see Grok.pm %XAI_PRICING).
+            price_prompt     => $m->{price_prompt},
+            price_completion => $m->{price_completion},
+            price_known      => ( exists $m->{price_known} && defined $m->{price_known} )
+                                ? ( $m->{price_known} ? 1 : 0 ) : 1,
+            price_tier      => $m->{price_tier},
         };
     }
 
