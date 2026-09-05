@@ -9,12 +9,12 @@
 
     function getPanel(name) { return document.getElementById('panel-' + name); }
     function getIcon(name) {
-        return document.querySelector('.sidebar-icon[data-panel="' + name + '"]');
+        return document.querySelector('#sidebar-icons .sidebar-icon[data-panel="' + name + '"]');
     }
     function hideAll() {
         var panels = document.querySelectorAll('.sidebar-panel');
         for (var i = 0; i < panels.length; i++) panels[i].style.display = 'none';
-        var icons = document.querySelectorAll('.sidebar-icon');
+        var icons = document.querySelectorAll('#sidebar-icons .sidebar-icon');
         for (var j = 0; j < icons.length; j++) icons[j].classList.remove('active');
     }
 
@@ -88,7 +88,7 @@
     }
 
     function wire() {
-        var icons = document.querySelectorAll('.sidebar-icon');
+        var icons = document.querySelectorAll('#sidebar-icons .sidebar-icon');
         for (var i = 0; i < icons.length; i++) {
             (function (ic) {
                 var name = ic.getAttribute('data-panel');
