@@ -94,7 +94,7 @@
 
                 Tickets
 
-                [% IF c.check_user_roles('admin') %]<span class="badge-admin">Admin View</span>[% END %]
+                [% IF is_staff || is_admin_view %]<span class="badge-staff">Staff View</span>[% END %]
 
             </h2>
 

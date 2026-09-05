@@ -88,8 +88,11 @@ sub index :Chained('base') :PathPart('') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Starting HelpDesk index action");
     
-    # Set the template
-    $c->stash(template => 'CSC/HelpDesk.tt');
+    my $is_staff = $self->_is_staff($c);
+    $c->stash(
+        template => 'CSC/HelpDesk.tt',
+        is_staff => $is_staff,
+    );
     
     # Push debug message to stash
     push @{$c->stash->{debug_msg}}, "HelpDesk index action executed";
@@ -440,7 +443,7 @@ sub _load_admin_tickets {
     my $roles      = $c->session->{roles} || [];
     my @roles_list = ref $roles eq 'ARRAY' ? @$roles : split /,\s*/, $roles;
     my $is_csc     = (lc($site_name) eq 'csc')
-                  || (grep { lc($_) eq 'admin' } @roles_list
+                  || (grep { lc($_) eq 'admin' || lc($_) eq 'helpdesk' } @roles_list
                       && lc($c->session->{SiteName} || '') eq 'csc');
 
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_load_admin_tickets',
@@ -1382,6 +1385,24 @@ Show the authenticated user's tickets (or all tickets for admin)
 
 =cut
 
+sub queue :Chained('base') :PathPart('queue') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($self->_is_staff($c)) {
+        $c->res->redirect($c->uri_for('/HelpDesk'));
+        return;
+    }
+    $self->_load_admin_tickets($c, 'open', 'Open Tickets Queue');
+}
+
+sub staff :Chained('base') :PathPart('staff') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($self->_is_staff($c)) {
+        $c->res->redirect($c->uri_for('/HelpDesk'));
+        return;
+    }
+    $self->_load_admin_tickets($c, undef, 'All Staff Tickets');
+}
+
 sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
     my ($self, $c) = @_;
 
@@ -1403,10 +1424,13 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
             { order_by => { -desc => 'created_at' }, rows => 50 }
         )->all;
 
+        my $title = $is_admin ? 'All Site Tickets (Staff)' : 'My Support Tickets';
         $c->stash(
-            template => 'CSC/HelpDesk/ticket_status.tt',
-            tickets  => \@tickets,
-            title    => 'My Support Tickets',
+            template      => 'CSC/HelpDesk/ticket_status.tt',
+            tickets       => \@tickets,
+            title         => $title,
+            is_staff      => $is_admin,
+            is_admin_view => $is_admin ? 1 : 0,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_list',
