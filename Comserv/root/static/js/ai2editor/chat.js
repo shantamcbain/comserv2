@@ -175,6 +175,11 @@
             if (sidebar) sidebar.style.display = (_closed || _detached) ? 'none' : 'flex';
             if (reopen) reopen.style.display = _closed ? 'block' : 'none';
             if (btn) btn.textContent = _detached ? '⊞ Attach' : '⤢ Detach';
+            try {
+                document.dispatchEvent(new CustomEvent('ai2:chat-view', {
+                    detail: { closed: _closed, detached: _detached }
+                }));
+            } catch (evErr) { /* ignore */ }
             if (window.AI2EditorCore && typeof window.AI2EditorCore.resizeEditor === 'function') {
                 window.AI2EditorCore.resizeEditor();
             }
@@ -262,7 +267,7 @@
                 'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
                 '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
                 '</head><body>' +
-                '<h3>AI Chat (Hy3) — detached <button id="attach">⊞ Attach</button></h3>' +
+                '<h3>AI Chat — detached <button id="attach">⊞ Attach</button></h3>' +
                 '<div id="chat-messages"></div>' +
                 '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
                 '<button id="send">Send</button></div>' +
@@ -495,11 +500,11 @@
 
         // The editor is a coding context. The model is chosen from the shared
         // #model-select (populated by ai-chat/model-select.js), defaulting to
-        // hy3 — the same code path the general "Chat with AI" widget uses, so
-        // the two chat UIs can never diverge on model selection again.
+        // free north-mini-code — the same code path the general "Chat with AI"
+        // widget uses, so the two chat UIs can never diverge on model selection.
         const model = (window.ComservChat && ComservChat.modelSelect)
             ? ComservChat.modelSelect.getSelectedValue()
-            : 'tencent/hy3';
+            : 'openrouter|cohere/north-mini-code:free';
         const filePath = currentFilePath();
 
         loadCurrentFileContent().then(function (fileContent) {
@@ -686,7 +691,46 @@
         }, 4000);
     }
 
+
+    function initModelSelect() {
+        const modelSel = document.getElementById('model-select');
+        if (!modelSel) return;
+        function go() {
+            if (!(window.ComservChat && ComservChat.modelSelect)) return false;
+            ComservChat.modelSelect.init({
+                selectEl: modelSel,
+                context: 'code',
+                pinModel: 'cohere/north-mini-code:free',
+                onReady: function () {
+                    console.log('[AI2EditorChat] model-select populated by shared module');
+                },
+                onError: function (e) {
+                    console.error('[AI2EditorChat] model-select failed', e);
+                    try {
+                        modelSel.innerHTML = '';
+                        const opt = document.createElement('option');
+                        opt.disabled = true;
+                        opt.selected = true;
+                        opt.textContent = 'Model list unavailable';
+                        modelSel.appendChild(opt);
+                    } catch (err) { /* ignore */ }
+                }
+            });
+            return true;
+        }
+        if (go()) return;
+        // Defer script order race: retry briefly
+        let n = 0;
+        const t = setInterval(function () {
+            n++;
+            if (go() || n >= 40) clearInterval(t);
+        }, 100);
+    }
+
     function wire() {
+        // Models first so a later throw cannot leave "Loading models…" forever.
+        initModelSelect();
+
         const sendBtn = document.getElementById('ai-chat-send');
         const input = document.getElementById('ai-chat-input');
         const approve = document.getElementById('ai-approve-btn');
@@ -721,22 +765,8 @@
         initDetach();
         initClose();
         applyViewState();   // ensure correct initial view (attached by default)
-        applyClosedState();
 
-        // Populate the editor's #model-select from the SHARED model-selection
-        // module (same catalog + hy3 default the general widget uses).
-        const modelSel = document.getElementById('model-select');
-        if (modelSel && window.ComservChat && ComservChat.modelSelect) {
-            ComservChat.modelSelect.init({
-                selectEl: modelSel,
-                context: 'code',
-                pinModel: 'tencent/hy3',
-                onReady: function () {
-                    console.log('[AI2EditorChat] model-select populated by shared module');
-                },
-                onError: function (e) { console.error('[AI2EditorChat] model-select failed', e); }
-            });
-        }
+        // model-select: see initModelSelect() at top of wire()
 
         // "Add Todo" chat feature (shared module) — attaches to the current page's project.
         const todoBtn = document.getElementById('ai-chat-todo');
@@ -770,6 +800,19 @@
     }
 
     console.log('%c[AI2] chat module ready', 'color:#0a0');
-    window.AI2Chat = { setActiveFile: setActiveFile };
+    window.AI2Chat = {
+        setActiveFile: setActiveFile,
+        setClosed: function (v) { _closed = !!v; applyViewState(); },
+        isClosed: function () { return !!_closed; },
+        isDetached: function () { return !!_detached; },
+        reattach: function () {
+            _detached = false;
+            if (window._aiChatWin && !window._aiChatWin.closed) {
+                try { window._aiChatWin.close(); } catch (e) {}
+                window._aiChatWin = null;
+            }
+            applyViewState();
+        }
+    };
     window[NS] = window.AI2Chat;
 })();

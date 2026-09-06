@@ -19,11 +19,13 @@
     [% PageVersion %]
 [% END %]
 
+[% UNLESS git_embed %]
 <div class="quick-nav">
     <a href="[% c.uri_for('/admin') %]" class="admin-btn admin-btn-secondary admin-btn-sm">
         <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
     </a>
 </div>
+[% END %]
 
 <div class="app-container">
     <div class="content-container">

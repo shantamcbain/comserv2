@@ -2,7 +2,7 @@
 //
 // Eliminates the divergent model code that used to live separately in
 // local-chat.js (general "Chat with AI" widget) and ai2editor/chat.js (editor
-// chat, which hard-coded tencent/hy3). Both widgets now call THIS module,
+// chat, which hard-coded the coding default). Both widgets now call THIS module,
 // filtered by a `context` so each widget gets the catalog it needs without
 // duplicating the fetch/render logic.
 //
@@ -11,8 +11,8 @@
 //
 // API:
 //   ComservChat.modelSelect.init({ selectEl, context, pinModel, onReady, onError })
-//   ComservChat.modelSelect.getSelectedValue()   -> "provider|model"  (e.g. "openrouter|tencent/hy3")
-//   ComservChat.modelSelect.resolveDefault(ctx)   -> default model string for a context ("code" -> "tencent/hy3")
+//   ComservChat.modelSelect.getSelectedValue()   -> "provider|model"  (e.g. "openrouter|cohere/north-mini-code:free")
+//   ComservChat.modelSelect.resolveDefault(ctx)   -> default model string for a context ("code" -> coding default)
 //   ComservChat.modelSelect.onChange(cb)          -> register a change listener
 //   ComservChat.modelSelect.isChatModel(id)      -> bool (shared helper, moved from local-chat.js)
 //   ComservChat.modelSelect.modelSizeScore(id)   -> number (shared helper, moved from local-chat.js)
@@ -43,7 +43,7 @@
     var _listeners = [];          // onChange callbacks
     var _lastSelectEl = null;     // the select currently managed
     var _ctx = 'chat';            // context of the active select
-    var _pinnedValue = null;      // value pinned to top (e.g. openrouter|tencent/hy3)
+    var _pinnedValue = null;      // value pinned to top (e.g. openrouter|cohere/north-mini-code:free)
     var _ollamaOnly = false;      // when true, render only Ollama models (skip xAI/OpenRouter)
 
     // NOTE: there is intentionally NO static fallback model list. The catalog
@@ -55,7 +55,7 @@
     // Turn a "provider|model" value into a human label. Deriving the provider
     // from the value itself is the ONLY correct way: callers used to assume
     // "not grok therefore ollama", which mislabelled every OpenRouter model
-    // (e.g. openrouter|tencent/hy3 shown as "Ollama (Local): tencent/hy3").
+    // (e.g. openrouter|cohere/north-mini-code:free shown as "Ollama (Local): ...").
     function describeModel(value, opts) {
         opts = opts || {};
         if (!value) return 'AI Assistant';
@@ -198,10 +198,13 @@
             models.forEach(function (m) {
                 var id = m.id || m.value;
                 if (!id) return;
+                // /ai2/providers may already return full "provider|model" ids —
+                // do not double-prefix when the pipe is present.
+                var value = (String(id).indexOf('|') !== -1) ? String(id) : (svc + '|' + id);
                 // Carry cost metadata (incl. price_known) through so a provider
                 // that publishes no price is never rendered as "free".
                 out.push({
-                    value: svc + '|' + id,
+                    value: value,
                     label: m.label || id,
                     provider: svc,
                     price_prompt: (m.price_prompt != null) ? m.price_prompt : null,
@@ -299,10 +302,25 @@
             return ra - rb;
         });
 
-        var hy3Value = 'openrouter|tencent/hy3';
+        // Coding default (free north-mini-code). Accept full "provider|model" or bare slug.
+        var CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
+        var pinTarget = null;
+        if (typeof pinModel === 'string' && pinModel) {
+            pinTarget = (pinModel.indexOf('|') !== -1)
+                ? pinModel
+                : ('openrouter|' + pinModel);
+        } else if (pinModel) {
+            // Truthy non-string (e.g. true) → coding default
+            pinTarget = CODING_DEFAULT;
+        }
+
         var pinnedOpt = null;
         var ollamaValues = [];
         var freeOpenRouterValues = [];
+        var shortLabel = function (v) {
+            var slug = String(v || '').split('|').pop();
+            return slug || v;
+        };
 
         svcs.forEach(function (svc) {
             if (_ollamaOnly && svc !== 'ollama') return;
@@ -355,9 +373,12 @@
                     : String(m.label || m.value).replace(/\s*\([^)]*\)\s*$/, '');
                 text += costSuffix(m, svc);
                 opt.textContent = text;
-                if (m.value === hy3Value) {
+                if (pinTarget && (m.value === pinTarget ||
+                        (m.value.split('|').pop() === pinTarget.split('|').pop() &&
+                         (m.value.split('|')[0] === pinTarget.split('|')[0] || pinTarget.indexOf('|') === -1)))) {
                     pinnedOpt = opt;
-                    opt.textContent = '⚡ tencent/hy3 (OpenRouter)' + costSuffix(m, svc);
+                    pinTarget = m.value; // normalize to catalog value
+                    opt.textContent = '⚡ ' + shortLabel(pinTarget) + ' (OpenRouter)' + costSuffix(m, svc);
                 }
                 if (svc === 'openrouter' && /(^|:)(free)$/i.test(m.value)) freeOpenRouterValues.push(m.value);
                 grp.appendChild(opt);
@@ -366,16 +387,13 @@
             selectEl.appendChild(grp);
         });
 
-        // Pin hy3 to the top (visible + selectable) when requested, but do NOT
-        // auto-select it. The DEFAULT selected model for a non-paying user is a
-        // FREE OpenRouter model (no local load, no cost). Ollama is intentionally
-        // NOT the default: running local models hammers the workstation, and we
-        // only use Ollama once its bug is fixed or the user explicitly demands
-        // privacy. Fall back to Ollama / hy3 only when no free OpenRouter model
-        // exists. The user can still pick any model (including Ollama or hy3).
-        if (pinnedOpt && pinModel) {
+        // Pin coding default to the top when requested. For context "code" or
+        // "editor", also auto-select it when present in the catalog. For chat
+        // (and other contexts), pin only — prefer free OpenRouter (gemma/
+        // nemotron) and do not force-select the coding model.
+        if (pinnedOpt && pinTarget) {
             selectEl.insertBefore(pinnedOpt, selectEl.firstChild);
-            _pinnedValue = hy3Value;
+            _pinnedValue = pinTarget;
         } else {
             _pinnedValue = null;
         }
@@ -387,13 +405,16 @@
             if (/gemma/i.test(v) || /nemotron-3-(nano|super)/i.test(v)) defaultFree = v;
         });
 
-        // Auto-select default: free OpenRouter > smallest Ollama > pinned hy3 > first.
-        if (defaultFree) {
+        var isCodingCtx = (context === 'code' || context === 'editor');
+        if (isCodingCtx && pinTarget && pinnedOpt) {
+            // Editor/code surfaces: auto-select the coding default when available.
+            selectEl.value = pinTarget;
+        } else if (defaultFree) {
             selectEl.value = defaultFree;
         } else if (ollamaValues.length) {
             selectEl.value = ollamaValues[0];   // already smallest-first
-        } else if (pinModel && pinnedOpt) {
-            selectEl.value = hy3Value;
+        } else if (pinTarget && pinnedOpt) {
+            selectEl.value = pinTarget;
         } else if (selectEl.options.length) {
             selectEl.selectedIndex = 0;
         }
