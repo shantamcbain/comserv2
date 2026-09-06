@@ -74,6 +74,7 @@
                 <th>Status</th>
 
                 <th>Submitted by</th>
+                <th>Assigned</th>
 
                 <th>Created</th>
 
@@ -120,6 +121,7 @@
                 </td>
 
                 <td>[% t.username || t.email || 'guest' %]</td>
+                <td>[% t.assigned_to || '-' %]</td>
                 <td>[% t.created_at | user_time %]</td>
                 <td>[% (t.updated_at || t.created_at) | user_time %]</td>
                 <td class="ticket-row-actions">
