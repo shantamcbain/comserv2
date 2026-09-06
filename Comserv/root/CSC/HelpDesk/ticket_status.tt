@@ -3,27 +3,20 @@
 [% PageVersion = 'CSC/HelpDesk/ticket_status.tt,v 0.02 2026/03/24 shanta Exp shanta ' %]
 
 
-
 [% IF c.session.debug_mode == 1 %]
 
  <br>[% PageVersion %]</br>
 
  [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
-<<<<<<< Updated upstream
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-=======
-<meta name="viewport" content="width=device-width, initial-scale=1">
->>>>>>> Stashed changes
 [% END %]
-
 
 
 <div class="helpdesk-container">
 
     <h1>[% title || 'Support Tickets' %]</h1>
-
 
 
     [% IF error_msg %]
@@ -33,13 +26,11 @@
     [% END %]
 
 
-
     [% IF success_msg %]
 
     <div class="alert-success">[% success_msg %]</div>
 
     [% END %]
-
 
 
     [% IF is_admin_view %]
@@ -67,7 +58,6 @@
     [% END %]
 
 
-
     <div class="ticket-search">
 
         <form method="get" id="ticket-lookup-form"
@@ -91,7 +81,6 @@
     </div>
 
 
-
     <div class="ticket-list">
 
         [% IF c.session.username %]
@@ -103,7 +92,6 @@
                 [% IF c.check_user_roles('admin') %]<span class="badge-admin">Admin View</span>[% END %]
 
             </h2>
-
 
 
             [% IF tickets && tickets.size %]
@@ -187,13 +175,7 @@
                             [% END %]
 
                         </td>
-<<<<<<< HEAD
                         <td>[% t.created_at | user_time %]</td>
-=======
-
-                        <td>[% t.created_at %]</td>
-
->>>>>>> main
                         <td>
 
                             <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"
@@ -221,7 +203,6 @@
             </div>
 
             [% END %]
-
 
 
             [% IF ticket && ticket.description %]
@@ -253,7 +234,6 @@
             [% END %]
 
 
-
         [% ELSE %]
 
             <div class="login-prompt">
@@ -269,7 +249,6 @@
     </div>
 
 
-
     <div class="helpdesk-actions">
 
         <a href="[% c.uri_for('/HelpDesk/ticket/new') %]" class="btn btn-primary">Create New Ticket</a>
@@ -279,7 +258,6 @@
     </div>
 
 </div>
-
 
 
 <style>
@@ -293,7 +271,6 @@
         padding: 20px;
 
     }
-
 
 
     .alert-error {
@@ -311,7 +288,6 @@
     }
 
 
-
     .alert-success {
 
         background-color: #d4edda;
@@ -327,7 +303,6 @@
     }
 
 
-
     .ticket-search {
 
         background-color: var(--bg-secondary, #f8f9fa);
@@ -339,7 +314,6 @@
         margin-bottom: 25px;
 
     }
-
 
 
     .form-inline {
@@ -355,7 +329,6 @@
     }
 
 
-
     .form-control {
 
         padding: 8px;
@@ -369,13 +342,11 @@
     }
 
 
-
     .ticket-list {
 
         margin-top: 20px;
 
     }
-
 
 
     .tickets-table {
@@ -389,7 +360,6 @@
     }
 
 
-
     .tickets-table th, .tickets-table td {
 
         padding: 12px;
@@ -401,7 +371,6 @@
     }
 
 
-
     .tickets-table th {
 
         background-color: var(--bg-secondary, #f8f9fa);
@@ -409,7 +378,6 @@
         font-weight: bold;
 
     }
-
 
 
     .status-open        { color: var(--success-color, #28a745); font-weight: bold; }
@@ -421,7 +389,6 @@
     .status-closed      { color: var(--text-muted-color, #6c757d); }
 
 
-
     .priority-critical  { color: var(--danger-color, #dc3545); font-weight: bold; }
 
     .priority-high      { color: #fd7e14; font-weight: bold; }
@@ -429,7 +396,6 @@
     .priority-medium    { color: #ffc107; }
 
     .priority-low       { color: var(--text-muted-color, #6c757d); }
-
 
 
     .badge-admin {
@@ -449,7 +415,6 @@
     }
 
 
-
     .no-tickets {
 
         background-color: #e9ecef;
@@ -465,7 +430,6 @@
     }
 
 
-
     .ticket-detail {
 
         background-color: var(--bg-secondary, #f8f9fa);
@@ -479,13 +443,11 @@
     }
 
 
-
     .detail-row {
 
         margin-bottom: 15px;
 
     }
-
 
 
     .description-box {
@@ -507,7 +469,6 @@
     }
 
 
-
     .login-prompt {
 
         background-color: #e9ecef;
@@ -521,13 +482,11 @@
     }
 
 
-
     .helpdesk-actions {
 
         margin-top: 30px;
 
     }
-
 
 
     .btn {
@@ -549,7 +508,6 @@
     }
 
 
-
     .btn-sm {
 
         padding: 4px 10px;
@@ -559,11 +517,9 @@
     }
 
 
-
     .btn-primary   { background-color: var(--primary-color, #007bff); color: white; }
 
     .btn-secondary { background-color: var(--text-muted-color, #6c757d); color: white; }
-
 
 
     .debug-message {

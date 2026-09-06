@@ -3,21 +3,15 @@
 [% PageVersion = 'CSC/HelpDesk/kb.tt,v 0.01 2025/04/18 shanta Exp shanta ' %]
 
 
-
 [% IF c.session.debug_mode == 1 %]
 
  <br>[% PageVersion %]</br>
 
  [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
-<<<<<<< Updated upstream
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-=======
-<meta name="viewport" content="width=device-width, initial-scale=1">
->>>>>>> Stashed changes
 [% END %]
-
 
 
 <div class="helpdesk-container">
@@ -249,7 +243,6 @@
     </div>
 
 </div>
-
 
 
 <style>
