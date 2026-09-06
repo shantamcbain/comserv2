@@ -662,6 +662,10 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
             $emails_disabled = $meta->{emails_disabled} ? 1 : 0;
         }
 
+        my $staff_username = $c->session->{username} || '';
+        my $staff_display  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+        $staff_display     = $staff_username unless $staff_display =~ /\S/;
+
         $c->stash(
             template          => 'CSC/HelpDesk/ticket_view.tt',
             ticket            => $ticket,
@@ -672,6 +676,8 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
             error_msg         => $c->flash->{error_msg}   || '',
             emails_disabled   => $emails_disabled,
             guest_email       => $ticket->email || '',
+            staff_username    => $staff_username,
+            staff_display     => $staff_display,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_ticket',
@@ -991,6 +997,94 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
 }
 
+=head2 assign_ticket
+
+Staff-only: assign (or unassign) a ticket to a user/staff member.
+POST /HelpDesk/ticket/assign/<ticket_number>
+  params: assignee (username, name, or empty to unassign)
+
+Also records a system audit message on the ticket.
+
+=cut
+
+sub assign_ticket :Chained('ticket_base') :PathPart('assign') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $assignee = $c->req->params->{assignee} || '';
+    $assignee =~ s/^\s+|\s+$//g;  # trim
+
+    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name    = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+    my $now = Comserv::Util::AppTime->now_utc;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $old = $ticket->assigned_to || '';
+        my %update = ( updated_at => $now );
+        if ($assignee) {
+            $update{assigned_to} = $assignee;
+        } else {
+            $update{assigned_to} = undef;
+        }
+
+        $ticket->update(\%update);
+
+        my $audit_body;
+        if ($assignee) {
+            if ($old && $old ne $assignee) {
+                $audit_body = "Reassigned from '$old' to '$assignee' by $staff_name";
+            } else {
+                $audit_body = "Assigned to '$assignee' by $staff_name";
+            }
+        } else {
+            $audit_body = "Unassigned (was '$old') by $staff_name" if $old;
+            $audit_body ||= "Unassigned by $staff_name";
+        }
+
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => 'system',
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => $audit_body,
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'assign_ticket',
+            "Ticket $ticket_number assigned_to=" . ($assignee || 'NULL') . " by $staff_name");
+
+        $c->flash->{success_msg} = $assignee
+            ? "Ticket assigned to: $assignee"
+            : "Ticket unassigned";
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'assign_ticket',
+            "Error assigning $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error assigning ticket: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
 =head2 send_reminder
 
 Staff-only: send a reminder email to the ticket submitter asking them to check their ticket.
@@ -1177,6 +1271,24 @@ sub create_todo :Chained('ticket_base') :PathPart('create_todo') :Args(1) {
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_todo',
                 "Project lookup failed for $ticket_number, using PLANNING: $@");
+        }
+
+        # Auto-assign ticket to current staff when using "Work On" (claim it)
+        if ($todo_type eq 'work_on') {
+            my $current = $ticket->assigned_to || '';
+            if (!$current || $current ne $username) {
+                $ticket->update({ assigned_to => $username, updated_at => $now });
+                $schema->resultset('TicketMessage')->create({
+                    ticket_id    => $ticket->id,
+                    sender_type  => 'system',
+                    sender_name  => $staff_name,
+                    sender_email => $c->session->{email} || '',
+                    body         => "Ticket assigned to $username (Work On)",
+                    created_at   => $now,
+                });
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_todo',
+                    "Auto-assigned ticket $ticket_number to $username via Work On");
+            }
         }
 
         my $todo = $schema->resultset('Todo')->create({
