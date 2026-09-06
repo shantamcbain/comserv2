@@ -917,32 +917,38 @@ sub chat :Local :Args(0) {
     # Model::AI2::TodoCreate (same as /ai2/action and the 📝 button).
     # Use ->new not $c->model: a newly added Model::* is not in Catalyst's
     # component registry until the next process start (we must not restart).
-    my $todo_hit = eval {
-        require Comserv::Model::AI2::TodoCreate;
-        my $brain = eval { $c->model('AI2::TodoCreate') };
-        $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
-        $brain->try_chat_create($c,
-            prompt    => $prompt,
-            page_path => $page_path,
-        );
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'ai2_chat', "TodoCreate try_chat_create threw: $@");
-    }
-    if ($todo_hit && $todo_hit->{handled}) {
-        $c->res->body(encode_json({
-            success         => $todo_hit->{success} ? 1 : 0,
-            response        => $todo_hit->{response} // '',
-            model           => $todo_hit->{model} // '(todo-create)',
-            provider        => $todo_hit->{provider} // 'ai2-todo',
-            needs_web_search=> 0,
-            error           => $todo_hit->{error},
-            todo_action     => $todo_hit->{todo_action},
-            conversation_id => $conversation_id,
-            thinking        => [],
-        }));
-        return;
+    # AI Editor agents (programming/coding/code/documentation) must not short-
+    # circuit into TodoCreate — plan/analyze prompts often say "create todos".
+    my $editor_todo_skip = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation)$/);
+    my $todo_hit;
+    if (!$editor_todo_skip) {
+        $todo_hit = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->try_chat_create($c,
+                prompt    => $prompt,
+                page_path => $page_path,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'ai2_chat', "TodoCreate try_chat_create threw: $@");
+        }
+        if ($todo_hit && $todo_hit->{handled}) {
+            $c->res->body(encode_json({
+                success         => $todo_hit->{success} ? 1 : 0,
+                response        => $todo_hit->{response} // '',
+                model           => $todo_hit->{model} // '(todo-create)',
+                provider        => $todo_hit->{provider} // 'ai2-todo',
+                needs_web_search=> 0,
+                error           => $todo_hit->{error},
+                todo_action     => $todo_hit->{todo_action},
+                conversation_id => $conversation_id,
+                thinking        => [],
+            }));
+            return;
+        }
     }
 
     # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.

@@ -666,7 +666,9 @@
                   });
               }
 
-              if (extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
+              // Belt-and-suspenders: programming/docs agents must not create todos from chat actions.
+              const skipTodoCreate = /^(programming|coding|code|documentation)$/i.test(agentId);
+              if (!skipTodoCreate && extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
                   extracted.actions.forEach(function (a) {
                       if (a.action === 'create_todo' || a.action === 'create_project') {
                           ComservChat.featureTodo.handleAction(a, {
