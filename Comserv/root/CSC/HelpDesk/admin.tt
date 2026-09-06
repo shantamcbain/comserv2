@@ -3,7 +3,6 @@
 [% PageVersion = 'CSC/HelpDesk/admin.tt,v 0.01 2024/04/24 shanta Exp shanta ' %]
 
 
-
 [% IF c.session.debug_mode == 1 %]
 
  <br>[% PageVersion %]</br>
@@ -19,13 +18,9 @@
        <li>[% msg %]</li>
 
      [% END %]
-<<<<<<< Updated upstream
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-=======
-<meta name="viewport" content="width=device-width, initial-scale=1">
->>>>>>> Stashed changes
      </ul>
 
    </div>
@@ -33,7 +28,6 @@
  [% END %]
 
 [% END %]
-
 
 
 <div class="helpdesk-admin-container">
@@ -203,7 +197,6 @@
     </div>
 
 
-
     <div class="admin-section">
 
         <h2>Project Planning</h2>
@@ -225,7 +218,6 @@
     </div>
 
 </div>
-
 
 
 <style>
@@ -323,7 +315,6 @@
         color: white;
 
     }
-
 
 
     .btn-warning {
