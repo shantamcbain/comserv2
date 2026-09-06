@@ -245,8 +245,21 @@
         if (typeof state.roleRank === 'number') return state.roleRank;
         return state.canSelectModel || state.isAdmin ? 2 : (state.isGuest ? 0 : 1);
     }
+    // Site Chat-with-AI must never act as a code editor. AI Editor popup sets AI2_EDITOR.
+    function isAi2EditorContext() {
+        try {
+            if (window.AI2_EDITOR || window.AI2EditorCore || window.AI2EditorChat) return true;
+            var p = (window.location && window.location.pathname) || '';
+            if (/editing_widget_popup|\/ai2\/editor|ai2editor/i.test(p)) return true;
+            if (document.getElementById('ace-editor')) return true;
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
     function _agentAllowed(agent) {
         if (!agent) return false;
+        // Coding/programming agents are AI Editor only — never offer on /ai Chat-with-AI
+        if (agent.editor_only && !isAi2EditorContext()) return false;
         if (agent.local_only && !state.isDevMode) return false;
         if (agent.admin_only && _userRoleRank() < 2) return false;
         var min = agent.min_role;
@@ -466,6 +479,15 @@
     // Called when the AI response contains [READ_FILE: path] tokens.
     // Fetches the file content and sends it back as a follow-up context message.
     function _handleReadFileRequest(path) {
+        // Hard disable code-read mutation path from site Chat-with-AI widget
+        if (!isAi2EditorContext()) {
+            console.warn('[Chat-with-AI] READ_FILE ignored outside AI Editor');
+            var msgInput0 = document.getElementById('message-input');
+            if (msgInput0) {
+                msgInput0.value = '[Chat-with-AI cannot load/edit code files. Open AI Editor for code work.]';
+            }
+            return;
+        }
         var url = '/ai/read_file?path=' + encodeURIComponent(path) + '&limit=300';
         fetch(url, { credentials: 'include' })
             .then(function(r) { return r.json(); })
@@ -549,6 +571,7 @@
         // an admin-only / non-public agent (that lands on Access denied).
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.editor_only && !isAi2EditorContext()) continue;
             if (agent.local_only && !state.isDevMode) continue;
             if (!_agentAllowed(agent)) continue;
 
@@ -3056,8 +3079,10 @@
                     });
                 }
 
-                // Coding agent: intercept [READ_FILE: path] requests automatically
-                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                // Coding READ_FILE auto-fetch is AI Editor only — hard-disable on site Chat-with-AI
+                if (isAi2EditorContext()
+                    && state.pageContext
+                    && (state.pageContext.agent_id === 'coding' || state.pageContext.agent_id === 'programming')) {
                     var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
                     if (rfMatch) {
                         _handleReadFileRequest(rfMatch[1].trim());

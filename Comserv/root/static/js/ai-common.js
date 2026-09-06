@@ -4,6 +4,17 @@
  */
 
 const AIUtils = {
+    // Apply Fix / code mutation only inside AI Editor (not site Chat-with-AI)
+    isAi2EditorContext: function() {
+        try {
+            if (window.AI2_EDITOR || window.AI2EditorCore || window.AI2EditorChat) return true;
+            var p = (window.location && window.location.pathname) || '';
+            if (/editing_widget_popup|\/ai2\/editor|ai2editor/i.test(p)) return true;
+            if (document.getElementById('ace-editor')) return true;
+        } catch (e) {}
+        return false;
+    },
+
     /**
      * Escapes HTML characters to prevent XSS
      * @param {string} text - Raw text to escape
@@ -127,26 +138,39 @@ const AIUtils = {
                     const fixPath = pendingFixPath;
                     const rawCode = code.trim();
                     const escapedPath = this.escapeHtml(fixPath);
-                    html += `<div class="ai-fix-block">` +
-                            `<div class="ai-fix-header">` +
-                              `<span>📝 Fix for: <code>${escapedPath}</code></span>` +
-                              `<button class="ai-apply-fix-btn" ` +
-                                `onclick="(function(btn){` +
-                                  `if(!confirm('Apply fix to ${escapedPath}?'))return;` +
-                                  `btn.disabled=true;btn.textContent='Applying…';` +
-                                  `fetch('/ai/apply_fix',{method:'POST',credentials:'include',` +
-                                    `headers:{'Content-Type':'application/x-www-form-urlencoded'},` +
-                                    `body:'path='+encodeURIComponent('${fixPath.replace(/'/g,"\\'")}')+'&content='+encodeURIComponent(atob(btn.dataset.code))` +
-                                  `}).then(r=>r.json()).then(d=>{` +
-                                    `btn.textContent=d.success?'✅ Applied':'❌ '+d.error;` +
-                                    `btn.style.background=d.success?'#2a7a2a':'#9b0000';` +
-                                  `}).catch(e=>{btn.textContent='❌ Error';btn.disabled=false;});` +
-                                `})(this)" ` +
-                                `data-code="${btoa(unescape(encodeURIComponent(rawCode)))}" ` +
-                                `title="Apply this fix to ${escapedPath}">✅ Apply Fix</button>` +
-                            `</div>` +
-                            `<code class="code-block">${escapedCode}</code>` +
-                            `</div>`;
+                    const canApply = this.isAi2EditorContext();
+                    if (canApply) {
+                        html += `<div class="ai-fix-block">` +
+                                `<div class="ai-fix-header">` +
+                                  `<span>📝 Fix for: <code>${escapedPath}</code></span>` +
+                                  `<button class="ai-apply-fix-btn" ` +
+                                    `onclick="(function(btn){` +
+                                      `if(!confirm('Apply fix to ${escapedPath}?'))return;` +
+                                      `btn.disabled=true;btn.textContent='Applying…';` +
+                                      `fetch('/ai/apply_fix',{method:'POST',credentials:'include',` +
+                                        `headers:{'Content-Type':'application/x-www-form-urlencoded'},` +
+                                        `body:'path='+encodeURIComponent('${fixPath.replace(/'/g,"\\'")}')+'&content='+encodeURIComponent(atob(btn.dataset.code))` +
+                                      `}).then(r=>r.json()).then(d=>{` +
+                                        `btn.textContent=d.success?'✅ Applied':'❌ '+d.error;` +
+                                        `btn.style.background=d.success?'#2a7a2a':'#9b0000';` +
+                                      `}).catch(e=>{btn.textContent='❌ Error';btn.disabled=false;});` +
+                                    `})(this)" ` +
+                                    `data-code="${btoa(unescape(encodeURIComponent(rawCode)))}" ` +
+                                    `title="Apply this fix to ${escapedPath}">✅ Apply Fix</button>` +
+                                `</div>` +
+                                `<code class="code-block">${escapedCode}</code>` +
+                                `</div>`;
+                    } else {
+                        // Chat-with-AI: show code for copy only — never mutate files
+                        html += `<div class="ai-fix-block">` +
+                                `<div class="ai-fix-header">` +
+                                  `<span>📝 Suggested fix for: <code>${escapedPath}</code></span>` +
+                                  `<span class="ai-apply-fix-disabled" style="opacity:0.85;font-size:0.9em;">` +
+                                  `Code edits are disabled in Chat-with-AI — open AI Editor to apply.</span>` +
+                                `</div>` +
+                                `<code class="code-block">${escapedCode}</code>` +
+                                `</div>`;
+                    }
                     pendingFixPath = null;
                 } else {
                     html += `<code class="code-block">${escapedCode}</code>`;
