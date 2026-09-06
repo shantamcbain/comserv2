@@ -722,6 +722,15 @@ sub index :Path('/admin/git') :Args(0) {
         template        => 'admin/git/index.tt',
     );
 
+    # Body-only embed for AI2 editor Git tab iframe (?embed=1).
+    # Use ai_popup_mode (not bare no_wrapper) so layout.tt still loads Header CSS + js_load.tt.
+    if ($c->req->param('embed')) {
+        $c->stash(
+            git_embed     => 1,
+            ai_popup_mode => 1,
+        );
+    }
+
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Git dashboard - Template: admin/git/index.tt";
         push @{$c->stash->{debug_msg}}, "Repo: " . ($self->repo_path($c) || 'unresolved');

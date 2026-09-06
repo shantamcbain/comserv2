@@ -110,7 +110,7 @@
 
             <div id="panel-git" class="sidebar-panel" style="display:none; padding:0; width:100%; background:#2b2b2b; font-size:13px;">
                 <!-- The editor and Git desktop intentionally share one implementation. -->
-                <iframe src="/admin/git" title="Git Dashboard"
+                <iframe src="/admin/git?embed=1" title="Git Dashboard"
                         style="width:100%;height:calc(100vh - 42px);min-height:620px;border:0;background:#1e1f22;"></iframe>
             </div>
 
