@@ -972,7 +972,7 @@ sub chat :Local :Args(0) {
     }
 
     # Code-read: "can you read the files" must not reach Hy3.
-    if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+    if (lc($agent_id) =~ /^(?:code|coding|programming)$/ || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
         my $read_hit = eval {
             require Comserv::Model::AI2::CodeRead;
             my $brain = eval { $c->model('AI2::CodeRead') };
@@ -1006,9 +1006,11 @@ sub chat :Local :Args(0) {
     # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
     # UI button uses) so the question is answerable from Chat-with-AI too.
     # Triggered by the 'focustune' agent_id OR a natural-language intent.
-    my $is_focus = (lc($agent_id) eq 'focustune')
+    # Programming/coding agents in AI Editor must not divert to FocusTune on plan/build words.
+    my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code)$/);
+    my $is_focus = (!$editor_prog) && ((lc($agent_id) eq 'focustune')
         || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
-            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i);
+            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i));
     if ($is_focus) {
         my $tune = $c->model('AI2::FocusTune');
         my $now_epoch = time();
