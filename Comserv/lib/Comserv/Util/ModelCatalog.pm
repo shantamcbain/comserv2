@@ -281,7 +281,7 @@ our @FREE_PREFERENCE = (
     'openrouter|stealth/ox-alpha',                     # 0/0 priced, no :free suffix
 );
 
-our $CODING_DEFAULT = 'openrouter|tencent/hy3';
+our $CODING_DEFAULT = 'openrouter|cohere/north-mini-code:free';
 
 sub default_for {
     my ($class, $c, %opts) = @_;
