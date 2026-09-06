@@ -691,7 +691,46 @@
         }, 4000);
     }
 
+
+    function initModelSelect() {
+        const modelSel = document.getElementById('model-select');
+        if (!modelSel) return;
+        function go() {
+            if (!(window.ComservChat && ComservChat.modelSelect)) return false;
+            ComservChat.modelSelect.init({
+                selectEl: modelSel,
+                context: 'code',
+                pinModel: 'cohere/north-mini-code:free',
+                onReady: function () {
+                    console.log('[AI2EditorChat] model-select populated by shared module');
+                },
+                onError: function (e) {
+                    console.error('[AI2EditorChat] model-select failed', e);
+                    try {
+                        modelSel.innerHTML = '';
+                        const opt = document.createElement('option');
+                        opt.disabled = true;
+                        opt.selected = true;
+                        opt.textContent = 'Model list unavailable';
+                        modelSel.appendChild(opt);
+                    } catch (err) { /* ignore */ }
+                }
+            });
+            return true;
+        }
+        if (go()) return;
+        // Defer script order race: retry briefly
+        let n = 0;
+        const t = setInterval(function () {
+            n++;
+            if (go() || n >= 40) clearInterval(t);
+        }, 100);
+    }
+
     function wire() {
+        // Models first so a later throw cannot leave "Loading models…" forever.
+        initModelSelect();
+
         const sendBtn = document.getElementById('ai-chat-send');
         const input = document.getElementById('ai-chat-input');
         const approve = document.getElementById('ai-approve-btn');
@@ -726,22 +765,8 @@
         initDetach();
         initClose();
         applyViewState();   // ensure correct initial view (attached by default)
-        applyClosedState();
 
-        // Populate the editor's #model-select from the SHARED model-selection
-        // module (same catalog + coding default the general widget uses).
-        const modelSel = document.getElementById('model-select');
-        if (modelSel && window.ComservChat && ComservChat.modelSelect) {
-            ComservChat.modelSelect.init({
-                selectEl: modelSel,
-                context: 'code',
-                pinModel: 'cohere/north-mini-code:free',
-                onReady: function () {
-                    console.log('[AI2EditorChat] model-select populated by shared module');
-                },
-                onError: function (e) { console.error('[AI2EditorChat] model-select failed', e); }
-            });
-        }
+        // model-select: see initModelSelect() at top of wire()
 
         // "Add Todo" chat feature (shared module) — attaches to the current page's project.
         const todoBtn = document.getElementById('ai-chat-todo');
