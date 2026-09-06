@@ -1,0 +1,2 @@
+[% # CSC-20260831-1585: docker /ai Thinking… (Ollama/fast) hang %]
+<li><strong>2026-09-06 — AI / Docker:</strong> Fail fast when Ollama is unreachable from a container (no more 120–480s Thinking hang), restore <code>extra_hosts</code> + <code>OLLAMA_HOST</code> on <code>docker-compose.prod.yml</code>, and fall back to a free OpenRouter model when the local hop is dead. Ticket CSC-20260831-1585.</li>
