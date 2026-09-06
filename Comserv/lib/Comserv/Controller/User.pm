@@ -485,6 +485,28 @@ sub do_login :Local {
             }
         }
         
+        # Auto-assign "helpdesk" staff role for the official support bot (helpdesksupport / helpdesk@computersystemconsulting.ca).
+        # Gives the bot full HelpDesk staff access (queues, create_todo/escalate, admin views) vs normal/member (own tickets).
+        my %helpdesk_bots = map { $_ => 1 } qw(helpdesksupport helpdesk);
+        my $user_email = lc( $user->email || "" );
+        if ( $helpdesk_bots{ lc($username) } || $user_email eq 'helpdesk@computersystemconsulting.ca' ) {
+            my @current_roles = @$roles;
+            unless ( grep { lc($_) eq "helpdesk" } @current_roles ) {
+                push @current_roles, "helpdesk";
+                my $roles_str = join(",", @current_roles);
+                eval {
+                    $user->update({ roles => $roles_str });
+                    $c->session->{roles} = \@current_roles;
+                    $self->logging->log_with_details($c, "info", __FILE__, __LINE__, "do_login",
+                        "Auto-assigned helpdesk staff role to bot $username / $user_email");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, "error", __FILE__, __LINE__, "do_login",
+                        "Failed to auto-assign helpdesk role: $@");
+                }
+            }
+        }
+
         # Log the final roles
         $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
         $self->logging->log_with_details(
