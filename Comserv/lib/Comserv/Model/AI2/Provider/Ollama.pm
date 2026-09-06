@@ -48,7 +48,7 @@ sub check_connection {
     $host ||= 'localhost';
     $port ||= 11434;
 
-    my $ua  = LWP::UserAgent->new(timeout => 3);
+    my $ua  = LWP::UserAgent->new(timeout => 2);
     my $res = try { $ua->get("http://$host:$port/api/tags") } catch { undef };
     return $res && $res->is_success ? 1 : 0;
 }
@@ -56,19 +56,24 @@ sub check_connection {
 # Resolve the FIRST reachable Ollama host/port for THIS deployment.
 #
 # The workstation is reachable at two addresses for the same machine:
-#   192.168.1.199   (LAN — works from the host process on :3001)
+#   192.168.1.199   (LAN — works from the host process on :4006/:3001)
 #   172.30.131.126  (ZeroTier — works from remote hosts like production1)
 # A Docker container on the workstation reaches the host via
-# host.docker.internal (mapped in the compose extra_hosts).
+# host.docker.internal (mapped in the compose extra_hosts) — IF the host
+# firewall accepts docker-bridge → host:11434. Without that path, probes
+# time out and MUST NOT fall into a 120–480s chat hang (CSC-20260831-1585).
 #
-# Because a single hardcoded IP can't be correct from all three vantage
-# points, we probe candidates in priority order and return the first that
-# answers /api/tags. Order:
+# Probe order:
 #   1) $ENV{OLLAMA_HOST}            (per-deployment override, e.g. compose env)
-#   2) comserv.conf <Ollama> host   (primary — LAN)
-#   3) comserv.conf fallback_host   (ZeroTier / alternate)
-# Returns ($host, $port). Falls back to the primary host (unprobed) if none
-# answer, so callers still get a sane value and can emit their own sentinel.
+#   2) host.docker.internal         (when running inside a container)
+#   3) comserv.conf <Ollama> host   (primary — LAN)
+#   4) comserv.conf fallback_host   (ZeroTier / alternate)
+# Returns ($host, $port, $reachable). $reachable is 0 when nothing answered.
+# Negative results are cached ~30s so Starman workers are not pinned by
+# repeated dead probes on every /ai2/chat or catalog refresh.
+our %_RESOLVE_CACHE;    # key => [epoch, host, port, reachable]
+our $_RESOLVE_TTL = 30;
+
 sub resolve_host {
     my ($self, $c) = @_;
     my $cfg      = ($c && $c->config->{Ollama}) || {};
@@ -77,8 +82,18 @@ sub resolve_host {
     my $port     = ($ENV{OLLAMA_PORT} && $ENV{OLLAMA_PORT} =~ /^\d+$/)
                  ? $ENV{OLLAMA_PORT} : ($cfg->{port} || 11434);
 
+    my $in_docker = (-f '/.dockerenv' || ($ENV{SYSTEM_IDENTIFIER} // '') =~ /prod-local|docker/i) ? 1 : 0;
+    my $cache_key = join('|', $ENV{OLLAMA_HOST} // '', $primary, $fallback, $port, $in_docker);
+    if (my $hit = $_RESOLVE_CACHE{$cache_key}) {
+        my ($ts, $h, $p, $ok) = @$hit;
+        if ((time - $ts) < $_RESOLVE_TTL) {
+            return ($h, $p, $ok);
+        }
+    }
+
     my @candidates;
     push @candidates, $ENV{OLLAMA_HOST} if $ENV{OLLAMA_HOST};
+    push @candidates, 'host.docker.internal' if $in_docker;
     push @candidates, $primary;
     push @candidates, $fallback if $fallback ne $primary;
 
@@ -87,12 +102,16 @@ sub resolve_host {
         if ($self->check_connection($c, $h, $port)) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                 'ollama_resolve_host', "Ollama reachable at $h:$port");
-            return ($h, $port);
+            $_RESOLVE_CACHE{$cache_key} = [time, $h, $port, 1];
+            return ($h, $port, 1);
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'ollama_resolve_host', "Ollama not reachable at $h:$port, trying next");
     }
-    return ($primary, $port);   # nothing answered — return primary unprobed
+    # Nothing answered — return primary with reachable=0 so callers fail fast
+    # instead of issuing a multi-minute generate against a dead host.
+    $_RESOLVE_CACHE{$cache_key} = [time, $primary, $port, 0];
+    return ($primary, $port, 0);
 }
 
 # Migrated from v1 Controller::AI generate path (cold-start timeout logic).
@@ -107,9 +126,28 @@ sub chat {
 
     my $messages = $args{messages} || [];
     my $model    = $args{model}    || 'phi4:14b';
-    my ($rhost, $rport) = $self->resolve_host($c);
+    my ($rhost, $rport, $reachable) = $self->resolve_host($c);
     my $host     = $args{host}     || $rhost;
     my $port     = $args{port}     || $rport;
+
+    # Fail fast when resolve_host already proved the endpoint dead. Without
+    # this guard, get_running_models/chat use 120–480s timeouts and the UI
+    # sticks on "Thinking… (Ollama/fast)" (CSC-20260831-1585 / docker).
+    if (defined $reachable && !$reachable && !$args{host}) {
+        my $err = "Can't connect to Ollama at $host:$port (timed out). "
+                . 'Pick an external/free model, or fix docker→host Ollama '
+                . '(compose extra_hosts + host firewall / OLLAMA_HOST).';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ollama_chat', $err);
+        return { success => 0, error => $err, unreachable => 1 };
+    }
+    unless ($self->check_connection($c, $host, $port)) {
+        my $err = "Can't connect to Ollama at $host:$port (timed out). "
+                . 'Pick an external/free model, or fix docker→host Ollama networking.';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'ollama_chat', $err);
+        return { success => 0, error => $err, unreachable => 1 };
+    }
 
     my $ollama = try {
         Comserv::Model::Ollama->new(host => $host, port => $port);
