@@ -159,6 +159,11 @@ sub providers :Local :Args(0) {
 sub editing_widget_popup :Local :Args(0) {
     my ($self, $c) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'ai2_editing_widget_popup', "AI2 code editor popup opened");
 
