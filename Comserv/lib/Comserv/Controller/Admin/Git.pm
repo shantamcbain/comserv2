@@ -564,8 +564,8 @@ PROMPT
 
     # An explicit model from the Git dashboard wins. The dropdown offers the
     # FULL catalog (Ollama + Grok + OpenRouter); the selected value is
-    # "provider|model" (e.g. "openrouter|tencent/hy3"). If empty, the Router
-    # falls back to the app-wide default (openrouter|tencent/hy3) unless no
+    # "provider|model" (e.g. "openrouter|cohere/north-mini-code:free"). If empty, the Router
+    # falls back to the app-wide default (openrouter|cohere/north-mini-code:free) unless no
     # external key is configured, in which case it uses local Ollama — so the
     # behavior is consistent with the chat widget and editor.
     my $requested_model = $c->req->param('model') || '';
@@ -721,6 +721,15 @@ sub index :Path('/admin/git') :Args(0) {
         worktree_list   => $self->git_service->build_worktree_list,
         template        => 'admin/git/index.tt',
     );
+
+    # Body-only embed for AI2 editor Git tab iframe (?embed=1).
+    # Use ai_popup_mode (not bare no_wrapper) so layout.tt still loads Header CSS + js_load.tt.
+    if ($c->req->param('embed')) {
+        $c->stash(
+            git_embed     => 1,
+            ai_popup_mode => 1,
+        );
+    }
 
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Git dashboard - Template: admin/git/index.tt";

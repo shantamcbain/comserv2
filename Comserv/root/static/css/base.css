@@ -53,6 +53,16 @@
   --bg-color: var(--background-color);
   --bg-secondary: var(--secondary-color);
   --card-bg: var(--table-header-bg);
+
+  /* Floating control stack — themes may override */
+  --float-left-inset: 20px;
+  --float-left-bottom: 20px;
+  --float-stack-gap: 70px; /* button size + margin so AI2 sits above back-to-top */
+  --float-right-inset: 20px;
+  --float-right-bottom: 20px;
+  --float-z-back-to-top: 1000;
+  --float-z-ai2: 1001;
+  --float-z-chat: 9999;
 }
 
 /* Base styles using variables */
@@ -165,9 +175,9 @@ select {
 /* AI2 Editor floating button & popup (modular, fixed, high z-index) */
 .ai2-float-btn, .ai2editor-float-btn {
   position: fixed !important;
-  bottom: 90px;
-  left: 24px;
-  z-index: 99999 !important;
+  bottom: calc(var(--float-left-bottom) + var(--float-stack-gap));
+  left: var(--float-left-inset);
+  z-index: var(--float-z-ai2);
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 .ai2editor-popup {

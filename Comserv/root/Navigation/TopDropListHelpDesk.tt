@@ -23,7 +23,7 @@
                 <a href="/HelpDesk/kb" class="submenu-link"><i class="icon-kb"></i>Knowledge Base</a>
                 <a href="/faq" class="submenu-link"><i class="icon-faq"></i>FAQ</a>
                 
-                [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+                [% IF c.session.roles && (c.session.roles.grep('^admin$').size || c.session.roles.grep('^helpdesk$').size) %]
                 <div class="submenu-section">
                     <span class="submenu-section-title">Admin Resources</span>
                     <a href="[% c.uri_for('/admin/dev-preview') %]" class="submenu-link"><i class="icon-flask"></i>Preview Upcoming Changes</a>

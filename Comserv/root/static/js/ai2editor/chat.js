@@ -18,6 +18,10 @@
 (function () {
     'use strict';
 
+    // Mark this page as AI Editor so Chat-with-AI Apply Fix / coding paths stay off elsewhere.
+    try { window.AI2_EDITOR = true; } catch (e) { /* ignore */ }
+
+
     const NS = 'AI2EditorChat';
     let _activeFile = '';
 
@@ -175,6 +179,11 @@
             if (sidebar) sidebar.style.display = (_closed || _detached) ? 'none' : 'flex';
             if (reopen) reopen.style.display = _closed ? 'block' : 'none';
             if (btn) btn.textContent = _detached ? '⊞ Attach' : '⤢ Detach';
+            try {
+                document.dispatchEvent(new CustomEvent('ai2:chat-view', {
+                    detail: { closed: _closed, detached: _detached }
+                }));
+            } catch (evErr) { /* ignore */ }
             if (window.AI2EditorCore && typeof window.AI2EditorCore.resizeEditor === 'function') {
                 window.AI2EditorCore.resizeEditor();
             }
@@ -262,7 +271,7 @@
                 'h3{margin:0;padding:8px;background:#2b2b2b;font-size:13px;display:flex;justify-content:space-between;align-items:center;}' +
                 '#attach{background:transparent;border:1px solid #555;color:#aaa;border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;}</style>' +
                 '</head><body>' +
-                '<h3>AI Chat (Hy3) — detached <button id="attach">⊞ Attach</button></h3>' +
+                '<h3>AI Chat — detached <button id="attach">⊞ Attach</button></h3>' +
                 '<div id="chat-messages"></div>' +
                 '<div class="bar"><input id="chat-input" placeholder="Ask AI about the open file...">' +
                 '<button id="send">Send</button></div>' +
@@ -468,6 +477,103 @@
             });
     }
 
+
+    // --- Agent + phase (analyze → plan → verify → implement) ---
+    const ANALYZE_MODEL = 'openrouter|google/gemma-4-31b-it:free';
+    const IMPLEMENT_MODEL = 'openrouter|cohere/north-mini-code:free';
+    let _editorPhase = 'analyze'; // analyze | plan | implement
+    let _planApproved = false;
+
+    function currentEditorAgentId() {
+        const sel = document.getElementById('ai-editor-agent');
+        const v = sel && sel.value ? sel.value : 'programming';
+        return v || 'programming';
+    }
+
+    function currentEditorPhase() {
+        const sel = document.getElementById('ai-editor-phase');
+        if (sel && sel.value) _editorPhase = sel.value;
+        return _editorPhase || 'analyze';
+    }
+
+    function setEditorPhase(phase) {
+        _editorPhase = phase || 'analyze';
+        const sel = document.getElementById('ai-editor-phase');
+        if (sel) sel.value = _editorPhase;
+        const badge = document.getElementById('ai-editor-phase-badge');
+        if (badge) {
+            badge.textContent = 'Phase: ' + _editorPhase + (_planApproved ? ' (plan approved)' : '');
+        }
+    }
+
+    function resolveEditorModel(phase) {
+        // Header model select always wins when user picks something other than empty.
+        const picked = (window.ComservChat && ComservChat.modelSelect)
+            ? ComservChat.modelSelect.getSelectedValue()
+            : '';
+        if (phase === 'implement') {
+            return picked || IMPLEMENT_MODEL;
+        }
+        // analyze / plan: prefer cheap free model; keep user pick if set
+        return picked || ANALYZE_MODEL;
+    }
+
+    function phaseContract(phase, agentId) {
+        const lines = [
+            '[AI Editor agent=' + agentId + ' phase=' + phase + ']',
+            'Contract:',
+            'A) analyze — cheap analysis only; no ## FIX / large rewrites.',
+            'B) plan — short plan for user verify; MAY include docs/planning/todo updates before code; end by asking for "approve plan".',
+            'C) implement — code suggestion only after plan approval (or explicit implement request).'
+        ];
+        if (agentId === 'documentation') {
+            lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
+        } else {
+            lines.push('You are in programming mode: do NOT divert to FocusTune todo ranking; stay on code/docs/plan for this file.');
+        }
+        if (phase === 'analyze') {
+            lines.push('Current phase ANALYZE: respond with analysis only.');
+        } else if (phase === 'plan') {
+            lines.push('Current phase PLAN: propose the plan; wait for user "approve plan" / Verify before code.');
+        } else {
+            lines.push('Current phase IMPLEMENT: provide concrete code suggestion for Approve/Reject.');
+        }
+        return lines.join('\n');
+    }
+
+    function todoStartReminder() {
+        let todoId = '';
+        try {
+            const q = new URLSearchParams(window.location.search);
+            todoId = q.get('todo_id') || q.get('record_id') || '';
+        } catch (e) { /* ignore */ }
+        if (!todoId && window.AI2_TODO_ID) todoId = String(window.AI2_TODO_ID);
+        if (!todoId) {
+            // Look for todo #NNNN in recent chat
+            try {
+                const blob = chatLog.map(function (e) { return e.html || ''; }).join(' ');
+                const m = blob.match(/todo\s*#?\s*(\d{3,})/i) || blob.match(/record_id[=: ]+(\d{3,})/i);
+                if (m) todoId = m[1];
+            } catch (e2) { /* ignore */ }
+        }
+        if (!todoId) return '';
+        return '\n[TODO CONTEXT] Existing todo #' + todoId
+            + ' — remind user to Start it first (POST /todo/open_log) before coding if not already started. '
+            + 'Link: /todo/details?record_id=' + todoId + '\n';
+    }
+
+    function maybeAdvancePhaseFromUser(prompt) {
+        const p = String(prompt || '').toLowerCase();
+        if (/\bapprove\s+plan\b|\bplan\s+approved\b|\bverify(ied)?\b|\bgo\s+ahead\b|\bimplement\b|\bwrite\s+the\s+code\b/.test(p)) {
+            _planApproved = true;
+            setEditorPhase('implement');
+            return;
+        }
+        if (/\b(make\s+a\s+)?plan\b|\bpropose\b/.test(p) && currentEditorPhase() === 'analyze') {
+            setEditorPhase('plan');
+        }
+    }
+
     function sendPrompt(prompt, target) {
         target = target || {
             messages: document.getElementById('chat-messages'),
@@ -493,13 +599,12 @@
 
         if (target.status) target.status('Asking AI...');
 
-        // The editor is a coding context. The model is chosen from the shared
-        // #model-select (populated by ai-chat/model-select.js), defaulting to
-        // hy3 — the same code path the general "Chat with AI" widget uses, so
-        // the two chat UIs can never diverge on model selection again.
-        const model = (window.ComservChat && ComservChat.modelSelect)
-            ? ComservChat.modelSelect.getSelectedValue()
-            : 'tencent/hy3';
+        // Agent + phase: programming/documentation; analyze/plan use cheap free model;
+        // implement defaults to north-mini-code:free (header model select still wins).
+        maybeAdvancePhaseFromUser(prompt);
+        const agentId = currentEditorAgentId();
+        const phase = currentEditorPhase();
+        const model = resolveEditorModel(phase);
         const filePath = currentFilePath();
 
         loadCurrentFileContent().then(function (fileContent) {
@@ -510,9 +615,10 @@
                     ? [{ path: filePath, content: fileContent }] : []);
             return filesP.then(function (files) {
                 const blob = filesToPromptBlob(files);
+                const contract = phaseContract(phase, agentId) + todoStartReminder();
                 const fullPrompt = blob
-                    ? (prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
-                    : prompt;
+                    ? (contract + '\n\n' + prompt + '\n\n---\nThese files were loaded live from this app via GET /ai2/load_file. They ARE in this message. Never say you cannot see them or ask the user to paste.\n\n' + blob)
+                    : (contract + '\n\n' + prompt);
                 if (target.status && files.length) {
                     target.status('Loaded ' + files.map(function (f) { return f.path; }).join(', '));
                 }
@@ -522,7 +628,7 @@
                     body: JSON.stringify({
                         prompt: fullPrompt,
                         model: model,
-                        agent_id: 'code',
+                        agent_id: agentId,
                         page_path: filePath || (files[0] && files[0].path) || '',
                         page_title: filePath ? filePath.split('/').pop() : '',
                         page_content: (files[0] && files[0].content) || fileContent || ''
@@ -560,7 +666,9 @@
                   });
               }
 
-              if (extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
+              // Belt-and-suspenders: programming/docs agents must not create todos from chat actions.
+              const skipTodoCreate = /^(programming|coding|code|documentation)$/i.test(agentId);
+              if (!skipTodoCreate && extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
                   extracted.actions.forEach(function (a) {
                       if (a.action === 'create_todo' || a.action === 'create_project') {
                           ComservChat.featureTodo.handleAction(a, {
@@ -573,13 +681,20 @@
               }
 
               const block = (data.provider === 'ai2-coderead') ? null : extractCodeBlock(display);
-              if (block) {
+              const allowSuggest = (currentEditorAgentId() !== 'documentation')
+                  && (currentEditorPhase() === 'implement' || _planApproved
+                      || /\b(implement|apply|write code|fix now)\b/i.test(prompt));
+              if (block && allowSuggest) {
                   // A suggestion is always applied to the MAIN editor window,
                   // even when chat is detached into its own window.
                   showSuggestion(block.code);
                   if (target.status) target.status('Suggestion ready (' + usedModel + ')');
               } else {
-                  if (target.status) target.status('Replied (no code suggestion)');
+                  if (target.status) {
+                      target.status(block && !allowSuggest
+                          ? 'Plan/analyze reply (code suggestion held until implement/Verify)'
+                          : 'Replied (no code suggestion)');
+                  }
               }
           })
           .catch(function (err) {
@@ -686,7 +801,46 @@
         }, 4000);
     }
 
+
+    function initModelSelect() {
+        const modelSel = document.getElementById('model-select');
+        if (!modelSel) return;
+        function go() {
+            if (!(window.ComservChat && ComservChat.modelSelect)) return false;
+            ComservChat.modelSelect.init({
+                selectEl: modelSel,
+                context: 'code',
+                pinModel: 'cohere/north-mini-code:free',
+                onReady: function () {
+                    console.log('[AI2EditorChat] model-select populated by shared module');
+                },
+                onError: function (e) {
+                    console.error('[AI2EditorChat] model-select failed', e);
+                    try {
+                        modelSel.innerHTML = '';
+                        const opt = document.createElement('option');
+                        opt.disabled = true;
+                        opt.selected = true;
+                        opt.textContent = 'Model list unavailable';
+                        modelSel.appendChild(opt);
+                    } catch (err) { /* ignore */ }
+                }
+            });
+            return true;
+        }
+        if (go()) return;
+        // Defer script order race: retry briefly
+        let n = 0;
+        const t = setInterval(function () {
+            n++;
+            if (go() || n >= 40) clearInterval(t);
+        }, 100);
+    }
+
     function wire() {
+        // Models first so a later throw cannot leave "Loading models…" forever.
+        initModelSelect();
+
         const sendBtn = document.getElementById('ai-chat-send');
         const input = document.getElementById('ai-chat-input');
         const approve = document.getElementById('ai-approve-btn');
@@ -721,22 +875,8 @@
         initDetach();
         initClose();
         applyViewState();   // ensure correct initial view (attached by default)
-        applyClosedState();
 
-        // Populate the editor's #model-select from the SHARED model-selection
-        // module (same catalog + hy3 default the general widget uses).
-        const modelSel = document.getElementById('model-select');
-        if (modelSel && window.ComservChat && ComservChat.modelSelect) {
-            ComservChat.modelSelect.init({
-                selectEl: modelSel,
-                context: 'code',
-                pinModel: 'tencent/hy3',
-                onReady: function () {
-                    console.log('[AI2EditorChat] model-select populated by shared module');
-                },
-                onError: function (e) { console.error('[AI2EditorChat] model-select failed', e); }
-            });
-        }
+        // model-select: see initModelSelect() at top of wire()
 
         // "Add Todo" chat feature (shared module) — attaches to the current page's project.
         const todoBtn = document.getElementById('ai-chat-todo');
@@ -759,6 +899,37 @@
         // Apply shared tooltip map to this widget's buttons.
         if (window.ComservChat && ComservChat.tooltips) ComservChat.tooltips.apply(document);
 
+
+        // Agent + phase controls (minimal analyze → plan → verify → implement UI)
+        const agentSel = document.getElementById('ai-editor-agent');
+        const phaseSel = document.getElementById('ai-editor-phase');
+        const verifyBtn = document.getElementById('ai-editor-verify');
+        if (agentSel && !agentSel._wired) {
+            agentSel._wired = true;
+            agentSel.addEventListener('change', function () {
+                _planApproved = false;
+                setEditorPhase(agentSel.value === 'documentation' ? 'analyze' : currentEditorPhase());
+                recordMessage('AI', '<em>Switched agent to ' + escapeHtml(agentSel.value) + '. Flow: analyze → plan → Verify → implement.</em>');
+            });
+        }
+        if (phaseSel && !phaseSel._wired) {
+            phaseSel._wired = true;
+            phaseSel.addEventListener('change', function () {
+                setEditorPhase(phaseSel.value);
+            });
+            setEditorPhase(phaseSel.value || 'analyze');
+        }
+        if (verifyBtn && !verifyBtn._wired) {
+            verifyBtn._wired = true;
+            verifyBtn.addEventListener('click', function () {
+                _planApproved = true;
+                setEditorPhase('implement');
+                recordMessage('You', escapeHtml('approve plan'));
+                recordMessage('AI', '<em>Plan verified. Phase → implement. Ask for the code change (or Send again).</em>');
+                if (typeof setStatus === 'function') setStatus('Plan approved — implement phase');
+            });
+        }
+
         console.log('[AI2EditorChat] chat + suggestion wiring ready');
     }
 
@@ -770,6 +941,19 @@
     }
 
     console.log('%c[AI2] chat module ready', 'color:#0a0');
-    window.AI2Chat = { setActiveFile: setActiveFile };
+    window.AI2Chat = {
+        setActiveFile: setActiveFile,
+        setClosed: function (v) { _closed = !!v; applyViewState(); },
+        isClosed: function () { return !!_closed; },
+        isDetached: function () { return !!_detached; },
+        reattach: function () {
+            _detached = false;
+            if (window._aiChatWin && !window._aiChatWin.closed) {
+                try { window._aiChatWin.close(); } catch (e) {}
+                window._aiChatWin = null;
+            }
+            applyViewState();
+        }
+    };
     window[NS] = window.AI2Chat;
 })();

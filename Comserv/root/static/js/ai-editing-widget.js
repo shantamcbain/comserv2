@@ -590,7 +590,7 @@
         var aewSel = $('aew-provider');
         if (aewSel && aewSel.value) {
             // Shared module renders "provider|model"; the /ai2/chat endpoint
-            // accepts that format and routes correctly (e.g. openrouter|tencent/hy3).
+            // accepts that format and routes correctly (e.g. openrouter|cohere/north-mini-code:free).
             provider = aewSel.value;
         }
         setStatus('AI thinking…');
@@ -659,7 +659,7 @@
             ComservChat.modelSelect.init({
                 selectEl: sel,
                 context: 'code',
-                pinModel: 'tencent/hy3',
+                pinModel: 'cohere/north-mini-code:free',
                 onError: function () {
                     // Fallback: keep a minimal grok/ollama pair if the module fails.
                     sel.innerHTML = '';
