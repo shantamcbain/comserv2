@@ -6,9 +6,9 @@
 
 .local-chat-widget {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 9999;
+    bottom: var(--float-right-bottom, 20px);
+    right: var(--float-right-inset, 20px);
+    z-index: var(--float-z-chat, 9999);
     font-family: inherit;
 }
 
@@ -37,8 +37,8 @@
 /* Chat panel container */
 .chat-panel {
     position: fixed;
-    bottom: 90px;
-    right: 20px;
+    bottom: calc(var(--float-right-bottom, 20px) + var(--float-stack-gap, 70px));
+    right: var(--float-right-inset, 20px);
     width: 380px;
     min-width: 280px;
     max-width: 90vw;
@@ -51,7 +51,7 @@
     display: flex;
     flex-direction: column;
     font-family: inherit;
-    z-index: 10001;
+    z-index: calc(var(--float-z-chat, 9999) + 2);
     overflow: hidden;
     border: 1px solid var(--border-color, #ccc);
 }
@@ -535,8 +535,8 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
 /* ── Mobile responsive chat widget ──────────────────────────────────────── */
 @media (max-width: 600px) {
     .local-chat-widget {
-        right: 10px !important;
-        bottom: 10px !important;
+        right: calc(var(--float-right-inset, 20px) - 10px) !important;
+        bottom: calc(var(--float-right-bottom, 20px) - 10px) !important;
         left: auto !important;
         top: auto !important;
     }
