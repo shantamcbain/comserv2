@@ -3,15 +3,15 @@
 [% PageVersion = 'CSC/HelpDesk/new_ticket.tt,v 0.02 2026/03/26 shanta Exp shanta ' %]
 
 
-
 [% IF c.session.debug_mode == 1 %]
 
  <br>[% PageVersion %]</br>
 
  [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
-<meta name="viewport" content="width=device-width, initial-scale=1">
-[% END %]
 
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+[% END %]
 
 
 <script>
@@ -25,11 +25,9 @@
 </script>
 
 
-
 <div class="helpdesk-container">
 
     <h1>Create New Support Ticket</h1>
-
 
 
     <div id="hd-prescreen-banner" class="hd-prescreen-banner">
@@ -55,13 +53,11 @@
     </div>
 
 
-
     <div class="hd-divider">
 
         <span>— or —</span>
 
     </div>
-
 
 
     <div id="hd-ticket-toggle" class="hd-ticket-toggle">
@@ -73,7 +69,6 @@
         </button>
 
     </div>
-
 
 
     <div id="ticket-form-section" class="ticket-form" style="display:none;">
@@ -92,13 +87,16 @@
 
             </div>
 
-
-
-            <!-- Math challenge - session-based arithmetic question -->
-            [%# Always render challenge inputs (controller always issues num1/num2 in ticket_new).
-                The ELSE was a stray token from previous edit causing TT parse error. %]
+            [%# Math challenge for guests. Never render blank "What is + ?". %]
+            [% IF is_public_guest || !c.session.user_id %]
             <div class="form-group math-challenge">
-                [% IF num1 %]
+                [% IF math_a && math_b %]
+                <label for="math_challenge_ans">Security Question: What is [% math_a %] + [% math_b %]?</label>
+                <input type="number" id="math_challenge_ans" name="math_challenge_ans"
+                       class="form-control" required min="4" max="18" step="1"
+                       inputmode="numeric" autocomplete="off"
+                       placeholder="Enter the sum">
+                [% ELSIF num1 && num2 %]
                 <label for="math_challenge_ans">Security Question: What is [% num1 %] + [% num2 %]?</label>
 
                 <input type="number" id="math_challenge_ans" name="math_challenge_ans"
@@ -109,7 +107,7 @@
                 <p class="error">Security check could not be loaded. Please <a href="[% c.uri_for('/HelpDesk/ticket/new') %]">reload this page</a> before submitting.</p>
                 [% END %]
             </div>
-
+            [% END %]
 
 
             <div class="form-group">
@@ -121,7 +119,6 @@
                        placeholder="Brief description of your issue">
 
             </div>
-
 
 
             <div class="form-group">
@@ -147,7 +144,6 @@
             </div>
 
 
-
             <div class="form-group">
 
                 <label for="priority">Priority:</label>
@@ -169,7 +165,6 @@
             </div>
 
 
-
             <div class="form-group">
 
                 <label for="description">Description:</label>
@@ -181,7 +176,6 @@
             </div>
 
 
-
             <div class="form-group">
 
                 <label for="attachment">Attachment (optional):</label>
@@ -189,7 +183,6 @@
                 <input type="file" id="attachment" name="attachment" class="form-control-file">
 
             </div>
-
 
 
             <div class="form-actions">
@@ -207,7 +200,6 @@
 </div>
 
 
-
 <script>
 
 (function() {
@@ -217,7 +209,6 @@
     var showBtn  = document.getElementById('hd-show-form-btn');
 
     var formSec  = document.getElementById('ticket-form-section');
-
 
 
     if (openBtn) {
@@ -245,7 +236,6 @@
     }
 
 
-
     if (showBtn) {
 
         showBtn.addEventListener('click', function() {
@@ -265,7 +255,6 @@
     }
 
 
-
     window.showHelpDeskTicketForm = function() {
 
         formSec.style.display = 'block';
@@ -275,7 +264,6 @@
         if (showBtn) showBtn.style.display = 'none';
 
     };
-
 
 
     (function() {
@@ -333,7 +321,6 @@
 </script>
 
 
-
 <style>
 
     .helpdesk-container {
@@ -345,7 +332,6 @@
         padding: 20px;
 
     }
-
 
 
     .hd-prescreen-banner {
@@ -371,7 +357,6 @@
     }
 
 
-
     .hd-prescreen-icon {
 
         font-size: 2em;
@@ -379,7 +364,6 @@
         flex-shrink: 0;
 
     }
-
 
 
     .hd-prescreen-text {
@@ -395,7 +379,6 @@
     }
 
 
-
     .hd-divider {
 
         text-align: center;
@@ -409,7 +392,6 @@
     }
 
 
-
     .hd-ticket-toggle {
 
         text-align: center;
@@ -417,7 +399,6 @@
         margin-bottom: 24px;
 
     }
-
 
 
     .ticket-form {
@@ -435,7 +416,6 @@
     }
 
 
-
     .ticket-form h2 {
 
         margin-top: 0;
@@ -449,13 +429,11 @@
     }
 
 
-
     .form-group {
 
         margin-bottom: 20px;
 
     }
-
 
 
     .form-control {
@@ -479,13 +457,11 @@
     }
 
 
-
     .form-control-file {
 
         padding: 8px 0;
 
     }
-
 
 
     label {
@@ -501,13 +477,11 @@
     }
 
 
-
     .form-actions {
 
         margin-top: 30px;
 
     }
-
 
 
     .btn {
@@ -533,7 +507,6 @@
     }
 
 
-
     .btn-ai {
 
         background-color: var(--nav-bg, #ccffff);
@@ -551,7 +524,6 @@
     .btn-ai:disabled { opacity: 0.5; cursor: default; }
 
 
-
     .btn-primary {
 
         background-color: var(--button-bg, #f2f2f2);
@@ -565,7 +537,6 @@
     .btn-primary:hover { background-color: var(--button-hover-bg, #e0e0e0); }
 
 
-
     .btn-secondary {
 
         background-color: var(--secondary-color, #e9ecef);
@@ -577,7 +548,6 @@
     }
 
     .btn-secondary:hover { opacity: 0.85; }
-
 
 
     .debug-message {
