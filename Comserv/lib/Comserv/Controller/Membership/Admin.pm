@@ -1444,7 +1444,9 @@ sub hosting_account_edit :Local :Args(1) {
     $nav->_ensure_hosting_list_publicly_column($c) if $nav;
 
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
-    unless (lc($site_name) eq 'csc') {
+    # Allow each site to edit its own hosting account features
+    # (was: only 'csc' was allowed, which prevented local sites from managing their own addons)
+    unless (lc($site_name) eq $c->session->{SiteName} || lc($site_name) eq 'csc') {
         $c->response->redirect($c->uri_for('/membership/admin'));
         return;
     }

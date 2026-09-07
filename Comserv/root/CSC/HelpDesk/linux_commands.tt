@@ -3,7 +3,6 @@
 [% PageVersion = 'CSC/HelpDesk/linux_commands.tt,v 1.1 2025/06/15 shanta Exp shanta ' %]
 
 
-
 [% IF c.session.debug_mode == 1 %]
 
  <br>[% PageVersion %]</br>
@@ -19,6 +18,9 @@
        <li>[% msg %]</li>
 
      [% END %]
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
      </ul>
 
    </div>
@@ -26,7 +28,6 @@
  [% END %]
 
 [% END %]
-
 
 
 [% # Include additional CSS files if specified %]
@@ -40,7 +41,6 @@
     [% END %]
 
 [% END %]
-
 
 
 <div class="helpdesk-container">
@@ -2066,7 +2066,6 @@
 </div>
 
 
-
 <style>
 
     .helpdesk-container {
@@ -2408,7 +2407,6 @@
     }
 
 </style>
-
 
 
 [% # Include additional JavaScript files if specified %]
