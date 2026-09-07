@@ -1,11 +1,10 @@
 [% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.02 2026/04/27' %]
 
 [% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-
 <div class="helpdesk-container">
+
 
 
     <nav class="ticket-breadcrumb">
@@ -27,6 +26,7 @@
     </nav>
 
 
+
     [% IF error_msg || c.flash.error_msg %]
 
     <div class="hd-alert-error">[% error_msg || c.flash.error_msg %]</div>
@@ -40,6 +40,7 @@
     [% END %]
 
 
+
     [% IF !is_staff && (ticket.status == 'closed' || ticket.status == 'resolved') %]
 
     <div class="hd-alert-info">
@@ -51,6 +52,7 @@
     </div>
 
     [% END %]
+
 
 
     <div class="ticket-header-card">
@@ -89,12 +91,9 @@
             <span>Last activity: <strong>[% ticket.updated_at | user_time %]</strong></span>
             [% END %]
 
-            [% IF ticket.assigned_to %]
-
+            [% IF is_staff || ticket.assigned_to %]
             &bull;
-
-            <span>Assigned to: <strong>[% ticket.assigned_to %]</strong></span>
-
+            <span>Assigned to: <strong>[% ticket.assigned_to || 'Unassigned' %]</strong></span>
             [% END %]
 
             [% IF ticket.closed_at %]
@@ -104,6 +103,21 @@
             [% END %]
 
         </div>
+
+        [% IF is_staff %]
+        <div class="ticket-customer-email" style="margin-top: 0.5rem; font-size: 0.9em; background: #f8f9fa; padding: 4px 8px; border-radius: 4px;">
+            <strong>Customer email:</strong> 
+            [% IF guest_email %]
+                <strong>[% guest_email %]</strong>
+                <a href="mailto:[% guest_email %]?subject=[% ticket.ticket_number %] [% ticket.subject | uri %]" 
+                   class="btn btn-sm btn-outline-secondary" style="margin-left: 6px; padding: 1px 6px; font-size: 0.8em;">
+                    ✉ Reply via email
+                </a>
+            [% ELSE %]
+                <em>none provided</em>
+            [% END %]
+        </div>
+        [% END %]
 
         <div style="margin-top:0.75rem;">
 
@@ -120,6 +134,7 @@
         </div>
 
     </div>
+
 
 
     [% IF is_staff %]
@@ -185,6 +200,7 @@
             </form>
 
 
+
             [% IF ticket.email && (ticket.status == 'awaiting_response' || ticket.status == 'open' || ticket.status == 'in_progress') %]
 
             <form method="post"
@@ -205,7 +221,72 @@
 
             [% END %]
 
-        </div>
+        
+            <form method="post"
+                  action="[% c.uri_for('/HelpDesk/ticket/create_todo/' _ ticket.ticket_number) %]"
+                  style="display:contents;">
+                <button type="submit" name="todo_type" value="work_on"
+                        class="btn btn-sm btn-outline-primary"
+                        title="Create a todo to track work on this ticket">
+                    Work On
+                </button>
+                <input type="text" name="note" placeholder="note (optional)" style="width:180px;font-size:0.85em;margin-left:2px;" value="">
+            </form>
+
+            <form method="post"
+                  action="[% c.uri_for('/HelpDesk/ticket/escalate_ticket/' _ ticket.ticket_number) %]"
+                  style="display:contents;">
+                <button type="submit" name="todo_type" value="escalate"
+                        class="btn btn-sm btn-outline-danger"
+                        title="Create a high-priority escalation todo">
+                    Escalate
+                </button>
+                <input type="text" name="note" placeholder="note (optional)" style="width:180px;font-size:0.85em;margin-left:2px;" value="">
+            </form>
+
+            <!-- Assign / reassign / unassign ticket to staff/user -->
+            <div class="ticket-assign" style="margin-top:8px; padding-top:6px; border-top:1px solid #eee; font-size:0.9em;">
+                <strong>Assign To:</strong>
+                <form method="post" action="[% c.uri_for('/HelpDesk/ticket/assign/' _ ticket.ticket_number) %]" style="display:inline-block; margin-left:4px;">
+                    <input type="text" name="assignee" value="[% ticket.assigned_to || '' %]"
+                           placeholder="username or name" style="width:150px; font-size:0.85em; padding:1px 4px; vertical-align:middle;">
+                    <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:0.8em; padding:1px 5px; vertical-align:middle;">Assign</button>
+                </form>
+                [% IF staff_username %]
+                <form method="post" action="[% c.uri_for('/HelpDesk/ticket/assign/' _ ticket.ticket_number) %]" style="display:inline-block; margin-left:3px;">
+                    <input type="hidden" name="assignee" value="[% staff_username %]">
+                    <button type="submit" class="btn btn-sm btn-secondary" style="font-size:0.8em; padding:1px 5px; vertical-align:middle;"
+                            title="Assign to me ([% staff_display %])">Me</button>
+                </form>
+                [% END %]
+                [% IF ticket.assigned_to %]
+                <form method="post" action="[% c.uri_for('/HelpDesk/ticket/assign/' _ ticket.ticket_number) %]" style="display:inline-block; margin-left:3px;">
+                    <input type="hidden" name="assignee" value="">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" style="font-size:0.8em; padding:1px 5px; vertical-align:middle;"
+                            onclick="return confirm('Unassign this ticket?');">Unassign</button>
+                </form>
+                [% END %]
+                [% IF ticket.assigned_to %]
+                <span style="margin-left:6px; color:#555; font-size:0.8em;">Current: <strong>[% ticket.assigned_to %]</strong></span>
+                [% END %]
+            </div>
+
+            <!-- Change priority -->
+            <div class="ticket-priority-edit" style="margin-top:8px; padding-top:6px; border-top:1px solid #eee; font-size:0.9em;">
+                <form method="post" action="[% c.uri_for('/HelpDesk/ticket/update_priority/' _ ticket.ticket_number) %]" style="display:inline-block;">
+                    <label for="new_priority" style="margin-right:4px;">Priority:</label>
+                    <select name="new_priority" id="new_priority" style="padding:2px 4px;">
+                        [% SET cur_p = ticket.priority || 'medium' %]
+                        [% FOREACH p IN ['low','medium','high','critical'] %]
+                          <option value="[% p %]"[% IF cur_p == p %] selected[% END %]>[% p %]</option>
+                        [% END %]
+                    </select>
+                    <button type="submit" class="btn btn-secondary" style="padding:2px 8px; font-size:0.85em;">Update</button>
+                </form>
+            </div>
+
+</div>
+
 
 
         [% IF ticket.resolution %]
@@ -223,6 +304,7 @@
     [% END %]
 
 
+
     <div class="conversation-thread">
 
         <div class="message message-user message-original">
@@ -238,6 +320,7 @@
             <div class="message-body">[% ticket.description | html | replace('\n', '<br>') %]</div>
 
         </div>
+
 
 
         [% FOREACH msg IN messages %]
@@ -271,6 +354,7 @@
     </div>
 
 
+
     [% IF c.session.username %]
 
     [% IF ticket.status == 'closed' || ticket.status == 'resolved' %]
@@ -280,7 +364,6 @@
         <h3>
 
             [% IF is_staff %]Reply (will not reopen)[% ELSE %]Reply to Reopen[% END %]
-
             <div class="reply-actions-small" style="margin-top:10px;">
                 <a href="[% c.uri_for('/HelpDesk') %]" class="btn btn-secondary" style="font-size:0.85em;">Back to Tickets</a>
             </div>
@@ -369,6 +452,7 @@
     </div>
 
     [% END %]
+
 
 
 </div>
