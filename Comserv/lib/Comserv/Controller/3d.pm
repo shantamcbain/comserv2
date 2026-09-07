@@ -1154,6 +1154,7 @@ sub my_orders :Path('/3d/my_orders') :Args(0) {
 
 sub queue :Path('/3d/queue') :Args(0) {
     my ($self, $c) = @_;
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
     $self->_require_module($c);
     $self->_require_admin($c);
 
