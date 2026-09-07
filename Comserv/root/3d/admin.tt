@@ -106,6 +106,10 @@
         <h3>🗂 Model Manager</h3>
         <p>Upload STL files, auto-calculate grams from geometry, and link models to inventory items.</p>
     </a>
+    <a href="[% manufacturing_traveler_link %]" class="admin-link-card" target="_blank">
+        <h3><i class="icon-file-text"></i> Manufacturing Traveler</h3>
+        <p>View and print manufacturing travelers for open orders.</p>
+    </a>
 </div>
 
 <h2 class="section-header">Inventory (Filaments &amp; Supplies)</h2>
