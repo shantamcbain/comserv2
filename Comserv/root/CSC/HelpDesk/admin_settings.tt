@@ -1,0 +1,61 @@
+[% PageVersion = 'CSC/HelpDesk/admin_settings.tt,v 0.01 2026/09/07 cscdeveloper Exp cscdeveloper ' %]
+[% META title = 'HelpDesk System Settings' %]
+
+<div class="helpdesk-admin-container" style="max-width:720px; margin:1.5em auto; padding:0 1em;">
+  <h1>HelpDesk System Settings</h1>
+  <p style="color:#555;">Configure the Grok Bot ticket-change webhook
+    (routine <code>helpdesk-ticket-change-webhook</code>).
+    Paste the Webhook URL and Authorization/key from the HelpDesk support agent routine panel.
+    Leave URL empty to disable. Failures never block ticket actions.</p>
+
+  [% IF c.flash.success_msg %]
+    <div class="alert-success">[% c.flash.success_msg %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+    <div class="alert-error">[% c.flash.error_msg %]</div>
+  [% END %]
+
+  [% IF env_overrides_url %]
+    <div class="alert-warning" style="background:#fff3cd; padding:0.75em; margin-bottom:1em;">
+      <strong>Note:</strong> <code>HELPDESK_WEBHOOK_URL</code> is set in the environment and overrides the URL below at send time.
+    </div>
+  [% END %]
+
+  <form method="post" action="[% c.uri_for('/HelpDesk/admin/settings') %]" class="app-form">
+    <div class="form-field" style="margin-bottom:1em;">
+      <label for="helpdesk_webhook_url"><strong>Webhook URL</strong></label><br>
+      <input type="url" id="helpdesk_webhook_url" name="helpdesk_webhook_url"
+             value="[% webhook_url | html %]"
+             placeholder="https://…/helpdesk-ticket-change-webhook"
+             style="width:100%; max-width:640px; padding:0.4em;" autocomplete="off">
+    </div>
+    <div class="form-field" style="margin-bottom:1em;">
+      <label for="helpdesk_webhook_auth"><strong>Authorization / sender key</strong></label><br>
+      <input type="password" id="helpdesk_webhook_auth" name="helpdesk_webhook_auth"
+             value="[% webhook_auth | html %]"
+             placeholder="Bearer … or raw key"
+             style="width:100%; max-width:640px; padding:0.4em;" autocomplete="new-password">
+      <div style="font-size:0.85em; color:#666; margin-top:0.35em;">
+        Stored in <code>site_config</code> (CSC site). Sent as the HTTP <code>Authorization</code> header.
+        Raw keys get a <code>Bearer </code> prefix automatically.
+        [% IF webhook_auth_configured %]<em>Effective auth is configured.</em>[% ELSE %]<em>No auth configured yet.</em>[% END %]
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save settings</button>
+      <a href="[% c.uri_for('/HelpDesk/admin') %]" class="btn btn-secondary">← Admin</a>
+    </div>
+  </form>
+
+  <hr style="margin:2em 0;">
+  <h2>Events posted</h2>
+  <ul>
+    <li><code>ticket.created</code> — new ticket</li>
+    <li><code>ticket.replied</code> — customer/staff reply or note</li>
+    <li><code>ticket.updated</code> — status / priority / assign (<code>change</code> field)</li>
+    <li><code>ticket.mail_ingested</code> — mail→ticket ingest notify</li>
+  </ul>
+  <p style="font-size:0.9em; color:#555;">Body example:
+    <code>{ "event":"ticket.updated", "ticket_id":"CSC-…", "site":"CSC", "change":"status", "at":"ISO-8601", … }</code>
+  </p>
+</div>
