@@ -9,6 +9,7 @@ use Try::Tiny;
 use JSON;
 use DateTime;
 use Comserv::Util::Logging;
+use Comserv::Util::HelpDeskWebhook;
 
 extends 'Catalyst::Model';
 
@@ -551,6 +552,13 @@ sub perform {
         my $ticket_num = $new_ticket->ticket_number // $ticket_number;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
             "AI action create_helpdesk_ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
+        eval {
+            Comserv::Util::HelpDeskWebhook->notify_ticket_change($c,
+                event  => 'ticket.created',
+                change => 'created',
+                ticket => $new_ticket,
+            );
+        };
         $c->response->body(encode_json({
             success       => JSON::true,
             message       => "Support ticket $ticket_num created: \"$subject\". An admin will be notified.",
