@@ -65,11 +65,15 @@
             </li>
         [% END %]
 
-        <!-- Beekeeping Menu (beekeeping/apiary module or BMaster site) -->
+        <!-- Beekeeping Menu (beekeeping/apiary module or BMaster site)-->
+        [% IF c.stash.can_beekeep || (c.session.SiteName eq 'BMaster') %]
         [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
+        [% END %]
 
         <!-- Brew / brewhouse addon (brew.* hostnames or brew module) -->
+        [% IF c.stash.brew_addon_active || (c.req.uri.host || '') =~ /^brew\./i %]
         [% INCLUDE 'Navigation/TopDropListBrew.tt' %]
+        [% END %]
         
         <!-- Manager Menu (role-specific) -->
         [% IF user_roles.grep('manager').size || cached_nav.manager_menu.defined %]
