@@ -1,7 +1,6 @@
 [% PageVersion = 'CSC/HelpDesk/admin_tickets.tt,v 0.03 2026/04/27 shanta Exp shanta ' %]
 
 
-
 [% IF c.session.debug_mode == 1 %]
 
  <br>[% PageVersion %]</br>
@@ -12,11 +11,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 
-
 <div class="helpdesk-container">
 
     <h1>[% title || 'Ticket Management' %]</h1>
-
 
 
     [% IF error_msg %]
@@ -24,7 +21,6 @@
     <div class="hd-alert-error">[% error_msg %]</div>
 
     [% END %]
-
 
 
     <div class="admin-ticket-nav">
@@ -50,7 +46,6 @@
     </div>
 
 
-
     [% IF tickets && tickets.size %]
 
     <p>[% tickets.size %] ticket(s)</p>
@@ -74,7 +69,6 @@
                 <th>Status</th>
 
                 <th>Submitted by</th>
-                <th>Assigned</th>
 
                 <th>Created</th>
 
@@ -121,7 +115,6 @@
                 </td>
 
                 <td>[% t.username || t.email || 'guest' %]</td>
-                <td>[% t.assigned_to || '-' %]</td>
                 <td>[% t.created_at | user_time %]</td>
                 <td>[% (t.updated_at || t.created_at) | user_time %]</td>
                 <td class="ticket-row-actions">

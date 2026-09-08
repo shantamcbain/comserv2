@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Comserv::Util::Logging;
 use Comserv::Util::AppTime;
+use Comserv::Util::HelpDeskWebhook;
 use POSIX qw(strftime);
 use Try::Tiny;
 use JSON ();
@@ -412,6 +413,137 @@ sub admin :Chained('base') :PathPart('admin') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+
+=head2 admin_settings
+
+GET/POST /HelpDesk/admin/settings — admin-configurable Grok webhook URL + auth key.
+
+=cut
+
+sub admin_settings :Chained('base') :PathPart('admin/settings') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    my $site_id = 1;  # shared HelpDesk defaults live on CSC
+
+    if (uc($c->req->method // '') eq 'POST') {
+        my $url  = $c->req->params->{helpdesk_webhook_url}  // '';
+        my $auth = $c->req->params->{helpdesk_webhook_auth} // '';
+        $url  =~ s/^\s+|\s+$//g;
+        $auth =~ s/^\s+|\s+$//g;
+        eval {
+            Comserv::Util::HelpDeskWebhook->save_config($c,
+                site_id => $site_id,
+                url     => $url,
+                auth    => $auth,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_settings',
+                "Failed saving webhook config: $@");
+            $c->flash->{error_msg} = 'Failed to save webhook settings: ' . $@;
+        } else {
+            $c->flash->{success_msg} = 'HelpDesk webhook settings saved.'
+                . ($url ? '' : ' (URL empty — webhook disabled)');
+        }
+        $c->res->redirect($c->uri_for('/HelpDesk/admin/settings'));
+        return;
+    }
+
+    my $cfg = Comserv::Util::HelpDeskWebhook->resolve_config($c);
+    # Prefer DB values for the form (env still overrides at send time)
+    my ($db_url, $db_auth) = ('', '');
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('SiteConfig');
+        my $u = $rs->find({ site_id => $site_id, config_key => 'helpdesk_webhook_url' });
+        my $a = $rs->find({ site_id => $site_id, config_key => 'helpdesk_webhook_auth' });
+        $db_url  = $u ? ($u->config_value // '') : '';
+        $db_auth = $a ? ($a->config_value // '') : '';
+    };
+
+    $c->stash(
+        template          => 'CSC/HelpDesk/admin_settings.tt',
+        title             => 'HelpDesk System Settings',
+        webhook_url       => $db_url,
+        webhook_auth      => $db_auth,
+        webhook_url_effective  => $cfg->{url}  || '',
+        webhook_auth_configured => ($cfg->{auth} && $cfg->{auth} =~ /\S/) ? 1 : 0,
+        env_overrides_url => (defined $ENV{HELPDESK_WEBHOOK_URL} && $ENV{HELPDESK_WEBHOOK_URL} =~ /\S/) ? 1 : 0,
+    );
+    $c->forward($c->view('TT'));
+}
+
+=head2 api_mail_ingest_notify
+
+POST /HelpDesk/api/mail_ingest_notify — called by mail→ticket ingest bridges.
+JSON or form: ticket_number (required). Fires ticket.mail_ingested webhook.
+Staff/API local only (same soft-fail semantics).
+
+=cut
+
+sub api_mail_ingest_notify :Chained('base') :PathPart('api/mail_ingest_notify') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Allow staff session OR localhost (mail cron bridges)
+    my $addr = $c->req->address // '';
+    my $is_local = ($addr eq '127.0.0.1' || $addr eq '::1' || $addr =~ /^192\.168\.1\./);
+    unless ($is_local || $self->_is_staff($c)) {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON->new->encode({ success => 0, error => 'forbidden' }));
+        return;
+    }
+
+    my $ticket_number = $c->req->params->{ticket_number} || '';
+    if (!$ticket_number && $c->req->body) {
+        eval {
+            my $body = $c->req->body;
+            my $raw = '';
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                $raw = do { local $/; <$body> };
+            } else {
+                $raw = "$body";
+            }
+            my $data = JSON->new->decode($raw) if $raw;
+            $ticket_number = $data->{ticket_number} || $data->{ticket_id} || '' if $data;
+        };
+    }
+
+    unless ($ticket_number) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON->new->encode({ success => 0, error => 'ticket_number required' }));
+        return;
+    }
+
+    my $ticket;
+    eval {
+        $ticket = $c->model('DBEncy')->schema->resultset('SupportTicket')
+            ->find({ ticket_number => $ticket_number });
+    };
+    unless ($ticket) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON->new->encode({ success => 0, error => 'ticket not found' }));
+        return;
+    }
+
+    $self->_fire_ticket_webhook($c,
+        event  => 'ticket.mail_ingested',
+        change => 'mail',
+        ticket => $ticket,
+    );
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(JSON->new->encode({
+        success       => 1,
+        ticket_number => $ticket->ticket_number,
+        event         => 'ticket.mail_ingested',
+    }));
+}
+
 sub admin_tickets :Chained('base') :PathPart('admin/tickets') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_admin($c);
@@ -576,6 +708,12 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
                      . "View ticket: $view_url\n"
                      . "Open queue:  " . $c->uri_for('/HelpDesk/admin/tickets/open'),
             event   => 'submit_ticket',
+        );
+
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.created',
+            change => 'created',
+            ticket => $ticket,
         );
 
         $c->stash(
@@ -839,6 +977,12 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             event   => 'ticket_reply',
         );
 
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.replied',
+            change => 'reply',
+            ticket => $ticket,
+        );
+
         $c->flash->{success_msg} = 'Your reply has been posted.';
 
     } catch {
@@ -986,6 +1130,12 @@ sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Arg
                 $@ ? "Status-change email failed: $@" : "Status-change email sent to " . $ticket->email);
         }
 
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.updated',
+            change => 'status',
+            ticket => $ticket,
+        );
+
         $c->flash->{success_msg} = "Ticket status updated to: $status_label";
 
     } catch {
@@ -1073,6 +1223,12 @@ sub assign_ticket :Chained('ticket_base') :PathPart('assign') :Args(1) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'assign_ticket',
             "Ticket $ticket_number assigned_to=" . ($assignee || 'NULL') . " by $staff_name");
 
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.updated',
+            change => 'assign',
+            ticket => $ticket,
+        );
+
         $c->flash->{success_msg} = $assignee
             ? "Ticket assigned to: $assignee"
             : "Ticket unassigned";
@@ -1080,6 +1236,78 @@ sub assign_ticket :Chained('ticket_base') :PathPart('assign') :Args(1) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'assign_ticket',
             "Error assigning $ticket_number: $_");
         $c->flash->{error_msg} = 'Error assigning ticket: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+
+=head2 update_priority
+
+Staff-only: change ticket priority.
+POST /HelpDesk/ticket/update_priority/<ticket_number>
+  params: new_priority (low|medium|high|critical)
+
+=cut
+
+sub update_priority :Chained('ticket_base') :PathPart('update_priority') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+    return unless $self->_require_admin($c);
+
+    unless (uc($c->req->method // '') eq 'POST') {
+        $c->flash->{error_msg} = 'Invalid request method.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $new_priority = lc($c->req->params->{new_priority} || '');
+    $new_priority =~ s/[^a-z]//g;
+    my %ok = map { $_ => 1 } qw(low medium high critical);
+    unless ($ok{$new_priority}) {
+        $c->flash->{error_msg} = "Invalid priority: $new_priority";
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $staff_name = $c->session->{username} || $c->session->{user_name} || 'staff';
+    my $site_name  = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $old = $ticket->priority || 'medium';
+        my $now = Comserv::Util::AppTime->now_utc;
+        $ticket->update({ priority => $new_priority, updated_at => $now });
+
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => 'system',
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => "Priority changed from $old to $new_priority by $staff_name",
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_priority',
+            "Ticket $ticket_number priority $old -> $new_priority by $staff_name");
+
+        $self->_fire_ticket_webhook($c,
+            event  => 'ticket.updated',
+            change => 'priority',
+            ticket => $ticket,
+        );
+
+        $c->flash->{success_msg} = "Ticket priority updated to: $new_priority";
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_priority',
+            "Error updating priority for $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error updating priority: ' . $_;
     };
 
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
@@ -1577,7 +1805,7 @@ sub api_search_tickets :Chained('base') :PathPart('api/search_tickets') :Args(0)
     my $is_staff  = $self->_is_staff($c);
 
     unless ($q) {
-        $c->response->body(JSON::encode_json({ error => 'q parameter required', tickets => [] }));
+        $c->response->body(JSON->new->encode({ error => 'q parameter required', tickets => [] }));
         return;
     }
 
@@ -1617,7 +1845,7 @@ sub api_search_tickets :Chained('base') :PathPart('api/search_tickets') :Args(0)
         }
     };
 
-    $c->response->body(JSON::encode_json({
+    $c->response->body(JSON->new->encode({
         query   => $q,
         count   => scalar(@results),
         tickets => \@results,
@@ -1903,6 +2131,25 @@ sub _spam_guard_fail {
     }
 
     return '';
+}
+
+
+=head2 _fire_ticket_webhook
+
+Soft-fail notify to Grok Bot HelpDesk change webhook. Never raises to caller.
+
+=cut
+
+sub _fire_ticket_webhook {
+    my ($self, $c, %args) = @_;
+    eval {
+        Comserv::Util::HelpDeskWebhook->notify_ticket_change($c, %args);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_fire_ticket_webhook',
+            "Webhook notify swallowed: $@");
+    }
+    return 1;
 }
 
 sub _notify_contact_admins {
