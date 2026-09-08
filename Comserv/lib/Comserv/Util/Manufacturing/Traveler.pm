@@ -509,7 +509,24 @@ sub _parts_from_leaves {
         # green = in pick box, blue = printed ready to pick,
         # red = already in print queue, purple = need print but NOT queued yet
         my ($row_state, $status_display, $status);
-        if ($qty > 0 && $on_hand >= $qty) {
+        # Priority order for traveler display:
+        # 1. need_print (purple) — shortfall, nothing queued yet
+        # 2. in_queue (red) — already on print farm queue
+        # 3. in_box (green) — in pick box / in stock
+        if ($is_print && $short > 0 && $in_queue <= 0) {
+            $row_state       = 'need_print';       # purple — shortfall, nothing queued
+            $status          = 'pending';
+            $status_display  = 'Need print (not queued)';
+        } elsif ($is_print && $in_queue > 0 && $short == 0) {
+            # Extra queue while stock already covered
+            $row_state       = 'in_queue';         # red — already on farm queue
+            $status          = 'pending';
+            $status_display  = "In print queue ($in_queue)";
+        } elsif ($is_print && $short > 0 && $in_queue > 0) {
+            $row_state       = 'in_queue';         # red — already on farm queue
+            $status          = 'pending';
+            $status_display  = "In print queue ($in_queue)";
+        } elsif ($qty > 0 && $on_hand >= $qty) {
             $row_state       = 'in_box';          # green
             $status          = 'in_stock';
             $status_display  = 'In pick box';
@@ -521,19 +538,6 @@ sub _parts_from_leaves {
             $row_state       = 'printed_ready';
             $status          = 'printed';
             $status_display  = 'Printed — ready to pick into box';
-        } elsif ($is_print && $short > 0 && $in_queue > 0) {
-            $row_state       = 'in_queue';         # red — already on farm queue
-            $status          = 'pending';
-            $status_display  = "In print queue ($in_queue)";
-        } elsif ($is_print && $short > 0) {
-            $row_state       = 'need_print';       # purple — shortfall, nothing queued
-            $status          = 'pending';
-            $status_display  = 'Need print (not queued)';
-        } elsif ($is_print && $in_queue > 0 && $short == 0) {
-            # Extra queue while stock already covered
-            $row_state       = 'in_queue';
-            $status          = 'pending';
-            $status_display  = "In print queue ($in_queue)";
         } elsif (!$is_print && $short > 0) {
             $row_state       = 'need_buy';         # amber
             $status          = 'pending';
