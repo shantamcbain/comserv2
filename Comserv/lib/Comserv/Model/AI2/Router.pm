@@ -444,8 +444,16 @@ sub chat_with_fallback {
     }
 
     my $err = $pre_err || ($resp && $resp->{error}) || 'AI provider error';
-    my $do_fallback = $self->_provider_needs_credit_fallback($provider_name)
-        && ($skip_paid || $self->_credits_exhausted($err));
+    # Credit-exhaustion on paid providers OR a dead Ollama hop (docker cannot
+    # reach host:11434 — CSC-20260831-1585) should fall through to a free
+    # OpenRouter model instead of leaving the UI on Thinking… forever.
+    my $do_fallback = (
+        $self->_provider_needs_credit_fallback($provider_name)
+            && ($skip_paid || $self->_credits_exhausted($err))
+    ) || (
+        ($provider_name // '') eq 'ollama'
+            && ($resp && $resp->{unreachable} || $self->_credits_exhausted($err))
+    );
 
     unless ($do_fallback) {
         $resp ||= { success => 0, error => $err, provider => $provider_name };
@@ -454,10 +462,12 @@ sub chat_with_fallback {
     }
 
     my ($free, $local) = $self->pick_free_fallback($c, $provider_name, $use_model);
+    # When Ollama itself is the failing hop, do not retry another Ollama tag.
+    $local = undef if ($provider_name // '') eq 'ollama';
     for my $hop ($free, $local) {
         next unless $hop;
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
-            "Paid $provider_name exhausted ($err); falling back to $hop->{provider} $hop->{model}");
+            "$provider_name failed ($err); falling back to $hop->{provider} $hop->{model}");
         my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages);
         if ($retry && $retry->{success}) {
             $retry->{provider}       = $hop->{provider};

@@ -88,19 +88,25 @@ sub build_system_prompt {
     push @parts, $args{navigation_hint}     if $args{navigation_hint};
 
     # Logged-in users can create todos from this same chat (widget + editor).
+    # Skip TodoCreate contract for AI Editor agents — they plan/analyze code,
+    # and "create todos" in those prompts must not become a todo agent contract.
     my $uname = eval { $c->session->{username} } || '';
+    my $aid_lc = lc($args{agent_id} // '');
+    my $editor_todo_skip = ($aid_lc =~ /^(?:programming|coding|code|documentation)$/);
     if ($uname && lc($uname) ne 'guest') {
-        my $contract = eval {
-            require Comserv::Model::AI2::TodoCreate;
-            my $brain = eval { $c->model('AI2::TodoCreate') };
-            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
-            $brain->chat_contract($c);
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
-                'build_system_prompt', "TodoCreate chat_contract failed: $@");
+        if (!$editor_todo_skip) {
+            my $contract = eval {
+                require Comserv::Model::AI2::TodoCreate;
+                my $brain = eval { $c->model('AI2::TodoCreate') };
+                $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+                $brain->chat_contract($c);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__,
+                    'build_system_prompt', "TodoCreate chat_contract failed: $@");
+            }
+            push @parts, $contract if $contract;
         }
-        push @parts, $contract if $contract;
 
         my $inv_contract = eval {
             require Comserv::Model::AI2::InvoiceCreate;
@@ -197,28 +203,33 @@ sub process {
 
     # Todo-create AGENT (in-chat job). Deterministic — does NOT use the
     # picker model. Free models invent a fake "Add" box; this runs first.
-    my $todo_hit = eval {
-        require Comserv::Model::AI2::TodoCreate;
-        Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
-            prompt    => $prompt,
-            page_path => $args{page_path} || '',
-        );
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
-            "TodoCreate try_chat_create threw: $@");
-    }
-    if ($todo_hit && $todo_hit->{handled}) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
-            'Todo-create agent handled chat (no LLM)');
-        return {
-            success     => 1,
-            response    => $todo_hit->{response} // '',
-            model       => $todo_hit->{model} // '(todo-create)',
-            provider    => $todo_hit->{provider} // 'ai2-todo',
-            todo_action => $todo_hit->{todo_action},
-            thinking    => [],
+    # Skip for AI Editor agents (programming/coding/code/documentation).
+    my $editor_todo_skip = (lc($args{agent_id} // '') =~ /^(?:programming|coding|code|documentation)$/);
+    my $todo_hit;
+    if (!$editor_todo_skip) {
+        $todo_hit = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            Comserv::Model::AI2::TodoCreate->new->try_chat_create($c,
+                prompt    => $prompt,
+                page_path => $args{page_path} || '',
+            );
         };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
+                "TodoCreate try_chat_create threw: $@");
+        }
+        if ($todo_hit && $todo_hit->{handled}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process',
+                'Todo-create agent handled chat (no LLM)');
+            return {
+                success     => 1,
+                response    => $todo_hit->{response} // '',
+                model       => $todo_hit->{model} // '(todo-create)',
+                provider    => $todo_hit->{provider} // 'ai2-todo',
+                todo_action => $todo_hit->{todo_action},
+                thinking    => [],
+            };
+        }
     }
 
     # Invoice-create AGENT. Same intercept as todos — draft only, never posts GL.

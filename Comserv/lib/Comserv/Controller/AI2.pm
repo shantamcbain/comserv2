@@ -159,6 +159,11 @@ sub providers :Local :Args(0) {
 sub editing_widget_popup :Local :Args(0) {
     my ($self, $c) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
         'ai2_editing_widget_popup', "AI2 code editor popup opened");
 
@@ -912,32 +917,38 @@ sub chat :Local :Args(0) {
     # Model::AI2::TodoCreate (same as /ai2/action and the 📝 button).
     # Use ->new not $c->model: a newly added Model::* is not in Catalyst's
     # component registry until the next process start (we must not restart).
-    my $todo_hit = eval {
-        require Comserv::Model::AI2::TodoCreate;
-        my $brain = eval { $c->model('AI2::TodoCreate') };
-        $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
-        $brain->try_chat_create($c,
-            prompt    => $prompt,
-            page_path => $page_path,
-        );
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'ai2_chat', "TodoCreate try_chat_create threw: $@");
-    }
-    if ($todo_hit && $todo_hit->{handled}) {
-        $c->res->body(encode_json({
-            success         => $todo_hit->{success} ? 1 : 0,
-            response        => $todo_hit->{response} // '',
-            model           => $todo_hit->{model} // '(todo-create)',
-            provider        => $todo_hit->{provider} // 'ai2-todo',
-            needs_web_search=> 0,
-            error           => $todo_hit->{error},
-            todo_action     => $todo_hit->{todo_action},
-            conversation_id => $conversation_id,
-            thinking        => [],
-        }));
-        return;
+    # AI Editor agents (programming/coding/code/documentation) must not short-
+    # circuit into TodoCreate — plan/analyze prompts often say "create todos".
+    my $editor_todo_skip = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation)$/);
+    my $todo_hit;
+    if (!$editor_todo_skip) {
+        $todo_hit = eval {
+            require Comserv::Model::AI2::TodoCreate;
+            my $brain = eval { $c->model('AI2::TodoCreate') };
+            $brain = Comserv::Model::AI2::TodoCreate->new if !$brain || !ref $brain;
+            $brain->try_chat_create($c,
+                prompt    => $prompt,
+                page_path => $page_path,
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'ai2_chat', "TodoCreate try_chat_create threw: $@");
+        }
+        if ($todo_hit && $todo_hit->{handled}) {
+            $c->res->body(encode_json({
+                success         => $todo_hit->{success} ? 1 : 0,
+                response        => $todo_hit->{response} // '',
+                model           => $todo_hit->{model} // '(todo-create)',
+                provider        => $todo_hit->{provider} // 'ai2-todo',
+                needs_web_search=> 0,
+                error           => $todo_hit->{error},
+                todo_action     => $todo_hit->{todo_action},
+                conversation_id => $conversation_id,
+                thinking        => [],
+            }));
+            return;
+        }
     }
 
     # Invoice-create intent: BEFORE the LLM. Draft only; never posts GL.
@@ -967,7 +978,7 @@ sub chat :Local :Args(0) {
     }
 
     # Code-read: "can you read the files" must not reach Hy3.
-    if (lc($agent_id) eq 'code' || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
+    if (lc($agent_id) =~ /^(?:code|coding|programming)$/ || ($prompt =~ /\b(read|files|source|codebase|filesystem)\b/i)) {
         my $read_hit = eval {
             require Comserv::Model::AI2::CodeRead;
             my $brain = eval { $c->model('AI2::CodeRead') };
@@ -1001,9 +1012,11 @@ sub chat :Local :Args(0) {
     # Delegates to Model::AI2::FocusTune (the SAME brain the /api/focus/top5
     # UI button uses) so the question is answerable from Chat-with-AI too.
     # Triggered by the 'focustune' agent_id OR a natural-language intent.
-    my $is_focus = (lc($agent_id) eq 'focustune')
+    # Programming/coding agents in AI Editor must not divert to FocusTune on plan/build words.
+    my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code)$/);
+    my $is_focus = (!$editor_prog) && ((lc($agent_id) eq 'focustune')
         || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
-            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i);
+            && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i));
     if ($is_focus) {
         my $tune = $c->model('AI2::FocusTune');
         my $now_epoch = time();

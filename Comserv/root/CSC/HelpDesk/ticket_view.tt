@@ -271,6 +271,20 @@
                 [% END %]
             </div>
 
+            <!-- Change priority -->
+            <div class="ticket-priority-edit" style="margin-top:8px; padding-top:6px; border-top:1px solid #eee; font-size:0.9em;">
+                <form method="post" action="[% c.uri_for('/HelpDesk/ticket/update_priority/' _ ticket.ticket_number) %]" style="display:inline-block;">
+                    <label for="new_priority" style="margin-right:4px;">Priority:</label>
+                    <select name="new_priority" id="new_priority" style="padding:2px 4px;">
+                        [% SET cur_p = ticket.priority || 'medium' %]
+                        [% FOREACH p IN ['low','medium','high','critical'] %]
+                          <option value="[% p %]"[% IF cur_p == p %] selected[% END %]>[% p %]</option>
+                        [% END %]
+                    </select>
+                    <button type="submit" class="btn btn-secondary" style="padding:2px 8px; font-size:0.85em;">Update</button>
+                </form>
+            </div>
+
 </div>
 
 

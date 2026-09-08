@@ -240,8 +240,23 @@
             <div id="chat-messages" class="chat-messages" style="flex:1; padding:8px; overflow:auto; font-size:0.9em;">
                 <div><strong>AI:</strong> How can I help with this file?</div>
             </div>
+            <div class="chat-agent-phase" style="padding:4px 6px; border-top:1px solid #555; display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11px; color:#bbb;">
+                <label for="ai-editor-agent" style="margin:0;">Agent</label>
+                <select id="ai-editor-agent" title="Programming edits code; Documentation focuses on docs/plans" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:130px;">
+                    <option value="programming" selected>💻 Programming</option>
+                    <option value="documentation">📚 Documentation</option>
+                </select>
+                <label for="ai-editor-phase" style="margin:0;">Phase</label>
+                <select id="ai-editor-phase" title="analyze → plan → Verify → implement" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:110px;">
+                    <option value="analyze" selected>A Analyze</option>
+                    <option value="plan">B Plan</option>
+                    <option value="implement">C Implement</option>
+                </select>
+                <button id="ai-editor-verify" type="button" title="Approve plan and move to implement" style="background:#2e7d32;color:white;border:none;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 8px;">Verify</button>
+                <span id="ai-editor-phase-badge" style="opacity:0.85;">Phase: analyze</span>
+            </div>
             <div class="chat-input" style="padding:6px; border-top:1px solid #555; display:flex; gap:6px;">
-                <input id="ai-chat-input" type="text" style="flex:1" placeholder="Ask about this file, or name another lib/… path to read">
+                <input id="ai-chat-input" type="text" style="flex:1" placeholder="Ask about this file (analyze→plan→Verify→code)">
                 <button id="ai-chat-send" type="button" style="background:#0e639c;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">Send</button>
             </div>
         </div>

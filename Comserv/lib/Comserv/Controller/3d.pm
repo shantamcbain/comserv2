@@ -1154,6 +1154,7 @@ sub my_orders :Path('/3d/my_orders') :Args(0) {
 
 sub queue :Path('/3d/queue') :Args(0) {
     my ($self, $c) = @_;
+    $c->stash( manufacturing_traveler_link => $c->uri_for('/Accounting/manufacturing') );
     $self->_require_module($c);
     $self->_require_admin($c);
 
@@ -1190,20 +1191,54 @@ sub queue :Path('/3d/queue') :Args(0) {
 
             } elsif ($action eq 'complete') {
                 my $printer    = $job->printer;
+
+                # ---- Auto-fetch print time from printer LAN (if linked) ----
+                my $lan_host = '';
+                if ($printer && (my $pn = $printer->notes // '')) {
+                    $lan_host = $1 if $pn =~ /\[LAN_HOST:([0-9.]+)\]/;
+                }
+                my $lan_print_time_min;
+                if ($lan_host) {
+                    require Comserv::Util::Printing3d::Adapter::Anycubic;
+                    my $adapter = Comserv::Util::Printing3d::Adapter::Anycubic->new;
+                    my $st = eval { $adapter->fetch_state($c, $lan_host, 18910) };
+                    if ($st && $st->{ok} && defined $st->{print_time_min}
+                        && $st->{print_time_min} !~ /^\s*$/) {
+                        $lan_print_time_min = 0 + $st->{print_time_min};
+                    }
+                }
+
                 my $grams_used = $c->req->params->{filament_grams} || undef;
                 $grams_used = undef if defined $grams_used && $grams_used !~ /^\d+\.?\d*$/;
 
                 my $print_hours;
-                my $ph_h = $c->req->params->{print_hours_h};
-                my $ph_m = $c->req->params->{print_hours_m};
-                if (defined $ph_h || defined $ph_m) {
-                    $ph_h = 0 + ($ph_h || 0);
-                    $ph_m = 0 + ($ph_m || 0);
-                    my $total = $ph_h + $ph_m / 60;
-                    $print_hours = $total > 0 ? $total : undef;
-                } else {
-                    $print_hours = $c->req->params->{print_hours} || undef;
-                    $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                # If LAN time is available, use it (printer's own elapsed is ground truth).
+                if (defined $lan_print_time_min && $lan_print_time_min > 0) {
+                    $print_hours = $lan_print_time_min / 60;
+                }
+                # Fall back to manual only when no LAN time.
+                if (!defined $print_hours || $print_hours <= 0) {
+                    my $ph_h = $c->req->params->{print_hours_h};
+                    my $ph_m = $c->req->params->{print_hours_m};
+                    if (defined $ph_h || defined $ph_m) {
+                        $ph_h = 0 + ($ph_h || 0);
+                        $ph_m = 0 + ($ph_m || 0);
+                        my $total = $ph_h + $ph_m / 60;
+                        $print_hours = $total > 0 ? $total : undef;
+                    } else {
+                        $print_hours = $c->req->params->{print_hours} || undef;
+                        $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                    }
+                }
+
+                # ---- Auto-fill filament grams from model STL weight if not manually entered ----
+                if (!$grams_used) {
+                    my $model = eval { $job->model };
+                    if ($model && $model->stl_weight_g && $model->stl_weight_g > 0) {
+                        $grams_used = $model->stl_weight_g;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queue',
+                            "complete job=$job_id auto-fill grams from model stl_weight_g=$grams_used");
+                    }
                 }
 
                 # ---- Cost calculation ----
