@@ -511,6 +511,10 @@
         const picked = (window.ComservChat && ComservChat.modelSelect)
             ? ComservChat.modelSelect.getSelectedValue()
             : '';
+        // Analyze worker stays on the cheap analyze model unless user overrides.
+        if (currentEditorAgentId() === 'analyze') {
+            return picked || ANALYZE_MODEL;
+        }
         if (phase === 'implement') {
             return picked || IMPLEMENT_MODEL;
         }
@@ -526,7 +530,9 @@
             'B) plan — short plan for user verify; MAY include docs/planning/todo updates before code; end by asking for "approve plan".',
             'C) implement — code suggestion only after plan approval (or explicit implement request).'
         ];
-        if (agentId === 'documentation') {
+        if (agentId === 'analyze') {
+            lines.push('You are the Analyze worker: read open buffers and named paths; explain root cause and a short plan only. Never emit ## FIX, never rewrite files, never ask to paste files already loaded via /ai2/load_file.');
+        } else if (agentId === 'documentation') {
             lines.push('You are in documentation mode: prefer docs/changelog/planning guidance; do not emit code file rewrites unless asked.');
         } else {
             lines.push('You are in programming mode: do NOT divert to FocusTune todo ranking; stay on code/docs/plan for this file.');
@@ -564,7 +570,25 @@
 
     function maybeAdvancePhaseFromUser(prompt) {
         const p = String(prompt || '').toLowerCase();
-        if (/\bapprove\s+plan\b|\bplan\s+approved\b|\bverify(ied)?\b|\bgo\s+ahead\b|\bimplement\b|\bwrite\s+the\s+code\b/.test(p)) {
+        // Analyze worker never auto-advances to implement from chat text.
+        if (currentEditorAgentId() === 'analyze') {
+            if (/\b(make\s+a\s+)?plan\b|\bpropose\b/.test(p) && currentEditorPhase() === 'analyze') {
+                setEditorPhase('plan');
+            }
+            return;
+        }
+        // Waiting/negative wording must not advance (e.g. "wait for Verify before implementing").
+        const waitingOrNegative = /\b(wait\s+for|do\s+not|don't|dont|never|before)\b/.test(p)
+            && /\b(verify|implement)/.test(p);
+        if (!waitingOrNegative && (
+            /\bapprove\s+plan\b/.test(p)
+            || /\bplan\s+approved\b/.test(p)
+            || /\bverified\b/.test(p)
+            || /\bgo\s+ahead\b/.test(p)
+            || /\bwrite\s+the\s+code\b/.test(p)
+            || /\bplease\s+implement\b/.test(p)
+            || /\bimplement\s+now\b/.test(p)
+        )) {
             _planApproved = true;
             setEditorPhase('implement');
             return;
@@ -657,7 +681,9 @@
               // Prefix the reply with the model actually used, for transparency.
               recordMessage('AI', '<span style="color:#7fb7ff;font-size:0.85em;">[' + escapeHtml(usedModel) + ']</span> ' + escapeHtml(display).replace(/\n/g, '<br>'));
 
-              if (data.todo_action && window.ComservChat && ComservChat.featureTodo
+              // Belt-and-suspenders: programming/docs agents must not create todos from chat.
+              const skipTodoCreate = /^(programming|coding|code|documentation|analyze)$/i.test(agentId);
+              if (!skipTodoCreate && data.todo_action && window.ComservChat && ComservChat.featureTodo
                   && typeof ComservChat.featureTodo.handleServerResult === 'function') {
                   ComservChat.featureTodo.handleServerResult(data.todo_action, {
                       host: document.getElementById('chat-messages'),
@@ -665,9 +691,6 @@
                       pagePath: currentFilePath() || window.location.pathname
                   });
               }
-
-              // Belt-and-suspenders: programming/docs agents must not create todos from chat actions.
-              const skipTodoCreate = /^(programming|coding|code|documentation)$/i.test(agentId);
               if (!skipTodoCreate && extracted.actions && extracted.actions.length && window.ComservChat.featureTodo.handleAction) {
                   extracted.actions.forEach(function (a) {
                       if (a.action === 'create_todo' || a.action === 'create_project') {
@@ -682,6 +705,7 @@
 
               const block = (data.provider === 'ai2-coderead') ? null : extractCodeBlock(display);
               const allowSuggest = (currentEditorAgentId() !== 'documentation')
+                  && (currentEditorAgentId() !== 'analyze')
                   && (currentEditorPhase() === 'implement' || _planApproved
                       || /\b(implement|apply|write code|fix now)\b/i.test(prompt));
               if (block && allowSuggest) {
@@ -908,7 +932,7 @@
             agentSel._wired = true;
             agentSel.addEventListener('change', function () {
                 _planApproved = false;
-                setEditorPhase(agentSel.value === 'documentation' ? 'analyze' : currentEditorPhase());
+                setEditorPhase((agentSel.value === 'documentation' || agentSel.value === 'analyze') ? 'analyze' : currentEditorPhase());
                 recordMessage('AI', '<em>Switched agent to ' + escapeHtml(agentSel.value) + '. Flow: analyze → plan → Verify → implement.</em>');
             });
         }
