@@ -165,6 +165,15 @@ sub _sanitize_provider_error {
     my ($code, $body) = @_;
     $body //= '';
     $body =~ s/\s+/ /g;
+    # x.AI answers 403 for BOTH "credential rejected" and "subscription/credit
+    # limit reached". Collapsing both into "login expired" sent humans to
+    # re-auth a perfectly valid token AND hid the real cause from Router's
+    # _credits_exhausted, so the free-model fallback never engaged and the turn
+    # just dead-ended (todo #2374).
+    if ($body =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+        && $body !~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) {
+        return 'SuperGrok/xAI quota or spending limit reached — add credits or wait for the reset; falling back to a free model';
+    }
     if ($code == 401 || $code == 403
         || $body =~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) {
         return 'SuperGrok/xAI login expired or invalid — re-auth (hermes auth add xai-oauth) then run script/sync_supergrok_token.pl';
@@ -385,8 +394,16 @@ sub chat {
         my $code = $res ? $res->code : 599;
         my $raw  = $res ? ($res->decoded_content // '') : 'no response';
         my $safe = _sanitize_provider_error($code, substr($raw, 0, 300));
-        my $auth_fail = ($code == 401 || $code == 403
-            || $raw =~ /unauthenticated|bad-credentials|invalid.?token/i) ? 1 : 0;
+        # A 403 is NOT automatically an auth failure: x.AI also returns 403 for
+        # a spent subscription ("personal-team-blocked:spending-limit"). Flagging
+        # that as auth_failed made callers (Git.pm suggest_commit_message) tell
+        # the user to re-auth when the real fix is credits/fallback
+        # (todo #2374 / #2375).
+        my $is_quota = ($raw =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+            && $raw !~ /unauthenticated|bad-credentials|invalid.?token|token could not be validated/i) ? 1 : 0;
+        my $auth_fail = (!$is_quota
+            && ($code == 401 || $code == 403
+                || $raw =~ /unauthenticated|bad-credentials|invalid.?token/i)) ? 1 : 0;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             'grok_chat',
             "x.AI chat HTTP $code source=" . ($self->{_last_cred_source} || '?')
