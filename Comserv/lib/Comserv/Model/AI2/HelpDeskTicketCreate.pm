@@ -50,6 +50,16 @@ sub _is_guest {
     return 0;
 }
 
+# Pull a contact email from the prompt when present (guests need one for follow-up).
+sub _extract_email {
+    my ($self, $text) = @_;
+    return '' unless defined $text && $text =~ /\S/;
+    if ($text =~ /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i) {
+        return $1;
+    }
+    return '';
+}
+
 sub _schema {
     my ($self, $c) = @_;
     return eval { $c->model('DBEncy')->schema };
@@ -96,26 +106,40 @@ sub detect_create_intent {
         $priority = 'high';
     }
 
+    my $email = $self->_extract_email($prompt);
     return {
         subject     => $subject,
         description => $prompt,
         category    => $category,
         priority    => $priority,
+        (length $email ? (email => $email) : ()),
     };
 }
 
 sub try_chat_create {
     my ($self, $c, %args) = @_;
     my $intent = $self->detect_create_intent($args{prompt} // '') or return;
+    # Guests may create tickets (public HelpDesk parity). Prefer email from
+    # prompt/session; otherwise ask once — never a hard login wall.
     if ($self->_is_guest($c)) {
-        return {
-            handled       => 1,
-            success       => 1,
-            response      => 'Log in to create a HelpDesk ticket from chat.',
-            model         => '(helpdesk-ticket-create)',
-            provider      => 'ai2-helpdesk',
-            ticket_action => { success => JSON::false, error => 'Login required' },
-        };
+        my $email = $intent->{email} || $c->session->{email} || '';
+        unless ($email =~ /\S+@\S+\.\S+/) {
+            return {
+                handled       => 1,
+                success       => 1,
+                response      => 'I can create that HelpDesk ticket as a guest. What email should we use for updates on this ticket?',
+                model         => '(helpdesk-ticket-create)',
+                provider      => 'ai2-helpdesk',
+                ticket_action => {
+                    success      => JSON::false,
+                    need_clarify => JSON::true,
+                    field        => 'email',
+                    draft        => $intent,
+                    error        => 'Email required for guest ticket',
+                },
+            };
+        }
+        $intent->{email} = $email;
     }
     $intent->{page_url} = $args{page_path} if $args{page_path};
     my $created = eval { $self->create_from_params($c, $intent) };
@@ -142,7 +166,6 @@ sub try_chat_create {
 
 sub chat_contract {
     my ($self, $c) = @_;
-    return '' if $self->_is_guest($c);
     my $sitename = $self->sitename($c);
     return <<"END";
 HELPDESK SUPPORT TICKETS (SiteName=$sitename):
@@ -184,9 +207,24 @@ sub create_from_params {
     my $category  = $params->{category}  || 'General';
     my $priority  = $params->{priority}  || 'normal';
     my $email     = $params->{email}     || $c->session->{email} || '';
+    $email = $self->_extract_email($email) if $email;
     my $site_name = $self->sitename($c);
     my $user_id   = $c->session->{user_id} || undef;
-    my $username  = $c->session->{username} || 'ai';
+    my $username  = $c->session->{username} || '';
+    if (!$username || lc($username) eq 'guest') {
+        $username = 'guest';
+        $user_id  = undef;
+        unless ($email =~ /\S+@\S+\.\S+/) {
+            return {
+                success      => JSON::false,
+                need_clarify => JSON::true,
+                field        => 'email',
+                draft        => $params,
+                message      => 'I can create that HelpDesk ticket as a guest. What email should we use for updates on this ticket?',
+            };
+        }
+    }
+    $username = 'ai' if !$username;
 
     require Comserv::Controller::HelpDesk;
     if (Comserv::Controller::HelpDesk->_looks_like_spam_content($subject, $description)) {
