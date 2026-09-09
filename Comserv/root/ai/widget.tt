@@ -449,15 +449,16 @@
     // Pick the smallest Ollama model that can reliably return JSON (~3b+)
     function ffAutoModel(fieldCount, useSearch) {
         if (useSearch && !FF_ALL_MODELS.ollama.length) {
-            // No local Ollama models — fall back to Grok for search
+            // No local Ollama models — fall back to Grok for search.
+            // Never invent a model tag: one that is not installed 404s at Ollama.
             var grokModel = FF_ALL_MODELS.grok[0];
             return grokModel ? { model: grokModel, provider: 'grok' }
-                             : { model: 'gemma3:4b', provider: 'ollama' };
+                             : { model: '', provider: '' };
         }
         if (!FF_ALL_MODELS.ollama.length) {
             var grokModel = FF_ALL_MODELS.grok[0];
             return grokModel ? { model: grokModel, provider: 'grok' }
-                             : { model: 'gemma3:4b', provider: 'ollama' };
+                             : { model: '', provider: '' };
         }
         // Sort ollama models by size score
         var ranked = FF_ALL_MODELS.ollama.slice().sort(function(a,b){ return ffModelScore(a)-ffModelScore(b); });
@@ -494,7 +495,7 @@
                             });
                     }
                 });
-                if (opts.length <= 1) opts.push({ val:'mistral:latest|ollama', label:'mistral:latest (Ollama)' });
+                if (opts.length <= 1) opts.push({ val:'', label:'⚠ No models available — check AI provider config' });
                 sel.innerHTML = '';
                 // Restore previously saved model selection
                 var saved = localStorage.getItem('ai_widget_ff_model');
@@ -517,9 +518,7 @@
                 });
             })
             .catch(function() {
-                sel.innerHTML = '<option value="auto|auto">⚡ Auto (recommended)</option>'
-                              + '<option value="gemma3:4b|ollama">gemma3:4b (Ollama)</option>'
-                              + '<option value="qwen2.5:7b|ollama">qwen2.5:7b (Ollama)</option>';
+                sel.innerHTML = '<option value="">⚠ Could not load models — retry the page</option>';
             });
     }
 
