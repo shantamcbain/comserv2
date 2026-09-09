@@ -242,7 +242,8 @@
             </div>
             <div class="chat-agent-phase" style="padding:4px 6px; border-top:1px solid #555; display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11px; color:#bbb;">
                 <label for="ai-editor-agent" style="margin:0;">Agent</label>
-                <select id="ai-editor-agent" title="Programming edits code; Documentation focuses on docs/plans" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:130px;">
+                <select id="ai-editor-agent" title="Analyze = cheap root-cause worker; Programming edits code; Documentation focuses on docs/plans" style="background:#222;color:#ddd;border:1px solid #555;border-radius:3px;padding:1px 4px;max-width:140px;">
+                    <option value="analyze">🔍 Analyze</option>
                     <option value="programming" selected>💻 Programming</option>
                     <option value="documentation">📚 Documentation</option>
                 </select>

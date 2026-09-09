@@ -274,6 +274,15 @@ sub detect_create_intent {
     # Negations: "does not create todos", "don't create", "without creating", etc.
     return if $p =~ /\b(?:does\s+not|doesn'?t|do\s+not|don'?t|never|not|without)\s+(?:creating|create|adding|add|making|make|tracking|track)\b/i;
 
+    # HelpDesk ticket is the primary ask — do not steal into todo/project picker
+    # even when the ticket text mentions "todo"/"task" (3D-20260907-3180 / 6510).
+    # Yield only when the user clearly asked to create a todo/task instead.
+    require Comserv::Model::AI2::ChatIntent;
+    if (Comserv::Model::AI2::ChatIntent::looks_like_helpdesk_ticket_create($p)
+        && !Comserv::Model::AI2::ChatIntent::looks_like_todo_create($p)) {
+        return;
+    }
+
     # Drop overly broad "file" (matches file paths). Require clear create-todo
     # intent: (add|create|make|track) near todo/task, or classic "create a todo".
     my $todo_word = qr/(?:todos?|tasks?|to-dos?|to\s+dos?)/i;
