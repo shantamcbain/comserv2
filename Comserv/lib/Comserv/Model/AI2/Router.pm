@@ -290,6 +290,10 @@ sub _credits_exhausted {
     # not known) — fall through rather than surfacing a dead provider.
     return 1 if $error =~ /can'?t connect|connection (refused|reset|timed? ?out)|name or service not known|temporary failure in name resolution|\b500 can't connect|\btimed? ?out\b/i;
     return 1 if $error =~ /402\b|payment.?required|insufficient credit|out of credit|credit.?balance|can only afford|prepaid credit|usage limit|quota|weekly usage|limit_remaining|no auto-fill/i;
+    # x.AI returns 403 (not 402) for a spent SuperGrok subscription/quota —
+    # "personal-team-blocked:spending-limit". Router must read that as "this
+    # hop is down" and fall through, not dead-end (todo #2374).
+    return 1 if $error =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i;
     return 1 if $self->_transient_outage($error);
     return 0;
 }

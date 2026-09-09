@@ -602,7 +602,12 @@ PROMPT
         my $err = ($resp && $resp->{error}) ? $resp->{error} : 'AI returned no message';
         # UI surfaces this verbatim — never dump full OAuth JSON / JWT bodies.
         $err =~ s/\s+/ /g;
-        if ($err =~ /unauthenticated|bad-credentials|token could not be validated/i
+        if ($err =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i
+            && $err !~ /unauthenticated|bad-credentials|token could not be validated/i) {
+            # Not a credential problem — re-auth would be a waste of time.
+            $err = 'SuperGrok/xAI quota or spending limit reached — add credits or wait for the reset; another model was tried automatically';
+        }
+        elsif ($err =~ /unauthenticated|bad-credentials|token could not be validated/i
             || ($resp && $resp->{auth_failed})) {
             $err = 'SuperGrok/xAI login expired or invalid — re-auth Hermes (xai-oauth), then run script/sync_supergrok_token.pl';
         }
