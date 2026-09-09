@@ -912,14 +912,44 @@ sub chat :Local :Args(0) {
         return;
     }
 
-    # ── Create-todo intent: do this BEFORE the LLM. Free/small models invent
-    # a fake "Add" box instead of emitting [ACTION: create_todo]. One brain:
-    # Model::AI2::TodoCreate (same as /ai2/action and the 📝 button).
-    # Use ->new not $c->model: a newly added Model::* is not in Catalyst's
-    # component registry until the next process start (we must not restart).
-    # AI Editor agents (programming/coding/code/documentation) must not short-
-    # circuit into TodoCreate — plan/analyze prompts often say "create todos".
-    my $editor_todo_skip = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation)$/);
+    # ── Create-HelpDesk-ticket intent BEFORE todo / LLM.
+    # Ticket prompts that mention "todo" (bug subjects) must not fall into
+    # TodoCreate's project picker (3D-20260907-3180 / 6510). Use ->new: a newly
+    # added Model::* is not in Catalyst's registry until process start.
+    my $hd_hit = eval {
+        require Comserv::Model::AI2::HelpDeskTicketCreate;
+        my $hbrain = eval { $c->model('AI2::HelpDeskTicketCreate') };
+        $hbrain = Comserv::Model::AI2::HelpDeskTicketCreate->new if !$hbrain || !ref $hbrain;
+        $hbrain->try_chat_create($c,
+            prompt    => $prompt,
+            page_path => $page_path,
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'ai2_chat', "HelpDeskTicketCreate try_chat_create threw: $@");
+    }
+    if ($hd_hit && $hd_hit->{handled}) {
+        $c->res->body(encode_json({
+            success         => $hd_hit->{success} ? 1 : 0,
+            response        => $hd_hit->{response} // '',
+            model           => $hd_hit->{model} // '(helpdesk-ticket-create)',
+            provider        => $hd_hit->{provider} // 'ai2-helpdesk',
+            needs_web_search=> 0,
+            error           => $hd_hit->{error},
+            ticket_action   => $hd_hit->{ticket_action},
+            conversation_id => $conversation_id,
+            thinking        => [],
+        }));
+        return;
+    }
+
+    # ── Create-todo intent: AFTER ticket, BEFORE the LLM. Free/small models
+    # invent a fake "Add" box instead of emitting [ACTION: create_todo].
+    # AI Editor agents must not short-circuit into TodoCreate — plan/analyze
+    # prompts often say "create todos".
+    require Comserv::Model::AI2::ChatIntent;
+    my $editor_todo_skip = Comserv::Model::AI2::ChatIntent::is_editor_agent($agent_id);
     my $todo_hit;
     if (!$editor_todo_skip) {
         $todo_hit = eval {
@@ -1013,7 +1043,7 @@ sub chat :Local :Args(0) {
     # UI button uses) so the question is answerable from Chat-with-AI too.
     # Triggered by the 'focustune' agent_id OR a natural-language intent.
     # Programming/coding agents in AI Editor must not divert to FocusTune on plan/build words.
-    my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code)$/);
+    my $editor_prog = (lc($agent_id // '') =~ /^(?:programming|coding|code|documentation|analyze)$/);
     my $is_focus = (!$editor_prog) && ((lc($agent_id) eq 'focustune')
         || ($prompt =~ /\b(top\s*5|top five|most important|should i (do|work on|tackle)|what (todo|todos) (should|to) i|priorit)/i
             && $prompt =~ /\b(todo|todos|task|tasks|plan|next step|next steps|build)\b/i));

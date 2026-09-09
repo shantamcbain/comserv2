@@ -66,4 +66,20 @@ ok(!$m->subject_needs_clarify('wire the hive graph'), 'real subject is enough');
     is($d3, 'body', 'short path leaves description alone');
 }
 
+
+# 3D-20260907-3180 / 6510 — HelpDesk ticket prompts that mention "todo" must
+# not be stolen into TodoCreate (which asks "which 3d project").
+ok(!$m->detect_create_intent(
+    'Create a HelpDesk ticket: Chat-with-AI todo-create asked which 3d project'),
+    'ticket prompt mentioning todo-create is not a todo intent');
+ok(!$m->detect_create_intent(
+    'create a support ticket about the todo create flow failing'),
+    'support-ticket about todo flow is not a todo intent');
+ok(!$m->detect_create_intent('file a ticket: AI Editor create-todo hijack'),
+    'file-a-ticket mentioning create-todo is not a todo intent');
+ok($m->detect_create_intent('add a todo to fix helpdesk ticket create'),
+    'explicit create-todo about tickets still matches');
+ok($m->detect_create_intent('create a todo for the helpdesk ticket create bug'),
+    'explicit create-todo for ticket bug still matches');
+
 done_testing();
