@@ -924,6 +924,9 @@ sub model_download :Path('/3d/model_download') :Args(1) {
     $c->response->content_type($mime);
     $c->response->header('Content-Disposition' => "attachment; filename=\"$dl_name\"");
     $c->response->header('Content-Length' => -s $path);
+    $c->response->header('Cache-Control' => 'no-cache, no-store, must-revalidate');
+    $c->response->header('Pragma' => 'no-cache');
+    $c->response->header('Expires' => '0');
     local $/ = undef;
     $c->response->body(<$fh>);
     close $fh;
@@ -1722,7 +1725,18 @@ sub printers :Path('/3d/printers') :Args(0) {
                 my $printer = $schema->resultset('Printing3dPrinter')->find(
                     $c->req->params->{printer_id}
                 );
-                $printer->delete if $printer && $printer->status eq 'idle';
+                if ($printer) {
+                    # Unassign any jobs still referencing this printer
+                    my @jobs = $schema->resultset('Printing3dJob')->search(
+                        { printer_id => $printer->id, status => ['assigned', 'printing'] }
+                    )->all;
+                    for my $j (@jobs) {
+                        $j->update({ printer_id => undef, status => 'queued' });
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'printers',
+                            "Unassigned job #$j->id from printer #$printer->id ($printer->name) before delete");
+                    }
+                    $printer->delete;
+                }
             } elsif ($action eq 'pause_lan' || $action eq 'resume_lan') {
                 my $printer = $schema->resultset('Printing3dPrinter')->find(
                     $c->req->params->{printer_id}
@@ -2172,6 +2186,108 @@ sub model_stl_info :Path('/3d/model_stl_info') :Args(1) {
         weight_petg_g => sprintf('%.2f', $w_petg),
         weight_abs_g  => sprintf('%.2f', $w_abs),
     }));
+    $c->detach;
+}
+
+# ============================================================
+# Upload replacement STL for an existing model (overwrites the file on NFS)
+# POST /3d/model_upload/{model_id}  multipart: stl_file
+# ============================================================
+
+sub model_upload :Path('/3d/model_upload') :Args(1) {
+    my ($self, $c, $id) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $model = eval { $schema->resultset('Printing3dModel')->find({ id => $id, sitename => $sitename }) };
+    unless ($model) {
+        $c->flash->{error_msg} = 'Model not found.';
+        $c->res->redirect($c->uri_for('/3d/models'));
+        $c->detach;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'POST required.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $upload = $c->req->upload('stl_file');
+    unless ($upload) {
+        $c->flash->{error_msg} = 'No file provided.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my ($orig_name) = ($upload->filename =~ /([^\/\\]+)$/);
+    my ($ext) = ($orig_name =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+
+    my ($file_row, $upload_err) =
+        $c->model('File')->upload_and_record($c, $upload, 'path:/data/nfs/3d/models');
+    if ($upload_err) {
+        $c->flash->{error_msg} = "Upload failed: $upload_err";
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    my $nfs_stored = $file_row->nfs_path || $file_row->file_path || '';
+
+    # Resolve the path via NfsPath so we find it on any runtime (Docker/workstation)
+    my $resolved_path = '';
+    if ($nfs_stored) {
+        eval { $resolved_path = Comserv::Util::NfsPath->new->resolve_path($nfs_stored) };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'model_upload',
+            "model=$id stored=$nfs_stored resolved=$resolved_path size=" . ($upload->size // '?') . " orig=$orig_name");
+    }
+
+    my ($vol_cm3, $weight_g);
+    if ($ext eq 'stl' && $resolved_path && -r $resolved_path) {
+        my $file_size_kb = -s $resolved_path;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'model_upload',
+            "file on disk: $resolved_path size=${file_size_kb}b") if defined $file_size_kb && $file_size_kb > 0;
+
+        my $stl_info = $self->_parse_stl($resolved_path);
+        if ($stl_info) {
+            my $v = $stl_info->{volume_cm3};
+            if (defined $v && $v == $v && $v > 0) {
+                $vol_cm3  = $v;
+                $weight_g = sprintf('%.3f', $v * 1.24);
+            }
+        }
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'model_upload',
+            "File not visible at resolved path after upload — stl=$nfs_stored resolved=$resolved_path");
+        $c->flash->{error_msg} = 'Upload landed but the file is not visible on the server filesystem. Try again or check NFS mount.';
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    eval {
+        $model->update({
+            file_id          => $file_row->id,
+            nfs_path         => $nfs_stored,
+            file_type        => $ext || 'unknown',
+            stl_volume_cm3   => $vol_cm3  // undef,
+            stl_weight_g     => $weight_g // undef,
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Could not update model record: $@";
+    } else {
+        my $msg = "STL replaced for '$model->name' — uploaded $orig_name";
+        if ($vol_cm3) {
+            $msg .= " (${vol_cm3} cm³ → ~${weight_g} g PLA)";
+        }
+        $c->flash->{success_msg} = $msg;
+    }
+
+    # Redirect back to where they came from (queue page most likely)
+    my $ref = $c->req->referer || $c->uri_for('/3d/queue');
+    $c->res->redirect($ref);
     $c->detach;
 }
 
