@@ -175,7 +175,14 @@
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="printer_id" value="[% p.id %]">
                     <button type="submit" class="btn-sm btn-delete"
-                        onclick="return confirm('Remove [% p.name | html %]?')">Remove</button>
+                        onclick="return confirm('Remove [% p.name | html %]? This will unassign any active jobs.')">Remove</button>
+                </form>
+                [% ELSE %]
+                <form method="post" action="/3d/printers" style="display:inline;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="printer_id" value="[% p.id %]">
+                    <button type="submit" class="btn-sm btn-delete"
+                        onclick="return confirm('Remove [% p.name | html %]? Any jobs assigned to it will go back to queued.')">Remove</button>
                 </form>
                 [% END %]
             </td>
