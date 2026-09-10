@@ -509,48 +509,53 @@ sub _parts_from_leaves {
         # green = in pick box, blue = printed ready to pick,
         # red = already in print queue, purple = need print but NOT queued yet
         my ($row_state, $status_display, $status);
-        # Priority order for traveler display:
-        # 1. need_print (purple) — shortfall, nothing queued yet
-        # 2. in_queue (red) — already on print farm queue
-        # 3. in_box (green) — in pick box / in stock
-        if ($is_print && $short > 0 && $in_queue <= 0) {
-            $row_state       = 'need_print';       # purple — shortfall, nothing queued
-            $status          = 'pending';
-            $status_display  = 'Need print (not queued)';
-        } elsif ($is_print && $in_queue > 0 && $short == 0) {
-            # Extra queue while stock already covered
-            $row_state       = 'in_queue';         # red — already on farm queue
-            $status          = 'pending';
-            $status_display  = "In print queue ($in_queue)";
-        } elsif ($is_print && $short > 0 && $in_queue > 0) {
-            $row_state       = 'in_queue';         # red — already on farm queue
-            $status          = 'pending';
-            $status_display  = "In print queue ($in_queue)";
-        } elsif ($qty > 0 && $on_hand >= $qty) {
-            $row_state       = 'in_box';          # green
-            $status          = 'in_stock';
-            $status_display  = 'In pick box';
-        } elsif ($from_queue >= $qty && $qty > 0 && $on_hand < $qty) {
-            $row_state       = 'printed_ready';   # blue
-            $status          = 'printed';
-            $status_display  = 'Printed — ready to pick into box';
-        } elsif ($from_queue > $on_hand && $short == 0) {
-            $row_state       = 'printed_ready';
-            $status          = 'printed';
-            $status_display  = 'Printed — ready to pick into box';
-        } elsif (!$is_print && $short > 0) {
-            $row_state       = 'need_buy';         # amber
-            $status          = 'pending';
-            $status_display  = 'Need purchase';
-        } elsif ($on_hand > 0) {
-            $row_state       = 'in_box';
-            $status          = 'in_stock';
-            $status_display  = 'In pick box / partial stock';
-        } else {
-            $row_state       = 'in_box';
-            $status          = 'in_stock';
-            $status_display  = 'OK';
-        }
+                # Priority order for traveler display (user requested):
+                # 1. need_buy (amber) — items to be ordered
+                # 2. need_print (purple) — items to add to queue / need to print
+                # 3. in_queue (red) — picked items / already in queue / need to be picked
+                # 4. printed_ready (blue) — printed items that needs picking
+                # 5. in_box (green) — items in the pick box / picked items — LAST group
+                if (!$is_print && $short > 0) {
+                    $row_state       = 'need_buy';         # amber — items to be ordered
+                    $status          = 'pending';
+                    $status_display  = 'Need purchase';
+                } elsif ($is_print && $short > 0 && $in_queue <= 0) {
+                    $row_state       = 'need_print';       # purple — items to add to queue
+                    $status          = 'pending';
+                    $status_display  = 'Need print (not queued)';
+                } elsif ($is_print && $in_queue > 0) {
+                    $row_state       = 'in_queue';         # red — picked items / already in queue
+                    $status          = 'pending';
+                    $status_display  = "In print queue ($in_queue)";
+                } elsif ($is_print && $qty > $on_hand && $on_hand < $qty && $from_queue >= 0) {
+                    $row_state       = 'printed_ready';   # blue — printed items that needs picking
+                    $status          = 'printed';
+                    $status_display  = 'Printed — needs picking';
+                } elsif ($qty > 0 && $on_hand >= $qty) {
+                    $row_state       = 'in_box';          # green — items in the pick box / picked items
+                    $status          = 'in_stock';
+                    $status_display  = 'In pick box';
+                } elsif ($from_queue >= $qty && $qty > 0 && $on_hand < $qty) {
+                    $row_state       = 'printed_ready';
+                    $status          = 'printed';
+                    $status_display  = 'Printed — ready to pick into box';
+                } elsif ($from_queue > $on_hand && $short == 0) {
+                    $row_state       = 'printed_ready';
+                    $status          = 'printed';
+                    $status_display  = 'Printed — ready to pick into box';
+                } elsif (!$is_print && $short > 0) {
+                    $row_state       = 'need_buy';
+                    $status          = 'pending';
+                    $status_display  = 'Need purchase';
+                } elsif ($on_hand > 0) {
+                    $row_state       = 'in_box';
+                    $status          = 'in_stock';
+                    $status_display  = 'In pick box / partial stock';
+                } else {
+                    $row_state       = 'in_box';
+                    $status          = 'in_stock';
+                    $status_display  = 'OK';
+                }
 
         if ($is_print && $model->{file_warn}) {
             $status_display = ($status_display ? "$status_display — " : '') . $model->{file_warn};
@@ -589,6 +594,8 @@ sub _parts_from_leaves {
 }
 
 # Receive completed-print lag into inventory so "In Stock" / pick box matches shop floor.
+# Accepts optional location_name: 'Print Farm Pick Box', 'Print Farm Stock', 'On Printer'
+# Defaults to 'Print Farm Pick Box' for backward compat.
 # Returns { ok, received, on_hand, error }
 #
 # Error audit (2026-09-03, item=84, site 3d): location_id NULL on INSERT to inventory_stock_levels.
@@ -596,9 +603,10 @@ sub _parts_from_leaves {
 # before any stock create. See changelog 2026-09-04-traveler-location-null.
 # Verified perl -c + code review 2026-09-05. CODER_READY (no re-plan needed for similar location issues).
 sub put_part_in_pick_box {
-    my ($self, $c, $item_id, $qty_hint) = @_;
+    my ($self, $c, $item_id, $qty_hint, $location_name) = @_;
     $item_id = 0 + ($item_id // 0);
     return { ok => 0, error => 'item_id required' } unless $item_id;
+    $location_name ||= 'Print Farm Pick Box';
 
     my $schema = eval { $c->model('DBEncy') };
     return { ok => 0, error => 'no schema' } unless $schema;
@@ -635,23 +643,24 @@ sub put_part_in_pick_box {
             };
 
             my $sitename = $self->_sitename($c);
+            # Look up or create the requested location
             my $loc = $schema->resultset('Accounting::InventoryLocation')->search(
-                { sitename => $sitename, status => 'active' },
+                { sitename => $sitename, name => $location_name, status => 'active' },
                 { order_by => 'id', rows => 1 },
             )->first;
             unless ($loc) {
                 $loc = $schema->resultset('Accounting::InventoryLocation')->search(
-                    { sitename => $sitename },
+                    { sitename => $sitename, name => $location_name },
                     { order_by => 'id', rows => 1 },
                 )->first;
             }
             unless ($loc) {
                 $loc = $schema->resultset('Accounting::InventoryLocation')->create({
                     sitename      => $sitename,
-                    name          => 'Print Farm Pick Box',
+                    name          => $location_name,
                     location_type => 'warehouse',
                     status        => 'active',
-                    notes         => 'Auto-created for traveler pick-box receives',
+                    notes         => 'Auto-created for traveler receives',
                     created_by    => $c->session->{username} || 'system',
                     created_at    => $now,
                     updated_at    => $now,
