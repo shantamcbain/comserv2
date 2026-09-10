@@ -329,22 +329,8 @@ sub auto :Private {
             $c->stash->{debug} = $c->session->{debug_mode};
         }
         
-        # Set up site name with timeout protection
-        eval {
-            local $SIG{ALRM} = sub { die "Site name fetch timeout\n"; };
-            alarm(3);  # 3 second timeout for site name fetch
-            $self->fetch_and_set($c, 'SiteName');
-            alarm(0);
-        };
-        alarm(0);  # Make sure alarm is cancelled
-        if ($@) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
-                "Site name fetch timed out or failed: $@. Using default site name.");
-            $c->stash->{SiteName} = 'default';
-        }
-        
-        # Set up theme using canonical ThemeConfig model with timeout protection
-        my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+        # Set up site name for theme resolution
+            my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
         # css_v is set once per server start at the top of auto() (ASSET_EPOCH);
         # do NOT reset it per-request or browsers cache stale JS/CSS.
@@ -708,6 +694,7 @@ sub auto :Private {
         eval {
             my $mod_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
             my %enabled;
+            my $hosting;
 
             # Site-wide module resolution (SiteModule + HostingAccount addons) is
             # identical for every visitor to a site and costs several DB round-trips,
@@ -778,7 +765,20 @@ sub auto :Private {
                 $enabled{accounting} = 1 unless exists $enabled{accounting};
             }
 
-            # Show Brew menu when site_modules or hosting lists the brew addon
+            # Check if the site actually has the brew addon enabled before enabling it
+            unless ($c->model('DBEncy')->resultset('SiteModule')->search({ sitename => $mod_site, module_name => 'brew', enabled => 1 })->count) {
+                # The site doesn't have brew addon enabled, so don't set the brew menu
+                $enabled{brew} = 0;
+            }
+
+            # If no SiteModule entry for this site yet, but hosting account has brew addon, then enable it
+            unless (exists $enabled{brew}) {
+                if ($hosting && $hosting->requested_addons && $hosting->requested_addons =~ /brew/i) {
+                    $enabled{'brew'} = 1;
+                }
+            }
+
+            # Show Brew menu only if brew addon is actually enabled for this site
             if ($enabled{brew}) {
                 $c->stash->{brew_addon_active} = 1;
             }

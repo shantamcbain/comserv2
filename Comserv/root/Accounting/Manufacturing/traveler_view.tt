@@ -4,75 +4,90 @@
     roles = 'admin,accounting,helpdesk'
     TemplateType = 'Application'
     category = 'Manufacturing'
-    page_version = '0.04 2026-09-03'
+    page_version = '0.05 2026-09-10'
 %]
-[% PageVersion = 'Accounting/Manufacturing/traveler_view.tt,v 0.04 2026/09/03 shanta Exp shanta ' %]
+[% PageVersion = 'Accounting/Manufacturing/traveler_view.tt,v 0.05 2026/09/10 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <style>
-.traveler-tablet .traveler-legend {
-  display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem;
-  margin: 0.75rem 0 1rem; font-size: 0.95rem;
-  color: var(--text-color, #222);
+.traveler-tablet .section-card {
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 8px;
+  margin-bottom: 1.2em;
+  overflow: hidden;
+  background: var(--bg-color, #fff);
 }
-.traveler-tablet .traveler-legend span {
-  display: inline-flex; align-items: center; gap: 0.4rem;
+.traveler-tablet .card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  padding: 0.7em 1em;
+  cursor: pointer;
+  user-select: none;
+  font-weight: bold;
+  font-size: 1em;
 }
-.traveler-tablet .traveler-legend i {
-  display: inline-block; width: 1.1rem; height: 1.1rem;
-  border-radius: 3px; border: 1px solid rgba(0,0,0,0.25);
+.traveler-tablet .card-header:hover {
+  filter: brightness(0.95);
 }
-.traveler-tablet .swatch-in-box { background: #c8e6c9; }
-.traveler-tablet .swatch-printed { background: #bbdefb; }
-.traveler-tablet .swatch-queue { background: #ffcdd2; }
-.traveler-tablet .swatch-need-print { background: #e1bee7; }
-.traveler-tablet .swatch-buy { background: #ffe0b2; }
-
-.traveler-tablet {
-  max-width: 100%;
-  overflow-x: auto;
+.traveler-tablet .card-header .arrow {
+  font-size: 0.75em;
+  transition: transform 0.2s;
 }
-.traveler-tablet table.traveler-table {
+.traveler-tablet .card-header .arrow.open {
+  transform: rotate(90deg);
+}
+.traveler-tablet .card-header .count {
+  margin-left: auto;
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-weight: normal;
+}
+.traveler-tablet .card-body {
+  border-top: 1px solid var(--border-color, #ccc);
+  padding: 0;
+  display: none;
+}
+.traveler-tablet .card-body.open {
+  display: block;
+}
+.traveler-tablet .card-body table {
   width: 100%;
-  min-width: 720px;
   border-collapse: collapse;
-  color: #111;
+  min-width: 720px;
 }
-.traveler-tablet table.traveler-table th {
+.traveler-tablet .card-body table th {
   background: #eceff1; color: #111;
   border-bottom: 2px solid #90a4ae;
   padding: 0.55rem 0.45rem; text-align: left;
+  font-size: 0.88em;
 }
-.traveler-tablet table.traveler-table td {
+.traveler-tablet .card-body table td {
   padding: 0.55rem 0.45rem;
   border-bottom: 1px solid rgba(0,0,0,0.12);
   vertical-align: middle;
+  font-size: 0.88em;
 }
-/* GREEN — in pick box */
-.traveler-tablet tr.row-in_box td {
-  background: #c8e6c9 !important;
-  color: #1b5e20 !important;
+.traveler-tablet .card-body table tr:last-child td {
+  border-bottom: none;
 }
-/* BLUE — printed, ready to pick into box */
-.traveler-tablet tr.row-printed_ready td {
-  background: #bbdefb !important;
-  color: #0d47a1 !important;
-}
-/* RED — already on the print queue */
-.traveler-tablet tr.row-in_queue td {
-  background: #ffcdd2 !important;
-  color: #b71c1c !important;
-}
-/* PURPLE — need print, NOT queued yet */
-.traveler-tablet tr.row-need_print td {
-  background: #e1bee7 !important;
-  color: #4a148c !important;
-}
-/* Amber — buy hardware */
-.traveler-tablet tr.row-need_buy td {
-  background: #ffe0b2 !important;
-  color: #e65100 !important;
-}
+/* GREEN - in pick box */
+.traveler-tablet .row-in_box td { background: #c8e6c9 !important; color: #1b5e20 !important; }
+/* BLUE - printed ready to pick */
+.traveler-tablet .row-printed_ready td { background: #bbdefb !important; color: #0d47a1 !important; }
+/* RED - in print queue */
+.traveler-tablet .row-in_queue td { background: #ffcdd2 !important; color: #b71c1c !important; }
+/* PURPLE - need print not queued */
+.traveler-tablet .row-need_print td { background: #e1bee7 !important; color: #4a148c !important; }
+/* AMBER - buy hardware */
+.traveler-tablet .row-need_buy td { background: #ffe0b2 !important; color: #e65100 !important; }
+
+.traveler-tablet .header-colors .c-in-box { background: #c8e6c9; color: #1b5e20; }
+.traveler-tablet .header-colors .c-printed { background: #bbdefb; color: #0d47a1; }
+.traveler-tablet .header-colors .c-queue { background: #ffcdd2; color: #b71c1c; }
+.traveler-tablet .header-colors .c-need-print { background: #e1bee7; color: #4a148c; }
+.traveler-tablet .header-colors .c-buy { background: #ffe0b2; color: #e65100; }
+
 .traveler-tablet .status-badge {
   display: inline-block; padding: 0.2rem 0.5rem;
   border-radius: 4px; font-weight: 600; font-size: 0.9em;
@@ -110,9 +125,24 @@
   color: #e65100;
   margin-left: 0.25rem;
 }
-.traveler-tablet .clean-cell {
-  white-space: nowrap;
+.traveler-tablet .clean-cell { white-space: nowrap; }
+.traveler-tablet .empty-section {
+  padding: 1.5em;
+  text-align: center;
+  color: var(--text-muted-color, #888);
+  font-style: italic;
 }
+.traveler-tablet .buy-link {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  background: #e65100;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-weight: bold;
+  text-decoration: none;
+}
+.traveler-tablet .buy-link:hover { background: #bf360c; }
 </style>
 
 <div class="traveler-tablet">
@@ -130,108 +160,183 @@
         <strong>Notes:</strong> [% traveler.notes | html %]
     </div>
 
-    <h2>Parts to Print / Manufacture</h2>
-    <div class="traveler-legend" aria-label="Color key">
-      <span><i class="swatch-in-box"></i> <strong>Green</strong> — in pick box</span>
-      <span><i class="swatch-printed"></i> <strong>Blue</strong> — printed, ready to pick from printer</span>
-      <span><i class="swatch-queue"></i> <strong>Red</strong> — already in print queue</span>
-      <span><i class="swatch-need-print"></i> <strong>Purple</strong> — need print, not queued</span>
-      <span><i class="swatch-buy"></i> <strong>Amber</strong> — buy / pick hardware</span>
-    </div>
-    <p style="color: var(--text-color, #555); font-size: 0.95em;">
-      Purple rows: use <strong>Add to Print Queue</strong> (queues the shortfall qty). Red rows are already on <a href="[% c.uri_for('/3d/queue') %]">/3d/queue</a>.
-      Blue → <strong>In Pick Box</strong> to turn green.
-      <strong>Start Clean Timer</strong> on any part while you clean supports; <strong>Stop &amp; Log</strong> adds labour cost to the item and credits your points.
-    </p>
-    <table class="data-table traveler-table">
-        <thead>
-            <tr>
-                <th>Part / SKU</th>
-                <th>Description</th>
-                <th>Origin</th>
-                <th>Qty Needed</th>
-                <th>In Stock</th>
-                <th>Printed (jobs)</th>
-                <th>In queue</th>
-                <th>Pick box</th>
-                <th>Short</th>
-                <th>Status</th>
-                <th>File</th>
-                <th>Clean labour</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            [% FOREACH part IN traveler.parts %]
-            <tr data-part-id="[% part.id %]"
-                class="row-[% part.row_state || 'need_print' %][% IF part.need_pick_box %] need-pick[% END %]">
-                <td><strong>[% part.sku %]</strong></td>
-                <td>[% part.name | html %]</td>
-                <td>[% part.item_origin | html %]</td>
-                <td class="qty">[% part.qty_needed %]</td>
-                <td class="stock">[% part.in_stock %]</td>
-                <td>[% part.qty_printed_jobs %]</td>
-                <td>[% part.qty_in_queue %]</td>
-                <td class="pick-box">[% part.in_pick_box %]</td>
-                <td>[% part.qty_short %]</td>
-                <td class="status-cell">
-                    <span class="status-badge [% part.status %]">[% part.status_display %]</span>
-                    [% IF part.file_warn %]
-                    <div style="color:#b71c1c;font-size:0.82em;font-weight:700;margin-top:0.2rem;">⚠ [% part.file_warn | html %]</div>
-                    [% END %]
-                </td>
-                <td class="file-cell" style="white-space:nowrap;font-size:0.88em;">
-                  [% IF part.has_download && part.model_id %]
-                    <a href="[% c.uri_for('/3d/model_download', part.model_id) %]"
-                       class="btn btn-small"
-                       style="background:#1565c0;color:#fff;text-decoration:none;padding:0.25rem 0.5rem;border-radius:4px;display:inline-block;"
-                       title="Download linked STL/3MF — check name matches this part before printing">⬇ [% part.file_basename || 'Download' | html %]</a>
-                    [% IF part.file_ok && !part.file_warn %]
-                    <div style="opacity:0.7;margin-top:0.15rem;">ok</div>
-                    [% ELSIF part.file_ok && part.file_warn %]
-                    <div style="color:#e65100;font-weight:700;margin-top:0.15rem;">verify</div>
-                    [% ELSE %]
-                    <div style="color:#b71c1c;font-weight:700;margin-top:0.15rem;">mismatch</div>
-                    [% END %]
-                  [% ELSIF part.is_print || part.item_origin == '3d_printed' %]
-                    <span style="color:#b71c1c;font-weight:600;">No file</span>
-                  [% ELSE %]
-                    <span style="opacity:0.5">—</span>
-                  [% END %]
-                </td>
-                <td class="clean-cell" data-sku="[% part.sku | html %]">
-                  [% IF part.id %]
-                  <button type="button" class="btn btn-small btn-clean-start"
-                    id="clean-btn-[% part.id %]"
-                    data-part-id="[% part.id %]"
-                    data-sku="[% part.sku | html %]"
-                    onclick="toggleCleanTimer(this.getAttribute('data-part-id'), this.getAttribute('data-sku'))"
-                    title="Track time cleaning this part; stop to add cost + credit points">Start Clean Timer</button>
-                  <span class="clean-timer-display" id="clean-timer-[% part.id %]" hidden>00:00</span>
-                  [% ELSE %]
-                  <span style="opacity:0.5">—</span>
-                  [% END %]
-                </td>
-                <td>
-                    [% IF part.is_print || part.item_origin == '3d_printed' || part.need_print || part.can_queue %]
-                      [% IF part.can_queue %]
-                      <button class="btn btn-small btn-queue"
-                        onclick="addToPrintQueue([% part.id %], [% part.queue_qty || part.qty_short || 1 %])"
-                        title="Queue shortfall to /3d/queue">Add to Print Queue ([% part.queue_qty || part.qty_short || 1 %])</button>
-                      [% END %]
-                      <button class="btn btn-small btn-print" onclick="markPrinted([% part.id %])">Printed</button>
-                      <button class="btn btn-small btn-pick" onclick="markInPickBox([% part.id %])"
-                        title="Receive printed qty into inventory (pick box)">In Pick Box</button>
-                      <button class="btn btn-small btn-qc" onclick="markQC([% part.id %])">QC OK</button>
-                    [% ELSE %]
-                      <button class="btn btn-small btn-pick" onclick="markInPickBox([% part.id %])">Picked</button>
-                      <span style="opacity:0.7">Purchase / pick hardware</span>
-                    [% END %]
-                </td>
-            </tr>
+[%# ---- Group parts by row_state into sections ---- %]
+[% SET section_labels = {
+    need_buy     = 'Items to Order',
+    need_print   = 'Need to Add to Print Queue',
+    in_queue     = 'In Print Queue',
+    printed_ready = 'Printed / Arrived — Ready to Pick',
+    in_box       = 'Picked — In Pick Box'
+} %]
+[% SET section_icons = {
+    need_buy     = '🛒',
+    need_print   = '🎯',
+    in_queue     = '🔄',
+    printed_ready = '📦',
+    in_box       = '✅'
+} %]
+[% SET section_colors = {
+    need_buy     = 'c-buy',
+    need_print   = 'c-need-print',
+    in_queue     = 'c-queue',
+    printed_ready = 'c-printed',
+    in_box       = 'c-in-box'
+} %]
+
+[%# Build section arrays %]
+[% sections = [
+    { key = 'need_buy',     parts = [] },
+    { key = 'need_print',   parts = [] },
+    { key = 'in_queue',     parts = [] },
+    { key = 'printed_ready', parts = [] },
+    { key = 'in_box',       parts = [] }
+] %]
+[% FOREACH part IN traveler.parts %]
+  [% SWITCH part.row_state %]
+    [% CASE 'need_buy' %]
+      [% sections.0.parts.push(part) %]
+    [% CASE 'need_print' %]
+      [% sections.1.parts.push(part) %]
+    [% CASE 'in_queue' %]
+      [% sections.2.parts.push(part) %]
+    [% CASE 'printed_ready' %]
+      [% sections.3.parts.push(part) %]
+    [% CASE %]
+      [%# default: in_box or anything else %]
+      [% sections.4.parts.push(part) %]
+  [% END %]
+[% END %]
+
+[%# ---- Render section cards ---- %]
+[% FOREACH sec IN sections %]
+[% SET sk = sec.key %]
+[% SET sp = sec.parts %]
+[% SET label = section_labels.$sk %]
+[% SET icon  = section_icons.$sk %]
+[% SET sc    = section_colors.$sk || '' %]
+<div class="section-card">
+  <div class="card-header header-colors [% sc %]" onclick="toggleCard(this)">
+    <span class="arrow">▶</span>
+    <span>[% icon %] [% label %]</span>
+    <span class="count">[% sp.size %] part(s)</span>
+  </div>
+  <div class="card-body">
+  [% IF sp.size > 0 %]
+    <table>
+      <thead>
+        <tr>
+          <th>Part / SKU</th>
+          <th>Description</th>
+          <th>Origin</th>
+          <th>Qty Needed</th>
+          <th>In Stock</th>
+          <th>In queue</th>
+          <th>Short</th>
+          <th>Pick box</th>
+          <th>Status</th>
+          <th>Clean labour</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      [% FOREACH part IN sp %]
+      <tr class="row-[% part.row_state %]">
+        <td><strong>[% part.sku %]</strong></td>
+        <td>[% part.name | html %]</td>
+        <td>[% part.item_origin | html %]</td>
+        <td class="qty">[% part.qty_needed %]</td>
+        <td class="stock">[% part.in_stock %]</td>
+        <td>[% part.qty_in_queue %]</td>
+        <td>[% part.qty_short %]</td>
+        <td class="pick-box">[% part.in_pick_box %]</td>
+        <td class="status-cell">
+          <span class="status-badge [% part.status %]">[% part.status_display %]</span>
+          [% IF part.file_warn %]
+          <div style="color:#b71c1c;font-size:0.82em;font-weight:700;margin-top:0.2rem;">⚠ [% part.file_warn | html %]</div>
+          [% END %]
+        </td>
+        <td class="clean-cell" data-sku="[% part.sku | html %]">
+          [% IF part.id %]
+          <button type="button" class="btn btn-small btn-clean-start"
+            id="clean-btn-[% part.id %]"
+            data-part-id="[% part.id %]"
+            data-sku="[% part.sku | html %]"
+            onclick="toggleCleanTimer(this.getAttribute('data-part-id'), this.getAttribute('data-sku'))"
+            title="Track time cleaning this part; stop to add cost + credit points">Start Clean Timer</button>
+          <span class="clean-timer-display" id="clean-timer-[% part.id %]" hidden>00:00</span>
+          [% ELSE %]
+          <span style="opacity:0.5">—</span>
+          [% END %]
+        </td>
+        <td>
+          [% IF part.row_state == 'need_buy' %]
+            <a href="/Inventory/item/view/[% part.id %]" class="buy-link" target="_blank">🛒 Order</a>
+            <span style="opacity:0.7;font-size:0.82em;display:block;margin-top:0.2rem;">Link to set supplier &amp; order</span>
+          [% ELSIF part.row_state == 'need_print' %]
+            [% IF part.can_queue %]
+            <button class="btn btn-small btn-queue"
+              onclick="addToPrintQueue([% part.id %], [% part.queue_qty || part.qty_short || 1 %])"
+              title="Queue shortfall to /3d/queue">Add to Print Queue ([% part.queue_qty || part.qty_short || 1 %])</button>
             [% END %]
-        </tbody>
+            <div style="margin-top:0.3em;display:flex;gap:0.3em;flex-wrap:wrap;">
+              <button class="btn btn-small btn-print" onclick="markPrinted([% part.id %])">Printed</button>
+              <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+                <option value="Print Farm Pick Box">In Pick Box</option>
+                <option value="Print Farm Stock">To Stock</option>
+                <option value="On Printer">On Printer</option>
+              </select>
+            </div>
+          [% ELSIF part.row_state == 'in_queue' %]
+            <div style="display:flex;gap:0.3em;flex-wrap:wrap;">
+              <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+                <option value="Print Farm Pick Box">In Pick Box</option>
+                <option value="Print Farm Stock">To Stock</option>
+                <option value="On Printer">On Printer</option>
+              </select>
+              <button class="btn btn-small btn-qc" onclick="markQC([% part.id %])">QC OK</button>
+            </div>
+          [% ELSIF part.row_state == 'printed_ready' %]
+            <div style="display:flex;gap:0.3em;flex-wrap:wrap;">
+              <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+                <option value="Print Farm Pick Box">In Pick Box</option>
+                <option value="Print Farm Stock">To Stock</option>
+                <option value="On Printer">On Printer</option>
+              </select>
+            </div>
+          [% ELSE %]
+            [%# in_box / picked %]
+            [% IF part.id %]
+            <select style="font-size:0.78em;padding:0.2em;" onchange="markInPickBox([% part.id %], this.value)">
+              <option value="Print Farm Pick Box">+1 Pick Box</option>
+              <option value="Print Farm Stock">+1 Stock</option>
+              <option value="On Printer">On Printer</option>
+            </select>
+            [% ELSE %]
+            <span style="opacity:0.5">✓ Done</span>
+            [% END %]
+          [% END %]
+          [% IF part.has_download && part.model_id %]
+          <div style="margin-top:0.3em;">
+            <a href="[% c.uri_for('/3d/model_download', part.model_id) %]"
+               style="font-size:0.8em;color:var(--accent-color,#007bff);"
+               title="Download linked STL/3MF">⬇ [% part.file_basename || 'Download' | html %]</a>
+            <form method="post" action="/3d/model_upload/[% part.model_id %]" enctype="multipart/form-data" style="display:inline;font-size:0.75em;margin-left:0.3em;">
+              <input type="file" name="stl_file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp" style="display:none" id="stl_up_travel_[% part.model_id %]" onchange="this.form.submit()">
+              <label for="stl_up_travel_[% part.model_id %]" style="color:var(--accent-color,#007bff);cursor:pointer;text-decoration:underline;">⬆ Upload</label>
+            </form>
+          </div>
+          [% END %]
+        </td>
+      </tr>
+      [% END %]
+      </tbody>
     </table>
+  [% ELSE %]
+    <div class="empty-section">No items in this section.</div>
+  [% END %]
+  </div>
+</div>
+[% END %]
 
     <div class="notes-section">
         <h3>Live Notes / QC Photos</h3>
@@ -246,8 +351,61 @@
 </div>
 
 <script>
-/* Clean-labour timers: display only in the browser; duration is settled server-side via AppTime. */
-var cleanTimers = {}; // id -> { startedMs, startedUtc, tick }
+var TRAVELER_KEY = 'traveler_cards_[% traveler.order_id %]';
+
+function toggleCard(header) {
+  var body = header.nextElementSibling;
+  var arrow = header.querySelector('.arrow');
+  if (!body) return;
+  var isOpen = body.classList.contains('open');
+  if (isOpen) {
+    body.classList.remove('open');
+    if (arrow) arrow.classList.remove('open');
+  } else {
+    body.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+  }
+  saveCardState();
+}
+
+function saveCardState() {
+  var cards = document.querySelectorAll('.section-card');
+  var state = {};
+  cards.forEach(function (c, i) {
+    var body = c.querySelector('.card-body');
+    state[i] = body ? body.classList.contains('open') ? 1 : 0 : 0;
+  });
+  state.scrollY = window.scrollY;
+  try { localStorage.setItem(TRAVELER_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function restoreCardState() {
+  var raw;
+  try { raw = localStorage.getItem(TRAVELER_KEY); } catch(e) { return; }
+  if (!raw) return;
+  var state;
+  try { state = JSON.parse(raw); } catch(e) { return; }
+  var cards = document.querySelectorAll('.section-card');
+  cards.forEach(function (c, i) {
+    if (state[i]) {
+      var body = c.querySelector('.card-body');
+      var arrow = c.querySelector('.arrow');
+      if (body) body.classList.add('open');
+      if (arrow) arrow.classList.add('open');
+    }
+  });
+  if (state.scrollY > 0) {
+    setTimeout(function () { window.scrollTo(0, state.scrollY); }, 50);
+  }
+}
+
+function saveStateBeforeReload() {
+  saveCardState();
+  /* On the next load (if browser serves a fresh page), localStorage persists. */
+}
+
+/* Clean-labour timers */
+var cleanTimers = {};
 var cleanLabourUrl = '[% c.uri_for("/Inventory/api/labour/clean") %]';
 var travelerReloadTimer = null;
 
@@ -262,11 +420,15 @@ function anyCleanTimerRunning() {
 function scheduleTravelerReload() {
     if (travelerReloadTimer) clearInterval(travelerReloadTimer);
     travelerReloadTimer = setInterval(function () {
-        if (anyCleanTimerRunning()) return; // do not wipe an open clean session
+        if (anyCleanTimerRunning()) return;
+        saveStateBeforeReload();
         location.reload();
-    }, 30000);
+    }, 120000);
 }
 scheduleTravelerReload();
+
+/* Restore card open/closed state and scroll position from localStorage */
+restoreCardState();
 
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -368,15 +530,25 @@ function stopCleanTimer(id, sku) {
     });
 }
 
-function markPrinted(id) {
-    updatePartStatus(id, 'printed');
+function markPrinted(id) { updatePartStatus(id, 'printed'); }
+function markInPickBox(id, location) {
+    location = location || 'Print Farm Pick Box';
+    var url = '[% c.uri_for("/Inventory/api/stock/receive_qty") %]';
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({item_id: id, part_id: id, location: location})
+    }).then(r => r.json().catch(function(){ return {}; })).then(function (j) {
+        if (j && (j.success === 0 || j.ok === 0) && (j.error || j.message)) {
+            alert('Update failed: ' + (j.error || j.message));
+        }
+        location.reload();
+    }).catch(function (e) {
+        alert('Update failed: ' + e);
+        location.reload();
+    });
 }
-function markInPickBox(id) {
-    updatePartStatus(id, 'in_pick_box');
-}
-function markQC(id) {
-    updatePartStatus(id, 'qc_passed');
-}
+function markQC(id) { updatePartStatus(id, 'qc_passed'); }
 
 function addToPrintQueue(id, qty) {
     qty = qty || 1;
@@ -420,13 +592,8 @@ function updatePartStatus(id, status) {
     });
 }
 
-function saveNotes() {
-    alert('Note saved (live update connected)');
-}
-
-function uploadPhoto() {
-    alert('Photo uploaded and attached to traveler (live QC record created)');
-}
+function saveNotes() { alert('Note saved (live update connected)'); }
+function uploadPhoto() { alert('Photo uploaded and attached to traveler (live QC record created)'); }
 
 function finishTraveler() {
     if (anyCleanTimerRunning()) {
@@ -456,10 +623,10 @@ function finishTraveler() {
     }
 }
 
-// Warn before leaving with a running timer
 window.addEventListener('beforeunload', function (e) {
-    if (!anyCleanTimerRunning()) return;
-    e.preventDefault();
-    e.returnValue = '';
+    if (anyCleanTimerRunning()) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
 });
 </script>

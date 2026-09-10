@@ -48,54 +48,224 @@
 [% IF items.size == 0 %]
   <p>No items found. <a href="/Inventory/item/add">Add one now</a>.</p>
 [% ELSE %]
-<table border="1" cellpadding="4" cellspacing="0">
-  <thead>
-    <tr>
-      <th>SKU</th>
-      <th>Name</th>
-      <th>Category</th>
-      <th>Unit</th>
-      <th>Cost</th>
-      <th>Sale Price</th>
-      <th>Stock (on hand)</th>
-      <th>Reorder Point</th>
-      <th>Status</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-  [% FOREACH item IN items %]
-    [% total_stock = 0 %]
-    [% FOREACH sl IN item.stock_levels %]
-      [% total_stock = total_stock + sl.quantity_on_hand %]
-    [% END %]
-    <tr[% IF item.reorder_point && total_stock <= item.reorder_point %] style="background: var(--caution-bg, #fff3cd)"[% END %]>
-      <td>[% item.sku %]</td>
-      <td><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a></td>
-      <td>[% item.category || '-' %]</td>
-      <td>[% item.unit_of_measure %]</td>
-      <td>[% item.unit_cost ? item.unit_cost : '-' %]</td>
-      <td>[% item.unit_price ? item.unit_price : '-' %]</td>
-      <td>[% total_stock %]</td>
-      <td>[% item.reorder_point || '0' %]</td>
-      <td>[% item.status %]</td>
-      <td>
-        <a href="/Inventory/item/view/[% item.id %]">View</a>
-        <a href="/Inventory/item/edit/[% item.id %]">Edit</a>
-        [% IF item.is_assemblable %]
-        <a href="/Inventory/bom/[% item.id %]">BOM</a>
+
+<style>
+.category-section {
+  margin-bottom: 1rem;
+}
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+.category-header:hover {
+  opacity: 0.9;
+}
+.category-header.collapsed {
+  border-radius: 6px;
+}
+.category-header:not(.collapsed) {
+  border-radius: 6px 6px 0 0;
+}
+.category-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+.category-count {
+  background: rgba(0,0,0,0.15);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-left: auto;
+}
+.category-chevron {
+  margin-left: 0.5rem;
+  transition: transform 0.2s;
+  font-size: 0.8rem;
+}
+.category-header.collapsed .category-chevron {
+  transform: rotate(-90deg);
+}
+.category-card {
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--card-bg, #fff);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.category-card.collapsed .category-table {
+  display: none;
+}
+.category-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.category-table th,
+.category-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #eee);
+}
+.category-table th {
+  background: var(--header-bg, #f8f9fa);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+}
+.category-table tr:last-child td {
+  border-bottom: none;
+}
+.category-table tbody tr {
+  transition: background 0.15s;
+}
+.category-table tbody tr:hover td {
+  background: var(--hover-bg, #f5f5f5);
+}
+.item-sku {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+}
+.item-name a {
+  color: var(--link-color, #3498db);
+  text-decoration: none;
+  font-weight: 500;
+}
+.item-name a:hover {
+  text-decoration: underline;
+}
+.item-stock {
+  font-weight: 500;
+}
+.item-stock.low {
+  color: var(--danger-color, #e74c3c);
+}
+.actions-cell {
+  white-space: nowrap;
+}
+.actions-cell a,
+.actions-cell form {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* Category-specific row styling - each category gets a subtle tint */
+.category-row-3d_filament td { border-left: 3px solid var(--cat-3d-filament, #3498db); }
+.category-row-3d_supply td { border-left: 3px solid var(--cat-3d-supply, #9b59b6); }
+.category-row-3d_printed_item td { border-left: 3px solid var(--cat-3d-printed, #e74c3c); }
+.category-row-filament td { border-left: 3px solid var(--cat-filament, #3498db); }
+.category-row-supply td { border-left: 3px solid var(--cat-supply, #9b59b6); }
+.category-row-printed td { border-left: 3px solid var(--cat-printed, #e74c3c); }
+.category-row-raw_material td { border-left: 3px solid var(--cat-raw, #27ae60); }
+.category-row-consumable td { border-left: 3px solid var(--cat-consumable, #f39c12); }
+.category-row-tool td { border-left: 3px solid var(--cat-tool, #34495e); }
+.category-row-equipment td { border-left: 3px solid var(--cat-equipment, #1abc9c); }
+.category-row-Uncategorized td { border-left: 3px solid var(--cat-default, #95a5a6); }
+.category-row-default td { border-left: 3px solid var(--cat-default, #95a5a6); }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.category-header').forEach(function(header) {
+    header.addEventListener('click', function() {
+      var section = this.closest('.category-section');
+      var card = section.querySelector('.category-card');
+      var isCollapsed = card.classList.toggle('collapsed');
+      this.classList.toggle('collapsed', isCollapsed);
+      
+      // Save state to localStorage
+      var catName = this.querySelector('span:nth-child(2)').textContent.trim();
+      localStorage.setItem('inv_cat_' + catName, isCollapsed ? 'collapsed' : 'expanded');
+    });
+  });
+
+  // Restore collapsed state from localStorage
+  document.querySelectorAll('.category-section').forEach(function(section) {
+    var header = section.querySelector('.category-header');
+    var card = section.querySelector('.category-card');
+    var catName = header.querySelector('span:nth-child(2)').textContent.trim();
+    var saved = localStorage.getItem('inv_cat_' + catName);
+    if (saved === 'collapsed') {
+      card.classList.add('collapsed');
+      header.classList.add('collapsed');
+    }
+  });
+});
+</script>
+
+[% FOREACH cat IN sorted_categories %]
+  [% items_in_cat = items_by_category.$cat %]
+  [% cat_color = category_colors.$cat || category_colors.default %]
+  <div class="category-section">
+    <div class="category-header collapsed" style="background: [% cat_color %]; color: white;">
+      <span class="category-color-dot" style="background: white; opacity: 0.9;"></span>
+      <span>[% cat | html %]</span>
+      <span class="category-count">[% items_in_cat.size %] items</span>
+      <span class="category-chevron">&#x25BC;</span>
+    </div>
+    <div class="category-card collapsed">
+      <table class="category-table">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Name</th>
+            <th>Unit</th>
+            <th>Cost</th>
+            <th>Sale Price</th>
+            <th>Stock (on hand)</th>
+            <th>Reorder Point</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        [% FOREACH item IN items_in_cat %]
+          [% total_stock = 0 %]
+          [% FOREACH sl IN item.stock_levels %]
+            [% total_stock = total_stock + sl.quantity_on_hand %]
+          [% END %]
+          <tr class="category-row-[% item.category || 'Uncategorized' %]">
+            <td class="item-sku">[% item.sku %]</td>
+            <td class="item-name"><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a></td>
+            <td>[% item.unit_of_measure %]</td>
+            <td>[% item.unit_cost ? item.unit_cost : '-' %]</td>
+            <td>[% item.unit_price ? item.unit_price : '-' %]</td>
+            <td class="item-stock [% IF item.reorder_point && total_stock <= item.reorder_point %]low[% END %]">[% total_stock %]</td>
+            <td>[% item.reorder_point || '0' %]</td>
+            <td>[% item.status %]</td>
+            <td class="actions-cell">
+              <a href="/Inventory/item/view/[% item.id %]">View</a>
+              <a href="/Inventory/item/edit/[% item.id %]">Edit</a>
+              [% IF item.is_assemblable %]
+              <a href="/Inventory/bom/[% item.id %]">BOM</a>
+              [% END %]
+              [% IF c.session.roles.grep('admin').size %]
+              <form method="POST" action="/Inventory/item/delete/[% item.id %]" style="display:inline"
+                    onsubmit="return confirm('Delete this item?')">
+                <input type="submit" value="Delete">
+              </form>
+              [% END %]
+            </td>
+          </tr>
         [% END %]
-        [% IF c.session.roles.grep('admin').size %]
-        <form method="POST" action="/Inventory/item/delete/[% item.id %]" style="display:inline"
-              onsubmit="return confirm('Delete this item?')">
-          <input type="submit" value="Delete">
-        </form>
-        [% END %]
-      </td>
-    </tr>
-  [% END %]
-  </tbody>
-</table>
+        </tbody>
+      </table>
+    </div>
+  </div>
+[% END %]
+
 [% END %]
 
 [% IF debug_errors && debug_errors.size > 0 %]
