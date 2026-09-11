@@ -409,6 +409,22 @@ sub _create_item {
     my $now    = $self->_now();
 
     my $sitename = $p->{sitename} || $self->_sitename($c);
+
+    # HARD GUARD: never create a second item with the same (sitename, sku).
+    # Prevents duplicate-SKU data corruption that previously occurred when rows were
+    # written outside the app (e.g. AI/script direct inserts). Returns the existing row
+    # instead of silently creating a twin that breaks BOM explosion / traveler dedup.
+    if ($p->{sku}) {
+        my $existing = $schema->resultset('Accounting::InventoryItem')->find(
+            { sitename => $sitename, sku => $p->{sku} }
+        );
+        if ($existing) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_item',
+                "Refused duplicate (sitename=$sitename, sku=" . $p->{sku} . ") — returning existing id=" . $existing->id);
+            return $existing;
+        }
+    }
+
     return $schema->resultset('Accounting::InventoryItem')->create({
         sitename            => $sitename,
         sku                 => $p->{sku},
@@ -1028,14 +1044,17 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         );
     };
     if ($@ || !$item || $item->sitename ne $sitename) {
-        $c->flash->{error_msg} = 'Item not found';
+        my $actual = $item ? $item->sitename : 'none';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'bom_view',
+            "Item $item_id sitename mismatch or not found: requested=$sitename actual=$actual");
+        $c->flash->{error_msg} = 'Item not found or wrong site (requested ' . $sitename . ', got ' . $actual . ')';
         $c->res->redirect($c->uri_for('/Inventory/items'));
-        return;
+        $c->detach;
     }
     unless ($item->is_assemblable) {
         $c->flash->{error_msg} = 'This item does not have a BOM (not marked as assemblable).';
         $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
-        return;
+        $c->detach;
     }
 
     my @all_items;
@@ -2158,7 +2177,9 @@ require JSON;
 
     my $schema = $self->_schema($c);
     my $existing = eval {
-        $schema->resultset('Accounting::InventoryItem')->find({ sku => $p->{sku} })
+        $schema->resultset('Accounting::InventoryItem')->find(
+            { sitename => $sitename, sku => $p->{sku} }
+        )
     };
     if ($existing) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
@@ -2252,6 +2273,24 @@ sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
         $c->res->content_type('application/json');
         $c->res->body(JSON::encode_json({ success => 0, error => 'item not found' }));
         $c->detach;
+    }
+
+    # HARD GUARD: reject any SKU change that would collide with another item in the same
+    # site. Prevents a duplicate-SKU from being created via update (the web item_edit form
+    # also routes SKU changes; this blocks the collision at the API layer too).
+    if (defined $p->{sku} && $p->{sku} ne ($item->sku // '')) {
+        my $sitename = $p->{sitename} || $item->sitename;
+        my $collision = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, sku => $p->{sku}, id => { '!=' => $item->id } }
+        )->first;
+        if ($collision) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_item_update',
+                "Refused SKU change to duplicate (sitename=$sitename, sku=" . $p->{sku} . ") — collides with id=" . $collision->id);
+            $c->res->status(409);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({ success => 0, error => "SKU $p->{sku} already exists for this site" }));
+            $c->detach;
+        }
     }
 
     my %upd;

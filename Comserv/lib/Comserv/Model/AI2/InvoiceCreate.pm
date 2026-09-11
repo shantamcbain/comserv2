@@ -379,7 +379,7 @@ sub chat_contract {
         }
     }
     else {
-        $list = "No active suppliers listed for $sitename yet. New suppliers are auto-created when you enter an invoice - just name the supplier. Web lookup may add contact info.\n";
+        $list = "No active suppliers listed for $sitename yet. New suppliers are auto-created when you enter an invoice — just name the supplier. Web lookup may add contact info.\n";
     }
     return <<"END";
 INVOICE ENTRY (SiteName=$sitename) — DRAFT ONLY, never post GL from chat:
