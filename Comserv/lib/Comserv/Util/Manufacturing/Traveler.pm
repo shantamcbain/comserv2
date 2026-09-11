@@ -271,10 +271,6 @@ sub _explode_to_leaves {
         }
         for my $ln (@flat) {
             my $sku = $ln->{sku} // '';
-            next if $sku =~ /^INT-HDRY-(BBL|BBR|BL|BLS|BR|BRS|FL|FLS|FR|FRS|FFL|FFR|SBR|SRC|SRL|SRR)/i;
-            next if $sku =~ /^HW-(M4|M3|608|MAG|GASKET|POLY|WASHER|BOLT|SPACER)/i;
-            next if $sku =~ /^INT-HDRY-GSK/i;
-            next if $sku =~ /^INT-HDRY-WHEEL/i;
             push @leaves, $self->_leaf_from_line($ln, $mult);
         }
     } else {
@@ -497,11 +493,6 @@ sub _parts_from_leaves {
         my $sku    = $meta->{sku}  || $ln->{sku}  || '';
         my $name   = $meta->{name} || $ln->{name} || '';
 
-        # Structure parts are always printed even if origin was left wrong at import.
-        if ($origin ne '3d_printed' && $sku =~ /^INT-HDRY-(BBL|BBR|BL|BLS|BR|BRS|FL|FLS|FR|FRS|FFL|FFR|SBR|SBL|SRC|SRL|SRR|WHEEL)/i) {
-            $origin = '3d_printed';
-        }
-
         my $is_print = ($origin eq '3d_printed' || $origin =~ /print/i) ? 1 : 0;
         my $model    = ($cid && $model_by_item{$cid}) ? $model_by_item{$cid} : {};
 
@@ -514,39 +505,45 @@ sub _parts_from_leaves {
                 # 2. need_print (purple) — items to add to queue / need to print
                 # 3. in_queue (red) — picked items / already in queue / need to be picked
                 # 4. printed_ready (blue) — printed items that needs picking
+                # Priority order for traveler display (user requested):
+                # 1. need_buy (amber) — items to be ordered
+                # 2. need_print (purple) — items to add to queue / need to print
+                # 3. in_queue (red) — picked items / already in queue / need to be picked
+                # 4. printed_ready (blue) — printed items that needs picking
                 # 5. in_box (green) — items in the pick box / picked items — LAST group
-                if (!$is_print && $short > 0) {
+                #
+                # Stock truth wins: if recorded on_hand already covers the need, the part is
+                # IN THE BOX (green) even if more are still printing. Any remaining queued
+                # qty is shown as a secondary note, never as a red/blue override, so a part
+                # that is already in the physical pick box is not mis-shown as "in queue".
+                if (!$is_print && $short > 0 && $on_hand < $qty) {
                     $row_state       = 'need_buy';         # amber — items to be ordered
                     $status          = 'pending';
                     $status_display  = 'Need purchase';
-                } elsif ($is_print && $short > 0 && $in_queue <= 0) {
-                    $row_state       = 'need_print';       # purple — items to add to queue
-                    $status          = 'pending';
-                    $status_display  = 'Need print (not queued)';
-                } elsif ($is_print && $in_queue > 0) {
-                    $row_state       = 'in_queue';         # red — picked items / already in queue
-                    $status          = 'pending';
-                    $status_display  = "In print queue ($in_queue)";
-                } elsif ($is_print && $qty > $on_hand && $on_hand < $qty && $from_queue >= 0) {
-                    $row_state       = 'printed_ready';   # blue — printed items that needs picking
-                    $status          = 'printed';
-                    $status_display  = 'Printed — needs picking';
-                } elsif ($qty > 0 && $on_hand >= $qty) {
+                } elsif ($on_hand >= $qty && $qty > 0) {
+                    # Already satisfied from stock — it is in the pick box.
                     $row_state       = 'in_box';          # green — items in the pick box / picked items
                     $status          = 'in_stock';
                     $status_display  = 'In pick box';
-                } elsif ($from_queue >= $qty && $qty > 0 && $on_hand < $qty) {
-                    $row_state       = 'printed_ready';
-                    $status          = 'printed';
-                    $status_display  = 'Printed — ready to pick into box';
-                } elsif ($from_queue > $on_hand && $short == 0) {
-                    $row_state       = 'printed_ready';
-                    $status          = 'printed';
-                    $status_display  = 'Printed — ready to pick into box';
-                } elsif (!$is_print && $short > 0) {
-                    $row_state       = 'need_buy';
+                    if ($in_queue > 0) {
+                        # Some extra qty still printing — note it, but do NOT override green.
+                        $status_display .= " (+$in_queue printing)";
+                    }
+                } elsif ($is_print && $short > 0 && $in_queue <= 0 && $from_queue <= $on_hand) {
+                    $row_state       = 'need_print';       # purple — items to add to queue
                     $status          = 'pending';
-                    $status_display  = 'Need purchase';
+                    # Label must never claim "not queued" when something IS queued/printing.
+                    $status_display  = ($in_queue > 0 || $from_queue > $on_hand)
+                        ? 'Need print (queued: ' . ($in_queue || 0) . ')'
+                        : 'Need print (not queued)';
+                } elsif ($is_print && $short > 0 && $in_queue > 0) {
+                    $row_state       = 'in_queue';         # red — picked items / already in queue
+                    $status          = 'pending';
+                    $status_display  = "In print queue ($in_queue)";
+                } elsif ($is_print && $short > 0 && $from_queue > $on_hand) {
+                    $row_state       = 'printed_ready';   # blue — printed items that needs picking
+                    $status          = 'printed';
+                    $status_display  = 'Printed — needs picking';
                 } elsif ($on_hand > 0) {
                     $row_state       = 'in_box';
                     $status          = 'in_stock';
@@ -737,11 +734,30 @@ sub queue_part_print {
     my $from_q  = 0 + ($printed->{$item_id} // 0);
     my $in_q    = 0 + ($queued->{$item_id} // 0);
     my $have    = $from_q > $on_hand ? $from_q : $on_hand;
-    # Caller qty wins; else leave room for anything already queued
-    my $need = defined $qty && $qty > 0 ? (0 + $qty) : 1;
-    if (!defined $qty || $qty <= 0) {
-        # If traveler passed no qty, queue at least 1 (UI should pass shortfall)
-        $need = 1;
+
+    # $qty (if passed) is the traveler's qty_needed for this part in the build.
+    # Queue ONLY the true remainder so a second click never double-queues:
+    #   remainder = qty_needed - on_hand - already_queued
+    # If the caller passed an explicit qty we treat it as qty_needed; otherwise fall
+    # back to (on_hand already satisfied -> at least 1) for direct/standalone calls.
+    my $qty_needed = (defined $qty && $qty > 0) ? (0 + $qty) : 0;
+    my $need;
+    if ($qty_needed > 0) {
+        $need = $qty_needed - $on_hand - $in_q;
+    } else {
+        # No qty context (e.g. standalone API call): queue 1 unless already covered.
+        $need = $have >= 1 ? 0 : 1;
+    }
+    $need = 0 + int($need);
+    if ($need <= 0) {
+        # Nothing left to queue — already satisfied by stock + what's in the queue.
+        return {
+            ok         => 1,
+            queued     => 0,
+            item_id    => $item_id,
+            sku        => $item ? $item->sku : undef,
+            message    => 'No remainder to queue (stock + existing queue already covers need)',
+        };
     }
 
     my $model = eval {
