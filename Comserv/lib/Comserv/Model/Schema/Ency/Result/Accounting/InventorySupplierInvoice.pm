@@ -188,4 +188,6 @@ __PACKAGE__->has_many(
     { cascade_delete => 1 }
 );
 
+__PACKAGE__->add_unique_constraint('sitename_invoice_number' => ['sitename', 'invoice_number']);
+
 1;

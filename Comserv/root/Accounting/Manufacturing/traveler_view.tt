@@ -14,7 +14,8 @@
   border: 1px solid var(--border-color, #ccc);
   border-radius: 8px;
   margin-bottom: 1.2em;
-  overflow: hidden;
+  /* NOTE: do NOT use overflow:hidden here — it breaks position:sticky on the
+     table header. Rounded corners are preserved by the scroll wrapper below. */
   background: var(--bg-color, #fff);
 }
 .traveler-tablet .card-header {
@@ -47,6 +48,10 @@
   border-top: 1px solid var(--border-color, #ccc);
   padding: 0;
   display: none;
+  /* Scroll container: with .section-card overflow:hidden removed, this becomes the
+     sticky context so the table <thead> floats while the user scrolls long part lists. */
+  max-height: 70vh;
+  overflow: auto;
 }
 .traveler-tablet .card-body.open {
   display: block;
@@ -56,11 +61,19 @@
   border-collapse: collapse;
   min-width: 720px;
 }
+/* Floating / sticky header so column meaning stays visible while scrolling long part lists */
+.traveler-tablet .card-body table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 2px 0 0 #90a4ae;
+}
 .traveler-tablet .card-body table th {
   background: #eceff1; color: #111;
   border-bottom: 2px solid #90a4ae;
   padding: 0.55rem 0.45rem; text-align: left;
   font-size: 0.88em;
+  white-space: nowrap;
 }
 .traveler-tablet .card-body table td {
   padding: 0.55rem 0.45rem;
@@ -241,7 +254,7 @@
       <tbody>
       [% FOREACH part IN sp %]
       <tr class="row-[% part.row_state %]">
-        <td><strong>[% part.sku %]</strong></td>
+        <td><strong>[% IF part.id %]<a href="/Inventory/item/view/[% part.id %]" target="_blank" rel="noopener" title="Open stock / item record in new tab">[% part.sku %]</a>[% ELSE %][% part.sku %][% END %]</strong></td>
         <td>[% part.name | html %]</td>
         <td>[% part.item_origin | html %]</td>
         <td class="qty">[% part.qty_needed %]</td>
@@ -275,8 +288,8 @@
           [% ELSIF part.row_state == 'need_print' %]
             [% IF part.can_queue %]
             <button class="btn btn-small btn-queue"
-              onclick="addToPrintQueue([% part.id %], [% part.queue_qty || part.qty_short || 1 %])"
-              title="Queue shortfall to /3d/queue">Add to Print Queue ([% part.queue_qty || part.qty_short || 1 %])</button>
+              onclick="addToPrintQueue([% part.id %], [% part.qty_needed %])"
+              title="Queue only the remaining shortfall (needed - stock - already queued) for this part">Add to Print Queue</button>
             [% END %]
             <div style="margin-top:0.3em;display:flex;gap:0.3em;flex-wrap:wrap;">
               <button class="btn btn-small btn-print" onclick="markPrinted([% part.id %])">Printed</button>
@@ -552,14 +565,18 @@ function markQC(id) { updatePartStatus(id, 'qc_passed'); }
 
 function addToPrintQueue(id, qty) {
     qty = qty || 1;
-    if (!confirm('Add ' + qty + ' to the print queue for this part?')) return;
+    if (!confirm('Queue the remaining shortfall for this part to the print queue?')) return;
     fetch('[% c.uri_for("/Inventory/api/print_queue/add") %]', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({item_id: id, part_id: id, quantity: qty})
     }).then(r => r.json().catch(function(){ return {}; })).then(function (j) {
         if (j && j.success) {
-            alert('Queued job #' + (j.job_id || '?') + ' x' + (j.quantity || qty));
+            if (j.queued && j.queued > 0) {
+                alert('Queued job #' + (j.job_id || '?') + ' x' + j.queued);
+            } else {
+                alert(j.message || 'Nothing left to queue — stock + existing queue already cover the need.');
+            }
         } else {
             alert('Queue failed: ' + ((j && (j.error || j.message)) || 'unknown'));
         }
