@@ -38,6 +38,7 @@
                 <a href="#hermes" class="doc-navlink">Hermes settings</a>
                 <a href="#providers" class="doc-navlink">In-app providers</a>
                 <a href="#park" class="doc-navlink">Parked work</a>
+                <a href="#skills-search" class="doc-navlink">Skills &amp; web search</a>
                 <a href="#project-tracking" class="doc-navlink">Project Tracking</a>
                 <a href="#see-also" class="doc-navlink">See Also</a>
             </div>
@@ -361,6 +362,40 @@
                 <li>chain_query multi-model #262–265 — after shortlists exist</li>
             </ul>
             <p class="doc-body">Keep live: <a href="[% c.uri_for('/todo/details') %]?record_id=562" class="doc-link" title="Older live todo: AI create todos.">#562</a>, <a href="[% c.uri_for('/todo/details') %]?record_id=2217" class="doc-link" title="Todo-create job (code).">#2217</a>, <a href="[% c.uri_for('/todo/details') %]?record_id=2218" class="doc-link" title="Scheduler agent (specified).">#2218</a>, #778 (document adding a project), GITWT Hermes context #2142–2146, AIMPS #2024–2036.</p>
+            <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="skills-search" class="doc-h2">5b. Skills &amp; web search (in progress)</h2>
+            <p class="doc-body">
+                Two v2 capabilities: <strong>DB-backed, approval-gated skills</strong>
+                and a <strong>web search that actually works</strong>.
+            </p>
+            <ul class="doc-body">
+                <li><strong>Skills live in MariaDB, not JSON</strong> — a config file
+                    only reaches production at the next deploy and each branch mutates
+                    its own copy. Approval is mandatory: new rows default to
+                    <code>pending</code> and only <code>approved</code> rows are ever
+                    injected, so an AI-written skill cannot change behaviour on its own.
+                    Admin approves in chat; non-admins get a todo raised.</li>
+                <li><strong>Table creation is a <code>schema</code>-branch action</strong> —
+                    todo <a href="[% c.uri_for('/todo/details') %]?record_id=2430" class="doc-link">#2430</a>.
+                    The Result class <code>AiSkill</code> exists; an admin materialises
+                    <code>ai_skills</code> via in-app schema-compare. Never hand-DDL.</li>
+                <li><strong>Web search</strong> — the <code>use_search</code> flag was
+                    dropped between <code>Chat.pm</code> and the provider, so the widget
+                    checkbox never worked. Fixed and verified. Search is self-hosted
+                    (<code>comserv2-search</code>) because OpenRouter's
+                    <code>search_domain_filter</code> is silently ignored — measured:
+                    a Wikipedia-only filter returned zero Wikipedia results — so scope
+                    control requires a service we run.</li>
+            </ul>
+            <p class="doc-body">
+                Full design:
+                <a href="[% c.uri_for('/Documentation/AiSkillsAndWebSearch') %]" class="doc-link">/Documentation/AiSkillsAndWebSearch</a>
+            </p>
             <p class="doc-backtop"><a href="#toc">&#8593; Back to Top</a></p>
         </div>
     </div>

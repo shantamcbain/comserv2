@@ -2469,8 +2469,15 @@
                     _nfFields.auto_pay = '1';
                     _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
                 }
-                const _supplierM = _billText.match(/HostGator|PayPal|Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio|eNom|GoDaddy|Namecheap|Hover|Tucows|WHC|Domain\.com/i);
-                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                // Derive the vendor name WITHOUT a hardcoded list. The old
+                // regex (HostGator|PayPal|OpenAI|...) could not match new
+                // vendors, so "OpenRouter" fell back to the literal 'Supplier'
+                // and the dropdown stayed empty. Prefer an explicit
+                // "Receipt from X" / "Invoice from X"; else first line.
+                const _fromM = _billText.match(/(?:Receipt|Invoice)\s+from\s+([A-Za-z0-9][A-Za-z0-9 .,&'\-]{1,58}?)\s*(?=\$|\d|USD|CAD|Receipt|Invoice|Qty|Total|\.|$)/i);
+                const _supplierName = (_fromM && _fromM[1].trim())
+                    ? _fromM[1].trim()
+                    : (_billText.split(/[\n\r]/)[0] || 'Supplier').slice(0, 60);
                 const _billedToM = _billText.match(/Billed\s+To[:\s]+([^\n\r]+)/i);
                 const _billedTo = _billedToM ? ' (' + _billedToM[1].trim() + ')' : '';
                 if (!_nfFields.notes) {
@@ -2494,7 +2501,31 @@
                         const _qs = Object.keys(_tf).filter(k => _tf[k]).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(_tf[k])).join('&');
                         executeAIAction({ action: 'navigate_and_fill', url: '/Accounting/transfer/new?' + _qs, fields: _tf });
                     } else {
-                        executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                        // Resolve the supplier NAME to its numeric id on the
+                        // server before navigating: the <select> is keyed by
+                        // id, and only the server reliably knows it.
+                        (function(fields, sName){
+                            if (!sName || sName === 'Supplier') {
+                                executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: fields });
+                                return;
+                            }
+                            fetch('/ai2/action', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'resolve_supplier', params: { name: sName } })
+                            })
+                            .then(function(r){ return r.json(); })
+                            .then(function(d){
+                                if (d && d.success && d.supplier_id) {
+                                    fields.supplier_id = String(d.supplier_id);
+                                }
+                            })
+                            .catch(function(e){ console.warn('resolve_supplier failed', e); })
+                            .then(function(){
+                                executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: fields });
+                            });
+                        })(_nfFields, _supplierName);
                     }
                     const _wAcc = document.createElement('div');
                     _wAcc.className = 'msg-wrapper msg-wrapper-ai';

@@ -2005,16 +2005,68 @@ sub _record_public_submit {
     # keep last hour only
     @$list = grep { defined $_ && ($_ > $now - 3600) } @$list;
     $c->session->{$key} = $list;
+    $self->_record_public_ip_submit($c);
+}
+
+sub _sanitize_public_ip {
+    my ($self, $ip) = @_;
+    $ip = defined $ip ? "$ip" : 'unknown';
+    $ip =~ s/[^0-9a-fA-F.:]/_/g;
+    $ip = 'unknown' if $ip eq '';
+    return $ip;
+}
+
+sub _public_ip_rate_dir {
+    return '/tmp/comserv_hd_public_rate';
+}
+
+sub _public_ip_rate_file {
+    my ($self, $c) = @_;
+    my $dir = $self->_public_ip_rate_dir();
+    unless (-d $dir) {
+        mkdir $dir, 0700 or return;
+    }
+    my $ip = $self->_sanitize_public_ip($c->req->address || 'unknown');
+    return "$dir/$ip";
+}
+
+sub _record_public_ip_submit {
+    my ($self, $c) = @_;
+    my $file = $self->_public_ip_rate_file($c) or return;
+    my $fh;
+    open $fh, '>>', $file or return;
+    print {$fh} time() . "\n";
+    close $fh;
+}
+
+sub _public_ip_rate_exceeded {
+    my ($self, $c) = @_;
+    my $file = $self->_public_ip_rate_file($c) or return 0;
+    return 0 unless -f $file;
+    my $now = time();
+    my $count = 0;
+    my $fh;
+    open $fh, '<', $file or return 0;
+    while (my $line = <$fh>) {
+        $line =~ s/^\s+|\s+$//g;
+        next unless $line =~ /^\d+$/;
+        $count++ if ($line + 0) > ($now - 3600);
+    }
+    close $fh;
+    # guests: max 5 public HelpDesk submits per IP / rolling hour
+    return $count >= 5 ? 1 : 0;
 }
 
 sub _public_submit_rate_exceeded {
     my ($self, $c) = @_;
     my $now  = time();
     my $list = $c->session->{hd_public_submits} || [];
-    return 0 unless ref $list eq 'ARRAY';
-    my @recent = grep { defined $_ && ($_ > $now - 3600) } @$list;
-    # guests: max 5 public HelpDesk submits per session/hour
-    return scalar(@recent) >= 5 ? 1 : 0;
+    if (ref $list eq 'ARRAY') {
+        my @recent = grep { defined $_ && ($_ > $now - 3600) } @$list;
+        # guests: max 3 public HelpDesk submits per session/hour
+        return 1 if scalar(@recent) >= 3;
+    }
+    return $self->_public_ip_rate_exceeded($c) ? 1 : 0;
 }
 
 sub _looks_like_spam_content {
@@ -2053,12 +2105,37 @@ sub _looks_like_spam_content {
     # Bare graph.org / shortener without scheme still counts as a link bait
     my $bare = () = $text =~ m{\b[\w\-]+\.(?:org|com|net|io)/\S+}g;
     return 1 if $bare >= 1 && $text =~ /(?:coinbase|bitcoin|mining|transfer|wallet|cloud)/i;
+
+    # Link-only / promo profile detection (CSC-20260911-6270)
+    my @urls;
+    while ($text =~ m{(?:https?://|www\.)\S+}g) {
+        push @urls, $&;
+    }
+    if (@urls) {
+        my $stripped = $text;
+        for my $u (@urls) {
+            my $q = quotemeta($u);
+            $stripped =~ s/$q//g;
+        }
+        $stripped =~ s/\s+/ /g;
+        $stripped =~ s/^\s+|\s+$//g;
+        my $remain = length($stripped);
+        return 1 if $remain < 40;
+        if ($remain < 80 && $text =~ /(?:profile|follow me|check out my|visit my|subscribe|followers|promo|discount)/) {
+            return 1;
+        }
+        my $url_len = 0;
+        $url_len += length($_) for @urls;
+        my $tlen = length($text);
+        return 1 if $tlen > 0 && ($url_len / $tlen) >= 0.55;
+    }
     return 0;
 }
 
 # Returns error message string on failure, empty string if OK.
 # Fail-closed on missing/invalid math session. Math required for public guests.
 # Content filter always runs (even for logged-in users on public forms).
+# Order: honeypot → rate (session+IP) → content → guest math (CSC-20260911-6270)
 sub _spam_guard_fail {
     my ($self, $c, $event, $subject, $body) = @_;
     my $ip = $c->req->address || 'unknown';
@@ -2075,6 +2152,12 @@ sub _spam_guard_fail {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
             "Rate limit exceeded for HelpDesk public submit ip=$ip");
         return 'Too many submissions. Please wait before trying again.';
+    }
+
+    if ($self->_looks_like_spam_content($subject, $body)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+            "Spam content rejected from ip=$ip subject=" . substr($subject // '', 0, 80));
+        return 'Your message was blocked by our spam filter. If this is a real support request, email support or rephrase without promotional links.';
     }
 
     my $is_guest = $self->_is_public_guest($c);
@@ -2122,12 +2205,6 @@ sub _spam_guard_fail {
         return $fail->('wrong answer') if ($ans + 0) != ($expected + 0);
 
         $clear_challenge->();
-    }
-
-    if ($self->_looks_like_spam_content($subject, $body)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
-            "Spam content rejected from ip=$ip subject=" . substr($subject // '', 0, 80));
-        return 'Your message was blocked by our spam filter. If this is a real support request, email support or rephrase without promotional links.';
     }
 
     return '';

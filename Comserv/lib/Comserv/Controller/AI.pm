@@ -21,6 +21,7 @@ use Moose;
 use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny subs (Perl 5.40)
 use Try::Tiny;
 use JSON;
+use Comserv::Model::AI::ConversationScope qw(is_guest_session ensure_guest_session_id guest_meta_ok conversation_owned_by_session);
 use Template;
 use DateTime;
 use LWP::UserAgent;
@@ -2676,7 +2677,7 @@ sub chat :Local :Args(0) {
     my $is_guest = 0;
     
     # If not logged in, create guest session
-    if (!$username) {
+    if (!$username || lc($username) eq 'guest' || $username =~ /^Guest-/i) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -6546,7 +6547,7 @@ sub conversations :Local :Args(0) {
     my $is_guest = 0;
     
     # If not logged in, create guest session
-    if (!$username) {
+    if (!$username || lc($username) eq 'guest' || $username =~ /^Guest-/i) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -6617,19 +6618,7 @@ sub conversations :Local :Args(0) {
                 
                 # For guests, only show conversations that belong to this guest session
                 if ($is_guest) {
-                    my $conv_metadata = {};
-                    if ($conv->metadata) {
-                        try {
-                            $conv_metadata = decode_json($conv->metadata);
-                        } catch {
-                            # Metadata parsing failed, skip this conversation
-                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                                'conversations', "Failed to parse conversation metadata for ID=" . $conv->id);
-                        };
-                    }
-                    
-                    # Check if this conversation belongs to this guest session
-                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                    unless (guest_meta_ok($conv->metadata, $guest_session_id)) {
                         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                             'conversations', "Skipping conversation ID=" . $conv->id . " - not owned by this guest session");
                         next;
@@ -6950,20 +6939,15 @@ sub get_conversation_list :Local :Args(0) {
     
     $c->response->content_type('application/json');
     
-    my $username = $c->session->{username};
+    my $is_guest = is_guest_session($c);
     my $user_id = $c->session->{user_id};
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest = 0;
-    
-    if (!$username) {
-        $is_guest = 1;
-        $user_id = 199;
-        unless ($guest_session_id) {
-            use Data::UUID;
-            my $ug = Data::UUID->new;
-            $guest_session_id = $ug->create_str();
-            $c->session->{guest_session_id} = $guest_session_id;
-        }
+    my $guest_session_id = ensure_guest_session_id($c);
+    if ($is_guest) {
+        $user_id = 199 unless defined $user_id;
+    }
+    unless (defined $user_id) {
+        $c->response->body(encode_json({ success => JSON::true, conversations => [] }));
+        return;
     }
     
     try {
@@ -6979,13 +6963,7 @@ sub get_conversation_list :Local :Args(0) {
         my @conv_list;
         foreach my $conv ($conv_rs->all) {
             if ($is_guest) {
-                my $conv_metadata = {};
-                if ($conv->metadata) {
-                    try {
-                        $conv_metadata = decode_json($conv->metadata);
-                    } catch {};
-                }
-                next unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id);
+                next unless guest_meta_ok($conv->metadata, $guest_session_id);
             }
             
             my $message_count = $conv->ai_messages->count;
@@ -7029,16 +7007,6 @@ sub get_conversation_messages :Local :Args(1) {
         return;
     }
     
-    my $username = $c->session->{username};
-    my $user_id = $c->session->{user_id};
-    my $guest_session_id = $c->session->{guest_session_id};
-    my $is_guest = 0;
-    
-    if (!$username) {
-        $is_guest = 1;
-        $user_id = 199;
-    }
-    
     try {
         my $schema = $c->model('DBEncy')->schema;
         my $conv = $schema->resultset('AiConversation')->find($conversation_id);
@@ -7051,28 +7019,12 @@ sub get_conversation_messages :Local :Args(1) {
             return;
         }
         
-        if ($conv->user_id != $user_id) {
+        unless (conversation_owned_by_session($c, $conv)) {
             $c->response->body(encode_json({
                 success => JSON::false,
                 error => 'Access denied'
             }));
             return;
-        }
-        
-        if ($is_guest) {
-            my $conv_metadata = {};
-            if ($conv->metadata) {
-                try {
-                    $conv_metadata = decode_json($conv->metadata);
-                } catch {};
-            }
-            unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
-                $c->response->body(encode_json({
-                    success => JSON::false,
-                    error => 'Access denied'
-                }));
-                return;
-            }
         }
         
         my @messages;

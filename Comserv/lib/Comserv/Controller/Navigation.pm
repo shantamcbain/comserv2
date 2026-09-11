@@ -1068,8 +1068,9 @@ sub _hosted_accounts_for_viewer {
                 )->all if @ors;
             }
         }
-        elsif ( lc($current_site) eq 'csc' ) {
-            # Public CSC catalogue: guests and members see all active hosted sites (public DNS filtered later).
+        elsif ( lc($current_site) eq 'csc' && $c->session->{user_id} ) {
+            # Authenticated CSC viewers see active hosted sites (public DNS filtered later).
+            # Guests must not receive tenant inventory (CSC-20260831-1151).
             @accounts = $rs->search( { status => 'active' }, { order_by => 'sitename' } )->all;
         }
         elsif ( $c->session->{user_id} ) {

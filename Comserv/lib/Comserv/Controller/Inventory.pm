@@ -3263,7 +3263,14 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
     my $ap_acct_id = $invoice->ap_account_id;
     unless ($ap_acct_id) {
         my $ap = eval { $schema->resultset('Accounting::CoaAccount')->search(
-            { accno => { -like => '2%' }, obsolete => 0 },
+            # Site-scoped: this site's rows PLUS global (NULL/empty) rows.
+            # Unscoped, this could pick ANOTHER site's AP account and post GL
+            # to the wrong entity.
+            [
+                { accno => { -like => '2%' }, sitename => $sitename, obsolete => 0 },
+                { accno => { -like => '2%' }, sitename => undef,     obsolete => 0 },
+                { accno => { -like => '2%' }, sitename => '',        obsolete => 0 },
+            ],
             { order_by => 'accno', rows => 1 }
         )->single };
         $ap_acct_id = $ap->id if $ap;
@@ -3297,7 +3304,13 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
                 my $acct_id = $line->account_id;
                 unless ($acct_id) {
                     my $exp = eval { $schema->resultset('Accounting::CoaAccount')->search(
-                        { accno => { -like => '5%' }, obsolete => 0 },
+                        # Site-scoped (see AP lookup above): never fall back
+                        # to another site's expense account.
+                        [
+                            { accno => { -like => '5%' }, sitename => $sitename, obsolete => 0 },
+                            { accno => { -like => '5%' }, sitename => undef,     obsolete => 0 },
+                            { accno => { -like => '5%' }, sitename => '',        obsolete => 0 },
+                        ],
                         { order_by => 'accno', rows => 1 }
                     )->single };
                     $acct_id = $exp->id if $exp;
@@ -3331,7 +3344,12 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
                 });
                 # CR side: find Points/Equity clearing account (3xxx) or use AP account as memo-only
                 my $pts_acct = eval { $schema->resultset('Accounting::CoaAccount')->search(
-                    { accno => { -like => '3%' }, obsolete => 0 },
+                    # Site-scoped (see AP lookup above).
+                    [
+                        { accno => { -like => '3%' }, sitename => $sitename, obsolete => 0 },
+                        { accno => { -like => '3%' }, sitename => undef,     obsolete => 0 },
+                        { accno => { -like => '3%' }, sitename => '',        obsolete => 0 },
+                    ],
                     { order_by => 'accno', rows => 1 }
                 )->single };
                 if ($pts_acct) {
