@@ -221,7 +221,11 @@ __PACKAGE__->add_columns(
     });
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(unique_sku => ['sku']);
+# SKU must be unique WITHIN a sitename. A given SKU (e.g. INT-HDRY-BBL01) may exist on
+# different sites (CSC vs 3d) but never twice in the same site. Enforced here for DBIC
+# create/update awareness AND as the canonical declaration for the DB unique index
+# (add the matching UNIQUE INDEX (sitename, sku) via the schema-compare / migration flow).
+__PACKAGE__->add_unique_constraint(unique_sku_per_site => ['sitename', 'sku']);
 
 __PACKAGE__->belongs_to(
     'marketplace_listing',

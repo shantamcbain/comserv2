@@ -127,6 +127,43 @@ Each printer is an inventory item with category <code>3d_printer</code>, <code>3
     <li>If the <code>inventory_equipment</code> table does not exist, the printers page still loads — the equipment section shows an empty state rather than crashing.</li>
 </ul>
 
+<h3 id="printer-maintenance">5.1 Printer Maintenance (between-print, per printer type)</h3>
+<p class="doc-body">
+Maintenance is <strong>between-print work</strong>, performed by the worker <em>before</em> starting the next job
+— not on a cloud schedule. Our Anycubic printers previously tracked hours online (e.g. a 500-hour service
+interval) via the vendor cloud; that cloud link is now <strong>offline</strong>, so hour-based reminders no longer
+fire automatically. Until an in-app maintenance tracker exists, the worker is responsible for doing the
+pre-print checks below by hand. Track hours/cycles on the printer's inventory-item notes so the interval is not missed.
+</p>
+
+<p class="doc-body"><strong>Universal pre-next-print checklist (all types):</strong></p>
+<ul class="doc-ul">
+    <li>Confirm the correct filament is loaded and the spool matches the job (filament changes are a maintenance action, not free).</li>
+    <li>Inspect the build surface / plate for residue, wipe / re-glue as needed.</li>
+    <li>Check nozzle for clog or ooze; cold-pull or swap if degraded.</li>
+    <li>Verify belts/tension and any visible wear.</li>
+    <li>Clear the physical pick area of the <em>previous</em> part before the new job starts (pickup hygiene).</li>
+</ul>
+
+<p class="doc-body"><strong>Per printer type — details differ:</strong></p>
+<table class="doc-table">
+    <tr><th class="doc-th">Type</th><th class="doc-th">Key maintenance notes</th></tr>
+    <tr><td class="doc-td">Anycubic (Kobra / similar, LAN mode)</td>
+        <td class="doc-td">Hour counter is now manual — log run-hours in item notes; perform the 500-hour service (lubricate axes, inspect PTFE, belt tension) at that mark. LAN-mode telemetry (MQTTS) gives live temp/state but <em>not</em> a maintenance alarm. Filament-path and bed-adhesion checks every swap.</td></tr>
+    <tr><td class="doc-td">Bambu / AMS-style</td>
+        <td class="doc-td">AMS roller/feeder cleaning on filament change; nozzle wipe + chamber checks. Hydra/AMS rollers are printed parts — verify they are not the worn item before assuming a printer fault.</td></tr>
+    <tr><td class="doc-td">Resin / SLA</td>
+        <td class="doc-td">Resin vat clean, FEP inspection, cure-station check. (Not yet in this farm's BOM; documented for when added.)</td></tr>
+</table>
+
+<p class="doc-body doc-muted">
+<b>Open:</b> no automated maintenance tracker yet. Future: a per-printer maintenance schedule in the app
+(last-service timestamp + interval per printer type) that blocks/flags a printer past its interval, and
+auto-assign-to-next-available-printer for the queue (deferred until the between-print ritual is reliable).
+The queue currently stays printer-agnostic; the <em>queue</em> (not the traveler) is responsible for choosing
+the next available printer.
+</p>
+
 <hr>
 
 <h2 id="consignment">6. Consignment Integration</h2>
