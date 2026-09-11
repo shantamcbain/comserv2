@@ -1,0 +1,6 @@
+<div id="2026-09-11-guest-exposure-lockdown" class="cl-entry">
+<h3>2026-09-11 — Guest exposure lockdown (IT, Hosted, Weather, Site, ThemeTest)</h3>
+<p class="doc-body"><strong>What.</strong> Closed anonymous guest access to staff/internal surfaces: Root <code>LAYER 0</code> now treats full <code>/site</code>, <code>/Weather/configuration</code> (+ related write/test endpoints) as admin-only; new <code>LAYER 0b</code> requires login for <code>/it/*</code> and <code>/hosted</code>. Matching controller gates added in IT, Hosting, Weather, Site, ThemeTest; Navigation no longer builds the CSC hosted tenant catalogue for guests. Weather config continues to blank API keys in HTML and redirects unauthenticated/non-admin users to <code>/user/login</code>.</p>
+<p class="doc-body"><strong>Why.</strong> CSC-20260831-2970, CSC-20260831-1151, CSC-20260831-3242, CSC-20260906-6513, CSC-20260831-4599 — guests could read IT network/servers/docs, hosted tenant inventory, Weather config (API key risk), Site Management, and ThemeTest.</p>
+<p class="doc-body"><strong>Files.</strong> <code>lib/Comserv/Controller/Root.pm</code> · <code>IT.pm</code> · <code>Hosting.pm</code> · <code>Navigation.pm</code> · <code>Weather.pm</code> · <code>Site.pm</code> · <code>ThemeTest.pm</code> · this changelog entry</p>
+</div>

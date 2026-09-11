@@ -213,8 +213,19 @@ sub auto :Private {
     }
 
     # LAYER 0: Require admin role for sensitive paths
-    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site/(?:add|modify|delete)|themetest|file/admin)}) {
+    # site (full Site Management), themetest, Weather configuration (+ related write/test
+    # endpoints) — guests must never reach these (CSC-20260831-3242 / 6513 / 4599).
+    if ($c->req->path =~ m{^(?:debug|setup|admin|log|proxmox|remotedb|ai/admin|ENCY/(?:edit|add)|site(?:/|$)|themetest|file/admin|Weather/(?:configuration|test_config|save_configuration|poll|test_location|lookup_postal)(?:/|$))}) {
         unless ($c->user_exists && $c->check_user_roles('admin')) {
+            $c->response->redirect($c->uri_for('/user/login'));
+            return 0;
+        }
+    }
+
+    # LAYER 0b: Login required for staff/internal pages (any authenticated user)
+    # IT infra docs + hosted tenant inventory (CSC-20260831-2970 / 1151).
+    if ($c->req->path =~ m{^(?:it(?:/|$)|hosted(?:/|$))}i) {
+        unless ($c->user_exists) {
             $c->response->redirect($c->uri_for('/user/login'));
             return 0;
         }

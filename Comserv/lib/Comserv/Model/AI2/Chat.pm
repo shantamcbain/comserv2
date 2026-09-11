@@ -5,6 +5,7 @@ use namespace::autoclean -except => [qw(try catch finally)];  # keep Try::Tiny s
 
 use Try::Tiny;
 use JSON qw(encode_json decode_json);
+use Comserv::Model::AI::ConversationScope qw(is_guest_session ensure_guest_session_id conversation_owned_by_session);
 
 use Comserv::Util::Logging;
 use Comserv::Util::ModelCatalog;
@@ -416,7 +417,11 @@ sub process {
     # xAI grok auto-fills — not the same provider as SuperGrok.
     my $router = $c->model('AI2::Router');
     my $resp = try {
-        $router->chat_with_fallback($c, $provider_name, $use_model, $messages);
+        # use_search must be threaded to the provider: it is set by the widget
+        # (local-chat.js) and parsed in AI2.pm, but was never forwarded past
+        # this point, so Grok's search_parameters (Grok.pm) never fired.
+        $router->chat_with_fallback($c, $provider_name, $use_model, $messages,
+            ($args{use_search} ? (use_search => 1) : ()));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process',
             "Provider $provider_name threw: $_");
@@ -500,13 +505,21 @@ sub process {
     my $created_at = '';
     try {
         my $schema = $c->model('DBEncy')->schema;
-        my $uid    = $c->session->{user_id} // 199;
+        my $is_guest = is_guest_session($c);
+        my $uid = $c->session->{user_id};
+        if ($is_guest) {
+            $uid = 199 unless defined $uid;
+        }
+        die "No user_id for conversation persist\n" unless defined $uid;
         my $agent  = $args{agent_id} // 'general';
+        my $gid = $is_guest ? ensure_guest_session_id($c) : '';
 
         # Create a new conversation only when none was supplied (first turn)
         unless ($conversation_id && $conversation_id =~ /^\d+$/) {
             $saved_title = $prompt ? substr($prompt, 0, 80) : 'Chat Conversation';
             $saved_title =~ s/\n/ /g;
+            my %meta = (agent_id => $agent);
+            $meta{guest_session_id} = $gid if $is_guest && length $gid;
             my $conv = $schema->resultset('AiConversation')->create({
                 user_id    => $uid,
                 title      => $saved_title,
@@ -514,9 +527,18 @@ sub process {
                 task_id    => $args{task_id},
                 model      => $resp->{model} // $use_model // '',
                 status     => 'active',
-                metadata   => encode_json({ agent_id => $agent }),
+                metadata   => encode_json(\%meta),
             });
             $conversation_id = $conv ? $conv->id : undef;
+        } else {
+            my $existing = $schema->resultset('AiConversation')->find($conversation_id);
+            if ($existing) {
+                unless (conversation_owned_by_session($c, $existing)) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process',
+                        "Blocked persist into foreign conversation_id=$conversation_id");
+                    $conversation_id = undef;
+                }
+            }
         }
 
         if ($conversation_id) {
