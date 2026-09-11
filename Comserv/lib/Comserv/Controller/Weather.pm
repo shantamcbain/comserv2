@@ -179,13 +179,12 @@ sub forecast :Path('/Weather/forecast') :Args(0) {
 sub configuration :Path('/Weather/configuration') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Strict admin-only access for API key configuration (security)
-    my @roles = @{$c->session->{roles} || []};
-    my $is_admin = grep { /^admin$/i } @roles;
-    unless ($is_admin) {
+    # CSC-20260831-3242: admin-only; redirect guests to login; never render API keys below
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
         $c->flash->{error_msg} = 'Admin access required to configure weather API keys.';
-        $c->response->redirect($c->uri_for('/Weather'));
-        return;
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
     }
 
     # Initialize debug_errors array
@@ -228,8 +227,28 @@ sub configuration :Path('/Weather/configuration') :Args(0) {
     );
 }
 
+sub _require_weather_admin {
+    my ( $self, $c ) = @_;
+    my $root = $c->controller('Root');
+    unless ($root && $root->user_exists($c) && $root->check_user_roles($c, 'admin')) {
+        if (($c->req->header('X-Requested-With') || '') eq 'XMLHttpRequest'
+            || ($c->req->content_type || '') =~ /json/i
+            || ($c->req->param('format') || '') eq 'json') {
+            $c->response->status(403);
+            $c->stash->{json_data} = { success => 0, message => 'Admin access required' };
+            $c->forward('View::JSON');
+            $c->detach;
+        }
+        $c->flash->{error_msg} = 'Admin access required for weather configuration.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+    return 1;
+}
+
 sub test_configuration :Path('/Weather/test_config') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -275,6 +294,7 @@ sub test_configuration :Path('/Weather/test_config') :Args(0) {
 
 sub test_location :Path('/Weather/test_location') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -336,6 +356,7 @@ sub test_location :Path('/Weather/test_location') :Args(0) {
 
 sub lookup_postal_code :Path('/Weather/lookup_postal') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -386,6 +407,7 @@ sub lookup_postal_code :Path('/Weather/lookup_postal') :Args(0) {
 
 sub save_configuration :Path('/Weather/save_configuration') :Args(0) {
     my ( $self, $c ) = @_;
+    $self->_require_weather_admin($c);
 
     # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
@@ -449,13 +471,7 @@ sub _check_weather_config {
 
 sub poll_now :Path('/Weather/poll') :Args(0) {
     my ($self, $c) = @_;
-
-    my @roles = @{$c->session->{roles} || []};
-    unless (grep { /^admin$/i } @roles) {
-        $c->flash->{error_msg} = 'Admin access required to run weather poll.';
-        $c->response->redirect($c->uri_for('/Weather'));
-        return;
-    }
+    $self->_require_weather_admin($c);
 
     my $config = try {
         $self->weather_model->get_weather_config($c);
