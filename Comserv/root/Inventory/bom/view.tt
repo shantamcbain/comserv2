@@ -48,8 +48,7 @@
   </tr>
 </table>
 
-[% SET bom_rows = item.bom_components %]
-[% SET bom_rows = sorted_comp_origins ? sorted_comp_origins : [0] %]
+[%# bom_rows SET lines removed - legacy from before origin grouping %]
 
 [% IF item.item_origin == '3d_printed' || item.item_origin == '3d_printer' || item.requires_printing %]
 [% SET has_fil_bom = 0 %]
@@ -208,7 +207,6 @@
     </tfoot>
   </table>
   [% END %]
-[% END %]
 [% END %]
 
 [% ELSE %]

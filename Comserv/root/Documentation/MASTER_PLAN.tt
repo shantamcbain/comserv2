@@ -97,7 +97,7 @@ sub-plan remains the authoritative spec for its own work.</p>
         <a href="[% c.uri_for('/Documentation/3dPrintingPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Opens the 3D printing coordinator plan: overall view and links to Dryer, Sign, Browse, operator KB.">3dPrintingPlan (the document)</a>
         <a href="[% c.uri_for('/project/details') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Opens project #206 3DPRINT — the database project that coordinator is attached to.">Project #206 3DPRINT</a>
         <a href="[% c.uri_for('/todo') %]?project_id=206" class="doc-navlink" target="_blank" rel="noopener" title="Lists todos on project #206 3DPRINT.">Todos on #206</a>
-        <a href="[% c.uri_for('/Documentation/DryerProjectImportPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Child plan: HDRY dryer import playbook (PDF BOM).">Dryer playbook (child)</a>
+        <a href="[% c.uri_for('/Documentation/DryerProjectPlan') %]" class="doc-navlink" target="_blank" rel="noopener" title="Child plan: HDRY dryer import playbook (PDF BOM).">Dryer playbook (child)</a>
     </div>
 </div>
 

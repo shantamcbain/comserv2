@@ -416,6 +416,14 @@
 
     <div class="row">
         <div class="col-100">
+            <h2 id="crosscheck" class="doc-h2">5c. Part-number cross-check (PDF vs 3MF vs ZIP vs Inventory)</h2>
+            <p class="doc-body">Full reconciliation matrix: <a href="[% c.uri_for('/Documentation/hdry_partnumber_crosscheck') %]" class="doc-link" target="_blank" rel="noopener">/Documentation/hdry_partnumber_crosscheck</a>.
+            Covers every HDRY code across the assembly manual, the seven 3MF plate exports, the Upgrade-2 ZIP, and the live inventory, including the group-plate complication (one plate &ne; one part; duplicate exports; door-hinge variant forks).</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
             <h2 id="invoice" class="doc-h2">6. Invoice for the files + monthly support</h2>
             <p class="doc-body">This is Inventory/Accounting work consumed by the 3d project — not a second
             invoice stack. Use the existing supplier-invoice UI.</p>

@@ -16,6 +16,9 @@ use namespace::autoclean -except => [qw(try catch finally)];
 use Try::Tiny;
 use JSON;
 use DateTime;
+use LWP::UserAgent;
+use HTTP::Request;
+use URI::Escape;
 use Comserv::Util::Logging;
 
 extends 'Catalyst::Model';
@@ -114,6 +117,15 @@ sub detect_create_intent {
     }
     elsif ($p =~ /\b(today)\b/i) {
         $invoice_date = _today();
+    }
+    # "Paid September 10, 2026" / "dated Sep 10 2026" — a plain Month-DD-YYYY
+    # date is the most common form on a pasted receipt, so parse it here.
+    elsif ($p =~ /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/i) {
+        my %mon = (jan=>1, feb=>2, mar=>3, apr=>4, may=>5, jun=>6,
+                   jul=>7, aug=>8, sep=>9, oct=>10, nov=>11, dec=>12);
+        my $m = $mon{ lc substr($1, 0, 3) } || 1;
+        my $d = $2; my $y = $3;
+        $invoice_date = sprintf('%04d-%02d-%02d', $y, $m, $d);
     }
 
     my $amount;
@@ -298,7 +310,7 @@ sub chat_contract {
         }
     }
     else {
-        $list = "No active suppliers listed for $sitename yet. Ask which supplier, or send the user to /Inventory/supplier.\n";
+        $list = "No active suppliers listed for $sitename yet. New suppliers are auto-created when you enter an invoice — just name the supplier. Web lookup may add contact info.\n";
     }
     return <<"END";
 INVOICE ENTRY (SiteName=$sitename) — DRAFT ONLY, never post GL from chat:
@@ -309,7 +321,7 @@ When the user pastes or asks to enter/record/add an invoice or bill:
 [ACTION: {"action":"create_invoice","params":{"kind":"supplier","supplier_name":"...","invoice_number":"...","invoice_date":"YYYY-MM-DD","amount":0,"tax_amount":0,"description":"..."}}]
 For a sales invoice use kind=customer and customer_name instead of supplier_name.
 4. The server creates a DRAFT on this SiteName. Accounting posts later at /Inventory/invoice (AP) or /Inventory/sales (AR).
-5. If supplier is missing or ambiguous the server will ASK — do not invent a supplier_id.
+5. If supplier is missing or ambiguous the server auto-creates it from the party name, then creates the draft invoice. Do not invent a supplier_id manually.
 6. Do not emit create_invoice unless the user asked to enter/record an invoice.
 
 $list
@@ -376,14 +388,27 @@ sub create_from_params {
         };
     }
     unless ($match->{supplier} && $match->{supplier}{id}) {
-        return {
-            success       => JSON::false,
-            need_supplier => JSON::true,
-            sitename      => $sitename,
-            draft         => $params,
-            candidates    => $match->{candidates} || [],
-            message       => "No supplier on $sitename matches. Name the supplier, or add one at /Inventory (then retry).",
-        };
+        # Auto-create the supplier from the parsed party name instead of
+        # just asking the user to go to /Inventory manually.
+        my $auto = $self->_auto_create_supplier($c, $schema, {
+            sitename => $sitename,
+            user     => $user,
+            name     => $params->{supplier_name} || $params->{party} || '',
+            notes    => "Auto-created from Chat-with-AI invoice entry.",
+        });
+        if ($auto && $auto->{id}) {
+            $match = { status => 'exact', supplier => { id => $auto->{id}, name => $auto->{name} || '' } };
+        }
+        else {
+            return {
+                success       => JSON::false,
+                need_supplier => JSON::true,
+                sitename      => $sitename,
+                draft         => $params,
+                candidates    => $match->{candidates} || [],
+                message       => "No supplier found — web lookup may be needed.",
+            };
+        }
     }
 
     return $self->_insert_supplier($c, $schema, {
@@ -398,6 +423,125 @@ sub create_from_params {
         description    => $params->{description} || $params->{notes} || '',
         notes          => $params->{notes} || '',
     });
+}
+
+sub _auto_create_supplier {
+    my ($self, $c, $schema, $args) = @_;
+    my $name = $args->{name} || '';
+    $name =~ s/^\s+|\s+$//g;
+    return undef unless length $name >= 2;
+
+    my $sitename = $args->{sitename} || $self->sitename($c);
+    my $user     = $args->{user} || 'ai';
+    my $now      = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+
+    # Check for an existing supplier with this name before creating
+    my $existing;
+    eval {
+        $existing = $schema->resultset('Accounting::InventorySupplier')->search({
+            sitename => $sitename,
+            name     => $name,
+        })->first;
+    };
+    if ($existing) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_create_supplier',
+            "Supplier '$name' already exists on $sitename");
+        return { id => 0 + $existing->id, name => $existing->name // '' };
+    }
+
+    # Attempt web lookup to enrich supplier data
+    my $enriched = $self->_web_lookup_supplier($c, $name);
+
+    my $supplier;
+    eval {
+        $supplier = $schema->resultset('Accounting::InventorySupplier')->create({
+            sitename     => $sitename,
+            name         => $name,
+            contact_name => $enriched->{contact_name} || undef,
+            email        => $enriched->{email} || undef,
+            phone        => $enriched->{phone} || undef,
+            address      => $enriched->{address} || undef,
+            website      => $enriched->{website} || undef,
+            status       => 'active',
+            notes        => $args->{notes} || 'Auto-created from Chat-with-AI invoice entry.',
+            created_by   => $user,
+            created_at   => $now,
+            updated_at   => $now,
+        });
+    };
+    if ($@ || !$supplier) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'auto_create_supplier', "Failed: $@");
+        return undef;
+    }
+
+    # If web lookup returned extra fields not in the initial insert, update
+    if ($enriched && ($enriched->{contact_name} || $enriched->{email} || $enriched->{phone} || $enriched->{address} || $enriched->{website})) {
+        my %update;
+        $update{contact_name} = $enriched->{contact_name} if $enriched->{contact_name};
+        $update{email}        = $enriched->{email}        if $enriched->{email};
+        $update{phone}        = $enriched->{phone}        if $enriched->{phone};
+        $update{address}      = $enriched->{address}      if $enriched->{address};
+        $update{website}      = $enriched->{website}      if $enriched->{website};
+        eval { $supplier->update(\%update) };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_create_supplier',
+        "Auto-created supplier #$supplier->id '$name' on $sitename" . ($enriched ? ' (web-enriched)' : ''));
+    return { id => 0 + $supplier->id, name => $supplier->name // '' };
+}
+
+sub _web_lookup_supplier {
+    my ($self, $c, $name) = @_;
+    my $q = "supplier contact info $name email phone address website";
+    my $ua = LWP::UserAgent->new(timeout => 10);
+    $ua->agent('Comserv/2.0');
+
+    my %result;
+    eval {
+        my $url = 'https://api.duckduckgo.com/?q='
+                . uri_escape($q)
+                . '&format=json&no_html=1&skip_disambig=1';
+        my $req  = HTTP::Request->new(GET => $url);
+        my $resp = $ua->request($req);
+        if ($resp->is_success) {
+            my $data = JSON::decode_json($resp->decoded_content);
+            # Grab the best abstract as a starting point
+            if ($data->{AbstractText} && $data->{AbstractURL}) {
+                my $abstract = $data->{AbstractText};
+                # Try to extract email from abstract/related topics
+                if ($abstract =~ /[\w.-]+@[\w.-]+\.\w+/) {
+                    $result{email} = $1;
+                }
+                # Try to extract phone-like patterns
+                if ($abstract =~ /(\+?[\d\s\-\(\)]{7,20})/) {
+                    $result{phone} = $1;
+                }
+            }
+            # Search related topics for more specific info
+            for my $t (@{ $data->{RelatedTopics} || [] }) {
+                next unless ref($t) eq 'HASH' && $t->{Text} && $t->{FirstURL};
+                last if keys %result >= 4;  # stop when we have enough
+                my $text = $t->{Text};
+                if ($text =~ /[\w.-]+@[\w.-]+\.\w+/) {
+                    $result{email} = $1;
+                }
+                elsif ($text =~ /(\+?[\d\s\-\(\)]{7,20})/) {
+                    $result{phone} = $1;
+                }
+                elsif ($t->{Text} =~ /address/i && $t->{Text} =~ /[\w\s,]+\s+\w+/) {
+                    # Could be an address — too noisy, skip
+                }
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'web_lookup_supplier', "DDG lookup failed for '$name': $@");
+        return undef;
+    }
+    return \%result if keys %result;
+    return undef;
 }
 
 sub _insert_supplier {
