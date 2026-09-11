@@ -17,6 +17,10 @@ GW_NET="${GATEWAY_NET:-192.168.1.0/24}"
 GW_IP="${GATEWAY_IP:-192.168.1.1}"
 ZT_NET="${ZT_NET:-172.30.0.0/16}"
 
+# Detect current ZeroTier IP (for box instructions and hints)
+ZT_IP=$(ip -4 addr show 2>/dev/null | awk '/^[0-9]+: zt/ {iface=$2; getline; if ($1 ~ /inet/) {print $2; exit}}' | cut -d/ -f1 || true)
+[ -z "$ZT_IP" ] && ZT_IP="172.30.131.126"
+
 echo "=== Opening Comserv AI editor port 4006 for gateway/LAN/ZeroTier ==="
 
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
@@ -56,7 +60,17 @@ fi
 echo ""
 echo "=== Reachability hints ==="
 echo "  LAN:        http://workstation.local:4006/"
-echo "  ZeroTier:  http://172.30.131.126:4006/  (or edit.computersystemconsulting.ca:4006)"
-echo "  Authorize new ZeroTier members in ZeroTier Central for network af78bf943680bfeb"
+echo "  ZeroTier:  http://workstation.local:4006/  (current ZT IP: ${ZT_IP})"
+echo "  (or direct: http://${ZT_IP}:4006/ or edit.computersystemconsulting.ca:4006)"
+echo ""
+echo "=== For Grok Bot (CSC developer box) on ZeroTier af78bf943680bfeb ==="
+echo "  1. Authorize the box member in ZeroTier Central *using the API* (not web UI)."
+echo "  2. On the box, ensure /etc/hosts (or DNS) resolves:"
+echo "       ${ZT_IP} workstation.local"
+echo "  3. Test reachability with hostname (required for app login/sitedomain/allowlist; raw IP will not work for browser login):"
+echo "       curl -sS -o /dev/null -w '%{http_code}' -H 'Host: workstation.local' http://workstation.local:4006/"
+echo "  4. Browser on box: http://workstation.local:4006/  (then /ai2/editing_widget_popup after login as shanta)"
+echo ""
+echo "Authorize new ZeroTier members in ZeroTier Central for network af78bf943680bfeb"
 echo ""
 echo "Done."

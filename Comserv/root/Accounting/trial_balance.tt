@@ -1,0 +1,95 @@
+[% PageVersion = 'Accounting/trial_balance.tt,v 0.01 2026/09/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Trial Balance</h1>
+<p><a href="/Accounting">← Accounting</a> | <a href="/Accounting/coa">Chart of Accounts</a></p>
+<p><strong>Site:</strong> [% sitename | html %]</p>
+
+[% IF total_debit == 0 && total_credit == 0 %]
+  <p style="color:#888;">No GL activity recorded for this site yet.</p>
+[% END %]
+
+[% SET cat_labels = {A = 'Asset', L = 'Liability', Q = 'Equity', I = 'Income', E = 'Expense'} %]
+
+[% IF accounts.size %]
+<table border="1" cellpadding="4" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr style="background:var(--bg-subtle,#eee);">
+      <th>Account #</th>
+      <th>Description</th>
+      <th style="text-align:right">Debit</th>
+      <th style="text-align:right">Credit</th>
+      <th style="text-align:right">Balance</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% SET last_cat = '' %]
+  [% FOREACH acct IN accounts %]
+    [% IF acct.category != last_cat %]
+      [% SET last_cat = acct.category %]
+      <tr style="background:var(--bg-subtle,#f7f7f7);font-weight:bold;">
+        <td colspan="5">[% cat_labels.${acct.category} || acct.category %]</td>
+      </tr>
+    [% END %]
+    [% SET b = balances.${acct.id} %]
+    <tr>
+      <td>[% acct.accno | html %]</td>
+      <td>[% acct.description | html %]</td>
+      <td style="text-align:right">[% IF b.debit %]$[% b.debit %][% END %]</td>
+      <td style="text-align:right">[% IF b.credit %]$[% b.credit %][% END %]</td>
+      <td style="text-align:right">
+        [% SET amt = b.balance || 0 %]
+        [% IF amt < 0 %]($[% -amt %])[% ELSE %]$[% amt %][% END %]
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+  <tfoot>
+    <tr style="font-weight:bold;background:var(--bg-subtle,#eee);">
+      <td colspan="2">TOTALS</td>
+      <td style="text-align:right">$[% total_debit %]</td>
+      <td style="text-align:right">$[% total_credit %]</td>
+      <td style="text-align:right"></td>
+    </tr>
+  </tfoot>
+</table>
+
+<div style="margin-top:1em;padding:10px 14px;border-left:4px solid [% IF balanced %]var(--success-color,#28a745)[% ELSE %]var(--danger-color,#dc3545)[% END %];background:var(--bg-subtle,#f6f6f6);">
+  [% IF balanced %]
+    <strong style="color:green;">Balanced.</strong>
+    Total debits equal total credits ($[% total_debit %]).
+  [% ELSE %]
+    <strong style="color:red;">Out of balance.</strong>
+    Debits $[% total_debit %] vs credits $[% total_credit %]
+    — difference <strong>$[% difference %]</strong>.
+  [% END %]
+</div>
+
+[% IF by_category %]
+<h2>By Category</h2>
+<table border="1" cellpadding="4" style="border-collapse:collapse;">
+  <thead>
+    <tr><th>Category</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Net</th></tr>
+  </thead>
+  <tbody>
+  [% FOREACH c IN ['A','L','Q','I','E'] %]
+    [% IF by_category.${c} %]
+    <tr>
+      <td>[% cat_labels.${c} %]</td>
+      <td style="text-align:right">$[% by_category.${c}.debit %]</td>
+      <td style="text-align:right">$[% by_category.${c}.credit %]</td>
+      <td style="text-align:right">$[% by_category.${c}.net %]</td>
+    </tr>
+    [% END %]
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+[% ELSE %]
+<p>No accounts found for this site.</p>
+[% END %]
+
+<p style="margin-top:1.5em;color:#666;font-size:0.9em;">
+  Balances are computed from GL entry lines restricted to this site
+  (GlEntry.sitename). Contra accounts are shown with their direction flipped.
+</p>

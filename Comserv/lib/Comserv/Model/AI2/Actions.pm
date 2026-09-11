@@ -415,7 +415,22 @@ sub perform {
         return;
     }
 
-    # ── create_invoice ────────────────────────────────────────────────────────
+    # ── resolve_supplier ───────────────────────────────────────────────────
+    # Look up a supplier by name and return its numeric id so the AI can
+    # pre-fill <select name="supplier_id">. The client used to guess the
+    # vendor from a HARDCODED regex list (HostGator|PayPal|OpenAI|...), which
+    # cannot cover new vendors — "OpenRouter" matched nothing and fell back to
+    # the literal string 'Supplier', leaving the dropdown empty. The server
+    # already resolves this correctly via match_supplier, so ask it.
+    if ($action_name eq 'resolve_supplier') {
+        require Comserv::Model::AI2::InvoiceCreate;
+        my $brain = eval { $c->model('AI2::InvoiceCreate') };
+        $brain = Comserv::Model::AI2::InvoiceCreate->new if !$brain || !ref $brain;
+        $brain->perform_resolve_supplier($c, $params);
+        return;
+    }
+
+    # ── create_invoice ──────────────────────────────────────────────────────
     # Draft AP/AR via existing Inventory tables. Never posts GL.
     if ($action_name eq 'create_invoice') {
         require Comserv::Model::AI2::InvoiceCreate;
