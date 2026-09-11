@@ -358,7 +358,7 @@ sub pick_free_fallback {
 }
 
 sub _chat_one {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
 
     my $dispatch = {
         ollama     => 'AI2::Provider::Ollama',
@@ -386,6 +386,9 @@ sub _chat_one {
             model    => $self->_bare_model($use_model),
             host     => $host,
             port     => $port,
+            # Threaded from Chat.pm: the web-search toggle was set by the
+            # widget but dropped here, so Grok's search_parameters never fired.
+            ($opts{use_search} ? (use_search => 1) : ()),
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_chat_one',
@@ -403,10 +406,10 @@ sub _chat_one {
 # Same hop, up to 3 tries, on 502/503/504 only. Sleep 1s then 2s.
 # Does not retry 401/400 (bad key / bad model).
 sub _chat_one_with_retry {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
     my $resp;
     for my $attempt (1 .. 3) {
-        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages);
+        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages, %opts);
         return $resp if $resp && $resp->{success};
         my $err = ($resp && $resp->{error}) || '';
         last unless $self->_transient_outage($err);
@@ -423,7 +426,7 @@ sub _chat_one_with_retry {
 # API) fall back to free OpenRouter then Ollama. xAI grok auto-fills — do
 # not steal the turn away from grok on a credit error.
 sub chat_with_fallback {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
 
     my $skip_paid = 0;
     my $pre_err;
@@ -441,7 +444,7 @@ sub chat_with_fallback {
 
     my $resp;
     unless ($skip_paid) {
-        $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages);
+        $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages, %opts);
         if ($resp && $resp->{success}) {
             return $resp;
         }

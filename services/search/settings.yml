@@ -1,0 +1,88 @@
+# comserv2-search — SearXNG settings
+#
+# The point of self-hosting is SCOPE CONTROL, so the engine list below is
+# deliberately short. Every engine you enable is another place a query can
+# leak to, and another source you cannot vouch for.
+#
+# Edit this file, then:  docker compose restart search
+
+use_default_settings: true
+
+general:
+  instance_name: "comserv2-search"
+  # Internal LAN service — no public contact address needed.
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  # Per-query filtering MUST stay enabled: the app relies on !site / site:
+  # operators to scope a search (e.g. ENCY -> ema.europa.eu, pubmed).
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  # The app server and this container are on the same LAN.
+  secret_key: "CHANGE_ME_ON_DEPLOY"
+  limiter: false
+  image_proxy: false
+  method: "POST"
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-Frame-Options: DENY
+
+# ---------------------------------------------------------------------------
+# ENGINES — keep this short and deliberate.
+#
+# Enabled: independent / privacy-respecting / EU-leaning sources that suit
+#          general and ENCY lookups.
+# Disabled: big commercial indexes. Turn them on only if you accept that
+#           queries go to them.
+# ---------------------------------------------------------------------------
+engines:
+  - name: duckduckgo
+    engine: duckduckgo
+    disabled: false
+
+  - name: mojeek
+    engine: mojeek
+    disabled: false
+    # Independent index, EU-based — useful for non-US-centric results.
+
+  - name: marginalia
+    engine: marginalia
+    disabled: false
+    # Small web / non-commercial index. Good for the "not just the North
+    # American medical industry" requirement.
+
+  - name: wikipedia
+    engine: wikipedia
+    disabled: false
+
+  - name: startpage
+    engine: startpage
+    disabled: true
+
+  - name: google
+    engine: google
+    disabled: true
+
+  - name: bing
+    engine: bing
+    disabled: true
+
+  - name: brave
+    engine: brave
+    disabled: true
+
+# ---------------------------------------------------------------------------
+# RESULT POST-PROCESSING
+# ---------------------------------------------------------------------------
+# Do NOT add a global domain blocklist here — scope is chosen PER QUERY by the
+# caller (see the search tier design), so a hardcoded allowlist would fight
+# the feature. Engine selection above is the coarse control.
