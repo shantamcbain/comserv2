@@ -44,15 +44,33 @@
     </select>
   </label>
   &nbsp;
+  <label>Category:
+    <select name="category">
+      <option value="">-- All Categories --</option>
+      [% FOREACH cat IN categories %]
+      <option value="[% cat %]"[% IF category == cat %] selected[% END %]>[% cat %]</option>
+      [% END %]
+    </select>
+  </label>
+  &nbsp;
   <label>
     <input type="checkbox" name="low_only" value="1"[% IF low_only %] checked[% END %]>
     Low stock only
   </label>
   &nbsp;
   <input type="submit" value="Filter">
-  [% IF low_only || item_id || location_id %]
+  [% IF low_only || item_id || location_id || category %]
   &nbsp;<a href="/Inventory/stock/levels">Clear</a>
   [% END %]
+</form>
+
+<form method="POST" action="/Inventory/po/order_group" style="margin:0.75rem 0;">
+  <input type="hidden" name="return_to" value="[% c.req.uri %]">
+  <input type="hidden" name="item_id" value="" id="order-group-ids">
+  <button type="submit" class="btn-order"
+    onclick="return orderSelectedBySupplier(this);"
+    title="Create one draft PO per supplier for the ticked orderable items (BOMs expand to their parts)">🛒 Order selected by supplier</button>
+  <span style="font-size:0.8rem;color:var(--text-muted-color,#666);margin-left:0.5rem;">Tick rows below, or leave none ticked to order all orderable low/missing items.</span>
 </form>
 
 [% IF stock_rows.size == 0 %]
@@ -65,6 +83,7 @@
 <table border="1" cellpadding="4" cellspacing="0">
   <thead>
     <tr>
+      <th><input type="checkbox" id="order-all" onclick="toggleAllOrder(this)"></th>
       <th>SKU</th>
       <th>Item</th>
       <th>Location</th>
@@ -89,6 +108,7 @@
     [% qty_on_order = sl ? sl.quantity_on_order : 0 %]
     [% available = qty_on_hand - qty_reserved %]
     <tr[% IF row.is_low %] style="background: var(--caution-bg, #fff3cd)"[% ELSIF !sl %] style="color:#666"[% END %]>
+      <td>[% IF row.is_orderable %]<input type="checkbox" class="order-chk" value="[% item.id %]">[% ELSE %]<span style="opacity:0.3" title="Not orderable (equipment / printed / cost centre)">—</span>[% END %]</td>
       <td>[% item.sku %]</td>
       <td><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a>[% IF row.is_missing %] <span style="color:#b91c1c;font-size:0.75rem;">⚠ Missing</span>[% END %]</td>
       <td>[% loc ? loc.name : '—' %]</td>
@@ -126,3 +146,18 @@
 [% IF debug_errors && debug_errors.size > 0 %]
 <div class="debug">[% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]</div>
 [% END %]
+
+<script>
+function toggleAllOrder(master) {
+  document.querySelectorAll('.order-chk').forEach(function (cb) { cb.checked = master.checked; });
+}
+function orderSelectedBySupplier(btn) {
+  var ids = [];
+  document.querySelectorAll('.order-chk:checked').forEach(function (cb) { ids.push(cb.value); });
+  document.getElementById('order-group-ids').value = ids.join(',');
+  var msg = ids.length
+    ? 'Create draft POs (one per supplier) for ' + ids.length + ' selected item(s)? BOMs expand to their parts.'
+    : 'Create draft POs for ALL orderable low/missing items (one per supplier)? BOMs expand to their parts.';
+  return confirm(msg);
+}
+</script>

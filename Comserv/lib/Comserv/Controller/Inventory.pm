@@ -1909,18 +1909,32 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
     my $low_only   = $c->req->params->{low_only} || 0;
     my $item_id    = $c->req->params->{item_id}  || '';
     my $location_id = $c->req->params->{location_id} || '';
+    my $category   = $c->req->params->{category} || '';
 
-    my (@stock_rows, @items, @locations);
+    # Origins/categories that are never purchase-ordered (cost centres, printed
+    # parts, capital equipment/printers). Used to flag rows as non-orderable so
+    # the group "Order by supplier" action skips them.
+    my %skip_origin = map { $_ => 1 } qw(overhead cost 3d_printed);
+    my %skip_cat    = map { $_ => 1 } qw(Equipment 3d_printer);
+
+    my (@stock_rows, @items, @locations, @categories);
     eval {
         my %item_search = (sitename => $sitename, status => 'active');
         $item_search{id} = $item_id if $item_id;
+        $item_search{category} = $category if $category;
 
         @items     = $schema->resultset('Accounting::InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
         @locations = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
+        @categories = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, status => 'active', category => { '!=' => undef } },
+            { columns => ['category'], distinct => 1, order_by => 'category' }
+        )->get_column('category')->all;
 
         for my $item (@items) {
             my %sl_search = (item_id => $item->id);
             $sl_search{location_id} = $location_id if $location_id;
+
+            my $is_orderable = (!$skip_origin{ lc($item->item_origin||'') }) && (!$skip_cat{ $item->category||'' });
 
             my @sls = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 \%sl_search,
@@ -1933,10 +1947,11 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
                     my $is_low  = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
                     next if $low_only && !$is_low;
                     push @stock_rows, {
-                        sl       => $sl,
-                        item     => $item,
-                        location => $sl->location,
-                        is_low   => $is_low,
+                        sl           => $sl,
+                        item         => $item,
+                        location     => $sl->location,
+                        is_low       => $is_low,
+                        is_orderable => $is_orderable,
                     };
                 }
             } else {
@@ -1950,11 +1965,12 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
                 my $is_low     = ($reorder > 0 || $low_only) ? 1 : 0;
                 next if $low_only && !$is_low;
                 push @stock_rows, {
-                    sl         => undef,
-                    item       => $item,
-                    location   => undef,
-                    is_low     => $is_low,
-                    is_missing => $is_missing,
+                    sl           => undef,
+                    item         => $item,
+                    location     => undef,
+                    is_low       => $is_low,
+                    is_missing   => $is_missing,
+                    is_orderable => $is_orderable,
                 };
             }
         }
@@ -1965,6 +1981,8 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
         stock_rows  => \@stock_rows,
         items       => \@items,
         locations   => \@locations,
+        categories  => \@categories,
+        category    => $category,
         low_only    => $low_only,
         item_id     => $item_id,
         location_id => $location_id,
@@ -2240,8 +2258,71 @@ sub po_order_item :Path('/Inventory/po/order_item') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'po_order_item',
         "Traveler order: PO $res->{po_number} for item $item_id (supplier $supplier_id, qty $qty)");
     $c->flash->{success_msg} = "Purchase Order $res->{po_number} created for "
-        . "[$item->sku] $item->name (supplier: $supplier_name).";
+        . " [$item->sku] $item->name (supplier: $supplier_name).";
     $c->res->redirect($c->uri_for('/Inventory/po/view', [$res->{po_id}]));
+}
+
+# Group "Order by supplier" from the Stock Levels low-only / orderable list.
+# Accepts a list of item_ids (checkboxes) and, for each item's preferred supplier,
+# creates one draft PO containing that supplier's lines. BOM parents are expanded to
+# their short leaf components by orderable_low_list. If no ids are posted, orders all
+# orderable low/missing items. Redirects to the PO list when done.
+sub po_order_group :Path('/Inventory/po/order_group') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+    my $return   = $params->{return_to} || $c->req->params->{return_to}
+                || $c->uri_for('/Inventory/stock/levels', { low_only => 1 });
+
+    my @ids;
+    my $ids_raw = $params->{item_id};
+    if (ref($ids_raw) eq 'ARRAY') { @ids = @$ids_raw; }
+    elsif ($ids_raw) { @ids = ($ids_raw); }
+
+    my $util = Comserv::Util::Inventory::Purchasing->new;
+    my $res  = $util->orderable_low_list($c, {
+        sitename     => $sitename,
+        selected_ids => \@ids,
+        expand_bom  => 1,
+    });
+    unless ($res->{ok}) {
+        $c->flash->{error_msg} = $res->{error} || 'Could not build order list';
+        $c->res->redirect($return);
+        return;
+    }
+
+    my @groups = @{ $res->{by_supplier} || [] };
+    unless (@groups) {
+        $c->flash->{error_msg} = 'No orderable items with a linked supplier selected.';
+        $c->res->redirect($return);
+        return;
+    }
+
+    my @created;
+    my $err;
+    for my $grp (@groups) {
+        my @lines = map { { item_id => $_->{item_id}, quantity => $_->{suggested_qty} || 1 } }
+                    @{ $grp->{items} || [] };
+        next unless @lines;
+        my $r = $util->create_po($c, {
+            sitename    => $sitename,
+            supplier_id => $grp->{supplier_id},
+            lines       => \@lines,
+            notes       => 'Group order from stock low list (by supplier).',
+            origin      => 'traveler',
+        });
+        if ($r->{ok}) { push @created, $r->{po_number}; }
+        else { $err .= " Supplier $grp->{supplier_name}: " . ($r->{error} || 'failed') . ';'; }
+    }
+
+    if ($err) {
+        $c->flash->{error_msg} = "Some POs failed:$err";
+    }
+    if (@created) {
+        $c->flash->{success_msg} = 'Created POs: ' . join(', ', @created);
+    }
+    $c->res->redirect($c->uri_for('/Inventory/po'));
 }
 
 sub po_list :Path('/Inventory/po') :Args(0) {
