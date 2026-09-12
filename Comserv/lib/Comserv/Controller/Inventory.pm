@@ -1931,12 +1931,16 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
                     };
                 }
             } else {
-                next if $low_only;
+                # Item has no stock_level rows: effective qty is 0.
+                # It is below reorder when it has a reorder point set (0 <= reorder_point).
+                my $reorder = defined $item->reorder_point ? $item->reorder_point : 0;
+                my $is_low  = ($reorder > 0) ? 1 : 0;
+                next if $low_only && !$is_low;
                 push @stock_rows, {
                     sl       => undef,
                     item     => $item,
                     location => undef,
-                    is_low   => 0,
+                    is_low   => $is_low,
                 };
             }
         }

@@ -132,8 +132,15 @@ Each printer is an inventory item with category <code>3d_printer</code>, <code>3
 Maintenance is <strong>between-print work</strong>, performed by the worker <em>before</em> starting the next job
 — not on a cloud schedule. Our Anycubic printers previously tracked hours online (e.g. a 500-hour service
 interval) via the vendor cloud; that cloud link is now <strong>offline</strong>, so hour-based reminders no longer
-fire automatically. Until an in-app maintenance tracker exists, the worker is responsible for doing the
-pre-print checks below by hand. Track hours/cycles on the printer's inventory-item notes so the interval is not missed.
+fire automatically.
+</p>
+
+<p class="doc-body">
+<strong>LAN switch timing (for hour back-fill):</strong> LAN mode (direct MQTT to the Kobra 3) was brought online in early-to-mid September 2026 (active development visible in commits around 2026-09-01 to 2026-09-11, including Kobra3 LAN discover/attach/control and state fetching). Pre-LAN prints (user recalls ~2–3 jobs) must be estimated from completed job records + any session logs from the setup period. Full printer state (including remain_time_min and print_time_min from the printer itself) is now captured on queue loads and job completion into per-printer JSON files at <code>/data/nfs/3d/printer_states/printer_&lt;id&gt;.json</code>. Use these + sum of <code>print_time</code> from completed <code>Printing3dJob</code> rows for cumulative hours per printer.
+</p>
+
+<p class="doc-body">
+Until an in-app maintenance tracker exists, the worker is responsible for doing the pre-print checks below by hand. Track hours/cycles on the printer's inventory-item notes so the interval is not missed.
 </p>
 
 <p class="doc-body"><strong>Universal pre-next-print checklist (all types):</strong></p>

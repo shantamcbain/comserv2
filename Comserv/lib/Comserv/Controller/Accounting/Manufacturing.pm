@@ -5,6 +5,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Manufacturing::Traveler;
+use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -164,6 +165,130 @@ sub traveler_view :Local :Args(1) {
 sub traveler_print :Local :Args(1) {
     my ($self, $c, $order_id) = @_;
     return $self->_render_print($c, $order_id);
+}
+
+# POST /Accounting/manufacturing/cancel/<order_id>
+# Cancels the manufacturing order, cancels non-running jobs for its items,
+# releases reservations. Global release so other orders can claim.
+sub cancel :Local :Args(1) {
+    my ($self, $c, $order_id_param) = @_;
+    my $schema = $c->model('DBEncy');
+    my $sitename = $self->_sitename($c);
+    my $cancelled_jobs = 0;
+
+    if ($order_id_param =~ /^item-(\d+)$/i) {
+        # Handle synthetic in-house "order" (e.g. item-51, item-52, item-53 from Traveler)
+        my $item_id = $1;
+
+        eval {
+            $schema->txn_do(sub {
+                # Cancel active jobs linked to this inventory item
+                my @jobs = $schema->resultset('Printing3dJob')->search({
+                    sitename => $sitename,
+                    source_item_id => $item_id,
+                    status => { -in => [qw(queued assigned printing)] },
+                })->all;
+
+                for my $job (@jobs) {
+                    my $printer = $job->printer;
+                    $job->update({ status => 'cancelled', completed_at => DateTime->now()->strftime('%Y-%m-%d %H:%M:%S') });
+
+                    if ($printer && ($printer->current_job_id // 0) == $job->id) {
+                        $printer->update({ status => 'idle', current_job_id => undef, updated_at => DateTime->now()->strftime('%Y-%m-%d %H:%M:%S') });
+                    }
+
+                    if ($job->inventory_reserved) {
+                        $job->update({ inventory_reserved => 0 });
+                    }
+                    $cancelled_jobs++;
+                }
+
+                # Create a real cancelled customer order record so the synthetic is suppressed
+                # and we have history. This makes future loads see a real (cancelled) order.
+                my $has_cancelled = $schema->resultset('Accounting::InventoryCustomerOrder')->search({
+                    sitename => $sitename,
+                    customer_name => 'In-House',
+                    status => 'cancelled',
+                })->search_related('lines', { item_id => $item_id })->count;
+
+                unless ($has_cancelled) {
+                    my $co = $schema->resultset('Accounting::InventoryCustomerOrder')->create({
+                        sitename => $sitename,
+                        customer_name => 'In-House',
+                        status => 'cancelled',
+                        notes => "Cancelled in-house for item $item_id (was synthetic $order_id_param)",
+                        created_by => $c->session->{username} || 'system',
+                        created_at => DateTime->now()->strftime('%Y-%m-%d %H:%M:%S'),
+                        updated_at => DateTime->now()->strftime('%Y-%m-%d %H:%M:%S'),
+                    });
+                    $co->create_related('lines', {
+                        item_id => $item_id,
+                        quantity => 1,
+                        description => "In-house item $item_id",
+                        line_total => 0,
+                    });
+                }
+            });
+        };
+
+        if ($@) {
+            $c->flash->{error_msg} = "Cancel failed for $order_id_param: $@";
+        } else {
+            $c->flash->{success_msg} = "In-house $order_id_param cancelled. $cancelled_jobs job(s) cancelled, reservations released globally.";
+        }
+    } else {
+        # Real numeric customer order ID
+        my $order;
+        eval {
+            $order = $schema->resultset('Accounting::InventoryCustomerOrder')->find($order_id_param, {
+                prefetch => { lines => 'item' }
+            });
+        };
+        unless ($order && $order->sitename eq $sitename) {
+            $c->flash->{error_msg} = 'Order not found or wrong site.';
+            $c->res->redirect($c->uri_for('/Accounting/manufacturing'));
+            $c->detach;
+        }
+
+        my @item_ids = map { $_->item_id } grep { $_->item_id } $order->lines->all;
+
+        eval {
+            $schema->txn_do(sub {
+                $order->update({ status => 'cancelled', updated_at => DateTime->now()->strftime('%Y-%m-%d %H:%M:%S') });
+
+                if (@item_ids) {
+                    my @jobs = $schema->resultset('Printing3dJob')->search({
+                        sitename => $sitename,
+                        source_item_id => { -in => \@item_ids },
+                        status => { -in => [qw(queued assigned printing)] },
+                    })->all;
+
+                    for my $job (@jobs) {
+                        my $printer = $job->printer;
+                        $job->update({ status => 'cancelled', completed_at => DateTime->now()->strftime('%Y-%m-%d %H:%M:%S') });
+
+                        if ($printer && ($printer->current_job_id // 0) == $job->id) {
+                            $printer->update({ status => 'idle', current_job_id => undef, updated_at => DateTime->now()->strftime('%Y-%m-%d %H:%M:%S') });
+                        }
+
+                        if ($job->inventory_reserved) {
+                            $job->update({ inventory_reserved => 0 });
+                        }
+                        $cancelled_jobs++;
+                    }
+                }
+            });
+        };
+
+        if ($@) {
+            $c->flash->{error_msg} = "Cancel failed: $@";
+        } else {
+            $c->flash->{success_msg} = "Order #$order_id_param cancelled. $cancelled_jobs job(s) cancelled and reservations released.";
+        }
+    }
+
+    $c->res->redirect($c->uri_for('/Accounting/manufacturing'));
+    $c->detach;
 }
 
 # POST /Accounting/manufacturing/api/update_part
