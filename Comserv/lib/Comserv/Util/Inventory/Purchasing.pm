@@ -193,7 +193,6 @@ sub stock_reorder_list {
             {
                 sitename      => $sitename,
                 status        => 'active',
-                reorder_point => { '>' => 0 },
             },
             {
                 prefetch => [ 'stock_levels', { item_suppliers => 'supplier' } ],
@@ -206,7 +205,12 @@ sub stock_reorder_list {
             for my $sl ($item->stock_levels->all) {
                 $total += $sl->quantity_on_hand || 0;
             }
-            next if $total > ($item->reorder_point || 0);
+            # Include items that are below reorder point OR have never been
+            # received (missing stock — total 0 and no stock_level rows).
+            my $reorder = $item->reorder_point || 0;
+            my $has_stock = $item->stock_levels->count ? 1 : 0;
+            next if $has_stock && $total > $reorder;
+            next if !$has_stock && $reorder > 0 && $total > $reorder;
 
             my $short = ($item->reorder_point || 0) - $total;
             my $qty   = $item->reorder_quantity || $short || 1;

@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <td>[% item.unit_of_measure %]</td>
             <td>[% item.unit_cost ? item.unit_cost : '-' %]</td>
             <td>[% item.unit_price ? item.unit_price : '-' %]</td>
-            <td class="item-stock [% IF item.reorder_point && total_stock <= item.reorder_point %]low[% END %]">[% total_stock %]</td>
+            <td class="item-stock [% IF item.reorder_point && item.reorder_point > 0 && total_stock <= item.reorder_point %]low[% END %][% IF !item.stock_levels.size %] missing[% END %]">[% total_stock %][% IF !item.stock_levels.size %] <span style="color:#b91c1c;font-size:0.75rem;">⚠ Missing</span>[% END %]</td>
             <td>[% item.reorder_point || '0' %]</td>
             <td>[% item.status %]</td>
             <td class="actions-cell">

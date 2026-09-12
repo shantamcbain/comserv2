@@ -1931,16 +1931,21 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
                     };
                 }
             } else {
-                # Item has no stock_level rows: effective qty is 0.
-                # It is below reorder when it has a reorder point set (0 <= reorder_point).
-                my $reorder = defined $item->reorder_point ? $item->reorder_point : 0;
-                my $is_low  = ($reorder > 0) ? 1 : 0;
+                # Item has no stock_level rows: it has never been received.
+                # In low_only view this is "missing stock" and must be shown so
+                # unstocked items are visible (they are genuinely short). In the
+                # full view they still appear, but only flagged low if a reorder
+                # point is set.
+                my $reorder    = defined $item->reorder_point ? $item->reorder_point : 0;
+                my $is_missing = 1;
+                my $is_low     = ($reorder > 0 || $low_only) ? 1 : 0;
                 next if $low_only && !$is_low;
                 push @stock_rows, {
-                    sl       => undef,
-                    item     => $item,
-                    location => undef,
-                    is_low   => $is_low,
+                    sl         => undef,
+                    item       => $item,
+                    location   => undef,
+                    is_low     => $is_low,
+                    is_missing => $is_missing,
                 };
             }
         }
@@ -4287,14 +4292,19 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
             $total_qty += $sl->quantity_on_hand;
             push @sl_detail, $sl;
         }
+        my $has_stock = @sl_detail ? 1 : 0;
         my $is_low = defined $item->reorder_point && $item->reorder_point > 0
                      && $total_qty <= $item->reorder_point;
-        next if $low_only && !$is_low;
+        # In low_only, also surface items that have never been received
+        # (no stock_level rows) — they are genuinely missing stock.
+        my $is_missing = !$has_stock ? 1 : 0;
+        next if $low_only && !$is_low && !$is_missing;
         push @report_rows, {
-            item      => $item,
-            sl_detail => \@sl_detail,
-            total_qty => $total_qty,
-            is_low    => $is_low,
+            item       => $item,
+            sl_detail  => \@sl_detail,
+            total_qty  => $total_qty,
+            is_low     => $is_low,
+            is_missing => $is_missing,
         };
     }
 
