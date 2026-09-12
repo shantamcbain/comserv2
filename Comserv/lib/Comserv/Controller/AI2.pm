@@ -589,12 +589,18 @@ sub _app_log_file {
 
 # GET /ai2/diagnostics — live "what is the system doing" snapshot.
 # Auth: any logged-in user may read their own view; admins see key state.
+# Localhost/LAN bypass (no session) matches Api.pm system_logs/hardware_metrics.
 sub diagnostics :Local :Args(0) {
     my ($self, $c) = @_;
 
     $c->res->content_type('application/json');
 
-    unless ($c->session->{username}) {
+    # Localhost / 192.168.1.0/24 LAN bypass (same trusted-address pattern as
+    # Api.pm system_logs / hardware_metrics). Remote still needs a session.
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local || $c->session->{username}) {
         $c->res->status(401);
         $c->res->body(encode_json({ success => 0, error => 'Authentication required' }));
         return;

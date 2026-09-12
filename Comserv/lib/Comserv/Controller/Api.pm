@@ -1295,6 +1295,321 @@ sub api_system_logs :Path('system_logs') :Args(0) {
     $c->detach();
 }
 
+=head2 api_hardware_metrics
+
+GET /api/hardware_metrics - Read-only query of hardware_metrics for agents/monitoring
+
+Same localhost / 192.168.1.0/24 LAN bypass as GET /api/system_logs (no Bearer
+required from trusted LAN; remote callers need a valid API token). Does not
+require aiusagemonitor member admin login.
+
+Optional query params:
+  hostname     - exact hostname filter
+  metric_name  - exact metric_name filter
+  since        - datetime string (e.g. 2025-09-01 00:00:00); inclusive lower bound
+  until        - datetime string; inclusive upper bound
+  limit        - max rows (default 2000, max 5000)
+
+Year-long history is supported (UI dashboard caps at 168h; this API does not).
+Returns newest-first. Uses an id-floor heuristic when a time window is given so
+timestamp filters do not full-scan the large insert-only table.
+
+Returns: { success, count, filters, metrics: [ { timestamp, hostname,
+system_identifier, metric_name, metric_value, unit, level } ] }
+=cut
+
+sub api_hardware_metrics :Path('hardware_metrics') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Authentication required' }));
+            $c->detach();
+        }
+    }
+
+    my $hostname    = $c->req->param('hostname')    // '';
+    my $metric_name = $c->req->param('metric_name') // '';
+    my $since       = $c->req->param('since')       // '';
+    my $until       = $c->req->param('until')       // '';
+    my $limit       = $c->req->param('limit')       // 2000;
+
+    $limit = int($limit) if defined $limit && $limit =~ /^-?\d+$/;
+    $limit = 2000 if !defined $limit || $limit < 1;
+    $limit = 5000 if $limit > 5000;
+
+    # Reject obvious injection in datetime params (expect ISO-ish / SQL datetime)
+    for my $dt_label (['since', \$since], ['until', \$until]) {
+        my ($label, $ref) = @$dt_label;
+        next unless $$ref;
+        unless ($$ref =~ /^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/) {
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => "Invalid $label datetime (use YYYY-MM-DD[ HH:MM:SS])" }));
+            $c->detach();
+        }
+        $$ref =~ s/T/ /;
+    }
+
+    my %where;
+    $where{hostname}    = $hostname    if $hostname ne '';
+    $where{metric_name} = $metric_name if $metric_name ne '';
+
+    if ($since ne '' && $until ne '') {
+        $where{timestamp} = { -between => [$since, $until] };
+    } elsif ($since ne '') {
+        $where{timestamp} = { '>=' => $since };
+    } elsif ($until ne '') {
+        $where{timestamp} = { '<=' => $until };
+    }
+
+    my $schema = $c->model('DBEncy');
+    my @rows;
+    eval {
+        my $rs = $schema->resultset('HardwareMetrics');
+
+        # hardware_metrics is large and insert-only; PK id tracks recency.
+        # When a time window is requested, bound by id first (same heuristic as
+        # Admin::HardwareMonitor) to avoid full-scan Lost-connection timeouts.
+        if ($since ne '' || $until ne '') {
+            my $max_id = $rs->get_column('id')->max;
+            if (defined $max_id) {
+                my $hours = 24 * 7;  # default window guess when only until given
+                if ($since ne '' && $since =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                    require Time::Local;
+                    my ($Y, $M, $D) = ($1, $2, $3);
+                    my $epoch = eval { Time::Local::timelocal(0, 0, 0, $D, $M - 1, $Y) };
+                    if (defined $epoch) {
+                        $hours = int((time() - $epoch) / 3600) + 24;
+                    }
+                }
+                $hours = 24 if $hours < 24;
+                $hours = 24 * 366 if $hours > 24 * 366;  # cap ~1y+
+                my $id_floor = $max_id - int(50_000 * $hours);
+                $id_floor = 0 if $id_floor < 0;
+                $where{id} = { '>=' => $id_floor };
+            }
+        }
+
+        @rows = $rs->search(
+            \%where,
+            {
+                order_by => { -desc => 'id' },
+                rows     => $limit,
+                columns  => [qw(timestamp hostname system_identifier metric_name metric_value unit level)],
+            }
+        )->all;
+    };
+    if ($@) {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Database error: $@" }));
+        $c->detach();
+    }
+
+    my @metrics = map {
+        {
+            timestamp         => $_->timestamp . '',
+            hostname          => $_->hostname,
+            system_identifier => $_->system_identifier,
+            metric_name       => $_->metric_name,
+            metric_value      => (defined $_->metric_value ? $_->metric_value + 0 : undef),
+            unit              => $_->unit,
+            level             => $_->level,
+        }
+    } @rows;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_hardware_metrics',
+        "hardware_metrics queried via API: hostname=$hostname metric_name=$metric_name "
+        . "since=$since until=$until limit=$limit count=" . scalar(@metrics) . " (Local: $is_local)");
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        count   => scalar(@metrics),
+        filters => {
+            hostname    => ($hostname    ne '' ? $hostname    : undef),
+            metric_name => ($metric_name ne '' ? $metric_name : undef),
+            since       => ($since       ne '' ? $since       : undef),
+            until       => ($until       ne '' ? $until       : undef),
+            limit       => $limit,
+        },
+        metrics => \@metrics,
+    }));
+    $c->detach();
+}
+
+
+=head2 api_ai_usage
+
+GET /api/ai_usage - Read-only query of ai_usage_logs for agents/monitoring
+
+Same localhost / 192.168.1.0/24 LAN bypass as GET /api/system_logs and
+GET /api/hardware_metrics (no Bearer required from trusted LAN; remote callers
+need a valid API token).
+
+Optional query params:
+  days - lookback window in days (default 7, min 1, max 365)
+
+Returns newest-first rows (capped at 200) plus a summary of calls/tokens/cost
+and error counts by provider and model for the full window.
+
+Column mapping (response field <- DB column):
+  created_at    <- created_at
+  provider      <- provider
+  model         <- model
+  status        <- status
+  error_message <- error_message
+  tokens        <- total_tokens
+  cost          <- estimated_cost_usd
+  duration_ms   <- duration_ms
+  (also included: prompt_tokens, completion_tokens, request_type, site_id)
+
+Returns: { success, days, count, summary, rows }
+
+=cut
+
+sub api_ai_usage :Path('ai_usage') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Authentication required' }));
+            $c->detach();
+        }
+    }
+
+    my $days = $c->req->param('days') // 7;
+    $days = int($days) if defined $days && $days =~ /^-?\d+$/;
+    $days = 7   if !defined $days || $days < 1;
+    $days = 365 if $days > 365;
+
+    my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
+
+    my $schema = $c->model('DBEncy');
+    my @row_list;
+    my %by_provider;
+    my %by_model;
+    my %by_status;
+    my $total_calls  = 0;
+    my $total_tokens = 0;
+    my $total_cost   = 0;
+    my $error_count  = 0;
+
+    eval {
+        my $rs = $schema->resultset('AiUsageLog')->search(
+            { created_at => { '>=' => $since } },
+            { order_by => { -desc => 'created_at' } }
+        );
+
+        while (my $r = $rs->next) {
+            my $prov   = $r->provider // 'unknown';
+            my $mod    = $r->model // 'unknown';
+            my $status = $r->status // 'unknown';
+            my $tok    = $r->total_tokens // 0;
+            my $cost   = $r->estimated_cost_usd // 0;
+            my $is_err = ($status ne 'success') ? 1 : 0;
+
+            $total_calls++;
+            $total_tokens += $tok;
+            $total_cost   += $cost;
+            $error_count  += $is_err;
+            $by_status{$status}++;
+
+            $by_provider{$prov}{calls}  = ($by_provider{$prov}{calls}  // 0) + 1;
+            $by_provider{$prov}{tokens} = ($by_provider{$prov}{tokens} // 0) + $tok;
+            $by_provider{$prov}{cost}   = ($by_provider{$prov}{cost}   // 0) + $cost;
+            $by_provider{$prov}{errors} = ($by_provider{$prov}{errors} // 0) + $is_err;
+
+            my $mk = "$prov|$mod";
+            $by_model{$mk}{provider} = $prov;
+            $by_model{$mk}{model}    = $mod;
+            $by_model{$mk}{calls}    = ($by_model{$mk}{calls}  // 0) + 1;
+            $by_model{$mk}{tokens}   = ($by_model{$mk}{tokens} // 0) + $tok;
+            $by_model{$mk}{cost}     = ($by_model{$mk}{cost}   // 0) + $cost;
+            $by_model{$mk}{errors}   = ($by_model{$mk}{errors} // 0) + $is_err;
+
+            if (@row_list < 200) {
+                my $created = $r->created_at;
+                if (defined $created && ref($created) && $created->can('iso8601')) {
+                    $created = $created->iso8601();
+                } elsif (defined $created) {
+                    $created = "$created";
+                }
+                push @row_list, {
+                    created_at         => $created,
+                    provider           => $prov,
+                    model              => $mod,
+                    status             => $status,
+                    error_message      => $r->error_message,
+                    tokens             => 0 + $tok,
+                    prompt_tokens      => 0 + ($r->prompt_tokens // 0),
+                    completion_tokens  => 0 + ($r->completion_tokens // 0),
+                    cost               => 0 + $cost,
+                    duration_ms        => (defined $r->duration_ms ? 0 + $r->duration_ms : undef),
+                    request_type       => $r->request_type,
+                    site_id            => $r->site_id,
+                };
+            }
+        }
+    };
+    if ($@) {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Database error: $@" }));
+        $c->detach();
+    }
+
+    # Round costs for JSON friendliness
+    for my $p (values %by_provider) {
+        $p->{cost} = 0 + sprintf('%.6f', $p->{cost} // 0);
+    }
+    for my $m (values %by_model) {
+        $m->{cost} = 0 + sprintf('%.6f', $m->{cost} // 0);
+    }
+
+    my $summary = {
+        days          => $days,
+        since         => $since,
+        total_calls   => $total_calls,
+        total_tokens  => $total_tokens,
+        total_cost    => 0 + sprintf('%.6f', $total_cost),
+        error_count   => $error_count,
+        by_status     => \%by_status,
+        by_provider   => \%by_provider,
+        by_model      => \%by_model,
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_ai_usage',
+        "ai_usage queried via API: days=$days rows=" . scalar(@row_list)
+        . " total_calls=$total_calls (Local: $is_local)");
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        days    => $days,
+        count   => scalar(@row_list),
+        summary => $summary,
+        rows    => \@row_list,
+    }));
+    $c->detach();
+}
+
+
 =head2 _api_authenticate
 
 Shared auth gate for the data endpoints. Requests originating from localhost or the
