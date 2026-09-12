@@ -178,7 +178,7 @@
     need_buy     = 'Items to Order',
     need_print   = 'Need to Add to Print Queue',
     in_queue     = 'In Print Queue',
-    printed_ready = 'Printed / Arrived — Ready to Pick',
+    printed_ready = 'Printed Arrived (in stock / not yet picked)',
     in_box       = 'Picked — In Pick Box'
 } %]
 [% SET section_icons = {

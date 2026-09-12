@@ -107,9 +107,33 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
         if ($@) {
             $c->stash->{error_msg}  = "Failed to submit order: $@";
             $c->stash->{submitted}  = $params;
+
+            # Prepare structured lines for JS restoration on error so user can fix
+            my @initial_lines;
+            for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
+                my $l = $lines_by_idx{$idx};
+                next unless ($l->{item_id} || $l->{description});
+                push @initial_lines, {
+                    item_id     => $l->{item_id} || '',
+                    description => $l->{description} || '',
+                    quantity    => $l->{quantity} || 1,
+                    notes       => $l->{notes_line} || '',
+                };
+            }
+            $c->stash->{initial_lines} = \@initial_lines;
         } else {
-            $c->stash->{success_msg} = 'Your order has been submitted! We will contact you shortly.';
+            my $order_id = 'N/A';
+            # The order was created inside the txn, but to expose ID we can search the latest for this customer as approximation or improve later
+            eval {
+                my $latest = $schema->resultset('Accounting::InventoryCustomerOrder')->search({
+                    sitename => $sitename,
+                    customer_name => $params->{customer_name},
+                }, { order_by => { -desc => 'created_at' }, rows => 1 })->first;
+                $order_id = $latest->id if $latest;
+            };
+            $c->stash->{success_msg} = "Your order has been submitted (ref #$order_id). We will contact you shortly.";
             $c->stash->{submitted}   = {};
+            $c->stash->{initial_lines} = [];
         }
     }
 

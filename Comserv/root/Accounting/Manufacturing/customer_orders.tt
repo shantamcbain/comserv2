@@ -38,6 +38,11 @@
         <td style="padding: 0.6rem; white-space: nowrap;">
           <a class="btn btn-primary" href="[% o.link %]" style="margin-right: 0.4rem;">Open Traveler</a>
           <a class="btn btn-secondary" href="[% o.print_link %]">Print Form</a>
+          [% UNLESS o.status.match('cancel|void') %]
+          <form method="post" action="[% c.uri_for('/Accounting/manufacturing/cancel', o.order_id) %]" style="display:inline;">
+            <button type="submit" class="btn btn-danger" style="padding:2px 6px;" onclick="return confirm('Cancel this order and release its jobs/reservations globally?');">Cancel</button>
+          </form>
+          [% END %]
         </td>
       </tr>
       [% END %]
