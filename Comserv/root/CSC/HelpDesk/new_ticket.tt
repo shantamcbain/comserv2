@@ -87,18 +87,27 @@
 
             </div>
 
+<<<<<<< HEAD
             [%# Math challenge for guests. Never render blank "What is + ?". %]
+=======
+            [%# Math challenge for guests. Prefer num1/num2 like contact.tt; math_a/math_b as fallback. %]
+>>>>>>> main
             [% IF is_public_guest || !c.session.user_id %]
             <div class="form-group math-challenge">
-                [% IF math_a && math_b %]
-                <label for="math_challenge_ans">Security Question: What is [% math_a %] + [% math_b %]?</label>
+                [% IF num1 && num2 %]
+                <label for="math_challenge_ans">Security Question: What is [% num1 %] + [% num2 %]?</label>
                 <input type="number" id="math_challenge_ans" name="math_challenge_ans"
                        class="form-control" required min="4" max="18" step="1"
                        inputmode="numeric" autocomplete="off"
                        placeholder="Enter the sum">
+<<<<<<< HEAD
                 [% ELSIF num1 && num2 %]
                 <label for="math_challenge_ans">Security Question: What is [% num1 %] + [% num2 %]?</label>
 
+=======
+                [% ELSIF math_a && math_b %]
+                <label for="math_challenge_ans">Security Question: What is [% math_a %] + [% math_b %]?</label>
+>>>>>>> main
                 <input type="number" id="math_challenge_ans" name="math_challenge_ans"
                        class="form-control" required min="4" max="18" step="1"
                        inputmode="numeric" autocomplete="off"

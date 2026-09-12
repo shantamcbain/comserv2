@@ -593,11 +593,23 @@ sub create_log :Path('/log/create_log') :Args() {
                         my $amount        = sprintf('%.2f', $hours_decimal * $rate);
                         if ($amount > 0) {
                             my $labor_acct = $schema->resultset('Accounting::CoaAccount')->search(
-                                { accno => { -in => ['5100', '5000', '6000', '6700'] } },
+                                # Site-scoped: this site's rows PLUS global
+                                # (NULL/empty). Unscoped this could pick
+                                # another site's labour account.
+                                [
+                                    { accno => { -in => ['5100','5000','6000','6700'] }, sitename => $sitename },
+                                    { accno => { -in => ['5100','5000','6000','6700'] }, sitename => undef },
+                                    { accno => { -in => ['5100','5000','6000','6700'] }, sitename => '' },
+                                ],
                                 { rows => 1 }
                             )->first;
                             my $ap_acct = $schema->resultset('Accounting::CoaAccount')->search(
-                                { accno => '2000' }, { rows => 1 }
+                                [
+                                    { accno => '2000', sitename => $sitename },
+                                    { accno => '2000', sitename => undef },
+                                    { accno => '2000', sitename => '' },
+                                ],
+                                { rows => 1 }
                             )->first;
                             if ($labor_acct && $ap_acct) {
                                 my $gl = $schema->resultset('Accounting::GlEntry')->create({

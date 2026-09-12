@@ -146,12 +146,39 @@ sub items :Path('/Inventory/items') :Args(0) {
     };
     push @{$c->stash->{debug_errors}}, "Error loading items: $@" if $@;
 
+    # Group items by category
+    my %items_by_category;
+    for my $item (@items) {
+        my $cat = $item->category || 'Uncategorized';
+        push @{$items_by_category{$cat}}, $item;
+    }
+
+    # Category color mapping
+    my %category_colors = (
+        '3d_filament'      => 'var(--cat-3d-filament, #3498db)',
+        '3d_supply'        => 'var(--cat-3d-supply, #9b59b6)',
+        '3d_printed_item'  => 'var(--cat-3d-printed, #e74c3c)',
+        'filament'         => 'var(--cat-filament, #3498db)',
+        'supply'           => 'var(--cat-supply, #9b59b6)',
+        'printed'          => 'var(--cat-printed, #e74c3c)',
+        'raw_material'     => 'var(--cat-raw, #27ae60)',
+        'consumable'       => 'var(--cat-consumable, #f39c12)',
+        'tool'             => 'var(--cat-tool, #34495e)',
+        'equipment'        => 'var(--cat-equipment, #1abc9c)',
+        'default'          => 'var(--cat-default, #95a5a6)',
+    );
+
+    my @sorted_categories = sort keys %items_by_category;
+
     $c->stash(
-        items    => \@items,
-        sitename => $sitename,
-        status   => $status,
-        category => $category,
-        template => 'Inventory/items/list.tt',
+        items                => \@items,
+        items_by_category    => \%items_by_category,
+        sorted_categories    => \@sorted_categories,
+        category_colors      => \%category_colors,
+        sitename             => $sitename,
+        status               => $status,
+        category             => $category,
+        template             => 'Inventory/items/list.tt',
     );
 }
 
@@ -232,14 +259,106 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
         )->first;
     };
 
+    # --- Print queue / order / traveler status for this item ---
+    my ($queue_jobs, $po_lines, $traveler_state);
+    $queue_jobs = [];
+    $po_lines   = [];
+    $traveler_state = undef;
+
+    # Print queue jobs linked via model->item_id
+    eval {
+        if ($print_model) {
+            $queue_jobs = [ $schema->resultset('Printing3dJob')->search(
+                { model_id => $print_model->id, sitename => $sitename },
+                { order_by => { -desc => 'created_at' }, rows => 10 }
+            )->all ];
+        } else {
+            # Fallback: match by item_name / source_item_id
+            $queue_jobs = [ $schema->resultset('Printing3dJob')->search(
+                { source_item_id => $id, sitename => $sitename },
+                { order_by => { -desc => 'created_at' }, rows => 10 }
+            )->all ];
+        }
+    };
+
+    # Purchase order lines for this item
+    eval {
+        $po_lines = [ $schema->resultset('Accounting::InventoryPurchaseOrderLine')->search(
+            { item_id => $id },
+            { prefetch => 'purchase_order', order_by => { -desc => 'id' }, rows => 5 }
+        )->all ];
+    };
+
+    # Derive traveler-style state (same logic as Traveler.pm _parts_from_leaves)
+    eval {
+        my $stock_map;
+        eval {
+            my $rs = $schema->resultset('Accounting::InventoryStockLevel')->search(
+                { 'item.sitename' => $sitename },
+                { join => ['item'] },
+            );
+            while (my $row = $rs->next) {
+                $stock_map->{ $row->item_id } = ($row->quantity_on_hand // 0) - ($row->quantity_reserved // 0);
+            }
+        };
+
+        my $on_hand = 0 + ($stock_map->{$id} // 0);
+
+        # Printed qty from completed jobs
+        my $printed_qty = 0;
+        for my $j (@$queue_jobs) {
+            next unless $j->status eq 'completed';
+            $printed_qty += ($j->quantity || 1);
+        }
+
+        # Queued qty (not yet completed)
+        my $in_queue_qty = 0;
+        for my $j (@$queue_jobs) {
+            next if $j->status eq 'completed' || $j->status eq 'cancelled';
+            $in_queue_qty += ($j->quantity || 1);
+        }
+
+        # Ordered qty from PO lines
+        my $ordered_qty = 0;
+        for my $pl (@$po_lines) {
+            $ordered_qty += ($pl->quantity_ordered || 0);
+        }
+
+        my $is_print = ($item->item_origin || '') eq '3d_printed' || ($item->category || '') =~ /print/i;
+        my $short = 0;
+
+        if ($is_print) {
+            if ($in_queue_qty > 0) {
+                $traveler_state = { state => 'in_queue',   label => 'In print queue',  qty => $in_queue_qty, color => '#b71c1c' };
+            } elsif ($printed_qty > 0 && $printed_qty > $on_hand) {
+                $traveler_state = { state => 'printed_ready', label => 'Printed — ready to pick', qty => $printed_qty, color => '#0d47a1' };
+            } elsif ($on_hand > 0) {
+                $traveler_state = { state => 'in_box',     label => 'In pick box',     qty => $on_hand,      color => '#1b5e20' };
+            } else {
+                $traveler_state = { state => 'need_print', label => 'Need to queue print', qty => 0,          color => '#4a148c' };
+            }
+        } else {
+            if ($ordered_qty > 0) {
+                $traveler_state = { state => 'ordered',    label => 'Ordered',         qty => $ordered_qty,  color => '#e65100' };
+            } elsif ($on_hand > 0) {
+                $traveler_state = { state => 'in_box',     label => 'In stock',         qty => $on_hand,      color => '#1b5e20' };
+            } else {
+                $traveler_state = { state => 'need_buy',   label => 'Need to order',    qty => 0,             color => '#e65100' };
+            }
+        }
+    };
+
     $c->stash(
-        item          => $item,
-        transactions  => \@transactions,
-        all_items     => \@all_items,
-        all_suppliers => \@all_suppliers,
-        print_model   => $print_model,
-        sitename      => $sitename,
-        template      => 'Inventory/items/view.tt',
+        item           => $item,
+        transactions   => \@transactions,
+        all_items      => \@all_items,
+        all_suppliers  => \@all_suppliers,
+        print_model    => $print_model,
+        queue_jobs     => $queue_jobs,
+        po_lines       => $po_lines,
+        traveler_state => $traveler_state,
+        sitename       => $sitename,
+        template       => 'Inventory/items/view.tt',
     );
 }
 
@@ -290,6 +409,22 @@ sub _create_item {
     my $now    = $self->_now();
 
     my $sitename = $p->{sitename} || $self->_sitename($c);
+
+    # HARD GUARD: never create a second item with the same (sitename, sku).
+    # Prevents duplicate-SKU data corruption that previously occurred when rows were
+    # written outside the app (e.g. AI/script direct inserts). Returns the existing row
+    # instead of silently creating a twin that breaks BOM explosion / traveler dedup.
+    if ($p->{sku}) {
+        my $existing = $schema->resultset('Accounting::InventoryItem')->find(
+            { sitename => $sitename, sku => $p->{sku} }
+        );
+        if ($existing) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_item',
+                "Refused duplicate (sitename=$sitename, sku=" . $p->{sku} . ") — returning existing id=" . $existing->id);
+            return $existing;
+        }
+    }
+
     return $schema->resultset('Accounting::InventoryItem')->create({
         sitename            => $sitename,
         sku                 => $p->{sku},
@@ -909,14 +1044,17 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         );
     };
     if ($@ || !$item || $item->sitename ne $sitename) {
-        $c->flash->{error_msg} = 'Item not found';
+        my $actual = $item ? $item->sitename : 'none';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'bom_view',
+            "Item $item_id sitename mismatch or not found: requested=$sitename actual=$actual");
+        $c->flash->{error_msg} = 'Item not found or wrong site (requested ' . $sitename . ', got ' . $actual . ')';
         $c->res->redirect($c->uri_for('/Inventory/items'));
-        return;
+        $c->detach;
     }
     unless ($item->is_assemblable) {
         $c->flash->{error_msg} = 'This item does not have a BOM (not marked as assemblable).';
         $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
-        return;
+        $c->detach;
     }
 
     my @all_items;
@@ -967,6 +1105,40 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         )->all;
     };
 
+    my @all_items_for_dropdown;
+    eval {
+        @all_items_for_dropdown = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, status => 'active', id => { '!=' => $item_id } },
+            { columns => ['id','name','sku','unit_of_measure','unit_cost'], order_by => 'name' }
+        )->all;
+    };
+
+    # Categorize all items by item_origin for grouped dropdowns
+    my %items_by_origin;
+    for my $ci (@all_items_for_dropdown) {
+        my $origin = $ci->item_origin || 'purchased';
+        push @{$items_by_origin{$origin}}, $ci;
+    }
+    my @sorted_origins = sort keys %items_by_origin;
+
+    # Categorize existing BOM components by item_origin
+    my %components_by_origin;
+    my @all_bom_rows = $item->bom_components->all;
+    for my $comp (@all_bom_rows) {
+        my $ci = $comp->component_item;
+        next unless $ci;
+        my $origin = $ci->item_origin || 'purchased';
+        push @{$components_by_origin{$origin}}, $comp;
+    }
+    my @sorted_comp_origins = sort keys %components_by_origin;
+
+    # Build flat bom_rows list for backward compatibility
+    my @bom_rows_sorted;
+    for my $origin (@sorted_comp_origins) {
+        push @bom_rows_sorted, @{$components_by_origin{$origin}};
+    }
+    my $bom_rows = \@bom_rows_sorted;
+
     my $assembled_cost = 0;
     for my $comp ($item->bom_components->all) {
         my $ci = $comp->component_item;
@@ -982,6 +1154,12 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         printers          => \@printers,
         filament_items    => \@filament_items,
         assembled_cost    => sprintf('%.2f', $assembled_cost),
+        items_by_origin   => \%items_by_origin,
+        sorted_origins    => \@sorted_origins,
+        components_by_origin => \%components_by_origin,
+        sorted_comp_origins => \@sorted_comp_origins,
+        bom_rows          => $bom_rows,
+        all_items         => \@all_items_for_dropdown,
         sitename          => $sitename,
         template          => 'Inventory/bom/view.tt',
     );
@@ -2219,7 +2397,9 @@ require JSON;
 
     my $schema = $self->_schema($c);
     my $existing = eval {
-        $schema->resultset('Accounting::InventoryItem')->find({ sku => $p->{sku} })
+        $schema->resultset('Accounting::InventoryItem')->find(
+            { sitename => $sitename, sku => $p->{sku} }
+        )
     };
     if ($existing) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_create',
@@ -2256,6 +2436,310 @@ require JSON;
         item_id  => $item->id,
         sku      => $item->sku,
         sitename => $item->sitename,
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/item/update
+# JSON: item_id or sku (+ optional sitename). Optional fields to patch:
+# item_origin, name, description, category, reorder_point, reorder_quantity,
+# is_assemblable, notes, status, unit_of_measure.
+# Used to correct import defaults (e.g. printed HDRY parts marked purchased).
+sub api_item_update :Path('/Inventory/api/item/update') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    my $schema = $self->_schema($c);
+    my $item;
+    if ($p->{item_id}) {
+        $item = eval { $schema->resultset('Accounting::InventoryItem')->find($p->{item_id}) };
+    } elsif ($p->{sku}) {
+        my $where = { sku => $p->{sku} };
+        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        $item = eval { $schema->resultset('Accounting::InventoryItem')->search($where)->first };
+    }
+    unless ($item) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'item not found' }));
+        $c->detach;
+    }
+
+    # HARD GUARD: reject any SKU change that would collide with another item in the same
+    # site. Prevents a duplicate-SKU from being created via update (the web item_edit form
+    # also routes SKU changes; this blocks the collision at the API layer too).
+    if (defined $p->{sku} && $p->{sku} ne ($item->sku // '')) {
+        my $sitename = $p->{sitename} || $item->sitename;
+        my $collision = $schema->resultset('Accounting::InventoryItem')->search(
+            { sitename => $sitename, sku => $p->{sku}, id => { '!=' => $item->id } }
+        )->first;
+        if ($collision) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'api_item_update',
+                "Refused SKU change to duplicate (sitename=$sitename, sku=" . $p->{sku} . ") — collides with id=" . $collision->id);
+            $c->res->status(409);
+            $c->res->content_type('application/json');
+            $c->res->body(JSON::encode_json({ success => 0, error => "SKU $p->{sku} already exists for this site" }));
+            $c->detach;
+        }
+    }
+
+    my %upd;
+    for my $col (qw(
+        item_origin name description category notes status unit_of_measure
+        reorder_point reorder_quantity unit_cost unit_price
+    )) {
+        $upd{$col} = $p->{$col} if exists $p->{$col};
+    }
+    if (exists $p->{is_assemblable}) {
+        $upd{is_assemblable} = $p->{is_assemblable} ? 1 : 0;
+    }
+    unless (keys %upd) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => 'no updatable fields' }));
+        $c->detach;
+    }
+    $upd{updated_at} = $self->_now();
+    $upd{updated_by} = $c->session->{username} || 'api';
+
+    eval { $item->update(\%upd) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_item_update',
+            "update failed id=" . $item->id . ": $@");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "update failed: $@" }));
+        $c->detach;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_item_update',
+        "updated item id=" . $item->id . " sku=" . ($item->sku // '') .
+        " fields=" . join(',', sort keys %upd));
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        success     => 1,
+        item_id     => $item->id,
+        sku         => $item->sku,
+        item_origin => $item->item_origin,
+        sitename    => $item->sitename,
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/stock/receive_qty
+# JSON: item_id (or sku+sitename), quantity (optional — default = print-job lag).
+# Creates stock row if missing and receives finished printed parts into pick-box stock.
+# Used by Manufacturing Traveler "In Pick Box" without a full PO receive form.
+sub api_stock_receive_qty :Path('/Inventory/api/stock/receive_qty') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $item_id  = $p->{item_id} // $p->{part_id};
+    if (!$item_id && $p->{sku}) {
+        my $where = { sku => $p->{sku} };
+        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        my $it = eval { $self->_schema($c)->resultset('Accounting::InventoryItem')->search($where)->first };
+        $item_id = $it->id if $it;
+    }
+    my $r = $traveler->put_part_in_pick_box($c, $item_id, $p->{quantity}, $p->{location});
+    $c->res->content_type('application/json');
+    $c->res->status($r->{ok} ? 200 : 500);
+    $c->res->body(JSON::encode_json({
+        success  => $r->{ok} ? 1 : 0,
+        received => $r->{received},
+        on_hand  => $r->{on_hand},
+        message  => $r->{message},
+        error    => $r->{error},
+        item_id  => $item_id,
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/print_queue/add
+# JSON: item_id (or sku), quantity (optional — shortfall qty from traveler)
+# Creates a printing_3d_jobs row status=queued for the print farm.
+sub api_print_queue_add :Path('/Inventory/api/print_queue/add') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $item_id  = $p->{item_id} // $p->{part_id};
+    if (!$item_id && $p->{sku}) {
+        my $where = { sku => $p->{sku} };
+        $where->{sitename} = $p->{sitename} if $p->{sitename};
+        my $it = eval { $self->_schema($c)->resultset('Accounting::InventoryItem')->search($where)->first };
+        $item_id = $it->id if $it;
+    }
+    my $r = $traveler->queue_part_print($c, $item_id, $p->{quantity} // $p->{qty});
+    $c->res->content_type('application/json');
+    $c->res->status($r->{ok} ? 200 : 500);
+    $c->res->body(JSON::encode_json({
+        success  => $r->{ok} ? 1 : 0,
+        job_id   => $r->{job_id},
+        quantity => $r->{quantity},
+        model_id => $r->{model_id},
+        item_id  => $item_id,
+        sku      => $r->{sku},
+        error    => $r->{error},
+    }));
+    $c->detach;
+}
+
+# POST /Inventory/api/labour/clean
+# JSON: item_id|part_id, started_at (UTC), ended_at?, duration_seconds?,
+#       category=clean|pick|pack|qc|other, notes?
+# Stops a traveler clean timer: adds labour $ to inventory unit_cost and
+# credits the logged-in user points for the time (PointSystem hourly_rate).
+sub api_labour_clean :Path('/Inventory/api/labour/clean') :Args(0) {
+    my ($self, $c) = @_;
+    require JSON;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"success":0,"error":"POST required"}');
+        $c->detach;
+    }
+
+    my $p = {};
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $p = JSON::decode_json($raw) if $raw;
+            } else {
+                $p = JSON::decode_json($body);
+            }
+        }
+    };
+    if ($@ || ref($p) ne 'HASH') {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ success => 0, error => "Invalid JSON: $@" }));
+        $c->detach;
+    }
+    for my $k (keys %{ $c->req->body_parameters || {} }) {
+        $p->{$k} = $c->req->body_parameters->{$k} unless exists $p->{$k};
+    }
+
+    require Comserv::Util::Manufacturing::Traveler;
+    my $traveler = Comserv::Util::Manufacturing::Traveler->new;
+    my $r = $traveler->record_clean_labour($c, $p);
+    $c->res->content_type('application/json');
+    $c->res->status($r->{ok} ? 200 : (($r->{error} || '') =~ /required|short|not found/i ? 400 : 500));
+    $c->res->body(JSON::encode_json({
+        success           => $r->{ok} ? 1 : 0,
+        item_id           => $r->{item_id},
+        sku               => $r->{sku},
+        category          => $r->{category},
+        duration_secs     => $r->{duration_secs},
+        duration_mins     => $r->{duration_mins},
+        duration_human    => $r->{duration_human},
+        hourly_rate       => $r->{hourly_rate},
+        labour_cost       => $r->{labour_cost},
+        unit_cost_old     => $r->{unit_cost_old},
+        unit_cost_new     => $r->{unit_cost_new},
+        points_credited   => $r->{points_credited},
+        credited          => $r->{credited},
+        username          => $r->{username},
+        ledger_id         => $r->{ledger_id},
+        message           => $r->{message},
+        error             => $r->{error},
     }));
     $c->detach;
 }
@@ -2999,7 +3483,14 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
     my $ap_acct_id = $invoice->ap_account_id;
     unless ($ap_acct_id) {
         my $ap = eval { $schema->resultset('Accounting::CoaAccount')->search(
-            { accno => { -like => '2%' }, obsolete => 0 },
+            # Site-scoped: this site's rows PLUS global (NULL/empty) rows.
+            # Unscoped, this could pick ANOTHER site's AP account and post GL
+            # to the wrong entity.
+            [
+                { accno => { -like => '2%' }, sitename => $sitename, obsolete => 0 },
+                { accno => { -like => '2%' }, sitename => undef,     obsolete => 0 },
+                { accno => { -like => '2%' }, sitename => '',        obsolete => 0 },
+            ],
             { order_by => 'accno', rows => 1 }
         )->single };
         $ap_acct_id = $ap->id if $ap;
@@ -3033,7 +3524,13 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
                 my $acct_id = $line->account_id;
                 unless ($acct_id) {
                     my $exp = eval { $schema->resultset('Accounting::CoaAccount')->search(
-                        { accno => { -like => '5%' }, obsolete => 0 },
+                        # Site-scoped (see AP lookup above): never fall back
+                        # to another site's expense account.
+                        [
+                            { accno => { -like => '5%' }, sitename => $sitename, obsolete => 0 },
+                            { accno => { -like => '5%' }, sitename => undef,     obsolete => 0 },
+                            { accno => { -like => '5%' }, sitename => '',        obsolete => 0 },
+                        ],
                         { order_by => 'accno', rows => 1 }
                     )->single };
                     $acct_id = $exp->id if $exp;
@@ -3067,7 +3564,12 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
                 });
                 # CR side: find Points/Equity clearing account (3xxx) or use AP account as memo-only
                 my $pts_acct = eval { $schema->resultset('Accounting::CoaAccount')->search(
-                    { accno => { -like => '3%' }, obsolete => 0 },
+                    # Site-scoped (see AP lookup above).
+                    [
+                        { accno => { -like => '3%' }, sitename => $sitename, obsolete => 0 },
+                        { accno => { -like => '3%' }, sitename => undef,     obsolete => 0 },
+                        { accno => { -like => '3%' }, sitename => '',        obsolete => 0 },
+                    ],
                     { order_by => 'accno', rows => 1 }
                 )->single };
                 if ($pts_acct) {
@@ -3871,33 +4373,33 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
         return $c->res->redirect($c->uri_for('/Inventory'));
     }
 
-    my $target_site = $c->req->query_parameters->{sitename} || '3d';
+    my $target_site = $c->req->query_parameters->{sitename} || $self->_sitename($c) || '3d';
     my $schema = $self->_schema($c);
     my $now    = $self->_now();
     my $by     = $c->session->{username} || 'system';
 
     my @filaments = (
-        { sku => 'MAT3D-NYLON-WHT',  name => 'Nylon White Filament 1kg',                brand => 'Mater3D' },
-        { sku => 'MAT3D-PETG-BLU',   name => 'PET-G Blue Filament 1kg',                 brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-YEL',    name => 'PLA Yellow Filament 1kg',                  brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-BLK',    name => 'PLA Black Filament 1kg',                   brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-RED',    name => 'PLA Red Filament 1kg',                     brand => 'Mater3D' },
-        { sku => 'MAT3D-PETG-RED',   name => 'PET-G Red Filament 1kg',                   brand => 'Mater3D' },
-        { sku => 'MAT3D-PETG-TRNBR', name => 'PET-G Transparent Brown Filament 1kg',     brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-NTR',    name => 'PLA Neutral Filament 1kg',                 brand => 'Mater3D' },
-        { sku => 'MAT3D-BAMB-CHBR',  name => 'PLA Bamboo Chocolate Brown Filament 1kg',  brand => 'Mater3D' },
-        { sku => 'MAT3D-BAMB-SLGR',  name => 'PLA Bamboo Slate Gray Filament 1kg',       brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-WD',     name => 'PLA Wood Filament 1kg',                    brand => 'Mater3D' },
-        { sku => 'MAT3D-PETG-CLR',   name => 'PET-G Clear Filament 1kg',                 brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-GRN',    name => 'PLA Green Filament 1kg',                   brand => 'Mater3D' },
-        { sku => 'MAT3D-BAMB-WHT',   name => 'Bamboo PLA White Filament 1kg',            brand => 'Mater3D' },
-        { sku => 'MAT3D-BAMB-BLU',   name => 'Bamboo PLA Blue Filament 1kg',             brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-SPGR',   name => 'PLA Space Gray Filament 1kg',              brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-BRN',    name => 'PLA Brown Filament 1kg',                   brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-GRY',    name => 'PLA Gray Filament 1kg',                    brand => 'Mater3D' },
-        { sku => 'MAT3D-PLA-LTBR',   name => 'PLA Light Brown Filament 1kg',             brand => 'Mater3D' },
-        { sku => 'PM-TPU90',         name => 'Polly Maker TPU90 Filament 1kg',            brand => 'Polymaker' },
-        { sku => 'KEXL-LTBR',        name => 'Kexcllish Light Brown Filament 1kg',       brand => 'Kexcllish' },
+        { sku => 'MAT3D-NYLON-WHT',  name => 'Nylon White Filament 1kg',                brand => 'Mater3D',  type => 'Nylon', color => 'White', cost_per_kg => 25.00 },
+        { sku => 'MAT3D-PETG-BLU',   name => 'PET-G Blue Filament 1kg',                 brand => 'Mater3D',  type => 'PETG', color => 'Blue',  cost_per_kg => 25.00 },
+        { sku => 'MAT3D-PLA-YEL',    name => 'PLA Yellow Filament 1kg',                  brand => 'Mater3D',  type => 'PLA',  color => 'Yellow', cost_per_kg => 20.00 },
+        { sku => 'MAT3D-PLA-BLK',    name => 'PLA Black Filament 1kg',                   brand => 'Mater3D',  type => 'PLA',  color => 'Black', cost_per_kg => 20.00 },
+        { sku => 'MAT3D-PLA-RED',    name => 'PLA Red Filament 1kg',                     brand => 'Mater3D',  type => 'PLA',  color => 'Red',   cost_per_kg => 20.00 },
+        { sku => 'MAT3D-PETG-RED',   name => 'PET-G Red Filament 1kg',                   brand => 'Mater3D',  type => 'PETG', color => 'Red',   cost_per_kg => 25.00 },
+        { sku => 'MAT3D-PETG-TRNBR', name => 'PET-G Transparent Brown Filament 1kg',     brand => 'Mater3D',  type => 'PETG', color => 'Transparent Brown', cost_per_kg => 25.00 },
+        { sku => 'MAT3D-PLA-NTR',    name => 'PLA Neutral Filament 1kg',                 brand => 'Mater3D',  type => 'PLA',  color => 'Natural', cost_per_kg => 20.00 },
+        { sku => 'MAT3D-BAMB-CHBR',  name => 'PLA Bamboo Chocolate Brown Filament 1kg',  brand => 'Mater3D',  type => 'PLA',  color => 'Chocolate Brown', cost_per_kg => 22.00 },
+        { sku => 'MAT3D-BAMB-SLGR',  name => 'PLA Bamboo Slate Gray Filament 1kg',       brand => 'Mater3D',  type => 'PLA',  color => 'Slate Gray', cost_per_kg => 22.00 },
+        { sku => 'MAT3D-PLA-WD',     name => 'PLA Wood Filament 1kg',                    brand => 'Mater3D',  type => 'PLA',  color => 'Wood',  cost_per_kg => 25.00 },
+        { sku => 'MAT3D-PETG-CLR',   name => 'PET-G Clear Filament 1kg',                 brand => 'Mater3D',  type => 'PETG', color => 'Clear', cost_per_kg => 28.00 },
+        { sku => 'MAT3D-PLA-GRN',    name => 'PLA Green Filament 1kg',                   brand => 'Mater3D',  type => 'PLA',  color => 'Green', cost_per_kg => 20.00 },
+        { sku => 'MAT3D-BAMB-WHT',   name => 'Bamboo PLA White Filament 1kg',            brand => 'Mater3D',  type => 'PLA',  color => 'White', cost_per_kg => 22.00 },
+        { sku => 'MAT3D-BAMB-BLU',   name => 'Bamboo PLA Blue Filament 1kg',             brand => 'Mater3D',  type => 'PLA',  color => 'Blue',  cost_per_kg => 22.00 },
+        { sku => 'MAT3D-PLA-SPGR',   name => 'PLA Space Gray Filament 1kg',              brand => 'Mater3D',  type => 'PLA',  color => 'Space Gray', cost_per_kg => 20.00 },
+        { sku => 'MAT3D-PLA-BRN',    name => 'PLA Brown Filament 1kg',                   brand => 'Mater3D',  type => 'PLA',  color => 'Brown', cost_per_kg => 20.00 },
+        { sku => 'MAT3D-PLA-GRY',    name => 'PLA Gray Filament 1kg',                    brand => 'Mater3D',  type => 'PLA',  color => 'Gray',  cost_per_kg => 20.00 },
+        { sku => 'MAT3D-PLA-LTBR',   name => 'PLA Light Brown Filament 1kg',             brand => 'Mater3D',  type => 'PLA',  color => 'Light Brown', cost_per_kg => 20.00 },
+        { sku => 'PM-TPU90',         name => 'Polly Maker TPU90 Filament 1kg',           brand => 'Polymaker', type => 'TPU',  color => 'Black', cost_per_kg => 30.00 },
+        { sku => 'KEXL-LTBR',        name => 'Kexcllish Light Brown Filament 1kg',       brand => 'Kexcllish', type => 'PLA',  color => 'Light Brown', cost_per_kg => 22.00 },
     );
 
     my ($created, $skipped) = (0, 0);
@@ -3910,7 +4412,30 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
             })->count;
         };
         if ($exists) {
-            push @log, "$f->{sku}: skipped (exists)";
+            # Update existing item with correct cost/price/type/color/reorder fields
+            eval {
+                my $item = $schema->resultset('Accounting::InventoryItem')->search({
+                    sitename => $target_site,
+                    sku      => $f->{sku},
+                })->first;
+                if ($item) {
+                    my $unit_cost = sprintf('%.4f', $f->{cost_per_kg} / 1000);
+                    my $unit_price = $f->{cost_per_kg} > 0 ? sprintf('%.2f', $f->{cost_per_kg} * 1.5) : undef;
+                    $item->update({
+                        unit_cost      => $unit_cost,
+                        unit_price     => $unit_price,
+                        category       => '3d_filament',
+                        unit_of_measure => 'g',
+                        filament_type  => $f->{type} || undef,
+                        filament_color => $f->{color} || undef,
+                        reorder_point  => 100,
+                        reorder_quantity => 500,
+                        description    => $f->{brand} . ' ' . $f->{name} . ' (cost: $' . $f->{cost_per_kg} . '/kg, $' . sprintf('%.2f', $f->{cost_per_kg} / 1000) . '/g)',
+                    });
+                    push @log, "$f->{sku}: updated (unit_cost=$unit_cost, unit_price=$unit_price, type=$f->{type}, color=$f->{color})";
+                }
+            };
+            push @log, "$f->{sku}: ERROR updating — $@" if $@;
             $skipped++;
             next;
         }
@@ -3922,14 +4447,23 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
                 item_origin     => 'purchased',
                 is_consumable   => 1,
                 is_reusable     => 0,
-                unit_of_measure => 'spool',
+                unit_of_measure => 'g',
+                category        => '3d_filament',
+                unit_cost       => sprintf('%.4f', $f->{cost_per_kg} / 1000),
+                unit_price      => $f->{cost_per_kg} > 0 ? sprintf('%.2f', $f->{cost_per_kg} * 1.5) : undef,
+                filament_type   => $f->{type} || undef,
+                filament_color  => $f->{color} || undef,
+                reorder_point   => 100,
+                reorder_quantity => 500,
                 status          => 'active',
                 created_by      => $by,
                 updated_by      => $by,
                 created_at      => $now,
                 updated_at      => $now,
             );
-            eval { $row{description} = $f->{brand} . ' filament for 3D printing. 1kg spool.' };
+            eval {
+                $row{description} = $f->{brand} . ' ' . $f->{name} . ' (cost: $' . $f->{cost_per_kg} . '/kg, $' . sprintf('%.2f', $f->{cost_per_kg} / 1000) . '/g)';
+            };
             $schema->resultset('Accounting::InventoryItem')->create(\%row);
         };
         if ($@) {
@@ -3976,8 +4510,22 @@ sub seed_brew_ingredients :Path('/Inventory/seed_brew_ingredients') :Args(0) {
         return $c->res->redirect($c->uri_for('/Inventory'));
     }
 
+    # Check if the site has the brew addon enabled
     my $target_site = $c->req->query_parameters->{sitename} || $self->_sitename($c) || 'Brew';
     my $schema = $self->_schema($c);
+
+    my $brew_enabled = eval {
+        $schema->resultset('SiteModule')->search({
+            sitename   => $target_site,
+            module_name => 'brew',
+            enabled    => 1,
+        })->count;
+    };
+    unless ($brew_enabled) {
+        $c->flash->{error_msg} = "Brew addon not enabled for site '$target_site'.";
+        return $c->res->redirect($c->uri_for('/Inventory'));
+    }
+
     my $now    = $self->_now();
     my $by     = $c->session->{username} || 'system';
 

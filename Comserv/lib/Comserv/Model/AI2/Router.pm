@@ -290,6 +290,10 @@ sub _credits_exhausted {
     # not known) — fall through rather than surfacing a dead provider.
     return 1 if $error =~ /can'?t connect|connection (refused|reset|timed? ?out)|name or service not known|temporary failure in name resolution|\b500 can't connect|\btimed? ?out\b/i;
     return 1 if $error =~ /402\b|payment.?required|insufficient credit|out of credit|credit.?balance|can only afford|prepaid credit|usage limit|quota|weekly usage|limit_remaining|no auto-fill/i;
+    # x.AI returns 403 (not 402) for a spent SuperGrok subscription/quota —
+    # "personal-team-blocked:spending-limit". Router must read that as "this
+    # hop is down" and fall through, not dead-end (todo #2374).
+    return 1 if $error =~ /spending.?limit|personal-team-blocked|out of credits|add credits|upgrade at/i;
     return 1 if $self->_transient_outage($error);
     return 0;
 }
@@ -354,7 +358,7 @@ sub pick_free_fallback {
 }
 
 sub _chat_one {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
 
     my $dispatch = {
         ollama     => 'AI2::Provider::Ollama',
@@ -382,6 +386,9 @@ sub _chat_one {
             model    => $self->_bare_model($use_model),
             host     => $host,
             port     => $port,
+            # Threaded from Chat.pm: the web-search toggle was set by the
+            # widget but dropped here, so Grok's search_parameters never fired.
+            ($opts{use_search} ? (use_search => 1) : ()),
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_chat_one',
@@ -399,10 +406,10 @@ sub _chat_one {
 # Same hop, up to 3 tries, on 502/503/504 only. Sleep 1s then 2s.
 # Does not retry 401/400 (bad key / bad model).
 sub _chat_one_with_retry {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
     my $resp;
     for my $attempt (1 .. 3) {
-        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages);
+        $resp = $self->_chat_one($c, $provider_name, $use_model, $messages, %opts);
         return $resp if $resp && $resp->{success};
         my $err = ($resp && $resp->{error}) || '';
         last unless $self->_transient_outage($err);
@@ -419,7 +426,7 @@ sub _chat_one_with_retry {
 # API) fall back to free OpenRouter then Ollama. xAI grok auto-fills — do
 # not steal the turn away from grok on a credit error.
 sub chat_with_fallback {
-    my ($self, $c, $provider_name, $use_model, $messages) = @_;
+    my ($self, $c, $provider_name, $use_model, $messages, %opts) = @_;
 
     my $skip_paid = 0;
     my $pre_err;
@@ -437,15 +444,23 @@ sub chat_with_fallback {
 
     my $resp;
     unless ($skip_paid) {
-        $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages);
+        $resp = $self->_chat_one_with_retry($c, $provider_name, $use_model, $messages, %opts);
         if ($resp && $resp->{success}) {
             return $resp;
         }
     }
 
     my $err = $pre_err || ($resp && $resp->{error}) || 'AI provider error';
-    my $do_fallback = $self->_provider_needs_credit_fallback($provider_name)
-        && ($skip_paid || $self->_credits_exhausted($err));
+    # Credit-exhaustion on paid providers OR a dead Ollama hop (docker cannot
+    # reach host:11434 — CSC-20260831-1585) should fall through to a free
+    # OpenRouter model instead of leaving the UI on Thinking… forever.
+    my $do_fallback = (
+        $self->_provider_needs_credit_fallback($provider_name)
+            && ($skip_paid || $self->_credits_exhausted($err))
+    ) || (
+        ($provider_name // '') eq 'ollama'
+            && ($resp && $resp->{unreachable} || $self->_credits_exhausted($err))
+    );
 
     unless ($do_fallback) {
         $resp ||= { success => 0, error => $err, provider => $provider_name };
@@ -454,10 +469,12 @@ sub chat_with_fallback {
     }
 
     my ($free, $local) = $self->pick_free_fallback($c, $provider_name, $use_model);
+    # When Ollama itself is the failing hop, do not retry another Ollama tag.
+    $local = undef if ($provider_name // '') eq 'ollama';
     for my $hop ($free, $local) {
         next unless $hop;
         $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'chat_with_fallback',
-            "Paid $provider_name exhausted ($err); falling back to $hop->{provider} $hop->{model}");
+            "$provider_name failed ($err); falling back to $hop->{provider} $hop->{model}");
         my $retry = $self->_chat_one_with_retry($c, $hop->{provider}, $hop->{model}, $messages);
         if ($retry && $retry->{success}) {
             $retry->{provider}       = $hop->{provider};
@@ -645,6 +662,15 @@ sub _default_free_catalog {
         if ($has_key) {
             if ($listed && $listed->{success} && $listed->{models} && @{$listed->{models}}) {
                 for my $m (@{$listed->{models}}) {
+                    # price_known distinguishes "this costs $0" (a genuinely
+                    # free model) from "the provider published no price"
+                    # (x.AI /v1/models returns no pricing at all). Defaulting
+                    # the latter to 0 made every Grok model look free and
+                    # leaked the paid x.AI catalog to guest-tier users.
+                    my $known = exists $m->{price_known}
+                        ? ($m->{price_known} ? 1 : 0)
+                        : ( (defined $m->{price_prompt} || defined $m->{price_completion}
+                             || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0 );
                     push @all, {
                         name     => $m->{id},
                         provider => $svc,
@@ -652,8 +678,11 @@ sub _default_free_catalog {
                         local    => 0,
                         prepaid  => ($svc eq 'supergrok' || $m->{prepaid}) ? 1 : 0,
                         pricing          => $m->{pricing}        || {},
-                        price_prompt     => $m->{price_prompt}     // 0,
-                        price_completion => $m->{price_completion} // 0,
+                        # Keep undef when unknown — consumers must NOT read
+                        # undef as zero/free.
+                        price_prompt     => $m->{price_prompt},
+                        price_completion => $m->{price_completion},
+                        price_known      => $known,
                     };
                 }
                 next;
@@ -717,11 +746,24 @@ sub _role_filter_models {
         # Zero-priced external entries (e.g. stealth/ox-alpha, openrouter/auto)
         # cost nothing — treat them as free so the guest/member tiers keep them
         # (mirrors the JS cost logic in daily-plan-utils.js / model-select.js).
+        #
+        # CRITICAL: only trust a zero price when the price is actually KNOWN.
+        # x.AI's /v1/models returns no pricing field, so every Grok model used
+        # to arrive with price_prompt/price_completion == 0 and was classified
+        # "free" — labelling paid Grok models free and leaking the whole paid
+        # x.AI catalog to guest-tier users. price_known gates that inference.
         unless ($free) {
-            my $pp = ($m->{price_prompt}     // 0) + 0;
-            my $pc = ($m->{price_completion} // 0) + 0;
-            $free = 1 if !$m->{local} && $pp == 0 && $pc == 0 && !($m->{pricing} && %{$m->{pricing}}
-                          && (($m->{pricing}{prompt} // 1) + 0) > 0);
+            my $known = $m->{price_known};
+            $known = ( defined $m->{price_prompt} || defined $m->{price_completion}
+                       || ($m->{pricing} && %{$m->{pricing}}) ) ? 1 : 0
+                unless defined $known;
+            if ($known && !$m->{local}) {
+                my $pp = ($m->{price_prompt}     // 0) + 0;
+                my $pc = ($m->{price_completion} // 0) + 0;
+                my $pricing_prompt = ($m->{pricing} && %{$m->{pricing}})
+                    ? (($m->{pricing}{prompt} // 0) + 0) : 0;
+                $free = 1 if $pp == 0 && $pc == 0 && $pricing_prompt == 0;
+            }
         }
         my $local = $m->{local} || ( $svc eq 'ollama' ? 1 : 0 );
         if ($tier eq 'guest') {

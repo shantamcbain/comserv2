@@ -1165,7 +1165,7 @@ sub manage_config :Path('/Documentation/manage_config') :Args {
     my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
 
     # Available roles in the system
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
 
     # Get list of all categories
     my @categories = sort keys %{$config->{categories}};
@@ -1515,7 +1515,7 @@ sub edit_category_form :Path('/Documentation/edit_category') :Args(1) {
     }
 
     # Available roles
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
 
     # Load current categories from config
     my $config_file = _documentation_config_read_path($c);
@@ -1555,7 +1555,7 @@ sub add_category_form :Path('/Documentation/add_category') :Args(0) {
     }
 
     # Available roles
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
 
     # Load current categories from config
     my $config_file = _documentation_config_read_path($c);
@@ -1652,7 +1652,7 @@ sub edit_roles :Path('/Documentation/edit_roles') :Args(1) {
     my $page_metadata = $pages->{$page_name};
     
     # Available roles in the system
-    my @available_roles = qw(normal user editor admin developer);
+    my @available_roles = qw(normal user editor helpdesk admin developer);
     
     $c->stash(
         template => 'admin/documentation/edit_roles.tt',
@@ -1713,7 +1713,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         "Raw selected roles count: " . scalar(@selected_roles) . ", roles: " . join(', ', @selected_roles));
     
     # Validate roles
-    my @valid_roles = qw(normal user editor admin developer);
+    my @valid_roles = qw(normal user editor helpdesk admin developer);
     my @filtered_roles = grep { my $role = $_; grep { $_ eq $role } @valid_roles } @selected_roles;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_roles',

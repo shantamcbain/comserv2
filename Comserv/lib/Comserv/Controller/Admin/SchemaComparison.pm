@@ -323,41 +323,46 @@ sub _get_fresh_dbh {
 
     # DDL (CREATE/DROP/ALTER) must run as the admin DB user (comserv_admin), so it
     # can CREATE/DROP tables. Prefer the env-provided admin credentials; fall back
-    # to the highest-priority connection's own credentials if admin is not set.
+    # to the highest-priority connection's own credentials (which includes any
+    # dedicated *_admin connection already present in the RemoteDB secret set) if
+    # the admin class is unavailable. Comserv::Util::DatabaseCredentials may not
+    # exist in every worktree/environment, so guard the call and treat an empty
+    # result as "no admin override" rather than dying on a misleading message.
     my $admin_user = eval { Comserv::Util::DatabaseCredentials->admin_user };
     my $admin_pass = eval { Comserv::Util::DatabaseCredentials->admin_password };
-    my $want_admin = ($admin_user && $admin_pass);
+    $admin_user = '' unless defined $admin_user;
+    $admin_pass = '' unless defined $admin_pass;
+    my $want_admin = ($admin_user ne '' && $admin_pass ne '');
 
-    my $dbh;
-    for my $conn_name (@group_conns) {
-        my $user = $want_admin ? $admin_user : $all_conns->{$conn_name}{config}{username};
-        my $pass = $want_admin ? $admin_pass : $all_conns->{$conn_name}{config}{password};
-
-        # Temporarily override the connection's credentials so get_connection uses
-        # the admin user, then restore (get_connection reads from $self->config).
-        my $saved_cfg = $all_conns->{$conn_name}{config};
-        my $orig_user = $saved_cfg->{username};
-        my $orig_pass = $saved_cfg->{password};
-        $saved_cfg->{username} = $user;
-        $saved_cfg->{password} = $pass;
-        $remote_db->config($all_conns);
-
-        $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
-
-        # Restore original credentials immediately.
-        $saved_cfg->{username} = $orig_user;
-        $saved_cfg->{password} = $orig_pass;
-        $remote_db->config($all_conns);
-
-        if ($dbh) {
-            $c->stash->{schema_compare_ddl_user} = $user;
-            last;
-        }
-    }
+    # NOTE: we intentionally do NOT swap credentials on the RemoteDB config here.
+    # RemoteDB::get_connection() calls _load_config() internally, which reloads
+    # the connection config from disk and discards any override we set, so the
+    # old credential-swap never took effect — it only produced confusing errors.
+    #
+    # Several callers (e.g. get_ency_table_schema, used by "Add to Result") only
+    # need to READ schema metadata (DESCRIBE / information_schema / SHOW INDEX),
+    # not to run DDL. Requiring a working admin DDL connection for those made the
+    # action fail outright whenever the admin connection is unreachable, even
+    # though a perfectly good ordinary connection was available. So: prefer a
+    # real admin connection when one exists, otherwise use any connection that
+    # actually connects instead of dying.
+    my ($dbh, $used_conn) = $self->_pick_live_connection(
+        $remote_db, $all_conns, \@group_conns, $database
+    );
 
     unless ($dbh) {
-        die "Failed to connect to database '$database' for DDL via admin user '$admin_user': $@";
+        my $tried = join(', ', map {
+            sprintf('%s(%s)', $_, ($all_conns->{$_}{config}{username} // '?'))
+        } @group_conns);
+        die "Failed to connect to database '$database' for DDL. "
+          . "Admin override "
+          . ($want_admin ? "requested as '$admin_user'" : 'NOT configured (Comserv::Util::DatabaseCredentials unavailable/empty)')
+          . ". Tried connections (in priority order): $tried. "
+          . "Last DBI error: " . ($remote_db->last_connection_error // 'none recorded');
     }
+
+    $c->stash->{schema_compare_ddl_user} =
+        $all_conns->{$used_conn}{config}{username} // '';
 
     return $dbh;
 }
@@ -1463,12 +1468,27 @@ sub update_result_field_from_table {
         my $list_str = join("', '", @{$table_field_info->{enum_list}});
         $new_field_def .= "\n        extra => { list => ['$list_str'] },";
     }
-    # Size may be a scalar (e.g. 255) or an array ref (e.g. [10, 0]) from the parser.
+    # Size may be a scalar (e.g. 255), an array ref (e.g. [10, 0]), or — for
+    # DECIMAL/NUMERIC columns — the string "10,2" as returned by the DB parser
+    # from a "decimal(10,2)" Type. The string form used to fall through to the
+    # plain-scalar branch and emit "size => 10,2", which is a bare list: it
+    # parses (so perl -c passes) but silently sets size to 10 with a stray 2,
+    # losing the scale. Normalize the "p,q" form into an array ref.
     if (my $sz = $table_field_info->{size}) {
         if (ref($sz) eq 'ARRAY') {
             $new_field_def .= "\n        size => [" . join(', ', @$sz) . "],";
-        } else {
+        }
+        elsif (!ref($sz) && $sz =~ /^\s*(\d+)\s*,\s*(\d+)\s*$/) {
+            $new_field_def .= "\n        size => [$1, $2],";
+        }
+        elsif (!ref($sz) && $sz =~ /^\s*\d+\s*$/) {
             $new_field_def .= "\n        size => $sz,";
+        }
+        else {
+            # Unrecognized shape — quote it so it can never emit bare-list syntax.
+            my $safe = $sz;
+            $safe =~ s/'/\\'/g;
+            $new_field_def .= "\n        size => '$safe',";
         }
     }
     $new_field_def .= "\n        is_nullable => " . ($table_field_info->{is_nullable} ? 1 : 0) . ",";
@@ -1480,16 +1500,22 @@ sub update_result_field_from_table {
     }
     $new_field_def .= "\n    }";
 
-    # --- Safe, bracket-aware field replacement ---------------------------------
-    # The old approach used a non-greedy /ms regex across the entire add_columns
-    # block; on large multi-field tables it could match the wrong field or
-    # backtrack badly and corrupt the file (which then wedged the worker and
-    # surfaced to the user as a bare "NetworkError"). We now locate the exact
-    # "$field_name => { ... }" block by counting braces, rebuild ONLY that block,
-    # and leave every other field untouched.
+    # --- Safe, bracket-aware field replacement / insertion ---------------------
+    # Two cases:
+    #   * field already present  -> rebuild ONLY that block (see below).
+    #   * field NOT present      -> INSERT it into the add_columns block.
+    # The second case is the "Add to Result" flow; previously it fell through to
+    # the replace-only path, which returned undef for a missing field and died
+    # with "Could not locate field ... in result file" — nonsense for an ADD.
     my $new_content = $self->_replace_result_field_block($content, $field_name, $new_field_def);
+
     unless (defined $new_content) {
-        die "Could not locate field '$field_name' in result file '$result_file_path'";
+        $new_content = $self->_insert_result_field_block($content, $field_name, $new_field_def);
+    }
+
+    unless (defined $new_content) {
+        die "Could not update field '$field_name' in result file '$result_file_path': "
+          . "the add_columns(...) block could not be located";
     }
 
     $self->_write_result_file_safe($result_file_path, $new_content);
@@ -1542,6 +1568,57 @@ sub _replace_result_field_block {
     my $prefix  = substr($content, 0, $brace_pos);
     my $suffix  = substr($content, $block_end + 1);
     return $prefix . $new_field_def . $suffix;
+}
+
+# Insert a NEW field definition into the add_columns( ... ) block.
+# Used by the "Add to Result" flow when the field does not yet exist in the
+# Result file. Finds the add_columns block by brace/paren counting and appends
+# the new "field_name => { ... }," entry just before its closing paren,
+# preserving each existing field untouched.
+# Returns the new full file content, or undef if the block cannot be located.
+sub _insert_result_field_block {
+    my ($self, $content, $field_name, $new_field_def) = @_;
+
+    return undef unless $content =~ /__PACKAGE__->add_columns\s*\(/;
+
+    # Locate the opening paren of add_columns( ... )
+    my $open_pos;
+    if ($content =~ /__PACKAGE__->add_columns\s*\(/g) {
+        $open_pos = pos($content) - 1;   # position of '('
+    }
+    return undef unless defined $open_pos;
+
+    # Walk forward counting parens/braces to find the matching close paren.
+    my $depth  = 0;
+    my $i      = $open_pos;
+    my $len    = length($content);
+    my $close_pos;
+    while ($i < $len) {
+        my $ch = substr($content, $i, 1);
+        if    ($ch eq '(') { $depth++; }
+        elsif ($ch eq ')') {
+            $depth--;
+            if ($depth == 0) { $close_pos = $i; last; }
+        }
+        $i++;
+    }
+    return undef unless defined $close_pos;
+
+    my $block = substr($content, $open_pos + 1, $close_pos - $open_pos - 1);
+
+    # Ensure the previous entry ends with a comma so we don't glue entries together.
+    my $trimmed = $block;
+    $trimmed =~ s/\s+$//;
+    my $needs_comma = ($trimmed ne '' && $trimmed !~ /,\s*$/) ? 1 : 0;
+
+    my $insertion = ($needs_comma ? ",\n" : "\n")
+                  . "    $field_name => " . $new_field_def;
+
+    my $new_block = $block . $insertion;
+
+    return substr($content, 0, $open_pos + 1)
+         . $new_block
+         . substr($content, $close_pos);
 }
 
 sub update_table_field_from_result {
@@ -2736,6 +2813,42 @@ sub _match_group_connections {
     return @matches;
 }
 
+# Pick a live connection for a database within a group.
+#
+# The group's connections are NOT all reachable: a group can contain dead rows
+# (placeholder credentials, offline hosts, wrong-port fallbacks). Previously a
+# caller did a single `grep` and used whichever connection happened to be first
+# in hash order, so the schema-compare display nondeterministically bound itself
+# to a dead connection: get_connection() returned undef, the DB column list came
+# back empty, and the page silently rendered with the table side missing (only
+# Result rows shown). That made the page appear to "break" on reload even though
+# nothing had changed.
+#
+# Fix: walk the matching connections in priority order and return a handle from
+# the first one that actually connects, together with its name.
+# Returns ($dbh, $conn_name); both undef if nothing connects.
+sub _pick_live_connection {
+    my ($self, $remote_db, $all_conns, $conn_names, $db_name) = @_;
+
+    my @candidates = grep {
+        my $cfg = $all_conns->{$_}{config};
+        (lc($cfg->{database} // $_) eq lc($db_name))
+    } @$conn_names;
+
+    # Deterministic order: lowest priority number first, then name.
+    @candidates = sort {
+        ($all_conns->{$a}{priority} // 999) <=> ($all_conns->{$b}{priority} // 999)
+        || $a cmp $b
+    } @candidates;
+
+    for my $conn_name (@candidates) {
+        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+        next unless $dbh;
+        return ($dbh, $conn_name);
+    }
+    return (undef, undef);
+}
+
 sub schema_compare_server :Path('/admin/schema_compare/server') :Args(1) {
     my ($self, $c, $group_key) = @_;
 
@@ -2798,18 +2911,19 @@ sub schema_compare_database :Path('/admin/schema_compare/server') :Args(3) {
 
     # Find a connection that matches this group key + database
     my @group_conns = $self->_match_group_connections($all_conns, $group_key);
-    my ($conn_name) = grep {
-        my $cfg = $all_conns->{$_}{config};
-        (($cfg->{database} // $_) eq $db_name)
-    } @group_conns;
 
-    # Get live tables from the database
+    # Get live tables from the database.
+    # Use a LIVE connection (priority order + fallback) — a single first-match
+    # grep can bind to a dead connection in the group and silently report the
+    # database as empty.
     my %db_tables;  # name => { row_count, size_kb, size }
     my $is_pg = 0;
-    if ($conn_name) {
+    my ($dbh, $conn_name) = $self->_pick_live_connection(
+        $remote_db, $all_conns, \@group_conns, $db_name
+    );
+    if ($dbh) {
         my $cfg = $all_conns->{$conn_name}{config} // {};
         $is_pg = $self->_is_postgresql($cfg);
-        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
         if ($dbh) {
             # Verify which database we are actually connected to.
             # MySQL: DATABASE(); PostgreSQL: current_database() — never SELECT DATABASE() on Pg (#2322).
@@ -2982,19 +3096,20 @@ sub schema_compare_table :Path('/admin/schema_compare/server') :Args(5) {
     my $all_conns = $remote_db->get_all_connections();
 
     my @group_conns = $self->_match_group_connections($all_conns, $group_key);
-    my ($conn_name) = grep {
-        my $cfg = $all_conns->{$_}{config};
-        ($cfg->{database} // $_) eq $db_name
-    } @group_conns;
 
     # --- Get DB column definitions ---
+    # Pick a LIVE connection (priority order + fallback). A single first-match
+    # grep used to bind to a dead connection in the group, leaving %db_columns
+    # empty so the page rendered with the table side missing.
     my %db_columns;  # lc(name) => { name, data_type, size, is_nullable, default_value, extra, comment }
     my $is_pg = 0;
-    if ($conn_name) {
-        my $cfg = $all_conns->{$conn_name}{config} // {};
-        $is_pg = $self->_is_postgresql($cfg);
-        my $dbh = eval { $remote_db->get_connection(undef, $conn_name) };
+    {
+        my ($dbh, $live_conn) = $self->_pick_live_connection(
+            $remote_db, $all_conns, \@group_conns, $db_name
+        );
         if ($dbh) {
+            my $cfg = $all_conns->{$live_conn}{config} // {};
+            $is_pg = $self->_is_postgresql($cfg);
             %db_columns = $self->_dbh_list_columns($dbh, $table_name, $is_pg);
             $dbh->disconnect;
         }

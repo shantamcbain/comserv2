@@ -163,6 +163,12 @@
                title="Download [% model.file_type | upper | html %] file to open in your slicer">
                 ⬇ Download [% model.file_type | upper | html %] File
             </a>
+            <form method="post" action="/3d/model_upload/[% model.id %]" enctype="multipart/form-data" style="display:inline;margin-left:0.4em;">
+                <label for="mdl_up_[% model.id %]"
+                   style="display:inline-block;padding:0.45em 1.1em;background:var(--secondary-color, #eee);color:var(--link-color,#007bff);border:1px solid var(--border-color);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;cursor:pointer;"
+                   title="Upload replacement STL — modify the downloaded file in your slicer and re-upload here">⬆ Replace STL</label>
+                <input type="file" name="stl_file" id="mdl_up_[% model.id %]" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp" style="display:none" onchange="this.form.submit()">
+            </form>
             [% IF model.source == 'sign_generator' %]
             <a href="/signgenerator/download/[% model.id %]/3mf"
                style="display:inline-block;padding:0.45em 1.1em;background:#1a5fb4;color:#fff;border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;margin-left:0.4em;"
@@ -241,6 +247,11 @@
                 <div class="form-group">
                     <label>How many units</label>
                     <input type="number" name="quantity" value="1" min="1" max="20">
+                </div>
+                <div class="form-group">
+                    <label>Filament (grams)</label>
+                    <input type="number" name="filament_quantity" value="1" min="0.5" step="0.5"
+                           style="width:100%;padding:0.5em 0.7em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);">
                 </div>
             </div>
             [% IF two_colour %]

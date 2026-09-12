@@ -130,10 +130,32 @@ sub display_name {
     return $self->accno . ' — ' . $self->description;
 }
 
+# NOTE: this method sums EVERY GL line posted to the account regardless of
+# which site owns the entry — with all sites sharing one coa_accounts table
+# that mixes every site's activity into a single number. It takes no sitename
+# argument, so it cannot be scoped, and callers cannot safely use it.
+#
+# Use Comserv::Util::Accounting::CoaScope::balances_for($schema, $sitename,
+# \@ids) instead: that joins GlEntry and filters by GlEntry.sitename, which is
+# what the COA list and Trial Balance use.
+#
+# Kept (deprecated) only because removing it risks breaking unknown callers;
+# it now warns so any misuse shows up in the log.
 sub balance {
     my $self = shift;
-    my $total = $self->gl_lines->get_column('amount')->sum || 0;
-    return $total;
+    warn "CoaAccount->balance() is site-unsafe (sums all sites); "
+       . "use Comserv::Util::Accounting::CoaScope::balances_for() instead";
+
+    # Best effort: if a sitename is supplied, scope the sum. This keeps the
+    # method from returning silently cross-site data when a caller already
+    # knows the site.
+    my ($sitename) = @_;
+    my $lines = $self->gl_lines;
+    if (defined $sitename && length $sitename) {
+        $lines = $lines->search({ 'gl_entry.sitename' => $sitename },
+                                { join => 'gl_entry' });
+    }
+    return $lines->get_column('amount')->sum || 0;
 }
 
 1;

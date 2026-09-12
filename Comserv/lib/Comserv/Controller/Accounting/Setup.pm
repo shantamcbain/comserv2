@@ -123,7 +123,7 @@ sub _status {
         }
     }
 
-    eval { $st{coa_count} = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0 })->count };
+    eval { $st{coa_count} = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0, sitename => $sitename })->count };
     eval { $st{gl_count}  = $schema->resultset('Accounting::GlEntry')->search({ sitename => $sitename })->count };
 
     # PG chart count (clone-target). Maria coa_count stays the live /Accounting/coa number.

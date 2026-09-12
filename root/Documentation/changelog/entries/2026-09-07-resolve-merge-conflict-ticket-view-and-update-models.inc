@@ -1,0 +1,6 @@
+<div id="2026-09-07-resolve-merge-conflict-ticket-view-and-update-models" class="cl-entry">
+<h3>2026-09-07 — Resolve merge conflict in ticket_view.tt and update Hermes model configuration</h3>
+<p class="doc-body"><strong>What.</strong> Resolved a merge conflict in the HelpDesk ticket view template between the aisystem branch and main. The conflict was in the staff actions section where the aisystem branch had additional features (ticket assignment, priority editing, todo creation, escalation) and the main branch had a simpler structure. Resolved by keeping the more complete aisystem version which includes all staff functionality. Also updated Hermes model configuration to set a free model alias for git functions and verified the fallback chain for when Grok budget is exhausted.</p>
+<p class="doc-body"><strong>Why.</strong> The merge conflict needed resolution to continue work on the aisystem branch. The model configuration updates ensure that when Grok credits are exhausted, the system automatically falls back to free/cheap models, and that git-specific tasks use a capable free model for better diff evaluation.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/root/CSC/HelpDesk/ticket_view.tt</code> (resolved conflict), <code>/home/shanta/.hermes/config.yaml</code> (updated model aliases and provider settings)</p>
+</div>

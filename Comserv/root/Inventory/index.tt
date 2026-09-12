@@ -36,7 +36,8 @@
       <ul style="list-style:none;padding:0;margin:0;">
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/items">Browse Items</a></li>
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/item/add">+ Add Item</a></li>
-        <li style="padding:0.35rem 0;"><a href="/Inventory/bom/list">Bill of Materials</a></li>
+        <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/bom/list">Bill of Materials</a></li>
+        <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/seed_filaments?sitename=[% sitename | uri %]">&#128230; Seed Filaments</a></li>
       </ul>
     </div>
 
