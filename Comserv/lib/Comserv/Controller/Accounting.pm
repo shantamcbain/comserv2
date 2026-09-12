@@ -140,10 +140,16 @@ sub index :Path('/Accounting') :Args(0) {
         )->count;
     };
     eval {
+        # Never count as low/orderable: cost centres (overhead/cost), printed parts
+        # (3d_printed — made in-house, not purchased), and capital equipment/printers.
+        my %skip_origin = map { $_ => 1 } qw(overhead cost 3d_printed);
+        my %skip_cat    = map { $_ => 1 } qw(Equipment 3d_printer);
         my @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' }
         )->all;
         for my $item (@items) {
+            next if $skip_origin{ lc($item->item_origin || '') };
+            next if $skip_cat{ $item->category || '' };
             my $reorder = $item->reorder_point || 0;
             my $stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 { item_id => $item->id }
