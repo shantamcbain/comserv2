@@ -516,7 +516,9 @@
                     automatic.value = '';
                     automatic.textContent = 'Use automatic model selection';
                     aiModelSelect.insertBefore(automatic, aiModelSelect.firstChild);
-                    aiModelSelect.value = '';
+                    // Default to north-mini-code (cheap/free coding model) for commit message drafting
+                    // instead of letting automatic selection potentially pick Grok/SuperGrok.
+                    aiModelSelect.value = 'openrouter|cohere/north-mini-code:free';
                 },
                 onError: function () {
                     aiModelSelect.innerHTML = '<option value="">Automatic model selection</option>';
