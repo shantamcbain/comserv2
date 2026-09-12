@@ -1,7 +1,7 @@
 # Documentation Maintenance Plan — Comserv2
 
 Owned by: the Documentation expert (`.hermes.md` role).
-Status: active. Last refreshed: 2026-08-25 (branch `Documentation`).
+Status: active. Last refreshed: 2026-09-11 (InventoryAccounting worktree + cross-branch dev server fix).
 
 Purpose: keep every documentation surface accurate, consistent, and in sync with the
 code — and to give a repeatable process so the docs don't drift again.
@@ -94,6 +94,14 @@ reader" discipline.
    is stale.
 4. **Before claiming done:** re-run the audits in §2 (controller mismatch scan, stray
    `.md` grep, stale-path grep) and confirm no new drift.
+
+### Recent session examples (follow the rules)
+- 2026-09-11: Reactive dev server fix (comserv_server.pl -r "Too many open files" / Linux::Inotify2 exhaustion from multi-worktree -r processes + full-root watching). 
+  - Added changelog fragment (per §3 rule).
+  - Restricted restart watcher to `lib/` only (consistent with Twiggy path).
+  - Created .hermes/plans/ summary for new-session context + updated this plan.
+  - No server ops performed. User-side: ulimit + sysctl + stale process cleanup.
+  - See .hermes/plans/2026-09-11-dev-server-inotify-restart-fix.md and the .inc fragment.
 
 ---
 

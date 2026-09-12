@@ -1,0 +1,7 @@
+<div id="2026-09-11-inventory-po-from-stock" class="cl-entry">
+<h3>2026-09-11 — Stock sheet to Supplier PO flow (Accounting/Inventory)</h3>
+<p class="doc-body"><strong>What.</strong> Added clean UI path: low-stock items (from stock_levels vs reorder_point) grouped by preferred supplier → form to select qty + send method (online/email/mail/phone) → create draft PO (reusing existing InventoryPurchaseOrder/Line) → list + view + mark-sent. Links added from items list, stock levels, dashboards, nav.</p>
+<p class="doc-body"><strong>Why.</strong> No previous way to go from stock sheet / low stock to PO for ordering from suppliers. Parts (API/util/Result) existed for BOM needs only; accounting staff now have grouped actionable list.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Util/Inventory/Purchasing.pm</code> (new stock_reorder_list), <code>Controller/Inventory.pm</code> (purchase, po_* actions), <code>root/Inventory/purchase/needs.tt</code>, <code>root/Inventory/po/list.tt</code>, <code>root/Inventory/po/view.tt</code>, nav + stock/items/index templates, <code>_acct_inv_nav.tt</code>, changelog.</p>
+<p class="doc-body"><strong>Notes.</strong> Uses DBIC (portable to Postgres). Send method logged in notes (no new columns yet). Run schema-compare if PO tables missing on a site. Follows existing patterns, log_with_details, var(--*) theming.</p>
+</div>
