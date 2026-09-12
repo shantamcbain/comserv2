@@ -1447,6 +1447,169 @@ sub api_hardware_metrics :Path('hardware_metrics') :Args(0) {
 }
 
 
+=head2 api_ai_usage
+
+GET /api/ai_usage - Read-only query of ai_usage_logs for agents/monitoring
+
+Same localhost / 192.168.1.0/24 LAN bypass as GET /api/system_logs and
+GET /api/hardware_metrics (no Bearer required from trusted LAN; remote callers
+need a valid API token).
+
+Optional query params:
+  days - lookback window in days (default 7, min 1, max 365)
+
+Returns newest-first rows (capped at 200) plus a summary of calls/tokens/cost
+and error counts by provider and model for the full window.
+
+Column mapping (response field <- DB column):
+  created_at    <- created_at
+  provider      <- provider
+  model         <- model
+  status        <- status
+  error_message <- error_message
+  tokens        <- total_tokens
+  cost          <- estimated_cost_usd
+  duration_ms   <- duration_ms
+  (also included: prompt_tokens, completion_tokens, request_type, site_id)
+
+Returns: { success, days, count, summary, rows }
+
+=cut
+
+sub api_ai_usage :Path('ai_usage') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address // '';
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Authentication required' }));
+            $c->detach();
+        }
+    }
+
+    my $days = $c->req->param('days') // 7;
+    $days = int($days) if defined $days && $days =~ /^-?\d+$/;
+    $days = 7   if !defined $days || $days < 1;
+    $days = 365 if $days > 365;
+
+    my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
+
+    my $schema = $c->model('DBEncy');
+    my @row_list;
+    my %by_provider;
+    my %by_model;
+    my %by_status;
+    my $total_calls  = 0;
+    my $total_tokens = 0;
+    my $total_cost   = 0;
+    my $error_count  = 0;
+
+    eval {
+        my $rs = $schema->resultset('AiUsageLog')->search(
+            { created_at => { '>=' => $since } },
+            { order_by => { -desc => 'created_at' } }
+        );
+
+        while (my $r = $rs->next) {
+            my $prov   = $r->provider // 'unknown';
+            my $mod    = $r->model // 'unknown';
+            my $status = $r->status // 'unknown';
+            my $tok    = $r->total_tokens // 0;
+            my $cost   = $r->estimated_cost_usd // 0;
+            my $is_err = ($status ne 'success') ? 1 : 0;
+
+            $total_calls++;
+            $total_tokens += $tok;
+            $total_cost   += $cost;
+            $error_count  += $is_err;
+            $by_status{$status}++;
+
+            $by_provider{$prov}{calls}  = ($by_provider{$prov}{calls}  // 0) + 1;
+            $by_provider{$prov}{tokens} = ($by_provider{$prov}{tokens} // 0) + $tok;
+            $by_provider{$prov}{cost}   = ($by_provider{$prov}{cost}   // 0) + $cost;
+            $by_provider{$prov}{errors} = ($by_provider{$prov}{errors} // 0) + $is_err;
+
+            my $mk = "$prov|$mod";
+            $by_model{$mk}{provider} = $prov;
+            $by_model{$mk}{model}    = $mod;
+            $by_model{$mk}{calls}    = ($by_model{$mk}{calls}  // 0) + 1;
+            $by_model{$mk}{tokens}   = ($by_model{$mk}{tokens} // 0) + $tok;
+            $by_model{$mk}{cost}     = ($by_model{$mk}{cost}   // 0) + $cost;
+            $by_model{$mk}{errors}   = ($by_model{$mk}{errors} // 0) + $is_err;
+
+            if (@row_list < 200) {
+                my $created = $r->created_at;
+                if (defined $created && ref($created) && $created->can('iso8601')) {
+                    $created = $created->iso8601();
+                } elsif (defined $created) {
+                    $created = "$created";
+                }
+                push @row_list, {
+                    created_at         => $created,
+                    provider           => $prov,
+                    model              => $mod,
+                    status             => $status,
+                    error_message      => $r->error_message,
+                    tokens             => 0 + $tok,
+                    prompt_tokens      => 0 + ($r->prompt_tokens // 0),
+                    completion_tokens  => 0 + ($r->completion_tokens // 0),
+                    cost               => 0 + $cost,
+                    duration_ms        => (defined $r->duration_ms ? 0 + $r->duration_ms : undef),
+                    request_type       => $r->request_type,
+                    site_id            => $r->site_id,
+                };
+            }
+        }
+    };
+    if ($@) {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Database error: $@" }));
+        $c->detach();
+    }
+
+    # Round costs for JSON friendliness
+    for my $p (values %by_provider) {
+        $p->{cost} = 0 + sprintf('%.6f', $p->{cost} // 0);
+    }
+    for my $m (values %by_model) {
+        $m->{cost} = 0 + sprintf('%.6f', $m->{cost} // 0);
+    }
+
+    my $summary = {
+        days          => $days,
+        since         => $since,
+        total_calls   => $total_calls,
+        total_tokens  => $total_tokens,
+        total_cost    => 0 + sprintf('%.6f', $total_cost),
+        error_count   => $error_count,
+        by_status     => \%by_status,
+        by_provider   => \%by_provider,
+        by_model      => \%by_model,
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_ai_usage',
+        "ai_usage queried via API: days=$days rows=" . scalar(@row_list)
+        . " total_calls=$total_calls (Local: $is_local)");
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        days    => $days,
+        count   => scalar(@row_list),
+        summary => $summary,
+        rows    => \@row_list,
+    }));
+    $c->detach();
+}
+
+
 =head2 _api_authenticate
 
 Shared auth gate for the data endpoints. Requests originating from localhost or the
