@@ -1846,6 +1846,226 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
 }
 
 # -------------------------------------------------------------------------
+# Supplier Purchase Orders (stock -> PO flow)
+# -------------------------------------------------------------------------
+# Clean path from stock sheet / low stock to grouped supplier PO creation.
+# Uses Util::Inventory::Purchasing for logic (easy to share with API/BOM).
+# Send methods (online/email/mail/phone) recorded in notes for now (no new cols).
+# Tables: InventoryPurchaseOrder + Line (apply via schema-compare if missing).
+# Designed with DBIC so portable to Postgres later.
+
+sub purchase :Path('/Inventory/purchase') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'purchase', 'Showing items needing order by supplier');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $util = Comserv::Util::Inventory::Purchasing->new;
+    my $res  = $util->stock_reorder_list($c, { sitename => $sitename });
+
+    if (!$res->{ok}) {
+        push @{$c->stash->{debug_errors}}, $res->{error} || 'Error loading reorder list';
+        $res = { by_supplier => [], unassigned => [], total_low => 0 };
+    }
+
+    # Also load all active suppliers for unassigned items or manual
+    my @all_suppliers;
+    eval {
+        @all_suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
+            { sitename => $sitename, status => 'active' },
+            { order_by => 'name' }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading suppliers: $@" if $@;
+
+    $c->stash(
+        by_supplier   => $res->{by_supplier} || [],
+        unassigned    => $res->{unassigned} || [],
+        total_low     => $res->{total_low} || 0,
+        all_suppliers => \@all_suppliers,
+        sitename      => $sitename,
+        template      => 'Inventory/purchase/needs.tt',
+    );
+}
+
+sub po_create :Path('/Inventory/po/create') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->flash->{error_msg} = 'POST required to create PO';
+        $c->res->redirect($c->uri_for('/Inventory/purchase'));
+        return;
+    }
+
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+
+    my $supplier_id = $params->{supplier_id};
+    unless ($supplier_id) {
+        $c->flash->{error_msg} = 'Supplier required';
+        $c->res->redirect($c->uri_for('/Inventory/purchase'));
+        return;
+    }
+
+    # Collect lines from form (from purchase/needs.tt): checkboxes name="include" value=item_id, qty per-item as qty_<id>
+    my @lines;
+    my $includes = $params->{include};
+    if (!ref($includes) && $includes) { $includes = [$includes]; }
+    if (ref($includes) eq 'ARRAY' && @$includes) {
+        for my $iid (@$includes) {
+            next unless $iid;
+            my $qty_key = 'qty_' . $iid;
+            my $qty = $params->{$qty_key} || 1;
+            my $line = {
+                item_id   => $iid,
+                quantity  => $qty,
+            };
+            # Capture optional from form hiddens (populated from stock list)
+            if (my $sku = $params->{"supplier_sku_$iid"}) { $line->{supplier_sku} = $sku; }
+            if (my $cost = $params->{"unit_cost_$iid"}) { $line->{unit_cost} = $cost; }
+            push @lines, $line;
+        }
+    } elsif ($params->{item_id}) {
+        # fallback for simple forms
+        my $qty = $params->{quantity} || 1;
+        push @lines, { item_id => $params->{item_id}, quantity => $qty };
+    }
+
+    unless (@lines) {
+        $c->flash->{error_msg} = 'No items selected for PO (check the include boxes)';
+        $c->res->redirect($c->uri_for('/Inventory/purchase'));
+        return;
+    }
+
+    # Build notes with send method if provided
+    my $send_via = $params->{send_via} || $params->{order_method} || '';
+    my $notes = $params->{notes} || '';
+    if ($send_via) {
+        $notes = "Ordered via: $send_via. " . $notes;
+    }
+    $notes .= " Created from stock reorder list." if !$notes;
+
+    my $p = {
+        sitename    => $sitename,
+        supplier_id => $supplier_id,
+        lines       => \@lines,
+        notes       => $notes,
+        origin      => 'internal',
+        # source_parent_item_id if from bom, but here stock
+    };
+
+    my $util = Comserv::Util::Inventory::Purchasing->new;
+    my $res  = $util->create_po($c, $p);
+
+    if (!$res->{ok}) {
+        $c->flash->{error_msg} = $res->{error} || 'PO creation failed';
+        if ($res->{need_schema_compare}) {
+            $c->flash->{error_msg} .= ' (run schema-compare to add tables)';
+        }
+        $c->res->redirect($c->uri_for('/Inventory/purchase'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'po_create',
+        "PO created via web: $res->{po_number} for supplier $supplier_id, send_via=$send_via");
+
+    $c->flash->{success_msg} = "Purchase Order $res->{po_number} created (status: $res->{status}).";
+    $c->res->redirect($c->uri_for('/Inventory/po'));
+}
+
+sub po_list :Path('/Inventory/po') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'po_list', 'Listing purchase orders');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my @pos;
+    eval {
+        @pos = $schema->resultset('Accounting::InventoryPurchaseOrder')->search(
+            { sitename => $sitename },
+            {
+                prefetch => ['supplier', 'lines'],
+                order_by => { -desc => 'order_date' },
+            }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading POs: $@" if $@;
+
+    $c->stash(
+        pos      => \@pos,
+        sitename => $sitename,
+        template => 'Inventory/po/list.tt',
+    );
+}
+
+sub po_view :Path('/Inventory/po/view') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $po;
+    eval {
+        $po = $schema->resultset('Accounting::InventoryPurchaseOrder')->find(
+            { id => $id, sitename => $sitename },
+            { prefetch => ['supplier', { lines => 'item' }] }
+        );
+    };
+    unless ($po) {
+        $c->flash->{error_msg} = 'PO not found';
+        $c->res->redirect($c->uri_for('/Inventory/po'));
+        return;
+    }
+
+    $c->stash(
+        po       => $po,
+        sitename => $sitename,
+        template => 'Inventory/po/view.tt',
+    );
+}
+
+sub po_mark_sent :Path('/Inventory/po/mark_sent') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless (uc($c->req->method || '') eq 'POST') {
+        $c->res->redirect($c->uri_for('/Inventory/po/view', [$id]));
+        return;
+    }
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $send_via = $c->req->body_parameters->{send_via} || 'email';  # default
+
+    my $po = $schema->resultset('Accounting::InventoryPurchaseOrder')->find({ id => $id, sitename => $sitename });
+    unless ($po) {
+        $c->flash->{error_msg} = 'PO not found';
+        $c->res->redirect($c->uri_for('/Inventory/po'));
+        return;
+    }
+
+    my $now = $self->_now();
+    my $notes = $po->notes || '';
+    $notes .= "\n[" . substr($now,0,10) . "] Marked sent via $send_via by " . ($c->session->{username} || 'user');
+    $po->update({
+        status     => 'sent',
+        notes      => $notes,
+        updated_at => $now,
+    });
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'po_mark_sent',
+        "PO $id marked sent via $send_via");
+
+    $c->flash->{success_msg} = "PO marked as sent via $send_via.";
+    $c->res->redirect($c->uri_for('/Inventory/po/view', [$id]));
+}
+
+# -------------------------------------------------------------------------
 # Marketplace integration
 # -------------------------------------------------------------------------
 

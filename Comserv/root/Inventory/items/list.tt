@@ -9,6 +9,8 @@
 <div class="actions">
   <a href="/Inventory/item/add">Add Item</a>
   &nbsp;|&nbsp;
+  <a href="/Inventory/purchase" style="background:var(--primary-color,#3b82f6);color:white;padding:2px 6px;border-radius:3px;text-decoration:none;">&#x1F4E6; Order Needed (by Supplier)</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory/stock/levels">Stock Levels</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/adjust">Adjust Stock</a>

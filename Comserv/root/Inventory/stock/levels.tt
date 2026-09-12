@@ -10,6 +10,8 @@
 <div class="actions">
   <a href="/Inventory/stock/receive" style="background: var(--success-color, #28a745);color:white;padding:4px 12px;border-radius:4px;text-decoration:none;">&#x2B07; Receive Stock</a>
   &nbsp;|&nbsp;
+  <a href="/Inventory/purchase" style="background: var(--primary-color, #3b82f6);color:white;padding:4px 12px;border-radius:4px;text-decoration:none;">&#x1F4E6; Order from Suppliers (low stock)</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory/stock/adjust">Adjust Stock</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/transactions">Transaction Log</a>

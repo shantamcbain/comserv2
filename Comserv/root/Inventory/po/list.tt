@@ -1,0 +1,60 @@
+[% PageVersion = 'Inventory/po/list.tt,v 0.01 2026/09/11 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Purchase Orders</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg | html %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg | html %]</p>[% END %]
+
+<div class="actions" style="margin-bottom:1rem;">
+  <a href="/Inventory/purchase">+ Create from Stock Needs</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/suppliers">Suppliers</a>
+</div>
+
+[% IF pos.size == 0 %]
+  <p>No purchase orders yet. <a href="/Inventory/purchase">Start from low stock items</a>.</p>
+[% ELSE %]
+<table border="1" cellpadding="4" cellspacing="0" style="width:100%;">
+  <thead>
+    <tr>
+      <th>PO #</th>
+      <th>Supplier</th>
+      <th>Date</th>
+      <th>Status</th>
+      <th>Lines</th>
+      <th>Notes</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH po IN pos %]
+    [% line_count = po.lines.count || 0 %]
+    <tr>
+      <td><strong>[% po.po_number || 'PO-' _ po.id %]</strong></td>
+      <td>[% po.supplier ? po.supplier.name : '—' | html %]</td>
+      <td>[% po.order_date || po.created_at ? po.created_at.substr(0,10) : '—' %]</td>
+      <td>
+        [% IF po.status == 'draft' %]<span style="color:#ca8a04;">draft</span>
+        [% ELSIF po.status == 'sent' %]<span style="color:#059669;">sent</span>
+        [% ELSE %][% po.status %][% END %]
+      </td>
+      <td>[% line_count %]</td>
+      <td style="max-width:20em; font-size:0.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">[% po.notes | html | truncate(60) %]</td>
+      <td>
+        <a href="/Inventory/po/view/[% po.id %]">View</a>
+        [% IF po.status == 'draft' %]
+          | <a href="/Inventory/po/view/[% po.id %]">Mark Sent</a>
+        [% END %]
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+
+<p style="font-size:0.8rem;color:#666;margin-top:1rem;">
+  POs are created draft from stock needs or API. Use "mark sent" after ordering (records method in notes).
+</p>
