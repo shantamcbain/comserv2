@@ -1,0 +1,6 @@
+<div id="2026-09-12-api-ai-usage-and-diagnostics-bypass" class="cl-entry">
+<h3>2026-09-12 — Add /api/ai_usage JSON + localhost diagnostics bypass (NONE-20260912-7546)</h3>
+<p class="doc-body"><strong>What.</strong> Added <code>GET /api/ai_usage?days=N</code> (default 7, max 365) reading historical rows from the <code>ai_usage_logs</code> table via <code>AiUsageLog</code>, returning a provider/model/status summary (calls, tokens, cost, errors) plus up to 200 newest rows. Extended localhost / 192.168.1.0/24 LAN bypass (same pattern as <code>/api/system_logs</code> and <code>/api/hardware_metrics</code>) to <code>GET /ai2/diagnostics</code> and <code>GET /ai/grok_balance</code> so agents can call them without an admin session; remote access still requires login.</p>
+<p class="doc-body"><strong>Why.</strong> Monitoring and AI agents on the workstation need usage rollups and diagnostic/balance probes without Bearer tokens or browser admin login, without weakening remote auth.</p>
+<p class="doc-body"><strong>Files.</strong> <code>Comserv/lib/Comserv/Controller/Api.pm</code>, <code>Comserv/lib/Comserv/Controller/AI2.pm</code>, <code>Comserv/lib/Comserv/Controller/AI.pm</code>, <code>Comserv/root/Documentation/changelog/entries/2026-09-12-api-ai-usage-and-diagnostics-bypass.inc</code></p>
+</div>
