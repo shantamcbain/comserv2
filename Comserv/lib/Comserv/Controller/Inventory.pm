@@ -97,7 +97,7 @@ sub index :Path('/Inventory') :Args(0) {
             for my $sl ($item->stock_levels->all) {
                 $total_qty += $sl->quantity_on_hand;
             }
-            $low_stock++ if defined $item->reorder_point && $total_qty <= $item->reorder_point;
+            $low_stock++ if defined $item->reorder_point && $item->reorder_point > 0 && $total_qty <= $item->reorder_point;
         }
     };
     if ($@) {
