@@ -184,24 +184,6 @@ function addLine() {
   tbody.appendChild(tr);
 }
 
-function addLineWithValues(itemId, desc, qty, notes) {
-  var idx = addLine();
-  setTimeout(function() {
-    var sel = document.getElementById('item_sel_' + idx);
-    if (sel && itemId) {
-      sel.value = itemId;
-      itemChanged(idx);
-    }
-    var descEl = document.getElementById('description_' + idx);
-    if (descEl && desc) descEl.value = desc;
-    var qtyEl = document.getElementById('qty_' + idx);
-    if (qtyEl && qty) qtyEl.value = qty;
-    var notesEl = document.querySelector('input[name="notes_line_' + idx + '"]');
-    if (notesEl && notes) notesEl.value = notes;
-    updateLine(idx);
-  }, 10);
-}
-
 if (initialLines && initialLines.length > 0) {
   initialLines.forEach(function(l) {
     addLineWithValues(l.item_id, l.description, l.quantity, l.notes);

@@ -18,6 +18,17 @@
   <p style="color: var(--danger-color, #b00020);">Could not load some orders: [% load_error | html %]</p>
   [% END %]
 
+  [% IF c.flash.success_msg %]
+  <div style="background: #d4edda; color: #155724; padding: 0.5rem 1rem; margin-bottom: 1rem; border: 1px solid #c3e6cb; border-radius: 4px;">
+    [% c.flash.success_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background: #f8d7da; color: #721c24; padding: 0.5rem 1rem; margin-bottom: 1rem; border: 1px solid #f5c6cb; border-radius: 4px;">
+    [% c.flash.error_msg | html %]
+  </div>
+  [% END %]
+
   [% IF customers && customers.size %]
   <h2 style="color: var(--text-color, #222);">Customers</h2>
   <table class="table" style="width: 100%; border-collapse: collapse; color: var(--text-color, #222);">
@@ -77,6 +88,11 @@
         <td style="padding: 0.6rem; white-space: nowrap;">
           <a class="btn btn-primary" href="[% o.link %]" style="margin-right: 0.4rem;">Open Traveler</a>
           <a class="btn btn-secondary" href="[% o.print_link %]">Print Form</a>
+          [% UNLESS o.status.match('cancel|void') %]
+          <form method="post" action="[% c.uri_for('/Accounting/manufacturing/cancel', o.order_id) %]" style="display:inline;">
+            <button type="submit" class="btn btn-danger" style="padding:2px 6px;" onclick="return confirm('Cancel this order and release its jobs/reservations globally?');">Cancel</button>
+          </form>
+          [% END %]
         </td>
       </tr>
       [% END %]
